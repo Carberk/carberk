@@ -9,7 +9,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, type Prisma } from "@auto-tm/db";
 
 import { CleanRetiredUploads } from "./CleanRetiredUploads";
 import { PrismaRetiredUploadLedger } from "./PrismaRetiredUploadLedger";
@@ -19,8 +19,8 @@ import type { CleanupWork, RetiredObjectStore } from "./retiredUploadCleanup";
 
 /**
  * Issue #721 / ADR-0088 against the hosted disposable Postgres and the
- * digest-pinned MinIO that `scripts/ci-services.sh` starts. It never runs
- * against a live or local provider.
+ * digest-pinned MinIO. Founder-authorized local execution uses only its recorded
+ * task-owned disposable compose project, never a live provider.
  *
  * Every row here is due around the year 2000 and every sweep runs "then", so a
  * sweep can only see this suite's work: other suites share the database and
@@ -39,6 +39,49 @@ const REQUEST_BUDGET_MS = 10_000;
 
 describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", () => {
   let prisma: PrismaService;
+  let application: PrismaService;
+  const role = `retired_storage_${randomUUID().replaceAll("-", "")}`;
+  let guardState: { table: string; name: string; enabled: string }[] = [];
+  let roleCreated = false;
+  let activeTransactions = 0;
+  let transition = Promise.resolve();
+  async function guards(enabled?: boolean) {
+    // Keep the exact catalog modes and all guard effects, but perform the
+    // fixture transition in one server transaction instead of 276 roundtrips.
+    const statements = guardState.map(row => {
+      const table = row.table.replaceAll('"', '""'), name = row.name.replaceAll('"', '""');
+      const mode = enabled === undefined
+        ? row.enabled === "D" ? "DISABLE" : row.enabled === "A" ? "ENABLE ALWAYS" : row.enabled === "R" ? "ENABLE REPLICA" : "ENABLE"
+        : enabled ? "ENABLE" : "DISABLE";
+      return `ALTER TABLE public."${table}" ${mode} TRIGGER "${name}";`;
+    });
+    if (statements.length) await prisma.$executeRawUnsafe(`DO $guards$ BEGIN ${statements.join("\n")} END $guards$`);
+  }
+  // Concurrent application transactions share activation. Only after the last
+  // one commits/rolls back are guards disabled for legitimate fixture seeding.
+  // The serialized transition prevents teardown racing another transaction entry.
+  function runtime(): PrismaService {
+    return new Proxy(prisma, { get(target, property) {
+      if (property === "$transaction") return async <T>(run: (tx: Prisma.TransactionClient) => Promise<T>, options?: Parameters<PrismaService["$transaction"]>[1]) => {
+        transition = transition.then(async () => {
+          if (activeTransactions++ === 0) await guards(true);
+        });
+        await transition;
+        try {
+          return await target.$transaction(async tx => {
+            await tx.$executeRawUnsafe(`SET LOCAL ROLE "${role}"`);
+            const [actual] = await tx.$queryRaw<{ ready: boolean; name: string; superuser: boolean; owns: boolean }[]>`SELECT diagnostic_source_guards_ready() AND campaign_preparation_ready() AS ready,current_user AS name,r.rolsuper AS superuser,pg_has_role(current_user,c.relowner,'USAGE') AS owns FROM pg_roles r JOIN pg_class c ON c.oid='public.media_uploads'::regclass WHERE r.rolname=current_user`;
+            expect(actual).toEqual({ ready: true, name: role, superuser: false, owns: false });
+            return run(tx);
+          }, options);
+        } finally {
+          transition = transition.then(async () => { if (--activeTransactions === 0) await guards(false); });
+          await transition;
+        }
+      };
+      const value: unknown = Reflect.get(target, property); return typeof value === "function" ? value.bind(target) : value;
+    } });
+  }
   let s3: S3Client;
   let ledger: PrismaRetiredUploadLedger;
   let store: S3RetiredObjectStore;
@@ -53,7 +96,18 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
   const slug = `cleanup-${randomUUID()}`;
 
   beforeAll(async () => {
+    if (!/^postgres(?:ql)?:\/\/[^/]+@(localhost|127\.0\.0\.1):\d+\//.test(process.env["DATABASE_URL"] ?? "")) throw new Error("Storage guard fixture requires task-owned disposable database");
     prisma = new PrismaService();
+    guardState = await prisma.$queryRaw<typeof guardState>`SELECT c.relname AS table,t.tgname AS name,t.tgenabled::text AS enabled FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')`;
+    expect(guardState.length).toBeGreaterThan(0);
+    await guards(false);
+    await prisma.$executeRawUnsafe(`CREATE ROLE "${role}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+    roleCreated = true;
+    await prisma.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO "${role}"`);
+    await prisma.$executeRawUnsafe(`GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO "${role}"`);
+    await prisma.$executeRawUnsafe(`GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO "${role}"`);
+    await prisma.$executeRawUnsafe(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO "${role}"`);
+    application = runtime();
     s3 = new S3Client({
       endpoint, region: "us-east-1", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED",
       credentials: {
@@ -61,7 +115,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
         secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin",
       },
     });
-    ledger = new PrismaRetiredUploadLedger(prisma);
+    ledger = new PrismaRetiredUploadLedger(application);
     store = new S3RetiredObjectStore(s3);
     job = new CleanRetiredUploads(ledger, store);
     const names = { nameRu: "Cleanup", nameTk: "Cleanup", nameEn: "Cleanup" };
@@ -82,13 +136,18 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
   afterAll(async () => {
     if (!prisma) return;
-    for (const Key of objectKeys) await s3.send(new DeleteObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key }));
-    await prisma.city.deleteMany({ where: { id: catalog.cityId } });
-    await prisma.region.deleteMany({ where: { id: catalog.regionId } });
-    await prisma.model.deleteMany({ where: { id: catalog.modelId } });
-    await prisma.brand.deleteMany({ where: { id: catalog.brandId } });
-    s3.destroy();
-    await prisma.onModuleDestroy();
+    try {
+      for (const Key of objectKeys) await s3.send(new DeleteObjectCommand({ Bucket: RETIRED_UPLOAD_BUCKET, Key }));
+      await prisma.city.deleteMany({ where: { id: catalog.cityId } });
+      await prisma.region.deleteMany({ where: { id: catalog.regionId } });
+      await prisma.model.deleteMany({ where: { id: catalog.modelId } });
+      await prisma.brand.deleteMany({ where: { id: catalog.brandId } });
+    } finally {
+      try {
+        await guards();
+        if (roleCreated) { await prisma.$executeRawUnsafe(`DROP OWNED BY "${role}"`); await prisma.$executeRawUnsafe(`DROP ROLE "${role}"`); }
+      } finally { s3?.destroy(); await prisma.onModuleDestroy(); }
+    }
   });
 
   function manifest(key: string): string[] {
@@ -390,7 +449,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
 
   it("cleans an expired historical nine-object placeholder through the existing fenced ledger", async () => {
     const upload = await retiredUpload({ historicalPlaceholder: true });
-    const result = await new CleanRetiredUploads(new PrismaRetiredUploadLedger(prisma), new S3RetiredObjectStore(s3)).execute({ now: SWEEP, limit: 10 });
+    const result = await new CleanRetiredUploads(new PrismaRetiredUploadLedger(application), new S3RetiredObjectStore(s3)).execute({ now: SWEEP, limit: 10 });
     expect(result.deleted).toBe(1);
     expect(await stateOf(upload.id)).toBe("DELETED");
     expect((await workOf(upload.id)).status).toBe("DONE");
@@ -433,7 +492,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     const afterCrash = await workOf(upload.id);
     expect(afterCrash).toMatchObject({ status: "PENDING", attempts: 1 });
     expect(await present(upload.keys)).toBe(5);
-    const restarted = new CleanRetiredUploads(new PrismaRetiredUploadLedger(prisma), new S3RetiredObjectStore(s3));
+    const restarted = new CleanRetiredUploads(new PrismaRetiredUploadLedger(application), new S3RetiredObjectStore(s3));
 
     await restarted.execute({ now: new Date(afterCrash.nextAttemptAt.getTime() + 1), limit: 10 });
 
@@ -651,7 +710,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     expect(await present(photo.keys)).toBe(5);
 
     // Only this suite's User is due in the year 2000, so the purge touches no one else.
-    expect(await new PurgeExpiredAccounts(prisma).execute({ now: SWEEP })).toEqual({ purgedCount: 1 });
+    expect(await new PurgeExpiredAccounts(application).execute({ now: SWEEP })).toEqual({ purgedCount: 1 });
 
     expect(await prisma.user.findUniqueOrThrow({ where: { id: userId } })).toMatchObject({
       displayName: null, avatarKey: null, avatarUploadId: null, avatarIndex: 7, phone: null,
@@ -679,7 +738,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
     await prisma.user.update({ where: { id: userId }, data: {
       avatarUploadId: photo.id, avatarKey: photo.key, deletionScheduledAt: DUE,
     } });
-    await new PurgeExpiredAccounts(prisma).execute({ now: SWEEP });
+    await new PurgeExpiredAccounts(application).execute({ now: SWEEP });
 
     const failed = await new CleanRetiredUploads(ledger, outageAfter(2)).execute({ now: SWEEP, limit: 10 });
 
@@ -744,7 +803,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
         return leased;
       }
     }
-    const sweep = () => new CleanRetiredUploads(new ObservedLedger(prisma), counting)
+    const sweep = () => new CleanRetiredUploads(new ObservedLedger(application), counting)
       .execute({ now: SWEEP, limit: 2 });
 
     const [one, two] = await Promise.all([sweep(), sweep()]);
