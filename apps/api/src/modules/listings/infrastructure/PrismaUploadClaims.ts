@@ -103,6 +103,8 @@ export class PrismaUploadClaims implements UploadClaimPort {
           "claimDeadline" = ${deadline}
         WHERE id = ANY(${input.uploadIds}::text[])`;
       return { token, joined: false };
+    }, (before, after) => {
+      if (this.competingReservation(before, after, input.target)) throw alreadyAttached();
     }));
   }
 
@@ -321,7 +323,46 @@ export class PrismaUploadClaims implements UploadClaimPort {
     return coverage;
   }
 
-  private async prepared<T>(tx: Prisma.TransactionClient, selection: Selection, patch: Patch, work: (plan: Plan) => Promise<T>): Promise<T> {
+  /** Only a proven AVAILABLE -> competing PREPARING transition maps to the
+   * existing public refusal. Never authorize work on a changed plan or translate
+   * owner, authority, adopter, byte or unrelated dependency changes. New target
+   * observations are used only to refuse; no new locks or writes follow. */
+  private competingReservation(before: Plan, after: Plan, target: UploadClaimTarget): boolean {
+    const fields = ["state", "claimToken", "claimDeadline", "claimTargetType", "claimTargetId"];
+    const stable = (row: unknown) => {
+      if (!row || typeof row !== "object") return row;
+      return Object.fromEntries(Object.entries(row).filter(([key]) => !fields.includes(key)));
+    };
+    if (before.uploads.length !== after.uploads.length) return false;
+    const changed = new Set<string>();
+    for (const old of before.uploads) {
+      const current = after.uploads.find(upload => upload.id === old.id);
+      if (!current || !same(stable(old), stable(current))) return false;
+      if (same(old, current)) continue;
+      if (old.state !== "AVAILABLE" || current.state !== "PREPARING" ||
+        !current.claimToken || !(current as unknown as Row)["claimDeadline"] || heldBy(current, target) ||
+        !["listing", "profile"].includes(current.claimTargetType ?? "") || !current.claimTargetId) return false;
+      changed.add(old.id);
+    }
+    if (!changed.size) return false;
+    for (const old of before.slots) {
+      const current = after.slots.find(slot => slot.table === old.table && slot.uniqueOnly === old.uniqueOnly && same(slot.key, old.key));
+      if (!current) return false;
+      const claim = old.table === "media_uploads" && changed.has(old.key["id"] ?? "");
+      if (!same(claim ? stable(old.row) : old.row, claim ? stable(current.row) : current.row)) return false;
+    }
+    for (const slot of after.slots) {
+      if (before.slots.some(old => old.table === slot.table && old.uniqueOnly === slot.uniqueOnly && same(old.key, slot.key))) continue;
+      // A new polymorphic stored target can appear solely because of the
+      // competing claim. Any other added endpoint or reverse adopter stays stale.
+      if (slot.uniqueOnly || !after.uploads.some(upload => changed.has(upload.id) &&
+        slot.table === (upload.claimTargetType === "profile" ? "users" : "listings") && same(slot.key, { id: upload.claimTargetId }))) return false;
+    }
+    return same(after.mutations, before.mutations.map(mutation =>
+      mutation.table === "media_uploads" && changed.has(mutation.key["id"] ?? "") ? { ...mutation, next: {} } : mutation));
+  }
+
+  private async prepared<T>(tx: Prisma.TransactionClient, selection: Selection, patch: Patch, work: (plan: Plan) => Promise<T>, changed?: (before: Plan, after: Plan) => void): Promise<T> {
     const before = await this.discover(tx, selection, patch);
     const coverage = this.campaignMutations(before);
     if (!coverage.length) return work(before);
@@ -338,7 +379,11 @@ export class PrismaUploadClaims implements UploadClaimPort {
             SELECT 1 FROM public.${Prisma.raw(slot.table)} s WHERE to_jsonb(s) @> ${JSON.stringify(slot.key)}::jsonb FOR UPDATE`);
         }
       }
-      if (!same(before, await this.discover(tx, selection, patch))) throw new Error("upload_claim_scope_changed");
+      const after = await this.discover(tx, selection, patch);
+      if (!same(before, after)) {
+        changed?.(before, after);
+        throw new Error("upload_claim_scope_changed");
+      }
       return work(before);
     });
   }

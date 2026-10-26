@@ -37,6 +37,22 @@ describe("upload claim transaction preparation", () => {
     await expect(claims.reserve({ userId: "owner", uploadIds: ["upload-1"], target })).rejects.toThrow("upload_claim_scope_changed");
     expect(db.tables["media_uploads"]![0]).toMatchObject({ state: "AVAILABLE", claimToken: null });
   });
+  it.each(["listing", "profile"] as const)("keeps the public competing-%s reservation refusal after waits", async type => {
+    const { db, claims } = setup(); db.upload();
+    db.afterWait = () => { Object.assign(db.tables["media_uploads"]![0]!, { ...held, claimTargetType: type, claimTargetId: type === "listing" ? "other-listing" : "other-user" }); };
+    await expect(claims.reserve({ userId: "owner", uploadIds: ["upload-1"], target })).rejects.toMatchObject({ code: "UPLOAD_ALREADY_ATTACHED" });
+  });
+  it.each(["owner", "adopter", "authority", "bytes"])("does not translate unrelated %s changes alongside a competing reservation", async cause => {
+    const { db, claims } = setup(); db.upload();
+    db.afterWait = () => {
+      Object.assign(db.tables["media_uploads"]![0]!, { ...held, claimTargetId: "other-listing" });
+      if (cause === "owner") db.tables["media_uploads"]![0]!["userId"] = "foreign";
+      if (cause === "bytes") db.tables["media_uploads"]![0]!["key"] = "changed/original.webp";
+      if (cause === "adopter") db.tables["listing_media"]?.push({ id: "late", listingId: "other-listing", uploadId: "upload-1" });
+      if (cause === "authority") db.tables["users"]![0]!["suspendedAt"] = now;
+    };
+    await expect(claims.reserve({ userId: "owner", uploadIds: ["upload-1"], target })).rejects.toThrow("upload_claim_scope_changed");
+  });
   it.each(["finalize", "retire"] as const)("refuses an unprepared supplied %s before locks", async method => {
     const { db, claims } = setup(); db.upload("upload-1", held);
     const action = method === "retire" ? claims.retire(db.tx, "upload-1") : claims.finalize(db.tx, { token: "token", uploadIds: ["upload-1"], target });
