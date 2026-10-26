@@ -17,7 +17,7 @@ import supertest from "supertest";
 import { Pool } from "pg";
 import { Listing } from "../../listings/domain/Listing";
 import { PrismaListingRepository } from "../../listings/infrastructure/PrismaListingRepository";
-import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
 import { workerDatabaseName, workerUrls } from "../../../../test/helpers/testDatabases";
@@ -179,7 +179,7 @@ describe("public continuity across different sellers and Listings", { concurrent
       console.info("R8 exact trigger restoration", { triggers: triggerSnapshot.length, receipts: receipts.rows });
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
-  const now = initialTime;
+  let now = initialTime;
   const owned = { orders: [] as string[], reports: [] as string[], pdfs: [] as string[],
     raw: [] as string[], evidence: [] as string[], provenance: [] as string[], proofs: [] as string[], keys: new Set<string>(), users: [] as string[],
     sessions: [] as string[], grants: [] as { userId: string; capability: string }[], qualifications: [] as string[],
@@ -475,6 +475,10 @@ describe("public continuity across different sellers and Listings", { concurrent
     if (typeof published.body.id === "string") templateId = published.body.id;
     expect(published.status, JSON.stringify(published.body)).toBe(201);
 
+  });
+  afterEach(() => {
+    now = initialTime;
+    vi.setSystemTime(initialTime);
   });
   afterAll(async () => {
     try {
@@ -1121,7 +1125,14 @@ describe("public continuity across different sellers and Listings", { concurrent
     }
     const finding = await submitLinked(input.reportId);
     await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }).expect(403);
+    // The Listing card selects the latest release. B follows A in time rather
+    // than tying at the frozen clock and letting random report IDs decide.
+    now = new Date("2026-10-21T12:01:00.000Z");
+    vi.setSystemTime(now);
     expect((await finalizeLinked(input.reportId)).status).toBe(201);
+    expect(aSnapshot.finalizedAt).toEqual(new Date("2026-10-21T12:00:00.000Z"));
+    expect((await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } })).finalizedAt)
+      .toEqual(new Date("2026-10-21T12:01:00.000Z"));
     const publicReport = await publicGet(`reports/${input.reportId}`).expect(200);
     expect(publicReport.body).toMatchObject({ successorOf: p.released.id, findings: [finding],
       observedAt: "2026-10-21T11:00:00.000Z", mileageKm: 123100, status: "finalized" });
