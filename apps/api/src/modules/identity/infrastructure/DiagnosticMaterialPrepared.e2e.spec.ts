@@ -1,9 +1,14 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 import { ConfigService } from "@nestjs/config";
 import { DiagnosticSchemas as D } from "@auto-tm/contracts";
-import { PrismaService, withDiagnosticSourceCommand, type Prisma } from "@auto-tm/db";
+import { PrismaService, Prisma, withDiagnosticSourceCommand } from "@auto-tm/db";
 import { Pool } from "pg";
+import { CreateBucketCommand, DeleteBucketCommand, S3Client } from "@aws-sdk/client-s3";
+import sharp from "sharp";
+import { S3DiagnosticObjects } from "../../diagnostics/infrastructure/S3DiagnosticObjects";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { defineE2eSuite } from "../../../../test/helpers/e2eSuite";
 import { CheckBusinessAuthority } from "../application/CheckBusinessAuthority";
@@ -23,38 +28,59 @@ import type { DiagnosticObjects } from "../../diagnostics/domain/ports/Diagnosti
 import type { DiagnosticIdentityEvidencePort } from "../../diagnostics/domain/ports/DiagnosticIdentityEvidencePort";
 import type { DiagnosticEvidencePort } from "../../diagnostics/domain/ports/DiagnosticEvidencePort";
 
-/** AUTHORED ONLY in R4. Do not import, collect or execute until parent assembly.
+/** Disposable R4 runtime fixture, executed only under parent candidate authority.
  * Actual stage/upload/append/read/abandon entrypoints own their own prefixes.
  * Assignment opposition uses unchanged production intake. Test-owned receipts
- * remain only in explicit fault transitions. Storage is a
- * system-boundary fake; all database constraints, guards and waits are real. */
+ * remain only in explicit fault transitions. Storage uses the unchanged production MinIO adapter with explicit fault hooks.
+ * All database constraints, guards and waits are real. */
 const suite = defineE2eSuite("diagnostic-material-r4");
+const runId = randomUUID();
 const text = { en: "Synthetic", ru: "Synthetic", tk: "Synthetic" };
 describe("real prepared diagnostic material adapters", () => {
   let db: PrismaService, pool: Pool, intake: PrismaDiagnosticIntake, authority: DiagnosticAuthority, identity: DiagnosticIdentityEvidencePort, evidence: DiagnosticEvidencePort;
   let sequence = 0, orderId: string, rawId: string, reportId: string, centerId: string;
   let clock: Date, putFailure: boolean, afterPut: (() => Promise<void>) | undefined, afterRead: (() => Promise<void>) | undefined;
-  const stored = new Map<string, Uint8Array>(), bytes = new Uint8Array([1, 2, 3]);
-  const id = (name: string) => suite.id(`${sequence}-${name}`);
+  const stored = new Map<string, Uint8Array>();
+  const objectKeys = new Set<string>();
+  let bytes: Uint8Array, storage: S3DiagnosticObjects, s3: S3Client;
+  let guardState: { table: string; name: string; enabled: string }[] = [];
+  const id = (name: string) => suite.id(`${runId}-${sequence}-${name}`);
   const subject = () => ({ userId: id("technician"), sessionId: id("session") });
   const rights = (): D.DiagnosticIdentityRights => ({ category: "vehicle_observation", purpose: "Restricted visit comparison", basis: "Synthetic fixture declaration", provenance: "Synthetic fixture only",
     identifiability: "personal", use: ["service"], schedule: { kind: "until", until: new Date(clock.getTime() + 3600_000).toISOString(), reason: "Declared synthetic end" }, supplierRestrictions: "Comparison only", hold: null });
   const stage = (name = "provenance", version = 1) => ({ id: id(name), expectedOrderVersion: version, contentType: "image/png" as const, sizeBytes: bytes.length, rights: rights() });
   const capture = (p: string, name = "capture", version = 1): D.DiagnosticIdentityEvidenceCapture => ({ id: id(name), identityRecordId: rawId, expectedOrderVersion: version, rights: rights(), correction: null,
     identifiers: [{ kind: "manufacturer_plate", location: "engine bay", value: "Synthetic plate", provenanceIds: [p] }] });
-  async function guards(enabled: boolean) {
-    const rows = await pool.query<{ table: string; name: string }>(`SELECT c.relname AS table,t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
-      JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')`);
-    for (const row of rows.rows) await pool.query(`ALTER TABLE public."${row.table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${row.name}"`);
+  const guardQuery = `SELECT c.relname AS table,t.tgname AS name,t.tgenabled::text AS enabled FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+    JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate') ORDER BY c.relname,t.tgname`;
+  async function guards(enabled?: boolean) {
+    for (const row of guardState) {
+      const action = enabled === undefined ? ({ D: "DISABLE", O: "ENABLE", A: "ENABLE ALWAYS", R: "ENABLE REPLICA" }[row.enabled]) : enabled ? "ENABLE" : "DISABLE";
+      if (!action) throw new Error("r4_unknown_guard_mode");
+      await pool.query(`ALTER TABLE public."${row.table.replaceAll('"', '""')}" ${action} TRIGGER "${row.name.replaceAll('"', '""')}"`);
+    }
   }
   const objects: DiagnosticObjects = {
-    sanitize: async input => ({ bytes: input, mime: "image/webp" }),
-    put: async (key, input) => { stored.set(key, input); if (afterPut) await afterPut(); if (putFailure) throw new Error("r4_lost_put_reply"); },
-    read: async key => { if (afterRead) await afterRead(); const content = stored.get(key); if (!content) throw new Error("r4_absent_bytes"); return content; },
-    remove: async key => { stored.delete(key); },
+    sanitize: (input, mime) => storage.sanitize(input, mime),
+    put: async (key, input, mime) => { await storage.put(key, input, mime); objectKeys.add(key); stored.set(key, input); if (afterPut) await afterPut(); if (putFailure) throw new Error("r4_lost_put_reply"); },
+    read: async (key, size, hash) => { if (afterRead) await afterRead(); return storage.read(key, size, hash); },
+    remove: async key => { await storage.remove(key); stored.delete(key); },
   };
   beforeAll(async () => {
-    db = new PrismaService(); pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
+    const adminUrl = process.env["R4_FIXTURE_ADMIN_URL"];
+    if (!adminUrl || !/^r4_[a-z0-9_]+$/.test(new URL(adminUrl).pathname.slice(1))) throw new Error("r4_disposable_database_required");
+    pool = new Pool({ connectionString: adminUrl });
+    guardState = (await pool.query<(typeof guardState)[number]>(guardQuery)).rows;
+    expect(guardState.length).toBeGreaterThan(0);
+    db = new PrismaService();
+    const [role] = await db.$queryRaw<{ superuser: boolean; owns: boolean }[]>`SELECT r.rolsuper AS superuser,pg_has_role(current_user,c.relowner,'USAGE') AS owns FROM pg_roles r JOIN pg_class c ON c.oid='public.diagnostic_identity_provenance'::regclass WHERE r.rolname=current_user`;
+    expect(role).toEqual({ superuser: false, owns: false });
+    console.info("r4_runtime_role", role, "matched_guards", guardState.length);
+    const config = new ConfigService({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private" });
+    storage = new S3DiagnosticObjects(config);
+    s3 = new S3Client({ endpoint: process.env["MINIO_ENDPOINT"]!, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" } });
+    await s3.send(new CreateBucketCommand({ Bucket: "diagnostic-test-private" }));
+    bytes = await sharp({ create: { width: 2, height: 2, channels: 3, background: "red" } }).png().toBuffer();
     const runtime = { now: () => new Date(clock), id: randomUUID, syntheticAllowed: () => true };
     const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime);
     authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
@@ -89,7 +115,13 @@ describe("real prepared diagnostic material adapters", () => {
   afterAll(async () => {
     // This disposable worker database is owned by the configured E2E runner.
     // No broad user/foreign cleanup or operator reset is performed here.
-    if (pool) { await guards(false); await pool.end(); }
+    if (pool) {
+      await guards();
+      expect((await pool.query(guardQuery)).rows).toEqual(guardState);
+      await pool.end();
+    }
+    if (storage) { for (const key of objectKeys) await storage.remove(key); storage.onModuleDestroy(); }
+    if (s3) { await s3.send(new DeleteBucketCommand({ Bucket: "diagnostic-test-private" })); s3.destroy(); }
     await db?.onModuleDestroy();
   });
   async function verified(name = "provenance", version = 1) {
@@ -102,7 +134,7 @@ describe("real prepared diagnostic material adapters", () => {
       const root = { table: "diagnostic_identity_provenance" as const, key: { id: provenanceId } };
       const row = await diagnosticPlannedRow(tx, root, next);
       await withDiagnosticSourceCommand(tx, { operation: "identity_material_change", roots: [root], rows: [row], actorUserId: null, sessionId: null, cutoff: null, campaign: null }, async () => {
-        await tx.diagnosticIdentityProvenance.update({ where: { id: provenanceId }, data: next });
+        await tx.diagnosticIdentityProvenance.update({ where: { id: provenanceId }, data: { ...next, ...(next["rights"] === null ? { rights: Prisma.DbNull } : {}) } });
       });
     });
   }
@@ -146,6 +178,7 @@ describe("real prepared diagnostic material adapters", () => {
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toEqual(report);
   });
   it.each(["revoke", "expiry", "disposal", "epoch", "storage"] as const)("actual adoption cannot revive material after %s between phases", async defect => {
+    if (defect === "expiry") clock = new Date(Date.now() - 2 * 3600_000);
     const input = stage(); await identity.stage(subject(), orderId, input);
     putFailure = defect === "storage";
     afterPut = async () => {
@@ -160,7 +193,9 @@ describe("real prepared diagnostic material adapters", () => {
       if (defect === "disposal") await material({ state: "cleanup_pending", erasedAt: clock, cleanupRequestedAt: clock, rights: null, epoch: randomUUID() }, input.id);
       if (defect === "epoch") await material({ epoch: id("replacement-epoch") }, input.id);
     };
-    await expect(identity.upload(subject(), orderId, input.id, { expectedOrderVersion: 1, mime: input.contentType, bytes })).rejects.toThrow();
+    const uploaded = outcome(identity.upload(subject(), orderId, input.id, { expectedOrderVersion: 1, mime: input.contentType, bytes }));
+    console.info("r4_adoption_outcome", defect, await uploaded);
+    await expect(uploaded.then(result => { if (!result.ok) throw result.error; return result.value; })).rejects.toThrow();
     const row = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: input.id } });
     expect(row.state).toBe(defect === "epoch" ? "staged" : "cleanup_pending");
     expect(row.verifiedAt).toBeNull();
@@ -168,6 +203,7 @@ describe("real prepared diagnostic material adapters", () => {
     if (defect === "epoch") expect(row).toMatchObject({ epoch: id("replacement-epoch"), cleanupRequestedAt: null });
   });
   it("cleanup preserves a production renewal committed between its initial and planning reads", async () => {
+    clock = new Date(Date.now() - 2 * 3600_000);
     const input = stage(); await identity.stage(subject(), orderId, input);
     let release: () => void = () => undefined, entered: () => void = () => undefined;
     const gate = new Promise<void>(resolve => { release = resolve; });
@@ -285,7 +321,7 @@ describe("real prepared diagnostic material adapters", () => {
     } finally {
       await gate.query("SELECT pg_advisory_unlock(18974,hashtext($1))", [orderId]); gate.release();
       // Release deliberately, then drain both real outer calls even if a barrier failed.
-      await Promise.all([source, staging]);
+      console.info("r4_assignment_outcomes", first, await Promise.all([source, staging]));
       await pool.query(`DROP TRIGGER diagnostic_r4_gate ON ${table}; DROP FUNCTION diagnostic_r4_gate()`);
     }
     const changed = await source!, staged = await staging!;
@@ -312,6 +348,128 @@ describe("real prepared diagnostic material adapters", () => {
     expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } })).toEqual(raw);
     expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toEqual(report);
     expect(await db.diagnosticIdentityEvidence.count({ where: { orderId } })).toBe(0);
+  });
+
+  it("R4 remaining foreign retained raw is refused without effects", async () => {
+    const p = await verified();
+    await guards(false);
+    const own = await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } });
+    const raw = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } });
+    const foreignOrder = id("foreign-retained-order"), foreignRaw = id("foreign-retained-raw");
+    await db.inspectionOrder.create({ data: { ...own, id: foreignOrder, requestKey: id("foreign-request"), physicalAuthorization: own.physicalAuthorization as Prisma.InputJsonValue, observedVehicle: own.observedVehicle as Prisma.InputJsonValue, publicationAuthorization: Prisma.DbNull } });
+    await db.diagnosticIdentityRecord.create({ data: { ...raw, id: foreignRaw, orderId: foreignOrder, observation: raw.observation as Prisma.InputJsonValue,
+      observationHash: diagnosticObservationHash(foreignOrder, 1, raw.observation as Omit<D.DiagnosticObservedVehicle, "expectedVersion">) } });
+    await guards(true);
+    const before = await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } });
+    const foreign = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: foreignRaw } });
+    await expect(identity.append(subject(), orderId, { ...capture(p), identityRecordId: foreignRaw })).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } })).toEqual(before);
+    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: foreignRaw } })).toEqual(foreign);
+    expect(await db.diagnosticIdentityEvidence.count({ where: { orderId } })).toBe(0);
+    expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
+  });
+  it.each(["permission", "rights", "erasure"] as const)("R4 remaining delivery refuses post-read %s", async defect => {
+    if (defect === "rights") clock = new Date(Date.now() - 2 * 3600_000);
+    const p = await verified();
+    const raw = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } });
+    afterRead = async () => {
+      afterRead = undefined;
+      if (defect === "permission") {
+        await db.$transaction(async tx => {
+          const root = { table: "staff_grants" as const, key: { userId: subject().userId, capability: "diagnostics.technician" } };
+          const row = await diagnosticPlannedRow(tx, root, { revokedAt: clock });
+          await withDiagnosticSourceCommand(tx, { operation: "staff_eligibility", roots: [root], rows: [row], actorUserId: null, sessionId: null, cutoff: null, campaign: null },
+            () => tx.staffGrant.update({ where: { userId_capability: root.key }, data: { revokedAt: clock } }));
+        });
+        // The same subject has reception authority too. Revoke that real grant
+        // with the same production preparation contract before post-read checks.
+        await db.$transaction(async tx => {
+          const root = { table: "staff_grants" as const, key: { userId: subject().userId, capability: "diagnostics.reception" } };
+          const row = await diagnosticPlannedRow(tx, root, { revokedAt: clock });
+          await withDiagnosticSourceCommand(tx, { operation: "staff_eligibility", roots: [root], rows: [row], actorUserId: null, sessionId: null, cutoff: null, campaign: null },
+            () => tx.staffGrant.update({ where: { userId_capability: root.key }, data: { revokedAt: clock } }));
+        });
+      } else if (defect === "rights") clock = new Date(rights().schedule.until);
+      else await material({ state: "cleanup_pending", rights: null, createdById: null, erasedAt: clock, cleanupRequestedAt: clock, epoch: randomUUID() }, p);
+    };
+    await expect(identity.read(subject(), orderId, p)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } })).toEqual(raw);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toEqual(report);
+    expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
+  });
+  it.each(["size", "hash"] as const)("R4 remaining real storage refuses wrong %s", async defect => {
+    const p = await verified();
+    const row = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } });
+    const clean = await storage.sanitize(bytes, "image/png");
+    const before = await storage.read(row.objectKey!, row.sizeBytes!, row.sha256!);
+    expect(before).toEqual(clean.bytes);
+    await expect(storage.read(row.objectKey!, defect === "size" ? row.sizeBytes! + 1 : row.sizeBytes!, defect === "hash" ? "0".repeat(64) : row.sha256!)).rejects.toThrow("REPORT_EVIDENCE_INVALID");
+    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toEqual(row);
+    expect(await storage.read(row.objectKey!, row.sizeBytes!, row.sha256!)).toEqual(before);
+  });
+  it("R4 remaining restricted role cannot write material without a receipt", async () => {
+    const p = await verified();
+    const before = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } });
+    await expect(db.diagnosticIdentityProvenance.update({ where: { id: p }, data: { epoch: randomUUID() } })).rejects.toThrow("diagnostic_source_unprepared");
+    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toEqual(before);
+  });
+  it.each(["identity", "finding"] as const)("R4 remaining object collision races with %s first", async first => {
+    const input = stage();
+    const gate = await pool.connect();
+    const table = first === "identity" ? "diagnostic_identity_provenance" : "diagnostic_evidence";
+    const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+    await gate.query("SELECT pg_advisory_lock(18975,hashtext($1))", [input.id]);
+    await pool.query(`CREATE FUNCTION diagnostic_r4_collision_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(18975,hashtext(NEW.id)); RETURN NEW; END $$;
+      CREATE TRIGGER diagnostic_r4_collision_gate BEFORE INSERT ON ${table} FOR EACH ROW EXECUTE FUNCTION diagnostic_r4_collision_gate()`);
+    const staging = () => identity.stage(subject(), orderId, input);
+    const finding = () => evidence.upload(subject(), { reportId, evidenceId: input.id, findingId: id("finding"), expectedVersion: 0, mime: "image/png", bytes });
+    let owner: ReturnType<typeof outcome<unknown>> | undefined, rival: ReturnType<typeof outcome<unknown>> | undefined;
+    try {
+      owner = outcome<unknown>(first === "identity" ? staging() : finding());
+      await blockedBy(gatePid, `%INSERT%${table}%`);
+      const held = await pool.query<{ pid: number }>("SELECT pid FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid)) AND query LIKE $2", [gatePid, `%INSERT%${table}%`]);
+      rival = outcome<unknown>(first === "identity" ? finding() : staging());
+      await blockedBy(held.rows[0]!.pid, "%diagnostic_prepare_source%");
+    } finally {
+      await gate.query("SELECT pg_advisory_unlock(18975,hashtext($1))", [input.id]); gate.release();
+      console.info("r4_collision_outcomes", first, await Promise.all([owner, rival]));
+      await pool.query(`DROP TRIGGER diagnostic_r4_collision_gate ON ${table}; DROP FUNCTION diagnostic_r4_collision_gate()`);
+    }
+    expect((await owner!)?.ok).toBe(true);
+    const loser = await rival!;
+    expect(loser?.ok).toBe(false);
+    if (loser && !loser.ok) expect(() => { throw loser.error; }).toThrow("diagnostic_source_graph_changed");
+    const provenance = await db.diagnosticIdentityProvenance.findUnique({ where: { id: input.id } });
+    const ordinary = await db.diagnosticEvidence.findUnique({ where: { id: input.id } });
+    if (first === "identity") {
+      expect(provenance).toMatchObject({ orderId, state: "staged", cleanupRequestedAt: null });
+      expect(ordinary).toBeNull();
+    } else {
+      expect(provenance).toBeNull();
+      expect(ordinary).toMatchObject({ reportId, state: "verified", cleanupRequestedAt: null });
+      expect(await storage.read(ordinary!.objectKey, ordinary!.sizeBytes!, ordinary!.sha256!)).toEqual((await storage.sanitize(bytes, "image/png")).bytes);
+    }
+    expect(await db.diagnosticIdentityEvidence.count({ where: { orderId } })).toBe(0);
+    expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
+  });
+  it("R4 remaining actual purge fences retained material and raw/report pins atomically", async () => {
+    const p = await verified();
+    await identity.append(subject(), orderId, capture(p));
+    // Scheduling is a fixture precondition, not the purge opponent.
+    await guards(false);
+    await db.user.update({ where: { id: subject().userId }, data: { deletionScheduledAt: clock } });
+    await guards(true);
+    const workerPath = resolve(__dirname, "../../../../../worker/dist/jobs/PurgeExpiredAccounts.js");
+    const { PurgeExpiredAccounts } = createRequire(__filename)(workerPath) as { PurgeExpiredAccounts: new (db: PrismaService) => { execute(input: { now: Date }): Promise<{ purgedCount: number }> } };
+    const result = await outcome(new PurgeExpiredAccounts(db).execute({ now: clock }));
+    console.info("r4_actual_purge_outcome", result);
+    expect(result).toEqual({ ok: true, value: { purgedCount: 1 } });
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } })).toMatchObject({ commissionerId: null, erasedAt: clock });
+    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } })).toMatchObject({ observation: null, observationHash: null, erasedAt: clock });
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toMatchObject({ identityRecordId: null, identityRecordHash: null, erasedAt: clock });
+    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toMatchObject({ state: "cleanup_pending", rights: null, erasedAt: clock });
+    await expect(identity.read(subject(), orderId, p)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
   });
 
 });
