@@ -112,7 +112,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   expect(state.filter(row => !row.guard), "ordinary integrity trigger modes unchanged").toEqual(triggerState.filter(row => !row.guard));
   const ready = present((await pool.query<{ source: boolean; campaign: boolean }>("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign")).rows[0]);
   expect(ready).toEqual({ source: true, campaign: true });
-  console.info("R6a disposable guards active", { database: scenarioDatabase, guards: state.filter(row => row.guard), ready });
+  console.info("R6a disposable guards active", JSON.stringify({ database: scenarioDatabase, guards: state.filter(row => row.guard), ready }));
  }
  async function restoreTriggers() {
   for (const row of triggerState) {
@@ -185,7 +185,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   triggerState = []; activation = undefined;
   triggerState = await snapshotTriggers();
   expect(triggerState.filter(row => row.guard).length).toBeGreaterThan(0);
-  console.info("R6a inherited triggers", { database: scenarioDatabase, triggers: triggerState });
+  console.info("R6a inherited triggers", JSON.stringify({ database: scenarioDatabase, triggers: triggerState }));
   for (const row of triggerState.filter(row => row.guard)) await pool.query(`ALTER TABLE public.${quoted(row.table)} DISABLE TRIGGER ${quoted(row.name)}`);
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now);
  });
@@ -225,6 +225,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    }
    await new Promise(resolve => setTimeout(resolve, 5));
   }
+  console.error("R6a absent barrier backend state", (await observer.query("SELECT pid,state,wait_event_type,wait_event,query,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE pid=ANY($1::int[])", [[waiter, blocker]])).rows);
   throw new Error(`no PostgreSQL barrier: waiter=${waiter} blocker=${blocker}`);
  }
  // The facade owns only transaction instrumentation. Every query and public
@@ -256,7 +257,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    } }) : tx;
    let result: T;
    try { result = await work(instrumented); }
-   catch (error) { ready.release(); if (options.holdFailure) await finish.promise; throw error; }
+   catch (error) { console.error("R6a actual caller transaction failure", { database: scenarioDatabase, backend, error }); ready.release(); if (options.holdFailure) await finish.promise; throw error; }
    await options.inspect?.(tx, result);
    ready.release();
    if (options.hold) await finish.promise;
