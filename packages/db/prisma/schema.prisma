@@ -2136,3 +2136,5 @@ model CampaignPreparation {
 // Snapshot: 20261026011000_diagnostic_bootstrap_capability_qualification.
 
 // Snapshot: 20261026012000_diagnostic_disposal_selector_precedence.
+
+// Snapshot: 20261026013000_diagnostic_purge_audit_details_precedence.
