@@ -114,6 +114,45 @@ describe("real prepared intake, ownership collection and first capture", () => {
       });
     }, { timeout: 15000 });
   }
+  it("assignment creation, updates and unchanged-active requests retain their exact receipt effects", async () => {
+    // readyVisit creates the technician assignment through the absent branch.
+    const visit = await readyVisit();
+    const key = { orderId: visit.id, userId: id("technician"), capability: "diagnostics.technician" };
+    const first = await db.diagnosticOrderAssignment.findUniqueOrThrow({ where: { orderId_userId_capability: key } });
+    const before = await db.diagnosticAudit.count({ where: { orderId: visit.id, action: "ORDER_ASSIGNMENT_CHANGED" } });
+    expect(first.revokedAt).toBeNull();
+    expect(before).toBe(1);
+    const unchanged = await intake.assign(subject("reception"), visit.id, { expectedVersion: visit.version, userId: key.userId, capability: "diagnostics.technician", active: true });
+    expect(unchanged.version).toBe(visit.version + 1);
+    expect(await db.diagnosticOrderAssignment.findUniqueOrThrow({ where: { orderId_userId_capability: key } })).toEqual(first);
+    const revoked = await intake.assign(subject("reception"), visit.id, { expectedVersion: unchanged.version, userId: key.userId, capability: "diagnostics.technician", active: false });
+    expect(await db.diagnosticOrderAssignment.findUniqueOrThrow({ where: { orderId_userId_capability: key } })).toMatchObject({ id: first.id, assignedAt: first.assignedAt, revokedAt: expect.any(Date) });
+    await intake.assign(subject("reception"), visit.id, { expectedVersion: revoked.version, userId: key.userId, capability: "diagnostics.technician", active: true });
+    expect(await db.diagnosticOrderAssignment.findUniqueOrThrow({ where: { orderId_userId_capability: key } })).toEqual(first);
+    expect(await db.diagnosticAudit.count({ where: { orderId: visit.id, action: "ORDER_ASSIGNMENT_CHANGED" } })).toBe(4);
+  });
+  it("assignment stale versions, current authority and late audit failure leave all declared rows unchanged", async () => {
+    const visit = await readyVisit();
+    const before = {
+      order: await db.inspectionOrder.findUniqueOrThrow({ where: { id: visit.id } }),
+      assignments: await db.diagnosticOrderAssignment.findMany({ where: { orderId: visit.id }, orderBy: { id: "asc" } }),
+      audits: await db.diagnosticAudit.findMany({ where: { orderId: visit.id }, orderBy: { id: "asc" } }),
+    };
+    const input = { expectedVersion: visit.version, userId: id("technician"), capability: "diagnostics.technician" as const, active: false };
+    await expect(intake.assign(subject("reception"), visit.id, { ...input, expectedVersion: visit.version - 1 })).rejects.toThrow("DIAGNOSTIC_STALE_VERSION");
+    await expect(intake.assign(subject("other"), visit.id, input)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    await expect(intake.assign({ ...subject("reception"), sessionId: id("other-session") }, visit.id, input)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    await pool.query(`CREATE FUNCTION diagnostic_r3_assignment_audit_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='ORDER_ASSIGNMENT_CHANGED' THEN RAISE EXCEPTION 'r3_assignment_audit_fault'; END IF; RETURN NEW; END $$;
+      CREATE TRIGGER diagnostic_r3_assignment_audit_fault BEFORE INSERT ON diagnostic_audits FOR EACH ROW EXECUTE FUNCTION diagnostic_r3_assignment_audit_fault()`);
+    try {
+      await expect(intake.assign(subject("reception"), visit.id, input)).rejects.toThrow("r3_assignment_audit_fault");
+      await expect(intake.assign(subject("reception"), visit.id, { ...input, userId: id("other") })).rejects.toThrow("r3_assignment_audit_fault");
+    }
+    finally { await pool.query("DROP TRIGGER diagnostic_r3_assignment_audit_fault ON diagnostic_audits; DROP FUNCTION diagnostic_r3_assignment_audit_fault()"); }
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: visit.id } })).toEqual(before.order);
+    expect(await db.diagnosticOrderAssignment.findMany({ where: { orderId: visit.id }, orderBy: { id: "asc" } })).toEqual(before.assignments);
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: visit.id }, orderBy: { id: "asc" } })).toEqual(before.audits);
+  });
   it("actual first grants and captures independently seal A and B unchanged", async () => {
     const a = await readyVisit();
     const template = await db.diagnosticTemplateVersion.findFirstOrThrow({ where: { centerId } });

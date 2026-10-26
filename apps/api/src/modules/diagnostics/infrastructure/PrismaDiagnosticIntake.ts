@@ -278,7 +278,10 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
       const assignment = await tx.diagnosticCenterAssignment.findUnique({ where: { centerId_userId_capability: { centerId: row.centerId, userId: input.userId, capability: input.capability } } });
       if (input.active && (!target || target.suspendedAt || target.deletionScheduledAt || !target.staffGrants.length || !assignment || assignment.revokedAt || !assignment.qualifiedUntil || assignment.qualifiedUntil <= this.runtime.now() || !this.runtime.syntheticAllowed({ userId: input.userId, sessionId: "" }))) throw denial();
       if (!input.active && input.userId === subject.userId && input.capability === "diagnostics.reception") throw new DiagnosticRuleError("DIAGNOSTIC_HANDOVER_REQUIRED");
-      await tx.diagnosticOrderAssignment.upsert({ where: { orderId_userId_capability: { orderId: id, userId: input.userId, capability: input.capability } }, create: data, update: { revokedAt: data.revokedAt } });
+      // Native upsert attempts INSERT before its conflict UPDATE. Match the verb
+      // whose complete OLD/NEXT tuple was prepared and revalidated above.
+      if (existing) await tx.diagnosticOrderAssignment.update({ where: { id: existing.id }, data: { revokedAt: data.revokedAt } });
+      else await tx.diagnosticOrderAssignment.create({ data });
       const next = await tx.inspectionOrder.update({ where: { id }, data: orderData });
       await tx.diagnosticAudit.create({ data: audit.data }); return this.dto(tx, next, true);
       });

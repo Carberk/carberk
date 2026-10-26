@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { createHash, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { performance } from "node:perf_hooks";
@@ -121,6 +121,25 @@ describe("public continuity across different sellers and Listings", { concurrent
   type TriggerMode = { schema: string; table: string; name: string; mode: "D" | "O" | "A" | "R"; definition: string };
   let triggerSnapshot: TriggerMode[] = [];
   const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  async function grantCampaignProvenance() {
+    const namespaces = (await fixtureOwner.query<{ name: string }>(`SELECT DISTINCT n.nspname AS name FROM pg_trigger t
+      JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_proc p ON p.oid=t.tgfoid JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE c.relnamespace='public'::regnamespace AND t.tgenabled='O' AND n.nspname ~ '^cf_[a-f0-9]{32}$'
+        AND p.proname IN ('track_auth','track_business') ORDER BY name`)).rows;
+    for (const { name } of namespaces) {
+      const tables = ["campaign_manifest", "campaign_records", "campaign_entities"];
+      const objects = await fixtureOwner.query<{ present: boolean }>("SELECT to_regclass($1) IS NOT NULL AS present", [`${identifier(name)}.campaign_object_ledger`]);
+      if (objects.rows[0]?.present) tables.push("campaign_object_ledger");
+      await fixtureOwner.query(`GRANT USAGE ON SCHEMA ${identifier(name)} TO ${identifier(fixtureRole)}`);
+      await fixtureOwner.query(`GRANT SELECT ON ${tables.map(table => `${identifier(name)}.${identifier(table)}`).join(",")} TO ${identifier(fixtureRole)}`);
+      const access = await db.$queryRawUnsafe<{ usage: boolean; create: boolean; write: boolean }[]>(`SELECT
+        has_schema_privilege(current_user,$1,'USAGE') AS usage,has_schema_privilege(current_user,$1,'CREATE') AS create,
+        EXISTS(SELECT 1 FROM unnest($2::text[]) t WHERE has_table_privilege(current_user,t,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')) AS write`,
+      name, tables.map(table => `${identifier(name)}.${identifier(table)}`));
+      expect(access).toEqual([{ usage: true, create: false, write: false }]);
+    }
+    console.info("R8 read-only campaign provenance", { namespaces: namespaces.map(row => row.name) });
+  }
   async function triggerModes() {
     return (await fixtureOwner.query<TriggerMode>(`SELECT n.nspname AS schema,c.relname AS table,t.tgname AS name,t.tgenabled AS mode,
       pg_get_triggerdef(t.oid) AS definition FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
@@ -375,6 +394,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     await fixtureOwner.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ${identifier(fixtureRole)}`);
     const applicationUrl = new URL(ownerUrl); applicationUrl.username = fixtureRole; applicationUrl.password = login;
     try { process.env["DATABASE_URL"] = applicationUrl.toString(); db = new PrismaService(); } finally { process.env["DATABASE_URL"] = ownerUrl; }
+    await grantCampaignProvenance();
     const role = await db.$queryRaw<{ current_user: string; session_user: string; privileged: boolean; owns: boolean }[]>`SELECT current_user,session_user,
       (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls) AS privileged,
       EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relowner=r.oid) AS owns
@@ -439,10 +459,22 @@ describe("public continuity across different sellers and Listings", { concurrent
     await db.staffGrant.create({ data: templateGrant });
     owned.qualifications.push(suite.id("template-qualification"));
     await db.diagnosticCenterAssignment.create({ data: { id: suite.id("template-qualification"), centerId, userId: suite.id("reception"), capability: "diagnostics.templates", qualifiedUntil: future } });
+    // A worker may retain an earlier full-v3 campaign. Exercise that same
+    // provenance boundary in an isolated run, before managed guards activate.
+    const campaignId = "d901d901d901d901d901d901d901d901";
+    const namespace = `cf_${campaignId}`;
+    const retained = await fixtureOwner.query<{ present: boolean }>("SELECT to_regnamespace($1) IS NOT NULL AS present", [namespace]);
+    if (!retained.rows[0]?.present) {
+      const sql = execFileSync(process.execPath, [resolve(__dirname, "../../../../../../scripts/testing/campaign-preparation-fixture.mjs"),
+        "campaign897-full-v3", campaignId, "67fb9e8e9c90265b0d3fd25a0072eb633e86cbec"], { encoding: "utf8", maxBuffer: 1024 * 1024 });
+      await fixtureOwner.query(sql);
+    }
+    await grantCampaignProvenance();
     await activateFixture();
     const published = await post("reception", `centers/${centerId}/templates`, { expectedVersion: 0, definition, synthetic: true });
     if (typeof published.body.id === "string") templateId = published.body.id;
     expect(published.status, JSON.stringify(published.body)).toBe(201);
+
   });
   afterAll(async () => {
     try {
@@ -596,6 +628,19 @@ describe("public continuity across different sellers and Listings", { concurrent
   }
 
   const publicGet = (path: string) => request.get(`/api/v1/public-diagnostics/${path}`);
+  it("admits the first ordinary public visit with retained campaign provenance", async () => {
+    const requestKey = randomUUID(); owned.requestKeys.push(requestKey);
+    const response = await post("sellerA", "orders", { requestKey, centerId,
+      templateVersionId: templateId, audience: "listing_public", listingId: suite.id("listing-A"), synthetic: true });
+    if (typeof response.body.id === "string") {
+      owned.orders.push(response.body.id);
+      owned.assignments.push({ orderId: response.body.id, userId: suite.id("reception"), capability: "diagnostics.reception" });
+    }
+    expect(response.status, JSON.stringify(response.body)).toBe(201);
+    expect(response.body).toMatchObject({ version: 0, audience: "listing_public", listingId: suite.id("listing-A") });
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: response.body.id } })).toMatchObject({ commissionerId: suite.id("sellerA"), requestKey });
+  });
+
   it("links independently observed public visits across distinct sellers and Listings without transferring restricted authority", async () => {
     expect(suite.id("reviewer")).not.toBe(suite.id("technician"));
     expect(suite.id("sellerA")).not.toBe(suite.id("sellerB"));

@@ -8,7 +8,7 @@ import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool, type PoolClient } from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 import { withCampaignPreparation, type Prisma } from "../src/index";
@@ -16,7 +16,9 @@ import { withCampaignPreparation, type Prisma } from "../src/index";
 // R6a original matrix continuation, attempt 2. Authored source only.
 // Parent owns source disposition and separately authorized disposable execution.
 // This file never accepts a DATABASE_URL: it migrates only its own container.
-// Strict source guards remain dormant. Ordinary FK/check triggers stay enabled.
+// Task-owned fixture facts precede complete local source/campaign activation.
+// Exact inherited trigger modes are restored before each case database is dropped.
+// Automatic admission remains closed; ordinary FK/check triggers stay enabled.
 type Subject = { userId: string; sessionId: string };
 interface Caller {
  open(subject: Subject, purpose: "support" | "history", sourceListingId?: string): Promise<{ id: string; resourceId: string }>;
@@ -93,11 +95,39 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  const pending: Promise<unknown>[] = [];
  const releases: (() => void)[] = [];
  const role = "r6a_service_caller";
+ type TriggerMode = "D" | "O" | "A" | "R";
+ type TriggerState = { table: string; name: string; enabled: TriggerMode; guard: boolean };
+ let triggerState: TriggerState[] = [];
+ let activation: Promise<void> | undefined;
+ const quoted = (value: string) => `"${value.replaceAll('"', '""')}"`;
+ async function snapshotTriggers() {
+  return (await pool.query<TriggerState>(`SELECT c.relname AS table,t.tgname AS name,t.tgenabled::text AS enabled,
+   (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate') AS guard
+   FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname='public' ORDER BY c.relname,t.tgname`)).rows;
+ }
+ async function activate() {
+  for (const row of triggerState.filter(row => row.guard)) await pool.query(`ALTER TABLE public.${quoted(row.table)} ENABLE TRIGGER ${quoted(row.name)}`);
+  const state = await snapshotTriggers();
+  expect(state.filter(row => !row.guard), "ordinary integrity trigger modes unchanged").toEqual(triggerState.filter(row => !row.guard));
+  const ready = present((await pool.query<{ source: boolean; campaign: boolean }>("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign")).rows[0]);
+  expect(ready).toEqual({ source: true, campaign: true });
+  console.info("R6a disposable guards active", JSON.stringify({ database: scenarioDatabase, guards: state.filter(row => row.guard), ready }));
+ }
+ async function restoreTriggers() {
+  for (const row of triggerState) {
+   const mode = { D: "DISABLE", O: "ENABLE", A: "ENABLE ALWAYS", R: "ENABLE REPLICA" }[row.enabled];
+   await pool.query(`ALTER TABLE public.${quoted(row.table)} ${mode} TRIGGER ${quoted(row.name)}`);
+  }
+  expect(await snapshotTriggers(), "exact inherited guard and integrity modes restored").toEqual(triggerState);
+  console.info("R6a disposable triggers restored", { database: scenarioDatabase, count: triggerState.length });
+ }
 
  beforeAll(async () => {
   container = await new PostgreSqlContainer("postgres:17-alpine").start();
+  console.info("R6a disposable PostgreSQL", { id: container.getId(), host: container.getHost(), port: container.getPort(), image: "postgres:17-alpine" });
   const url = container.getConnectionUri();
-  execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
+  console.info("R6a exact migration deploy", execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: { ...process.env, DATABASE_URL: url }, encoding: "utf8", stdio: "pipe" }));
   pool = new Pool({ connectionString: url });
   db = new PrismaClient({ adapter: new PrismaPg(pool) });
   await pool.query(`CREATE ROLE ${role} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
@@ -152,7 +182,13 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const url = new URL(container.getConnectionUri()); url.pathname = `/${scenarioDatabase}`;
   pool = new Pool({ connectionString: url.href });
   db = new PrismaClient({ adapter: new PrismaPg(pool) });
-  vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now);
+  triggerState = []; activation = undefined;
+  triggerState = await snapshotTriggers();
+  expect(triggerState.filter(row => row.guard).length).toBeGreaterThan(0);
+  console.info("R6a inherited triggers", JSON.stringify({ database: scenarioDatabase, triggers: triggerState }));
+  for (const row of triggerState.filter(row => row.guard)) await pool.query(`ALTER TABLE public.${quoted(row.table)} DISABLE TRIGGER ${quoted(row.name)}`);
+  // Production Prisma defaults use the real wall clock. Service/authority
+  // decisions retain their explicitly injected deterministic clock.
  });
  afterEach(async context => {
   for (const release of releases.splice(0)) release();
@@ -160,10 +196,10 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   // Drain even if a barrier, assertion or rollback failed. Preserve the test's
   // original error; cleanup failures are additional evidence, never its replacement.
   await Promise.allSettled(pending.splice(0));
-  vi.useRealTimers();
   for (const client of clients.splice(0)) {
    try { client.release(); } catch (error) { cleanup.push({ status: "rejected", reason: error }); }
   }
+  cleanup.push(...await Promise.allSettled([restoreTriggers()]));
   cleanup.push(...await Promise.allSettled([db.$disconnect(), pool.end()]));
   cleanup.push(...await Promise.allSettled([adminPool.query(`DROP DATABASE "${scenarioDatabase}"`)]));
   const failures = cleanup.flatMap(result => result.status === "rejected" ? [result.reason as unknown] : []);
@@ -172,7 +208,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    else throw new AggregateError(failures, "R6a fixture cleanup failed");
   }
  });
- afterAll(async () => { await adminPool?.end(); await container?.stop(); });
+ afterAll(async () => { await adminPool?.end(); await container?.stop(); console.info("R6a disposable container removed", { id: container?.getId() }); });
  async function connection() {
   const client = await pool.connect(); clients.push(client);
   await client.query("SET statement_timeout='8s'");
@@ -189,6 +225,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    }
    await new Promise(resolve => setTimeout(resolve, 5));
   }
+  console.error("R6a absent barrier backend state", (await observer.query("SELECT pid,state,wait_event_type,wait_event,query,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE pid=ANY($1::int[])", [[waiter, blocker]])).rows);
   throw new Error(`no PostgreSQL barrier: waiter=${waiter} blocker=${blocker}`);
  }
  // The facade owns only transaction instrumentation. Every query and public
@@ -197,10 +234,12 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const ready = latch(), finish = latch(), started = latch();
   releases.push(finish.release);
   let backend = 0;
-  const database = { $transaction: <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => db.$transaction(async tx => {
+  const database = { $transaction: async <T>(work: (tx: Prisma.TransactionClient) => Promise<T>, nativeOptions?: { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel }) => {
+   activation ??= activate(); await activation;
+   return db.$transaction(async tx => {
    await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`);
-   const [identity] = await tx.$queryRaw<{ pid: number; elevated: boolean; trigger: boolean }[]>`SELECT pg_backend_pid() AS pid,rolsuper OR rolcreatedb OR rolcreaterole AS elevated,has_table_privilege(current_user,'users','TRIGGER') AS trigger FROM pg_roles WHERE rolname=current_user`;
-   expect(identity).toMatchObject({ elevated: false, trigger: false });
+   const [identity] = await tx.$queryRaw<{ pid: number; name: string; elevated: boolean; login: boolean; inherit: boolean; owns: boolean; trigger: boolean }[]>`SELECT pg_backend_pid() AS pid,current_user AS name,rolsuper OR rolcreatedb OR rolcreaterole AS elevated,rolcanlogin AS login,rolinherit AS inherit,pg_has_role(current_user,c.relowner,'USAGE') AS owns,has_table_privilege(current_user,'users','TRIGGER') AS trigger FROM pg_roles JOIN pg_class c ON c.oid='public.users'::regclass WHERE rolname=current_user`;
+   expect(identity).toMatchObject({ name: role, elevated: false, login: false, inherit: false, owns: false, trigger: false });
    backend = present(identity).pid; started.release();
    const instrumented = options.finishRefusal ? new Proxy(tx, { get(target, key) {
     if (key === "$queryRaw") return async (strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -218,13 +257,13 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    } }) : tx;
    let result: T;
    try { result = await work(instrumented); }
-   catch (error) { ready.release(); if (options.holdFailure) await finish.promise; throw error; }
+   catch (error) { console.error("R6a actual caller transaction failure", { database: scenarioDatabase, backend, error }); ready.release(); if (options.holdFailure) await finish.promise; throw error; }
    await options.inspect?.(tx, result);
    ready.release();
    if (options.hold) await finish.promise;
    if (options.rollback) throw new Error("caller outer rollback");
    return result;
-  }, { timeout: 20000 }) };
+  }, nativeOptions); } };
   return { database, run: database.$transaction, service: construct(database, options.enabled ?? true, options.store, options.campaign, options.clock), started: started.promise, ready: ready.promise, release: finish.release, pid: () => backend };
  }
  function observe<T>(promise: Promise<T>) {
@@ -233,7 +272,10 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
  }
  async function principal(staff = false) {
   const user = await db.user.create({ data: { id: fixtureId(), email: `${fixtureId()}@example.invalid`, emailVerifiedAt: now, nameNumber: 1234, avatarIndex: 0, createdAt: now } });
-  const session = await db.session.create({ data: { id: fixtureId(), createdAt: now, userId: user.id, refreshTokenHash: fixtureId(), expiresAt: future, adminTotpExpiresAt: future } });
+  // Native Session rotation samples wall time; injected service authority uses
+  // now. Start valid for both, while expiry-opponent commands still write now.
+  const sessionValidUntil = new Date(Math.max(future.getTime(), Date.now() + 24 * 60 * 60 * 1000));
+  const session = await db.session.create({ data: { id: fixtureId(), createdAt: now, userId: user.id, refreshTokenHash: fixtureId(), expiresAt: sessionValidUntil, adminTotpExpiresAt: sessionValidUntil } });
   if (staff) for (const capability of ["support.operations", "history.fulfilment"]) await db.staffGrant.create({ data: { userId: user.id, capability, grantedAt: now } });
   return { userId: user.id, sessionId: session.id };
  }
@@ -719,7 +761,12 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const reportsBefore = await db.contentReport.findMany({ orderBy: { id: "asc" } });
   const reason = "R6a original M2 actual suspension";
   const a = caller({ hold: first === "service" }), b = caller({ hold: first === "writer" });
-  const suspend = () => suspensionWriter(b.database).execute({ userId: subject.userId, adminUserId: admin.userId, reason });
+  let suspensionInterval: { started: Date; completed: Date } | undefined;
+  const suspend = async () => {
+   const started = new Date();
+   try { return await suspensionWriter(b.database).execute({ userId: subject.userId, adminUserId: admin.userId, reason }); }
+   finally { suspensionInterval = { started, completed: new Date() }; }
+  };
   const read = () => a.service.read(subject, f.id, 0, 20);
   // Register both outcomes immediately. afterEach releases every latch and
   // drains both even when ready/barrier/assertions fail, preserving that error.
@@ -740,15 +787,23 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const write = first === "writer" ? leading : trailing, readResult = first === "writer" ? trailing : leading;
   expect(write.ok, "actual SuspendUser outer transaction commits").toBe(true);
   if (!write.ok) throw write.error;
-  expect(write.value).toEqual({ targetId: subject.userId, targetState: { suspendedAt: now, suspendedById: admin.userId, suspensionReason: reason }, reportId: undefined, reportStatus: undefined, auditLogId: expect.any(String) });
+  const suspendedAt = (write.value as Awaited<ReturnType<SuspensionWriter["execute"]>>).targetState.suspendedAt;
+  const interval = present(suspensionInterval);
+  expect(suspendedAt).toBeInstanceOf(Date);
+  expect(suspendedAt.getTime(), "reviewedAt is inside independently observed real execution").toBeGreaterThanOrEqual(interval.started.getTime());
+  expect(suspendedAt.getTime()).toBeLessThanOrEqual(interval.completed.getTime());
+  expect(write.value).toEqual({ targetId: subject.userId, targetState: { suspendedAt, suspendedById: admin.userId, suspensionReason: reason }, reportId: undefined, reportStatus: undefined, auditLogId: expect.any(String) });
   expect(readResult.ok, "one read decision at the real suspension barrier").toBe(first === "service");
   if (!readResult.ok) expect(readResult.error).toMatchObject({ code: "NO_ACCESS" });
   else expect(readResult.value).toMatchObject({ id: f.id, resourceId: f.resource, assignmentVersion: 1, messages: [], lastSequence: 8, readThrough: 0, unread: 0, hasMore: false });
-  expect(await db.user.findUniqueOrThrow({ where: { id: subject.userId } })).toEqual({ ...beforeUser, suspendedAt: now, suspendedById: admin.userId, suspensionReason: reason });
+  const suspendedUser = await db.user.findUniqueOrThrow({ where: { id: subject.userId } });
+  expect(suspendedUser.updatedAt.getTime(), "native User updatedAt belongs to the same real execution").toBeGreaterThanOrEqual(suspendedAt.getTime());
+  expect(suspendedUser.updatedAt.getTime()).toBeLessThanOrEqual(interval.completed.getTime());
+  expect(suspendedUser).toEqual({ ...beforeUser, updatedAt: suspendedUser.updatedAt, suspendedAt, suspendedById: admin.userId, suspensionReason: reason });
   expect(await db.session.findMany({ where: { userId: subject.userId } }), "all target Sessions revoked").toEqual([]);
   expect(await db.session.findUnique({ where: { id: admin.sessionId } }), "admin Session survives target suspension").not.toBeNull();
   const moderation = await db.auditLog.findMany({ orderBy: { id: "asc" }, select: { id: true, actorId: true, action: true, targetType: true, targetId: true, details: true } });
-  expect(moderation, "exact owner-written moderation audit").toEqual([{ id: (write.value as { auditLogId: string }).auditLogId, actorId: admin.userId, action: "USER_SUSPEND", targetType: "user", targetId: subject.userId, details: { reason, before: { suspendedAt: null, suspendedById: null, suspensionReason: null }, after: { suspendedAt: now.toISOString(), suspendedById: admin.userId, suspensionReason: reason } } }]);
+  expect(moderation, "exact owner-written moderation audit").toEqual([{ id: (write.value as { auditLogId: string }).auditLogId, actorId: admin.userId, action: "USER_SUSPEND", targetType: "user", targetId: subject.userId, details: { reason, before: { suspendedAt: null, suspendedById: null, suspensionReason: null }, after: { suspendedAt: suspendedAt.toISOString(), suspendedById: admin.userId, suspensionReason: reason } } }]);
   expect(await db.contentReport.findMany({ orderBy: { id: "asc" } }), "direct suspension leaves reports unchanged").toEqual(reportsBefore);
   expect(await audit(f.resource), "only successful staff read emits SERVICE_READ").toEqual(first === "service" && audience === "staff" ? [{ action: "SERVICE_READ", actorId: subject.userId, assignmentVersion: 1 }] : []);
   expect(await effects(f.id), "refused read leaves no service residue").toEqual({ messages: 0, outbox: 0, reads: 0, subscriptions: 0 });
