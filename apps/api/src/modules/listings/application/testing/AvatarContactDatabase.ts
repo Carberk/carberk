@@ -59,6 +59,7 @@ export class AvatarContactDatabase {
       const key = JSON.parse(String(values[1])) as Row;
       return [{ row: json(this.rows(String(values[0])).find(r => Object.entries(key).every(([k, v]) => r[k] === v)) ?? null) }];
     }
+    if (text.includes("pg_advisory_xact_lock(") && !text.trimEnd().endsWith("::text")) throw new Error("unsupported_void_result");
     if (text.includes("diagnostic_source_lock_keys(")) throw new Error("diagnostic_intake_reception_selection");
     if (text.includes("diagnostic_source_lock_keys_before_intake(")) {
       const slots = JSON.parse(String(values[0])) as { table: string; key: { id?: string } }[];
