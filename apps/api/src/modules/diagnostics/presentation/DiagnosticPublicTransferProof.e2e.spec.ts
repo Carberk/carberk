@@ -173,12 +173,12 @@ describe("public continuity across different sellers and Listings", { concurrent
   let catalogRegistered = false;
   const headers = (who: Person) => ({ authorization: `Bearer ${jwt.sign({ sub: suite.id(who), sid: suite.id(`${who}-session`), role: "buyer" })}` });
   const runtimeStarted = performance.now();
-  let lastResponse: { verb: string; path: string; status: number; elapsedMs: number } | undefined;
-  const observeResponse = (verb: string, path: string) => (response: { status: number }) => {
-    lastResponse = { verb, path, status: response.status, elapsedMs: Math.round(performance.now() - runtimeStarted) };
+  const responses: { verb: string; path: string; who: Person; status: number; elapsedMs: number }[] = [];
+  const observeResponse = (verb: string, path: string, who: Person) => (response: { status: number }) => {
+    responses.push({ verb, path, who, status: response.status, elapsedMs: Math.round(performance.now() - runtimeStarted) });
   };
-  const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body).on("response", observeResponse("POST", path));
-  const get = (who: Person, path: string) => request.get(`/api/v1/diagnostics/${path}`).set(headers(who)).on("response", observeResponse("GET", path));
+  const post = (who: Person, path: string, body: object) => request.post(`/api/v1/diagnostics/${path}`).set(headers(who)).send(body).on("response", observeResponse("POST", path, who));
+  const get = (who: Person, path: string) => request.get(`/api/v1/diagnostics/${path}`).set(headers(who)).on("response", observeResponse("GET", path, who));
   const evidencePath = (o: Order) => `orders/${o.id}/identity-evidence`;
   const provenancePath = (o: Order, id?: string) => `orders/${o.id}/identity-provenance${id ? `/${id}` : ""}`;
   const comparisonPath = (b: Order, reportId: string) => `orders/${b.id}/reinspection-comparison?predecessorId=${reportId}`;
@@ -314,7 +314,8 @@ describe("public continuity across different sellers and Listings", { concurrent
       // finally. Keep all original attribution assertions and exact object cleanup;
       // never bypass a source guard to manufacture row-by-row fixture teardown.
       if (triggerSnapshot.length) {
-        console.info("R8 disposable fixture outcomes", { lastResponse, orders: orders.length, reports: reports.length,
+        console.info("R8 disposable HTTP responses", responses);
+        console.info("R8 disposable fixture outcomes", { lastResponse: responses.at(-1), orders: orders.length, reports: reports.length,
           raw: await db.diagnosticIdentityRecord.count({ where: { orderId: { in: owned.orders } } }),
           components: await db.diagnosticOwnershipComponent.count({ where: { orderId: { in: owned.orders } } }),
           grants: await db.diagnosticOwnershipGrant.count({ where: { orderId: { in: owned.orders } } }),
@@ -961,6 +962,51 @@ describe("public continuity across different sellers and Listings", { concurrent
 
   it("refuses automatic continuity after a restored Listing VIN change without reobserving A", async () => {
     await refusesRestoredAutomaticOwnershipMutation("vin");
+  });
+
+  it("issues and consumes ordinary automatic continuity bound to both persisted first anchors", async () => {
+    const p = await automaticCandidate(await automaticPredecessor());
+    const anchors = await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } } });
+    expect(anchors).toHaveLength(2);
+    expect(anchors.find(row => row.orderId === p.a.id)).toMatchObject({ firstRecordId: p.ia.id, state: "unchanged" });
+    expect(anchors.find(row => row.orderId === p.b.id)).toMatchObject({ firstRecordId: p.ib.id, state: "unchanged" });
+    const issued = await post("reviewer", `orders/${p.b.id}/continuity-proofs`, automaticInput(p));
+    if (typeof issued.body.proofId === "string") owned.proofs.push(issued.body.proofId);
+    expect(issued.status, JSON.stringify(issued.body)).toBe(201); privateNoStore(issued);
+    const proofId = issued.body.proofId as string;
+    const stored = await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    expect(stored.bindings).toMatchObject({ ownership: [
+      { originalRecordId: p.ia.id, selectedRecordId: p.ia.id, currentRecordId: p.ia.id,
+        records: [{ id: p.ia.id, ownership: { state: "available", listingId: p.listingId, sellerId: suite.id("sellerA"), commissionerId: suite.id("sellerA") } }] },
+      { originalRecordId: p.ib.id, selectedRecordId: p.ib.id, currentRecordId: p.ib.id,
+        records: [{ id: p.ib.id, ownership: { state: "available", listingId: p.listingId, sellerId: suite.id("sellerA"), commissionerId: suite.id("sellerA") } }] },
+    ] });
+    const input = publicLink(p, proofId);
+    const created = await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201); privateNoStore(created);
+    expect(created.body).toMatchObject({ id: input.reportId, successorOf: p.released.id, status: "draft", version: 0 });
+    expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toMatchObject({ consumedReportId: input.reportId, consumedAt: initialTime });
+    expect((await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201)).body).toEqual(created.body);
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(1);
+    expect((await db.diagnosticAudit.findMany({ where: { orderId: p.b.id, action: { in: ["CONTINUITY_PROOF_ISSUED", "CONTINUITY_PROOF_CONSUMED", "REPORT_REINSPECTION_CREATED"] } } })).map(row => row.action).sort())
+      .toEqual(["CONTINUITY_PROOF_CONSUMED", "CONTINUITY_PROOF_ISSUED", "REPORT_REINSPECTION_CREATED"]);
+    expect(await db.diagnosticSourceAnchor.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } } })).toEqual(anchors);
+  });
+
+  it.each(["A", "B"] as const)("refuses unused automatic continuity after authenticated %s ownership-grant revocation", async side => {
+    const p = await automaticCandidate(await automaticPredecessor());
+    const issued = await post("reviewer", `orders/${p.b.id}/continuity-proofs`, automaticInput(p));
+    if (typeof issued.body.proofId === "string") owned.proofs.push(issued.body.proofId);
+    expect(issued.status, JSON.stringify(issued.body)).toBe(201);
+    const proofId = issued.body.proofId as string;
+    const order = side === "A" ? p.a : p.b;
+    const raw = side === "A" ? p.ia : p.ib;
+    const component = await db.diagnosticOwnershipComponent.findUniqueOrThrow({ where: { identityRecordId: raw.id } });
+    expect(component.grantId).toEqual(expect.stringMatching(uuid));
+    await post("sellerA", `orders/${order.id}/ownership-grant/${component.grantId}/revoke`, {}).expect(201);
+    const input = publicLink(p, proofId);
+    await denied(await post("technician", `orders/${p.b.id}/reinspections`, input));
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(0);
+    expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(0);
   });
 
   it("links unchanged public Listing identity and ownership by normalized VIN with independent B release", async () => {
