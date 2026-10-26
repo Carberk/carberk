@@ -46,7 +46,7 @@ describe("real prepared diagnostic material adapters", () => {
   let bytes: Uint8Array, storage: S3DiagnosticObjects, s3: S3Client;
   let guardState: { table: string; name: string; enabled: string }[] = [];
   const runtimeRole = `r4_${randomUUID().replaceAll("-", "")}`;
-  let roleCreated = false, completedReads = 0;
+  let roleCreated = false, completedReads = 0, purgeUserId: string;
   const id = (name: string) => suite.id(`${runId}-${sequence}-${name}`);
   const subject = () => ({ userId: id("technician"), sessionId: id("session") });
   const rights = (): D.DiagnosticIdentityRights => ({ category: "vehicle_observation", purpose: "Restricted visit comparison", basis: "Synthetic fixture declaration", provenance: "Synthetic fixture only",
@@ -101,6 +101,23 @@ describe("real prepared diagnostic material adapters", () => {
     // empty relation. Erasure deletes those proofs. Both are required trigger effects.
     await pool.query(`GRANT UPDATE,DELETE ON public.diagnostic_continuity_proofs TO "${runtimeRole}"`);
     for (const table of writable) await pool.query(`GRANT INSERT,UPDATE,DELETE ON public."${table}" TO "${runtimeRole}"`);
+    // Unchanged account-purge helpers issue these statements even for empty
+    // ancillary relations. Privileges follow their concrete verbs, not ALL tables.
+    const purgePermissions: Record<string, string[]> = {
+      DELETE: ["diagnostic_continuity_requests", "otp_requests", "measurement_investigation_exports", "measurement_principals", "totp_enrollments", "fcm_devices",
+        "notification_history", "notification_preferences", "saved_searches", "favorites", "owned_vehicles", "blocked_users", "dealership_members",
+        "listing_drafts", "verified_contact_phones", "service_messages", "service_push_subscriptions", "service_outbox", "service_read_states"],
+      UPDATE: ["media_uploads", "listings", "service_conversations", "service_attachments", "service_messages", "service_audits", "support_cases",
+        "history_deliveries", "history_artifacts", "history_bookings", "history_payments", "history_purchase_intents", "history_refunds", "history_orders",
+        "history_quotes", "vehicle_history_requests", "video_grants", "video_process_work", "video_generations", "video_upload_sessions",
+        "service_erasure_fences", "video_cleanup_work", "diagnostic_pdf_artifacts", "diagnostic_ownership_grants", "diagnostic_ownership_components", "dealerships"],
+      INSERT: ["media_upload_cleanups", "video_cleanup_work", "service_erasure_fences"],
+    };
+    for (const [verb, tables] of Object.entries(purgePermissions)) for (const table of tables) {
+      await pool.query(`GRANT SELECT,${verb} ON public."${table}" TO "${runtimeRole}"`);
+    }
+    // Required SELECT FOR UPDATE dependencies of the unchanged erasure helper.
+    await pool.query(`GRANT SELECT,UPDATE ON public.support_cases,public.vehicle_history_requests,public.listing_drafts TO "${runtimeRole}"`);
     const runtimeUrl = new URL(adminUrl); runtimeUrl.username = runtimeRole; runtimeUrl.password = password;
     process.env["DATABASE_URL"] = runtimeUrl.toString();
     try { db = new PrismaService(); } finally { process.env["DATABASE_URL"] = adminUrl; }
@@ -122,6 +139,7 @@ describe("real prepared diagnostic material adapters", () => {
   });
   beforeEach(async () => {
     await guards(false); sequence++; clock = new Date(); putFailure = false; afterPut = undefined; afterRead = undefined; stored.clear();
+    purgeUserId = subject().userId;
     centerId = id("center"); orderId = id("order"); rawId = id("raw"); reportId = id("report");
     const templateId = id("template"), userId = subject().userId;
     await db.user.create({ data: { id: userId } });
@@ -369,7 +387,7 @@ describe("real prepared diagnostic material adapters", () => {
     if (first === "source") {
       expect(changed.ok).toBe(true);
       expect(staged.ok).toBe(false);
-      if (!staged.ok) expect(() => { throw staged.error; }).toThrow("DIAGNOSTIC_STALE_VERSION");
+      if (!staged.ok) expect(() => { throw staged.error; }).toThrow("diagnostic_source_graph_changed");
       expect(await db.diagnosticIdentityProvenance.findUnique({ where: { id: input.id } })).toBeNull();
       expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } })).toEqual({ ...before, version: 2, updatedAt: clock });
       const audits = await db.diagnosticAudit.findMany({ where: { orderId } });
@@ -431,7 +449,7 @@ describe("real prepared diagnostic material adapters", () => {
         }
       } else if (defect === "rights") clock = new Date(rights().schedule.until);
       // Explicit erasure fault through the existing prepared helper. This is
-      // not accepted actual purge opposition; NEW130 remains external.
+      // not accepted actual purge opposition; actual purge has distinct cases below.
       else await material({ state: "cleanup_pending", rights: null, createdById: null, erasedAt: clock, cleanupRequestedAt: clock, epoch: randomUUID() }, p);
     };
     await expect(identity.read(subject(), orderId, p)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
@@ -469,6 +487,10 @@ describe("real prepared diagnostic material adapters", () => {
   });
   it.each(["identity", "finding"] as const)("R4 remaining object collision races with %s first", async first => {
     const input = stage();
+    const before = await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } });
+    const raw = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } });
+    const report = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } });
+    const assignments = await db.diagnosticOrderAssignment.findMany({ where: { orderId }, orderBy: { id: "asc" } });
     const gate = await pool.connect();
     const table = first === "identity" ? "diagnostic_identity_provenance" : "diagnostic_evidence";
     const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
@@ -483,7 +505,9 @@ describe("real prepared diagnostic material adapters", () => {
       await blockedBy(gatePid, `%INSERT%${table}%`);
       const held = await pool.query<{ pid: number }>("SELECT pid FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid)) AND query LIKE $2", [gatePid, `%INSERT%${table}%`]);
       rival = outcome<unknown>(first === "identity" ? finding() : staging());
-      await blockedBy(held.rows[0]!.pid, "%diagnostic_prepare_source%");
+      // The finding caller first owns a read prefix. Identity staging
+      // enters source preparation directly. Observe each real phase.
+      await blockedBy(held.rows[0]!.pid, first === "identity" ? "%pg_advisory_xact_lock%" : "%diagnostic_prepare_source%");
     } finally {
       await gate.query("SELECT pg_advisory_unlock(18975,hashtext($1))", [input.id]); gate.release();
       console.info("r4_collision_outcomes", first, await Promise.all([owner, rival]));
@@ -492,7 +516,7 @@ describe("real prepared diagnostic material adapters", () => {
     expect((await owner!)?.ok).toBe(true);
     const loser = await rival!;
     expect(loser?.ok).toBe(false);
-    if (loser && !loser.ok) expect(() => { throw loser.error; }).toThrow("diagnostic_source_graph_changed");
+    if (loser && !loser.ok) expect(() => { throw loser.error; }).toThrow(first === "identity" ? "DIAGNOSTIC_NO_ACCESS" : "diagnostic_source_graph_changed");
     const provenance = await db.diagnosticIdentityProvenance.findUnique({ where: { id: input.id } });
     const ordinary = await db.diagnosticEvidence.findUnique({ where: { id: input.id } });
     if (first === "identity") {
@@ -503,6 +527,11 @@ describe("real prepared diagnostic material adapters", () => {
       expect(ordinary).toMatchObject({ reportId, state: "verified", cleanupRequestedAt: null });
       expect(await storage.read(ordinary!.objectKey, ordinary!.sizeBytes!, ordinary!.sha256!)).toEqual((await storage.sanitize(bytes, "image/png")).bytes);
     }
+    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } })).toEqual(before);
+    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } })).toEqual(raw);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toEqual(report);
+    expect(await db.diagnosticOrderAssignment.findMany({ where: { orderId }, orderBy: { id: "asc" } })).toEqual(assignments);
+    if (first === "identity") expect(stored.size).toBe(0);
     expect(await db.diagnosticIdentityEvidence.count({ where: { orderId } })).toBe(0);
     expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
   });
@@ -549,23 +578,199 @@ describe("real prepared diagnostic material adapters", () => {
     expect(await db.diagnosticAudit.count({ where: { orderId } })).toBe(0);
     expect(stored.size).toBe(0);
   });
-  it("R4 remaining actual purge fences retained material and raw/report pins atomically", async () => {
-    const p = await verified();
-    await identity.append(subject(), orderId, capture(p));
-    // Scheduling is a fixture precondition, not the purge opponent.
-    await guards(false);
-    await db.user.update({ where: { id: subject().userId }, data: { deletionScheduledAt: clock } });
-    await guards(true);
+  const purge = () => {
     const workerPath = resolve(__dirname, "../../../../../worker/dist/jobs/PurgeExpiredAccounts.js");
     const { PurgeExpiredAccounts } = createRequire(__filename)(workerPath) as { PurgeExpiredAccounts: new (db: PrismaService) => { execute(input: { now: Date }): Promise<{ purgedCount: number }> } };
-    const result = await outcome(new PurgeExpiredAccounts(db).execute({ now: clock }));
-    console.info("r4_actual_purge_outcome", result);
-    expect(result).toEqual({ ok: true, value: { purgedCount: 1 } });
-    expect(await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } })).toMatchObject({ commissionerId: null, erasedAt: clock });
-    expect(await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } })).toMatchObject({ observation: null, observationHash: null, erasedAt: clock });
-    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } })).toMatchObject({ identityRecordId: null, identityRecordHash: null, erasedAt: clock });
-    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toMatchObject({ state: "cleanup_pending", rights: null, erasedAt: clock });
+    return new PurgeExpiredAccounts(db).execute({ now: clock });
+  };
+  async function preparePurgeSubject() {
+    // The due commissioner is distinct from the lawful current staff caller.
+    // Scheduling a staff actor itself would revoke access before either race.
+    purgeUserId = id("purge-customer");
+    await guards(false);
+    try {
+      await db.user.create({ data: { id: purgeUserId, displayName: "R4 synthetic purge subject", email: `${purgeUserId}@example.invalid`, emailVerifiedAt: clock } });
+      await db.session.create({ data: { id: id("purge-customer-session"), userId: purgeUserId, refreshTokenHash: id("purge-customer-refresh"), expiresAt: new Date(clock.getTime() + 86400_000) } });
+      await db.inspectionOrder.update({ where: { id: orderId }, data: { commissionerId: purgeUserId } });
+    } finally { await guards(true); }
+  }
+  async function schedulePurge(at: Date | null = clock) {
+    // Scheduling/restoration is a disposable fixture precondition only.
+    await guards(false);
+    try { await db.user.update({ where: { id: purgeUserId }, data: { deletionScheduledAt: at } }); }
+    finally { await guards(true); }
+  }
+  async function snapshot() {
+    return {
+      user: await db.user.findUniqueOrThrow({ where: { id: purgeUserId } }),
+      sessions: await db.session.findMany({ where: { userId: purgeUserId }, orderBy: { id: "asc" } }),
+      order: await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } }),
+      raw: await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } }),
+      report: await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: reportId } }),
+      material: await db.diagnosticIdentityProvenance.findMany({ where: { orderId }, orderBy: { id: "asc" } }),
+      evidence: await db.diagnosticIdentityEvidence.findMany({ where: { orderId }, orderBy: { id: "asc" } }),
+      audits: await db.diagnosticAudit.findMany({ where: { orderId }, orderBy: { id: "asc" } }),
+      assignments: await db.diagnosticOrderAssignment.findMany({ where: { orderId }, orderBy: { id: "asc" } }),
+      receipts: (await pool.query("SELECT id,command FROM diagnostic_source_commands ORDER BY id")).rows,
+    };
+  }
+  async function foreignControl() {
+    const own = await db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId } });
+    const raw = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: rawId } });
+    const foreignOrder = id("purge-foreign-order"), foreignRaw = id("purge-foreign-raw"), foreignReport = id("purge-foreign-report");
+    const manager = { userId: id("manager"), sessionId: id("manager-session") };
+    await guards(false);
+    try {
+      await db.staffGrant.create({ data: { userId: manager.userId, capability: "diagnostics.technician" } });
+      await db.diagnosticCenterAssignment.create({ data: { id: id("foreign-qualification"), centerId, userId: manager.userId, capability: "diagnostics.technician", qualifiedUntil: new Date(clock.getTime() + 86400_000) } });
+      await db.inspectionOrder.create({ data: { ...own, id: foreignOrder, version: 1, identityEvidenceGeneration: 0, commissionerId: manager.userId, requestKey: id("purge-foreign-request"), physicalAuthorization: { authorityReference: "Foreign synthetic permission", recordedBy: manager.userId, recordedAt: clock.toISOString() }, observedVehicle: own.observedVehicle as Prisma.InputJsonValue, publicationAuthorization: Prisma.DbNull } });
+      await db.diagnosticOrderAssignment.create({ data: { id: id("foreign-assignment"), orderId: foreignOrder, userId: manager.userId, capability: "diagnostics.technician" } });
+      await db.diagnosticIdentityRecord.create({ data: { ...raw, id: foreignRaw, orderId: foreignOrder, recordedById: manager.userId, observation: raw.observation as Prisma.InputJsonValue,
+        observationHash: diagnosticObservationHash(foreignOrder, 1, raw.observation as Omit<D.DiagnosticObservedVehicle, "expectedVersion">) } });
+      const selected = await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: foreignRaw } });
+      await db.diagnosticReportRecord.create({ data: { id: foreignReport, orderId: foreignOrder, identityRecordId: selected.id, identityRecordHash: selected.observationHash, templateVersionId: own.templateVersionId, audience: "buyer_private",
+        state: { id: foreignReport, orderId: foreignOrder, templateVersionId: own.templateVersionId, audience: "buyer_private", status: "draft", authorId: manager.userId, findings: [] } } });
+    } finally { await guards(true); }
+    const input = stage("purge-foreign-provenance");
+    await identity.stage(manager, foreignOrder, input);
+    await identity.upload(manager, foreignOrder, input.id, { expectedOrderVersion: 1, mime: "image/png", bytes });
+    const read = async () => ({
+      user: await db.user.findUniqueOrThrow({ where: { id: manager.userId } }),
+      order: await db.inspectionOrder.findUniqueOrThrow({ where: { id: foreignOrder } }),
+      raw: await db.diagnosticIdentityRecord.findUniqueOrThrow({ where: { id: foreignRaw } }),
+      report: await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: foreignReport } }),
+      material: await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: input.id } }),
+      audits: await db.diagnosticAudit.findMany({ where: { orderId: foreignOrder } }),
+    });
+    const before = await read(), content = await storage.read(before.material.objectKey!, before.material.sizeBytes!, before.material.sha256!);
+    return async () => {
+      expect(await read()).toEqual(before);
+      expect(await storage.read(before.material.objectKey!, before.material.sizeBytes!, before.material.sha256!)).toEqual(content);
+    };
+  }
+  async function assertPurged(p: string, before: Awaited<ReturnType<typeof snapshot>>) {
+    const after = await snapshot();
+    expect(after.user).toMatchObject({ id: before.user.id, deletionScheduledAt: null, phone: null, email: null, displayName: null });
+    expect(after.sessions).toEqual([]);
+    expect(after.order).toMatchObject({ commissionerId: null, erasedAt: clock, physicalAuthorization: null, observedVehicle: null, version: before.order.version + 1, identityEvidenceGeneration: before.order.identityEvidenceGeneration + 1 });
+    expect(after.raw).toMatchObject({ id: rawId, observation: null, observationHash: null, recordedById: null, erasedAt: clock });
+    expect(after.report).toMatchObject({ id: reportId, identityRecordId: null, identityRecordHash: null, erasedAt: clock, snapshot: before.report.snapshot, snapshotHash: before.report.snapshotHash });
+    const row = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } });
+    expect(row).toMatchObject({ state: "cleanup_pending", rights: null, createdById: null, erasedAt: clock, cleanupRequestedAt: clock, objectKey: before.material.find(item => item.id === p)!.objectKey });
+    expect(row.epoch).not.toBe(before.material.find(item => item.id === p)!.epoch);
+    expect(after.assignments).toEqual([]);
+    expect(after.evidence).toEqual(before.evidence.map(item => ({ ...item, observationHash: null, identifiers: null, provenance: null, rights: null, explanation: null, recordHash: null, recordedById: null, erasedAt: clock })));
+    expect(after.audits).toEqual(before.audits.map(item => { const details = { ...(item.details as Record<string, unknown>) }; delete details["reason"]; return { ...item, actorId: item.actorId === purgeUserId ? null : item.actorId, details }; }));
+    expect(after.receipts).toEqual(before.receipts);
+    // Fencing does not claim physical deletion before the actual cleanup worker.
+    expect(await storage.read(row.objectKey!, row.sizeBytes!, row.sha256!)).toEqual(await storage.sanitize(bytes, "image/png").then(clean => clean.bytes));
     await expect(identity.read(subject(), orderId, p)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+  }
+  it("R4 remaining actual purge fences retained material and raw/report pins atomically", async () => {
+    await preparePurgeSubject();
+    const p = await verified();
+    await identity.append(subject(), orderId, capture(p));
+    const foreign = await foreignControl();
+    await schedulePurge();
+    const before = await snapshot();
+    const result = await outcome(purge());
+    console.info("r4_actual_purge_outcome", result);
+    if (!result.ok) expect(await snapshot()).toEqual(before);
+    expect(result).toEqual({ ok: true, value: { purgedCount: 1 } });
+    await assertPurged(p, before);
+    await foreign();
+  });
+  it.each(["read", "purge"] as const)("R4 actual purge and delivery with %s first refuse bytes", async first => {
+    await preparePurgeSubject();
+    const p = await verified(), foreign = await foreignControl();
+    await schedulePurge();
+    const before = await snapshot(), readsBefore = completedReads;
+    if (first === "read") afterRead = async () => {
+      afterRead = undefined;
+      expect(completedReads).toBe(readsBefore + 1);
+      expect(await purge()).toEqual({ purgedCount: 1 });
+    };
+    else expect(await purge()).toEqual({ purgedCount: 1 });
+    await expect(identity.read(subject(), orderId, p)).rejects.toThrow("DIAGNOSTIC_NO_ACCESS");
+    expect(completedReads).toBe(readsBefore + (first === "read" ? 1 : 0));
+    await assertPurged(p, before);
+    await foreign();
+  });
+  it.each(["purge", "material"] as const)("R4 actual purge and staging serialize with %s first", async first => {
+    await preparePurgeSubject();
+    const foreign = await foreignControl(), input = stage();
+    await schedulePurge();
+    const before = await snapshot(), gate = await pool.connect();
+    const table = first === "purge" ? "inspection_orders" : "diagnostic_identity_provenance";
+    const event = first === "purge" ? "UPDATE" : "INSERT", key = first === "purge" ? "id" : "orderId";
+    const query = first === "purge" ? "%UPDATE inspection_orders%" : "%INSERT%diagnostic_identity_provenance%";
+    let purging: ReturnType<typeof outcome<Awaited<ReturnType<typeof purge>>>> | undefined;
+    let staging: ReturnType<typeof outcome<Awaited<ReturnType<typeof identity.stage>>>> | undefined;
+    await gate.query("SELECT pg_advisory_lock(18977,hashtext($1))", [orderId]);
+    const gatePid = (await gate.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+    await pool.query(`CREATE FUNCTION diagnostic_r4_purge_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(18977,hashtext(NEW."${key}")); RETURN NEW; END $$;
+      CREATE TRIGGER diagnostic_r4_purge_gate BEFORE ${event} ON ${table} FOR EACH ROW EXECUTE FUNCTION diagnostic_r4_purge_gate()`);
+    try {
+      if (first === "purge") purging = outcome(purge()); else staging = outcome(identity.stage(subject(), orderId, input));
+      await blockedBy(gatePid, query);
+      const held = await pool.query<{ pid: number }>("SELECT pid FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid)) AND query LIKE $2", [gatePid, query]);
+      const holderPid = held.rows[0]!.pid;
+      if (first === "purge") staging = outcome(identity.stage(subject(), orderId, input)); else purging = outcome(purge());
+      await blockedBy(holderPid, "%diagnostic_prepare_source%");
+    } finally {
+      await gate.query("SELECT pg_advisory_unlock(18977,hashtext($1))", [orderId]); gate.release();
+      console.info("r4_purge_material_outcomes", first, await Promise.all([purging, staging]));
+      await pool.query(`DROP TRIGGER diagnostic_r4_purge_gate ON ${table}; DROP FUNCTION diagnostic_r4_purge_gate()`);
+    }
+    const purged = await purging!, staged = await staging!;
+    if (first === "purge") {
+      expect(purged).toEqual({ ok: true, value: { purgedCount: 1 } });
+      expect(staged.ok).toBe(false);
+      if (!staged.ok) expect(() => { throw staged.error; }).toThrow("diagnostic_source_graph_changed");
+      expect(await db.diagnosticIdentityProvenance.findUnique({ where: { id: input.id } })).toBeNull();
+      const after = await snapshot();
+      expect(after.order).toMatchObject({ commissionerId: null, erasedAt: clock });
+      expect(after.raw).toMatchObject({ observation: null, observationHash: null, erasedAt: clock });
+      expect(after.report).toMatchObject({ identityRecordId: null, identityRecordHash: null, erasedAt: clock });
+      expect(after.audits).toEqual([]); expect(after.evidence).toEqual([]); expect(after.receipts).toEqual(before.receipts);
+    } else {
+      expect(staged).toEqual({ ok: true, value: { id: input.id, state: "staged" } });
+      expect(purged.ok).toBe(false);
+      if (!purged.ok) expect(() => { throw purged.error; }).toThrow("diagnostic_source_graph_changed");
+      const after = await snapshot();
+      expect(after.material).toEqual([expect.objectContaining({ id: input.id, orderId, state: "staged", objectKey: null, cleanupRequestedAt: null })]);
+      expect({ ...after, material: [] }).toEqual(before);
+      await schedulePurge(null);
+    }
+    expect(stored.size).toBe(1); // Only the independently verified foreign control has bytes.
+    await foreign();
+  });
+
+  it.each(["cleanup", "purge"] as const)("R4 actual purge and physical cleanup with %s first", async first => {
+    await preparePurgeSubject();
+    const p = await verified(), foreign = await foreignControl();
+    const worker = createRequire(__filename);
+    const { DiagnosticArtifactWorker } = worker(resolve(__dirname, "../../../../../worker/dist/jobs/diagnostics/DiagnosticArtifactWorker.js")) as { DiagnosticArtifactWorker: new (db: PrismaService, objects: unknown, fonts: unknown, runtime: unknown) => { cleanup(): Promise<number> } };
+    const { S3DiagnosticArtifactObjects } = worker(resolve(__dirname, "../../../../../worker/dist/jobs/diagnostics/S3DiagnosticArtifactObjects.js")) as { S3DiagnosticArtifactObjects: new (s3: S3Client, bucket: string) => unknown };
+    const cleanup = new DiagnosticArtifactWorker(db, new S3DiagnosticArtifactObjects(s3, "diagnostic-test-private"), { regular: new Uint8Array(), bold: new Uint8Array() }, { now: () => new Date(clock), id: randomUUID, enabled: () => true });
+    const row = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } });
+    if (first === "cleanup") {
+      expect(await cleanup.cleanup()).toBe(0);
+      expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toEqual(row);
+      expect(await storage.read(row.objectKey!, row.sizeBytes!, row.sha256!)).toEqual(await storage.sanitize(bytes, "image/png").then(clean => clean.bytes));
+    }
+    await schedulePurge();
+    const before = await snapshot();
+    expect(await purge()).toEqual({ purgedCount: 1 });
+    await assertPurged(p, before);
+    const fenced = await snapshot();
+    const result = await outcome(cleanup.cleanup());
+    console.info("r4_actual_cleanup_outcome", first, result);
+    if (!result.ok) { expect(await snapshot()).toEqual(fenced); await foreign(); }
+    expect(result).toEqual({ ok: true, value: 1 });
+    expect(await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: p } })).toMatchObject({ state: "removed", cleanupCompletedAt: clock, objectKey: row.objectKey, sha256: row.sha256, sizeBytes: row.sizeBytes });
+    await expect(storage.read(row.objectKey!, row.sizeBytes!, row.sha256!)).rejects.toMatchObject({ $metadata: { httpStatusCode: 404 } });
+    await foreign();
   });
 
 });
