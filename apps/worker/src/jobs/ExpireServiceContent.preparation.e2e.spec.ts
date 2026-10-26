@@ -296,7 +296,7 @@ describe.skipIf(process.env["R6C_EXPIRY_DISPOSABLE"] !== "1")("ordinary expiry p
  // boundary sentinel stops immediately AFTER its real result, before domain
  // mutation. This proves exact selection bounds/order and zero overflow effects;
  // it deliberately does not claim a100/200-transaction sweep completed.
- for (const kind of ["support100", "attachments200", "artifacts100", "fences100"] as const) it(`saturation ${kind} selects its exact finite oldest page and preserves the overflow snapshot`, async () => {
+ for (const proof of ["selection", "finish"] as const) for (const kind of ["support100", "attachments200", "artifacts100", "fences100"] as const) it.skipIf(proof === "finish" && process.env["R6C_EXPIRY_SATURATION_FINISH"] !== "1")(`saturation ${kind} ${proof} preserves the exact finite oldest page and overflow`, async () => {
   const limit = kind === "attachments200" ? 200 : 100;
   const ids = Array.from({ length: limit + 1 }, () => randomUUID());
   const date = (index: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, index));
@@ -314,6 +314,40 @@ describe.skipIf(process.env["R6C_EXPIRY_DISPOSABLE"] !== "1")("ordinary expiry p
    await db.vehicleHistoryRequest.createMany({ data: ids.map(id => ({ id })) });
    await db.serviceConversation.createMany({ data: ids.map(id => ({ id, purpose: "history", historyRequestId: id })) });
    await db.serviceErasureFence.createMany({ data: ids.map((id, index) => ({ conversationId: id, epoch: 0, objectKeys: [], erasedAt: date(index) })) });
+  }
+  if (proof === "finish") {
+   // Full sweep acceptance is separately opt-in and retains the runner's native
+   // timeout. No partial pass is substituted for this finish/count assertion.
+   const overflowId = present(ids[limit]);
+   const overflow = async () => kind === "support100"
+    ? { owner: await db.supportCase.findUniqueOrThrow({ where: { id: overflowId } }), conversation: await db.serviceConversation.findUniqueOrThrow({ where: { supportCaseId: overflowId } }) }
+    : kind === "attachments200" ? await db.serviceAttachment.findUniqueOrThrow({ where: { id: overflowId } })
+    : kind === "artifacts100" ? { artifact: await db.historyArtifact.findUniqueOrThrow({ where: { id: overflowId } }), cleanup: await db.historyArtifactCleanup.findUniqueOrThrow({ where: { artifactId: overflowId } }) }
+    : await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: overflowId } });
+   const beforeOverflow = await overflow();
+   const result = await new ExpireServiceContent(transaction().database, objects).execute(now);
+   expect(result).toEqual(kind === "support100" ? { supportPurged: 100, attachmentsRetired: 0, cleanupsCompleted: 100 }
+    : kind === "attachments200" ? { supportPurged: 0, attachmentsRetired: 200, cleanupsCompleted: 1 }
+    : kind === "fences100" ? { supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 100 }
+    : { supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 });
+   expect(await overflow()).toEqual(beforeOverflow);
+   if (kind === "support100") {
+    expect(await db.serviceConversation.count({ where: { erasedAt: now } })).toBe(100);
+    expect(await db.serviceAudit.count({ where: { action: "SERVICE_CONTENT_PURGED" } })).toBe(100);
+    expect(await db.serviceErasureFence.count({ where: { cleanupCompletedAt: now } })).toBe(100);
+   } else if (kind === "attachments200") {
+    expect(await db.serviceAttachment.count({ where: { state: "removed", removedAt: now, uploaderId: null } })).toBe(200);
+    expect(await db.serviceAttachment.count({ where: { removedAt: null } })).toBe(1);
+   } else if (kind === "artifacts100") {
+    expect(await db.historyArtifact.count({ where: { state: "removed", removedAt: now, vin: null, provenance: null } })).toBe(100);
+    expect(await db.historyArtifactCleanup.count({ where: { completedAt: now } })).toBe(100);
+    expect(await db.historyArtifactCleanup.count({ where: { completedAt: null } })).toBe(1);
+   } else {
+    expect(await db.serviceErasureFence.count({ where: { cleanupCompletedAt: now } })).toBe(100);
+    expect(await db.serviceErasureFence.count({ where: { cleanupCompletedAt: null } })).toBe(1);
+   }
+   expect(await db.campaignPreparation.count()).toBe(0);
+   return;
   }
   const before = await snapshot(), selected: string[] = [];
   const sentinel = new Error("Observed actual saturated production selector");
