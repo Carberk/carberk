@@ -129,7 +129,7 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
         const value: unknown = Reflect.get(target, name);
         return typeof value === "function" ? value.bind(target) : value;
       }
-      return <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => target.$transaction(async tx => {
+      return <T>(work: (tx: Prisma.TransactionClient) => Promise<T>, options?: { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel }) => target.$transaction(async tx => {
         pid = (await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`)[0]?.pid ?? 0;
         return work(new Proxy(tx, { get(client, property) {
           const value: unknown = Reflect.get(client, property);
@@ -149,7 +149,7 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
             return result;
           };
         } }));
-      }, { timeout: 30_000 });
+      }, options);
     } });
     return { service, release, entered, pid: () => pid };
   }
@@ -387,11 +387,11 @@ describe("common upload claim on Postgres (#721)", { concurrent: false }, () => 
         return typeof value === "function" ? value.bind(target) : value;
       } });
       const failingService = new Proxy(prisma, { get(target, name) {
-        if (name === "$transaction") return <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => target.$transaction(async tx => {
+        if (name === "$transaction") return <T>(work: (tx: Prisma.TransactionClient) => Promise<T>, options?: { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel }) => target.$transaction(async tx => {
           await work(tx);
           expect(retired).toBe(true);
           throw new Error("release failed");
-        });
+        }, options);
         const value: unknown = Reflect.get(target, name);
         return typeof value === "function" ? value.bind(target) : value;
       } });
