@@ -45,11 +45,17 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
   let roleCreated = false;
   let activeTransactions = 0;
   let transition = Promise.resolve();
-  async function guards(enabled: boolean) {
-    for (const row of guardState) {
+  async function guards(enabled?: boolean) {
+    // Keep the exact catalog modes and all guard effects, but perform the
+    // fixture transition in one server transaction instead of 276 roundtrips.
+    const statements = guardState.map(row => {
       const table = row.table.replaceAll('"', '""'), name = row.name.replaceAll('"', '""');
-      await prisma.$executeRawUnsafe(`ALTER TABLE public."${table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${name}"`);
-    }
+      const mode = enabled === undefined
+        ? row.enabled === "D" ? "DISABLE" : row.enabled === "A" ? "ENABLE ALWAYS" : row.enabled === "R" ? "ENABLE REPLICA" : "ENABLE"
+        : enabled ? "ENABLE" : "DISABLE";
+      return `ALTER TABLE public."${table}" ${mode} TRIGGER "${name}";`;
+    });
+    if (statements.length) await prisma.$executeRawUnsafe(`DO $guards$ BEGIN ${statements.join("\n")} END $guards$`);
   }
   // Concurrent application transactions share activation. Only after the last
   // one commits/rolls back are guards disabled for legitimate fixture seeding.
@@ -138,11 +144,7 @@ describe.skipIf(!hosted)("retired upload cleanup on Postgres and MinIO (#721)", 
       await prisma.brand.deleteMany({ where: { id: catalog.brandId } });
     } finally {
       try {
-        for (const row of guardState) {
-          const table = row.table.replaceAll('"', '""'), name = row.name.replaceAll('"', '""');
-          const mode = row.enabled === "D" ? "DISABLE" : row.enabled === "A" ? "ENABLE ALWAYS" : row.enabled === "R" ? "ENABLE REPLICA" : "ENABLE";
-          await prisma.$executeRawUnsafe(`ALTER TABLE public."${table}" ${mode} TRIGGER "${name}"`);
-        }
+        await guards();
         if (roleCreated) { await prisma.$executeRawUnsafe(`DROP OWNED BY "${role}"`); await prisma.$executeRawUnsafe(`DROP ROLE "${role}"`); }
       } finally { s3?.destroy(); await prisma.onModuleDestroy(); }
     }
