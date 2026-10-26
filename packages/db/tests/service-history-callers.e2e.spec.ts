@@ -517,7 +517,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
    expect(selections).toHaveLength(2);
    for (const selected of selections) {
     expect(selected.filter(row => row.table === "history_orders")).toEqual([]);
-    expect(selected.filter(row => row.table === "history_quotes").map(row => row.row.id)).toEqual([other.quote.id]);
+    expect(selected.filter(row => row.table === "history_quotes").map(row => row.row["id"])).toEqual([other.quote.id]);
    }
    expect(selections[1]).toEqual(selections[0]);
    expect(await db.historyOrder.findMany()).toEqual([]); // first order still uncommitted
