@@ -1,0 +1,46 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { retainedSchemaProfile, evaluateSchemaPlan } from './staging-schema.mjs';
+import { inventoryForSchema } from './testing/schema-profile-fixture.mjs';
+const name="20261026015000_diagnostic_component_expiry_representation", checksum="e0b3068681544bb5e48d016047e8a7e4304b3a737fb9c6e17ef547897c90e6cf", prior="84935c26f5e11609663fdb87dbc796836c60f6360de2a30832aa6177a931819d", current="e383b1f888a0c9003bd4a7c0fc5c362a4a934b7798e2c24513f327fe5bb26904";
+const hash=x=>createHash('sha256').update(x).digest('hex');
+test('component expiry is an exact forward parser/effect extension with a finite receipt-bound entry',async()=>{
+ const migration=await readFile(`packages/db/prisma/migrations/${name}/migration.sql`,'utf8');
+ assert.equal(hash(migration),checksum);
+ assert.equal(migration,await readFile(`scripts/testing/retained-schema/${name}.sql`,'utf8'));
+ const base=await readFile('packages/db/prisma/migrations/20261024030000_diagnostic_purge_effects/migration.sql','utf8');
+ assert.equal(hash(base),'23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba');
+ const start=base.indexOf('CREATE FUNCTION public.diagnostic_source_parse(c jsonb)');
+ const original=base.slice(start,base.indexOf('END $$;',start)+'END $$;'.length);
+ const parser=original.replace('CREATE FUNCTION public.diagnostic_source_parse(','CREATE OR REPLACE FUNCTION public.diagnostic_source_parse_before_intake(')
+  .replace("x->>'table' NOT IN ('diagnostic_ownership_grants','diagnostic_audits')", "x->>'table' NOT IN ('diagnostic_ownership_grants','diagnostic_audits') AND NOT (parsed->>'operation'='ownership_expire' AND x->>'table'='diagnostic_ownership_components')");
+ assert.equal(migration.slice(migration.indexOf('CREATE OR REPLACE FUNCTION'),migration.indexOf('END $$;')+'END $$;'.length),parser);
+ const functions=[...migration.matchAll(/CREATE (?:OR REPLACE )?FUNCTION public\.([a-z_]+)/g)].map(x=>x[1]);
+ assert.deepEqual(functions,['diagnostic_source_parse_before_intake','diagnostic_source_disposal_effects','diagnostic_dispose_ownership_components']);
+ assert.match(migration,/r->>'state' IS DISTINCT FROM 'available'/);
+ assert.match(migration,/r->>'rightsUntil' IS NULL OR \(r->>'rightsUntil'\)::timestamp>at_time/);
+ assert.match(migration,/e->'next' IS DISTINCT FROM public\.diagnostic_source_normalize\('diagnostic_ownership_components',r\|\|patch\)/);
+ assert.match(migration,/diagnostic_source_overlapping_derived_effect/);
+ const entry=migration.slice(migration.indexOf('CREATE FUNCTION public.diagnostic_dispose_ownership_components'));
+ assert.match(entry,/full_transaction_id=pg_current_xact_id\(\)::text/);
+ assert.match(entry,/receipt\.command->>'operation' IS DISTINCT FROM 'ownership_expire'/);
+ assert.match(entry,/cutoff IS DISTINCT FROM \(receipt\.command->>'cutoff'\)::timestamp/);
+ assert.match(entry,/FROM jsonb_array_elements\(receipt\.effects\)/);
+ assert.match(entry,/SELECT x FROM unnest\(component_ids\) x ORDER BY x/);
+ assert.doesNotMatch(entry,/diagnostic_ownership_disposal_scope|FOR UPDATE|LOCK TABLE|pg_advisory|UPDATE public\.(diagnostic_ownership_grants|diagnostic_identity_records|diagnostic_reports)/);
+ assert.doesNotMatch(migration,/ALTER TABLE|DROP |SECURITY DEFINER|ENABLE TRIGGER|DISABLE TRIGGER|CREATE TABLE|CREATE INDEX/i);
+});
+test('150 extends the exact140 profile and refuses missing map, missing150 and checksum drift',async()=>{
+ assert.equal(hash(await readFile('packages/db/prisma/schema.prisma')),current);
+ assert.deepEqual(retainedSchemaProfile.additions.find(x=>x.name===name),{name,checksum});
+ assert.equal(retainedSchemaProfile.schemaMigrations[prior].at(-1),'20261026014000_diagnostic_source_registry_evaluation');
+ assert.deepEqual(retainedSchemaProfile.schemaMigrations[current],[...retainedSchemaProfile.schemaMigrations[prior],name]);
+ const args={baseline:[],main:inventoryForSchema(prior,[]),candidate:inventoryForSchema(current,[]),mainSchema:prior,candidateSchema:current};
+ assert.equal(evaluateSchemaPlan(args).disposition,'retained-additive');
+ const profile=structuredClone(retainedSchemaProfile);delete profile.schemaMigrations[current];
+ assert.throws(()=>evaluateSchemaPlan({...args,profile}),/inventory mismatch/);
+ assert.throws(()=>evaluateSchemaPlan({...args,candidate:args.candidate.filter(x=>x.name!==name)}),/inventory mismatch/);
+ assert.throws(()=>evaluateSchemaPlan({...args,candidate:args.candidate.map(x=>x.name===name?{...x,checksum:'0'.repeat(64)}:x)}),/checksum drift/);
+});
