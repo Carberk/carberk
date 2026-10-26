@@ -444,7 +444,12 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(published.status, JSON.stringify(published.body)).toBe(201);
   });
   afterAll(async () => {
-    try { await teardownOwnedFixtures(); } finally {
+    try {
+      // Stop and drain in-flight HTTP work before inspecting/deleting fixture objects
+      // or restoring guards, including when a native test deadline fired.
+      await app?.getHttpAdapter().close();
+      await teardownOwnedFixtures();
+    } finally {
       try { objects?.destroy(); await app?.close(); } finally {
         try { await restoreFixture(); } finally {
           if (fixtureOwner) {

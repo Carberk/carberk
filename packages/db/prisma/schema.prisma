@@ -2132,3 +2132,5 @@ model CampaignPreparation {
 // Snapshot: 20261025020000_diagnostic_listing_publication_effects.
 
 // Snapshot: 20261026010000_diagnostic_automatic_public_continuity, activation remains gated.
+
+// Snapshot: 20261026011000_diagnostic_bootstrap_capability_qualification.
