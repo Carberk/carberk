@@ -1,0 +1,795 @@
+{
+  "base": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+  "testCheckpoint": "f6c57bc7877405a876fbfab77e755a713fab7f94",
+  "branch": "agent/issue-897-b5-timing-diagnosis-20261025",
+  "hostedAttribution": {
+    "receipt": "/tmp/897-b5-hosted-attribution-20261026.json",
+    "receiptSHA256": "0330b708f9ba4f5d964f3f99a8ecdc59568d17c7c23c2d0c0d96b59f266287d3",
+    "head": "0faf63520e119064539da8318dd90178d14862c2",
+    "tree": "24c399f72886da8fe0a094604237e2eb55d3e3af",
+    "run": "40273159386",
+    "log": "/tmp/897-hosted-40273159386-failed.log",
+    "logSHA256": "b06cfaf3f39a028ec95a04ced8a300f2aa5adb26f74831fa38742413bd527cb7",
+    "originalSourcePins": {
+      "apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts": "d6cf8dc5e5bcd293776bb78b0f445ba29a0c02b1c846bbb93493f7bc8e1f5f94",
+      "apps/worker/src/jobs/diagnostics/DiagnosticPdfRenderer.ts": "f10b795606fcf5a2dd50a5fd32039b251881cd885d70ae34deec9f317911ec54",
+      "apps/worker/src/jobs/diagnostics/testing/readDiagnosticPdfText.ts": "247d1c3367983a5bb6bc406d8cf9a530b5d53e662060303bf4367e3b56e2d083",
+      "apps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts": "1eb1f632eb592d16073d78eaff36c4ccefa04878e08e66412aad75635daad102"
+    }
+  },
+  "freshHostedFailure": {
+    "head": "14cd6f15eefb9bda8718e3741cce653207e2cb5e",
+    "run": "40277574871",
+    "job": "121423538150",
+    "log": "/tmp/897-hosted-40277574871-api-job.log",
+    "sha256": "1146a4a69918d13afadafb2607e2d4e7f975f2112a38e12eabca3867c1cd5491",
+    "failureLine": 2137,
+    "workerFiles": {
+      "failed": 10,
+      "passed": 53,
+      "skipped": 1
+    },
+    "workerTests": {
+      "failed": 39,
+      "passed": 423,
+      "skipped": 33
+    },
+    "sourcePins": {
+      "apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts": {
+        "sha256": "d6cf8dc5e5bcd293776bb78b0f445ba29a0c02b1c846bbb93493f7bc8e1f5f94",
+        "matchesOriginalPin": true
+      },
+      "apps/worker/src/jobs/diagnostics/DiagnosticPdfRenderer.ts": {
+        "sha256": "f10b795606fcf5a2dd50a5fd32039b251881cd885d70ae34deec9f317911ec54",
+        "matchesOriginalPin": true
+      },
+      "apps/worker/src/jobs/diagnostics/testing/readDiagnosticPdfText.ts": {
+        "sha256": "247d1c3367983a5bb6bc406d8cf9a530b5d53e662060303bf4367e3b56e2d083",
+        "matchesOriginalPin": true
+      },
+      "apps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts": {
+        "sha256": "1eb1f632eb592d16073d78eaff36c4ccefa04878e08e66412aad75635daad102",
+        "matchesOriginalPin": true
+      }
+    },
+    "status": "Same original four source pins, renderer correction absent. Supplemental timeout receipt, not a replacement for original attribution."
+  },
+  "runtime": {
+    "node": "v24.13.0",
+    "pnpm": "12.11.2",
+    "platform": "darwin-arm64",
+    "availableParallelism": 10,
+    "maxWorkers": 4,
+    "vitest": "5.0.4",
+    "pdf-lib": "1.17.1",
+    "fontkit": "1.1.1",
+    "testTimeout": "unchanged default5000ms",
+    "hostedFinalCandidate": false
+  },
+  "sourcePinsAfter": {
+    "apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts": "d6cf8dc5e5bcd293776bb78b0f445ba29a0c02b1c846bbb93493f7bc8e1f5f94",
+    "apps/worker/src/jobs/diagnostics/DiagnosticPdfRenderer.ts": "56cadc7ed652de1293e1d7d65523935e71c5443e2777592e11f7620a69aa74be",
+    "apps/worker/src/jobs/diagnostics/testing/readDiagnosticPdfText.ts": "247d1c3367983a5bb6bc406d8cf9a530b5d53e662060303bf4367e3b56e2d083",
+    "apps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts": "1eb1f632eb592d16073d78eaff36c4ccefa04878e08e66412aad75635daad102"
+  },
+  "changedImplementationFiles": {
+    "apps/worker/src/jobs/diagnostics/DiagnosticPdfRenderer.ts": "56cadc7ed652de1293e1d7d65523935e71c5443e2777592e11f7620a69aa74be",
+    "apps/worker/src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts": "fe992eeda7b30761fc94f3fb42dedebfff98f270d6601d9de632d2bd204f5388",
+    "apps/worker/test/b5-observation-plugin.mjs": "0f392c3d4d481ad64aec23cfabab2a7295caaa44e5c5a34b22d02227bf16d0ff"
+  },
+  "observerPinChange": [
+    {
+      "before": {
+        "file": "../src/jobs/diagnostics/DiagnosticPdfRenderer.ts",
+        "sha256": "f10b795606fcf5a2dd50a5fd32039b251881cd885d70ae34deec9f317911ec54",
+        "insertions": [
+          {
+            "label": "runtime-import",
+            "anchor": "import fontkit from \"@pdf-lib/fontkit\";\n",
+            "edge": "before",
+            "offset": 0,
+            "text": null
+          },
+          {
+            "label": "render-enter",
+            "anchor": "export async function renderDiagnosticPdf(input: DiagnosticPdfInput, fonts: DiagnosticPdfFonts): Promise<Uint8Array> {",
+            "edge": "after",
+            "offset": 5572,
+            "text": "\n  const __b5Frame = __b5Begin(\"render-create\");\n  let __b5Failed = false;\n  try {"
+          },
+          {
+            "label": "render-exit",
+            "anchor": "  return bytes;\n",
+            "edge": "after",
+            "offset": 12411,
+            "text": "  } catch (__b5OriginalError) {\n    __b5Failed = true;\n    throw __b5OriginalError;\n  } finally {\n    __b5Close(__b5Frame, __b5Failed);\n  }\n"
+          },
+          {
+            "label": "before-fonts",
+            "anchor": "  const regular = await pdf.embedFont(fonts.regular, { subset: true });",
+            "edge": "before",
+            "offset": 5858,
+            "text": "  __b5Step(__b5Frame, \"render-fonts\");\n"
+          },
+          {
+            "label": "after-fonts",
+            "anchor": "const bold = await pdf.embedFont(fonts.bold, { subset: true });",
+            "edge": "after",
+            "offset": 5993,
+            "text": "\n  __b5Step(__b5Frame, \"render-layout\");"
+          },
+          {
+            "label": "before-save",
+            "anchor": "  const bytes = await pdf.save();",
+            "edge": "before",
+            "offset": 12275,
+            "text": "  __b5Step(__b5Frame, \"render-save\");\n"
+          }
+        ]
+      },
+      "after": {
+        "file": "../src/jobs/diagnostics/DiagnosticPdfRenderer.ts",
+        "sha256": "56cadc7ed652de1293e1d7d65523935e71c5443e2777592e11f7620a69aa74be",
+        "insertions": [
+          {
+            "label": "runtime-import",
+            "anchor": "import fontkit from \"@pdf-lib/fontkit\";\n",
+            "edge": "before",
+            "offset": 0,
+            "text": null
+          },
+          {
+            "label": "render-enter",
+            "anchor": "export async function renderDiagnosticPdf(input: DiagnosticPdfInput, fonts: DiagnosticPdfFonts): Promise<Uint8Array> {",
+            "edge": "after",
+            "offset": 5572,
+            "text": "\n  const __b5Frame = __b5Begin(\"render-create\");\n  let __b5Failed = false;\n  try {"
+          },
+          {
+            "label": "render-exit",
+            "anchor": "  return bytes;\n",
+            "edge": "after",
+            "offset": 12747,
+            "text": "  } catch (__b5OriginalError) {\n    __b5Failed = true;\n    throw __b5OriginalError;\n  } finally {\n    __b5Close(__b5Frame, __b5Failed);\n  }\n"
+          },
+          {
+            "label": "before-fonts",
+            "anchor": "  const regular = await pdf.embedFont(fonts.regular, { subset: true, features: { kern: false, mark: false, mkmk: false } });",
+            "edge": "before",
+            "offset": 6086,
+            "text": "  __b5Step(__b5Frame, \"render-fonts\");\n"
+          },
+          {
+            "label": "after-fonts",
+            "anchor": "const bold = await pdf.embedFont(fonts.bold, { subset: true, features: { kern: false, mark: false, mkmk: false } });",
+            "edge": "after",
+            "offset": 6329,
+            "text": "\n  __b5Step(__b5Frame, \"render-layout\");"
+          },
+          {
+            "label": "before-save",
+            "anchor": "  const bytes = await pdf.save();",
+            "edge": "before",
+            "offset": 12611,
+            "text": "  __b5Step(__b5Frame, \"render-save\");\n"
+          }
+        ]
+      }
+    }
+  ],
+  "executions": [
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/profile.config.mts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/profile-baseline.log",
+      "sha256": "a6d3b1ea80b289acc08787c3ab904190591bfbcb3eafda3177e175f8c89978d8",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/kern-probe.config.mts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/profile-kern-probe.log",
+      "sha256": "7ced56609088636b660bb4048643db0fe37e90f8f6d309e9444e77ba2a956e45",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/position-probe.config.mts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/profile-position-probe.log",
+      "sha256": "10ffb1d811760da7efc628354eacb18f07f7746c1359a1850fecc06159f22fbf",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/fixed-profile.config.mts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/profile-fixed.log",
+      "sha256": "61cff8e29eac67ba146ae92d4444479206ae67c4a20b23968b260a0fb8e65d53",
+      "exitCode": 0
+    },
+    {
+      "command": "DIAGNOSTIC_PDF_PROOF_DIR=/tmp/897-b5-layout-20261026/pdf-baseline AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/baseline-bytes.config.mts src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/bytes-baseline.log",
+      "sha256": "a40731164fe58d93f4b3d1459f20dc474d2a7f2eaedfd2e6c3e9e249a06a4c2a",
+      "exitCode": 0
+    },
+    {
+      "command": "DIAGNOSTIC_PDF_PROOF_DIR=/tmp/897-b5-layout-20261026/pdf-kern-probe AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/kern-probe-bytes.config.mts src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/bytes-kern-probe.log",
+      "sha256": "aaee25ef0b186a341ec67e2fecd454ca72d35a21fff712a02eb7f1a16f769dae",
+      "exitCode": 0
+    },
+    {
+      "command": "DIAGNOSTIC_PDF_PROOF_DIR=/tmp/897-b5-layout-20261026/pdf-position-probe AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/position-probe-bytes.config.mts src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/bytes-position-probe.log",
+      "sha256": "6ecdc1cdcdff821c386150dc4e0884056cca938500b0ff6a488829fc0a0a7b53",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/paragraph.config.mts (initial selection error: full worker suite ran, intended temporary test did not)",
+      "log": "/tmp/897-b5-layout-20261026/paragraph-baseline.log",
+      "sha256": "606f348a42c26b2338530620881c6f6d53e514eb73cd4d2430553e0e67d0f91b",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/paragraph.config.mts /tmp/897-b5-layout-20261026/paragraph-baseline.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/paragraph-baseline-corrected.log",
+      "sha256": "8f97d9c107c9d654d01e0a67ce47b2baf7e509fc33dd31a477daae1ecd20a1b7",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/regression-before-fix.log",
+      "sha256": "e811a5670a9267ba0d28eb17a5f210f153662dc435ae5ddf5a12e5835fbf0690",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/diagnostics/SafeReplacementScheduling.spec.ts src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/fixed-observed.log",
+      "sha256": "0f3cfbff618a54584d0c50849f481a0c210163458af778a816a9e9eee3c01104",
+      "exitCode": 0
+    },
+    {
+      "command": "node --test apps/worker/test/b5-observation.check.mjs",
+      "log": "/tmp/897-b5-layout-20261026/observer-check-fixed.log",
+      "sha256": "856d28186d91fe270b36f96f62f95bd6315751d6e100fa13c4d72e0dff752885",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker test --config /tmp/897-b5-layout-20261026/uninstrumented.config.mts",
+      "log": "/tmp/897-b5-layout-20261026/full-worker-uninstrumented.log",
+      "sha256": "ecd8d927b4b1bd61c37725e99387b8292d6c00bb6188f050f25801de3f527430",
+      "exitCode": 0
+    },
+    {
+      "command": "DIAGNOSTIC_PDF_PROOF_DIR=/tmp/897-b5-layout-20261026/pdf-fixed AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-layout-20261026/uninstrumented.config.mts src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/final-uninstrumented-proof.log",
+      "sha256": "d90bb030cc0970ab62c2a9a363d25ade6531089036ab1dcde58dcdeab095c05d",
+      "exitCode": 0
+    },
+    {
+      "command": "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run --config /tmp/897-b5-diagnosis-20261025/known-red.config.mts src/jobs/diagnostics/SafeReplacementScheduling.spec.ts",
+      "log": "/tmp/897-b5-layout-20261026/known-scheduler-red-fixed.log",
+      "sha256": "df0d537375df68aa6ad94ea46df39e874381e1a70d96dd448c3206fc35de538a",
+      "exitCode": 1
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "log": "/tmp/897-b5-layout-20261026/lint-fixed.log",
+      "sha256": "86de4ebd1ddfa64be0009bdfb2a958be5fb31f4374c82c4cd267f3e8eebda1bc",
+      "exitCode": 1
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "log": "/tmp/897-b5-layout-20261026/lint-fixed-corrected.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker typecheck",
+      "log": "/tmp/897-b5-layout-20261026/typecheck-fixed.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker exec tsc6 --noEmit",
+      "log": "/tmp/897-b5-layout-20261026/tsc6-fixed.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker typecheck",
+      "log": "/tmp/897-b5-layout-20261026/typecheck-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker exec tsc6 --noEmit",
+      "log": "/tmp/897-b5-layout-20261026/tsc6-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker build",
+      "log": "/tmp/897-b5-layout-20261026/build-fixed.log",
+      "sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm check:agent-docs",
+      "log": "/tmp/897-b5-layout-20261026/agent-docs-final.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20",
+      "exitCode": 0
+    }
+  ],
+  "profileSummaryInclusiveMs": {
+    "baseline": {
+      "renderDiagnosticPdf": 831.6,
+      "layout": 770.1,
+      "encodeText": 523.3,
+      "drawText": 539.8,
+      "position": 632.5,
+      "widthOfTextAtSize": 63.3,
+      "lines": 264.8,
+      "text": 347.0,
+      "drawSvgPath": 2.3
+    },
+    "kern-probe": {
+      "renderDiagnosticPdf": 633.0,
+      "layout": 582.9,
+      "encodeText": 444.3,
+      "drawText": 452.1,
+      "position": 421.5,
+      "widthOfTextAtSize": 38.0,
+      "lines": 149.9,
+      "text": 203.8,
+      "drawSvgPath": 3.8
+    },
+    "position-probe": {
+      "renderDiagnosticPdf": 242.8,
+      "drawText": 99.3,
+      "layout": 190.7,
+      "encodeText": 88.1,
+      "position": 22.4,
+      "widthOfTextAtSize": 25.1,
+      "lines": 117.6,
+      "text": 161.7,
+      "drawSvgPath": 3.0
+    },
+    "fixed": {
+      "renderDiagnosticPdf": 341.7,
+      "layout": 246.1,
+      "encodeText": 124.8,
+      "drawText": 145.3,
+      "position": 29.7,
+      "widthOfTextAtSize": 38.8,
+      "lines": 143.4,
+      "text": 215.3,
+      "drawSvgPath": 3.4
+    }
+  },
+  "profileCaseMetrics": {
+    "profile-baseline.log": [
+      {
+        "name": "recovers an issued tk PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 480.26758299999995,
+        "cpu": {
+          "user": 690172,
+          "system": 27362
+        }
+      },
+      {
+        "name": "recovers an issued ru PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 375.2168750000001,
+        "cpu": {
+          "user": 451061,
+          "system": 14523
+        }
+      },
+      {
+        "name": "recovers an issued en PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 355.67204200000015,
+        "cpu": {
+          "user": 411699,
+          "system": 5787
+        }
+      }
+    ],
+    "profile-kern-probe.log": [
+      {
+        "name": "recovers an issued tk PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 385.69954199999995,
+        "cpu": {
+          "user": 565261,
+          "system": 32164
+        }
+      },
+      {
+        "name": "recovers an issued ru PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 317.009916,
+        "cpu": {
+          "user": 400250,
+          "system": 12728
+        }
+      },
+      {
+        "name": "recovers an issued en PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 307.9079999999999,
+        "cpu": {
+          "user": 361592,
+          "system": 12624
+        }
+      }
+    ],
+    "profile-position-probe.log": [
+      {
+        "name": "recovers an issued tk PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 222.065625,
+        "cpu": {
+          "user": 384322,
+          "system": 17878
+        }
+      },
+      {
+        "name": "recovers an issued ru PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 207.29383299999995,
+        "cpu": {
+          "user": 227178,
+          "system": 15277
+        }
+      },
+      {
+        "name": "recovers an issued en PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 159.22287500000004,
+        "cpu": {
+          "user": 181378,
+          "system": 6838
+        }
+      }
+    ],
+    "profile-fixed.log": [
+      {
+        "name": "recovers an issued tk PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 316.46462499999996,
+        "cpu": {
+          "user": 542620,
+          "system": 24101
+        }
+      },
+      {
+        "name": "recovers an issued ru PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 271.66820900000005,
+        "cpu": {
+          "user": 293077,
+          "system": 20558
+        }
+      },
+      {
+        "name": "recovers an issued en PDF in one ordinary maintenance pass despite older generation work",
+        "wallMs": 214.67787499999997,
+        "cpu": {
+          "user": 243795,
+          "system": 12724
+        }
+      }
+    ]
+  },
+  "pdfByteCompatibility": {
+    "completedRenderHashMultisets": 54,
+    "representativeFiles": {
+      "alternate-body-en.pdf": "9c464a9283facc704cdb1a55dba02dbe57248b7c3a0a8c87e3e78b46651bf55a",
+      "draft-en.pdf": "2e447d1ed832880b9b28f45f2352d5f32a16278d56b83d5e14183a51d0268b76",
+      "zero-photo-ru.pdf": "cbbf06f6121b137dde486b684b7a96eacfb781080a81b5c4bffa9cdf0af6c8da",
+      "zero-photo-en.pdf": "dd20af5abf4bd559f4ccc77807d094e647249ee70d80986bd220e7c1a11dd05f",
+      "draft-ru.pdf": "a1f89ef4822f76aa1611b73bcd6c9b96b9b8ea5cc1c49d5b3ec9bb4c52fc7324",
+      "alternate-body-ru.pdf": "68a4eb1863e593ceea3a3701291756770361cc9148a26093e847f3a0a595c737",
+      "short-tk.pdf": "65fa7fabe484f19585e7a79937d0f98e40d89ced0662a901a7a47175141b1205",
+      "long-en.pdf": "24c5a7eea914daba319bc29fe8b688d66798485f18fc53802dfdf5aede9b38fb",
+      "long-ru.pdf": "c98b109a6bffae1afd5c3aed09196f7a89436156ee09f3577596435483b9b903",
+      "many-findings-tk.pdf": "de9a0d567cdfe1c803050a6381f890b6ba7f67eb5ad2805b2b1d6be537323426",
+      "zero-photo-tk.pdf": "b1d172779ea2a75591c88ed6146e14ab11793df40b3e2ff99bc19000a221b487",
+      "alternate-body-tk.pdf": "e533eba0041c5464c8502c9c6005cfbafa4cc5ce6cdf3fb9e97793c96f5e7bbe",
+      "draft-tk.pdf": "61269ee4be4b88e1cd17391dc6ddb5a9124528ec508a568b61bcddd952c73b4e",
+      "short-ru.pdf": "bf693d35bddbcddf4d8121865a38bc3f7c87e8f2c5411d46a8e021c311401990",
+      "many-findings-en.pdf": "6d0730aeb97ac64ce187cb585ba2c83888ff0e6f675318b920a31f3b31958c37",
+      "many-findings-ru.pdf": "8081df36a24ecd201ef7c8297b486b7d0b2016c674b49895c8dd8b0b2dd6bba9",
+      "short-en.pdf": "6f6907a72c59d0c8f4a4a96172d746fcd43cbfaff7d4c4138ac8e1ee04824e3f",
+      "long-tk.pdf": "fb060ee2ae873498c6f3f5c5b98a6095f853d8dbbcd7d05872d90f88b0f221a0"
+    },
+    "finalUninstrumentedFilesByteIdentical": 18,
+    "goldenParagraphHashes": {
+      "tk": "858e29b3df9bdb6f888971605ac1a4243e1c59dd3b9725c46817e795601b57b5",
+      "ru": "59b988d5ca4a51c1c7f408a777be78ae40b54997cfeff6672ff5752eea610c53",
+      "en": "ef01ff5ef09ab09765338fea96062fb95a53d84873d0b9d96718c4134c722e27"
+    }
+  },
+  "finalObservedRecords": [
+    {
+      "version": 1,
+      "locale": "tk",
+      "outcome": "success",
+      "invalid": false,
+      "elapsedMs": 230.4,
+      "completedOuterMs": {
+        "fixture-fonts": 1.5,
+        "issued-generation": 50.7,
+        "issued-read-parse": 4,
+        "backlog-erasure": 0.3,
+        "pending-locales": 37.4,
+        "maintenance": 75.9,
+        "replacement-preservation": 26.2,
+        "ordinary-drain": 34.3
+      },
+      "outerActiveName": null,
+      "outerActiveMs": 0,
+      "inner": {
+        "render-create": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 1
+        },
+        "render-fonts": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 14.9
+        },
+        "render-layout": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 84.1
+        },
+        "render-save": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 89
+        },
+        "parse-load": {
+          "started": 4,
+          "completed": 4,
+          "failed": 0,
+          "completedMs": 3.4
+        },
+        "parse-font-maps": {
+          "started": 12,
+          "completed": 12,
+          "failed": 0,
+          "completedMs": 4.1
+        },
+        "parse-content": {
+          "started": 12,
+          "completed": 12,
+          "failed": 0,
+          "completedMs": 0.8
+        },
+        "worker-current": {
+          "started": 35,
+          "completed": 35,
+          "failed": 0,
+          "completedMs": 4.1
+        },
+        "worker-cleanup": {
+          "started": 2,
+          "completed": 2,
+          "failed": 0,
+          "completedMs": 0.5
+        }
+      },
+      "active": []
+    },
+    {
+      "version": 1,
+      "locale": "ru",
+      "outcome": "success",
+      "invalid": false,
+      "elapsedMs": 171,
+      "completedOuterMs": {
+        "fixture-fonts": 0.2,
+        "issued-generation": 15.6,
+        "issued-read-parse": 1.5,
+        "backlog-erasure": 0.2,
+        "pending-locales": 30,
+        "maintenance": 72.8,
+        "replacement-preservation": 20.7,
+        "ordinary-drain": 30
+      },
+      "outerActiveName": null,
+      "outerActiveMs": 0,
+      "inner": {
+        "render-create": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 0.4
+        },
+        "render-fonts": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 6.3
+        },
+        "render-layout": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 64.8
+        },
+        "render-save": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 71.9
+        },
+        "parse-load": {
+          "started": 4,
+          "completed": 4,
+          "failed": 0,
+          "completedMs": 1.2
+        },
+        "parse-font-maps": {
+          "started": 12,
+          "completed": 12,
+          "failed": 0,
+          "completedMs": 2.9
+        },
+        "parse-content": {
+          "started": 12,
+          "completed": 12,
+          "failed": 0,
+          "completedMs": 0.6
+        },
+        "worker-current": {
+          "started": 35,
+          "completed": 35,
+          "failed": 0,
+          "completedMs": 2
+        },
+        "worker-cleanup": {
+          "started": 2,
+          "completed": 2,
+          "failed": 0,
+          "completedMs": 0.3
+        }
+      },
+      "active": []
+    },
+    {
+      "version": 1,
+      "locale": "en",
+      "outcome": "success",
+      "invalid": false,
+      "elapsedMs": 148.8,
+      "completedOuterMs": {
+        "fixture-fonts": 0.2,
+        "issued-generation": 14.1,
+        "issued-read-parse": 1.1,
+        "backlog-erasure": 0.2,
+        "pending-locales": 26.1,
+        "maintenance": 64.3,
+        "replacement-preservation": 15.8,
+        "ordinary-drain": 27
+      },
+      "outerActiveName": null,
+      "outerActiveMs": 0,
+      "inner": {
+        "render-create": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 0.3
+        },
+        "render-fonts": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 6
+        },
+        "render-layout": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 57.5
+        },
+        "render-save": {
+          "started": 10,
+          "completed": 10,
+          "failed": 0,
+          "completedMs": 63.6
+        },
+        "parse-load": {
+          "started": 4,
+          "completed": 4,
+          "failed": 0,
+          "completedMs": 1
+        },
+        "parse-font-maps": {
+          "started": 12,
+          "completed": 12,
+          "failed": 0,
+          "completedMs": 2.5
+        },
+        "parse-content": {
+          "started": 12,
+          "completed": 12,
+          "failed": 0,
+          "completedMs": 0.6
+        },
+        "worker-current": {
+          "started": 35,
+          "completed": 35,
+          "failed": 0,
+          "completedMs": 1.7
+        },
+        "worker-cleanup": {
+          "started": 2,
+          "completed": 2,
+          "failed": 0,
+          "completedMs": 0.3
+        }
+      },
+      "active": []
+    }
+  ],
+  "dependencyHashes": {
+    "pnpm-lock.yaml": "541d3a6e869797c4131e4e92b95419d84872eae2c258449d022717cb206f6566",
+    "apps/worker/package.json": "66bbcd93abd0afb5370f95ebc4d38bc46c0377d4050e36c28f8046a083e1dd4c",
+    "apps/worker/vitest.config.mts": "e6d84e0ab7668e2ca3c23f82fd12c538f01006c145dec896f965bbc0d182a1f7",
+    "packages/db/src/testing/DiagnosticMemoryDatabase.ts": "f7ddac3e6e24b590f3d8fdd5753ed84b27951b121ba36209d7d0cfaf07b05291",
+    "packages/db/src/testing/DiagnosticMemoryObjects.ts": "fdb7db6438d32a7685b8f8ecef498baf58a489131abe7144b800dcaa0d49a3ec",
+    "packages/db/src/diagnostic-reader-projection.ts": "d1515bb8cde8f4f4f6f2e0e05f92ef1e7eb85b9a82a5ee4a996c25a2db7f1797",
+    "packages/contracts/src/schemas/diagnostics.ts": "e3d83560ceedae78b0f130cfd4dc232292754fc1b552137e1e231b6efef895fe",
+    "packages/db/dist/src/testing/DiagnosticMemoryDatabase.js": "02efcd9acd3c3daa1630423e2f728e5ff1869652c79f1e9a2afbe808bd774f87",
+    "packages/db/dist/src/testing/DiagnosticMemoryObjects.js": "2e814e3e287b00a6d61f9c20fdc0118d579691a3c99eaceb8ec7a601e9228a29",
+    "packages/db/dist/src/diagnostic-reader-projection.js": "3740283ef047016607f121d2b1724c1898bbbe24300bc4a4b37123296e35c521",
+    "packages/contracts/dist/schemas/diagnostics.js": "b2f7fae7e257d416625578db762d6b24a33c29ead8209f1f77e72d95e6b1f1b4",
+    "packages/contracts/dist/index.js": "5f928c529c3e9bd27a3eb81b24902cdee1f48e08a03787f6044ea622e5a39b94",
+    "packages/db/dist/src/index.js": "914daa81026d2410cbf3192ba80d45b8027dba6ed75aa6073539d1ff609717f5",
+    "apps/worker/assets/fonts/NotoSans-Regular.ttf": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+    "apps/worker/assets/fonts/NotoSans-Bold.ttf": "c976e4b1b99edc88775377fcc21692ca4bfa46b6d6ca6522bfda505b28ff9d6a",
+    "node_modules/pdf-lib/cjs/core/embedders/CustomFontEmbedder.js": "3462feb2ccd7f29531edad80f7362c45693aeee37cc4a53c3103d80bf1e93ca3",
+    "node_modules/pdf-lib/cjs/core/embedders/CustomFontSubsetEmbedder.js": "3543c613008acee23126c90637842d0ed451c9494e2f738739e4a75ce6beb02a",
+    "node_modules/@pdf-lib/fontkit/dist/fontkit.umd.js": "d60739f02b41b636ee0cc2fb79ba589958144f9240e585dbc19e6a3b08d82825"
+  },
+  "diagnosticArtifacts": {
+    "/tmp/897-b5-layout-20261026/loaded-baseline.json": "7c32af9c275575ccf1827a6acf9dfd2cfc616b31c0df3f95f0db269285307ed6",
+    "/tmp/897-b5-layout-20261026/paragraph-baseline.spec.ts": "be7bb81d53b7c110bb71e2c5fb49f5f0c562dcfbf3f72bc5218610f54228b668",
+    "/tmp/897-b5-layout-20261026/observer-repin.json": "50f6a571020fbeda587cbf27b4755ac1049efe266b12d98356cde1f62353bc3c",
+    "/tmp/897-b5-layout-20261026/paragraph-tk.pdf": "858e29b3df9bdb6f888971605ac1a4243e1c59dd3b9725c46817e795601b57b5",
+    "/tmp/897-b5-layout-20261026/kern-probe.cpuprofile": "7c5c3b8bc622cc63b8357549982585c006036fdfae47e656d0df677bcaa29961",
+    "/tmp/897-b5-layout-20261026/pdf-lib-customfontembedder-v1.17.1.ts": "35091c0674268a4cda2b2393186a2eee2815bbfa8fdb5b7883642ba60a019876",
+    "/tmp/897-b5-layout-20261026/loaded-kern-probe.json": "71502378c7deac743301305b698e3568fc7dc91392d5c0f389be025539f6cfef",
+    "/tmp/897-b5-layout-20261026/baseline.cpuprofile": "c827b0f82bd792e1538948d19f4bdc5423214f703072510ebe0f949ca40db26b",
+    "/tmp/897-b5-layout-20261026/pdf-lib-subsetembedder-v1.17.1.ts": "68afe7b09f5d5166c5851cf604a33d3f17699da6eecaec76e32e1e51e4791df8",
+    "/tmp/897-b5-layout-20261026/kern-probe.config.mts": "d1611b38ef217b9be449b25ac57c518a9251d037c9ea40ded1a32ebebd53ad5e",
+    "/tmp/897-b5-layout-20261026/pdf-compatibility.json": "24194c52e06a7a8c37ec27f359170d5a422ce2693bef609f7f997c7e576021c2",
+    "/tmp/897-b5-layout-20261026/loaded-position-probe.json": "c5ca0f396b3a0882e813a5c765df699d255c877bc093bcddda20696d7c3a0eff",
+    "/tmp/897-b5-layout-20261026/kern-probe-bytes.config.mts": "355a5144e05e3b91f0e622fd43db3fee33322ce38a382c1bab388bc821be6526",
+    "/tmp/897-b5-layout-20261026/loaded-position-bytes.json": "c5ca0f396b3a0882e813a5c765df699d255c877bc093bcddda20696d7c3a0eff",
+    "/tmp/897-b5-layout-20261026/baseline-bytes.config.mts": "8fafddb2c4d1b104557d876dcd74b77a68936055cc07e6c7c4ade0a61c4e976e",
+    "/tmp/897-b5-layout-20261026/loaded-fixed.json": "6ee42e1437f8cd31aee3b79e84399afe6ef93295388be82a534ed0685a972e75",
+    "/tmp/897-b5-layout-20261026/fixed-profile.config.mts": "3581ac9d36b2e0fcef16c8c3db22b300d06e333fff9935b54e58f89437814b2c",
+    "/tmp/897-b5-layout-20261026/14cd-source-pins.json": "a0002bdd5a9540b0d15ad9d8046de5839131507e33897b33ab3790fb4e4788f5",
+    "/tmp/897-b5-layout-20261026/cpu-summary.json": "63f2246b8488a3d554282877db22edffad18146d012630eceff5769f0c7c2fe5",
+    "/tmp/897-b5-layout-20261026/profile.config.mts": "230b6539fe33f47c752d435e6b083df6111ec7f30d16b63deb1ec3da7d2d3608",
+    "/tmp/897-b5-layout-20261026/pdf-lib-embedfontoptions.html": "f4c4ef4bc4e636918f2e928372e279706227f4f5fad8043b87292ac7bb3a4985",
+    "/tmp/897-b5-layout-20261026/paragraph.config.mts": "ba87de80056ec5c643a24bc8f7f2361bab355c42b41460d6e8be6805b6f4e7a6",
+    "/tmp/897-b5-layout-20261026/fixed.cpuprofile": "5dbfba5e2ddca9cf96f46332bb3db4602c329a3fad67c1ae0d9b5c0d6882de9e",
+    "/tmp/897-b5-layout-20261026/profile-position-setup.mjs": "734606ef7f57e8b2affe245c64dce3c81fd76d6b3667d7a4a2bee9df4969d3a8",
+    "/tmp/897-b5-layout-20261026/uninstrumented.config.mts": "85be489120e1613f158b081c521c4678cc6a58d8707341be66b26c3df60de5e7",
+    "/tmp/897-b5-layout-20261026/position-probe-bytes.config.mts": "3dbaa604dd6a1c11d8c4cfa2c164da127d38a82c054a39aa254802b2394e6b12",
+    "/tmp/897-b5-layout-20261026/paragraph-ru.pdf": "59b988d5ca4a51c1c7f408a777be78ae40b54997cfeff6672ff5752eea610c53",
+    "/tmp/897-b5-layout-20261026/paragraph-en.pdf": "ef01ff5ef09ab09765338fea96062fb95a53d84873d0b9d96718c4134c722e27",
+    "/tmp/897-b5-layout-20261026/position-probe.cpuprofile": "dde4f3f5531e618beb16649ae050f0796fd9f58fa164c1d4699eea90c3617a14",
+    "/tmp/897-b5-layout-20261026/profile-fixed-setup.mjs": "b0d364957b2408d035d80570b2dc40118f22981b185f85d8bcfa9512385e0f9f",
+    "/tmp/897-b5-layout-20261026/position-probe.config.mts": "6d2f5a775382ec2e67e93eaa5700589ee9e84dade939a6b7a785c80775ea7a77",
+    "/tmp/897-b5-layout-20261026/profile-setup.mjs": "d3af062e7c4cc325794a5fc18f1f88b0c65d845274d02061f871544631fdf28c",
+    "/tmp/897-b5-layout-20261026/profile-probe-setup.mjs": "46377850253763dee5f18f9548de52c3a0e4ce835c3d246f7e0b8c386ef811b1",
+    "/tmp/897-b5-layout-20261026/fontkit-readme.md": "5a76ffb1aeaf04a646ba36d50f7a3642578cdc598ec7606f10cb9a43c084ab7a"
+  },
+  "evidenceLimits": [
+    "Baseline loaded-baseline.json and probe loaded manifests were overwritten by subsequent byte-comparison runs using those config paths; source input guards stayed active. Config and profile hashes retained, fixed loaded manifest retains all4 final pins.",
+    "Initial temporary paragraph config selected the full worker suite unintentionally. Its passing307tests do not count as paragraph evidence; corrected explicit selection passed3.",
+    "Initial new-test lint failed a forbidden non-null assertion. Replaced with explicit fixture guard; corrected lint passed.",
+    "No local native5000ms timing reproduction claimed. Existing representative hosted RED supplies the timing failure, and original local scenario plus one-variable CPU/byte probes establish removable waste.",
+    "Process CPU includes V8 background work. Inclusive samples overlap; neither profile frames nor outer/inner wall intervals are added as CPU.",
+    "Final full worker run passed310 with73 service-dependent skips. Hosted integrated uninstrumented confirmation and all skipped gates remain parent-owned."
+  ]
+}

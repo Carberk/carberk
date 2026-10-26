@@ -35,7 +35,11 @@ export async function renderDiagnosticPdf(input: DiagnosticPdfInput, fonts: Diag
   const pdf = await PDFDocument.create(); pdf.registerFontkit(fontkit);
   pdf.setCreationDate(input.generatedAt); pdf.setModificationDate(input.generatedAt); pdf.setProducer("Carberk diagnostic renderer v1");
   pdf.setTitle(`${words[input.locale].title} ${input.snapshot.report.id}`);
-  const regular = await pdf.embedFont(fonts.regular, { subset: true }); const bold = await pdf.embedFont(fonts.bold, { subset: true });
+  // pdf-lib consumes glyph IDs and advanceWidth, not GlyphRun.positions.
+  // Skip the unused GPOS positioning work while retaining glyph substitution,
+  // fresh per-document subsets and the same encoded text and line widths.
+  const regular = await pdf.embedFont(fonts.regular, { subset: true, features: { kern: false, mark: false, mkmk: false } });
+  const bold = await pdf.embedFont(fonts.bold, { subset: true, features: { kern: false, mark: false, mkmk: false } });
   const copy = words[input.locale], report = input.snapshot.report;
   let page!: PDFPage; let y = 0; let continuingFindings = false;
   const label = (id: string) => [...input.snapshot.template.checks, ...input.snapshot.template.panels].find(item => item.id === id)?.label[input.locale] ?? id;

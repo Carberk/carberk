@@ -52,7 +52,7 @@ const modules = [
   },
   {
     "file": "../src/jobs/diagnostics/DiagnosticPdfRenderer.ts",
-    "sha256": "f10b795606fcf5a2dd50a5fd32039b251881cd885d70ae34deec9f317911ec54",
+    "sha256": "56cadc7ed652de1293e1d7d65523935e71c5443e2777592e11f7620a69aa74be",
     "insertions": [
       {
         "label": "runtime-import",
@@ -72,28 +72,28 @@ const modules = [
         "label": "render-exit",
         "anchor": "  return bytes;\n",
         "edge": "after",
-        "offset": 12411,
+        "offset": 12747,
         "text": "  } catch (__b5OriginalError) {\n    __b5Failed = true;\n    throw __b5OriginalError;\n  } finally {\n    __b5Close(__b5Frame, __b5Failed);\n  }\n"
       },
       {
         "label": "before-fonts",
-        "anchor": "  const regular = await pdf.embedFont(fonts.regular, { subset: true });",
+        "anchor": "  const regular = await pdf.embedFont(fonts.regular, { subset: true, features: { kern: false, mark: false, mkmk: false } });",
         "edge": "before",
-        "offset": 5858,
+        "offset": 6086,
         "text": "  __b5Step(__b5Frame, \"render-fonts\");\n"
       },
       {
         "label": "after-fonts",
-        "anchor": "const bold = await pdf.embedFont(fonts.bold, { subset: true });",
+        "anchor": "const bold = await pdf.embedFont(fonts.bold, { subset: true, features: { kern: false, mark: false, mkmk: false } });",
         "edge": "after",
-        "offset": 5993,
+        "offset": 6329,
         "text": "\n  __b5Step(__b5Frame, \"render-layout\");"
       },
       {
         "label": "before-save",
         "anchor": "  const bytes = await pdf.save();",
         "edge": "before",
-        "offset": 12275,
+        "offset": 12611,
         "text": "  __b5Step(__b5Frame, \"render-save\");\n"
       }
     ]
