@@ -1107,6 +1107,40 @@ describe("public continuity across different sellers and Listings", { concurrent
     expect(await db.diagnosticAudit.count({ where: { orderId: p.b.id, action: "CONTINUITY_PROOF_CONSUMED" } })).toBe(0);
   });
 
+  it.each(["A", "B"] as const)("recovers only consumed B after authenticated %s ownership revocation erases the restricted proof", async side => {
+    const p = await automaticCandidate(await automaticPredecessor());
+    const issued = await post("reviewer", `orders/${p.b.id}/continuity-proofs`, automaticInput(p)).expect(201);
+    const proofId = issued.body.proofId as string; owned.proofs.push(proofId);
+    const input = publicLink(p, proofId);
+    const created = await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201);
+    const order = side === "A" ? p.a : p.b;
+    const raw = side === "A" ? p.ia : p.ib;
+    const component = await db.diagnosticOwnershipComponent.findUniqueOrThrow({ where: { identityRecordId: raw.id } });
+    expect(component.grantId).toEqual(expect.stringMatching(uuid));
+    const aReport = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } });
+    const bReport = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } });
+    const records = await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } }, orderBy: { id: "asc" } });
+    const audits = await db.diagnosticAudit.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } }, orderBy: { id: "asc" } });
+    expect(bReport).toMatchObject({ continuityProofId: proofId, reinspectionOrderVersion: input.expectedOrderVersion });
+    // Serial consume-before-revoke evidence. Real-wait race acceptance is separate.
+    await post("sellerA", `orders/${order.id}/ownership-grant/${component.grantId}/revoke`, {}).expect(201);
+    expect(await db.diagnosticContinuityProof.findUnique({ where: { id: proofId } })).toBeNull();
+    expect(await db.diagnosticOwnershipGrant.findUniqueOrThrow({ where: { id: component.grantId! } })).toMatchObject({ state: "erased", rights: null, rightsUntil: null });
+    expect(await db.diagnosticOwnershipComponent.findUniqueOrThrow({ where: { identityRecordId: raw.id } })).toMatchObject({ state: "erased", grantId: null, rights: null, rightsUntil: null });
+    expect(await db.diagnosticSourceAnchor.findUniqueOrThrow({ where: { orderId: order.id } })).toMatchObject({ state: "erased", firstRecordId: null, source: null });
+    await denied(await get("reviewer", `orders/${p.b.id}/continuity-proofs/${proofId}`));
+    const retry = await post("technician", `orders/${p.b.id}/reinspections`, input).expect(201); privateNoStore(retry);
+    expect(retry.body).toEqual(created.body);
+    const otherReportId = randomUUID(); owned.reports.push(otherReportId);
+    await denied(await post("technician", `orders/${p.b.id}/reinspections`, { ...input, reportId: otherReportId }));
+    expect(await db.diagnosticReportRecord.findUnique({ where: { id: otherReportId } })).toBeNull();
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: p.released.id } })).toEqual(aReport);
+    expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: input.reportId } })).toEqual(bReport);
+    expect(await db.diagnosticIdentityRecord.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } }, orderBy: { id: "asc" } })).toEqual(records);
+    expect(await db.diagnosticAudit.findMany({ where: { orderId: { in: [p.a.id, p.b.id] } }, orderBy: { id: "asc" } })).toEqual(audits);
+    expect(await db.diagnosticReportRecord.count({ where: { predecessorId: p.released.id } })).toBe(1);
+  });
+
   it.each(["A", "B"] as const)("refuses automatic continuity when %s first ownership is unavailable and a late grant cannot repair it", async side => {
     const p = await automaticCandidate(await automaticPredecessor(side !== "A"), side !== "B");
     const order = side === "A" ? p.a : p.b;
