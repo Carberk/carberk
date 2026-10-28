@@ -54,4 +54,3 @@ Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
 
   × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
   │ dde97944/apps/web
-

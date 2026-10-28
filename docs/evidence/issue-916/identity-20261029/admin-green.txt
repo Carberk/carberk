@@ -6,4 +6,3 @@
       Tests  15 passed (15)
    Start at  01:44:11
    Duration  652ms (tests 46%, environment 28%, import 17%, transform 8%)
-
