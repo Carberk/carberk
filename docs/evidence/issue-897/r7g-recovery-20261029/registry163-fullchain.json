@@ -1,0 +1,68 @@
+{
+  "status": "Full-chain functional GREEN for 163; no measured/native call; fixture removed",
+  "chain": {
+    "migrations": 100,
+    "historical": 99,
+    "manifestSha256": "69a276a2d976a593c5845a02c08f458dd458cb259d47aaec245d5dccb126fd06",
+    "m162Sha256": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379 (already present at 690bda56; migrations tree identical to coordinator a6279645)",
+    "m163Sha256": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7",
+    "historicalMigrationsEdited": false
+  },
+  "fixture": "Disposable postgres:17.11 container r7g-owner2-fullchain-pg on a dynamic loopback port, removed with its volume (docker rm -f -v). Retained ownership7 and the attribution clone were not accessed.",
+  "harness": {
+    "path": "docs/evidence/issue-897/r7g-recovery-20261029/registry163-fullchain-harness.cjs",
+    "sha256": "ee463e1d89a16b13c27e1fc06e0c528559e67f8f44ecd634a327fd4367fa2359",
+    "receiptSha256": "701047b8b5fb6b0ceb406a0721b5246f3e3490f6d539f3dca8e99b6c2b02a386",
+    "verdict": "PASS",
+    "assertions": [
+      "prisma migrate deploy applies all 100 in order (162 then 163) with byte checksums",
+      "raw 99 incl. 162 then 163: only diagnostic_source_meta(text) body changes and diagnostic_source_registry_map() is added; meta owner/ACL unchanged; functions 188 -> 189; all 22 162-defined wrappers unchanged; 354 guards (hash b2be78df47e043f8268184b21eecce1fde636646c82931d688aa7d36bfa5aaff) and columns unchanged",
+      "deploy surface equals raw 99+163 surface (function hash a6c66ee722f0f0c3bdc5272b17ece2479358eacb1d3e935679cd2411a0320e89)",
+      "under a non-owner invoker: all 77 entries, NULL, unknown, empty and case/space variants equal the pre-163 historical meta (oracle, 0 differences); map deep-equals registry 6d7b15db175c3d3e7779a053e8d459f81cc07c163373600ba42e0e91c3a094be; meta and map immutable, invoker, search_path=pg_catalog, public",
+      "installation refuses with P0001 diagnostic_source_registry_metadata_drift before any replacement for duplicate, null-name, numeric-name, missing-entry, extra-entry, metadata-drift, reordered and non-array registries; positive control reinstalls",
+      "fixture surface unchanged after rolled-back negatives"
+    ]
+  },
+  "existingSuites": {
+    "suites": ["diagnostic-source-kernel", "campaign-preparation", "diagnostic-intake-effects", "diagnostic-purge-effects"],
+    "unchanged": "byte-identical between 690bda56 (99) and this branch (100)",
+    "with163": "96 failed / 165 passed / 34 skipped (log sha256 da606408494050541322982dcd39edabc567bdc9fe0a429086310a3a718365a9)",
+    "baseline99": "104 failed / 157 passed / 34 skipped (log sha256 c2da28a660d35ed5f965bf4f2bd55fa50c1b053e1f3182c882303428a50948f6)",
+    "attribution": "163 introduces no failure. Outside the 'ABA remains sticky' family, the 163 failure set is a subset of the baseline set. That family is nondeterministic on both chains: repeated runs overlap 3/11 vs 13 (163) and 5/15 vs 16 (99) with the same assertion.",
+    "preExistingRedOn99": "1 campaign-preparation beforeAll (campaign_preparation_nested/dormant), 3 intake, 37 purge, ~49 kernel: users_email_verified_check, measurement_principal_shape and diagnostic_report_valid CHECKs, missing updatedAt column, diagnostic_source_effect_mismatch/final_effect and provenance binding. Historical suites are stale versus later migrations; not 163 scope."
+  },
+  "genuineRed": {
+    "test": "packages/db/tests/maintenance-finite.r7g.e2e.spec.ts:85 and :106-107 (unchanged)",
+    "failure": "expected migrations to have length 99 but got 100; all 40 tests skipped before any container",
+    "logSha256": "907a33e30714178e106251372d67eb4a357a8088ab8db878de9fbd6376e45fb6",
+    "cause": "The maintenance suite pins the exact 99-migration manifest (sha cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a). Any additive migration, including 163, breaks it.",
+    "minimalCorrection": "Maintenance owner updates both pins to 100 and the manifest hash for the assembled chain, or the coordinator accepts the pin as a deliberate freeze. Not edited here."
+  },
+  "duplicatePasses": {
+    "decision": "Preserved per coordinator source contract",
+    "receipt": "prisma/migrations/20261024090000_diagnostic_message_enquiry_fences/migration.sql diagnostic_source_insert_receipt (line 227): parse, scope, campaign_prepare, campaigns, lock_keys before waits; per-key FOR UPDATE; then VOLATILE after_scope rediscovery compared with scope/keys/campaigns (lines 259-267), parse again",
+    "campaign": "prisma/migrations/20261024020000_campaign_preparation/migration.sql campaign_preparation_insert: fresh campaign_preparation_scope after waits (lines 194-195)"
+  },
+  "competingCost": {
+    "pattern": "Per key: EXECUTE 'SELECT ... FROM public.%I s WHERE to_jsonb(s) @> $1' is a whole-table scan that converts every row with to_jsonb; no index applies",
+    "sites": [
+      "diagnostic_source_read(text,jsonb) at 20261023130000_diagnostic_source_kernel/migration.sql:99 (prepare10 500 calls 260ms self; scope10 240 calls 128ms)",
+      "diagnostic_source_insert_receipt per-key FOR UPDATE at 20261024090000_diagnostic_message_enquiry_fences/migration.sql:257 (inside 136ms receipt self)",
+      "campaign_preparation_scope old_row read at 20261025015000_diagnostic_runtime_transport_corrections/migration.sql:234 (4 calls 528.6ms self; also per-entry registry scan and per-row campaign_row_namespaces catalog scans)"
+    ],
+    "keyFacts": "All 77 registry pk sets are backed by exact non-partial unique indexes; all 79 pk columns are text NOT NULL (2 composite pks)"
+  },
+  "proposal": {
+    "seam": "One additive helper that returns the WHERE predicate for (table, key). When the key object's field set equals the registry pk and every value is a jsonb string, emit typed equality on the pk columns (s.\"col\" = $1->>'col'), which the unique index serves. Otherwise emit the existing to_jsonb(s) @> $1 unchanged. Use it only at the three per-key sites above. Every read and lock still runs fresh at the same point; no caching, no removed pass, no guard/closure/cap change.",
+    "equivalence": "For a text column under deterministic collation, to_jsonb(s) @> {pk:string} holds exactly when each column equals the string. Object containment decomposes per key, and scalar containment is equality. Any other key shape falls back to the original expression.",
+    "proofObligations": [
+      "Oracle RED/GREEN per site: for all 77 tables and adversarial keys (exact pk, extra field, missing field, null, number, nested, case/space, non-pk unique field), row sets from old and new predicates are identical, including FOR UPDATE locked rows and NULL/absent results",
+      "Database default and pk column collations deterministic (assert at install; refuse otherwise)",
+      "EXPLAIN-only plan proof of an index scan on the pk path, no timing",
+      "Function-surface diff limited to the helper plus the three site bodies; ACL, owner, volatility, search_path unchanged; guards byte-identical",
+      "Existing full-chain functional proof (this harness) and clone scope/keys/effects/full100 refusal hashes unchanged",
+      "Only then a single parent-STARTed attribution run; native 5s still separate"
+    ],
+    "notProposed": "campaign_preparation_scope catalog/namespace queries and campaign_row_namespaces (1920 calls 24.8ms) until a separate attribution splits its 528ms self"
+  }
+}
