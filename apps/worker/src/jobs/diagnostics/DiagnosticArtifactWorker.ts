@@ -293,10 +293,27 @@ export class DiagnosticArtifactWorker {
         if (removed !== requests.length) throw new DiagnosticWorkerPreparationChanged();
       });
     });
-    // Grants and independent components have separate finite source commands.
-    // A full grant batch must not suppress an independently due component batch.
-    await this.db.$transaction(async tx => {
-      const grants = await tx.diagnosticOwnershipGrant.findMany({ where: { state: "available", rightsUntil: { lte: now } }, orderBy: { id: "asc" }, take: 100 });
+    // Freeze IDs only. Each prepared command replans its current complete graph.
+    // Independent work has its own capacity even when all 100 grants are due.
+    const grantIds = (await this.db.diagnosticOwnershipGrant.findMany({ where: { state: "available", rightsUntil: { lte: now } },
+      orderBy: [{ rightsUntil: "asc" }, { id: "asc" }], take: 100, select: { id: true } })).map(row => row.id);
+    const componentIds = (await this.db.diagnosticOwnershipComponent.findMany({ where: { state: "available", rightsUntil: { lte: now },
+      OR: [{ grantId: null }, { grantId: { notIn: grantIds } }] },
+    orderBy: [{ rightsUntil: "asc" }, { identityRecordId: "asc" }], take: 100, select: { identityRecordId: true } })).map(row => row.identityRecordId);
+    // This limits intentions, never derived components/effects. A connected graph
+    // over the kernel bound still refuses the whole command without subdivision.
+    const commandWidth = 10;
+    for (let offset = 0; offset < grantIds.length; offset += commandWidth) await this.db.$transaction(async tx => {
+      const selected = grantIds.slice(offset, offset + commandWidth);
+      const current = await tx.diagnosticOwnershipGrant.findMany({ where: { id: { in: selected } } });
+      const grants = [];
+      for (const id of selected) {
+        const row = current.find(item => item.id === id);
+        if (!row) throw new DiagnosticWorkerPreparationChanged();
+        if (row.state === "erased") continue; // A preceding complete disposal may overlap.
+        if (row.state !== "available" || !row.rightsUntil || row.rightsUntil > now) throw new DiagnosticWorkerPreparationChanged();
+        grants.push(row);
+      }
       if (!grants.length) return;
       const grantPatch = { state: "erased", listingId: null, identityDigest: null, sellerId: null, commissionerId: null, businessId: null, membershipId: null,
         grantorId: null, grantorMembershipId: null, sessionId: null, rights: null, rightsUntil: null, declaredAt: null, erasedAt: now };
@@ -304,22 +321,40 @@ export class DiagnosticArtifactWorker {
       const scopes: { scope: unknown }[][] = [];
       const scope = (id: string) => tx.$queryRaw<{ scope: unknown }[]>`SELECT diagnostic_ownership_disposal_scope(NULL::text,${now}::timestamp,${id}::text) AS scope`;
       for (const row of grants) {
-        plans.push(await workerPlannedRow(tx, { table: "diagnostic_ownership_grants", key: { id: row.id } }, grantPatch));
+        const plan = await workerPlannedRow(tx, { table: "diagnostic_ownership_grants", key: { id: row.id } }, grantPatch);
+        if (plan.verb !== "update" || plan.expected.source["state"] !== "available" || !plan.expected.source["rightsUntil"] ||
+          new Date(String(plan.expected.source["rightsUntil"])) > now) throw new DiagnosticWorkerPreparationChanged();
+        plans.push(plan);
         scopes.push(await scope(row.id));
       }
       await workerSource(tx, "ownership_expire", plans, now, async () => {
-        // Revalidate the whole union before any of our own effects shrink its graph.
+        // The prepared prefix checks every expected tuple. Check every retained
+        // disposal union before any effect can shrink another root's graph.
         for (const [index, row] of grants.entries()) if (JSON.stringify(await scope(row.id)) !== JSON.stringify(scopes[index])) throw new DiagnosticWorkerPreparationChanged();
         for (const row of grants) await tx.$queryRaw`SELECT diagnostic_dispose_ownership_scope(NULL::text,${now}::timestamp,${row.id}::text)`;
       });
     });
-    await this.db.$transaction(async tx => {
-      const components = await tx.diagnosticOwnershipComponent.findMany({ where: { state: "available", rightsUntil: { lte: now } }, orderBy: { identityRecordId: "asc" }, take: 100 });
+    for (let offset = 0; offset < componentIds.length; offset += commandWidth) await this.db.$transaction(async tx => {
+      const selected = componentIds.slice(offset, offset + commandWidth);
+      const current = await tx.diagnosticOwnershipComponent.findMany({ where: { identityRecordId: { in: selected } } });
+      const components = [];
+      for (const id of selected) {
+        const row = current.find(item => item.identityRecordId === id);
+        if (!row) throw new DiagnosticWorkerPreparationChanged();
+        if (row.state === "erased") continue;
+        if (row.state !== "available" || !row.rightsUntil || row.rightsUntil > now) throw new DiagnosticWorkerPreparationChanged();
+        components.push(row);
+      }
       if (!components.length) return;
       const componentPatch = { state: "erased", grantId: null, scope: null, sourceListingId: null, identityDigest: null, sellerId: null, commissionerId: null,
         businessId: null, membershipId: null, rights: null, rightsUntil: null, declaredById: null, declaredAt: null, erasedAt: now };
       const plans = [];
-      for (const row of components) plans.push(await workerPlannedRow(tx, { table: "diagnostic_ownership_components", key: { identityRecordId: row.identityRecordId } }, componentPatch));
+      for (const row of components) {
+        const plan = await workerPlannedRow(tx, { table: "diagnostic_ownership_components", key: { identityRecordId: row.identityRecordId } }, componentPatch);
+        if (plan.verb !== "update" || plan.expected.source["state"] !== "available" || !plan.expected.source["rightsUntil"] ||
+          new Date(String(plan.expected.source["rightsUntil"])) > now) throw new DiagnosticWorkerPreparationChanged();
+        plans.push(plan);
+      }
       await workerSource(tx, "ownership_expire", plans, now, async () => {
         await tx.$queryRaw`SELECT diagnostic_dispose_ownership_components(ARRAY[${Prisma.join(components.map(row => row.identityRecordId))}]::text[],${now}::timestamp)`;
       });
