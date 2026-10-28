@@ -231,3 +231,15 @@ it.each([["create", false], ["send", false], ["upload", false], ["create", true]
   expect(screen.queryByLabelText("Selected image")).toBeNull(); expect(screen.queryByText("Attachment ready to send")).toBeNull();
  } finally { release(); }
 });
+
+it("provides a localized way back while keeping existing history after new-request denial", async () => {
+ routeParams.purpose = "history";
+ server.use(http.post("*/services/conversations", () => HttpResponse.json({ code: "COLLECTION_DISABLED" }, { status: 503 })));
+ const screen = await renderMobile(<ServiceScreen/>);
+ expect(screen.queryByText("Vehicle History: 100 TMT")).toBeNull();
+ await fireEvent.press(screen.getByRole("button", { name: "New request" }));
+ await screen.findByText("This service is not available yet.");
+ await fireEvent.press(await screen.findByRole("button", { name: "General Support" }));
+ await screen.findByText(message.body);
+ expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
+});
