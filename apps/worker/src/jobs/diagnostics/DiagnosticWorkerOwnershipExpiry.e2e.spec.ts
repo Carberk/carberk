@@ -135,6 +135,7 @@ describe.skipIf(!enabled)("full grant queue with independently due ownership", (
     // race evidence. It runs only while the existing bounded caller is active.
     let sampling = false;
     const timer = setInterval(() => {
+      if (Date.now() - started >= 5000) { clearInterval(timer); return; }
       if (sampling || !owner) return;
       sampling = true;
       void owner.$queryRaw`SELECT pid,state,wait_event_type,wait_event,left(query,1200) AS query,
