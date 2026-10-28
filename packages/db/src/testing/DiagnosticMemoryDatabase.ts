@@ -150,7 +150,8 @@ export class DiagnosticMemoryDatabase {
         const order = args.orderBy ? Array.isArray(args.orderBy) ? args.orderBy : [args.orderBy] : [];
         result.sort((a, b) => {
           for (const clause of order) for (const [key, direction] of Object.entries(clause)) {
-            const av = a[key] as string | number | Date | null, bv = b[key] as string | number | Date | null;
+            const left = a[key] as string | number | Date | null, right = b[key] as string | number | Date | null;
+            const av = left instanceof Date ? left.getTime() : left, bv = right instanceof Date ? right.getTime() : right;
             if (av === bv) continue;
             const diff = av == null ? -1 : bv == null ? 1 : av < bv ? -1 : 1;
             return direction === "desc" ? -diff : diff;

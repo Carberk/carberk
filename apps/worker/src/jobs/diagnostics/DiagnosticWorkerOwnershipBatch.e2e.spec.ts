@@ -35,6 +35,10 @@ const enabled = process.env["DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE"] === 
 const fixtureManifest = process.env["DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_MANIFEST"];
 const only = process.env["DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_CASE"];
 if (enabled && only && !cases.some(name => name === only)) throw new Error("Unknown ownership batch case");
+const required = <T>(value: T | null | undefined): T => {
+  if (value === null || value === undefined) throw new Error("Missing exact fixture value");
+  return value;
+};
 const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
 const grantPatch = (now: Date) => ({ state: "erased", listingId: null, identityDigest: null, sellerId: null, commissionerId: null, businessId: null,
   membershipId: null, grantorId: null, grantorMembershipId: null, sessionId: null, rights: null, rightsUntil: null, declaredAt: null, erasedAt: now });
@@ -191,7 +195,7 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
   it("honors the selected command and race contract without retries or widened limits", async () => {
     if (name === "overlimit") {
       expect(selected).toHaveLength(1);
-      const order = before.grants.find(row => row.id === selected[0])!.orderId;
+      const order = required(before.grants.find(row => row.id === selected[0])).orderId;
       expect(before.raw.filter(row => row.orderId === order).length).toBeGreaterThan(1000);
       await expect(worker().cleanup()).rejects.toThrow("diagnostic_source_scope_limit");
       expect(await snapshot()).toEqual(before); await receipts();
@@ -199,7 +203,7 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
     }
     if (name === "later-failure") {
       expect(selected).toHaveLength(100);
-      const doomed = selected[10]!;
+      const doomed = required(selected[10]);
       // BEFORE grant UPDATE runs after its components/proofs have changed. The
       // transaction must undo those mandatory effects along with its receipt.
       await owner.$executeRawUnsafe(`CREATE FUNCTION public.${quote(fault)}() RETURNS trigger LANGUAGE plpgsql AS $fault$
@@ -225,12 +229,12 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
       expect(selected).toHaveLength(100);
       if (!fixture.newerGrantId || !fixture.outsideGrantComponentId || !fixture.nonDueGrantId || !fixture.arrivalRequest) throw new Error("Literal oldest/new arrival/outside grant fixture required");
       expect(selected).not.toContain(fixture.newerGrantId);
-      const newestSelected = before.grants.find(row => row.id === selected[99])!;
-      const newer = before.grants.find(row => row.id === fixture.newerGrantId)!;
-      expect(newer.rightsUntil! > newestSelected.rightsUntil!).toBe(true);
-      const outside = before.components.find(row => row.identityRecordId === fixture.outsideGrantComponentId)!;
-      expect(outside.grantId).toBe(fixture.nonDueGrantId); expect(outside.rightsUntil! <= now).toBe(true);
-      expect(before.grants.find(row => row.id === outside.grantId)!.rightsUntil! > now).toBe(true);
+      const newestSelected = required(before.grants.find(row => row.id === selected[99]));
+      const newer = required(before.grants.find(row => row.id === fixture.newerGrantId));
+      expect(required(newer.rightsUntil) > required(newestSelected.rightsUntil)).toBe(true);
+      const outside = required(before.components.find(row => row.identityRecordId === fixture.outsideGrantComponentId));
+      expect(outside.grantId).toBe(fixture.nonDueGrantId); expect(required(outside.rightsUntil) <= now).toBe(true);
+      expect(required(required(before.grants.find(row => row.id === outside.grantId)).rightsUntil) > now).toBe(true);
       // The ordinary new arrival is issued while the frozen worker waits below.
     }
     if (name.includes("first") || name === "oldest-capacity") {
@@ -239,7 +243,7 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
       const workerFirst = name.startsWith("worker-first") || name === "oldest-capacity";
       const race = fixture.race;
       if (!race) throw new Error("Real opponent and exact User barrier fixture required");
-      const beforeOpponent = async () => name === "oldest-capacity" ? request(fixture.arrivalRequest!) : secondWorker ? worker().cleanup() : request(race.request);
+      const beforeOpponent = async () => name === "oldest-capacity" ? request(required(fixture.arrivalRequest)) : secondWorker ? worker().cleanup() : request(race.request);
       try {
         await owner.$transaction(async tx => {
           const [holder] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
@@ -251,8 +255,8 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
           } else await tx.$queryRaw`SELECT id FROM users WHERE id=${race.barrierUserId} FOR UPDATE`;
           operations.push(Promise.allSettled([workerFirst ? worker().cleanup() : beforeOpponent()]));
           const waiting = await until(() => owner.$queryRaw<{ pid: number }[]>`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
-            AND ${holder!.pid}::int=ANY(pg_blocking_pids(pid)) AND state='active'`, rows => rows.length === 1);
-          const firstPid = waiting[0]!.pid;
+            AND ${required(holder).pid}::int=ANY(pg_blocking_pids(pid)) AND state='active'`, rows => rows.length === 1);
+          const firstPid = required(waiting[0]).pid;
           if (!workerFirst && !secondWorker) await until(() => owner.$queryRaw<{ due: boolean }[]>`
             SELECT clock_timestamp() AT TIME ZONE 'UTC'>=${now}::timestamp AS due`, rows => rows[0]?.due === true);
           let opponentSettled = false;
@@ -265,21 +269,21 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
           // Expired use may refuse before preparation. Otherwise require an
           // actual two-command lock chain, never a sleep or assumed order.
           if (chain.settled && !chain.rows.length) {
-            const result = (await second)[0]!;
+            const result = required((await second)[0]);
             if (result.status === "rejected") throw result.reason;
             expect(result.value).toMatchObject({ status: name === "oldest-capacity" ? 201 : 409 });
           }
-          await writeFile(`${root}/barrier.json`, JSON.stringify({ holder: holder!.pid, firstPid,
+          await writeFile(`${root}/barrier.json`, JSON.stringify({ holder: required(holder).pid, firstPid,
             secondPids: chain.rows.map(row => row.pid), role, workerFirst, opponentRefusedBeforePrefix: chain.settled && !chain.rows.length }), { flag: "wx" });
         });
       } finally { await Promise.all(operations); }
-      const outcomes = (await Promise.all(operations)).map(rows => rows[0]!);
-      const workerOutcome = outcomes[workerFirst ? 0 : 1]!;
+      const outcomes = (await Promise.all(operations)).map(rows => required(rows[0]));
+      const workerOutcome = required(outcomes[workerFirst ? 0 : 1]);
       if (workerOutcome.status === "rejected") {
         expect(String(workerOutcome.reason)).toMatch(/DIAGNOSTIC_PREPARATION_CHANGED|diagnostic_source_(graph_changed|expected|stale)/);
         // No skip/retry inside cleanup. A separate later invocation resumes.
       } else expect(workerOutcome.value).toBe(0);
-      const opponent = outcomes[workerFirst ? 1 : 0]!;
+      const opponent = required(outcomes[workerFirst ? 1 : 0]);
       if (secondWorker) {
         if (opponent.status === "rejected") expect(String(opponent.reason)).toMatch(/DIAGNOSTIC_PREPARATION_CHANGED|diagnostic_source_(graph_changed|expected|stale)/);
         else expect(opponent.value).toBe(0);
@@ -292,11 +296,11 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
       // A stale command cannot leave half a group's grant/component effects.
       // Earlier committed groups remain valid; the faulted group stays exact.
       for (let offset = 0; offset < selected.length; offset += 10) {
-        const states = selected.slice(offset, offset + 10).map(id => raced.grants.find(row => row.id === id)!.state);
+        const states = selected.slice(offset, offset + 10).map(id => required(raced.grants.find(row => row.id === id)).state);
         expect(new Set(states).size).toBe(1);
       }
       for (const grant of before.grants) {
-        const actual = raced.grants.find(row => row.id === grant.id)!;
+        const actual = required(raced.grants.find(row => row.id === grant.id));
         expect(actual).toEqual(actual.state === "erased" && grant.state === "available" ? { ...grant, ...grantPatch(now) } : grant);
         for (const component of before.components.filter(row => row.grantId === grant.id)) {
           const current = raced.components.find(row => row.identityRecordId === component.identityRecordId);
@@ -312,22 +316,22 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
         expect(raced.components.find(row => row.identityRecordId === fixture.outsideGrantComponentId)).toMatchObject({ state: "erased" });
         for (const id of [fixture.newerGrantId, fixture.nonDueGrantId]) expect(raced.grants.find(row => row.id === id)).toEqual(before.grants.find(row => row.id === id));
         const arrival = raced.grants.filter(row => !before.grants.some(old => old.id === row.id));
-        expect(arrival).toHaveLength(1); expect(arrival[0]!.state).toBe("available"); expect(arrival[0]!.rightsUntil! > now).toBe(true);
+        expect(arrival).toHaveLength(1); expect(required(arrival[0]).state).toBe("available"); expect(required(required(arrival[0]).rightsUntil) > now).toBe(true);
         await receipts();
         return; // The next invocation may legitimately select the newer due work.
       }
       if (name === "capture-first-worker") {
         const appended = raced.raw.filter(row => !before.raw.some(old => old.id === row.id));
         expect(appended).toHaveLength(1);
-        if (workerOutcome.status === "fulfilled") expect(raced.components.find(row => row.identityRecordId === appended[0]!.id)).toMatchObject({ state: "erased" });
+        if (workerOutcome.status === "fulfilled") expect(raced.components.find(row => row.identityRecordId === required(appended[0]).id)).toMatchObject({ state: "erased" });
       }
       if (name === "proof-use-first-worker") {
         const released = raced.reports.filter(row => !before.reports.some(old => old.id === row.id));
         expect(released).toHaveLength(1);
-        expect(released[0]!.continuityProofId).not.toBeNull(); expect(released[0]!.reinspectionOrderVersion).not.toBeNull();
+        expect(required(released[0]).continuityProofId).not.toBeNull(); expect(required(released[0]).reinspectionOrderVersion).not.toBeNull();
         if (!race.retryRequest) throw new Error("Consumed retry request required");
         expect(await request(race.retryRequest)).toMatchObject({ status: 201 });
-        expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: released[0]!.id } })).toEqual(released[0]);
+        expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: required(released[0]).id } })).toEqual(released[0]);
       }
       await receipts();
       if (workerOutcome.status === "fulfilled") {
