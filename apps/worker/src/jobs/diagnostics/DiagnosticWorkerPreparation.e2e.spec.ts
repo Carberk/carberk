@@ -1,9 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-
-import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { join } from "node:path";
 
+import { CreateBucketCommand, DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaService } from "@auto-tm/db";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 
