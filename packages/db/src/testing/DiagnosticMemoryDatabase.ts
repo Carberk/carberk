@@ -31,6 +31,7 @@ function matches(row: Row, where: Row = {}): boolean {
 type Mutation = { table: string; key: Record<string, string>; verb: string; next: Row | null };
 type MemoryTransaction = { receipt?: string; mutations?: Mutation[] };
 const physical: Record<string, string> = {
+  diagnostic_centers: "diagnosticCenter",
   users: "user", sessions: "session", staff_grants: "staffGrant", listings: "listing", dealership_members: "dealershipMember",
   inspection_orders: "inspectionOrder", diagnostic_reports: "diagnosticReportRecord", diagnostic_pdf_artifacts: "diagnosticPdfArtifact",
   diagnostic_evidence: "diagnosticEvidence", diagnostic_template_versions: "diagnosticTemplateVersion", diagnostic_order_assignments: "diagnosticOrderAssignment",
