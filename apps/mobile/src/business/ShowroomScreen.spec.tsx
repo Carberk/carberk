@@ -30,3 +30,14 @@ it("hides previously visible inventory after a current unavailable response and 
  screen.unmount(); const next = await renderMobile(<ShowroomScreen businessId={id} />);
  expect(await next.findByRole("button", { name: "Try again" })).toBeTruthy(); expect(next.queryByText("Ahal Motors")).toBeNull();
 });
+
+it("keeps direct-entry showrooms escapable when unavailable", async () => {
+ server.use(http.get("*/public-marketplace/showrooms/:id", () => HttpResponse.json({ code: "NOT_FOUND" }, { status: 404 })));
+ routerMock.canGoBack.mockReturnValue(false);
+ try {
+  const screen = await renderMobile(<ShowroomScreen businessId={id}/>);
+  await screen.findByText("This page is unavailable");
+  await fireEvent.press(screen.getByRole("button", { name: "Back" }));
+  expect(routerMock.replace).toHaveBeenCalledWith("/(tabs)/(search)");
+ } finally { routerMock.canGoBack.mockReturnValue(true); }
+});
