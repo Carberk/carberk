@@ -25,7 +25,7 @@ function routeFromResponse(
     const identifier = response.notification.request.identifier;
     if (lastHandledIdentifier.current === identifier) return;
     lastHandledIdentifier.current = identifier;
-    router.push({ pathname: "/services", params: { conversationId: serviceId } });
+    router.push({ pathname: "/service-requests", params: { conversationId: serviceId } });
     return;
   }
 

@@ -219,7 +219,7 @@ describe("Messages tab", () => {
     const view = await renderScreen();
     expect(view.getAllByRole("button", { name: "General Support" })).toHaveLength(1);
     await fireEvent.press(view.getByRole("button", { name: "General Support" }));
-    expect(routerMock.push).toHaveBeenLastCalledWith({ pathname: "/services", params: { purpose: "support" } });
+    expect(routerMock.push).toHaveBeenLastCalledWith({ pathname: "/service-requests", params: { purpose: "support" } });
   });
 });
 

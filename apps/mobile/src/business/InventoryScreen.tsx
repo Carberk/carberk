@@ -15,10 +15,15 @@ import { useBusinessWorkspace } from "./api";
 import { inventoryCopy } from "./inventoryCopy";
 
 import { Button } from "@/components/ui/button";
+import { SafeScreen } from "@/components/navigation/SafeScreen";
+import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
+import { useSafeBack } from "@/src/navigation/useSafeBack";
 import { Text } from "@/components/ui/text";
 
 /** The approved stock list keeps status, review reminders and drafts separate. */
 export function InventoryScreen() {
+ const goBack = useSafeBack("/business");
+ const { t: navigationText } = useTranslation("common");
  const { i18n } = useTranslation(); const c = inventoryCopy(i18n.language);
  const { userId, isAuthenticated } = useAuth(); const workspace = useBusinessWorkspace(); const business = workspace.data?.workspace;
  const businessId = business?.business.id; const cache = useQueryClient(); const [message, setMessage] = useState("");
@@ -42,7 +47,7 @@ export function InventoryScreen() {
  const act = (id: string, action: Parameters<typeof mutation.mutate>[0]["action"]) => mutation.mutate({ id, action });
  const button = (label: string, onPress: () => void, disabled = false) => <Button disabled={disabled || mutation.isPending} onPress={onPress}><Text>{label}</Text></Button>;
  const openDraft = (resumeDraftId?: string) => { if (!businessId) return; router.push({ pathname: "/(tabs)/sell", params: { businessId, ...(resumeDraftId ? { resumeDraftId } : {}) } }); };
- return <><Stack.Screen options={{ title: c.title, headerBackTitle: c.back }} /><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }}>
+ return <SafeScreen><StackHeader title={c.title} leading={<BackButton onPress={goBack} accessibilityLabel={navigationText("back")}/>}/><Stack.Screen options={{ title: c.title, headerBackTitle: c.back }} /><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }}>
   {isAuthenticated !== true || workspaceDenied || (!workspace.isPending && !workspace.isError && !business) ? <Text accessibilityRole="alert">{c.denied}</Text> : workspace.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.retry, () => { void workspace.refetch(); })}</> : workspace.isPending || stock.isPending ? <Text accessibilityRole="progressbar">{c.working}</Text> : stock.isError ? <><Text accessibilityRole="alert">{stock.error instanceof ApiError && stock.error.status === 403 ? c.denied : c.error}</Text>{button(c.retry, () => { void stock.refetch(); })}</> : stock.data ? <>
    <Text className="font-heading text-title-2 font-semibold">{business?.business.name}</Text>
    {!active ? <Text accessibilityRole="alert">{c.inactive}</Text> : null}
@@ -59,5 +64,5 @@ export function InventoryScreen() {
    {business?.membership.role === "owner" ? button(c.changePhone, () => router.push({ pathname: "/listings/contact-phone", params: { businessId: businessId ?? "", returnPathname: "/business" } }), !active) : null}
    {button(c.retry, () => { void workspace.refetch(); void stock.refetch(); })}
   </> : null}
- </ScrollView></>;
+ </ScrollView></SafeScreen>;
 }

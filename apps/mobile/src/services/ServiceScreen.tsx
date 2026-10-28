@@ -22,6 +22,9 @@ import { useServiceConversation, useServiceList, useServiceOpen, useServiceSend,
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SafeScreen } from "@/components/navigation/SafeScreen";
+import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
+import { useSafeBack } from "@/src/navigation/useSafeBack";
 import { Text } from "@/components/ui/text";
 
 export function ServiceScreen() {
@@ -31,6 +34,8 @@ export function ServiceScreen() {
 
 // An identity change unmounts every composer and its draft map together.
 function CustomerServiceScreen() {
+ const goBack = useSafeBack("/(tabs)/services");
+ const { t: navigationText } = useTranslation("common");
  const params = useLocalSearchParams<{ conversationId?: string; purpose?: string; sourceListingId?: string; vin?: string }>();
  const { i18n } = useTranslation(), c = serviceCopy(i18n.language); const { userId, isAuthenticated } = useAuth();
  const d = discoveryCopy(i18n.language);
@@ -86,9 +91,9 @@ function CustomerServiceScreen() {
  }
  async function create(purpose: "support" | "history" = "history") { const epoch = contextEpoch.current; setError(null); try { const value = await open.mutateAsync(purpose); if (epoch === contextEpoch.current) switchConversation(value.id); } catch (value) { if (epoch === contextEpoch.current) failure(value); } }
  const button = (title: string, action: () => void, disabled = false) => <Button accessibilityLabel={title} disabled={disabled} onPress={action}><Text>{title}</Text></Button>;
- return <><Stack.Screen options={{ title: c.customerTitle }}/><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled"><Text className="font-heading text-title-2 font-semibold">{c.customerTitle}</Text>
-  {!selected && params.purpose !== "support" ? <><Text className="font-heading text-title-3 font-semibold">{c.history}</Text><Text>{c.historyIntro}</Text><Text>{c.price}</Text><HistorySample locale={i18n.language}/>{sourceListingId ? <Text>{d.sourceListing}: {sourceListingId}</Text> : null}</> : null}
-  {isAuthenticated !== true ? <>{button(c.signedOut, () => useAuthIntentStore.getState().requireSignIn(router, { returnTo: { pathname: "/services", params: { purpose: params.purpose, ...(sourceListingId ? { sourceListingId } : {}), ...(requestVin ? { vin: requestVin } : {}) } } }))}</> : <>
+ return <SafeScreen><StackHeader title={c.customerTitle} leading={<BackButton onPress={goBack} accessibilityLabel={navigationText("back")}/>}/><Stack.Screen options={{ title: c.customerTitle }}/><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+  {!selected && params.purpose !== "support" ? <><Text className="font-heading text-title-3 font-semibold">{c.history}</Text><Text>{c.historyIntro}</Text><HistorySample locale={i18n.language}/>{sourceListingId ? <Text>{d.sourceListing}: {sourceListingId}</Text> : null}</> : null}
+  {isAuthenticated !== true ? <>{button(c.signedOut, () => useAuthIntentStore.getState().requireSignIn(router, { returnTo: { pathname: "/service-requests", params: { purpose: params.purpose, ...(sourceListingId ? { sourceListingId } : {}), ...(requestVin ? { vin: requestVin } : {}) } } }))}</> : <>
    {error ? <Text accessibilityRole="alert">{c[error]}</Text> : null}
    {!selected ? <>{params.purpose !== "support" ? <><Input accessibilityLabel={d.requestVin} value={requestVin} onChangeText={value => setRequestVin(value.replace(/\s/g, "").toUpperCase())} maxLength={17} autoCapitalize="characters"/>{requestVin.length === 17 && previous.isFetching ? <Text accessibilityRole="progressbar">{c.loading}</Text> : null}{previous.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.refresh, () => { void previous.refetch(); })}</> : previous.data?.length ? <><Text>{d.repeatWarning}</Text>{previous.data.map(item => <View key={item.conversationId}>{button(d.previousReports, () => switchConversation(item.conversationId))}</View>)}</> : null}</> : null}{button(params.purpose === "support" ? c.refresh : c.newRequest, () => { void create(params.purpose === "support" ? "support" : "history"); }, open.isPending || (params.purpose !== "support" && requestVin.length > 0 && (!/^[A-HJ-NPR-Z0-9]{17}$/.test(requestVin) || previous.isPending || previous.isError)))}
     {list.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : list.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.refresh, () => { void list.refetch(); })}</> : list.data?.length === 0 ? <Text>{c.empty}</Text> : list.data?.map(item => <View key={item.id} className="gap-2 rounded-xl border border-border p-4">{button(c[item.purpose], () => switchConversation(item.id))}<Text className="text-muted-foreground">{new Date(item.createdAt).toLocaleString(localeTag(i18n.language))}</Text></View>)}</> : <>
@@ -108,5 +113,5 @@ function CustomerServiceScreen() {
     </> : button(c.refresh, () => { setError(null); void conversation.refetch(); })}
    </>}
   </>}
- </ScrollView></>;
+ </ScrollView></SafeScreen>;
 }
