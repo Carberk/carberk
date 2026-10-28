@@ -75,3 +75,5 @@ All 36 pages passed visual inspection. Page 1 shows localized center, human-read
 Extracted PDF text plus document information/metadata contain neither the full source VIN nor restricted field names `manualReference` and `identityRecordId`. Both customer audiences use the same safe VIN masking. Artifacts are synthetic evidence, not issued customer documents. Snapshots and PDF artifact hashes are distinct concepts; locale/audience variants may share bytes where their visible content is identical.
 
 CPU RELEASE was sent after rendering and inspection drained. No DB, Docker, native, browser, Metro, export bundle or SQL profile ran. Remaining acceptance includes PostgreSQL lock/race and affected container-backed e2e execution, independent assembled reviews, CI and deployed proof. Offline rollback/retry and unchanged legacy renderer bytes do not substitute for those gates.
+
+Final evidence check normalized terminal-log trailing blank lines only. `git diff --check b71e8412abce19e22ae6c1c6bea9b6e95402d683 HEAD` then passed; command output and results are unchanged.
