@@ -5,7 +5,7 @@ import { Session } from "node:inspector";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { CreateBucketCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, DeleteBucketCommand, DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
@@ -83,7 +83,7 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     const migrations = readdirSync(`${packageDir}prisma/migrations`).sort().filter(name => name !== "migration_lock.toml")
       .map(name => ({ name, sha256: sha256(readFileSync(`${packageDir}prisma/migrations/${name}/migration.sql`)) }));
     expect(migrations).toHaveLength(99);
-    expect(sha256(JSON.stringify(migrations))).toBe("7a0b668e071403351356300f5e4d6028bd61c32d2cca9271cdb4bcfcce3e7792");
+    expect(sha256(JSON.stringify(migrations))).toBe("4a3315f44edfb6dc0533f0134ae0274ff031482a8b86437aac2d65cfacc61d52");
     evidence.push({ kind: "source", migrations, pins: ["tests/maintenance-finite.r7g.e2e.spec.ts", "scripts/maintenance-listings.ts", "scripts/demo-inventory/application/testing/FakeObjectStore.ts", "src/account-source-command.ts", "src/maintenance-source-command.ts", "src/PrismaAdminPromotionStore.ts", "src/diagnostic-source-command.ts", "scripts/reviewer-scenario-store.ts", "scripts/promote-admin.ts", "scripts/ui-fixture.ts", "scripts/demo-inventory/seed.ts", "scripts/demo-inventory/remove.ts", "src/reviewer-scenario-seed.ts", "src/promote-admin.ts", "src/tester-accounts.ts", "src/PrismaTesterAccountStore.ts", "generated/prisma/client/client.ts", "dist/src/index.js", "../contracts/dist/index.js"]
       .map(path => ({ path, sha256: sha256(readFileSync(`${packageDir}${path}`)) })) });
     const supplied = process.env["R7G_MAINTENANCE_CONTROL_URL"];
@@ -95,7 +95,7 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     control = new Pool({ connectionString: supplied ?? container.getConnectionUri() });
     await control.query(`CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
   });
-  beforeEach(async () => {
+  beforeEach(async ({ task }) => {
     databaseName = `r7g_${randomUUID().replaceAll("-", "")}`;
     await control.query(`CREATE DATABASE "${databaseName}"`);
     const url = new URL(process.env["R7G_MAINTENANCE_CONTROL_URL"] ?? container.getConnectionUri()); url.pathname = `/${databaseName}`;
@@ -104,7 +104,7 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     guardSnapshot = await guards();
     const applied = (await observer.query<{ name: string; sha256: string }>('SELECT migration_name AS name,checksum AS sha256 FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name')).rows;
     expect(applied).toHaveLength(99);
-    expect(sha256(JSON.stringify(applied))).toBe("7a0b668e071403351356300f5e4d6028bd61c32d2cca9271cdb4bcfcce3e7792");
+    expect(sha256(JSON.stringify(applied))).toBe("4a3315f44edfb6dc0533f0134ae0274ff031482a8b86437aac2d65cfacc61d52");
     evidence.push({ kind: "database", databaseName, applied, guardSnapshot });
     drainOwner = trackPoolClientEnds(observer);
     owner = new PrismaClient({ adapter: new PrismaPg(observer) });
@@ -130,6 +130,12 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     await owner.user.create({ data: { ...reviewer, phoneVerifiedAt: now, emailVerifiedAt: now } });
     const tester = must(parseTesterAccounts(testerJson, "[]")[0]);
     await owner.user.create({ data: { ...tester, phoneVerifiedAt: now, emailVerifiedAt: now } });
+    if (task.name.includes("compound reviewer")) {
+      for (const userId of [reviewer.id, foreignId]) {
+        await owner.session.create({ data: { userId, refreshTokenHash: randomUUID(), expiresAt: new Date("2027-01-01") } });
+        await owner.fcmDevice.create({ data: { userId, token: randomUUID(), platform: "ios" } });
+      }
+    }
     // UI replacement plan exists, but no destructive work is needed to detect it.
     await owner.user.create({ data: { id: "f1000000-0000-4000-8000-000000000010" } });
     create = { id: listingId, sellerId, brandId: brand.id, modelId: model.id, cityId: city.id, regionId: region.id, year: 2020, priceAmount: 100, status: "active", damaged: false };
@@ -148,6 +154,16 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     storage = new FakeObjectStore({ "listing-photos": new Map([
       ["demo-inventory/retained/original.webp", Buffer.from("retained")], ["foreign/original.webp", Buffer.from("foreign")],
     ]), "chat-attachments": new Map([["foreign/chat", Buffer.from("foreign chat")]]) });
+    if (task.name.includes("compound reviewer")) {
+      const support = await owner.supportCase.create({ data: { customerId: foreignId } });
+      const service = await owner.serviceConversation.create({ data: { purpose: "support", supportCaseId: support.id } });
+      for (const userId of [reviewer.id, foreignId]) {
+        const session = await owner.session.findFirstOrThrow({ where: { userId } });
+        const device = await owner.fcmDevice.findFirstOrThrow({ where: { userId } });
+        await owner.servicePushSubscription.create({ data: { sessionId: session.id, deviceId: device.id, conversationId: service.id, lifecycleEpoch: 0 } });
+        await owner.videoGrant.create({ data: { ownerUserId: userId, ownerSessionId: session.id, secretHash: randomUUID(), listingId, generationId: randomUUID(), purpose: "upload", expiresAt: new Date("2027-01-01") } });
+      }
+    }
     const triggers = await observer.query<{ table: string; name: string }>(`SELECT c.relname AS table,t.tgname AS name FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')`);
     for (const trigger of triggers.rows) await observer.query(`ALTER TABLE public."${trigger.table}" ENABLE TRIGGER "${trigger.name}"`);
     expect((await observer.query("SELECT diagnostic_source_guards_ready() AS ready")).rows).toEqual([{ ready: true }]);
@@ -528,9 +544,26 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
       .withCommand(["server", "/data"]).withExposedPorts(9000)
       .withWaitStrategy(Wait.forHttp("/minio/health/live", 9000)).start();
     const endpoint = process.env["R7G_MINIO_ENDPOINT"] ?? `http://${must(minio).getHost()}:${must(minio).getMappedPort(9000)}`;
+    const minioAddress = new URL(endpoint);
+    if (process.env["R7G_MINIO_ENDPOINT"] && (minioAddress.hostname !== "127.0.0.1" || ["5432", "6379", "9000"].includes(minioAddress.port))) throw new Error("Isolated R7g MinIO required");
     const realStore = createS3ObjectStore({ endpoint, region: "us-east-1", accessKeyId: "minioadmin", secretAccessKey: "minioadmin" });
     const s3 = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" } });
     const originalEnv = Object.fromEntries(["MINIO_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY"].map(key => [key, process.env[key]]));
+    async function clearFixtureBucket() {
+      // Only the isolated task's fixture bucket; restore absence after each run.
+      try {
+        let token: string | undefined;
+        do {
+          const page = await s3.send(new ListObjectsV2Command({ Bucket: "listing-photos", ContinuationToken: token }));
+          const keys = (page.Contents ?? []).flatMap(item => item.Key ? [{ Key: item.Key }] : []);
+          if (keys.length > 0) await s3.send(new DeleteObjectsCommand({ Bucket: "listing-photos", Delete: { Objects: keys } }));
+          token = page.NextContinuationToken;
+        } while (token);
+        await s3.send(new DeleteBucketCommand({ Bucket: "listing-photos" }));
+      } catch (error) {
+        if (!(error instanceof Error) || error.name !== "NoSuchBucket") throw error;
+      }
+    }
     async function bytes() {
       const result = [];
       for (const key of (await realStore.list("")).sort()) {
@@ -541,6 +574,7 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
       return result;
     }
     try {
+      await clearFixtureBucket();
       await s3.send(new CreateBucketCommand({ Bucket: "listing-photos" }));
       await s3.send(new PutObjectCommand({ Bucket: "listing-photos", Key: "foreign/original.webp", Body: "foreign bytes" }));
       process.env["MINIO_ENDPOINT"] = endpoint; process.env["MINIO_ACCESS_KEY"] = "minioadmin"; process.env["MINIO_SECRET_KEY"] = "minioadmin";
@@ -601,9 +635,78 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
       evidence.push({ kind: "minio", objects: objectsBefore, metadata: { width: meta.width, height: meta.height, format: meta.format } });
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) { if (value === undefined) Reflect.deleteProperty(process.env, key); else process.env[key] = value; }
-      s3.destroy(); realStore.close(); await minio?.stop();
+      try { await clearFixtureBucket(); }
+      finally { s3.destroy(); realStore.close(); await minio?.stop(); }
       evidence.push({ kind: "minioStopped", containerId: minio?.getId() ?? "parent-owned-candidatea-r7g" });
     }
+  });
+
+  it("compound reviewer revoke repeats without security, audit or historical content writes", async () => {
+    const store = new PrismaReviewerScenarioSeedStore(db);
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" })).toMatchObject({ exitCode: 0 });
+    const before = await snapshot();
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" }))
+      .toMatchObject({ exitCode: 0, revokedUserIds: [] });
+    expect(await snapshot()).toEqual(before);
+  });
+
+  async function reviewerCredentialPlan(mode: "rotate" | "revoke") {
+    const target = must(parseReviewerScenarioAccounts(reviewerJson)[2]);
+    const existing = await db.user.findUniqueOrThrow({ where: { id: target.id } });
+    const ids = reviewerScenarioSeedIds;
+    const roster = parseReviewerScenarioAccounts(mode === "rotate" ? reviewerJson : JSON.stringify([1, 2, 3, 4, 5].map(index => ({ phone: `+9936500000${index}`, email: `r7g-reviewer${index}@example.invalid`, code: "123456" }))));
+    return { mode, expected: [existing], now,
+      accounts: roster.map(account => mode === "rotate"
+        ? { ...account, email: account.id === target.id ? "rotated@example.invalid" : account.email }
+        : { ...account, phone: `revoked:${account.id}`, email: null, displayName: `Revoked ${account.id}` }),
+      associations: { catalog: { brandId: ids.brandId, brandSlug: "autotm-reviewer", modelId: ids.modelId, modelSlug: "review-scenario",
+        regionId: ids.regionId, regionSlug: "reviewer-region", cityId: ids.cityId, citySlug: "reviewer-city" }, listings: [] },
+    };
+  }
+
+  it.each(["sessions", "fcm_devices", "audit_logs"] as const)("compound reviewer failure at %s rolls back the complete account/security/audit graph", async table => {
+    const plan = await reviewerCredentialPlan("rotate");
+    const before = await snapshot();
+    await observer.query(`CREATE FUNCTION r7g_compound_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'r7g_compound_fault'; END $$`);
+    const verb = table === "sessions" ? "DELETE" : table === "fcm_devices" ? "UPDATE" : "INSERT";
+    await observer.query(`CREATE TRIGGER r7g_compound_fault BEFORE ${verb} ON public.${table} FOR EACH ROW EXECUTE FUNCTION r7g_compound_fault()`);
+    try {
+      await expect(new PrismaReviewerScenarioSeedStore(db).changeCredentials(plan)).rejects.toThrow("r7g_compound_fault");
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      await observer.query(`DROP TRIGGER r7g_compound_fault ON public.${table}`);
+      await observer.query("DROP FUNCTION r7g_compound_fault()");
+    }
+  });
+
+  it.each(["rotate", "revoke"] as const)("compound reviewer %s atomically changes credentials, Sessions, active devices and one contact-free audit", async mode => {
+    const store = new PrismaReviewerScenarioSeedStore(db);
+    const target = must(parseReviewerScenarioAccounts(reviewerJson)[2]);
+    const existing = await db.user.findUniqueOrThrow({ where: { id: target.id } });
+    const foreignUser = await db.user.findUniqueOrThrow({ where: { id: foreignId } });
+    const foreignSessions = await db.session.findMany({ where: { userId: foreignId } });
+    const foreignDevices = await db.fcmDevice.findMany({ where: { userId: foreignId } });
+    const foreignGrants = await db.videoGrant.findMany({ where: { ownerUserId: foreignId } });
+    const foreignSubscriptions = await db.servicePushSubscription.findMany({ where: { sessionId: { in: foreignSessions.map(row => row.id) } } });
+    expect(await store.changeCredentials(await reviewerCredentialPlan(mode))).toEqual([target.id]);
+    const changed = await db.user.findUniqueOrThrow({ where: { id: target.id } });
+    expect(changed).toMatchObject(mode === "rotate"
+      ? { phone: existing.phone, email: "rotated@example.invalid", phoneVerifiedAt: now, emailVerifiedAt: now }
+      : { phone: `revoked:${target.id}`, email: null, phoneVerifiedAt: existing.phoneVerifiedAt, emailVerifiedAt: null });
+    expect(await db.session.count({ where: { userId: target.id } })).toBe(0);
+    expect(await db.videoGrant.count({ where: { ownerUserId: target.id } })).toBe(0);
+    expect(await db.servicePushSubscription.count()).toBe(foreignSubscriptions.length);
+    expect(await db.videoGrant.findMany({ where: { ownerUserId: foreignId } })).toEqual(foreignGrants);
+    expect(await db.servicePushSubscription.findMany({ where: { sessionId: { in: foreignSessions.map(row => row.id) } } })).toEqual(foreignSubscriptions);
+    expect(await db.fcmDevice.findMany({ where: { userId: target.id } })).toMatchObject([{ invalidatedAt: now }]);
+    const audits = await db.auditLog.findMany();
+    expect(audits).toHaveLength(1);
+    expect(must(audits[0])).toMatchObject({ actorId: null, action: mode === "rotate" ? "REVIEWER_SCENARIO_ROTATE" : "REVIEWER_SCENARIO_REVOKE" });
+    expect(JSON.stringify(audits)).not.toContain(existing.phone);
+    expect(JSON.stringify(audits)).not.toContain(existing.email);
+    expect(await db.user.findUniqueOrThrow({ where: { id: foreignId } })).toEqual(foreignUser);
+    expect(await db.session.findMany({ where: { userId: foreignId } })).toEqual(foreignSessions);
+    expect(await db.fcmDevice.findMany({ where: { userId: foreignId } })).toEqual(foreignDevices);
   });
 
   it("strict maintenance parser rejects malformed intents, excess roots and protected-field plans without effects", async () => {
@@ -616,6 +719,9 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
       const accounts = parseReviewerScenarioAccounts(reviewerJson);
       const target = must(accounts[2]);
       const reviewer = await reviewerCredentialsSourceCommand(tx, { mode: "rotate", accounts: accounts.map(account => ({ ...account, email: account.id === target.id ? "rotated@example.invalid" : account.email })), changedIds: [target.id], now });
+      for (const valid of [promotion, removal, reviewer]) {
+        expect((await appPool.query("SELECT public.diagnostic_source_parse($1::jsonb) AS command", [JSON.stringify(valid)])).rows).toHaveLength(1);
+      }
       // Parser calls perform unlocked discovery only; rejected JSON never receives
       // a receipt and cannot authorize any protected source write.
       const first = must(promotion.rows[0]);
@@ -631,7 +737,8 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
       for (const payload of invalid) {
         // Each rejected PostgreSQL statement needs its own outer transaction;
         // never swallow an aborted command behind a savepoint or mint a receipt.
-        await expect(appPool.query("SELECT public.diagnostic_source_parse($1::jsonb)", [JSON.stringify(payload)])).rejects.toThrow();
+        await expect(appPool.query("SELECT public.diagnostic_source_parse($1::jsonb)", [JSON.stringify(payload)]))
+          .rejects.toMatchObject({ code: "P0001", message: expect.stringMatching(/^diagnostic_/) });
       }
     });
     expect(await snapshot()).toEqual(before);
@@ -658,7 +765,10 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     try {
       await reservation.query("BEGIN");
       await reservation.query(`SELECT pg_advisory_xact_lock(897100,hashtext(jsonb_build_array('unique',jsonb_build_array('email'),jsonb_build_object('email',$1::text))::text))`, ["contended@example.invalid"]);
-      await expect(db.user.create({ data: { email: "contended@example.invalid" } })).rejects.toThrow("diagnostic_source_user_insert_busy");
+      // Prisma maps SQLSTATE40001 to P2034 and discards the server message.
+      // The same restricted principal executes ordinary INSERT to retain the exact fence oracle.
+      await expect(appPool.query('INSERT INTO public.users (id,email,"updatedAt") VALUES ($1,$2,$3)',
+        [randomUUID(), "contended@example.invalid", now])).rejects.toThrow("diagnostic_source_user_insert_busy");
     } finally { await reservation.query("ROLLBACK"); reservation.release(); }
     expect(await snapshot()).toEqual(before);
   });

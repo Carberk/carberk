@@ -81,7 +81,7 @@ $$;
 ALTER FUNCTION public.diagnostic_source_account_effects(jsonb) RENAME TO diagnostic_source_account_effects_before_maintenance;
 CREATE FUNCTION public.diagnostic_source_account_effects(c jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SET search_path=pg_catalog,public AS $$
-DECLARE result jsonb:='[]'; probe jsonb; e jsonb; r record; ordinary jsonb;
+DECLARE result jsonb:='[]'; probe jsonb; r record; ordinary jsonb;
 BEGIN
  IF c->>'operation'<>'account_schedule' OR c->'intent'->>'mode' IS DISTINCT FROM 'tester_remove' THEN
   RETURN public.diagnostic_source_account_effects_before_maintenance(c); END IF;
@@ -105,7 +105,7 @@ END $$;
 ALTER FUNCTION public.diagnostic_source_fk_effects(jsonb) RENAME TO diagnostic_source_fk_effects_before_maintenance;
 CREATE FUNCTION public.diagnostic_source_fk_effects(c jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SET search_path=pg_catalog,public AS $$
-DECLARE result jsonb; sessions jsonb; e jsonb; r record; audit jsonb;
+DECLARE result jsonb; sessions jsonb; r record; audit jsonb;
 BEGIN
  IF public.diagnostic_maintenance_selected(c) IS NOT TRUE THEN RETURN public.diagnostic_source_fk_effects_before_maintenance(c); END IF;
  result:=public.diagnostic_source_fk_effects_before_maintenance(CASE WHEN c->'intent'->>'mode'='tester_remove'
@@ -120,7 +120,7 @@ BEGIN
  IF c->>'operation'='reviewer_credentials_change' THEN
   FOR r IN SELECT to_jsonb(d) AS row FROM public.fcm_devices d WHERE d."invalidatedAt" IS NULL AND EXISTS
    (SELECT 1 FROM jsonb_array_elements(c->'rows') e WHERE e->'key'->>'id'=d."userId") ORDER BY d.id LOOP
-   result:=result||jsonb_build_array(public.diagnostic_purge_effect('fcm_devices',r.row,jsonb_build_object('invalidatedAt',(c->'intent'->>'at')::timestamp(3))));
+   result:=result||jsonb_build_array(public.diagnostic_purge_effect('fcm_devices',r.row,jsonb_build_object('invalidatedAt',(c->'intent'->>'at')::timestamp(3),'updatedAt',transaction_timestamp()::timestamp(3))));
   END LOOP;
  END IF;
  audit:=public.diagnostic_maintenance_audit(c);
@@ -136,7 +136,7 @@ ALTER FUNCTION public.diagnostic_source_parse(jsonb) RENAME TO diagnostic_source
 CREATE FUNCTION public.diagnostic_source_parse(c jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SET search_path=pg_catalog,public AS $$
 DECLARE parsed jsonb; i jsonb:=c->'intent'; op text:=c->>'operation'; e jsonb; prior jsonb; target jsonb; uid text;
- ids jsonb; roots jsonb; a jsonb; stored jsonb; actual_ids jsonb; wanted_ids jsonb; selector jsonb; stamp timestamp(3); normalized text; roster text[]:=ARRAY['be255e7f-3414-49ae-8dcb-d4d6b26b94f9','c410b0ef-dc1b-45f5-afe6-72f4ba5d9cb7','9ee7ec27-8ebc-40e5-b0b5-e76494c9a024','dbda60a2-a7f6-4230-a993-9ec73f30dc6d','30157e67-4129-4984-afe1-c4cd014f68ed'];
+ ids jsonb; roots jsonb; account_item jsonb; stored jsonb; actual_ids jsonb; wanted_ids jsonb; selector jsonb; stamp timestamp(3); normalized text; roster text[]:=ARRAY['be255e7f-3414-49ae-8dcb-d4d6b26b94f9','c410b0ef-dc1b-45f5-afe6-72f4ba5d9cb7','9ee7ec27-8ebc-40e5-b0b5-e76494c9a024','dbda60a2-a7f6-4230-a993-9ec73f30dc6d','30157e67-4129-4984-afe1-c4cd014f68ed'];
 BEGIN
  IF op NOT IN ('admin_bootstrap_promote','reviewer_credentials_change') AND
   NOT(op='account_schedule' AND c ? 'intent') THEN RETURN public.diagnostic_source_parse_before_maintenance(c); END IF;
@@ -180,19 +180,19 @@ BEGIN
     AND (l."sellerId" IS DISTINCT FROM roster[2] OR l."businessId" IS NOT NULL)) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_listing'; END IF;
   SELECT jsonb_agg(a->'id' ORDER BY a->>'id') INTO wanted_ids FROM jsonb_array_elements(i->'accounts') a;
   IF roots IS DISTINCT FROM wanted_ids OR jsonb_array_length(wanted_ids)<>(SELECT count(DISTINCT value) FROM jsonb_array_elements(wanted_ids)) THEN RAISE EXCEPTION 'diagnostic_maintenance_roster'; END IF;
-  FOR a IN SELECT value FROM jsonb_array_elements(i->'accounts') LOOP
-   uid:=a->>'id'; stored:=public.diagnostic_source_read('users',jsonb_build_object('id',uid));
-   IF (jsonb_typeof(a)='object' AND a-ARRAY['id','phone','email']='{}' AND a ?& ARRAY['id','phone','email']
+  FOR account_item IN SELECT value FROM jsonb_array_elements(i->'accounts') LOOP
+   uid:=account_item->>'id'; stored:=public.diagnostic_source_read('users',jsonb_build_object('id',uid));
+   IF (jsonb_typeof(account_item)='object' AND account_item-ARRAY['id','phone','email']='{}' AND account_item ?& ARRAY['id','phone','email']
     AND public.diagnostic_maintenance_reviewer_role(uid) IS NOT NULL) IS NOT TRUE THEN RAISE EXCEPTION 'diagnostic_maintenance_roster'; END IF;
    IF stored IS NOT NULL AND (stored->>'role' IS DISTINCT FROM public.diagnostic_maintenance_reviewer_role(uid)
     OR stored->>'suspendedAt' IS NOT NULL OR stored->>'deletionScheduledAt' IS NOT NULL
     OR stored->>'phoneVerifiedAt' IS NULL OR stored->>'emailVerifiedAt' IS NULL) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_source'; END IF;
    IF i->>'mode'='rotate' THEN
-    IF (jsonb_typeof(a->'phone')='string' AND a->>'phone' ~ '^\+993[0-9]{8}$'
-     AND jsonb_typeof(a->'email')='string' AND a->>'email'=public.diagnostic_maintenance_email(a->>'email')
-     AND a->>'email' ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$') IS NOT TRUE
-     OR EXISTS(SELECT 1 FROM public.users u WHERE u.id<>uid AND (u.phone=a->>'phone' OR public.diagnostic_maintenance_email(u.email)=a->>'email')) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_destination'; END IF;
-   ELSIF a->>'phone' IS DISTINCT FROM 'revoked:'||uid OR a->'email' IS DISTINCT FROM 'null' THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_destination'; END IF;
+    IF (jsonb_typeof(account_item->'phone')='string' AND account_item->>'phone' ~ '^\+993[0-9]{8}$'
+     AND jsonb_typeof(account_item->'email')='string' AND account_item->>'email'=public.diagnostic_maintenance_email(account_item->>'email')
+     AND account_item->>'email' ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$') IS NOT TRUE
+     OR EXISTS(SELECT 1 FROM public.users u WHERE u.id<>uid AND (u.phone=account_item->>'phone' OR public.diagnostic_maintenance_email(u.email)=account_item->>'email')) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_destination'; END IF;
+   ELSIF account_item->>'phone' IS DISTINCT FROM 'revoked:'||uid OR account_item->'email' IS DISTINCT FROM 'null' THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_destination'; END IF;
   END LOOP;
   -- Every changed existing slot is explicit; no caller may omit the final slot.
   SELECT coalesce(jsonb_agg(a->'id' ORDER BY a->>'id'),'[]') INTO actual_ids FROM jsonb_array_elements(i->'accounts') a
@@ -221,10 +221,10 @@ BEGIN
     AND target->>'deletionScheduledAt' IS NOT NULL) IS NOT TRUE OR
     (target->>'deletionScheduledAt')::timestamp IS DISTINCT FROM least(coalesce((prior->>'deletionScheduledAt')::timestamp,stamp),stamp) THEN RAISE EXCEPTION 'diagnostic_maintenance_tester_source'; END IF;
   ELSE
-   SELECT value INTO a FROM jsonb_array_elements(i->'accounts') a WHERE a->>'id'=uid;
+   SELECT value INTO account_item FROM jsonb_array_elements(i->'accounts') a WHERE a->>'id'=uid;
    IF i->>'mode'='rotate' THEN
     IF target IS DISTINCT FROM public.diagnostic_source_normalize('users',prior||jsonb_build_object(
-      'phone',a->'phone','email',a->'email','phoneVerifiedAt',stamp,'emailVerifiedAt',stamp)) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_fields'; END IF;
+      'phone',account_item->'phone','email',account_item->'email','phoneVerifiedAt',stamp,'emailVerifiedAt',stamp)) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_fields'; END IF;
    ELSIF target IS DISTINCT FROM prior||jsonb_build_object('phone','revoked:'||uid,'email',NULL,'emailVerifiedAt',NULL,'displayName','Revoked '||uid) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_fields'; END IF;
   END IF;
  END LOOP;
@@ -263,24 +263,24 @@ END $$;
 ALTER FUNCTION public.diagnostic_source_lock_keys(jsonb,jsonb) RENAME TO diagnostic_source_lock_keys_before_maintenance;
 CREATE FUNCTION public.diagnostic_source_lock_keys(scope jsonb,c jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SET search_path=pg_catalog,public AS $$
-DECLARE result jsonb; all_rows jsonb; e jsonb; value text; audit jsonb;
+DECLARE result jsonb; all_rows jsonb; account_item jsonb; canonical_value text;
 BEGIN
  all_rows:=c->'rows';
  IF public.diagnostic_maintenance_selected(c) IS TRUE THEN all_rows:=all_rows||public.diagnostic_source_fk_effects(c)||public.diagnostic_source_account_effects(c); END IF;
  result:=public.diagnostic_source_lock_keys_before_maintenance(scope,c||jsonb_build_object('rows',all_rows));
- FOR value IN
+ FOR canonical_value IN
   SELECT public.diagnostic_maintenance_email(r->>'email') FROM (
    SELECT e->'row' AS r FROM jsonb_array_elements(scope) e WHERE e->>'table'='users'
    UNION ALL SELECT e->'next' FROM jsonb_array_elements(all_rows) e WHERE e->>'table'='users'
    UNION ALL SELECT a FROM jsonb_array_elements(coalesce(c->'intent'->'accounts','[]')) a
   ) rows WHERE r->>'email' IS NOT NULL
  LOOP
-  result:=result||jsonb_build_array(jsonb_build_object('namespace',897100,'key',hashtext(jsonb_build_array('canonical_email',value)::text)));
+  result:=result||jsonb_build_array(jsonb_build_object('namespace',897100,'key',hashtext(jsonb_build_array('canonical_email',canonical_value)::text)));
  END LOOP;
  IF c->>'operation'='reviewer_credentials_change' THEN
-  FOR e IN SELECT value FROM jsonb_array_elements(c->'intent'->'accounts') LOOP
-   IF e->>'phone' IS NOT NULL THEN result:=result||jsonb_build_array(jsonb_build_object('namespace',897100,'key',hashtext(jsonb_build_array('unique',jsonb_build_array('phone'),jsonb_build_object('phone',e->'phone'))::text))); END IF;
-   IF e->>'email' IS NOT NULL THEN result:=result||jsonb_build_array(jsonb_build_object('namespace',897100,'key',hashtext(jsonb_build_array('unique',jsonb_build_array('email'),jsonb_build_object('email',e->'email'))::text))); END IF;
+  FOR account_item IN SELECT value FROM jsonb_array_elements(c->'intent'->'accounts') LOOP
+   IF account_item->>'phone' IS NOT NULL THEN result:=result||jsonb_build_array(jsonb_build_object('namespace',897100,'key',hashtext(jsonb_build_array('unique',jsonb_build_array('phone'),jsonb_build_object('phone',account_item->'phone'))::text))); END IF;
+   IF account_item->>'email' IS NOT NULL THEN result:=result||jsonb_build_array(jsonb_build_object('namespace',897100,'key',hashtext(jsonb_build_array('unique',jsonb_build_array('email'),jsonb_build_object('email',account_item->'email'))::text))); END IF;
   END LOOP;
  END IF;
  RETURN (SELECT coalesce(jsonb_agg(key ORDER BY (key->>'namespace')::int,(key->>'key')::int),'[]') FROM (SELECT DISTINCT value AS key FROM jsonb_array_elements(result)) d);
