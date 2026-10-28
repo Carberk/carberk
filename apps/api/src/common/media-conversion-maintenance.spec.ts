@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createMediaConversionMaintenanceServer } from "./media-conversion-maintenance";
 
@@ -15,13 +15,19 @@ describe("photo conversion maintenance", () => {
       { APP_ENV: "production" }, { PHOTO_CONVERSION_MAINTENANCE: "false" }, { AUTOTM_COMMIT_SHA: "b".repeat(40) },
       { RAILWAY_SERVICE_ID: "other" }, { STAGING_CLEAN_RESET_EXECUTOR: "{}" },
       { STAGING_CLEAN_RESET_EXECUTOR: JSON.stringify({ ...binding, proof: true }) },
-    ]) expect(() => createMediaConversionMaintenanceServer({ ...env, ...change })).toThrow("Reset executor admission refused");
-    const server = createMediaConversionMaintenanceServer(env);
+    ]) {
+      try {
+        for (const [key, value] of Object.entries({ ...env, ...change })) vi.stubEnv(key, value);
+        expect(() => createMediaConversionMaintenanceServer()).toThrow("Reset executor admission refused");
+      } finally { vi.unstubAllEnvs(); }
+    }
+    for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+    const server = createMediaConversionMaintenanceServer();
     try {
       expect((await server.inject({ method: "GET", url: "/healthz" })).json()).toMatchObject({ commitSha: binding.candidate });
       expect((await server.inject({ method: "POST", url: "/api/v1/auth/sign-in" })).statusCode).toBe(503);
       expect((await server.inject({ method: "POST", url: "/operator/reset" })).statusCode).toBe(503);
-    } finally { await server.close(); }
+    } finally { await server.close(); vi.unstubAllEnvs(); }
   });
   it("keeps liveness reachable and refuses every business route and Socket.IO handshake", async () => {
     const server = createMediaConversionMaintenanceServer();
