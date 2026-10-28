@@ -38,8 +38,13 @@ const binding = { owner: "operator-901", leaseCommit: "a".repeat(40),
   window: { operationId, candidate, closedAt: "2026-10-21T00:00:00.000Z", observedAt: "2026-10-21T00:15:00.000Z", elapsedSeconds: 900 },
   deployments: { api: [{ id: "api-deployment", status: "SUCCESS", sha: candidate }], worker: [{ id: "worker-deployment", status: "SUCCESS", sha: candidate }] } };
 const base = { operation: "clean-reset", operationId, reservationId, candidate };
+let planDigestOf: (expectedInventory: unknown) => string = () => "0".repeat(64);
+// Rows carries the synthetic durable closure admission; its plan digest is the executor's own artifact digest.
 const pgRequest = (phase: string, expectedInventory?: unknown) => ({ ...base, phase,
-  identity: { ...identity, origins: { database: identity.origins.database } }, ...(expectedInventory === undefined ? {} : { expectedInventory }) });
+  identity: { ...identity, origins: { database: identity.origins.database } }, ...(expectedInventory === undefined ? {} : { expectedInventory }),
+  ...(phase === "rows" ? { admission: { operationId: base.operationId, reservationId: base.reservationId, owner: "operator-901", candidate: base.candidate,
+    targetIdentity: { ...identity, origins: { database: identity.origins.database } }, closureGeneration: "1".repeat(32), closureEvidenceDigest: "2".repeat(64),
+    expectedInventory, planDigest: planDigestOf(expectedInventory) } } : {}) });
 const redisInventoryRequest = () => ({ ...base, phase: "redis-inventoried", identity: structuredClone(identity) });
 const hash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const hex64 = expect.stringMatching(/^[a-f0-9]{64}$/);
@@ -287,7 +292,7 @@ describe("real interrupted Redis intent and lost Lua reply on disposable transpo
 
   beforeEach(async () => {
     redisWrites = 0;
-    ({ cleanResetProgram } = await import(pathToFileURL(`${root}/scripts/staging-clean-reset-remote.mjs`).href));
+    ({ cleanResetProgram, cleanResetRowsPlanDigest: planDigestOf } = await import(pathToFileURL(`${root}/scripts/staging-clean-reset-remote.mjs`).href));
     expect(workerRequire("bullmq/package.json").version).toBe("5.76.8");
     // Keep the recurring liveness probe off the target database's exclusive reset boundary.
     postgres = await new PostgreSqlContainer("postgres:16-alpine").withHealthCheck({

@@ -75,6 +75,17 @@ const pid = value => Number.isInteger(value) && value > 0 && value <= 2147483647
         diagnostic += ` ${field}=${Number(value)}`;
       }
     }
+    // Separate opt-in level for reset RED attribution; level `1` stays SQLSTATE and positions only. Value-free
+    // context: a guard identifier RAISEd without formatted text, the server routine, catalog identifiers and the
+    // PL/pgSQL call stack. Message text with spaces, detail, hint, query bodies and connection data never pass.
+    if (process.env.STAGING_TEST_SQL_DIAGNOSTICS_CONTEXT === '1') {
+      const identifier = value => typeof value === 'string' && /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(value);
+      if (error.code === 'P0001' && typeof error.message === 'string' && /^[a-z][a-z0-9_]{2,79}$/.test(error.message)) diagnostic += ` refusal=${error.message}`;
+      for (const field of ['routine', 'constraint', 'table', 'column']) if (identifier(error[field])) diagnostic += ` ${field}=${error[field]}`;
+      const stack = typeof error.where === 'string' ? [...error.where.matchAll(/PL\/pgSQL function ([a-z_][a-z0-9_]{0,62}(?:\.[a-z_][a-z0-9_]{0,62})?)\(/g)]
+        .map(match => match[1]).slice(0, 6) : [];
+      if (stack.length) diagnostic += ` stack=${stack.join('>')}`;
+    }
     console.error(diagnostic);
   }
   process.exitCode = 1;

@@ -9,14 +9,16 @@ const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 const operation = "a".repeat(32);
 const binding = () => ({ operationId: operation, reservationId: "b".repeat(32), owner: "operator-901", candidate: "c".repeat(40),
   targetIdentity: { projectId: "176ddec0-dd65-4087-b82c-798599fc2ebe", environmentId: "652abc79-fdb0-48b0-9f6c-ad0ff572d7b2",
-    api: "6db6f1b1-5c7a-4033-88d0-53f5f315bfc0", database: "postgresql://postgres.railway.internal:5432/railway" },
-  closureGeneration: "d".repeat(32), closureEvidenceDigest: "e".repeat(64), executorDigest: "f".repeat(64) });
+    services: { api: "6db6f1b1-5c7a-4033-88d0-53f5f315bfc0", worker: "24aa02e0-25a9-4e80-9cc2-c1795ef82091" },
+    origins: { database: "postgresql://postgres.railway.internal:5432/railway" } },
+  closureGeneration: "d".repeat(32), closureEvidenceDigest: "e".repeat(64),
+  expectedInventory: { schema: "1".repeat(64), retained: "2".repeat(64), disposable: "3".repeat(64) }, planDigest: "f".repeat(64) });
 
 describe("operator-owned operational reset row admission", () => {
   let container: StartedPostgreSqlContainer;
   let pool: Pool;
   beforeAll(async () => {
-    container = await new PostgreSqlContainer("postgres:17-alpine").withDatabase("issue901_reset_a_20261029").start();
+    container = await new PostgreSqlContainer("postgres:17-alpine").withDatabase("issue901_reset_a_recovery_20261029").start();
     const url = container.getConnectionUri();
     execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], { cwd: packageRoot,
       env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
@@ -39,11 +41,16 @@ describe("operator-owned operational reset row admission", () => {
       const before = await client.query("SELECT to_jsonb(u) AS row FROM users u WHERE id='reset-a-user'");
       const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
       const result = (await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb) AS value", [binding(), observed])).rows[0].value;
-      expect(result).toMatchObject({ operationId: operation, tupleCount: 6 });
-      const sealed = (await client.query("SELECT plan FROM staging_clean_reset_rows.operations WHERE operation_id=$1", [operation])).rows[0].plan;
-      expect(sealed.find((row: { table: string }) => row.table === "users").old).toEqual(before.rows[0].row);
+      expect(result).toMatchObject({ operationId: operation, tupleCount: 6, planDigest: expect.stringMatching(/^[a-f0-9]{64}$/) });
+      // Full OLD tuples are sealed only in this transaction; the admission record holds digests and counts.
+      const sealed = (await client.query("SELECT old FROM pg_temp.operational_reset_sealed WHERE relation='users'")).rows.map(row => row.old);
+      expect(sealed).toEqual([before.rows[0].row]);
+      const admitted = (await client.query(`SELECT to_jsonb(a)::text AS record, backend_pid=pg_backend_pid() AS backend,
+        full_transaction_id=pg_current_xact_id()::text AS transaction FROM staging_clean_reset_rows.admissions a`)).rows;
+      expect(admitted).toEqual([expect.objectContaining({ backend: true, transaction: true })]);
+      expect(admitted[0].record).not.toContain("non-secret-fixture");
       await expect(client.query("COMMIT")).rejects.toThrow("operational_reset_unfinished");
-      expect((await client.query("SELECT count(*)::int AS count FROM staging_clean_reset_rows.operations")).rows[0].count).toBe(0);
+      expect((await client.query("SELECT count(*)::int AS count FROM staging_clean_reset_rows.admissions")).rows[0].count).toBe(0);
       expect((await client.query("SELECT to_jsonb(u) AS row FROM users u WHERE id='reset-a-user'")).rows).toEqual(before.rows);
     } finally { await client.query("ROLLBACK"); client.release(); }
   });
@@ -118,7 +125,8 @@ describe("operator-owned operational reset row admission", () => {
   it("an admitted operation cannot be updated, deleted or truncated directly", async () => {
     const client = await pool.connect();
     try {
-      for (const sql of ["UPDATE staging_clean_reset_rows.operations SET result='{}'", "DELETE FROM staging_clean_reset_rows.operations", "TRUNCATE staging_clean_reset_rows.operations"]) {
+      for (const sql of ["UPDATE staging_clean_reset_rows.admissions SET tuple_count=0", "DELETE FROM staging_clean_reset_rows.admissions",
+        "TRUNCATE staging_clean_reset_rows.completions, staging_clean_reset_rows.admissions"]) {
         await client.query("BEGIN");
         const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
         await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(),observed]);
