@@ -1,0 +1,16 @@
+$ node scripts/build.cjs
+$ node scripts/build.cjs
+Failed to load config file "/Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/packages/db" as a TypeScript/JavaScript module. Error: PrismaConfigEnvError: Cannot resolve environment variable: DATABASE_URL.
+[ELIFECYCLE] Command failed with exit code 1.
+Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+
+  × "pnpm recursive run" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ dde97944/packages/db
+
+$ node scripts/build.cjs
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.8.0) to ./generated/prisma/client in 254ms
+
