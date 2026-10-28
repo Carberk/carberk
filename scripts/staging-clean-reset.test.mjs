@@ -508,3 +508,24 @@ test('continuity request classification still refuses unknown tables and inexact
     assert.throws(() => planTables(manifest, truncateTrigger), /TRUNCATE trigger/);
   }
 });
+
+test('DELETE mode retains only pinned public migration TRUNCATE guards; RESTRICT and every other refusal stay', () => {
+  const pinned = { table: 'audit_logs', name: 'diagnostic_source_no_truncate', functionSchema: 'public', truncate: true };
+  assert.ok(manifest.migrationTriggers.includes(`${pinned.table}.${pinned.name}`));
+  const inventory = live();
+  inventory.triggers.push(pinned);
+  assert.throws(() => planTables(manifest, inventory), /TRUNCATE trigger refused: diagnostic_source_no_truncate/);
+  const plan = planTables(manifest, inventory, { mode: 'DELETE' });
+  assert.equal(plan.mode, 'DELETE');
+  assert.deepEqual(plan.delete, planTables(manifest, live()).truncate);
+  assert.equal(Object.hasOwn(plan, 'truncate'), false);
+  const unguarded = Object.keys(manifest.tables).find(table => !manifest.migrationTriggers.includes(`${table}.${pinned.name}`));
+  assert.ok(unguarded);
+  for (const change of [{ name: 'rogue_truncate' }, { functionSchema: 'other' }, { table: unguarded }]) {
+    const unpinned = clone(live());
+    unpinned.triggers.push({ ...pinned, ...change });
+    assert.throws(() => planTables(manifest, unpinned, { mode: 'DELETE' }), /TRUNCATE trigger refused/, JSON.stringify(change));
+  }
+  for (const options of [{ mode: 'CASCADE' }, { mode: 'DELETE', cascade: true }])
+    assert.throws(() => planTables(manifest, live(), options), /plan mode/, JSON.stringify(options));
+});

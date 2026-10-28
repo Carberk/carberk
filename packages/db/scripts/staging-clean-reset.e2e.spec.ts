@@ -27,10 +27,47 @@ const containerEnv = (): Record<string, string | undefined> => ({ RAILWAY_PROJEC
   DATABASE_URL: "postgresql://u:secret@postgres.railway.internal:5432/railway" });
 const inventoried = (): Record<string, unknown> => ({ operation: "clean-reset", phase: "inventoried", operationId, reservationId, candidate,
   identity: structuredClone(identity) });
-const rows = (expectedInventory: unknown): Record<string, unknown> => ({ ...inventoried(), phase: "rows", expectedInventory });
+let planDigestOf: (expectedInventory: unknown) => string = () => "0".repeat(64);
+// Synthetic durable closure binding as the controller would hand it over; the plan digest is the
+// executor's own artifact digest, never a caller-chosen value.
+const admissionFor = (expectedInventory: unknown, change: Record<string, unknown> = {}): Record<string, unknown> => ({ operationId, reservationId,
+  owner: "operator-901", candidate, targetIdentity: structuredClone(identity), closureGeneration: "1".repeat(32), closureEvidenceDigest: "2".repeat(64),
+  expectedInventory, planDigest: planDigestOf(expectedInventory), ...change });
+const rows = (expectedInventory: unknown, change: Record<string, unknown> = {}): Record<string, unknown> => ({ ...inventoried(), phase: "rows",
+  admission: admissionFor(expectedInventory, Object.fromEntries(Object.entries(change).map(([key, value]) => [key === "identity" ? "targetIdentity" : key, value]))),
+  expectedInventory, ...change });
 const hex64 = /^[a-f0-9]{64}$/;
 const monotonicMs = () => Number(process.hrtime.bigint() / 1000000n);
 const cfNamespace = `cf_${"9".repeat(32)}`;
+// Representative diagnostic raw/component/anchor/evidence/provenance/report/proof/PDF graph, a Session/device,
+// a suspension self-reference and report/evidence corrections, consistent with every CHECK constraint.
+const REPRESENTATIVE_FIXTURE = `SET session_replication_role = replica;
+INSERT INTO users(id,"displayName","updatedAt") VALUES('ra-tech','Disposable technician',now()),('ra-buyer','Disposable commissioner',now());
+UPDATE users SET "suspendedById"='ra-tech' WHERE id='ra-buyer';
+INSERT INTO sessions(id,"userId","refreshTokenHash","expiresAt") VALUES('ra-session','ra-buyer','ra-refresh-hash',now()+interval '1 hour');
+INSERT INTO fcm_devices(id,"userId",token,platform,"updatedAt") VALUES('ra-device','ra-buyer','ra-push-token','android',now());
+INSERT INTO diagnostic_centers(id,code,names) VALUES('ra-center','ra-center','{}');
+INSERT INTO diagnostic_template_versions(id,"centerId",version,definition) VALUES('ra-template','ra-center',1,'{}');
+INSERT INTO inspection_orders(id,"centerId","templateVersionId","commissionerId","requestKey",audience,epoch,"updatedAt","observedVehicle")
+ VALUES('ra-order','ra-center','ra-template','ra-buyer','ra-order','buyer_private','ra-order',now(),'{}');
+INSERT INTO diagnostic_identity_records(id,"orderId","orderVersion",observation,"observationHash","recordedById","recordedAt")
+ SELECT 'ra-raw',id,version,'{}',repeat('a',64),'ra-tech',now() FROM inspection_orders WHERE id='ra-order';
+INSERT INTO diagnostic_ownership_grants(id,"orderId",state,"erasedAt") VALUES('ra-grant','ra-order','erased',now());
+INSERT INTO diagnostic_ownership_components("identityRecordId","orderId","orderVersion",state,"grantId") SELECT 'ra-raw','ra-order',version,'unavailable','ra-grant' FROM inspection_orders WHERE id='ra-order';
+INSERT INTO diagnostic_source_anchors("orderId",state,"firstRecordId",source,"createdTransaction") VALUES('ra-order','pending','ra-raw','{}','1');
+INSERT INTO diagnostic_identity_evidence(id,"orderId","orderVersion","identityRecordId","rightsUntil","recordedAt","observationHash","recordHash",identifiers,provenance,rights) SELECT 'ra-evidence','ra-order',version,'ra-raw',now()+interval '1 day',now(),repeat('a',64),repeat('d',64),'{}','{}','{}' FROM inspection_orders WHERE id='ra-order';
+INSERT INTO diagnostic_identity_evidence(id,"orderId","orderVersion","identityRecordId","rightsUntil","recordedAt","supersedesId","observationHash","recordHash",identifiers,provenance,rights) SELECT 'ra-correction','ra-order',version+1,'ra-raw',now()+interval '1 day',now(),'ra-evidence',repeat('a',64),repeat('e',64),'{}','{}','{}' FROM inspection_orders WHERE id='ra-order';
+INSERT INTO diagnostic_identity_provenance(id,"orderId","contentType","declaredSizeBytes","rightsUntil",epoch,rights) VALUES('ra-provenance','ra-order','image/jpeg',1,now()+interval '1 day','ra-order','{}');
+INSERT INTO diagnostic_continuity_requests(id,"actorId","sessionId","orderId",kind) VALUES('ra-request','ra-buyer','ra-session','ra-order','issue');
+INSERT INTO diagnostic_reports(id,"orderId","templateVersionId",audience,status,state,"updatedAt","identityRecordId","identityRecordHash","identityEvidenceId","identityEvidenceHash")
+ VALUES('ra-report','ra-order','ra-template','buyer_private','draft','{"id":"ra-report","orderId":"ra-order","templateVersionId":"ra-template","audience":"buyer_private","status":"draft"}',now(),'ra-raw',repeat('a',64),'ra-evidence',repeat('d',64));
+INSERT INTO diagnostic_reports(id,"orderId","templateVersionId",audience,status,state,"updatedAt","predecessorId")
+ VALUES('ra-report-correction','ra-order','ra-template','buyer_private','draft','{"id":"ra-report-correction","orderId":"ra-order","templateVersionId":"ra-template","audience":"buyer_private","status":"draft"}',now(),'ra-report');
+INSERT INTO diagnostic_continuity_proofs(id,"predecessorReportId","candidateOrderId","issuerId","issuerSessionId","rightsUntil","issuedAt","requestId")
+ VALUES('ra-proof','ra-report','ra-order','ra-tech','ra-session',now()+interval '1 day',now(),'ra-request');
+INSERT INTO diagnostic_evidence(id,"reportId","findingId","objectKey",sha256,"sizeBytes",mime,epoch) VALUES('ra-photo','ra-report','finding','diagnostic-evidence/ra-photo/'||repeat('b',64),repeat('b',64),1,'image/jpeg','ra-order');
+INSERT INTO diagnostic_pdf_artifacts(id,"reportId","snapshotHash",locale,"rendererVersion",epoch,"objectKey") VALUES('ra-pdf','ra-report-correction',repeat('c',64),'ru','v1','ra-order','diagnostic-pdf/ra-report-correction/ra-pdf.pdf');
+RESET session_replication_role;`;
 
 // Independently written retained set: reference catalog, protected state, migration history.
 const retained = ["public._prisma_migrations", "public.body_types", "public.brands", "public.cities", "public.colors", "public.drive_types",
@@ -125,7 +162,7 @@ describe("staging clean-reset remote operation on disposable application schema"
         const startedAt = monotonicMs();
         const result = spawnSync(globalThis.process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
           input: options.input, encoding: "utf8", timeout: 30000,
-          env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1",
+          env: { ...globalThis.process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1", STAGING_TEST_SQL_DIAGNOSTICS_CONTEXT: "1",
             STAGING_TEST_PG_DIAGNOSTICS: "1", STAGING_TEST_PG_ROLE: "sql-child", STAGING_TEST_PG_ORDINAL: String(ordinal) },
         });
         // Reuse the loopback-only transport's validated categories. Never forward raw stderr.
@@ -141,13 +178,16 @@ describe("staging clean-reset remote operation on disposable application schema"
         subprocesses.push({ status: result.status, signal: result.signal,
           error: result.error ? errorCode && ["ETIMEDOUT", "ENOBUFS", "ENOENT", "EACCES", "EINTR", "EINVAL"].includes(errorCode) ? errorCode : "other" : undefined,
           markers: result.stdout?.split("\n").filter(line => line.startsWith("clean-reset:")).length ?? 0,
-          sqlDiagnostic: result.stderr?.slice(0, 8192).split(/\r?\n/).find(line => /^Disposable database SQL diagnostic: SQLSTATE=[A-Z0-9]{5}(?: position=[0-9]{1,10})?(?: internalPosition=[0-9]{1,10})?$/.test(line)) });
+          sqlDiagnostic: result.stderr?.slice(0, 8192).split(/\r?\n/).find(line => /^Disposable database SQL diagnostic: SQLSTATE=[A-Z0-9]{5}(?: position=[0-9]{1,10})?(?: internalPosition=[0-9]{1,10})?(?: refusal=[a-zA-Z_][a-zA-Z0-9_.:]{0,143})?(?: (?:routine|constraint|table|column)=[a-zA-Z_][a-zA-Z0-9_.:]{0,143})*(?: stack=[a-zA-Z0-9_.>]{1,500})?$/.test(line)) });
         return result;
       },
     } : localRequire(name), console: {
       log: (value: string) => { receipt = JSON.parse(value) as Record<string, unknown>; },
       error: (...values: unknown[]) => { code = 1; failure = values.map(String).join(" "); },
     } });
+    // Private receipt in the test log only: the first bounded SQL refusal behind a sanitized public failure.
+    const envelope = subprocesses.find(child => child.sqlDiagnostic)?.sqlDiagnostic;
+    if (envelope) console.error(`Private SQL envelope: ${envelope}`);
     return { code: code || process.exitCode, failure, receipt, queries, subprocesses };
   }
   async function run(payload: unknown, env = containerEnv()): Promise<Outcome> { await settle(); return execute(payload, env); }
@@ -159,7 +199,8 @@ describe("staging clean-reset remote operation on disposable application schema"
     const maintenance = new URL(databaseUrl); maintenance.pathname = "/postgres";
     admin = new Pool({ connectionString: maintenance.toString(), max: 1 });
     execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
-    ({ cleanResetProgram } = await import(pathToFileURL(`${root}/scripts/staging-clean-reset-remote.mjs`).href) as { cleanResetProgram: (payload: unknown) => string });
+    ({ cleanResetProgram, cleanResetRowsPlanDigest: planDigestOf } = await import(pathToFileURL(`${root}/scripts/staging-clean-reset-remote.mjs`).href) as
+      { cleanResetProgram: (payload: unknown) => string; cleanResetRowsPlanDigest: (expectedInventory: unknown) => string });
     // Retained reference rows with an intentional logo key and rate edit, protected measurement state,
     // and disposable application rows that reference them.
     await query(`INSERT INTO brands(id,slug,"nameRu","nameTk","nameEn","logoKey","updatedAt") VALUES('reset-brand','reset-brand','Brand','Brand','Brand','brands/reset-brand/admin-upload-7/logo-60.png',now());
@@ -178,14 +219,6 @@ describe("staging clean-reset remote operation on disposable application schema"
       INSERT INTO audit_logs(id,"actorId",action,"targetType","targetId") VALUES('reset-audit','reset-seller','LISTING_PUBLISHED','Listing','reset-listing');`);
   }, 120000);
   afterAll(async () => { await admin?.end(); await postgres?.stop(); });
-
-  it("current reset A preserves complete state when the fully migrated planner refuses before DELETE", async () => {
-    const before = await snapshot();
-    const outcome = await run(inventoried());
-    expect(await snapshot()).toEqual(before);
-    console.error("Current reset A earliest executor verdict", JSON.stringify(outcome));
-    expect(outcome).toEqual(expect.objectContaining({ code: 0, failure: "" }));
-  });
 
   it("wrong or missing target identity and caller-claimed state refuse before any application read", async () => {
     const before = await snapshot();
@@ -318,7 +351,33 @@ describe("staging clean-reset remote operation on disposable application schema"
     expect(await query(`SELECT "displayName" FROM users ORDER BY id`)).toEqual([{ displayName: "Disposable buyer" }, { displayName: "Disposable seller" }]);
   });
 
-  it("deletes only the explicit disposable public tables in one transaction and binds completion to the exact operation", async () => {
+  it("a database refusal keeps the exact sanitized public failure while the private transport receipt preserves its first SQL refusal", async () => {
+    // users.avatarUploadId (NO ACTION) against media_uploads.userId (CASCADE) is the actual refused cycle.
+    await query(`SET session_replication_role = replica;
+      INSERT INTO media_uploads(id,"userId",key,kind,"contentType") VALUES('reset-avatar','reset-buyer','avatars/reset-avatar.webp','image','image/webp');
+      UPDATE users SET "avatarUploadId"='reset-avatar' WHERE id='reset-buyer';
+      RESET session_replication_role;`);
+    try {
+      const observed = await run(inventoried());
+      expect([observed.code, observed.failure]).toEqual([0, ""]);
+      const before = await snapshot();
+      const outcome = await run(rows(observed.receipt?.["digest"]));
+      expect({ code: outcome.code, failure: outcome.failure, receipt: outcome.receipt })
+        .toEqual({ code: 1, failure: "Clean reset refused: database operation failed", receipt: undefined });
+      // Private, test-only envelope: SQLSTATE, identifier-only RAISE text and the PL/pgSQL stack, no row values.
+      expect(outcome.subprocesses?.at(-1)?.sqlDiagnostic).toMatch(
+        /^Disposable database SQL diagnostic: SQLSTATE=P0001 .*refusal=operational_reset_unsupported_cycle .*stack=staging_clean_reset_rows\.prepare$/);
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      await query(`SET session_replication_role = replica; UPDATE users SET "avatarUploadId"=NULL WHERE id='reset-buyer';
+        DELETE FROM media_uploads WHERE id='reset-avatar'; RESET session_replication_role;`);
+    }
+  });
+
+  it("admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion", async () => {
+    // Fixture arrangement only: inserted with replication-role triggers off so the representative graph needs
+    // no source command. CHECK constraints still apply; the executor below runs with every trigger enabled.
+    await query(REPRESENTATIVE_FIXTURE);
     const live = await tables();
     expect(live).toEqual(expect.arrayContaining(retained));
     const namespacesBefore = await namespaces();
@@ -327,14 +386,20 @@ describe("staging clean-reset remote operation on disposable application schema"
     const receipt = observed.receipt ?? {};
     expect(Object.keys(receipt).sort()).toEqual(["candidate", "digest", "environmentId", "operation", "operationId", "phase", "plan", "reservationId", "rows", "state"]);
     expect(receipt).toEqual(expect.objectContaining({ ...bound, phase: "inventoried", state: "observed", digest: digestShape }));
-    expect(receipt["plan"]).toEqual({ mode: "RESTRICT", retain: retained, truncate: live.filter(name => !retained.includes(name)) });
-    expect(receipt["rows"]).toEqual(expect.objectContaining({ "public.users": 2, "public.sessions": 1, "public.listings": 1, "public.favorites": 1,
+    expect(receipt["plan"]).toEqual({ mode: "DELETE", retain: retained, delete: live.filter(name => !retained.includes(name)) });
+    expect(receipt["rows"]).toEqual(expect.objectContaining({ "public.users": 4, "public.sessions": 2, "public.fcm_devices": 1,
+      "public.diagnostic_identity_records": 1, "public.diagnostic_reports": 2, "public.diagnostic_continuity_proofs": 1, "public.diagnostic_source_anchors": 1, "public.listings": 1, "public.favorites": 1,
       "public.audit_logs": 1, "public.brands": 1, "public.exchange_rates": 1, "public.measurement_state": 1, "public._prisma_migrations": migrations.length }));
     const before = receipt["digest"] as Digest;
     const kept = (all: Record<string, string>) => Object.fromEntries(Object.entries(all).filter(([name]) => retained.includes(name) || name === "public-catalog"));
     const retainedBefore = kept(await snapshot());
 
+    const pre = await snapshot();
     const completed = await run(rows(before));
+    // A refusal must leave complete state unchanged; the private transport envelope names the refusing guard.
+    if (completed.code !== 0) expect(await snapshot()).toEqual(pre);
+    console.error("Admitted reset A executor verdict", JSON.stringify({ code: completed.code, failure: completed.failure,
+      sqlDiagnostic: completed.subprocesses?.at(-1)?.sqlDiagnostic }));
     expect([completed.code, completed.failure]).toEqual([0, ""]);
     expect(completed.receipt).toEqual({ ...bound, phase: "rows", state: "completed",
       digest: { schema: before.schema, retained: before.retained, disposable: expect.stringMatching(hex64) } });
@@ -363,10 +428,10 @@ describe("staging clean-reset remote operation on disposable application schema"
     const current = await snapshot(); const stored = await files();
     const otherCandidate = "d".repeat(40);
     const mismatches: [string, Record<string, unknown>, Record<string, string | undefined>][] = [
-      ["operation", { ...rows(before), operationId: "a".repeat(32) }, containerEnv()],
-      ["reservation", { ...rows(before), reservationId: "b".repeat(32) }, containerEnv()],
-      ["candidate", { ...rows(before), candidate: otherCandidate }, { ...containerEnv(), AUTOTM_COMMIT_SHA: otherCandidate }],
-      ["environment", { ...rows(before), identity: { ...structuredClone(identity), environmentId: "other-staging" } }, { ...containerEnv(), RAILWAY_ENVIRONMENT_ID: "other-staging" }],
+      ["operation", rows(before, { operationId: "a".repeat(32) }), containerEnv()],
+      ["reservation", rows(before, { reservationId: "b".repeat(32) }), containerEnv()],
+      ["candidate", rows(before, { candidate: otherCandidate }), { ...containerEnv(), AUTOTM_COMMIT_SHA: otherCandidate }],
+      ["environment", rows(before, { identity: { ...structuredClone(identity), environmentId: "other-staging" } }), { ...containerEnv(), RAILWAY_ENVIRONMENT_ID: "other-staging" }],
     ];
     const refusals = ["Clean reset refused: Inventory changed since observation", "Clean reset refused: Clean-reset operation identity changed"];
     for (const [label, input, environment] of mismatches) {
