@@ -57,6 +57,8 @@ photo removal until the preview can be displayed.
 
 ## Railway era — staging and reviewer-only production
 
+Use the host's [existing Railway CLI authentication](../../agents/cli-access.md) and explicit target IDs. Missing project-token environment variables alone are not an access blocker.
+
 ### Production foundation: what duplication taught us
 
 **The recovery itself is complete** — see [#281 evidence](evidence/issue-281-production-foundation.md)
