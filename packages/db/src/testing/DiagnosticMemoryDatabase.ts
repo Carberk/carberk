@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 import { Prisma } from "../../generated/prisma/client/client";
 import type { PrismaService } from "../prisma.service";
@@ -27,25 +28,108 @@ function matches(row: Row, where: Row = {}): boolean {
     });
   });
 }
-/** Database boundary fake: CRUD/filter/CAS only. It does not implement projection,
- * authorization, generation, cleanup, erasure SQL or transaction/row-lock semantics. */
+type Mutation = { table: string; key: Record<string, string>; verb: string; next: Row | null };
+type MemoryTransaction = { receipt?: string; mutations?: Mutation[] };
+const physical: Record<string, string> = {
+  diagnostic_centers: "diagnosticCenter",
+  users: "user", sessions: "session", staff_grants: "staffGrant", listings: "listing", dealership_members: "dealershipMember",
+  inspection_orders: "inspectionOrder", diagnostic_reports: "diagnosticReportRecord", diagnostic_pdf_artifacts: "diagnosticPdfArtifact",
+  diagnostic_evidence: "diagnosticEvidence", diagnostic_template_versions: "diagnosticTemplateVersion", diagnostic_order_assignments: "diagnosticOrderAssignment",
+  diagnostic_center_assignments: "diagnosticCenterAssignment", diagnostic_identity_records: "diagnosticIdentityRecord", diagnostic_identity_evidence: "diagnosticIdentityEvidence",
+  diagnostic_identity_provenance: "diagnosticIdentityProvenance", diagnostic_continuity_proofs: "diagnosticContinuityProof", diagnostic_continuity_requests: "diagnosticContinuityRequest",
+  diagnostic_audits: "diagnosticAudit", diagnostic_ownership_grants: "diagnosticOwnershipGrant", diagnostic_ownership_components: "diagnosticOwnershipComponent",
+};
+const memoryKey = (table: string, row: Row): Record<string, string> => table === "staff_grants" ? { userId: String(row["userId"]), capability: String(row["capability"]) }
+  : table === "diagnostic_ownership_components" ? { identityRecordId: String(row["identityRecordId"]) } : { id: String(row["id"]) };
+const wire = (value: unknown): Row => JSON.parse(JSON.stringify(value)) as Row;
+
+/** Database boundary fake for CRUD/filter/CAS and ordinary finite campaign plans.
+ * It checks absent/OLD/NEW tuples and rollback at that boundary. It does not model
+ * PostgreSQL source receipts, guards, authorization, advisory locks or waits;
+ * prepared-source and race acceptance must use real restricted PostgreSQL. */
 export class DiagnosticMemoryDatabase {
   private readonly tables = new Map<string, Row[]>();
+  private readonly transactions = new AsyncLocalStorage<MemoryTransaction>();
   readonly client: PrismaService;
   private table(name: string): Row[] {
     const rows = this.tables.get(name);
     if (!rows) throw new Error(`Unknown fake table ${name}`);
     return rows;
   }
+  private readPhysical(table: string, key: Record<string, string>): Row | null {
+    const name = physical[table];
+    if (!name) throw new Error(`Unsupported memory source table ${table}`);
+    const row = this.table(name).find(row => matches(row, key));
+    return row ? wire(row) : null;
+  }
+  private ordinaryScope(command: { roots: Mutation[]; rows: Mutation[] }) {
+    const selected = new Map<string, { table: string; key: Record<string, string> }>();
+    const add = (table: string, key: Record<string, string>) => { if (physical[table]) selected.set(JSON.stringify([table, key]), { table, key }); };
+    for (const root of [...command.roots, ...command.rows]) add(root.table, root.key);
+    const references: Record<string, string> = { orderId: "inspection_orders", reportId: "diagnostic_reports", predecessorId: "diagnostic_reports",
+      predecessorReportId: "diagnostic_reports", candidateOrderId: "inspection_orders", predecessorOrderId: "inspection_orders", identityRecordId: "diagnostic_identity_records",
+      templateVersionId: "diagnostic_template_versions", listingId: "listings", commissionerId: "users", sellerId: "users", createdById: "users", recordedById: "users",
+      issuerId: "users", linkingTechnicianId: "users", issuerSessionId: "sessions", sessionId: "sessions", actorId: "users", grantId: "diagnostic_ownership_grants" };
+    let previous = -1;
+    while (previous !== selected.size) {
+      previous = selected.size;
+      for (const root of [...selected.values()]) {
+        const row = this.readPhysical(root.table, root.key) ?? command.rows.find(row => row.table === root.table && JSON.stringify(row.key) === JSON.stringify(root.key))?.next;
+        if (row) for (const [field, table] of Object.entries(references)) if (typeof row[field] === "string") add(table, { id: row[field] as string });
+      }
+      for (const [table, model] of Object.entries(physical)) for (const row of this.table(model)) {
+        if (Object.entries(references).some(([field, target]) => ["inspection_orders", "diagnostic_reports", "diagnostic_identity_records"].includes(target) &&
+          typeof row[field] === "string" && selected.has(JSON.stringify([target, { id: row[field] }])))) add(table, memoryKey(table, row));
+      }
+      if (selected.size > 1000) throw new Error("diagnostic_source_scope_limit");
+    }
+    return [...selected.values()].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))).map(root => ({ ...root, row: this.readPhysical(root.table, root.key) }));
+  }
+  private assertOrdinaryWrite(model: string, verb: string, old: Row | null, next: Row): void {
+    const context = this.transactions.getStore();
+    if (!context?.receipt) return;
+    const table = Object.keys(physical).find(table => physical[table] === model);
+    if (!table) throw new Error("campaign_preparation_uncovered");
+    const key = memoryKey(table, next);
+    const mutation = context.mutations?.find(row => row.table === table && JSON.stringify(row.key) === JSON.stringify(key));
+    if (!mutation || mutation.verb !== verb || (verb === "insert" && old) || canonical(wire(mutation.next)) !== canonical(wire(next))) throw new Error("campaign_preparation_changed");
+  }
   constructor() {
     const client: Row = { $queryRaw: async (parts: TemplateStringsArray, ...values: string[]) => {
       // Material SELECTs used to bind staffing, with locks deliberately unmodelled.
       const sql = parts.join("?");
+      if (sql.includes("diagnostic_prepare_source")) throw new Error("Prepared source acceptance requires real PostgreSQL");
+      if (sql.includes("diagnostic_source_project(public.diagnostic_source_read")) {
+        const table = values[0] ?? "", key = JSON.parse(values[1] ?? "{}") as Record<string, string>;
+        const source = this.readPhysical(table, key);
+        return [{ source, ...(sql.includes("diagnostic_source_normalize") ? { next: { ...source, ...JSON.parse(values.at(-1) ?? "{}") as Row } } : {}) }];
+      }
+      if (sql.includes("WITH discovered AS MATERIALIZED")) {
+        const command = JSON.parse(values[0] ?? "{}") as { roots: Mutation[]; rows: Mutation[] };
+        const scope = this.ordinaryScope(command);
+        const mutations: Mutation[] = scope.map(root => command.rows.find(row => row.table === root.table && JSON.stringify(row.key) === JSON.stringify(root.key)) ??
+          { table: root.table, key: root.key, verb: root.row ? "update" : "insert", next: root.row ?? {} });
+        return [{ scope, keys: [], campaigns: [], mutations }];
+      }
+      if (sql.includes("FROM jsonb_array_elements(public.diagnostic_source_registry())")) return Object.keys(physical).map((table, namespace) => ({ table, namespace }));
+      if (sql.includes("public.campaign_prepare(")) {
+        const context = this.transactions.getStore();
+        const mutations = JSON.parse(values[0] ?? "[]") as Mutation[];
+        if (!context || context.receipt || mutations.length < 1 || mutations.length > 1000) throw new Error("campaign_preparation_shape");
+        context.receipt = randomUUID(); context.mutations = mutations;
+        return [{ receipt: context.receipt }];
+      }
+      if (sql.includes("public.campaign_finish(")) {
+        const context = this.transactions.getStore();
+        if (!context?.receipt || context.receipt !== values[0]) throw new Error("campaign_preparation_receipt");
+        delete context.receipt; delete context.mutations;
+        return [];
+      }
       if (sql.includes('SELECT id,"orderId","userId"')) return clone(this.table("diagnosticOrderAssignment").filter(row => values.slice(0, 2).includes(row["orderId"] as string) && values.slice(2).includes(row["userId"] as string)).sort((a, b) => String(a["id"]).localeCompare(String(b["id"]))));
       if (sql.includes('SELECT id,"centerId","userId"')) return clone(this.table("diagnosticCenterAssignment").filter(row => values.slice(0, 2).includes(row["centerId"] as string) && values.slice(2).includes(row["userId"] as string)).sort((a, b) => String(a["id"]).localeCompare(String(b["id"]))));
       return [];
-    }, $executeRaw: async () => 0 };
-    for (const name of ["diagnosticCenter", "diagnosticContinuityRequest", "user", "session", "staffGrant", "diagnosticIdentityRecord", "diagnosticContinuityProof", "diagnosticAudit", "dealershipMember", "inspectionOrder", "listing", "diagnosticReportRecord", "diagnosticPdfArtifact", "diagnosticEvidence", "diagnosticTemplateVersion", "diagnosticOrderAssignment", "diagnosticCenterAssignment", "diagnosticIdentityEvidence", "diagnosticIdentityProvenance"]) {
+    }, $executeRaw: async () => 0, $queryRawUnsafe: async () => [] };
+    for (const name of Object.values(physical)) {
       this.tables.set(name, []);
       const rows = () => this.table(name);
       const reportRelations = (row: Row): Row => ({ ...row, order: this.table("inspectionOrder").filter(o => o["id"] === row["orderId"]).map(orderRelations)[0], artifacts: this.table("diagnosticPdfArtifact").filter(a => a["reportId"] === row["id"]) });
@@ -88,14 +172,28 @@ export class DiagnosticMemoryDatabase {
             if (args.data && key in args.data && args.data[key] !== row[key]) throw new Error("diagnostic_pdf_identity_immutable");
           }
         }
-        for (const row of selected) for (const [key, value] of Object.entries(args.data ?? {})) row[key] = value === Prisma.DbNull || value === Prisma.JsonNull ? null : object(value) && "increment" in value ? Number(row[key]) + Number(value["increment"]) : clone(value);
+        for (const row of selected) {
+          const next = { ...row };
+          for (const [key, value] of Object.entries(args.data ?? {})) next[key] = value === Prisma.DbNull || value === Prisma.JsonNull ? null : object(value) && "increment" in value ? Number(row[key]) + Number(value["increment"]) : clone(value);
+          this.assertOrdinaryWrite(name, "update", row, next);
+          Object.assign(row, next);
+        }
         return { count: selected.length };
       };
       client[name] = { count: async (args: Args) => (await findMany(args)).length, findMany, findFirst, findUnique: findFirst, findUniqueOrThrow, findFirstOrThrow: findUniqueOrThrow, updateMany,
         update: async (args: Args) => { await updateMany(args); return findUniqueOrThrow({ where: args.where }); },
-        create: async (args: Args) => { const row = { id: randomUUID(), epoch: randomUUID(), state: "pending", generation: 1, attempts: 0, retryAt: null, failureCode: null, leaseUntil: null, sha256: null, sizeBytes: null, verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null, createdAt: new Date("2026-10-23T00:00:00Z"), ...(name === "diagnosticReportRecord" ? { status: "draft", version: 0, erasedAt: null, snapshot: null, withdrawnAt: null, withdrawalReason: null } : {}), ...(name === "diagnosticContinuityProof" ? { consumedReportId: null, consumedAt: null, invalidatedAt: null, erasedAt: null } : {}), ...clone(args.data) }; rows().push(row); return clone(row); } };
+        create: async (args: Args) => { const row = { id: randomUUID(), epoch: randomUUID(), state: "pending", generation: 1, attempts: 0, retryAt: null, failureCode: null, leaseUntil: null, sha256: null, sizeBytes: null, verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null, createdAt: new Date("2026-10-23T00:00:00Z"), ...(name === "diagnosticReportRecord" ? { status: "draft", version: 0, erasedAt: null, snapshot: null, withdrawnAt: null, withdrawalReason: null } : {}), ...(name === "diagnosticContinuityProof" ? { consumedReportId: null, consumedAt: null, invalidatedAt: null, erasedAt: null } : {}), ...clone(args.data) }; this.assertOrdinaryWrite(name, "insert", rows().find(old => old["id"] === row.id) ?? null, row); rows().push(row); return clone(row); } };
     }
-    client["$transaction"] = async (fn: (tx: unknown) => Promise<unknown>) => fn(client);
+    client["$transaction"] = async (fn: (tx: unknown) => Promise<unknown>) => {
+      const before = clone([...this.tables.entries()]);
+      return this.transactions.run({}, async () => {
+        try {
+          const result = await fn(client);
+          if (this.transactions.getStore()?.receipt) throw new Error("campaign_preparation_unfinished");
+          return result;
+        } catch (error) { this.tables.clear(); for (const [name, rows] of before) this.tables.set(name, rows); throw error; }
+      });
+    };
     this.client = client as unknown as PrismaService;
   }
   seed(table: string, row: Row) { this.table(table).push(clone(row)); }

@@ -4,6 +4,7 @@ import { DiagnosticSchemas as D } from "@auto-tm/contracts";
 import { Prisma, diagnosticReaderProjection, DIAGNOSTIC_ERASED_LINEAGE_RENDERER, DIAGNOSTIC_PDF_RENDERERS, type PrismaService } from "@auto-tm/db";
 
 import { renderDiagnosticPdf, type DiagnosticPdfFonts } from "./DiagnosticPdfRenderer";
+import { DiagnosticWorkerPreparationChanged, workerOrdinary, workerPlannedRow, workerSource } from "./DiagnosticWorkerPreparation";
 
 export interface DiagnosticArtifactObjects {
   put(key: string, bytes: Uint8Array, mime: "application/pdf"): Promise<void>;
@@ -42,15 +43,71 @@ export class DiagnosticArtifactWorker {
     if (artifact.rendererVersion !== projection.rendererVersion) return null;
     return { ...parsed.data, report: projection.report };
   }
-  private async locked(tx: Tx, artifact: Artifact): Promise<Artifact | null> {
-    await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${artifact.reportId} FOR UPDATE`;
-    const row = await tx.diagnosticPdfArtifact.findUnique({ where: { id: artifact.id } });
-    if (!row || row.state !== "processing" || row.epoch !== artifact.epoch || !row.leaseUntil || row.leaseUntil <= this.runtime.now() || row.cleanupRequestedAt) return null;
-    return row;
+  private retirement() { return { state: "cleanup_pending", epoch: this.runtime.id(), cleanupRequestedAt: this.runtime.now() }; }
+
+  private async pdfUpdate(where: Prisma.DiagnosticPdfArtifactWhereInput, data: Prisma.DiagnosticPdfArtifactUpdateManyMutationInput, eligible?: (tx: Tx) => Promise<boolean>): Promise<number> {
+    return this.db.$transaction(async tx => {
+      const row = await tx.diagnosticPdfArtifact.findFirst({ where });
+      if (!row || (eligible && !await eligible(tx))) return 0;
+      const plan = await workerPlannedRow(tx, { table: "diagnostic_pdf_artifacts", key: { id: row.id } }, data);
+      return workerOrdinary(tx, [plan], async () => {
+        if (eligible && !await eligible(tx)) return 0;
+        return (await tx.diagnosticPdfArtifact.updateMany({ where: { AND: [where, { id: row.id, epoch: row.epoch }] }, data })).count;
+      });
+    }).catch((error: unknown) => { if (error instanceof DiagnosticWorkerPreparationChanged) return 0; throw error; });
   }
-  private async retire(tx: Tx, artifact: Artifact) {
-    await tx.diagnosticPdfArtifact.updateMany({ where: { id: artifact.id, epoch: artifact.epoch },
-      data: { state: "cleanup_pending", epoch: this.runtime.id(), cleanupRequestedAt: this.runtime.now() } });
+
+  private async evidenceUpdate(where: Prisma.DiagnosticEvidenceWhereInput, data: Prisma.DiagnosticEvidenceUpdateManyMutationInput, eligible?: (tx: Tx) => Promise<boolean>): Promise<number> {
+    return this.db.$transaction(async tx => {
+      const row = await tx.diagnosticEvidence.findFirst({ where });
+      if (!row || (eligible && !await eligible(tx))) return 0;
+      const plan = await workerPlannedRow(tx, { table: "diagnostic_evidence", key: { id: row.id } }, data);
+      return workerOrdinary(tx, [plan], async () => {
+        if (eligible && !await eligible(tx)) return 0;
+        return (await tx.diagnosticEvidence.updateMany({ where: { AND: [where, { id: row.id, epoch: row.epoch }] }, data })).count;
+      });
+    }).catch((error: unknown) => { if (error instanceof DiagnosticWorkerPreparationChanged) return 0; throw error; });
+  }
+
+  private async provenanceUpdate(where: Prisma.DiagnosticIdentityProvenanceWhereInput,
+    change: (row: Prisma.DiagnosticIdentityProvenanceGetPayload<object>) => Prisma.DiagnosticIdentityProvenanceUpdateManyMutationInput,
+    eligible?: (tx: Tx) => Promise<boolean>): Promise<number> {
+    return this.db.$transaction(async tx => {
+      const row = await tx.diagnosticIdentityProvenance.findFirst({ where });
+      if (!row || (eligible && !await eligible(tx))) return 0;
+      const data = change(row);
+      const plan = await workerPlannedRow(tx, { table: "diagnostic_identity_provenance", key: { id: row.id } }, data);
+      const work = async () => {
+        if (eligible && !await eligible(tx)) throw new DiagnosticWorkerPreparationChanged();
+        const result = await tx.diagnosticIdentityProvenance.updateMany({ where: { AND: [where, { id: row.id, epoch: row.epoch }] }, data });
+        if (result.count !== 1) throw new DiagnosticWorkerPreparationChanged();
+        return result.count;
+      };
+      const scalar = Object.keys(data).every(key => ["writeLeaseUntil", "cleanupLeaseUntil", "cleanupAttempts", "cleanupFailureCode"].includes(key));
+      return scalar ? workerOrdinary(tx, [plan], work) : workerSource(tx, "identity_material_change", [plan], this.runtime.now(), work);
+    }).catch((error: unknown) => { if (error instanceof DiagnosticWorkerPreparationChanged) return 0; throw error; });
+  }
+
+  /** Planning and adoption use separate native transactions, with no rendering or
+   * storage under their prefix. Select the complete transition before locking. */
+  private async advance(artifact: Artifact, descriptor?: { sha256: string; sizeBytes: number }): Promise<boolean> {
+    return this.db.$transaction(async tx => {
+      const row = await tx.diagnosticPdfArtifact.findUnique({ where: { id: artifact.id } });
+      const live = (value: Artifact | null): value is Artifact => !!value && value.state === "processing" && value.epoch === artifact.epoch &&
+        !!value.leaseUntil && value.leaseUntil > this.runtime.now() && !value.cleanupRequestedAt && value.objectKey === artifact.objectKey && value.snapshotHash === artifact.snapshotHash;
+      if (!live(row)) return false;
+      const current = await this.current(tx, row);
+      if (current && descriptor && ((row.sha256 && row.sha256 !== descriptor.sha256) || (row.sizeBytes && row.sizeBytes !== descriptor.sizeBytes))) throw new Error("DIAGNOSTIC_PDF_GENERATION_CONFLICT");
+      const data = !current ? this.retirement() : descriptor ?? { state: "ready", verifiedAt: this.runtime.now(), leaseUntil: null, failureCode: null };
+      const plan = await workerPlannedRow(tx, { table: "diagnostic_pdf_artifacts", key: { id: row.id } }, data);
+      return workerOrdinary(tx, [plan], async () => {
+        await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${row.reportId} FOR UPDATE`;
+        const checked = await tx.diagnosticPdfArtifact.findUnique({ where: { id: row.id } });
+        if (!live(checked) || !!(await this.current(tx, checked)) !== !!current) return false;
+        const written = await tx.diagnosticPdfArtifact.updateMany({ where: { id: row.id, epoch: row.epoch, state: "processing", cleanupRequestedAt: null, leaseUntil: { gt: this.runtime.now() } }, data });
+        return !!current && written.count === 1;
+      });
+    }).catch((error: unknown) => { if (error instanceof DiagnosticWorkerPreparationChanged) return false; throw error; });
   }
   async generate(id: string): Promise<boolean> {
     if (!this.runtime.enabled()) return false;
@@ -58,20 +115,26 @@ export class DiagnosticArtifactWorker {
       const candidate = await tx.diagnosticPdfArtifact.findUnique({ where: { id } });
       if (!candidate || !available(candidate, this.runtime.now()) || !DIAGNOSTIC_PDF_RENDERERS.includes(candidate.rendererVersion) || !["tk", "ru", "en"].includes(candidate.locale) ||
         candidate.objectKey !== `diagnostic-pdf/${candidate.reportId}/${candidate.id}.pdf`) return null;
-      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${candidate.reportId} FOR UPDATE`;
-      const row = await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id } });
-      if (!available(row, this.runtime.now())) return null;
-      const snapshot = await this.current(tx, row);
+      const snapshot = await this.current(tx, candidate);
       if (!snapshot) {
-        const replacementId = await this.requestSafeReplacement(tx, row);
+        const replacementId = await this.requestSafeReplacement(tx, candidate, true);
         if (replacementId) return { replacementId };
-        await this.retire(tx, row); return null;
+        return null;
       }
       const epoch = this.runtime.id();
-      const claimed = await tx.diagnosticPdfArtifact.updateMany({ where: { id, epoch: row.epoch, state: row.state, cleanupRequestedAt: null, leaseUntil: row.leaseUntil }, data: { state: "processing", epoch, attempts: { increment: 1 }, leaseUntil: leaseEnd(this.runtime.now()), failureCode: null, retryAt: null } });
-      if (!claimed.count) return null;
-      return { artifact: await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id } }), snapshot };
-    });
+      const data = { state: "processing", epoch, attempts: candidate.attempts + 1, leaseUntil: leaseEnd(this.runtime.now()), failureCode: null, retryAt: null };
+      const plan = await workerPlannedRow(tx, { table: "diagnostic_pdf_artifacts", key: { id } }, data);
+      return workerOrdinary(tx, [plan], async () => {
+        await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${candidate.reportId} FOR UPDATE`;
+        const row = await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id } });
+        if (!available(row, this.runtime.now())) return null;
+        const checked = await this.current(tx, row);
+        if (!checked) return null;
+        const claimed = await tx.diagnosticPdfArtifact.updateMany({ where: { id, epoch: row.epoch, state: row.state, cleanupRequestedAt: null, leaseUntil: row.leaseUntil }, data });
+        if (!claimed.count) return null;
+        return { artifact: await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id } }), snapshot: checked };
+      });
+    }).catch((error: unknown) => { if (error instanceof DiagnosticWorkerPreparationChanged) return null; throw error; });
     if (!intent) return false;
     // The requested old intent cannot change its immutable identity. Complete
     // its current replacement outside the transaction and its report lock.
@@ -97,14 +160,7 @@ export class DiagnosticArtifactWorker {
           verificationReference: `/diagnostics/reports/${artifact.reportId}`, photos }, this.fonts);
       }
       const digest = sha(bytes), size = bytes.byteLength;
-      const planned = await this.db.$transaction(async tx => {
-        const row = await this.locked(tx, artifact);
-        if (!row) return false;
-        if (!(await this.current(tx, row))) { await this.retire(tx, row); return false; }
-        // Retried generation cannot replace an earlier durable byte descriptor.
-        if ((row.sha256 && row.sha256 !== digest) || (row.sizeBytes && row.sizeBytes !== size)) throw new Error("DIAGNOSTIC_PDF_GENERATION_CONFLICT");
-        return (await tx.diagnosticPdfArtifact.updateMany({ where: { id, epoch: artifact.epoch, state: "processing", cleanupRequestedAt: null, leaseUntil: { gt: this.runtime.now() } }, data: { sha256: digest, sizeBytes: size } })).count === 1;
-      });
+      const planned = await this.advance(artifact, { sha256: digest, sizeBytes: size });
       if (!planned) return false;
       // The exact write plan is durable before any network mutation starts.
       if (!artifact.sha256 || !artifact.sizeBytes) await this.objects.put(artifact.objectKey, bytes, "application/pdf");
@@ -113,35 +169,39 @@ export class DiagnosticArtifactWorker {
         catch (error) { if (!missing(error)) throw error; await this.objects.put(artifact.objectKey, bytes, "application/pdf"); }
       }
       await this.objects.read(artifact.objectKey, size, digest);
-      return this.db.$transaction(async tx => {
-        const row = await this.locked(tx, artifact);
-        if (!row) return false;
-        if (!(await this.current(tx, row))) { await this.retire(tx, row); return false; }
-        return (await tx.diagnosticPdfArtifact.updateMany({ where: { id, epoch: artifact.epoch, state: "processing", cleanupRequestedAt: null, leaseUntil: { gt: this.runtime.now() } }, data: { state: "ready", verifiedAt: this.runtime.now(), leaseUntil: null, failureCode: null } })).count === 1;
-      });
+      return await this.advance(artifact);
     } catch {
-      await this.db.diagnosticPdfArtifact.updateMany({ where: { id, epoch: artifact.epoch, state: "processing", cleanupRequestedAt: null },
-        data: { state: "failed", leaseUntil: null, failureCode: "storage_or_render", retryAt: artifact.attempts < 5 ? new Date(this.runtime.now().getTime() + Math.min(3600_000, 30_000 * 2 ** artifact.attempts)) : null } });
+      await this.pdfUpdate({ id, epoch: artifact.epoch, state: "processing", cleanupRequestedAt: null },
+        { state: "failed", leaseUntil: null, failureCode: "storage_or_render", retryAt: artifact.attempts < 5 ? new Date(this.runtime.now().getTime() + Math.min(3600_000, 30_000 * 2 ** artifact.attempts)) : null });
       throw new Error("DIAGNOSTIC_ARTIFACT_RETRY");
     }
   }
 
-  /** Under B's report lock. Source and projection must both validate before
-   * a new exact-key intent is created. No artifact identity is ever rewritten. */
-  private async requestSafeReplacement(tx: Tx, row: Artifact): Promise<string | null> {
-    if (row.rendererVersion !== "v1") return null;
+  /** Allocate every absent identity and retirement tuple before the report/FK
+   * locks. A ready issued copy and its immutable bytes remain historical. */
+  private async requestSafeReplacement(tx: Tx, row: Artifact, retireObsolete = false): Promise<string | null> {
     const safe = { ...row, rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER };
-    if (!await this.current(tx, safe)) return null;
-    if (row.state !== "ready" && !row.cleanupRequestedAt) await this.retire(tx, row);
-    const existing = await tx.diagnosticPdfArtifact.findFirst({ where: { reportId: row.reportId, locale: row.locale,
-      rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, cleanupRequestedAt: null } });
-    if (existing) return existing.id;
-    const latest = await tx.diagnosticPdfArtifact.findFirst({ where: { reportId: row.reportId, locale: row.locale }, orderBy: { generation: "desc" } });
+    const eligible = row.rendererVersion === "v1" && !!await this.current(tx, safe);
+    const existing = eligible ? await tx.diagnosticPdfArtifact.findFirst({ where: { reportId: row.reportId, locale: row.locale,
+      rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, cleanupRequestedAt: null } }) : null;
+    const latest = eligible && !existing ? await tx.diagnosticPdfArtifact.findFirst({ where: { reportId: row.reportId, locale: row.locale }, orderBy: { generation: "desc" } }) : null;
+    const retire = !row.cleanupRequestedAt && row.state !== "ready" && (eligible || retireObsolete) ? this.retirement() : null;
     const id = this.runtime.id();
-    await tx.diagnosticPdfArtifact.create({ data: { id, reportId: row.reportId, snapshotHash: row.snapshotHash, locale: row.locale,
-      rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, generation: (latest?.generation ?? 0) + 1,
-      objectKey: `diagnostic-pdf/${row.reportId}/${id}.pdf` } });
-    return id;
+    const fresh = eligible && !existing ? { id, reportId: row.reportId, snapshotHash: row.snapshotHash, locale: row.locale,
+      rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, generation: (latest?.generation ?? 0) + 1, epoch: this.runtime.id(),
+      objectKey: `diagnostic-pdf/${row.reportId}/${id}.pdf`, state: "pending", attempts: 0, retryAt: null, failureCode: null,
+      leaseUntil: null, sha256: null, sizeBytes: null, verifiedAt: null, cleanupRequestedAt: null, cleanupCompletedAt: null, createdAt: this.runtime.now() } : null;
+    if (!retire && !fresh) return existing?.id ?? null;
+    const plans = [];
+    if (retire) plans.push(await workerPlannedRow(tx, { table: "diagnostic_pdf_artifacts", key: { id: row.id } }, retire));
+    if (fresh) plans.push(await workerPlannedRow(tx, { table: "diagnostic_pdf_artifacts", key: { id } }, fresh, true));
+    return workerOrdinary(tx, plans, async () => {
+      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${row.reportId} FOR UPDATE`;
+      if (eligible !== (row.rendererVersion === "v1" && !!await this.current(tx, safe))) return null;
+      if (retire) await tx.diagnosticPdfArtifact.updateMany({ where: { id: row.id, epoch: row.epoch }, data: retire });
+      if (fresh) await tx.diagnosticPdfArtifact.create({ data: fresh });
+      return fresh?.id ?? existing?.id ?? null;
+    }, [{ table: "diagnostic_reports", key: { id: row.reportId } }]);
   }
 
   /** A ready issued copy is historical and remains byte-identical. Its source
@@ -155,7 +215,6 @@ export class DiagnosticArtifactWorker {
           artifacts: { none: { locale, rendererVersion: DIAGNOSTIC_ERASED_LINEAGE_RENDERER, cleanupRequestedAt: null } } },
       }, orderBy: { id: "asc" }, take: 100 });
       for (const candidate of candidates) await this.db.$transaction(async tx => {
-        await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${candidate.reportId} FOR UPDATE`;
         const row = await tx.diagnosticPdfArtifact.findUniqueOrThrow({ where: { id: candidate.id } });
         await this.requestSafeReplacement(tx, row);
       });
@@ -167,7 +226,9 @@ export class DiagnosticArtifactWorker {
     const now = this.runtime.now();
     await this.replaceErasedLineage();
     // A crash on the last allowed attempt must become an honest terminal failure.
-    await this.db.diagnosticPdfArtifact.updateMany({ where: { state: "processing", attempts: { gte: 5 }, cleanupRequestedAt: null, leaseUntil: { lte: now } }, data: { state: "failed", leaseUntil: null, retryAt: null, failureCode: "attempts_exhausted" } });
+    const exhausted = await this.db.diagnosticPdfArtifact.findMany({ where: { state: "processing", attempts: { gte: 5 }, cleanupRequestedAt: null, leaseUntil: { lte: now } }, orderBy: { id: "asc" }, take: 100 });
+    for (const item of exhausted) await this.pdfUpdate({ id: item.id, epoch: item.epoch, state: "processing", attempts: { gte: 5 }, cleanupRequestedAt: null, leaseUntil: { lte: this.runtime.now() } },
+      { state: "failed", leaseUntil: null, retryAt: null, failureCode: "attempts_exhausted" });
     const eligible: Prisma.DiagnosticPdfArtifactWhereInput = { cleanupRequestedAt: null, attempts: { lt: 5 }, OR: [{ state: "pending" }, { state: "failed", retryAt: { lte: now } }, { state: "processing", leaseUntil: { lte: now } }] };
     // A newly discovered safe replacement must advance even behind older release
     // work. Reserve one of the existing five slots, leaving at least four FIFO
@@ -195,15 +256,21 @@ export class DiagnosticArtifactWorker {
         WHERE refs."orderId"=r."orderId" AND (finding->'evidenceIds') ? e.id)
       ORDER BY e."verifiedAt", e.id LIMIT 100`;
     for (const item of candidates) await this.db.$transaction(async tx => {
-      // The same order/report lock order used by authoring fences late attachment.
-      await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
-      await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${item.reportId} FOR UPDATE`;
-      const referenced = await tx.$queryRaw<{ id: string }[]>`
+      const referenced = () => tx.$queryRaw<{ id: string }[]>`
         SELECT refs.id FROM diagnostic_reports refs,
         LATERAL jsonb_array_elements(COALESCE(refs.snapshot->'report'->'findings',refs.state->'findings','[]'::jsonb)) finding
         WHERE refs."orderId"=${item.orderId} AND (finding->'evidenceIds') ? ${item.id} LIMIT 1`;
-      if (referenced.length) return;
-      await tx.diagnosticEvidence.updateMany({ where: { id: item.id, epoch: item.epoch, state: "verified", cleanupRequestedAt: null, verifiedAt: { lte: cutoff } }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+      const where = { id: item.id, epoch: item.epoch, state: "verified", cleanupRequestedAt: null, verifiedAt: { lte: cutoff } };
+      if (!await tx.diagnosticEvidence.findFirst({ where }) || (await referenced()).length) return;
+      const data = { state: "cleanup_pending", cleanupRequestedAt: now };
+      const plan = await workerPlannedRow(tx, { table: "diagnostic_evidence", key: { id: item.id } }, data);
+      await workerOrdinary(tx, [plan], async () => {
+        // The complete prefix precedes the original attachment-fencing locks.
+        await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM diagnostic_reports WHERE id=${item.reportId} FOR UPDATE`;
+        if ((await referenced()).length) return;
+        await tx.diagnosticEvidence.updateMany({ where, data });
+      });
     });
   }
 
@@ -212,39 +279,99 @@ export class DiagnosticArtifactWorker {
    * place and bumps the visit's generation. Provenance follows its rights, abandoned intents
    * and verified items never attached to any evidence record use the upload lifecycle rule. */
   private async retireIdentity(now: Date): Promise<void> {
-    // Separate transaction: both disposers acquire their own complete upstream prefix.
+    // Freeze the bounded request selection before any actor/order lock. Session
+    // linkage is reread after source preparation; the disposer must not reselect.
     await this.db.$transaction(async tx => {
-      await tx.$queryRaw`SELECT diagnostic_dispose_expired_requests(${now}::timestamp)`;
+      const requests = await tx.$queryRaw<{ id: string }[]>`SELECT q.id FROM diagnostic_continuity_requests q
+        JOIN sessions s ON s.id=q."sessionId" WHERE s."expiresAt"<=${now}::timestamp ORDER BY q.id LIMIT 100`;
+      if (!requests.length) return;
+      const plans = [];
+      for (const row of requests) plans.push(await workerPlannedRow(tx, { table: "diagnostic_continuity_requests", key: { id: row.id } }, null));
+      await workerSource(tx, "proof_expire", plans, now, async () => {
+        const removed = await tx.$executeRaw`DELETE FROM diagnostic_continuity_requests q USING sessions s
+          WHERE q.id IN (${Prisma.join(requests.map(row => row.id))}) AND s.id=q."sessionId" AND s."expiresAt"<=${now}::timestamp`;
+        if (removed !== requests.length) throw new DiagnosticWorkerPreparationChanged();
+      });
+    });
+    // Grants and independent components have separate finite source commands.
+    // A full grant batch must not suppress an independently due component batch.
+    await this.db.$transaction(async tx => {
+      const grants = await tx.diagnosticOwnershipGrant.findMany({ where: { state: "available", rightsUntil: { lte: now } }, orderBy: { id: "asc" }, take: 100 });
+      if (!grants.length) return;
+      const grantPatch = { state: "erased", listingId: null, identityDigest: null, sellerId: null, commissionerId: null, businessId: null, membershipId: null,
+        grantorId: null, grantorMembershipId: null, sessionId: null, rights: null, rightsUntil: null, declaredAt: null, erasedAt: now };
+      const plans = [];
+      const scopes: { scope: unknown }[][] = [];
+      const scope = (id: string) => tx.$queryRaw<{ scope: unknown }[]>`SELECT diagnostic_ownership_disposal_scope(NULL::text,${now}::timestamp,${id}::text) AS scope`;
+      for (const row of grants) {
+        plans.push(await workerPlannedRow(tx, { table: "diagnostic_ownership_grants", key: { id: row.id } }, grantPatch));
+        scopes.push(await scope(row.id));
+      }
+      await workerSource(tx, "ownership_expire", plans, now, async () => {
+        // Revalidate the whole union before any of our own effects shrink its graph.
+        for (const [index, row] of grants.entries()) if (JSON.stringify(await scope(row.id)) !== JSON.stringify(scopes[index])) throw new DiagnosticWorkerPreparationChanged();
+        for (const row of grants) await tx.$queryRaw`SELECT diagnostic_dispose_ownership_scope(NULL::text,${now}::timestamp,${row.id}::text)`;
+      });
     });
     await this.db.$transaction(async tx => {
-      await tx.$queryRaw`SELECT diagnostic_dispose_ownership(NULL::text,${now}::timestamp)`;
+      const components = await tx.diagnosticOwnershipComponent.findMany({ where: { state: "available", rightsUntil: { lte: now } }, orderBy: { identityRecordId: "asc" }, take: 100 });
+      if (!components.length) return;
+      const componentPatch = { state: "erased", grantId: null, scope: null, sourceListingId: null, identityDigest: null, sellerId: null, commissionerId: null,
+        businessId: null, membershipId: null, rights: null, rightsUntil: null, declaredById: null, declaredAt: null, erasedAt: now };
+      const plans = [];
+      for (const row of components) plans.push(await workerPlannedRow(tx, { table: "diagnostic_ownership_components", key: { identityRecordId: row.identityRecordId } }, componentPatch));
+      await workerSource(tx, "ownership_expire", plans, now, async () => {
+        await tx.$queryRaw`SELECT diagnostic_dispose_ownership_components(ARRAY[${Prisma.join(components.map(row => row.identityRecordId))}]::text[],${now}::timestamp)`;
+      });
     });
-    // The proof's declared end is the shortest retained evidence/provenance right,
-    // not a newly invented TTL. Delete the whole restricted payload and linkage.
-    await this.db.$executeRaw`DELETE FROM diagnostic_continuity_proofs WHERE id IN
-      (SELECT id FROM diagnostic_continuity_proofs WHERE "rightsUntil"<=${now}::timestamp ORDER BY "rightsUntil",id LIMIT 100)`;
+    // A proof's end is the shortest declared retained material right, not a TTL.
+    await this.db.$transaction(async tx => {
+      const proofs = await tx.diagnosticContinuityProof.findMany({ where: { rightsUntil: { lte: now } }, orderBy: [{ rightsUntil: "asc" }, { id: "asc" }], take: 100 });
+      if (!proofs.length) return;
+      const plans = [];
+      for (const row of proofs) plans.push(await workerPlannedRow(tx, { table: "diagnostic_continuity_proofs", key: { id: row.id } }, null));
+      await workerSource(tx, "proof_expire", plans, now, async () => {
+        const removed = await tx.$executeRaw`DELETE FROM diagnostic_continuity_proofs WHERE id IN (${Prisma.join(proofs.map(row => row.id))}) AND "rightsUntil"<=${now}::timestamp`;
+        if (removed !== proofs.length) throw new DiagnosticWorkerPreparationChanged();
+      });
+    });
     const cutoff = new Date(now.getTime() - 86400_000);
-    const expired = await this.db.diagnosticIdentityEvidence.findMany({ where: { erasedAt: null, rightsUntil: { lte: now } }, orderBy: [{ rightsUntil: "asc" }, { id: "asc" }], take: 100, select: { id: true, orderId: true } });
+    const expired = await this.db.diagnosticIdentityEvidence.findMany({ where: { erasedAt: null, rightsUntil: { lte: now } }, orderBy: [{ rightsUntil: "asc" }, { id: "asc" }], take: 100 });
     for (const item of expired) await this.db.$transaction(async tx => {
-      await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
-      const erased = await tx.$executeRaw`UPDATE diagnostic_identity_evidence SET "observationHash"=NULL, identifiers=NULL, provenance=NULL, rights=NULL,
-        explanation=NULL, "recordHash"=NULL, "erasedAt"=${now}::timestamp WHERE id=${item.id} AND "erasedAt" IS NULL AND "rightsUntil"<=${now}::timestamp`;
-      if (erased) await tx.$executeRaw`UPDATE inspection_orders SET "identityEvidenceGeneration"="identityEvidenceGeneration"+1 WHERE id=${item.orderId}`;
+      const where = { id: item.id, erasedAt: null, rightsUntil: { lte: now } };
+      const evidence = await tx.diagnosticIdentityEvidence.findFirst({ where });
+      if (!evidence) return;
+      const order = await tx.inspectionOrder.findUniqueOrThrow({ where: { id: evidence.orderId } });
+      const patch = { observationHash: null, identifiers: null, provenance: null, rights: null, explanation: null, recordHash: null, erasedAt: now };
+      const generation = order.identityEvidenceGeneration + 1;
+      const plans = [await workerPlannedRow(tx, { table: "diagnostic_identity_evidence", key: { id: evidence.id } }, patch),
+        await workerPlannedRow(tx, { table: "inspection_orders", key: { id: order.id } }, { identityEvidenceGeneration: generation })];
+      await workerSource(tx, "identity_material_change", plans, now, async () => {
+        await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${order.id} FOR UPDATE`;
+        const removed = await tx.$executeRaw`UPDATE diagnostic_identity_evidence SET "observationHash"=NULL, identifiers=NULL, provenance=NULL, rights=NULL,
+          explanation=NULL, "recordHash"=NULL, "erasedAt"=${now}::timestamp WHERE id=${evidence.id} AND "erasedAt" IS NULL AND "rightsUntil"<=${now}::timestamp`;
+        if (removed !== 1) throw new DiagnosticWorkerPreparationChanged();
+        await tx.$executeRaw`UPDATE inspection_orders SET "identityEvidenceGeneration"=${generation} WHERE id=${order.id}`;
+      });
     });
-    await this.db.$executeRaw`UPDATE diagnostic_identity_provenance SET state='cleanup_pending', epoch=gen_random_uuid()::text, rights=NULL,
-      "cleanupRequestedAt"=COALESCE("cleanupRequestedAt",${now}::timestamp), "erasedAt"=COALESCE("erasedAt",${now}::timestamp) WHERE "erasedAt" IS NULL AND "rightsUntil"<=${now}::timestamp`;
-    await this.db.diagnosticIdentityProvenance.updateMany({ where: { state: "staged", cleanupRequestedAt: null, createdAt: { lte: cutoff }, OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+    const rights = await this.db.diagnosticIdentityProvenance.findMany({ where: { erasedAt: null, rightsUntil: { lte: now } }, orderBy: [{ rightsUntil: "asc" }, { id: "asc" }], take: 100 });
+    for (const row of rights) await this.provenanceUpdate({ id: row.id, epoch: row.epoch, erasedAt: null, rightsUntil: { lte: now } }, current => ({
+      state: "cleanup_pending", epoch: this.runtime.id(), rights: Prisma.DbNull, cleanupRequestedAt: current.cleanupRequestedAt ?? now, erasedAt: current.erasedAt ?? now,
+    }));
+    const staged = await this.db.diagnosticIdentityProvenance.findMany({ where: { state: "staged", cleanupRequestedAt: null, createdAt: { lte: cutoff },
+      OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100 });
+    for (const row of staged) await this.provenanceUpdate({ id: row.id, epoch: row.epoch, state: "staged", cleanupRequestedAt: null, createdAt: { lte: cutoff },
+      OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: this.runtime.now() } }] }, () => ({ state: "cleanup_pending", cleanupRequestedAt: now }));
     const attached = Prisma.sql`EXISTS (SELECT 1 FROM diagnostic_identity_evidence e, LATERAL jsonb_array_elements(COALESCE(e.provenance,'[]'::jsonb)) ref
       WHERE e."orderId"=p."orderId" AND ref->>'id'=p.id)`;
     const unattached = await this.db.$queryRaw<{ id: string; orderId: string; epoch: string }[]>`
       SELECT p.id, p."orderId", p.epoch FROM diagnostic_identity_provenance p WHERE p.state='verified' AND p."cleanupRequestedAt" IS NULL
       AND p."verifiedAt"<=${cutoff}::timestamp AND NOT ${attached} ORDER BY p."verifiedAt", p.id LIMIT 100`;
-    for (const item of unattached) await this.db.$transaction(async tx => {
-      // Capture holds the order lock while binding provenance; recheck under it.
-      await tx.$queryRaw`SELECT id FROM inspection_orders WHERE id=${item.orderId} FOR UPDATE`;
-      const still = await tx.$queryRaw<{ id: string }[]>`SELECT p.id FROM diagnostic_identity_provenance p WHERE p.id=${item.id} AND NOT ${attached}`;
-      if (still.length) await tx.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch: item.epoch, state: "verified", cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
-    });
+    for (const item of unattached) await this.provenanceUpdate({ id: item.id, epoch: item.epoch, state: "verified", cleanupRequestedAt: null, verifiedAt: { lte: cutoff } },
+      () => ({ state: "cleanup_pending", cleanupRequestedAt: now }), async tx => {
+        const still = await tx.$queryRaw<{ id: string }[]>`SELECT p.id FROM diagnostic_identity_provenance p WHERE p.id=${item.id} AND NOT ${attached}`;
+        return still.length === 1;
+      });
   }
 
   async cleanup(): Promise<number> {
@@ -255,23 +382,31 @@ export class DiagnosticArtifactWorker {
     // Erasure fences access before network cleanup. Active reports have no blanket purge.
     const erased = await this.db.diagnosticReportRecord.findMany({ where: { AND: [{ OR: [{ erasedAt: { not: null } }, { order: { erasedAt: { not: null } } }, { audience: "buyer_private", order: { commissionerId: null } }] }, { OR: [{ artifacts: { some: { cleanupRequestedAt: null } } }, { evidence: { some: { cleanupRequestedAt: null } } }] }] }, orderBy: { id: "asc" }, take: 100 });
     for (const report of erased) {
-      await this.db.diagnosticPdfArtifact.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
-      await this.db.diagnosticEvidence.updateMany({ where: { reportId: report.id, cleanupRequestedAt: null }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+      const eligible = async (tx: Tx) => {
+        const current = await tx.diagnosticReportRecord.findUnique({ where: { id: report.id }, include: { order: true } });
+        return !!current && (!!current.erasedAt || !!current.order.erasedAt || (current.audience === "buyer_private" && !current.order.commissionerId));
+      };
+      const pdfs = await this.db.diagnosticPdfArtifact.findMany({ where: { reportId: report.id, cleanupRequestedAt: null }, orderBy: { id: "asc" } });
+      for (const item of pdfs) await this.pdfUpdate({ id: item.id, epoch: item.epoch, reportId: report.id, cleanupRequestedAt: null }, { state: "cleanup_pending", cleanupRequestedAt: now }, eligible);
+      const children = await this.db.diagnosticEvidence.findMany({ where: { reportId: report.id, cleanupRequestedAt: null }, orderBy: { id: "asc" } });
+      for (const item of children) await this.evidenceUpdate({ id: item.id, epoch: item.epoch, reportId: report.id, cleanupRequestedAt: null }, { state: "cleanup_pending", cleanupRequestedAt: now }, eligible);
     }
     // An unfinished staging attempt is temporary upload data, not a retained report.
     const stale = await this.db.diagnosticEvidence.findMany({ where: { state: "staged", cleanupRequestedAt: null, createdAt: { lte: new Date(now.getTime() - 86400_000) }, OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: 100, select: { id: true } });
-    await this.db.diagnosticEvidence.updateMany({ where: { id: { in: stale.map(row => row.id) }, state: "staged", cleanupRequestedAt: null, OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, data: { state: "cleanup_pending", cleanupRequestedAt: now } });
+    for (const item of stale) await this.evidenceUpdate({ id: item.id, state: "staged", cleanupRequestedAt: null, createdAt: { lte: new Date(now.getTime() - 86400_000) },
+      OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: this.runtime.now() } }] }, { state: "cleanup_pending", cleanupRequestedAt: now });
     const artifacts = await this.db.diagnosticPdfArtifact.findMany({ where: { cleanupRequestedAt: { not: null }, OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] }, orderBy: [{ cleanupCompletedAt: { sort: "asc", nulls: "first" } }, { id: "asc" }], take: 100 });
     for (const item of artifacts) {
       if (item.objectKey !== `diagnostic-pdf/${item.reportId}/${item.id}.pdf`) throw new Error("DIAGNOSTIC_CLEANUP_INVALID");
       const epoch = this.runtime.id();
-      const claim = await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, OR: [{ leaseUntil: null }, { leaseUntil: { lte: now } }] }, data: { epoch, state: "cleanup_pending", leaseUntil: leaseEnd(now) } });
-      if (!claim.count) continue;
+      const claim = await this.pdfUpdate({ id: item.id, epoch: item.epoch, objectKey: item.objectKey, sha256: item.sha256, sizeBytes: item.sizeBytes,
+        cleanupRequestedAt: { not: null }, OR: [{ leaseUntil: null }, { leaseUntil: { lte: this.runtime.now() } }] }, { epoch, state: "cleanup_pending", leaseUntil: leaseEnd(this.runtime.now()) });
+      if (!claim) continue;
       try {
         await this.objects.deleteAndVerify([item.objectKey]);
-        completed += (await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch, state: "cleanup_pending" }, data: { state: "removed", cleanupCompletedAt: this.runtime.now(), leaseUntil: null, failureCode: null } })).count;
+        completed += await this.pdfUpdate({ id: item.id, epoch, state: "cleanup_pending" }, { state: "removed", cleanupCompletedAt: this.runtime.now(), leaseUntil: null, failureCode: null });
       } catch {
-        await this.db.diagnosticPdfArtifact.updateMany({ where: { id: item.id, epoch }, data: { failureCode: "cleanup_storage", leaseUntil: new Date(now.getTime() + 60_000) } });
+        await this.pdfUpdate({ id: item.id, epoch }, { failureCode: "cleanup_storage", leaseUntil: new Date(now.getTime() + 60_000) });
         throw new Error("DIAGNOSTIC_CLEANUP_RETRY");
       }
     }
@@ -279,13 +414,15 @@ export class DiagnosticArtifactWorker {
     for (const item of evidence) {
       if (item.objectKey !== `diagnostic-evidence/${item.id}/${item.sha256}`) throw new Error("DIAGNOSTIC_CLEANUP_INVALID");
       const epoch = this.runtime.id();
-      const claim = await this.db.diagnosticEvidence.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, AND: [{ OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, { OR: [{ cleanupLeaseUntil: null }, { cleanupLeaseUntil: { lte: now } }] }] }, data: { epoch, state: "cleanup_pending", cleanupLeaseUntil: leaseEnd(now), cleanupAttempts: { increment: 1 } } });
-      if (!claim.count) continue;
+      const claim = await this.evidenceUpdate({ id: item.id, epoch: item.epoch, objectKey: item.objectKey, sha256: item.sha256, sizeBytes: item.sizeBytes, cleanupRequestedAt: { not: null },
+        AND: [{ OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: this.runtime.now() } }] }, { OR: [{ cleanupLeaseUntil: null }, { cleanupLeaseUntil: { lte: this.runtime.now() } }] }] },
+        { epoch, state: "cleanup_pending", cleanupLeaseUntil: leaseEnd(this.runtime.now()), cleanupAttempts: item.cleanupAttempts + 1 });
+      if (!claim) continue;
       try {
         await this.objects.deleteAndVerify([item.objectKey]);
-        completed += (await this.db.diagnosticEvidence.updateMany({ where: { id: item.id, epoch, state: "cleanup_pending" }, data: { state: "removed", cleanupCompletedAt: this.runtime.now(), cleanupLeaseUntil: null, cleanupFailureCode: null } })).count;
+        completed += await this.evidenceUpdate({ id: item.id, epoch, state: "cleanup_pending" }, { state: "removed", cleanupCompletedAt: this.runtime.now(), cleanupLeaseUntil: null, cleanupFailureCode: null });
       } catch {
-        await this.db.diagnosticEvidence.updateMany({ where: { id: item.id, epoch }, data: { cleanupFailureCode: "cleanup_storage", cleanupLeaseUntil: new Date(now.getTime() + 60_000) } });
+        await this.evidenceUpdate({ id: item.id, epoch }, { cleanupFailureCode: "cleanup_storage", cleanupLeaseUntil: new Date(now.getTime() + 60_000) });
         throw new Error("DIAGNOSTIC_CLEANUP_RETRY");
       }
     }
@@ -294,13 +431,15 @@ export class DiagnosticArtifactWorker {
       // An intent never bound to bytes has no object; a bound one names exactly one key.
       if (item.objectKey !== null && item.objectKey !== `diagnostic-evidence/${item.id}/${item.sha256}`) throw new Error("DIAGNOSTIC_CLEANUP_INVALID");
       const epoch = this.runtime.id();
-      const claim = await this.db.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch: item.epoch, cleanupRequestedAt: { not: null }, AND: [{ OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: now } }] }, { OR: [{ cleanupLeaseUntil: null }, { cleanupLeaseUntil: { lte: now } }] }] }, data: { epoch, state: "cleanup_pending", cleanupLeaseUntil: leaseEnd(now), cleanupAttempts: { increment: 1 } } });
-      if (!claim.count) continue;
+      const claim = await this.provenanceUpdate({ id: item.id, epoch: item.epoch, objectKey: item.objectKey, sha256: item.sha256, sizeBytes: item.sizeBytes, cleanupRequestedAt: { not: null },
+        AND: [{ OR: [{ writeLeaseUntil: null }, { writeLeaseUntil: { lte: this.runtime.now() } }] }, { OR: [{ cleanupLeaseUntil: null }, { cleanupLeaseUntil: { lte: this.runtime.now() } }] }] },
+        current => ({ epoch, state: "cleanup_pending", cleanupLeaseUntil: leaseEnd(this.runtime.now()), cleanupAttempts: current.cleanupAttempts + 1 }));
+      if (!claim) continue;
       try {
         if (item.objectKey) await this.objects.deleteAndVerify([item.objectKey]);
-        completed += (await this.db.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch, state: "cleanup_pending" }, data: { state: "removed", cleanupCompletedAt: this.runtime.now(), cleanupLeaseUntil: null, cleanupFailureCode: null } })).count;
+        completed += await this.provenanceUpdate({ id: item.id, epoch, state: "cleanup_pending" }, () => ({ state: "removed", cleanupCompletedAt: this.runtime.now(), cleanupLeaseUntil: null, cleanupFailureCode: null }));
       } catch {
-        await this.db.diagnosticIdentityProvenance.updateMany({ where: { id: item.id, epoch }, data: { cleanupFailureCode: "cleanup_storage", cleanupLeaseUntil: new Date(now.getTime() + 60_000) } });
+        await this.provenanceUpdate({ id: item.id, epoch }, () => ({ cleanupFailureCode: "cleanup_storage", cleanupLeaseUntil: new Date(now.getTime() + 60_000) }));
         throw new Error("DIAGNOSTIC_CLEANUP_RETRY");
       }
     }
