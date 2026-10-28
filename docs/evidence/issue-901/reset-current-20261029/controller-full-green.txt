@@ -1,0 +1,56 @@
+✔ oldest ready request wins within founder priority and keeps all authority fields durably (623.175166ms)
+✔ OT-CLOSE-CURRENT-1 lost stop reply resumes the same operation and requires automatic exclusion, actual expiry and socket death (2322.695ms)
+✔ current closure refuses changed authority, ambiguous CAS, clock discontinuity and strict expiry equality without data effects (6403.0465ms)
+✔ current closure reconciles a lost drain reply but refuses issuance changing at the drain admission boundary (2844.064708ms)
+✔ fresh authoritative identity rejects wrong IDs, production, ambiguous origins and wrong credential scope before mutation (677.562667ms)
+✔ changed candidate, former owner and changed policy fail closed on each mutation (344.304292ms)
+✔ fixture and reset use only the durable disposable namespace; arbitrary commands are refused (1170.685875ms)
+✔ a durable in-flight operation excludes deployments, resets, release and another owner (624.793625ms)
+✔ an interrupted mutation retains blocked recovery state and redacts provider diagnostics (860.317958ms)
+✔ current-main restoration and readiness proof are required before release; moved main needs another restore (1931.038958ms)
+✔ persistent schema differences and incomplete readiness prevent restoration/release (826.806458ms)
+✔ simultaneous deploy and reset contenders cannot both cross the mutation boundary (714.33425ms)
+✔ a changed authenticated coordinator cannot persist another owner operation (359.574167ms)
+✔ main moving during restoration proof never records a releasable restoration (781.659958ms)
+✔ interruption after a provider creates a deployment preserves its actual ID for recovery (848.639666ms)
+✔ only proven complete interrupted deployments can recover; unknown or partial states retain ownership (1630.103834ms)
+✔ restoration carries retained schema forward but never assumes an undeployed candidate migration ran (1245.101042ms)
+✔ failed proof, wrong owner and moved-main recovery cannot clear the durable interrupted operation (3167.848ms)
+✔ release preserves retained migration disposition for the next reservation (1624.97975ms)
+✔ campaign profile is explicit, durable before the first side effect and cannot replace a narrow fixture (898.744458ms)
+✔ a completed narrow fixture cannot silently become campaign identities (634.858875ms)
+▶ campaign restoration refuses before deploy without current durable complete disposal evidence
+  ✔ missing (811.036ms)
+  ✔ caller-boolean (808.535375ms)
+  ✔ foreign-reservation (1196.76875ms)
+  ✔ candidate (1135.9295ms)
+  ✔ profile (1134.217667ms)
+  ✔ partial-queue (1300.473458ms)
+  ✔ partial-sink (1196.784875ms)
+  ✔ cleaning (1224.492875ms)
+  ✔ no-tombstone (1306.099041ms)
+  ✔ stale-before-fixture (1244.992209ms)
+✔ campaign restoration refuses before deploy without current durable complete disposal evidence (11360.151875ms)
+✔ a fresh controller restores from persisted exact campaign disposal after repeated reset (1801.512292ms)
+✔ explicit reset continues only its persisted exact campaign cleanup operation after interruption (1640.484167ms)
+▶ explicit reset refuses incomplete or changed in-flight identity, runtime authority and other operation kinds
+  ✔ legacy (1241.324791ms)
+  ✔ owner (1206.571875ms)
+  ✔ namespace (1219.696917ms)
+  ✔ candidate (1147.370542ms)
+  ✔ profile (1153.98075ms)
+  ✔ deploy (1135.262708ms)
+  ✔ restore (1158.019333ms)
+  ✔ target (1291.819875ms)
+  ✔ attestation (1138.883458ms)
+  ✔ changed-during-attestation (1331.7345ms)
+✔ explicit reset refuses incomplete or changed in-flight identity, runtime authority and other operation kinds (12025.428208ms)
+✔ business lease with no deployment or disposal proof retains ownership (580.432709ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 46
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 57985.561959

@@ -1,0 +1,15 @@
+✔ the collector exhausts all eight configured families, version and multipart marker pairs and checks exact reference bytes (6.074416ms)
+✔ unknown scope, incomplete pagination, ambiguous null versions and equal-ETag different artwork refuse (1.597958ms)
+✔ durable exact object intent reconciles lost replies and subsets without enlarging the plan, completion replays read-only (14.565583ms)
+✔ HTTP200 per-item errors, a new identity or changed authority cannot become object completion (5.442125ms)
+✔ the object intent admits an explicit storage epoch/configuration and detects journal change at an effect boundary (0.485042ms)
+✔ a wrong staging target refuses before any storage read (0.06225ms)
+✔ a truncated page cannot skip identities using a cursor absent from that page (0.164ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62.917083

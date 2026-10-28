@@ -1,0 +1,11 @@
+✔ OT-CLOSE-CURRENT-1 lost stop reply resumes the same operation and requires automatic exclusion, actual expiry and socket death (2492.9005ms)
+✔ current closure refuses changed authority, ambiguous CAS, clock discontinuity and strict expiry equality without data effects (5883.6785ms)
+✔ current closure reconciles a lost drain reply but refuses issuance changing at the drain admission boundary (3263.578084ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11674.942917

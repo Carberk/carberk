@@ -1,0 +1,23 @@
+✖ the object intent admits an explicit storage epoch/configuration and detects journal change at an effect boundary (0.620458ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35.183458
+
+✖ failing tests:
+
+test at scripts/staging-clean-reset-storage.test.mjs:151:1
+✖ the object intent admits an explicit storage epoch/configuration and detects journal change at an effect boundary (0.620458ms)
+  Error: Storage reset refused: immutable binding or approved reference digest unavailable
+      at refuse (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.mjs:10:34)
+      at context (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.mjs:21:5)
+      at Module.collectResetObjects (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.mjs:91:13)
+      at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.test.mjs:154:30)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
