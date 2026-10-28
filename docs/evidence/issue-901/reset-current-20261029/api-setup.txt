@@ -1,0 +1,58 @@
+Scope: 5 of 12 workspace projects
+✓ Lockfile passes supply-chain policies (verified 1h ago)
+Lockfile is up to date, resolution step is skipped
+Packages are cloned from the content-addressable store to the virtual store.
+  Content-addressable store is at: /Users/bagtyyar/Library/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 853, reused 853, downloaded 0, added 838
+Packages: +1036
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1036, reused 1036, downloaded 0, added 1036, done
+.../node_modules/prisma preinstall$ node scripts/preinstall-entry.js
+.../node_modules/prisma preinstall: Done
+
+devDependencies:
++ @typescript/native <- typescript 7.0.2
++ tsx 4.23.15
++ turbo 2.11.7
++ typescript <- @typescript/typescript6 6.0.2
+
+Done in 2.4s using pnpm v12.11.2
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/apps/api
+
+No test files found, exiting with code 0
+
+filter: src/common/media-conversion-maintenance.spec.ts
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**, **/dist/**
+
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: Failed to resolve entry for package "@auto-tm/db". The package may have incorrect main/module/exports specified in its package.json.
+ ❯ reviveInvokeError ../../node_modules/.pnpm/vite@8.3.4_@types+node@22.20.5_esbuild@0.28.2_jiti@2.7.0_terser@5.47.1_tsx@4.23.15_yaml@2.9.0/node_modules/vite/dist/node/module-runner.js:556:14
+ ❯ Object.invoke ../../node_modules/.pnpm/vite@8.3.4_@types+node@22.20.5_esbuild@0.28.2_jiti@2.7.0_terser@5.47.1_tsx@4.23.15_yaml@2.9.0/node_modules/vite/dist/node/module-runner.js:572:33
+ ❯ ServerModuleRunner.getModuleInformation ../../node_modules/.pnpm/vite@8.3.4_@types+node@22.20.5_esbuild@0.28.2_jiti@2.7.0_terser@5.47.1_tsx@4.23.15_yaml@2.9.0/node_modules/vite/dist/node/module-runner.js:1228:7
+ ❯ request ../../node_modules/.pnpm/vite@8.3.4_@types+node@22.20.5_esbuild@0.28.2_jiti@2.7.0_terser@5.47.1_tsx@4.23.15_yaml@2.9.0/node_modules/vite/dist/node/module-runner.js:1245:83
+ ❯ test/globalSetup.ts:7:1
+      5| import { parseEnv, promisify } from "node:util";
+      6|
+      7| import { PrismaService } from "@auto-tm/db";
+       | ^
+      8| import { Redis } from "ioredis";
+      9| import type { TestProject } from "vitest/node";
+ ❯ VitestModuleEvaluator._runInlinedModule ../../node_modules/.pnpm/vitest@5.0.4_@opentelemetry+api@1.9.1_@types+node@22.20.5_happy-dom@20.14.6_msw@2.14.6__44988e00608939ca9bda78c40bef4345/node_modules/vitest/dist/module-evaluator.js:261:4
+ ❯ ServerModuleRunner.directRequest ../../node_modules/.pnpm/vite@8.3.4_@types+node@22.20.5_esbuild@0.28.2_jiti@2.7.0_terser@5.47.1_tsx@4.23.15_yaml@2.9.0/node_modules/vite/dist/node/module-runner.js:1288:59
+ ❯ ServerModuleRunner.cachedRequest ../../node_modules/.pnpm/vite@8.3.4_@types+node@22.20.5_esbuild@0.28.2_jiti@2.7.0_terser@5.47.1_tsx@4.23.15_yaml@2.9.0/node_modules/vite/dist/node/module-runner.js:1195:73
+ ❯ ServerModuleRunner.import ../../node_modules/.pnpm/vite@8.3.4_@types+node@22.20.5_esbuild@0.28.2_jiti@2.7.0_terser@5.47.1_tsx@4.23.15_yaml@2.9.0/node_modules/vite/dist/node/module-runner.js:1150:10
+ ❯ loadGlobalSetupFile ../../node_modules/.pnpm/vitest@5.0.4_@opentelemetry+api@1.9.1_@types+node@22.20.5_happy-dom@20.14.6_msw@2.14.6__44988e00608939ca9bda78c40bef4345/node_modules/vitest/dist/chunks/index.B8VfM7Mf.js:4171:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'ERR_RESOLVE_PACKAGE_ENTRY_FAIL' }
+
+
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ ccafc35f/apps/api

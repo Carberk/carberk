@@ -1,0 +1,104 @@
+✖ the collector exhausts all eight configured families, version and multipart marker pairs and checks exact reference bytes (0.7575ms)
+✖ unknown scope, incomplete pagination, ambiguous null versions and equal-ETag different artwork refuse (0.110833ms)
+✖ durable exact object intent reconciles lost replies and subsets without enlarging the plan, completion replays read-only (0.088667ms)
+✖ HTTP200 per-item errors, a new identity or changed authority cannot become object completion (0.073666ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 0
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35.845542
+
+✖ failing tests:
+
+test at scripts/staging-clean-reset-storage.test.mjs:84:1
+✖ the collector exhausts all eight configured families, version and multipart marker pairs and checks exact reference bytes (0.7575ms)
+  AssertionError [ERR_ASSERTION]: The fixed reset boundary must collect actual S3 inventory
+  + actual - expected
+
+  + 'undefined'
+  - 'function'
+
+      at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.test.mjs:85:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/staging-clean-reset-storage.test.mjs:98:1
+✖ unknown scope, incomplete pagination, ambiguous null versions and equal-ETag different artwork refuse (0.110833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'undefined'
+  - 'function'
+
+      at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.test.mjs:99:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/staging-clean-reset-storage.test.mjs:115:1
+✖ durable exact object intent reconciles lost replies and subsets without enlarging the plan, completion replays read-only (0.088667ms)
+  AssertionError [ERR_ASSERTION]: The fixed reset boundary must own object recovery
+  + actual - expected
+
+  + 'undefined'
+  - 'function'
+
+      at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.test.mjs:116:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/staging-clean-reset-storage.test.mjs:134:1
+✖ HTTP200 per-item errors, a new identity or changed authority cannot become object completion (0.073666ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'undefined'
+  - 'function'
+
+      at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.test.mjs:135:10)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'undefined',
+    expected: 'function',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
