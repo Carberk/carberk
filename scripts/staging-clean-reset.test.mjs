@@ -13,6 +13,53 @@ const read = path => readFileSync(join(root, path), 'utf8');
 const manifest = JSON.parse(read('scripts/staging-clean-reset.tables.json'));
 const clone = value => structuredClone(value);
 
+const objectInventory = () => Object.fromEntries([
+  'listing-photos', 'listing-videos', 'chat-attachments', 'catalog-assets', 'service-private', 'listing-video-private',
+].map(bucket => [bucket, { complete: true, versions: [], deleteMarkers: [], multipart: [] }]));
+const logo = { key: 'brands/approved/logo.webp', versionId: 'logo-v1', size: 17, etag: 'logo-etag' };
+
+test('object planning names every version, delete marker and multipart while preserving approved catalog identities', async () => {
+  const { planObjects } = await import('./staging-clean-reset.mjs');
+  const inventory = objectInventory();
+  inventory['catalog-assets'].versions.push(logo);
+  inventory['listing-photos'].versions.push({ key: 'pending/photo.webp', versionId: 'v1', size: 9, etag: 'one' },
+    { key: 'pending/photo.webp', versionId: 'v2', size: 11, etag: 'two' });
+  inventory['listing-photos'].deleteMarkers.push({ key: 'pending/photo.webp', versionId: 'deleted-v3' });
+  inventory['listing-videos'].multipart.push({ key: 'pending/video.mp4', uploadId: 'upload-1' });
+  const before = clone(inventory);
+  assert.deepEqual(planObjects(inventory, [logo]), {
+    preserve: [{ bucket: 'catalog-assets', ...logo }],
+    versions: [{ bucket: 'listing-photos', key: 'pending/photo.webp', versionId: 'v1', size: 9, etag: 'one' },
+      { bucket: 'listing-photos', key: 'pending/photo.webp', versionId: 'v2', size: 11, etag: 'two' }],
+    deleteMarkers: [{ bucket: 'listing-photos', key: 'pending/photo.webp', versionId: 'deleted-v3' }],
+    multipart: [{ bucket: 'listing-videos', key: 'pending/video.mp4', uploadId: 'upload-1' }],
+  });
+  assert.deepEqual(inventory, before);
+});
+
+test('incomplete, unknown, duplicate and unapproved object inventories refuse before producing a plan', async () => {
+  const { planObjects } = await import('./staging-clean-reset.mjs');
+  for (const change of [
+    i => { delete i['service-private']; },
+    i => { i.foreign = { complete: true, versions: [], deleteMarkers: [], multipart: [] }; },
+    i => { i['listing-photos'].complete = false; },
+    i => { i['listing-photos'].nextCursor = 'unread'; },
+    i => { i['catalog-assets'].versions.push({ ...logo, versionId: 'unapproved' }); },
+    i => { i['catalog-assets'].versions[0].etag = 'changed'; },
+    i => { i['catalog-assets'].versions = []; },
+    i => { i['catalog-assets'].deleteMarkers.push({ key: logo.key, versionId: 'hidden-logo' }); },
+    i => { i['catalog-assets'].multipart.push({ key: logo.key, uploadId: 'late-logo' }); },
+    i => { i['listing-photos'].versions.push({ ...logo }, { ...logo }); },
+    i => { i['listing-photos'].multipart.push({ key: 'video', uploadId: 'same' }, { key: 'video', uploadId: 'same' }); },
+    i => { i['listing-photos'].versions.push({ key: 'photo', versionId: null, size: -1, etag: 'etag' }); },
+  ]) {
+    const inventory = objectInventory();
+    inventory['catalog-assets'].versions.push(clone(logo));
+    change(inventory);
+    assert.throws(() => planObjects(inventory, [logo]), /Object inventory refused/);
+  }
+});
+
 // Offline fixtures only. Every value below stands in for a future
 // authoritative adapter observation; none was read from a live environment.
 const stagingPolicy = { target: 'staging', projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2',

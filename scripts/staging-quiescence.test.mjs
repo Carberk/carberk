@@ -3,6 +3,58 @@ import assert from 'node:assert/strict';
 import { observeQuiescence } from './staging-quiescence.mjs';
 import { quiescenceBoundary, target } from './testing/quiescence-boundaries.mjs';
 
+test('an exact CLI-session target reaches read-only observations without claiming closure', async () => {
+  const { platform, state } = quiescenceBoundary();
+  const remote = platform.command;
+  const network = platform.fetch;
+  const commands = [];
+  platform.token = undefined;
+  platform.command = async (program, args) => {
+    commands.push(args);
+    if (args[0] === 'status') return JSON.stringify({ id: 'project',
+      environments: { edges: [{ node: { id: 'stage', name: 'staging', canAccess: true } }] },
+      services: { edges: [{ node: { id: 'api' } }, { node: { id: 'worker' } }] } });
+    if (args[0] === 'api') {
+      const result = await network('https://backboard.railway.com/graphql/v2', {
+        headers: { 'Project-Access-Token': 'scoped-boundary-token' },
+        body: JSON.stringify({ query: args[1], variables: JSON.parse(args[3]) }),
+      });
+      return JSON.stringify(await result.json());
+    }
+    return remote(program, args);
+  };
+  const request = structuredClone(target);
+  request.identity.credentialScope = 'cli-session:project:stage';
+  await assert.rejects(platform.observeQuiescence(request), { code: 'QUIESCENCE_EVIDENCE_GAP' });
+  assert.deepEqual(commands[0], ['status', '--project', 'project', '--environment', 'stage', '--json']);
+  assert.equal(state.receipts.length, 2);
+  assert.deepEqual(state.mutations, []);
+  assert.equal(state.executorCalls, 0);
+});
+
+test('quiescence credential modes cannot masquerade or automatically fall back', async () => {
+  for (const cliSession of [false, true]) {
+    const { platform, state } = quiescenceBoundary();
+    const request = structuredClone(target);
+    if (cliSession) platform.token = undefined;
+    else request.identity.credentialScope = 'cli-session:project:stage';
+    await assert.rejects(platform.observeQuiescence(request), /credential mode mismatch/);
+    assert.deepEqual(state.effects, []);
+    assert.deepEqual(state.mutations, []);
+    assert.equal(state.receipts.length, 0);
+  }
+});
+
+test('CLI-session quiescence refuses a cross-target scope before any platform read', async () => {
+  const { platform, state } = quiescenceBoundary();
+  platform.token = undefined;
+  const request = structuredClone(target);
+  request.identity.credentialScope = 'cli-session:project:other';
+  await assert.rejects(platform.observeQuiescence(request), /exact scoped staging identity/);
+  assert.deepEqual(state.effects, []);
+  assert.deepEqual(state.mutations, []);
+});
+
 test('caller JSON cannot claim quiescence or invoke an executor', async () => {
   const { platform, state } = quiescenceBoundary();
   await assert.rejects(observeQuiescence(platform, { ...target, quiesced: true }), /exact quiescence request/);
