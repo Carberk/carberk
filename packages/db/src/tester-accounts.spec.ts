@@ -31,15 +31,13 @@ class FakeStore implements TesterAccountStore {
   }
   async removePersonalAccounts(users: TesterUser[], now: Date) {
     const ids = users.map(user => user.id);
-    if (this.sessionUsers.some(id => ids.includes(id))) {
-      throw new Error("unsupported atomic schedule + Session deletion + Listing archive");
-    }
     const changed = users.filter(user => user.deletionScheduledAt === null || user.deletionScheduledAt > now).map(user => user.id);
-    if (this.activeListingUsers.some(id => ids.includes(id) && !changed.includes(id))) throw new Error("unsupported unchanged schedule archive");
     const scheduled = await this.scheduleDeletion(changed, now);
-    const listingsArchived = await this.archiveListings(changed);
-    return { created: 0, scheduled, sessionsDeleted: 0, listingsArchived };
+    const sessionsDeleted = await this.deleteSessions(ids);
+    const listingsArchived = await this.archiveListings(ids);
+    return { created: 0, scheduled, sessionsDeleted, listingsArchived };
   }
+
   async scheduleDeletion(ids: string[], now: Date): Promise<number> {
     let count = 0;
     for (const user of this.users) {
@@ -147,14 +145,15 @@ describe("temporary tester operator behavior", () => {
   });
 });
 
-it("refuses the complete nonempty tester removal plan before scheduling, Session deletion or Listing archive", async () => {
+it("refuses a privileged final tester before scheduling, Session deletion or Listing archive", async () => {
   const store = new FakeStore();
   store.users.push(ownedUser(), ownedUser(2));
   store.sessionUsers = store.users.map((user) => user.id);
   store.activeListingUsers = [...store.sessionUsers];
+  must(store.users[1]).role = "admin";
   const before = structuredClone({ users: store.users, sessions: store.sessionUsers, listings: store.activeListingUsers });
   await expect(runTesterAccounts(store, options("remove", [account(), account(2)])))
-    .rejects.toThrow("unsupported atomic schedule + Session deletion + Listing archive");
+    .rejects.toThrow("unrelated or privileged User");
   expect({ users: store.users, sessions: store.sessionUsers, listings: store.activeListingUsers }).toEqual(before);
 });
 
@@ -181,4 +180,18 @@ it("schedules no-Session personal testers atomically without postponing an earli
   expect(await runTesterAccounts(store, options("remove", [account(), account(2)])))
     .toEqual({ created: 0, scheduled: 0, sessionsDeleted: 0, listingsArchived: 0 });
   expect(store.users).toEqual(before);
+});
+
+
+it("cleans Sessions and active personal inventory without postponing an earlier tester schedule", async () => {
+  const store = new FakeStore();
+  const earlier = new Date("2026-10-06T00:00:00Z");
+  store.users.push({ ...ownedUser(), deletionScheduledAt: earlier });
+  store.sessionUsers = [must(store.users[0]).id];
+  store.activeListingUsers = [...store.sessionUsers];
+  expect(await runTesterAccounts(store, options("remove")))
+    .toEqual({ created: 0, scheduled: 0, sessionsDeleted: 1, listingsArchived: 1 });
+  expect(must(store.users[0]).deletionScheduledAt).toEqual(earlier);
+  expect(await runTesterAccounts(store, options("remove")))
+    .toEqual({ created: 0, scheduled: 0, sessionsDeleted: 0, listingsArchived: 0 });
 });

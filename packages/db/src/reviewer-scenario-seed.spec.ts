@@ -7,6 +7,7 @@ import {
   type ReviewerScenarioSeedOptions,
   type ReviewerScenarioSeedStore,
   type ReviewerScenarioUser,
+  type ReviewerCredentialChange,
 } from "./reviewer-scenario-seed";
 
 const NOW = new Date("2026-08-09T12:00:00.000Z");
@@ -96,6 +97,36 @@ class FakeReviewerScenarioSeedStore implements ReviewerScenarioSeedStore {
   async findUserByEmail(email: string): Promise<ReviewerScenarioUser | null> {
     const id = this.usersByEmail.get(email);
     return id ? (this.users.get(id) ?? null) : null;
+  }
+
+  credentialFault: "sessions" | "devices" | "audit" | null = null;
+  async changeCredentials(input: ReviewerCredentialChange): Promise<string[]> {
+    const before = structuredClone(this);
+    try {
+      const ids: string[] = [];
+      for (const account of input.accounts) {
+        const user = this.users.get(account.id);
+        if (!user) continue;
+        if (user.role !== account.role || user.deletionScheduledAt !== null || !user.phoneVerifiedAt || !user.emailVerifiedAt) {
+          throw new Error("Unsupported reviewer source");
+        }
+        if (input.mode === "rotate" && user.phone === account.phone && user.email === account.email) continue;
+        ids.push(account.id);
+        if (input.mode === "revoke") await this.revokeUser({ id: account.id, revokedPhone: account.phone, displayName: account.displayName });
+        else await this.upsertUser({ ...account, email: account.email ?? "" });
+      }
+      if (this.credentialFault === "sessions") throw new Error("Session deletion refused");
+      await this.deleteSessionsByUserIds(ids);
+      if (this.credentialFault === "devices") throw new Error("Device invalidation refused");
+      await this.invalidatePushDevicesByUserIds(ids);
+      if (this.credentialFault === "audit") throw new Error("Credential audit refused");
+      await this.createAuditLog({ action: input.mode === "rotate" ? "REVIEWER_SCENARIO_ROTATE" : "REVIEWER_SCENARIO_REVOKE",
+        targetType: "reviewer_scenario", targetId: "store-review", details: input.mode === "rotate"
+          ? { mode: "seed", accountCount: input.accounts.length, seededUserIds: input.accounts.map(account => account.id),
+            rotatedUserIds: ids, occurredAt: input.now.toISOString() }
+          : { mode: "revoke", accountCount: ids.length, revokedUserIds: ids, occurredAt: input.now.toISOString() } });
+      return ids;
+    } catch (error) { Object.assign(this, before); throw error; }
   }
 
   async upsertUser(input: {
@@ -482,9 +513,12 @@ it("stores the seller's own sign-in phone so archived reviewer Listings can repu
   for (const listing of store.listings.values()) expect(listing.contactPhone).toBe("+99365000002");
 });
 
-it.each(["seed", "revoke"] as const)("refuses the entire unsupported reviewer %s plan before any scenario effect", async (mode) => {
+it.each(["seed", "revoke"] as const)("refuses a privileged final reviewer %s target before any scenario effect", async (mode) => {
   const store = new FakeReviewerScenarioSeedStore();
   await runReviewerScenarioSeed(store, seedOptions());
+  const last = store.users.get(reviewerScenarioSeedIds.buyerIds[1]);
+  if (!last) throw new Error("Missing final reviewer");
+  last.role = "admin";
   const before = structuredClone(store);
   const result = await runReviewerScenarioSeed(store, seedOptions({
     mode,
@@ -492,7 +526,7 @@ it.each(["seed", "revoke"] as const)("refuses the entire unsupported reviewer %s
     reviewDemoAccountsJson: reviewerJson(["+99365000001", "+99365000002", "+99365000903"]),
   }));
   expect(result.exitCode).toBe(1);
-  expect(result.message).toContain("unsupported");
+  expect(result.message).toMatch(/privileged|unsupported/);
   expect(structuredClone(store)).toEqual(before);
 });
 
@@ -530,4 +564,16 @@ it("converges displayName-only drift while preserving verified contacts and owne
   for (const user of store.users.values()) user.displayName = "Presentation drift";
   expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 0, rotatedUserIds: [] });
   expect([...store.users.values()]).toEqual(before);
+});
+
+
+it.each(["sessions", "devices", "audit"] as const)("rolls back every reviewer credential and security effect when %s fails", async fault => {
+  const store = new FakeReviewerScenarioSeedStore();
+  await runReviewerScenarioSeed(store, seedOptions());
+  store.credentialFault = fault;
+  const before = structuredClone(store);
+  await expect(runReviewerScenarioSeed(store, seedOptions({
+    reviewDemoAccountsJson: reviewerJson(["+99365000901", "+99365000902", "+99365000903"]),
+  }))).rejects.toThrow(/refused/);
+  expect(structuredClone(store)).toEqual(before);
 });

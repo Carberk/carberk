@@ -1,0 +1,78 @@
+{
+  "parent": "7f5738cb5eea3dd423a96e9786ca1ed6d4bdf763",
+  "status": "unverified-maintenance-source-only",
+  "originalPatchSha256": "3bd68b472b0bec113df56ef4c70050cd35afb1d6a39941e32f6c7cc4522e33ea",
+  "historicalMigrationCount": 98,
+  "historicalMigrationManifestSha256": "7e6c3b98ddd2a75ef4751be9ff8fb0fbe5b3a7926f3a27eb91e50e3801e78046",
+  "contractSha256": "12ed3eefc7f089db3c1d00acb2701e1c3cec9db357e26b9bad60724e26829f31",
+  "files": [
+    {
+      "path": "docs/evidence/issue-897/r7g-recovery-20261029/compatibility-source.md",
+      "sha256": "f1bf0392953ca002cd512f8d7013687121e7e152f441c9a3229d2ec6ffa7d59e"
+    },
+    {
+      "path": "docs/evidence/issue-897/r7g-recovery-20261029/maintenance-verification-plan.md",
+      "sha256": "869d0189d25cb4b8f2c38e7ded6cd84fb9b37e6b58fca09a3b8b89abc3703ea0"
+    },
+    {
+      "path": "packages/db/CONTEXT.md",
+      "sha256": "9ba8071dbb5a1b527fa5f92459905ce47434b648cc12625b1c6e971418e9b9aa"
+    },
+    {
+      "path": "packages/db/prisma/migrations/20261026016200_diagnostic_maintenance_compatibility/migration.sql",
+      "sha256": "2df3f065c49d06ca019c28cdb1b0647c1035951ba57efa68b844af3f3e1111a9"
+    },
+    {
+      "path": "packages/db/scripts/promote-admin.ts",
+      "sha256": "ed0a2a6b9b554e8f162140f135decf31610e832f5b0b088dfea3c51941b10fc8"
+    },
+    {
+      "path": "packages/db/scripts/reviewer-scenario-store.ts",
+      "sha256": "24cf79ba91044116c712b9b5807dde2dd052922386ee4691b7bcf46602d62ed9"
+    },
+    {
+      "path": "packages/db/scripts/reviewer-scenario.ts",
+      "sha256": "29fbd317569772c75373b819396c806cc5d803e3ce9ebd9b7e39c360c9a7effd"
+    },
+    {
+      "path": "packages/db/src/PrismaAdminPromotionStore.ts",
+      "sha256": "88d5a0a651e87cd962e42fe187a96305704f0eaf82995a402af04a3f5b9cf1fb"
+    },
+    {
+      "path": "packages/db/src/PrismaTesterAccountStore.ts",
+      "sha256": "c2e52d4c8f649c7603d3ae395cfa1618dc6e74037f42058aeecd920637ee2c5a"
+    },
+    {
+      "path": "packages/db/src/diagnostic-source-command.ts",
+      "sha256": "de430bdb2c90e6a5b92d07cd33fa152d12ed96b28bd15deb4ea6a818155f71a4"
+    },
+    {
+      "path": "packages/db/src/maintenance-source-command.ts",
+      "sha256": "4af974b2a1dba650f90e3cf89b4fde2f8a3ddac8bc0c1cd7402171b44324543d"
+    },
+    {
+      "path": "packages/db/src/promote-admin.spec.ts",
+      "sha256": "2d4fc9dfbaa6627d38fe67c9cee3de920e34a3c5758e1f1b1505feed47dbc62e"
+    },
+    {
+      "path": "packages/db/src/promote-admin.ts",
+      "sha256": "b841b504558ba07c166b232b87ed29544e03dc1446c3b25b5cae332316829242"
+    },
+    {
+      "path": "packages/db/src/reviewer-scenario-seed.spec.ts",
+      "sha256": "68a44b8375de048b79d2b5bf3f9672a8142b64b85a2c41fba00bcb7d1f71c042"
+    },
+    {
+      "path": "packages/db/src/reviewer-scenario-seed.ts",
+      "sha256": "21607cb16a312dea6491f459e694395d6a34b24d2adcff314bc41e77ac5b9099"
+    },
+    {
+      "path": "packages/db/src/tester-accounts.spec.ts",
+      "sha256": "4db79f2051a755d3a7a91e39e4c7e838340375b6c0b099b3e7cc5fa4c5328543"
+    },
+    {
+      "path": "packages/db/src/tester-accounts.ts",
+      "sha256": "02a35eda08d55de140d51615c81a497abde806c7a79f76a39601b191a9d9b90f"
+    }
+  ]
+}

@@ -10,7 +10,7 @@ export interface PromoteAdminUser {
 }
 
 export interface PromoteAdminDeps {
-  /** Reads lock exact selector results for reservation, dry-run, no-op and refusal checks. */
+  /** The adapter prepares before mutation locks and confirms read-only outcomes. */
   transaction<T>(work: (tx: PromoteAdminTransaction) => Promise<T>): Promise<T>;
 }
 
@@ -99,9 +99,9 @@ export async function runPromoteAdmin(
       };
     }
 
-    return {
-      exitCode: 1,
-      message: "Promotion refused: unsupported User.role promotion; no accepted finite operation covers role + audit DML",
-    };
+    await tx.updateUserRole(user.id, ADMIN_ROLE);
+    await tx.createAuditLog({ actorId: null, action: "ADMIN_BOOTSTRAP_PROMOTE", targetType: "user", targetId: user.id,
+      details: { reason: normalizedReason, before: { role: user.role }, after: { role: ADMIN_ROLE } } });
+    return { exitCode: 0, message: `Promoted user ${user.id} to admin` };
   });
 }

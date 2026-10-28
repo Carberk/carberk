@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 export interface TesterUser {
   id: string; phone: string | null; email: string | null; role: string;
-  phoneVerifiedAt: Date | null; emailVerifiedAt: Date | null; deletionScheduledAt: Date | null;
+  phoneVerifiedAt: Date | null; emailVerifiedAt: Date | null; deletionScheduledAt: Date | null; suspendedAt?: Date | null;
 }
 export interface TesterTransaction {
   findUsers(accounts: { id: string; phone: string; email: string }[]): Promise<TesterUser[]>;
@@ -74,6 +74,7 @@ export async function runTesterAccounts(store: TesterAccountStore, input: Tester
       if (!user || candidates.length !== 1 || user.id !== account.id || (user.role !== "buyer" && user.role !== "seller")) {
         throw new TesterAccountsRefused("unrelated or privileged User");
       }
+      if (user.suspendedAt != null) throw new TesterAccountsRefused("tester suspended");
       // Purge keeps the marker User but erases both methods. Removal remains retryable.
       if (input.mode === "remove" && user.phone === null && user.email === null && user.deletionScheduledAt === null) continue;
       if (user.phone !== account.phone || user.email !== account.email || user.phoneVerifiedAt === null || user.emailVerifiedAt === null) {
