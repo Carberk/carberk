@@ -14,7 +14,8 @@ function validateRequest(request) {
   if (!exact(request, ['operationId', 'candidate', 'identity']) || !hash(request.operationId, 32) || !hash(request.candidate, 40)) fail('exact quiescence request required');
   const p = request.identity;
   if (!exact(p, ['projectId', 'environmentId', 'environmentName', 'services', 'credentialScope', 'origins']) ||
-      !id(p.projectId) || !id(p.environmentId) || p.environmentName !== 'staging' || p.credentialScope !== `project:${p.projectId}:${p.environmentId}` ||
+      !id(p.projectId) || !id(p.environmentId) || p.environmentName !== 'staging' ||
+      !['project', 'cli-session'].some(mode => p.credentialScope === `${mode}:${p.projectId}:${p.environmentId}`) ||
       !exact(p.services, ['api', 'worker']) || !id(p.services.api) || !id(p.services.worker) || p.services.api === p.services.worker ||
       !exact(p.origins, ['api', 'database', 'media', 'publicMedia'])) fail('exact scoped staging identity required');
   for (const [kind, raw] of Object.entries(p.origins)) {

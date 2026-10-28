@@ -37,6 +37,54 @@ const count = value => Number.isSafeInteger(value) && value >= 0;
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const fail = message => { throw new Error(message); };
 
+/**
+ * Plan only from an adapter's exhausted object inventory. This pure input is
+ * neither caller authorization nor proof of pagination, byte hashes or closure.
+ * The adapter must bind approved reference bytes separately before execution.
+ */
+export function planObjects(inventory, approvedCatalog) {
+  const refused = () => fail('Object inventory refused');
+  const buckets = ['listing-photos', 'listing-videos', 'chat-attachments', 'catalog-assets', 'service-private', 'listing-video-private'];
+  const string = value => typeof value === 'string' && value.length > 0 && !/[\u0000-\u001f]/.test(value);
+  const version = row => exact(row, ['key', 'versionId', 'size', 'etag']) && string(row.key) &&
+    string(row.versionId) && count(row.size) && string(row.etag);
+  const identity = row => JSON.stringify([row.key, row.versionId]);
+  if (!exact(inventory, buckets) || !Array.isArray(approvedCatalog) || approvedCatalog.some(row => !version(row) || !row.key.startsWith('brands/'))) refused();
+  const approved = new Map(approvedCatalog.map(row => [identity(row), row]));
+  if (approved.size !== approvedCatalog.length) refused();
+  const result = { preserve: [], versions: [], deleteMarkers: [], multipart: [] };
+  for (const bucket of [...buckets].sort()) {
+    const snapshot = inventory[bucket];
+    if (!exact(snapshot, ['complete', 'versions', 'deleteMarkers', 'multipart']) || snapshot.complete !== true ||
+        !['versions', 'deleteMarkers', 'multipart'].every(kind => Array.isArray(snapshot[kind]))) refused();
+    const seen = new Set();
+    for (const kind of ['versions', 'deleteMarkers', 'multipart']) {
+      for (const row of snapshot[kind]) {
+        if (kind === 'versions' ? !version(row) : !exact(row, ['key', kind === 'multipart' ? 'uploadId' : 'versionId']) ||
+            !string(row.key) || !string(row[kind === 'multipart' ? 'uploadId' : 'versionId'])) refused();
+        // Versions and delete markers share an S3 version identity. Multipart
+        // uploads have a separate identity even when they use the same key.
+        const unique = JSON.stringify([kind === 'multipart' ? 'upload' : 'version', row.key, row.versionId ?? row.uploadId]);
+        if (seen.has(unique)) refused();
+        seen.add(unique);
+        if (bucket === 'catalog-assets' && row.key.startsWith('brands/')) {
+          const reference = approved.get(identity(row));
+          if (kind !== 'versions' || !reference || row.size !== reference.size || row.etag !== reference.etag) refused();
+          approved.delete(identity(row));
+          result.preserve.push({ bucket, ...row });
+        } else result[kind].push({ bucket, ...row });
+      }
+    }
+  }
+  if (approved.size) refused();
+  for (const rows of Object.values(result)) rows.sort((a, b) => {
+    const left = JSON.stringify([a.bucket, a.key, a.versionId ?? a.uploadId]);
+    const right = JSON.stringify([b.bucket, b.key, b.versionId ?? b.uploadId]);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+  return result;
+}
+
 function services(value) { return exact(value, ['api', 'worker']) && id.test(value.api) && id.test(value.worker); }
 
 /** Validates caller JSON. Only target identity and reservation claim are accepted. */
