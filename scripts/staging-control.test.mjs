@@ -37,6 +37,71 @@ test('oldest ready request wins within founder priority and keeps all authority 
   await assert.rejects(control.acquire(second), /reserved/);
 });
 
+test('OT-CLOSE-CURRENT-1 lost stop reply resumes the same operation and requires automatic exclusion, actual expiry and socket death', async t => {
+  const { control, platform, ledger, claim } = await setup(t);
+  const lease = await claim();
+  platform.configureCleanReset(lease.candidate);
+  platform.loseStopReply = true;
+  assert.equal(typeof control.cleanReset, 'function', 'The real controller must own current clean-reset closure');
+  await assert.rejects(control.cleanReset(lease), /retained|blocked|Lost stop/);
+  const pending = (await ledger.read()).state.reservation.operation;
+  assert.equal(pending.kind, 'clean-reset');
+  assert.equal(pending.phase, 'stop-intent');
+  const reconstructed = new StagingControl({ ...control, ledger, platform });
+  platform.reset.clock.ticksMs += 1000000;
+  platform.reset.clock.storageTimeMs += 1000000;
+  platform.reset.providerContract.automaticPaths.crash = 'restart-possible';
+  await assert.rejects(reconstructed.cleanReset(lease), /automatic|exclusion/);
+  platform.reset.providerContract.automaticPaths.crash = 'desired-zero';
+  await assert.rejects(reconstructed.cleanReset(lease), /horizon|issuance/);
+  assert.equal((await ledger.read()).state.reservation.operation.id, pending.id);
+  await assert.rejects(reconstructed.restore(lease), /in-flight/);
+  platform.reset.issuance = { families: ['v4'], expiresAtMs: 2000100, authorityDigest: '6'.repeat(64), clockEpoch: 'time-authority-1' };
+  platform.reset.clock.ticksMs += 200;
+  platform.reset.clock.storageTimeMs += 200;
+  platform.reset.storage.accepted = [{ id: 'accepted-before-expiry', epoch: 'minio-old' }];
+  platform.surviveDrain = true;
+  await assert.rejects(reconstructed.cleanReset(lease), /epoch|accepted|drain/);
+  assert.ok(platform.operations.every(effect => ['stop-applications', 'drain-storage'].includes(effect.kind)));
+  platform.surviveDrain = false;
+  const result = await reconstructed.cleanReset(lease);
+  assert.equal(result.phase, 'inventory-ready');
+  assert.equal(result.operationId, pending.id);
+  assert.equal((await ledger.read()).state.reservation.operation.id, pending.id);
+  assert.ok(platform.operations.every(effect => ['stop-applications', 'drain-storage'].includes(effect.kind)));
+  platform.reset.executions.push({ role: 'worker', deploymentId: 'automatic-rollout', instanceId: 'late-instance', bootId: 'late-boot', mode: 'business', candidate: lease.candidate });
+  await assert.rejects(reconstructed.cleanReset(lease), /execution|exclusion/);
+});
+
+test('current closure refuses changed authority, ambiguous CAS, clock discontinuity and strict expiry equality without data effects', async t => {
+  for (const fault of ['owner', 'candidate', 'target', 'generation', 'cas', 'clock', 'expiry']) {
+    const { control, platform, ledger, claim } = await setup(t);
+    const lease = await claim();
+    platform.configureCleanReset(lease.candidate);
+    assert.equal(typeof control.cleanReset, 'function', 'Current closure must be a controller operation');
+    if (fault === 'cas') {
+      const cas = ledger.compareAndSwap.bind(ledger);
+      ledger.compareAndSwap = async (...args) => { await cas(...args); return false; };
+      await assert.rejects(control.cleanReset(lease), /uncertain|changed/);
+      assert.deepEqual(platform.operations, []);
+      continue;
+    }
+    await assert.rejects(control.cleanReset(lease), /horizon|issuance/);
+    const record = await ledger.read();
+    if (fault === 'owner') record.state.reservation.owner = 'bob';
+    if (fault === 'candidate') record.state.reservation.candidate = 'b'.repeat(40);
+    if (fault === 'target') record.state.reservation.identity.environmentId = 'other';
+    if (fault === 'generation') record.state.reservation.operation.closureGeneration = 'f'.repeat(32);
+    if (['owner', 'candidate', 'target', 'generation'].includes(fault)) await ledger.compareAndSwap(record.revision, record.state);
+    platform.reset.issuance = { families: ['v4'], expiresAtMs: 1001000, authorityDigest: '6'.repeat(64), clockEpoch: 'time-authority-1' };
+    platform.reset.clock.ticksMs = 1000; platform.reset.clock.storageTimeMs = 1001000;
+    if (fault === 'clock') platform.reset.clock.epoch = 'new-clock-epoch';
+    await assert.rejects(control.cleanReset(lease), /owner|candidate|identity|generation|clock|expiry/);
+    assert.ok(platform.operations.every(effect => effect.kind === 'stop-applications'));
+    assert.notEqual((await ledger.read()).state.reservation, null);
+  }
+});
+
 test('fresh authoritative identity rejects wrong IDs, production, ambiguous origins and wrong credential scope before mutation', async(t) => {
   for (const change of [
     { projectId: 'wrong' }, { environmentId: 'production-id' }, { environmentName: 'production' },
