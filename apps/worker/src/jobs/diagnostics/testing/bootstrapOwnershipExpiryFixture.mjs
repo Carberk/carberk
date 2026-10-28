@@ -1,4 +1,4 @@
-// Source-only until the parent releases the serialized runtime interval.
+// Run only inside the parent-reserved task-local runtime interval.
 // From repo root, after sequential builds and task-owned service provisioning:
 // DIAGNOSTIC_WORKER_FIXTURE_OWNER_URL=... node .../bootstrapOwnershipExpiryFixture.mjs serve CONFIG.json
 // Stop this exact process after evidence collection, then run the same command with cleanup.
@@ -90,32 +90,42 @@ try {
     }
     const urls = roles.map((role, i) => { const url = new URL(ownerUrl); url.username = role; url.password = passwords[i]; return url.toString(); });
     const end = new Date(Date.now() + 3600_000), localized = { tk: "Syntetik", ru: "Синтетический", en: "Synthetic" };
-    const people = {};
-    // Cross-context principals/catalog only, as in the accepted original HTTP
-    // suite. No grant/component/observation/anchor/proof/request is backfilled.
-    for (const who of ["commissioner", "reception", "technician", "reviewer"]) {
-      const userId = randomUUID(), sessionId = randomUUID();
-      const phone = `+9936${BigInt(`0x${userId.replaceAll("-", "").slice(0, 12)}`).toString().slice(-7).padStart(7, "0")}`;
-      await owner.user.create({ data: { id: userId, phone, phoneVerifiedAt: new Date() } });
-      await owner.session.create({ data: { id: sessionId, userId, refreshTokenHash: randomUUID(), expiresAt: end, adminTotpExpiresAt: end } });
-      people[who] = { userId, sessionId };
-    }
-    const centerId = randomUUID(), listingIds = Array.from({ length: 102 }, () => randomUUID()), brandId = randomUUID(), modelId = randomUUID(), regionId = randomUUID(), cityId = randomUUID();
+    const people = {}, visits = [];
+    const brandId = randomUUID(), modelId = randomUUID(), regionId = randomUUID(), cityId = randomUUID();
     const names = { nameTk: "Synthetic", nameRu: "Synthetic", nameEn: "Synthetic" };
     await owner.brand.create({ data: { id: brandId, slug: brandId, ...names } });
     await owner.model.create({ data: { id: modelId, brandId, slug: modelId, ...names } });
     await owner.region.create({ data: { id: regionId, slug: regionId, ...names } });
     await owner.city.create({ data: { id: cityId, regionId, slug: cityId, ...names } });
     const vin = "SYN-OWNERSHIP";
-    for (const listingId of listingIds) {
-      await owner.listing.create({ data: { id: listingId, sellerId: people.commissioner.userId, brandId, modelId, cityId, vin,
+    // Explicit actor roots expand their retained inventories. Isolate visits at
+    // that boundary, not merely at Listing IDs. The comparison pair shares its
+    // original actors and center so both current staff assignments remain real.
+    // Only cross-context prerequisites are written here, never Orders or grants.
+    for (let index = 0; index < 102; index += 1) {
+      const group = {};
+      if (index === 1) Object.assign(group, visits[0].people);
+      else for (const who of ["commissioner", "reception", "technician", "reviewer"]) {
+        const userId = randomUUID(), sessionId = randomUUID();
+        const phone = `+9936${String(index * 4 + Object.keys(group).length).padStart(7, "0")}`;
+        await owner.user.create({ data: { id: userId, phone, phoneVerifiedAt: new Date() } });
+        await owner.session.create({ data: { id: sessionId, userId, refreshTokenHash: randomUUID(), expiresAt: end, adminTotpExpiresAt: end } });
+        group[who] = { userId, sessionId };
+      }
+      const centerId = index === 1 ? visits[0].centerId : randomUUID(), listingId = randomUUID();
+      await owner.listing.create({ data: { id: listingId, sellerId: group.commissioner.userId, brandId, modelId, cityId, vin,
         status: "active", priceAmount: 100000, priceTmt: 100000, priceCurrency: "TMT" } });
+      if (index !== 1) {
+        await owner.diagnosticCenter.create({ data: { id: centerId, code: centerId, names: localized } });
+        for (const [who, capability] of [["reception", "diagnostics.reception"], ["reception", "diagnostics.templates"], ["technician", "diagnostics.technician"], ["reviewer", "diagnostics.reviewer"]]) {
+          await owner.staffGrant.create({ data: { userId: group[who].userId, capability } });
+          await owner.diagnosticCenterAssignment.create({ data: { centerId, userId: group[who].userId, capability, qualifiedUntil: end } });
+        }
+      }
+      if (index === 0) Object.assign(people, group);
+      visits.push({ people: group, centerId, listingId });
     }
-    await owner.diagnosticCenter.create({ data: { id: centerId, code: centerId, names: localized } });
-    for (const [who, capability] of [["reception", "diagnostics.reception"], ["reception", "diagnostics.templates"], ["technician", "diagnostics.technician"], ["reviewer", "diagnostics.reviewer"]]) {
-      await owner.staffGrant.create({ data: { userId: people[who].userId, capability } });
-      await owner.diagnosticCenterAssignment.create({ data: { centerId, userId: people[who].userId, capability, qualifiedUntil: end } });
-    }
+    const allPeople = [...new Map(visits.flatMap(visit => Object.values(visit.people)).map(person => [person.userId, person])).values()];
     await owner.$transaction(async tx => {
       for (const t of triggers.filter(t => t.name.startsWith("diagnostic_source_") || t.name.startsWith("zz_diagnostic_source_") || t.name.startsWith("zzzz_campaign_preparation"))) {
         await tx.$executeRawUnsafe(`ALTER TABLE public.${quote(t.table)} ENABLE TRIGGER ${quote(t.name)}`);
@@ -138,22 +148,28 @@ try {
     finally { s3.destroy(); }
     const secret = randomUUID();
     const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private", APP_ENV: "test",
-        DIAGNOSTIC_SYNTHETIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_PUBLIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_USER_IDS: Object.values(people).map(p => p.userId) })] }),
+        DIAGNOSTIC_SYNTHETIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_PUBLIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_USER_IDS: allPeople.map(p => p.userId) })] }),
       EventEmitterModule.forRoot(), BullModule.forRoot({ connection: { url: redis.toString() } }), DiagnosticsModule, JwtModule.register({ global: true, secret })] }).compile();
     app = testing.createNestApplication(new FastifyAdapter());
     const jwt = app.get(JwtService);
     app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
     await app.listen(0, "127.0.0.1");
-    for (const p of Object.values(people)) p.token = jwt.sign({ sub: p.userId, sid: p.sessionId, role: "buyer" }, { expiresIn: "1h" });
+    for (const p of allPeople) p.token = jwt.sign({ sub: p.userId, sid: p.sessionId, role: "buyer" }, { expiresIn: "1h" });
     const apiUrl = await app.getUrl();
-    const response = await fetch(`${apiUrl}/api/v1/diagnostics/centers/${centerId}/templates`, { method: "POST",
-      headers: { authorization: `Bearer ${people.reception.token}`, "content-type": "application/json" }, signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({ expectedVersion: 0, synthetic: true, definition: { title: localized, limitations: localized, syntheticNotice: localized,
-        checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] } }) });
-    const body = await response.text();
-    await writeFile(join(root, "template-route.json"), JSON.stringify({ status: response.status, body }, null, 2), { flag: "wx" });
-    if (response.status !== 201) throw new Error("Ordinary template route refused");
-    const templateId = JSON.parse(body).id;
+    const templateRoutes = [];
+    for (const [index, visit] of visits.entries()) {
+      if (index === 1) { visit.templateId = visits[0].templateId; continue; }
+      const response = await fetch(`${apiUrl}/api/v1/diagnostics/centers/${visit.centerId}/templates`, { method: "POST",
+        headers: { authorization: `Bearer ${visit.people.reception.token}`, "content-type": "application/json" }, signal: AbortSignal.timeout(5000),
+        body: JSON.stringify({ expectedVersion: 0, synthetic: true, definition: { title: localized, limitations: localized, syntheticNotice: localized,
+          checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] } }) });
+      const body = await response.text();
+      templateRoutes.push({ index, status: response.status, body });
+      await writeFile(join(root, "template-route.json"), JSON.stringify(templateRoutes, null, 2));
+      if (response.status !== 201) throw new Error("Ordinary template route refused");
+      visit.templateId = JSON.parse(body).id;
+    }
+    const { centerId, templateId } = visits[0], listingIds = visits.map(visit => visit.listingId);
     const sourceAndLoadedFiles = [];
     for (const module of ["DiagnosticOwnershipGrants", "DiagnosticOwnershipCapture", "PrismaDiagnosticIntake", "PrismaDiagnosticContinuityProofs"]) {
       for (const path of [`apps/api/src/modules/diagnostics/infrastructure/${module}.ts`, `apps/api/dist/src/modules/diagnostics/infrastructure/${module}.js`]) {
@@ -172,8 +188,8 @@ try {
     const bootstrapReceipt = join(root, "bootstrap.json");
     const resourceIdentity = { ...config.resourceIdentity, apiPid: process.pid, apiUrl, bootstrapReceipt };
     await writeFile(bootstrapReceipt, JSON.stringify({ dependency, migrations, resourceIdentity, roles, people: Object.fromEntries(Object.entries(people).map(([who, p]) => [who, { userId: p.userId, sessionId: p.sessionId }])),
-      centerId, listingIds, templateId, vin, sourceAndLoadedFiles, loadedFiles, readiness: ready, clocks: "real advancing wall clock", commands: "Production template route; cross-context prerequisite writes listed in bootstrap source", cleanup: "Stop this process; run cleanup mode; destroy exact recorded task Compose project with volumes" }, null, 2), { flag: "wx" });
-    await writeFile(privatePath, JSON.stringify({ dependency, evidenceDir: root, resourceIdentity, apiUrl, centerId, templateId, listingIds, vin, people, sourceAndLoadedFiles }, null, 2), { mode: 0o600, flag: "wx" });
+      centerId, listingIds, templateId, vin, visits: visits.map(({ people: group, ...visit }) => ({ ...visit, people: Object.fromEntries(Object.entries(group).map(([who, person]) => [who, { userId: person.userId, sessionId: person.sessionId }])) })), sourceAndLoadedFiles, loadedFiles, readiness: ready, clocks: "real advancing wall clock", commands: "Production template route; cross-context prerequisite writes listed in bootstrap source", cleanup: "Stop this process; run cleanup mode; destroy exact recorded task Compose project with volumes" }, null, 2), { flag: "wx" });
+    await writeFile(privatePath, JSON.stringify({ dependency, evidenceDir: root, resourceIdentity, apiUrl, centerId, templateId, listingIds, vin, people, visits, sourceAndLoadedFiles }, null, 2), { mode: 0o600, flag: "wx" });
     await writeFile(join(root, "caller-env.private.json"), JSON.stringify({ apiDatabaseUrl: urls[0], workerDatabaseUrl: urls[1], producerDatabaseUrl: urls[2], producerConfig: privatePath }, null, 2), { mode: 0o600, flag: "wx" });
     // No polling or fabricated delay. Parent runs producer/test in this reserved
     // interval, then sends this exact process SIGTERM for graceful closure.

@@ -1,4 +1,4 @@
-// SOURCE ONLY until the parent assigns the compiler/native/HTTP interval.
+// Run only inside the parent-reserved task-local runtime interval.
 // Run from the repository root with the task's compiled DB package available:
 // node apps/worker/src/jobs/diagnostics/testing/produceOwnershipExpiryFixture.mjs CONFIG.json
 // CONFIG is private task-owned input; never include bearer tokens in evidence.
@@ -18,7 +18,7 @@ const config = JSON.parse(await readFile(configPath, "utf8"));
 const endpoint = new URL(config.apiUrl);
 const database = new URL(process.env.DATABASE_URL ?? "");
 if (endpoint.hostname !== "127.0.0.1" || database.hostname !== "127.0.0.1" || database.port === "5432" ||
-  config.dependency !== dependency || !config.resourceIdentity?.composeProject || !config.sourceAndLoadedFiles?.length || !Array.isArray(config.listingIds) || config.listingIds.length < 102) {
+  config.dependency !== dependency || !config.resourceIdentity?.composeProject || !config.sourceAndLoadedFiles?.length || !Array.isArray(config.listingIds) || config.listingIds.length < 102 || !Array.isArray(config.visits) || config.visits.length !== 102) {
   throw new Error("Pinned source and task-owned loopback resource identity required");
 }
 for (const who of ["commissioner", "reception", "technician", "reviewer"]) {
@@ -33,17 +33,19 @@ const db = new PrismaService();
 const root = config.evidenceDir;
 await mkdir(root, { recursive: true });
 const commands = [], orderIds = [], keys = [], dueGrantIds = [], derivedComponentIds = [], nonDueGrantIds = [], nonDueComponentIds = [];
+let currentPeople = config.people;
+const orderPeople = new Map();
 const started = Date.now(), deadline = started + 120_000;
 let cutoff;
 const persist = async name => writeFile(join(root, name), JSON.stringify({ dependency, resourceIdentity: config.resourceIdentity,
-  principals: Object.fromEntries(Object.entries(config.people).map(([key, p]) => [key, { userId: p.userId, sessionId: p.sessionId }])),
+  principals: config.visits.map(visit => Object.fromEntries(Object.entries(visit.people).map(([key, p]) => [key, { userId: p.userId, sessionId: p.sessionId }]))),
   startedAt: new Date(started).toISOString(), setupDeadline: new Date(deadline).toISOString(), cutoff: cutoff?.toISOString(), commands, orderIds, keys }, null, 2), { flag: "wx" });
 const request = async (who, method, path, body, status = 201, binary = false) => {
   const remaining = deadline - Date.now();
   if (remaining <= 0) throw new Error("Producer native120s setup deadline exceeded");
   const input = binary ? body : body === undefined ? undefined : JSON.stringify(body);
   const response = await fetch(new URL(`/api/v1/diagnostics/${path}`, endpoint), { method,
-    headers: { authorization: `Bearer ${config.people[who].token}`, ...(input === undefined ? {} : { "content-type": binary ? "application/octet-stream" : "application/json" }),
+    headers: { authorization: `Bearer ${currentPeople[who].token}`, ...(input === undefined ? {} : { "content-type": binary ? "application/octet-stream" : "application/json" }),
       ...(binary ? { "x-evidence-type": "image/png" } : {}) }, body: input, signal: AbortSignal.timeout(Math.min(5000, remaining)) });
   const text = await response.text();
   commands.push({ at: new Date().toISOString(), who, method, path, body: binary ? { bytes: body.length, sha256: hash(body) } : body,
@@ -56,13 +58,14 @@ const rights = end => ({ category: "vehicle_observation", purpose: "SYNTHETIC re
   basis: "SYNTHETIC source permission for task-owned generated visits", provenance: "Ordinary grant and classified observation routes",
   identifiability: "personal", use: ["service"], schedule: { kind: "until", until: end.toISOString(), reason: "Declared fixture retention end" },
   supplierRestrictions: "Synthetic service only", hold: null });
-const visit = async (listingId) => {
-  let order = await post("commissioner", "orders", { requestKey: randomUUID(), centerId: config.centerId,
-    templateVersionId: config.templateId, audience: "listing_public", listingId, synthetic: true });
-  orderIds.push(order.id);
+const visit = async fixture => {
+  currentPeople = fixture.people;
+  let order = await post("commissioner", "orders", { requestKey: randomUUID(), centerId: fixture.centerId,
+    templateVersionId: fixture.templateId, audience: "listing_public", listingId: fixture.listingId, synthetic: true });
+  orderIds.push(order.id); orderPeople.set(order.id, currentPeople);
   for (const [who, capability] of [["technician", "diagnostics.technician"], ["reviewer", "diagnostics.reviewer"]]) {
     order = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version,
-      userId: config.people[who].userId, capability, active: true });
+      userId: currentPeople[who].userId, capability, active: true });
   }
   for (const kind of ["physical", "publication"]) order = await post("reception", `orders/${order.id}/authorization`, {
     expectedVersion: order.version, kind, authorityReference: `SYNTHETIC ${kind} permission` });
@@ -70,6 +73,7 @@ const visit = async (listingId) => {
   return order;
 };
 const capture = async (order, grantEnd, componentEnd) => {
+  currentPeople = orderPeople.get(order.id);
   const grant = await post("commissioner", `orders/${order.id}/ownership-grant`, { rights: rights(grantEnd) });
   order = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, method: "vin", vin: config.vin,
     manualReference: null, observedAt: new Date().toISOString(), mileageKm: 123000, ownershipGrantId: grant.id,
@@ -80,6 +84,7 @@ const capture = async (order, grantEnd, componentEnd) => {
   return { order, grant, raw, component };
 };
 const structured = async captured => {
+  currentPeople = orderPeople.get(captured.order.id);
   const id = randomUUID();
   const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVR4nGP4z8AARwgWXg4ArpMP8aaUSCMAAAAASUVORK5CYII=", "base64");
   const end = new Date(cutoff.getTime() + 3600_000);
@@ -116,16 +121,18 @@ try {
   const [actor] = await db.$queryRawUnsafe("SELECT current_user::text AS role,rolsuper,rolbypassrls,EXISTS(SELECT 1 FROM pg_class WHERE relowner=(SELECT oid FROM pg_roles WHERE rolname=current_user) AND relnamespace='public'::regnamespace) AS owns FROM pg_roles WHERE rolname=current_user");
   if (!actor || actor.rolsuper || actor.rolbypassrls || actor.owns) throw new Error("Restricted nonowner producer readback role required");
   await writeFile(join(root, "loaded-bytes.json"), JSON.stringify({ dependency, files, migrations, actor, resourceIdentity: config.resourceIdentity }, null, 2), { flag: "wx" });
-  const sessions = await db.session.findMany({ where: { id: { in: Object.values(config.people).map(p => p.sessionId) } }, select: { id: true, userId: true, expiresAt: true } });
-  if (sessions.length !== 4 || sessions.some(row => row.expiresAt.getTime() <= deadline + 600_000)) throw new Error("All source/request Sessions must outlive expiry and validation");
-  for (const principal of Object.values(config.people)) {
+  const principals = [...new Map(config.visits.flatMap(visit => Object.values(visit.people)).map(person => [person.userId, person])).values()];
+  if (principals.length !== 404) throw new Error("Expected shared comparison pair and 100 independent principal groups");
+  const sessions = await db.session.findMany({ where: { id: { in: principals.map(p => p.sessionId) } }, select: { id: true, userId: true, expiresAt: true } });
+  if (sessions.length !== 404 || sessions.some(row => row.expiresAt.getTime() <= deadline + 600_000)) throw new Error("All source/request Sessions must outlive expiry and validation");
+  for (const principal of principals) {
     if (!sessions.some(row => row.id === principal.sessionId && row.userId === principal.userId)) throw new Error("Session principal mismatch");
   }
   const readiness = await db.$queryRawUnsafe("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign");
   if (!readiness[0]?.source || !readiness[0]?.campaign) throw new Error("Matched guards required throughout ordinary production");
   // Prepare visit authority first. No ownership is created until E is declared.
   const visits = [];
-  for (let i = 0; i < 102; i += 1) visits.push(await visit(config.listingIds[i]));
+  for (let i = 0; i < 102; i += 1) visits.push(await visit(config.visits[i]));
   // E is an actual immutable declaration, not a test clock jump. Abort rather
   // than extending E if route construction cannot finish before it.
   const horizon = 45_000;
