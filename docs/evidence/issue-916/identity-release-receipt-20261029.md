@@ -19,7 +19,7 @@ CPU released to coordinator after these runs. No database, Docker, device, brows
 
 Optional `releaseIdentity` inside immutable `snapshot.report`, version 1, no legacy defaults. Center id/localized names and safe vehicle method/display are captured at authorized finalization. Standard normalized 17-character VIN gets thirteen stars plus last four in both customer audiences. Nonstandard VIN and arbitrary manual references remain restricted. New manual releases require typed make/model/year supplied through existing finalize input; old issued snapshots remain unchanged. No mutable catalog-name reads, raw identity IDs, ownership/contact data or observation/proof hash changes.
 
-GREEN, rollback/retry, every-page locale inspection, legacy issued-byte hashes and full assembled acceptance remain pending. Independent assembled reviews, CI and deployed evidence belong to coordinator.
+Focused GREEN, rollback/retry, legacy issued-byte hashes and every-page locale inspection are recorded below. Full assembled acceptance, independent reviews, CI and deployed evidence remain with coordinator.
 
 ## Source checkpoint (verification pending)
 
@@ -51,3 +51,27 @@ For each of `@auto-tm/contracts`, `@auto-tm/db`, `@auto-tm/api`, `@auto-tm/worke
 Affected-file lint ran `pnpm exec eslint <exact changed .ts/.tsx paths relative to workspace> --max-warnings 0` inside each of those seven workspaces, deriving paths from `git diff --name-only b71e8412abce19e22ae6c1c6bea9b6e95402d683 HEAD`; all exited 0. `git diff --check` passed. Logs use `<workspace>-lint.txt`.
 
 No full repository tests, container-backed affected e2e, browser/device UI proof or deployed acceptance ran in this focused window. Those remain coordinator assembly gates; the twenty affected finalize fixture assertions have compiler/lint validation here, not executed database acceptance.
+
+## Every-page PDF proof at source `c35cfd4e19aca112b247611426857e69304102ed`
+
+The PDF skill was applied before creation and inspection. Its operation marker completed once with `--operation-kind create --expected-output-count 12 --output-format pdf`. The only source change since focused GREEN is an opt-in renderer test line retaining the exact snapshot JSON next to each proof PDF. No production source changed after the compiler/lint window.
+
+Literal configured command:
+
+```sh
+AUTO_TM_TEST_DATABASES=off DIAGNOSTIC_IDENTITY_PROOF_DIR=/Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/docs/evidence/issue-916/identity-20261029/pdf pnpm --filter @auto-tm/worker exec vitest run src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts --maxWorkers=1
+```
+
+Exit 0, 14 passed, 1.11 seconds. See [render log](identity-20261029/visual-render.txt). The default 5000 ms remains unchanged. This rerun also passed the original literal issued-byte SHA-256 assertions:
+
+- TK: `858e29b3df9bdb6f888971605ac1a4243e1c59dd3b9725c46817e795601b57b5`
+- RU: `59b988d5ca4a51c1c7f408a777be78ae40b54997cfeff6672ff5752eea610c53`
+- EN: `ef01ff5ef09ab09765338fea96062fb95a53d84873d0b9d96718c4134c722e27`
+
+The [visual manifest](identity-20261029/visual-manifest.json) records all 12 PDFs, exact snapshot JSON files, canonical snapshot hashes, snapshot-file hashes, PDF artifact hashes and all page-image hashes. The matrix is TK/RU/EN × buyer_private/listing_public × manual/VIN. Every PDF has three A4 pages, 36 pages total. Real embedded fonts and the production renderer were used. Poppler `pdftoppm -r 110 -png <pdf> <page-prefix>` produced 910 × 1287 pixel page images. Every page was individually viewed at that readable scale, rather than reviewing thumbnails or relying on extracted text.
+
+All 36 pages passed visual inspection. Page 1 shows localized center, human-readable Toyota Camry 2018 display, manual identification label or thirteen stars plus VIN last four, existing report reference, date/mileage/template and complete findings. Pages 2 and 3 retain all five body-map views, markers, headings and the report copy caveat. Turkmen, Cyrillic and Latin glyphs are intact. Page numbers and synthetic notices appear throughout. No clipping, overlap, black squares, missing glyphs or masking defects were observed. Existing whitespace and numeric coordinate formatting were left unchanged within the approved conformance scope.
+
+Extracted PDF text plus document information/metadata contain neither the full source VIN nor restricted field names `manualReference` and `identityRecordId`. Both customer audiences use the same safe VIN masking. Artifacts are synthetic evidence, not issued customer documents. Snapshots and PDF artifact hashes are distinct concepts; locale/audience variants may share bytes where their visible content is identical.
+
+CPU RELEASE was sent after rendering and inspection drained. No DB, Docker, native, browser, Metro, export bundle or SQL profile ran. Remaining acceptance includes PostgreSQL lock/race and affected container-backed e2e execution, independent assembled reviews, CI and deployed proof. Offline rollback/retry and unchanged legacy renderer bytes do not substitute for those gates.

@@ -1,0 +1,9 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/apps/worker
+
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  01:47:22
+   Duration  1.11s (tests 80%, import 17%, transform 3%)
+
