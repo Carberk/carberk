@@ -33,19 +33,20 @@ const db = new PrismaService();
 const root = config.evidenceDir;
 await mkdir(root, { recursive: true });
 const commands = [], orderIds = [], keys = [], dueGrantIds = [], derivedComponentIds = [], nonDueGrantIds = [], nonDueComponentIds = [];
-let currentPeople = config.people, currentEndpoint = endpoint;
-const orderPeople = new Map();
+const orderFixtures = new Map();
 const started = Date.now(), deadline = started + 120_000;
 let cutoff;
 const persist = async name => writeFile(join(root, name), JSON.stringify({ dependency, resourceIdentity: config.resourceIdentity,
   principals: config.visits.map(visit => Object.fromEntries(Object.entries(visit.people).map(([key, p]) => [key, { userId: p.userId, sessionId: p.sessionId }]))),
   startedAt: new Date(started).toISOString(), setupDeadline: new Date(deadline).toISOString(), cutoff: cutoff?.toISOString(), commands, orderIds, keys }, null, 2), { flag: "wx" });
-const request = async (who, method, path, body, status = 201, binary = false) => {
+const request = async (fixture, who, method, path, body, status = 201, binary = false) => {
+  const currentEndpoint = new URL(fixture.apiUrl);
+  if (currentEndpoint.hostname !== "127.0.0.1") throw new Error("Task-loopback visit API required");
   const remaining = deadline - Date.now();
   if (remaining <= 0) throw new Error("Producer native120s setup deadline exceeded");
   const input = binary ? body : body === undefined ? undefined : JSON.stringify(body);
   const response = await fetch(new URL(`/api/v1/diagnostics/${path}`, currentEndpoint), { method,
-    headers: { authorization: `Bearer ${currentPeople[who].token}`, ...(input === undefined ? {} : { "content-type": binary ? "application/octet-stream" : "application/json" }),
+    headers: { authorization: `Bearer ${fixture.people[who].token}`, ...(input === undefined ? {} : { "content-type": binary ? "application/octet-stream" : "application/json" }),
       ...(binary ? { "x-evidence-type": "image/png" } : {}) }, body: input, signal: AbortSignal.timeout(Math.min(5000, remaining)) });
   const text = await response.text();
   commands.push({ at: new Date().toISOString(), apiUrl: currentEndpoint.toString(), who, method, path, body: binary ? { bytes: body.length, sha256: hash(body) } : body,
@@ -53,20 +54,40 @@ const request = async (who, method, path, body, status = 201, binary = false) =>
   if (response.status !== status) throw new Error(`Ordinary route refused ${method} ${path}: ${response.status}`);
   return text ? JSON.parse(text) : undefined;
 };
-const post = (who, path, body) => request(who, "POST", path, body);
+const commandsFor = fixture => ({
+  post: (who, path, body) => request(fixture, who, "POST", path, body),
+  send: (who, method, path, body, status, binary) => request(fixture, who, method, path, body, status, binary),
+});
+// Keep every order's command/version sequence serial. Only disjoint actor/center
+// groups overlap, with deterministic index-to-result mapping and at most four
+// in-flight HTTP requests. Drain active work on failure before preserving state.
+const parallel = async (items, work) => {
+  const results = new Array(items.length);
+  let next = 0, stopped = false;
+  const outcomes = await Promise.allSettled(Array.from({ length: Math.min(4, items.length) }, async () => {
+    while (!stopped) {
+      const index = next++;
+      if (index >= items.length) return;
+      try { results[index] = await work(items[index], index); }
+      catch (error) { stopped = true; throw error; }
+    }
+  }));
+  const failed = outcomes.find(result => result.status === "rejected");
+  if (failed) throw failed.reason;
+  return results;
+};
 const rights = end => ({ category: "vehicle_observation", purpose: "SYNTHETIC restricted ownership continuity comparison",
   basis: "SYNTHETIC source permission for task-owned generated visits", provenance: "Ordinary grant and classified observation routes",
   identifiability: "personal", use: ["service"], schedule: { kind: "until", until: end.toISOString(), reason: "Declared fixture retention end" },
   supplierRestrictions: "Synthetic service only", hold: null });
-const visit = async fixture => {
-  currentPeople = fixture.people; currentEndpoint = new URL(fixture.apiUrl);
-  if (currentEndpoint.hostname !== "127.0.0.1") throw new Error("Task-loopback visit API required");
+const visit = async (fixture, index) => {
+  const { post } = commandsFor(fixture);
   let order = await post("commissioner", "orders", { requestKey: randomUUID(), centerId: fixture.centerId,
     templateVersionId: fixture.templateId, audience: "listing_public", listingId: fixture.listingId, synthetic: true });
-  orderIds.push(order.id); orderPeople.set(order.id, fixture);
+  orderIds[index] = order.id; orderFixtures.set(order.id, fixture);
   for (const [who, capability] of [["technician", "diagnostics.technician"], ["reviewer", "diagnostics.reviewer"]]) {
     order = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version,
-      userId: currentPeople[who].userId, capability, active: true });
+      userId: fixture.people[who].userId, capability, active: true });
   }
   for (const kind of ["physical", "publication"]) order = await post("reception", `orders/${order.id}/authorization`, {
     expectedVersion: order.version, kind, authorityReference: `SYNTHETIC ${kind} permission` });
@@ -74,8 +95,8 @@ const visit = async fixture => {
   return order;
 };
 const capture = async (order, grantEnd, componentEnd) => {
-  const fixture = orderPeople.get(order.id);
-  currentPeople = fixture.people; currentEndpoint = new URL(fixture.apiUrl);
+  const fixture = orderFixtures.get(order.id);
+  const { post } = commandsFor(fixture);
   const grant = await post("commissioner", `orders/${order.id}/ownership-grant`, { rights: rights(grantEnd) });
   order = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, method: "vin", vin: config.vin,
     manualReference: null, observedAt: new Date().toISOString(), mileageKm: 123000, ownershipGrantId: grant.id,
@@ -86,14 +107,14 @@ const capture = async (order, grantEnd, componentEnd) => {
   return { order, grant, raw, component };
 };
 const structured = async captured => {
-  const fixture = orderPeople.get(captured.order.id);
-  currentPeople = fixture.people; currentEndpoint = new URL(fixture.apiUrl);
+  const fixture = orderFixtures.get(captured.order.id);
+  const { post, send } = commandsFor(fixture);
   const id = randomUUID();
   const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVR4nGP4z8AARwgWXg4ArpMP8aaUSCMAAAAASUVORK5CYII=", "base64");
   const end = new Date(cutoff.getTime() + 3600_000);
   await post("technician", `orders/${captured.order.id}/identity-provenance`, { id, expectedOrderVersion: captured.order.version,
     contentType: "image/png", sizeBytes: image.length, rights: rights(end) });
-  await request("technician", "PUT", `orders/${captured.order.id}/identity-provenance/${id}?expectedOrderVersion=${captured.order.version}`, image, 200, true);
+  await send("technician", "PUT", `orders/${captured.order.id}/identity-provenance/${id}?expectedOrderVersion=${captured.order.version}`, image, 200, true);
   const p = await db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id } });
   keys.push(p.objectKey);
   const evidence = await post("technician", `orders/${captured.order.id}/identity-evidence`, { id: randomUUID(), expectedOrderVersion: captured.order.version,
@@ -134,24 +155,26 @@ try {
   const readiness = await db.$queryRawUnsafe("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign");
   if (!readiness[0]?.source || !readiness[0]?.campaign) throw new Error("Matched guards required throughout ordinary production");
   // Prepare visit authority first. No ownership is created until E is declared.
-  const visits = [];
-  for (let i = 0; i < 102; i += 1) visits.push(await visit(config.visits[i]));
+  const visits = [await visit(config.visits[0], 0), await visit(config.visits[1], 1),
+    ...await parallel(config.visits.slice(2), (fixture, index) => visit(fixture, index + 2))];
   // E is an actual immutable declaration, not a test clock jump. Abort rather
   // than extending E if route construction cannot finish before it.
   const horizon = 45_000;
   if (Date.now() + horizon > deadline) throw new Error("Insufficient native setup budget before declaration");
   cutoff = new Date(Date.now() + horizon);
-  const later = new Date(cutoff.getTime() + 3600_000), captured = [];
-  for (let i = 0; i < 100; i += 1) {
+  const later = new Date(cutoff.getTime() + 3600_000);
+  const captureOne = (order, index) => {
     if (Date.now() >= cutoff.getTime()) throw new Error("Declared rights ended before producer finished");
-    const item = await capture(visits[i], cutoff, cutoff); captured.push(item);
-    dueGrantIds.push(item.grant.id); derivedComponentIds.push(item.raw.id);
-  }
-  const independent = await capture(visits[100], later, cutoff);
-  const control = await capture(visits[101], later, later);
+    return capture(order, index < 100 ? cutoff : later, index < 101 ? cutoff : later);
+  };
+  const material = [await captureOne(visits[0], 0), await captureOne(visits[1], 1),
+    ...await parallel(visits.slice(2), (order, index) => captureOne(order, index + 2))];
+  const captured = material.slice(0, 100), independent = material[100], control = material[101];
+  dueGrantIds.push(...captured.map(item => item.grant.id)); derivedComponentIds.push(...captured.map(item => item.raw.id));
   nonDueGrantIds.push(independent.grant.id, control.grant.id); nonDueComponentIds.push(control.raw.id);
   const pa = await structured(captured[0]), pb = await structured(captured[1]);
   const reportId = randomUUID(), a = captured[0], b = captured[1];
+  const { post } = commandsFor(config.visits[0]);
   await post("technician", `orders/${a.order.id}/reports`, { reportId, expectedOrderVersion: a.order.version });
   await post("technician", `reports/${reportId}/findings`, { expectedVersion: 0, finding: { id: randomUUID(), checkId: "brakes", assessment: "normal",
     explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null } });
