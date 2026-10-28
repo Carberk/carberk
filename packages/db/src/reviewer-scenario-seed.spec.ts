@@ -115,6 +115,8 @@ class FakeReviewerScenarioSeedStore implements ReviewerScenarioSeedStore {
       phone: input.phone,
       email: input.email,
       role: input.role,
+      displayName: input.displayName, phoneVerifiedAt: new Date("2026-10-26T00:00:00Z"),
+      emailVerifiedAt: new Date("2026-10-26T00:00:00Z"), deletionScheduledAt: null,
     };
     this.users.set(input.id, row);
     this.usersByPhone.set(input.phone, input.id);
@@ -144,6 +146,13 @@ class FakeReviewerScenarioSeedStore implements ReviewerScenarioSeedStore {
   async invalidatePushDevicesByUserIds(userIds: string[]): Promise<number> {
     this.invalidatedDeviceUserIds.push(...userIds);
     return userIds.length;
+  }
+
+  async preflightSeed(input: { catalog: unknown; listings: { id: string; sellerId: string }[] }): Promise<string | null> {
+    return input.listings.some(target => {
+      const row = this.listings.get(target.id);
+      return row && row.sellerId !== target.sellerId;
+    }) ? "foreign Listing association" : null;
   }
 
   async upsertCatalog(): Promise<void> {
@@ -394,6 +403,7 @@ describe("runReviewerScenarioSeed", () => {
       phone: "+99365000001",
       email: "0001@autotm.bagtyyar.dev",
       role: "admin",
+      displayName: "Privileged", phoneVerifiedAt: null, emailVerifiedAt: null, deletionScheduledAt: null,
     });
     store.usersByPhone.set("+99365000001", reviewerScenarioSeedIds.buyerIds[0]);
 
@@ -470,4 +480,55 @@ it("stores the seller's own sign-in phone so archived reviewer Listings can repu
   const store = new FakeReviewerScenarioSeedStore();
   await runReviewerScenarioSeed(store, seedOptions());
   for (const listing of store.listings.values()) expect(listing.contactPhone).toBe("+99365000002");
+});
+
+it.each(["seed", "revoke"] as const)("refuses the entire unsupported reviewer %s plan before any scenario effect", async (mode) => {
+  const store = new FakeReviewerScenarioSeedStore();
+  await runReviewerScenarioSeed(store, seedOptions());
+  const before = structuredClone(store);
+  const result = await runReviewerScenarioSeed(store, seedOptions({
+    mode,
+    // The final account changes, so an implementation that mutates earlier slots fails equality.
+    reviewDemoAccountsJson: reviewerJson(["+99365000001", "+99365000002", "+99365000903"]),
+  }));
+  expect(result.exitCode).toBe(1);
+  expect(result.message).toContain("unsupported");
+  expect(structuredClone(store)).toEqual(before);
+});
+
+
+it.each(["displayName", "role", "deletionScheduledAt", "emailVerifiedAt"] as const)("preflights an unsupported final reviewer %s before changing earlier accounts", async field => {
+  const store = new FakeReviewerScenarioSeedStore();
+  await runReviewerScenarioSeed(store, seedOptions());
+  const user = store.users.get(reviewerScenarioSeedIds.buyerIds[1]);
+  if (!user) throw new Error("Missing reviewer");
+  if (field === "role") user.role = "seller";
+  else if (field === "displayName") user.displayName = "Changed name";
+  else if (field === "deletionScheduledAt") user.deletionScheduledAt = new Date("2026-10-26T00:00:00Z");
+  else user.emailVerifiedAt = null;
+  const before = structuredClone(store);
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 1, message: expect.stringContaining("unsupported") });
+  expect(structuredClone(store)).toEqual(before);
+});
+
+
+it("refuses a foreign fixed Listing before creating accounts, catalog or media", async () => {
+  const store = new FakeReviewerScenarioSeedStore();
+  const foreign = { id: reviewerScenarioSeedIds.primaryListingId, sellerId: "foreign", damaged: false, knownIssuesText: null };
+  store.listings.set(foreign.id, foreign);
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 1, message: expect.stringContaining("Listing association") });
+  expect([...store.users]).toEqual([]);
+  expect(store.catalogSeeded).toBe(false);
+  expect([...store.media]).toEqual([]);
+  expect([...store.listings.values()]).toEqual([foreign]);
+  expect(store.auditLogs).toEqual([]);
+});
+
+it("converges displayName-only drift while preserving verified contacts and ownership", async () => {
+  const store = new FakeReviewerScenarioSeedStore();
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 0 });
+  const before = structuredClone([...store.users.values()]);
+  for (const user of store.users.values()) user.displayName = "Presentation drift";
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 0, rotatedUserIds: [] });
+  expect([...store.users.values()]).toEqual(before);
 });

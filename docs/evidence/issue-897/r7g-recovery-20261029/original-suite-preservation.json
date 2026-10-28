@@ -1,0 +1,18 @@
+{
+  "packages/db/src/promote-admin.spec.ts": {
+    "sha256": "7e192bcaad52610a1cedbdf5bdb0cacbc22aef8d66583ee842aa940b7634d4ff",
+    "unchangedFromBase": true
+  },
+  "packages/db/tests/promote-admin.command.test.ts": {
+    "sha256": "bbc14328bd1725568d256966e6b8bcbb694c1eb0ef6aacec3932b7706e1cfb8f",
+    "unchangedFromBase": true
+  },
+  "packages/db/tests/tester-accounts.e2e.spec.ts": {
+    "sha256": "bac74594d8c0d0d1ccb8e8b8b5093ab5f52f2a843bb0f13e63a7cbc7f46c6f4c",
+    "unchangedFromBase": true
+  },
+  "packages/db/tests/demo-inventory.seed.test.ts": {
+    "sha256": "a7c1827625b391990f18d2e28c110c05017db15e0274b98321c54bb930e58607",
+    "unchangedFromBase": true
+  }
+}

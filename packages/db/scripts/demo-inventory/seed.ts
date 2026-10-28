@@ -1,4 +1,5 @@
 import type { PrismaClient } from "../../generated/prisma/client/client";
+import { deleteMaintenanceListings, upsertMaintenanceListing } from "../maintenance-listings";
 
 import { DEMO_CARS, DEMO_SELLERS, type DemoCar, type DemoSeller } from "./content";
 import { DEMO_PHOTO_MANIFEST, validateDemoInventory, type DemoPhotoManifest } from "./manifest";
@@ -174,13 +175,25 @@ export async function seedDemoInventory(deps: {
 
   const held = await prisma.user.findMany({
     where: { id: { startsWith: DEMO_ID_PREFIX } },
-    select: { id: true, phone: true, email: true, role: true },
+    select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true },
   });
   if (held.some(holdsRealSignInMethod)) {
     return refused("seed", "a seeded seller has gained a Sign-in Method");
   }
   if (held.some((user) => user.role !== "seller" && user.role !== "buyer")) {
     return refused("seed", "a seeded seller has become privileged");
+  }
+
+  const sellerById = new Map(sellers.map((seller) => [seller.id, seller]));
+  if (held.some((user) => !sellerById.has(user.id))) {
+    return refused("seed", "unsupported physical User DELETE in stale-seller plan; account_purge requires a surviving erasure UPDATE");
+  }
+  for (const user of held) {
+    const seller = sellerById.get(user.id);
+    if (!seller || user.role !== "seller" || user.phone !== demoSellerPhone(user.id) || user.email !== null ||
+        !user.phoneVerifiedAt || user.emailVerifiedAt !== null || user.deletionScheduledAt !== null) {
+      return refused("seed", "unsupported existing-source contact/role/deletion rotation");
+    }
   }
 
   const catalog = await loadCatalog(prisma);
@@ -190,6 +203,18 @@ export async function seedDemoInventory(deps: {
   }
 
   for (const seller of sellers) {
+    const existing = held.find(user => user.id === seller.id);
+    if (existing) {
+      if (existing.displayName !== seller.displayName) {
+        const changed = await prisma.user.updateMany({ where: {
+          id: existing.id, phone: existing.phone, email: existing.email, role: existing.role,
+          phoneVerifiedAt: existing.phoneVerifiedAt, emailVerifiedAt: existing.emailVerifiedAt,
+          deletionScheduledAt: existing.deletionScheduledAt,
+        }, data: { displayName: seller.displayName } });
+        if (changed.count !== 1) throw new Error("Demo seed refused: existing-source changed");
+      }
+      continue;
+    }
     const data = {
       phone: demoSellerPhone(seller.id),
       phoneVerifiedAt: new Date(seller.memberSince),
@@ -202,7 +227,7 @@ export async function seedDemoInventory(deps: {
       role: "seller" as const,
       createdAt: new Date(seller.memberSince),
     };
-    await prisma.user.upsert({ where: { id: seller.id }, update: data, create: { id: seller.id, ...data } });
+    await prisma.user.create({ data: { id: seller.id, ...data } });
   }
   const sellerIds = new Map(sellers.map((seller) => [seller.key, seller.id]));
 
@@ -271,8 +296,7 @@ export async function seedDemoInventory(deps: {
       damaged: car.damaged,
       knownIssuesText: car.knownIssuesText ?? null,
     };
-    await prisma.listing.upsert({
-      where: { id },
+    await upsertMaintenanceListing(prisma, {
       update: fields,
       create: {
         id,
@@ -291,12 +315,7 @@ export async function seedDemoInventory(deps: {
 
   // Converge: drop what an earlier run seeded and the content no longer lists.
   const listingIds = cars.map((_, index) => demoListingId(index));
-  await prisma.listing.deleteMany({
-    where: { sellerId: { startsWith: DEMO_ID_PREFIX }, id: { notIn: listingIds } },
-  });
-  await prisma.user.deleteMany({
-    where: { id: { startsWith: DEMO_ID_PREFIX, notIn: sellers.map((seller) => seller.id) } },
-  });
+  await deleteMaintenanceListings(prisma, { sellerId: { startsWith: DEMO_ID_PREFIX }, id: { notIn: listingIds } });
   const stale = (await storage.list(DEMO_OBJECT_PREFIX)).filter((key) => !expectedKeys.has(key));
   await storage.remove(stale);
 
