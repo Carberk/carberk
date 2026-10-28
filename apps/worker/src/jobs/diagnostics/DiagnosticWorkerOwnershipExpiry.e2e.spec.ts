@@ -123,21 +123,53 @@ describe.skipIf(!enabled)("full grant queue with independently due ownership", (
   it("rolls back a refused full queue, then disposes every grant-derived and independent due component", async () => {
     if (!owner) throw new Error("Missing fixture owner");
     const before = await retained(), cutoff = new Date(fixture.cutoff);
+    const phases: { phase: string; at: string; elapsedMs: number }[] = [];
+    const observations: unknown[] = [];
+    const started = Date.now();
+    const mark = async (phase: string) => {
+      phases.push({ phase, at: new Date().toISOString(), elapsedMs: Date.now() - started });
+      await writeFile(`${evidenceDir}/phases.json`, JSON.stringify(phases, null, 2));
+    };
+    // Read-only owner observation names no payload or credentials. Each sample
+    // records the actual worker statement and wait event, never a fixed sleep as
+    // race evidence. It runs only while the existing bounded caller is active.
+    let sampling = false;
+    const timer = setInterval(() => {
+      if (sampling || !owner) return;
+      sampling = true;
+      void owner.$queryRaw`SELECT pid,state,wait_event_type,wait_event,left(query,1200) AS query,
+        extract(epoch FROM clock_timestamp()-query_start)*1000 AS "statementMs"
+        FROM pg_stat_activity WHERE datname=current_database() AND usename=${role} AND state<>'idle'`
+        .then(rows => { observations.push({ elapsedMs: Date.now() - started, rows }); })
+        .catch((error: unknown) => { observations.push({ elapsedMs: Date.now() - started, observerError: String(error) }); })
+        .finally(() => { sampling = false; });
+    }, 50);
+    onTestFailed(async () => {
+      clearInterval(timer);
+      await writeFile(`${evidenceDir}/statement-observations.json`, JSON.stringify(observations, null, 2));
+      await mark("test-failed");
+    });
+    await mark("baseline-read");
     onTestFailed(async () => {
       await writeFile(`${evidenceDir}/failure-state.json`, JSON.stringify({ state: await retained(), receipts: await receipts() }, null, 2), { flag: "wx" });
     });
     await writeFile(`${evidenceDir}/before.json`, JSON.stringify(before, null, 2), { flag: "wx" });
     const worker = new DiagnosticArtifactWorker(db, new S3DiagnosticArtifactObjects(s3, "diagnostic-test-private"),
       { regular: Buffer.alloc(0), bold: Buffer.alloc(0) }, { now: () => cutoff, id: randomUUID, enabled: () => true });
+    await mark("privilege-revoke");
     await owner.$executeRawUnsafe(`REVOKE UPDATE ON diagnostic_ownership_grants FROM ${quote(role)}`);
     try {
       expect(await db.$queryRaw`SELECT has_table_privilege(current_user,'diagnostic_ownership_grants','UPDATE') AS allowed`).toEqual([{ allowed: false }]);
+      await mark("refused-cleanup-start");
       await expect(worker.cleanup()).rejects.toThrow("permission denied for table diagnostic_ownership_grants");
+      await mark("refused-cleanup-rejected");
       expect(await retained()).toEqual(before);
       expect(await receipts()).toEqual([{ source: 0, campaign: 0 }]);
     } finally { await owner.$executeRawUnsafe(`GRANT UPDATE ON diagnostic_ownership_grants TO ${quote(role)}`); }
     try {
+      await mark("accepted-cleanup-start");
       expect(await worker.cleanup()).toBe(0);
+      await mark("accepted-cleanup-finished");
       const after = await retained();
       const due = new Set(fixture.dueGrantIds), erased = new Set([...fixture.derivedComponentIds, fixture.independentComponentId]);
       const affectedOrders = new Set([...before.grants.filter(row => due.has(row.id)).map(row => row.orderId),
@@ -158,8 +190,13 @@ describe.skipIf(!enabled)("full grant queue with independently due ownership", (
       expect(after.proofs).toEqual(before.proofs.filter(row => !removedProofs.some(removed => removed.id === row.id)));
       expect(after.requests).toEqual(before.requests.filter(row => !removedRequests.has(row.id)));
       expect(await receipts()).toEqual([{ source: 0, campaign: 0 }]);
+      clearInterval(timer);
+      await writeFile(`${evidenceDir}/statement-observations.json`, JSON.stringify(observations, null, 2));
+      await mark("assertions-finished");
       await writeFile(`${evidenceDir}/after.json`, JSON.stringify(after, null, 2), { flag: "wx" });
     } catch (error) {
+      clearInterval(timer);
+      await writeFile(`${evidenceDir}/statement-observations.json`, JSON.stringify(observations, null, 2));
       await writeFile(`${evidenceDir}/first-failure.json`, JSON.stringify({ state: await retained(), receipts: await receipts(),
         error: error instanceof Error ? { message: error.message, stack: error.stack } : String(error) }, null, 2), { flag: "wx" });
       throw error;
