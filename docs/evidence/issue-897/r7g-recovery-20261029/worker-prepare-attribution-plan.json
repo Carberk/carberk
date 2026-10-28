@@ -1,0 +1,98 @@
+{
+  "status": "source-only attribution plan; measurement NOT STARTED",
+  "base": "ed69483382321485493a754c1d1e51c581470c01",
+  "maintenanceRerun": false,
+  "optimizationApplied": false,
+  "retainedResourceAccess": false,
+  "input": {
+    "sha256": "0cc55f9db0bbe795fb2a1c14e4d8b7bef3cb0b0a58ea3299facd1e4ee8990e22",
+    "operation": "ownership_expire",
+    "rows": 100,
+    "roots": 100,
+    "actorUserId": null,
+    "sessionId": null,
+    "selectedKeysEqualSavedBeforeDue100": true,
+    "expectedSourceEqualsBeforeAfterTypedTimestampNormalization": true,
+    "first10EqualCommitted10": true
+  },
+  "savedPrepareObservations": [
+    {
+      "intervalMs": [
+        0,
+        1683
+      ],
+      "samples": 31,
+      "firstMs": 101,
+      "lastMs": 1630,
+      "maxStatementMs": 1549.198,
+      "allWaitEventsNull": true
+    },
+    {
+      "intervalMs": [
+        1705,
+        4850
+      ],
+      "samples": 58,
+      "firstMs": 1784,
+      "lastMs": 4684,
+      "maxStatementMs": 2931.553,
+      "allWaitEventsNull": true
+    },
+    {
+      "intervalMs": [
+        4850,
+        5005
+      ],
+      "samples": 3,
+      "firstMs": 4886,
+      "lastMs": 4987,
+      "maxStatementMs": 125.964,
+      "allWaitEventsNull": true
+    }
+  ],
+  "savedRowCounts": {
+    "beforeAvailableGrants": 102,
+    "afterErasedGrants": 10,
+    "afterAvailableGrants": 92,
+    "afterSelectedAvailableGrants": 90
+  },
+  "evidenceArtifacts": {
+    "/tmp/897-r6c-recovery-20261029/ownership-batched-native/phases.json": "886b93754176512e160c5332cc1f04a6f9c5c66f217ecbefe37f16cc0cd31041",
+    "/tmp/897-r6c-recovery-20261029/ownership-batched-native/statement-observations.json": "3052140b17ae766eb7a54615f188756921f78ccfab132919f2d3373394904c6c",
+    "/tmp/897-r6c-recovery-20261029/ownership-batched-native/before.json": "510779e454b9bbbac1fd66f21aadcb9731f9eff8c0f7fc269551cbfb0d8dd50f",
+    "/tmp/897-r6c-recovery-20261029/ownership-batched-native/failure-state.json": "692667e7c50da49d447bd9c0d282c362e16e7dcbc470f26d8df95c843323245a"
+  },
+  "sourcePins": {
+    "packages/db/prisma/migrations/20261023130000_diagnostic_source_kernel/migration.sql": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf",
+    "packages/db/prisma/migrations/20261024010000_diagnostic_source_guard_repair/migration.sql": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3",
+    "packages/db/prisma/migrations/20261024020000_campaign_preparation/migration.sql": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429",
+    "packages/db/prisma/migrations/20261024030000_diagnostic_purge_effects/migration.sql": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba",
+    "packages/db/prisma/migrations/20261024040000_diagnostic_intake_effects/migration.sql": "9d9155637143e152ac63baf255d074fe768ff0c4bcb4ec041dd75b32404903a5",
+    "packages/db/prisma/migrations/20261024050000_diagnostic_kernel_invariants/migration.sql": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8",
+    "packages/db/prisma/migrations/20261024060000_diagnostic_source_correction/migration.sql": "55fa19d86c4f30d6c6abab96985dfbfb7bc30b0e6d928da1f63ba8fdbd13b7f6",
+    "packages/db/prisma/migrations/20261024070000_diagnostic_user_eligibility/migration.sql": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e",
+    "packages/db/prisma/migrations/20261024080000_diagnostic_moderation_complete_effects/migration.sql": "a82144b10637924c522188c2511fab6f906ee7ecc803875189155c3e8289e6c0",
+    "packages/db/prisma/migrations/20261024090000_diagnostic_message_enquiry_fences/migration.sql": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c",
+    "packages/db/prisma/migrations/20261024110000_diagnostic_user_insert_fence/migration.sql": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271",
+    "packages/db/prisma/migrations/20261024120000_diagnostic_account_noop_enquiry/migration.sql": "aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f",
+    "packages/db/prisma/migrations/20261024130000_diagnostic_intake_campaign_composition/migration.sql": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed",
+    "packages/db/prisma/migrations/20261025010000_diagnostic_report_source_effects/migration.sql": "a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9",
+    "packages/db/prisma/migrations/20261025015000_diagnostic_runtime_transport_corrections/migration.sql": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+    "packages/db/prisma/migrations/20261025017500_diagnostic_effect_scope_alias_correction/migration.sql": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f",
+    "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39",
+    "packages/db/prisma/migrations/20261026011000_diagnostic_bootstrap_capability_qualification/migration.sql": "d7265b92ba944af1a62055a6ffd6ce9316f1203b75384929a89c3da86f8ccc3d",
+    "packages/db/prisma/migrations/20261026014000_diagnostic_source_registry_evaluation/migration.sql": "6d3ea989e90a1169fa7f5b46cecfc6e4d1e0a23e8fde774916e54bb1d2592756",
+    "packages/db/prisma/migrations/20261026015000_diagnostic_component_expiry_representation/migration.sql": "e0b3068681544bb5e48d016047e8a7e4304b3a737fb9c6e17ef547897c90e6cf",
+    "packages/db/prisma/migrations/20261026016000_diagnostic_provenance_invalidation_parity/migration.sql": "87dd1162b90c334137859cbaf4afd61af068f50602a4ec438d041b22364e95b1"
+  },
+  "staticSourceCountsSuccessfulPrepare": {
+    "parse": 2,
+    "scope": 2,
+    "lockKeys": 2,
+    "effects": 1,
+    "disposalEffects": 5,
+    "disposalScope10Roots": 50,
+    "disposalScope100Roots": 500
+  },
+  "countsCaveat": "Successful-path source counts only; not measured function invocation or self-time. Early refusal may reduce counts."
+}
