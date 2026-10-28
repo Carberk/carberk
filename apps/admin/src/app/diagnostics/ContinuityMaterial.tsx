@@ -1,20 +1,22 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { DiagnosticSchemas as D } from "@auto-tm/contracts";
 
 import type { ContinuityCopy } from "./continuity-copy";
+import type * as Actions from "./actions";
 import type { DiagnosticCopy } from "./copy";
 
 import { useAdminLocale } from "@/lib/i18n";
 
-export const continuityButton = "min-h-11 rounded-md border border-text-secondary bg-background px-4 py-2 text-sm disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground hover:bg-accent hover:text-accent-foreground";
+export const continuityButton = "min-h-11 rounded-md border border-text-secondary bg-background px-4 py-2 text-sm disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100 hover:bg-accent hover:text-accent-foreground";
 export const continuityPrimary = `${continuityButton} bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground`;
-export const continuityField = "mt-2 min-h-12 w-full rounded-md border border-text-secondary bg-background px-3 py-2 text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
+export const continuityField = "mt-2 min-h-12 w-full rounded-md border border-text-secondary bg-background px-3 py-2 text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100";
 export function VisitFacts({ observation, c, locale }: { observation: NonNullable<D.DiagnosticOrder["observedVehicle"]>; c: DiagnosticCopy; locale: string }) {
  return <dl className="grid gap-2 break-words sm:grid-cols-[12rem_1fr]"><dt>{c.method}</dt><dd>{c[observation.method]}</dd><dt>{observation.method === "vin" ? c.vin : c.manualReference}</dt><dd className="break-all font-mono">{observation.method === "vin" ? observation.vin : observation.manualReference}</dd><dt>{c.observedAt}</dt><dd>{new Date(observation.observedAt).toLocaleString(locale==="tk"?"tk-TM":locale==="ru"?"ru-RU":"en-GB", { timeZone: "UTC" })} UTC</dd><dt>{c.mileage}</dt><dd>{observation.mileageKm.toLocaleString(locale)} km</dd></dl>;
 }
 /** No original image URLs enter this component. Fetch only our protected same-origin proxy. */
 export function ContinuityMaterial({ src, caption, c, denied, acknowledge, checked = false }: { src: string; caption: string; c: ContinuityCopy; denied(): void; acknowledge?(value: boolean): void; checked?: boolean }) {
+ const labelId = useId();
  const [open, setOpen] = useState(false), [url, setUrl] = useState(""), [error, setError] = useState(false), [loading, setLoading] = useState(false), [decoded,setDecoded]=useState(false), [zoom, setZoom] = useState(100);
  const opener = useRef<HTMLButtonElement>(null), heading = useRef<HTMLHeadingElement>(null), epoch = useRef(0), objectUrl = useRef("");
  useEffect(() => () => { epoch.current++; if (objectUrl.current) URL.revokeObjectURL(objectUrl.current); }, []);
@@ -35,9 +37,9 @@ export function ContinuityMaterial({ src, caption, c, denied, acknowledge, check
   finally { if (generation === epoch.current) setLoading(false); }
  }
  function close() { epoch.current++; setOpen(false); setLoading(false); setZoom(100); opener.current?.focus(); }
- return <div className="min-h-14 space-y-3 break-words border-b border-border py-3"><p>{caption}</p><button ref={opener} type="button" className={continuityButton} disabled={loading} onClick={() => void read()}>{c.reviewImage}</button>
- {acknowledge && <label className="flex min-h-12 items-center gap-3"><input aria-required="true" type="checkbox" checked={checked} disabled={!url || !decoded || error} onChange={e => acknowledge(e.target.checked)}/>{c.ack} · {c.required}</label>}
- {open && <section aria-label={caption} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); close(); } }} className="space-y-3 rounded-lg border border-border p-4"><h4 ref={heading} tabIndex={-1}>{caption}</h4>{loading && <p role="status">{c.reviewImage}…</p>}{error && <p role="alert">{c.unavailable}</p>}{url && <><div className="flex flex-wrap gap-2"><button className={continuityButton} onClick={() => setZoom(Math.min(400, zoom + 25))}>{c.zoomIn}</button><button className={continuityButton} onClick={() => setZoom(Math.max(100, zoom - 25))}>{c.zoomOut}</button><button className={continuityButton} onClick={() => setZoom(100)}>{c.resetZoom}</button><output>{zoom}%</output></div><div tabIndex={0} role="region" aria-label={caption} className="max-h-[32rem] overflow-auto border border-border bg-muted focus-visible:outline-2">{/* Retained sanitized evidence requires a native protected blob image. */}<img src={url} alt={caption} style={{ width: `${zoom}%`, maxWidth: "none" }} onLoad={()=>setDecoded(true)} onError={() => { setDecoded(false); setError(true); acknowledge?.(false); }}/></div></>}<button className={continuityButton} onClick={close}>{c.close}</button></section>}
+ return <div className="min-h-14 space-y-3 break-words border-b border-border py-3"><p id={`${labelId}-context`}>{caption}</p><button id={`${labelId}-open`} aria-labelledby={`${labelId}-open ${labelId}-context`} ref={opener} type="button" className={continuityButton} disabled={loading} onClick={() => void read()}>{c.reviewImage}</button>
+ {acknowledge && <label className="flex min-h-12 items-center gap-3"><input aria-labelledby={`${labelId}-ack ${labelId}-context`} aria-required="true" type="checkbox" checked={checked} disabled={!url || !decoded || error} onChange={e => acknowledge(e.target.checked)}/><span id={`${labelId}-ack`}>{c.ack} · {c.required}</span></label>}
+ {open && <section aria-label={caption} onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); close(); } }} className="space-y-3 rounded-lg border border-border p-4"><h4 ref={heading} tabIndex={-1}>{caption}</h4>{loading && <p role="status">{c.reviewImage}…</p>}{error && <p role="alert">{c.unavailable}</p>}{url && <><div className="flex flex-wrap gap-2"><button className={continuityButton} onClick={() => setZoom(Math.min(400, zoom + 25))}>{c.zoomIn}</button><button className={continuityButton} onClick={() => setZoom(Math.max(100, zoom - 25))}>{c.zoomOut}</button><button className={continuityButton} onClick={() => setZoom(100)}>{c.resetZoom}</button><output>{zoom}%</output></div><div tabIndex={0} role="region" aria-label={caption} className="max-h-[32rem] overflow-auto border border-border bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100">{/* Retained sanitized evidence requires a native protected blob image. */}<img src={url} alt={caption} style={{ width: `${zoom}%`, maxWidth: "none" }} onLoad={()=>setDecoded(true)} onError={() => { setDecoded(false); setError(true); acknowledge?.(false); }}/></div></>}<button className={continuityButton} onClick={close}>{c.close}</button></section>}
  </div>;
 }
 export function IdentityEvidenceDetails({ record, c, base }: { record: D.DiagnosticIdentityEvidence; c: ContinuityCopy; base: DiagnosticCopy }) {
@@ -46,7 +48,8 @@ export function IdentityEvidenceDetails({ record, c, base }: { record: D.Diagnos
 }
 
 /** Each field group keeps A and B adjacent at every viewport. Edges, never array position, define history. */
-export function IdentityComparison({predecessor,candidate,c,base}:{predecessor:D.DiagnosticComparisonIdentity;candidate:D.DiagnosticComparisonIdentity;c:ContinuityCopy;base:DiagnosticCopy}) {
+export function IdentityComparison({comparison,c,base}:{comparison:Extract<Awaited<ReturnType<typeof Actions.diagnosticReinspectionComparison>>,{ok:true}>["data"];c:ContinuityCopy;base:DiagnosticCopy}) {
+ const {identity:predecessor,...predecessorBindings}=comparison.predecessor, {identity:candidate,...candidateBindings}=comparison.candidate;
  const {locale}=useAdminLocale();
  function paired(label:string,a:ReactNode,b:ReactNode,key=label){return <section key={key} className="space-y-3"><h4 className="font-semibold">{label}</h4><div className="grid min-w-0 gap-6 lg:grid-cols-2">{[[c.previous,a],[c.current,b]].map(([side,value],index)=><dl key={index} className="min-w-0 space-y-2 [overflow-wrap:anywhere]"><dt className="font-medium">{side}</dt><dd className="whitespace-pre-wrap">{value??c.unavailable}</dd></dl>)}</div></section>;}
  function history(identity:D.DiagnosticComparisonIdentity) {
@@ -71,13 +74,13 @@ export function IdentityComparison({predecessor,candidate,c,base}:{predecessor:D
   {label:c.identifiability,value:r=>c[r.rights.identifiability]},{label:c.until,value:r=>format(r.rights.schedule.until)},
   {label:c.scheduleReason,value:r=>r.rights.schedule.reason},{label:c.restrictions,value:r=>r.rights.supplierRestrictions},
   {label:base.explanation,value:r=>r.correction?.explanation??null},
-  {label:base.currentActor,value:r=><details><summary className="min-h-11">{base.currentActor}</summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify({id:r.id,supersedesId:r.correction?.supersedesId??null,identityRecordId:r.identityRecordId,recordHash:r.recordHash,recordedBy:r.recordedBy,recordedAt:r.recordedAt,provenance:r.provenance},null,2)}</pre></details>},
+  {label:base.currentActor,value:r=><details><summary className="min-h-11">{base.currentActor}</summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify({id:r.id,orderId:r.orderId,orderVersion:r.orderVersion,observationHash:r.observationHash,supersedesId:r.correction?.supersedesId??null,identityRecordId:r.identityRecordId,recordHash:r.recordHash,recordedBy:r.recordedBy,recordedAt:r.recordedAt,provenance:r.provenance},null,2)}</pre></details>},
  ];
- return <div className="space-y-6"><h3>{c.raw}</h3><p>{c.previous} · {c.pinnedRaw}</p><p>{c.current} · {c.currentRaw}</p>{observationFields.map(item=>paired(item.label,item.value(predecessor.observation),item.value(candidate.observation)))}
+ return <div className="space-y-6">{paired(c.audit,<details><summary className="min-h-11">{c.audit}</summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify({...predecessorBindings,evidenceGeneration:predecessor.evidenceGeneration,correctionHeadHash:predecessor.correctionHeadHash,evidenceId:predecessor.evidence?.id??null},null,2)}</pre></details>,<details><summary className="min-h-11">{c.audit}</summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify({...candidateBindings,evidenceGeneration:candidate.evidenceGeneration,correctionHeadHash:candidate.correctionHeadHash,evidenceId:candidate.evidence?.id??null},null,2)}</pre></details>)}<h3>{c.raw}</h3><p>{c.previous} · {c.pinnedRaw}</p><p>{c.current} · {c.currentRaw}</p>{observationFields.map(item=>paired(item.label,item.value(predecessor.observation),item.value(candidate.observation)))}
  {paired(c.pinnedEvidence,predecessor.evidence?.id,candidate.evidence?.id)}
  {Array.from({length:Math.max(...sides.map(side=>side.length))},(_,index)=>{
   const a=sides[0]?.[index],b=sides[1]?.[index];
-  function role(record:D.DiagnosticIdentityEvidence|undefined,side:D.DiagnosticIdentityEvidence[],pin:string|undefined,previous=false){return record?<div><p>{record.correction?c.correction:c.root}</p><p>{side.some(item=>item.correction?.supersedesId===record.id)?c.superseded:c.currentLeaf}</p>{record.id===pin&&<p>{previous?c.pinnedPrevious:c.pinnedEvidence}</p>}<p className="font-mono">{record.id}{record.correction&&<> ← {record.correction.supersedesId}</>}</p></div>:null;}
+  function role(record:D.DiagnosticIdentityEvidence|undefined,side:D.DiagnosticIdentityEvidence[],pin:string|undefined,previous=false){return record?<div><p>{record.correction?c.correction:c.root}</p><p>{side.some(item=>item.correction?.supersedesId===record.id)?c.superseded:c.successorUnknown}</p>{record.id===pin&&<p>{previous?c.pinnedPrevious:c.pinnedEvidence}</p>}<p className="font-mono">{record.id}{record.correction&&<> ← {record.correction.supersedesId}</>}</p></div>:null;}
   return <section key={index} className="space-y-4 border-t border-border pt-4">{paired(c.identity,role(a,sides[0]??[],predecessor.evidence?.id,true),role(b,sides[1]??[],candidate.evidence?.id))}{observationFields.map(item=>paired(item.label,a?item.value(a.observation):null,b?item.value(b.observation):null))}{recordFields.map(item=>paired(item.label,a?item.value(a):null,b?item.value(b):null))}</section>;
  })}</div>;
 }

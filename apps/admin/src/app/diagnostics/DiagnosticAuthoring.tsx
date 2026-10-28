@@ -6,8 +6,8 @@ import { diagnosticAbandon, diagnosticSave, type DiagnosticResult } from "./acti
 import type { DiagnosticCopy } from "./copy";
 
 type Draft = Omit<D.DiagnosticFinding,"assessment"> & {assessment:D.DiagnosticFinding["assessment"]|""};
-const field="mt-1 min-h-11 w-full rounded-md border border-neutral-400 bg-white px-3 py-2";
-const button="min-h-11 rounded-md border border-neutral-400 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2";
+const field="mt-1 min-h-11 w-full rounded-md border border-neutral-400 bg-white px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100";
+const button="min-h-11 rounded-md border border-neutral-400 px-4 py-2 text-sm hover:bg-neutral-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100";
 export type DiagnosticPerform = (work:()=>Promise<DiagnosticResult<unknown>>) => Promise<boolean>;
 export function DiagnosticAuthoring({report,c,locale,editable,busy,conflict,perform,denied,onDirty}:{report:D.DiagnosticReportRecord;c:DiagnosticCopy;locale:"tk"|"ru"|"en";editable:boolean;busy:boolean;conflict:boolean;perform:DiagnosticPerform;denied:()=>void;onDirty:(value:boolean)=>void}) {
  const [draft,setDraft]=useState<Draft|null>(null),[message,setMessage]=useState<"noChanges"|"uploadError"|"invalidImage"|"error"|null>(null),[upload,setUpload]=useState<{file:File;id:string;failed:boolean}|null>(null),[uploading,setUploading]=useState(false);
