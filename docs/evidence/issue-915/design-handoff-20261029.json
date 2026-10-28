@@ -3,10 +3,12 @@
   "role": "design-writer",
   "base": "0617c7d094e4ab56e8631458cac258ad31756404",
   "branch": "agent/issue-915-candidate-a-staff-design-20261029",
-  "status": "wireframe-awaiting-independent-ux-review",
+  "fixBase": "0b375be73eabdf3cc4b851a206ff1e9ea8628f2f",
+  "priorIndependentReview": { "usability": 7, "discoverability": 8, "findings": "F1 severity 3; F2/F3 severity 2" },
+  "status": "bounded-wireframe-fix-awaiting-coordinator-diff-inspection",
   "wireframe": "docs/prd/ui/wireframes/diagnostic-staff-continuity.md",
   "evidence": "docs/evidence/issue-915/design-20261029.md",
-  "next": "Fresh read-only UX review on returned checkpoint SHA; coordinator adjudication before sequential hi-fi or production",
+  "next": "Coordinator fix-diff inspection and any affected independent recheck; no hi-fi, final copy or production yet",
   "runtimeAcceptance": "not-run",
   "cleanup": "retain-clean-checkpoint-worktree-and-branch; no-runtime-resources-created"
 }
