@@ -1,0 +1,56 @@
+{
+  "status": "refused-or-failed",
+  "phases": [
+    {
+      "name": "parse",
+      "elapsedMs": 735.836583,
+      "count": null,
+      "sha256": "a7518fe8d667fb113e0457e824143d2ceff1c2f7a1b63ab202fc04dae87ad48a"
+    },
+    {
+      "name": "scope",
+      "elapsedMs": 4492.417208,
+      "error": {
+        "code": "P0001",
+        "message": "diagnostic_source_scope_limit"
+      }
+    }
+  ],
+  "guardsUnchanged": true,
+  "rowsUnchanged": true,
+  "finalReceipts": {
+    "source_receipts": 0,
+    "campaign_receipts": 0
+  },
+  "rolledBack": true,
+  "poolDrained": true,
+  "artifacts": [
+    {
+      "name": "parse.private.json",
+      "sha256": "f5498c023d052a3c97b0358a45fbf1677663c6d147c934c33c8c4a87953084b1"
+    },
+    {
+      "name": "report.private.json",
+      "sha256": "248d0b0096209eff41b9e2df13c2d381ed243bc126a17144d2f367600c933ac9"
+    }
+  ],
+  "identity": {
+    "pid": 4870,
+    "read_only": "on",
+    "isolation": "read committed",
+    "guards_ready": true,
+    "source_receipts": 0,
+    "campaign_receipts": 0
+  },
+  "artifactHashes": {
+    "summary.json": "1fad34d2caaeeee2bb9db79d193f991191afa5ea817c6809629419347186f684",
+    "report.private.json": "248d0b0096209eff41b9e2df13c2d381ed243bc126a17144d2f367600c933ac9",
+    "parse.private.json": "f5498c023d052a3c97b0358a45fbf1677663c6d147c934c33c8c4a87953084b1",
+    "profile.cjs": "f690cf7bfefbfcff413d401c3ece6f1d9ac38f53870fe0e645b17860e424f6ee",
+    "offline-lower-bound.py": "349e4b8a8078e9a1a4e117e739a28f8a4bd5510a8bb7d992dd4874e59988aaf1",
+    "offline-lower-bound.json": "c67fb1d52c544eb9de0c18f4d5e2ab2a8f9d023fd22157a49fbeeabdf98b1c33"
+  },
+  "normalizedCommandSha256": "0cc55f9db0bbe795fb2a1c14e4d8b7bef3cb0b0a58ea3299facd1e4ee8990e22",
+  "sourceBase": "023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab",
+  "migration161Applied": false
+}
