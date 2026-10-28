@@ -83,7 +83,7 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     const migrations = readdirSync(`${packageDir}prisma/migrations`).sort().filter(name => name !== "migration_lock.toml")
       .map(name => ({ name, sha256: sha256(readFileSync(`${packageDir}prisma/migrations/${name}/migration.sql`)) }));
     expect(migrations).toHaveLength(99);
-    expect(sha256(JSON.stringify(migrations))).toBe("4a3315f44edfb6dc0533f0134ae0274ff031482a8b86437aac2d65cfacc61d52");
+    expect(sha256(JSON.stringify(migrations))).toBe("cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a");
     evidence.push({ kind: "source", migrations, pins: ["tests/maintenance-finite.r7g.e2e.spec.ts", "scripts/maintenance-listings.ts", "scripts/demo-inventory/application/testing/FakeObjectStore.ts", "src/account-source-command.ts", "src/maintenance-source-command.ts", "src/PrismaAdminPromotionStore.ts", "src/diagnostic-source-command.ts", "scripts/reviewer-scenario-store.ts", "scripts/promote-admin.ts", "scripts/ui-fixture.ts", "scripts/demo-inventory/seed.ts", "scripts/demo-inventory/remove.ts", "src/reviewer-scenario-seed.ts", "src/promote-admin.ts", "src/tester-accounts.ts", "src/PrismaTesterAccountStore.ts", "generated/prisma/client/client.ts", "dist/src/index.js", "../contracts/dist/index.js"]
       .map(path => ({ path, sha256: sha256(readFileSync(`${packageDir}${path}`)) })) });
     const supplied = process.env["R7G_MAINTENANCE_CONTROL_URL"];
@@ -104,7 +104,7 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     guardSnapshot = await guards();
     const applied = (await observer.query<{ name: string; sha256: string }>('SELECT migration_name AS name,checksum AS sha256 FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name')).rows;
     expect(applied).toHaveLength(99);
-    expect(sha256(JSON.stringify(applied))).toBe("4a3315f44edfb6dc0533f0134ae0274ff031482a8b86437aac2d65cfacc61d52");
+    expect(sha256(JSON.stringify(applied))).toBe("cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a");
     evidence.push({ kind: "database", databaseName, applied, guardSnapshot });
     drainOwner = trackPoolClientEnds(observer);
     owner = new PrismaClient({ adapter: new PrismaPg(observer) });
@@ -647,6 +647,66 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     const before = await snapshot();
     expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" }))
       .toMatchObject({ exitCode: 0, revokedUserIds: [] });
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("compound reviewer dirty repeat cleans new security dependencies without rewriting its tombstone", async () => {
+    const store = new PrismaReviewerScenarioSeedStore(db);
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" })).toMatchObject({ exitCode: 0 });
+    const id = must(parseReviewerScenarioAccounts(reviewerJson)[2]).id;
+    const tombstone = await db.user.findUniqueOrThrow({ where: { id } });
+    const foreignSessions = await db.session.findMany({ where: { userId: foreignId } });
+    const foreignDevices = await db.fcmDevice.findMany({ where: { userId: foreignId } });
+    await db.session.create({ data: { userId: id, refreshTokenHash: randomUUID(), expiresAt: new Date("2027-01-01") } });
+    await db.fcmDevice.create({ data: { userId: id, token: randomUUID(), platform: "ios" } });
+    const audits = await db.auditLog.count();
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" }))
+      .toMatchObject({ exitCode: 0, revokedUserIds: [id] });
+    expect(await db.user.findUniqueOrThrow({ where: { id } })).toEqual(tombstone);
+    expect(await db.session.count({ where: { userId: id } })).toBe(0);
+    expect(await db.fcmDevice.count({ where: { userId: id, invalidatedAt: null } })).toBe(0);
+    expect(await db.auditLog.count()).toBe(audits + 1);
+    expect(await db.session.findMany({ where: { userId: foreignId } })).toEqual(foreignSessions);
+    expect(await db.fcmDevice.findMany({ where: { userId: foreignId } })).toEqual(foreignDevices);
+    const clean = await snapshot();
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" })).toMatchObject({ exitCode: 0, revokedUserIds: [] });
+    expect(await snapshot()).toEqual(clean);
+  });
+
+  it("compound reviewer mixed repeat rolls back every slot and new security dependency on audit failure", async () => {
+    const store = new PrismaReviewerScenarioSeedStore(db);
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" })).toMatchObject({ exitCode: 0 });
+    const accounts = parseReviewerScenarioAccounts(reviewerJson);
+    const active = must(accounts[0]);
+    await store.upsertUser(active);
+    const revokedId = must(accounts[2]).id;
+    await db.session.create({ data: { userId: revokedId, refreshTokenHash: randomUUID(), expiresAt: new Date("2027-01-01") } });
+    await db.fcmDevice.create({ data: { userId: revokedId, token: randomUUID(), platform: "ios" } });
+    const before = await snapshot();
+    await observer.query(`CREATE FUNCTION r7g_repeat_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'r7g_repeat_fault'; END $$`);
+    await observer.query("CREATE TRIGGER r7g_repeat_fault BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION r7g_repeat_fault()");
+    try {
+      await expect(runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" })).rejects.toThrow("r7g_repeat_fault");
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      await observer.query("DROP TRIGGER r7g_repeat_fault ON audit_logs");
+      await observer.query("DROP FUNCTION r7g_repeat_fault()");
+    }
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" }))
+      .toMatchObject({ exitCode: 0, revokedUserIds: expect.arrayContaining([active.id, revokedId]) });
+    expect(await db.session.count({ where: { userId: revokedId } })).toBe(0);
+    expect(await db.fcmDevice.count({ where: { userId: revokedId, invalidatedAt: null } })).toBe(0);
+  });
+
+  it("compound reviewer tombstone display drift refuses the complete dirty repeat without effects", async () => {
+    const store = new PrismaReviewerScenarioSeedStore(db);
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" })).toMatchObject({ exitCode: 0 });
+    const id = must(parseReviewerScenarioAccounts(reviewerJson)[2]).id;
+    await db.user.update({ where: { id }, data: { displayName: "Unsupported tombstone" } });
+    await db.session.create({ data: { userId: id, refreshTokenHash: randomUUID(), expiresAt: new Date("2027-01-01") } });
+    const before = await snapshot();
+    expect(await runReviewerScenarioSeed(store, { ...reviewerOptions, mode: "revoke" }))
+      .toMatchObject({ exitCode: 1, message: expect.stringContaining("unsupported reviewer source") });
     expect(await snapshot()).toEqual(before);
   });
 

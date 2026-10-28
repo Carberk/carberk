@@ -1,0 +1,19 @@
+# Exact reviewer revoke-repeat closure
+
+Source-only continuation after runtime checkpoint `25be70c03ba7d4304805030e430e0a3be3127b35`, tree `5c5929d627a218f108f6d74f158228887f446163`. Its reached second-revoke RED remains in the runtime receipt. Coordinator accepted this closure under runbook80's removal of reviewer login reachability and independent contract61's real idempotency. No new authority, grants, public transport, historical migration, schema, budgets or assertions are selected.
+
+The domain predicate and162 SQL recognize only fixed roster ID/slot role, exact phone `revoked:<id>`, null email/emailVerifiedAt, exact displayName `Revoked <id>`, nonnull retained phoneVerifiedAt, null suspension and null deletion schedule. Partially tombstoned verification/contact drift is refused. Rotation behavior remains unchanged.
+
+The application still preflights the whole fixed roster and its catalog/Listing associations. The real adapter repeats that validation and checks expected source dates/ownership. For a clean whole roster, it discovers owned Session and active-device counts, revalidates, and returns empty IDs without User/security/audit DML or receipt preparation. For any active slot, new Session or active device, it prepares rows for every existing roster slot under one transaction. Unchanged tombstones have equal expected/next source tuples and receive no User UPDATE. Every existing slot participates in Session/device cleanup and the exact contact-free audit. The SQL parser accepts the same exact tombstone predicate, still requires the full five-slot revoke intent/roots and every existing User row, and retains the existing closure, locks, rediscovery and finite limits.
+
+Added real tests cover clean repeat whole-state/byte/audit equality; dirty repeat cleanup with unchanged tombstone and foreign security state; mixed active/revoked plan rollback at audit failure then complete cleanup; and displayName drift refusal before effects. The earlier real rotate/revoke, protected-field/parser negatives, rollback, original and race assertions remain. These additions and source repair have NOT been executed or compiled after the resource RELEASE. Do not inherit the earlier GREEN results onto this source.
+
+Current99 manifest SHA256: `cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a`. Additive162 SQL SHA256: `aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379`. No161 exists; historical98 and schema remain untouched. Exact file pins are in `reviewer-repeat-source.json`.
+
+## Next bounded verification request
+
+After coordinator releases R6c/reset slots, run scalar75, TS7/TS6 and affected lint first. Rebuild configured DB artifacts if needed. Then reserve the stopped isolated `candidatea-r7g` project at its retained dynamic ports60936/60937; never ownership7/shared services. Restart only these task services. Recreate the two original databases with `/tmp/897-r7g-runtime-20261029/rerun.cjs --fresh`, which also proves fresh99 migration replay. This candidate's162 hash differs from the previously loaded databases, so a mere migrate-deploy against the old retained databases is not valid proof.
+
+First runtime command: `R7G_RUN_LABEL=reviewer-repeat-green R7G_PATTERN='compound reviewer|strict maintenance parser|dormant maintenance' node /tmp/897-r7g-runtime-20261029/rerun.cjs --restricted`. The restricted suite creates fresh per-case databases, checks the current manifest and captures actual V8 loaded-source evidence. Preserve its exact first failure. Once focused checks pass, run the full restricted suite and original expanded suite with fresh databases sequentially. Keep native/kernel/HTTP/opposing proof/Session/device/purge races separate, explicit UNKNOWN until executed in reserved resources.
+
+Current task resources remain STOPPED, clients drained and source/campaign receipts0/0. No runtime/test/build/compiler invocation was started while writing this repair.
