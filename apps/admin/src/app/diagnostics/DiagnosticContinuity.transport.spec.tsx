@@ -323,7 +323,7 @@ it("reviews an out-of-order correction graph with its returned pin and issues th
  vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{if(new URL(String(args[0]),"http://localhost").pathname.endsWith("/reinspection-comparison")){const data=comparison();return Response.json({...data,predecessor:{...data.predecessor,identity:{...data.predecessor.identity,evidence:pin,corrections:[leaf,original]}}});}return real(...args);});
  setup();await compare();expect(screen.getByText(c.pinnedPrevious)).toBeTruthy();expect(screen.getByText("Pinned recorded correction")).toBeTruthy();expect(screen.getByText("Later supported correction")).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:c.technicians}));await screen.findByRole("option",{name:"Distinct Technician"});fireEvent.change(screen.getByRole("combobox",{name:`${c.select} · ${c.required}`}),{target:{value:technicianId}});fireEvent.change(screen.getByRole("textbox",{name:`${base.reason} · ${c.required}`}),{target:{value:"Complete original, pinned and later correction review"}});fireEvent.change(screen.getByRole("combobox",{name:`${c.method} · ${c.required}`}),{target:{value:"comparative_attestation"}});
  for(const opener of screen.getAllByRole("button",{name:new RegExp(`^${c.reviewImage}`)})){fireEvent.click(opener);const row=opener.closest("li") as HTMLElement;fireEvent.load(await within(row).findByRole("img"));fireEvent.click(within(row).getByRole("checkbox"));}
- fireEvent.click(screen.getByRole("checkbox",{name:`${c.same} · ${c.required}`}));fireEvent.click(screen.getByRole("button",{name:c.review}));fireEvent.click(screen.getByRole("button",{name:c.issue}));await screen.findByRole("button",{name:c.inspect});expect((writes.at(-1)?.body as D.DiagnosticContinuityRequestExecute & {kind:"issue"}).command.provenanceRecordIds).toEqual([uuid(100),uuid(102),uuid(101)]);
+ fireEvent.click(screen.getByRole("checkbox",{name:`${c.same} · ${c.required}`}));fireEvent.click(screen.getByRole("button",{name:c.review}));fireEvent.click(screen.getByRole("button",{name:c.issue}));await screen.findByRole("button",{name:c.inspect});expect((writes.at(-1)?.body as D.DiagnosticContinuityRequestExecute & {kind:"issue"}).command.provenanceRecordIds).toEqual([uuid(100),uuid(101),uuid(102)]);
 });
 it("offers only existing authorized assignment coordination when no technician name is usable",async()=>{
  names=[{userId:uuid(71),name:"Same name"},{userId:uuid(72),name:"same name"}];context.capabilities.push("diagnostics.reception");setup();await compare();fireEvent.click(screen.getByRole("button",{name:c.technicians}));await screen.findByText(c.noTechnician);expect(screen.getByRole("button",{name:c.review}).getAttribute("aria-disabled")).toBe("true");fireEvent.click(screen.getByRole("button",{name:c.coordinate}));await waitFor(()=>expect(screen.getByText(base.intake).closest("details")?.open).toBe(true));expect(document.activeElement?.textContent).toBe(base.intake);expect(writes).toEqual([]);
@@ -337,10 +337,10 @@ it("keeps the collapsed intake summary in native keyboard navigation", async () 
  expect(summary.getAttribute("tabindex")).not.toBe("-1");
  summary.focus(); expect(document.activeElement).toBe(summary);
 });
-it.each(["en","ru","tk"] as const)("names material controls with their localized side, record role, ordinal and location in %s",async(locale)=>{
+it.each(["en","ru","tk"] as const)("names material controls with their localized visit role, ordinal, kind and location only in %s",async(locale)=>{
  materials=2;setup(undefined,locale);const copy=continuityCopy[locale];
  fireEvent.click(await screen.findByRole("button",{name:copy.link}));fireEvent.click(screen.getByRole("button",{name:copy.search}));fireEvent.click(await screen.findByRole("button",{name:copy.compare}));
- const caption=`${copy.materials} 2 · ${copy.previous}: ${copy.root} · ${copy.manufacturer_plate} · Physical plate 0 · Observed B value`;
+ const caption=`${copy.materials} 2 · ${copy.imageLabel.replace("{visit}",copy.previous).replace("{kind}",copy.manufacturer_plate).replace("{location}","Physical plate 0")}`;
  const opener=await screen.findByRole("button",{name:`${copy.reviewImage} ${caption}`});
  const ack=screen.getByRole("checkbox",{name:`${copy.ack} · ${copy.required} ${caption}`});
  expect(ack.hasAttribute("disabled")).toBe(true);const association=opener.getAttribute("aria-labelledby");
@@ -547,4 +547,52 @@ it("offers no preparation while a lost prepare is undiscovered and stays fenced 
  await screen.findByText(c.uncertain);expect(screen.queryByRole("button",{name:c.issue})).toBeNull();expect(screen.queryByRole("button",{name:c.search})).toBeNull();
  await waitFor(()=>expect(screen.getByRole("button",{name:c.status}).hasAttribute("disabled")).toBe(false));fireEvent.click(screen.getByRole("button",{name:c.status}));await waitFor(()=>expect(receiptPages).toBe(2));
  expect(screen.queryByRole("button",{name:c.search})).toBeNull();release();await waitFor(()=>expect(receiptPages).toBe(3));expect(prepares).toBe(1);expect(writes.filter(item=>item.path.endsWith("/execute"))).toEqual([]);
+});
+
+// Durable command identity: a conflict or edit never discards the original request.
+function durableStub(onExecute:(input:D.DiagnosticContinuityRequestExecute,count:number)=>Response|undefined){
+ const real=fetch;const calls={prepares:0,executes:[] as {path:string;body:D.DiagnosticContinuityRequestExecute}[]};
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{const p=path(args[0]);
+  if(p.endsWith("/continuity-requests")&&args[1]?.method==="POST")calls.prepares++;
+  if(p.endsWith("/execute")){const body=JSON.parse(String(args[1]?.body)) as D.DiagnosticContinuityRequestExecute;calls.executes.push({path:p,body});const response=onExecute(body,calls.executes.length);if(response)return response;}
+  return real(...args);});
+ return calls;
+}
+async function reviewConsume(reason:string){fireEvent.change(await screen.findByRole("textbox",{name:`${base.reason} · ${c.required}`}),{target:{value:reason}});fireEvent.click(screen.getByRole("button",{name:c.reviewB}));fireEvent.click(screen.getByRole("button",{name:c.consume}));}
+async function checkStatus(){await waitFor(()=>expect(screen.getByRole("button",{name:c.status}).hasAttribute("disabled")).toBe(false));fireEvent.click(screen.getByRole("button",{name:c.status}));}
+it("an execute conflict retains the original request and frozen command for GET-first exact retry",async()=>{
+ const calls=durableStub((_,count)=>count===1?Response.json({code:"DIAGNOSTIC_CONFLICT"},{status:409}):undefined);
+ setup(proofId);await chooseHandoff();await reviewConsume("Original frozen reason");
+ await screen.findByText(c.uncertain);expect(screen.queryByRole("button",{name:c.retryExact})).toBeNull();
+ await checkStatus();fireEvent.click(await screen.findByRole("button",{name:c.retryExact}));await screen.findAllByRole("button",{name:c.result});
+ expect(calls.prepares).toBe(1);expect(calls.executes).toHaveLength(2);expect(calls.executes[1]).toEqual(calls.executes[0]);expect(calls.executes[0]?.path).toBe(`/api/v1/diagnostics/orders/${orderId}/continuity-requests/${requestId}/execute`);
+});
+it("editing after a pending GET re-enters the same request and recovers a late original commit without a second preparation",async()=>{
+ loseExecute=true;const calls=durableStub((_,count)=>{if(count===2){receipt={requestId,kind:"consume",state:"completed",result:{proofId,reportId}};return Response.json({code:"DIAGNOSTIC_CONFLICT"},{status:409});}return undefined;});
+ setup(proofId);await chooseHandoff();await reviewConsume("Original lost reason");await screen.findByText(c.uncertain);
+ await checkStatus();await screen.findByRole("button",{name:c.retryExact});
+ const operations=screen.getByRole("button",{name:c.retryExact}).parentElement as HTMLElement;fireEvent.click(within(operations).getByRole("button",{name:c.edit}));
+ expect(screen.queryByRole("button",{name:c.retryExact})).toBeNull();fireEvent.click(screen.getByRole("button",{name:c.check}));await chooseHandoff();await reviewConsume("Edited re-entry reason");
+ await screen.findByText(c.uncertain);expect(screen.queryByRole("button",{name:c.consume})).toBeNull();
+ await checkStatus();await screen.findAllByRole("button",{name:c.result});
+ expect(calls.prepares).toBe(1);expect(calls.executes.map(item=>item.path)).toEqual([0,1].map(()=>`/api/v1/diagnostics/orders/${orderId}/continuity-requests/${requestId}/execute`));
+ expect(calls.executes.map(item=>item.body.kind==="consume"&&item.body.command.reason)).toEqual(["Original lost reason","Edited re-entry reason"]);
+});
+it.each(["en","ru","tk"] as const)("names protected pair images only by visit role, identifier kind and location in %s",async locale=>{
+ setup(undefined,locale);const copy=continuityCopy[locale];
+ fireEvent.click(await screen.findByRole("button",{name:copy.link}));fireEvent.click(screen.getByRole("button",{name:copy.search}));fireEvent.click(await screen.findByRole("button",{name:copy.compare}));
+ const opener=await screen.findByRole("button",{name:new RegExp(`^${copy.reviewImage}`)});fireEvent.click(opener);const image=await screen.findByRole("img");
+ const label=(visit:string)=>copy.imageLabel.replace("{visit}",visit).replace("{kind}",copy.manufacturer_plate).replace("{location}","Physical plate 0");
+ expect(image.getAttribute("alt")).toBe(`${label(copy.previous)}; ${label(copy.current)}`);
+ for(const name of [image.getAttribute("alt")??"",opener.closest("li")?.textContent??""]){expect(name).not.toContain("Observed B value");expect(name).not.toContain(hash);expect(name).not.toContain(".png");}
+});
+it("freezes sorted provenance before the first command and retries that exact frozen order",async()=>{
+ const real=fetch;loseExecute=true;
+ vi.stubGlobal("fetch",async(...args:Parameters<typeof fetch>)=>{if(path(args[0]).endsWith("/reinspection-comparison")){const data=comparison();return Response.json({...data,predecessor:{...data.predecessor,identity:{...data.predecessor.identity,evidence:evidenceFixture(uuid(30),[uuid(105),uuid(101),uuid(103)])}}});}return real(...args);});
+ setup();await compare();await technicianDecision();
+ for(const opener of screen.getAllByRole("button",{name:new RegExp(`^${c.reviewImage}`)})){fireEvent.click(opener);const row=opener.closest("li") as HTMLElement;fireEvent.load(await within(row).findByRole("img"));fireEvent.click(within(row).getByRole("checkbox"));}
+ fireEvent.click(screen.getByRole("checkbox",{name:`${c.same} · ${c.required}`}));fireEvent.click(screen.getByRole("button",{name:c.review}));fireEvent.click(screen.getByRole("button",{name:c.issue}));await screen.findByText(c.uncertain);
+ await checkStatus();fireEvent.click(await screen.findByRole("button",{name:c.retryExact}));await screen.findByRole("button",{name:c.inspect});
+ const executes=writes.filter(item=>item.path.endsWith("/execute")).map(item=>(item.body as D.DiagnosticContinuityRequestExecute & {kind:"issue"}).command.provenanceRecordIds);
+ expect(executes).toEqual([[uuid(100),uuid(101),uuid(103),uuid(105)],[uuid(100),uuid(101),uuid(103),uuid(105)]]);
 });

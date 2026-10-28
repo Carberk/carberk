@@ -1,6 +1,7 @@
 // Proposed copy. Native EN/RU/TK and diagnostics terminology review remains required.
 export const continuityCopy = {
   "en": {
+    "imageLabel": "{visit}: {kind}, {location} — supporting image",
     "imageRights": "Rights for this supporting image",
     "imageRightsHelp": "This declaration covers the retained image only.",
     "recordRights": "Rights for this identity record",
@@ -151,6 +152,7 @@ export const continuityCopy = {
     "unlinked": "This starts a separate empty report without linking a previous inspection."
   },
   "ru": {
+    "imageLabel": "{visit}: {kind}, {location} — подтверждающее изображение",
     "imageRights": "Права на это подтверждающее изображение",
     "imageRightsHelp": "Эта декларация относится только к сохраняемому изображению.",
     "recordRights": "Права на эту запись идентификации",
@@ -301,6 +303,7 @@ export const continuityCopy = {
     "unlinked": "Создаётся отдельный пустой отчёт без связи с предыдущим осмотром."
   },
   "tk": {
+    "imageLabel": "{visit}: {kind}, {location} — tassyklaýjy surat",
     "imageRights": "Şu tassyklaýjy surata bolan hukuklar",
     "imageRightsHelp": "Bu beýannama diňe saklanýan surata degişlidir.",
     "recordRights": "Şu şahsyýet ýazgysyna bolan hukuklar",
