@@ -4,6 +4,7 @@
 // Completed replay is read-only. Pending recovery requires exact completed-marker proof.
 // No object/platform calls; the operator CLI/controller remain default closed.
 import { readFileSync } from 'node:fs';
+export { collectResetObjects, resetObjects, s3ResetStorage } from './staging-clean-reset-storage.mjs';
 
 import { QUEUES } from './staging-clean-reset.mjs';
 

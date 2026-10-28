@@ -163,6 +163,136 @@ export class StagingControl {
     if (digest(current.state.reservation) !== digest(expected)) throw new Error('Durable mutation authority changed');
     return current;
   }
+  /** Current closure only. Reaching inventory-ready authorizes no row/Redis/object effects or reopen. */
+  async cleanReset(claim) {
+    if (!claim || Object.keys(claim).sort().join() !== 'candidate,id' || !/^[a-f0-9]{32}$/.test(claim.id) || !sha(claim.candidate))
+      throw new Error('Exact clean-reset reservation claim required');
+    await this.platform.authorize(claim);
+    await this.attest();
+    let snapshot = await this.owned(claim, true);
+    let lease = snapshot.state.reservation;
+    if (lease.operation && lease.operation.kind !== 'clean-reset') throw new Error('Durable in-flight operation requires recovery');
+    const hex = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+    const named = value => typeof value === 'string' && /^[a-zA-Z0-9-]{1,100}$/.test(value);
+    const refused = message => { throw new Error(`Current closure refused: ${message}; ownership retained`); };
+    const immutable = operation => ({ id: operation.id, reservationId: operation.reservationId, owner: operation.owner,
+      candidate: operation.candidate, identity: operation.identity, baseline: operation.baseline });
+    if (!lease.operation) {
+      if (typeof this.platform.cleanResetBaseline !== 'function') refused('qualified execution boundary unavailable');
+      const baseline = await this.platform.cleanResetBaseline(structuredClone(lease));
+      if (!baseline || !['configurationDigest', 'referenceDigest', 'scopeDigest'].every(key => hex(baseline[key])) ||
+          !baseline.storage || !named(baseline.storage.serviceId) || !hex(baseline.storage.configurationDigest) ||
+          !Array.isArray(baseline.storage.epochs) || !baseline.storage.epochs.length || !baseline.storage.epochs.every(named) ||
+          !baseline.executor || baseline.executor.candidate !== lease.candidate || baseline.executor.mode !== 'maintenance-before-nest' ||
+          !hex(baseline.executor.entrypointDigest) || !named(baseline.providerContract?.revision)) refused('exact protected baseline unavailable');
+      // The baseline read does not admit an effect. Revalidate the durable owner
+      // after that external read, before recording the operation's intent.
+      const checked = await this.owned(claim, true);
+      if (checked.revision !== snapshot.revision) refused('authority changed during baseline');
+      const operation = { id: this.id(), kind: 'clean-reset', reservationId: lease.id, owner: lease.owner,
+        candidate: lease.candidate, identity: structuredClone(lease.identity), baseline: structuredClone(baseline), phase: 'stop-intent' };
+      if (!/^[a-f0-9]{32}$/.test(operation.id)) refused('invalid operation identity');
+      operation.closureGeneration = digest(immutable(operation)).slice(0, 32);
+      lease.operation = operation;
+      await this.write(snapshot, snapshot.state);
+      // An ambiguous CAS never reaches stop, even if its write actually landed.
+      snapshot = await this.owned(claim, true); lease = snapshot.state.reservation;
+    }
+    let operation = lease.operation;
+    const expectedGeneration = digest(immutable(operation)).slice(0, 32);
+    if (operation.reservationId !== lease.id || operation.owner !== this.actor || operation.candidate !== lease.candidate ||
+        digest(operation.identity) !== digest(lease.identity) || operation.closureGeneration !== expectedGeneration ||
+        !['stop-intent', 'closed', 'drain-intent', 'inventory-ready'].includes(operation.phase)) refused('operation authority or generation changed');
+    let expected = structuredClone(lease);
+    const authority = async () => {
+      await this.platform.authorize(claim);
+      await this.attest();
+      return this.mutationAuthority(claim, expected);
+    };
+    const save = async change => {
+      const current = await authority();
+      Object.assign(current.state.reservation.operation, change);
+      await this.write(current, current.state);
+      snapshot = await this.owned(claim, true); lease = snapshot.state.reservation; operation = lease.operation;
+      expected = structuredClone(lease);
+    };
+    const observe = async () => {
+      await authority();
+      const facts = await this.platform.observeCleanReset(structuredClone(lease), structuredClone(operation));
+      await authority();
+      const baseline = operation.baseline;
+      if (!facts || ['configurationDigest', 'referenceDigest', 'scopeDigest'].some(key => facts[key] !== baseline[key]) ||
+          facts.storage?.serviceId !== baseline.storage.serviceId || facts.storage.configurationDigest !== baseline.storage.configurationDigest ||
+          facts.providerContract?.revision !== baseline.providerContract.revision || digest(facts.executor) !== digest(baseline.executor))
+        refused('protected target, executor or configuration changed');
+      return facts;
+    };
+    const exclusion = facts => {
+      if (!facts.desired || Object.keys(facts.desired).sort().join() !== Object.keys(this.policy.services).sort().join() ||
+          Object.values(facts.desired).some(regions => !regions || !Object.keys(regions).length || Object.values(regions).some(count => count !== 0)))
+        refused('desired-zero exclusion unavailable');
+      const paths = facts.providerContract?.automaticPaths;
+      if (!paths || Object.keys(paths).sort().join() !== 'crash,cron,rollout,wake' || Object.values(paths).some(mode => mode !== 'desired-zero'))
+        refused('automatic execution exclusion unavailable');
+      if (!Array.isArray(facts.executions) || facts.executions.length !== 1 || digest(facts.executions[0]) !== digest(operation.baseline.executor))
+        refused('unexpected application execution or missing admitted executor');
+    };
+    const clock = facts => {
+      const c = facts.clock;
+      if (!c || !named(c.source) || !named(c.epoch) || ![c.ticksMs, c.storageTimeMs, c.errorMs].every(Number.isSafeInteger) ||
+          c.ticksMs < 0 || c.errorMs < 0) refused('trusted clock authority unavailable');
+      return c;
+    };
+    if (operation.phase === 'stop-intent') {
+      // Stop is repeatable only under this exact durable intent. A lost reply
+      // leaves it intact; a reconstructed coordinator observes the same IDs.
+      try { await this.platform.stopCleanReset(structuredClone(lease), structuredClone(operation), authority); }
+      catch { refused('stop reply unknown; current intent retained'); }
+      const facts = await observe(); exclusion(facts);
+      await save({ phase: 'closed', closedClock: clock(facts) });
+    }
+    let facts = await observe(); exclusion(facts);
+    const verifyWindow = facts => {
+      const currentClock = clock(facts), closedClock = operation.closedClock;
+      if (!closedClock || currentClock.source !== closedClock.source || currentClock.epoch !== closedClock.epoch ||
+          currentClock.ticksMs < closedClock.ticksMs ||
+          Math.abs((currentClock.storageTimeMs - closedClock.storageTimeMs) - (currentClock.ticksMs - closedClock.ticksMs)) > currentClock.errorMs + closedClock.errorMs)
+        refused('trusted clock continuity changed');
+      const horizon = facts.issuance;
+      if (!horizon || !Array.isArray(horizon.families) || horizon.families.length === 0 ||
+          new Set(horizon.families).size !== horizon.families.length || horizon.families.some(family => !['v2', 'v4', 'post-policy'].includes(family)) ||
+          !Number.isSafeInteger(horizon.expiresAtMs) || !hex(horizon.authorityDigest) || horizon.clockEpoch !== currentClock.epoch)
+        refused('actual issuance horizon unavailable');
+      if (operation.horizon && digest(operation.horizon) !== digest(horizon)) refused('issuance horizon changed');
+      // External ticks survive coordinator reconstruction; wall time alone never
+      // creates elapsed continuity. Equality remains unexpired after clock error.
+      const lowerTime = Math.min(currentClock.storageTimeMs - currentClock.errorMs,
+        closedClock.storageTimeMs - closedClock.errorMs + currentClock.ticksMs - closedClock.ticksMs - currentClock.errorMs);
+      if (lowerTime <= horizon.expiresAtMs) refused('grant expiry not strictly passed');
+      return horizon;
+    };
+    const horizon = verifyWindow(facts);
+    if (operation.phase === 'closed') await save({ phase: 'drain-intent', horizon: structuredClone(horizon) });
+    const drained = value => Array.isArray(value.storage.epochs) && value.storage.epochs.length === 1 &&
+      named(value.storage.epochs[0]) && !operation.baseline.storage.epochs.includes(value.storage.epochs[0]) &&
+      Array.isArray(value.storage.accepted) && value.storage.accepted.length === 0;
+    if (operation.phase === 'drain-intent') {
+      if (!drained(facts)) {
+        const beforeDrain = async () => { const current = await observe(); exclusion(current); verifyWindow(current); await authority(); };
+        try { await this.platform.drainCleanReset(structuredClone(lease), structuredClone(operation), beforeDrain); }
+        catch { refused('storage drain reply unknown; exact epoch intent retained'); }
+      }
+      facts = await observe(); exclusion(facts);
+      verifyWindow(facts);
+      if (!drained(facts)) refused('old storage epoch or accepted request survived drain');
+      await save({ phase: 'inventory-ready', storageEpoch: facts.storage.epochs[0] });
+    }
+    facts = await observe(); exclusion(facts);
+    verifyWindow(facts);
+    if (!drained(facts) || facts.storage.epochs[0] !== operation.storageEpoch) refused('storage epoch changed after drain');
+    return { operationId: operation.id, closureGeneration: operation.closureGeneration, phase: 'inventory-ready',
+      rowExecution: 'blocked-parent-lawful-reset-contract', reopened: false };
+  }
   async perform(claim, kind, restoring = false, profile) {
     let snapshot = await this.owned(claim);
     const selectedProfile = snapshot.state.reservation.fixtureProfile ?? 'listing-v1';

@@ -2,79 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as remote from './staging-clean-reset-remote.mjs';
+import { StorageBoundary } from './testing/fake-reset-storage.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const settings = { videoBucket: 'configured-video', diagnosticBucket: 'diagnostic-test-private' };
 const scope = () => ({ api: { ...settings }, worker: { ...settings }, unboundBuckets: ['outside'] });
 const reference = { bucket: 'catalog-assets', key: 'brands/acme/logo.webp', versionId: 'logo-v1', sha256: hash('approved-artwork') };
-const binding = () => ({ operationId: '1'.repeat(32), candidate: 'a'.repeat(40), closureGeneration: '2'.repeat(32),
-  projectId: 'project', environmentId: 'stage', endpoint: 'http://minio.railway.internal:9000', referenceDigest: hash(JSON.stringify([reference])) });
+const binding = () => ({ reservationId: '3'.repeat(32), owner: 'alice', storageEpoch: 'minio-new', configurationDigest: '5'.repeat(64), operationId: '1'.repeat(32), candidate: 'a'.repeat(40), closureGeneration: '2'.repeat(32),
+  projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2', endpoint: 'http://minio.railway.internal:9000', referenceDigest: hash(JSON.stringify([reference])) });
 
-/** One transparent S3 wire boundary. Lists use actual S3 response/marker names. */
-class StorageBoundary {
-  constructor() {
-    this.buckets = new Map(); this.effects = []; this.reads = []; this.pageSize = 1;
-    for (const name of ['listing-photos', 'listing-videos', 'chat-attachments', 'catalog-assets', 'business-chat-private',
-      'service-private', 'configured-video', 'diagnostic-test-private', 'outside']) this.buckets.set(name, { versions: [], markers: [], uploads: [], bytes: new Map() });
-    this.put('catalog-assets', reference.key, reference.versionId, 'approved-artwork');
-    this.put('listing-photos', 'pending/a.webp', 'v1', 'old');
-    this.put('listing-photos', 'pending/a.webp', 'v2', 'new');
-    this.put('business-chat-private', 'business-chat-private/a/b/original.webp', 'null', 'private-chat');
-    this.put('diagnostic-test-private', 'diagnostic-evidence/a/hash', 'd1', 'diagnostic');
-    this.put('outside', 'unowned-bytes', 'outside-v1', 'keep-foreign');
-    this.buckets.get('listing-photos').markers.push({ Key: 'pending/a.webp', VersionId: 'marker-v3' });
-    this.buckets.get('configured-video').uploads.push({ Key: 'video/v1/a/b/source.mp4', UploadId: 'upload-1' }, { Key: 'video/v1/a/c/source.mp4', UploadId: 'upload-2' });
-  }
-  put(bucket, Key, VersionId, bytes) {
-    const b = this.buckets.get(bucket);
-    b.versions.push({ Key, VersionId, Size: Buffer.byteLength(bytes), ETag: 'same-etag' });
-    b.bytes.set(JSON.stringify([Key, VersionId]), Buffer.from(bytes));
-  }
-  async send(operation, input) {
-    this.reads.push({ operation, input: structuredClone(input) });
-    if (operation === 'ListBuckets') return { Buckets: [...this.buckets.keys()].map(Name => ({ Name })) };
-    const b = this.buckets.get(input.Bucket);
-    if (!b) throw new Error('NoSuchBucket');
-    if (operation === 'GetBucketVersioning') return { Status: 'Enabled' };
-    if (operation === 'GetObject') return { Body: b.bytes.get(JSON.stringify([input.Key, input.VersionId])) };
-    if (operation === 'ListObjectVersions' || operation === 'ListMultipartUploads') {
-      const multipart = operation === 'ListMultipartUploads';
-      const id = multipart ? 'UploadId' : 'VersionId';
-      const all = (multipart ? b.uploads : [...b.versions.map(row => ({ ...row, kind: 'version' })), ...b.markers.map(row => ({ ...row, kind: 'marker' }))])
-        .sort((a, z) => JSON.stringify([a.Key, a[id]]).localeCompare(JSON.stringify([z.Key, z[id]])));
-      const marker = multipart ? input.UploadIdMarker : input.VersionIdMarker;
-      const start = input.KeyMarker === undefined ? 0 : all.findIndex(row => row.Key === input.KeyMarker && row[id] === marker) + 1;
-      const page = all.slice(start, start + this.pageSize);
-      const IsTruncated = start + page.length < all.length;
-      const tail = page.at(-1);
-      const output = multipart ? { Uploads: page } : { Versions: page.filter(row => row.kind === 'version').map(({ kind, ...row }) => row),
-        DeleteMarkers: page.filter(row => row.kind === 'marker').map(({ kind, ...row }) => row) };
-      Object.assign(output, { IsTruncated, ...(IsTruncated ? { NextKeyMarker: tail.Key,
-        [multipart ? 'NextUploadIdMarker' : 'NextVersionIdMarker']: tail[id] } : {}) });
-      return this.transformPage ? this.transformPage(operation, output, input) : output;
-    }
-    if (operation === 'AbortMultipartUpload') {
-      this.effects.push({ operation, input: structuredClone(input) });
-      b.uploads = b.uploads.filter(row => row.Key !== input.Key || row.UploadId !== input.UploadId);
-      if (this.loseAbort) { this.loseAbort = false; throw new Error('Lost abort reply'); }
-      return {};
-    }
-    if (operation === 'DeleteObjects') {
-      this.effects.push({ operation, input: structuredClone(input) });
-      const deleted = [];
-      for (const object of input.Delete.Objects) {
-        if (this.itemError) continue;
-        b.versions = b.versions.filter(row => row.Key !== object.Key || row.VersionId !== object.VersionId);
-        b.markers = b.markers.filter(row => row.Key !== object.Key || row.VersionId !== object.VersionId);
-        b.bytes.delete(JSON.stringify([object.Key, object.VersionId])); deleted.push(object);
-      }
-      if (this.loseDelete) { this.loseDelete = false; throw new Error('Lost delete reply'); }
-      return { $metadata: { httpStatusCode: 200 }, Deleted: deleted,
-        ...(this.itemError ? { Errors: input.Delete.Objects.map(row => ({ ...row, Code: 'AccessDenied' })) } : {}) };
-    }
-    throw new Error(`Unexpected storage operation ${operation}`);
-  }
-}
 const journal = () => ({ revision: 0, state: null,
   async read() { return { revision: this.revision, state: structuredClone(this.state) }; },
   async compareAndSwap(revision, state) { if (revision !== this.revision) return false; this.state = structuredClone(state); this.revision++; return true; },
@@ -83,7 +19,7 @@ const argumentsFor = storage => ({ storage, journal: journal(), binding: binding
 
 test('the collector exhausts all eight configured families, version and multipart marker pairs and checks exact reference bytes', async () => {
   assert.equal(typeof remote.collectResetObjects, 'function', 'The fixed reset boundary must collect actual S3 inventory');
-  const storage = new StorageBoundary();
+  const storage = new StorageBoundary(reference);
   const inventory = await remote.collectResetObjects(argumentsFor(storage));
   assert.equal(inventory.versions.length, 5);
   assert.deepEqual(inventory.multipart.map(row => row.uploadId), ['upload-1', 'upload-2']);
@@ -98,7 +34,7 @@ test('the collector exhausts all eight configured families, version and multipar
 test('unknown scope, incomplete pagination, ambiguous null versions and equal-ETag different artwork refuse', async () => {
   assert.equal(typeof remote.collectResetObjects, 'function');
   for (const fault of ['unknown-bucket', 'configuration', 'missing-marker', 'repeated-marker', 'null-version', 'unknown-prefix', 'artwork']) {
-    const storage = new StorageBoundary(), args = argumentsFor(storage);
+    const storage = new StorageBoundary(reference), args = argumentsFor(storage);
     if (fault === 'unknown-bucket') storage.buckets.set('unexplained-application', { versions: [], markers: [], uploads: [], bytes: new Map() });
     if (fault === 'configuration') args.scope.worker.videoBucket = 'other-video';
     if (fault === 'missing-marker') storage.transformPage = (_op, page) => { if (page.IsTruncated) delete page.NextKeyMarker; return page; };
@@ -115,7 +51,7 @@ test('unknown scope, incomplete pagination, ambiguous null versions and equal-ET
 test('durable exact object intent reconciles lost replies and subsets without enlarging the plan, completion replays read-only', async () => {
   assert.equal(typeof remote.resetObjects, 'function', 'The fixed reset boundary must own object recovery');
   for (const loss of ['loseAbort', 'loseDelete']) {
-    const storage = new StorageBoundary(), args = argumentsFor(storage);
+    const storage = new StorageBoundary(reference), args = argumentsFor(storage);
     storage[loss] = true;
     await assert.rejects(remote.resetObjects(args), /Storage reset/);
     const original = structuredClone(args.journal.state.plan);
@@ -134,7 +70,7 @@ test('durable exact object intent reconciles lost replies and subsets without en
 test('HTTP200 per-item errors, a new identity or changed authority cannot become object completion', async () => {
   assert.equal(typeof remote.resetObjects, 'function');
   for (const fault of ['item-error', 'new-identity', 'authority', 'binding']) {
-    const storage = new StorageBoundary(), args = argumentsFor(storage);
+    const storage = new StorageBoundary(reference), args = argumentsFor(storage);
     storage.loseAbort = true;
     await assert.rejects(remote.resetObjects(args), /Storage reset/);
     if (fault === 'item-error') storage.itemError = true;
@@ -146,4 +82,38 @@ test('HTTP200 per-item errors, a new identity or changed authority cannot become
     assert.notEqual(args.journal.state.phase, 'complete');
     if (fault !== 'item-error') assert.deepEqual(storage.effects, prior);
   }
+});
+
+test('the object intent admits an explicit storage epoch/configuration and detects journal change at an effect boundary', async () => {
+  const storage = new StorageBoundary(reference), args = argumentsFor(storage);
+  Object.assign(args.binding, { reservationId: '3'.repeat(32), owner: 'alice', storageEpoch: 'minio-new', configurationDigest: '5'.repeat(64) });
+  assert.equal((await remote.collectResetObjects(args)).binding.storageEpoch, 'minio-new');
+  let changed = false;
+  args.admit = async () => {
+    if (!changed && args.journal.state?.batches.length) {
+      changed = true;
+      args.journal.revision++;
+      args.journal.state = { ...args.journal.state, interruptedByOtherCoordinator: true };
+    }
+  };
+  await assert.rejects(remote.resetObjects(args), /Storage reset/);
+  assert.deepEqual(storage.effects, []);
+});
+
+test('a wrong staging target refuses before any storage read', async () => {
+  const storage = new StorageBoundary(reference), args = argumentsFor(storage);
+  args.binding.projectId = 'wrong-project';
+  await assert.rejects(remote.collectResetObjects(args), /Storage reset refused/);
+  assert.deepEqual(storage.reads, []);
+});
+
+test('a truncated page cannot skip identities using a cursor absent from that page', async () => {
+  const storage = new StorageBoundary(reference), args = argumentsFor(storage);
+  storage.transformPage = (operation, page, input) => {
+    if (input.KeyMarker === 'pending/skipped.webp') return { Versions: [], DeleteMarkers: [], IsTruncated: false };
+    if (operation === 'ListObjectVersions' && page.IsTruncated) return { ...page, NextKeyMarker: 'pending/skipped.webp', NextVersionIdMarker: 'unlisted-version' };
+    return page;
+  };
+  await assert.rejects(remote.collectResetObjects(args), /Storage reset refused/);
+  assert.deepEqual(storage.effects, []);
 });

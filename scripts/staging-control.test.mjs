@@ -102,6 +102,32 @@ test('current closure refuses changed authority, ambiguous CAS, clock discontinu
   }
 });
 
+test('current closure reconciles a lost drain reply but refuses issuance changing at the drain admission boundary', async t => {
+  for (const changedHorizon of [false, true]) {
+    const { control, platform, ledger, claim } = await setup(t);
+    const lease = await claim(); platform.configureCleanReset(lease.candidate);
+    await assert.rejects(control.cleanReset(lease), /horizon|issuance/);
+    platform.reset.issuance = { families: ['v4'], expiresAtMs: 1000100, authorityDigest: '6'.repeat(64), clockEpoch: 'time-authority-1' };
+    platform.reset.clock.ticksMs = 200; platform.reset.clock.storageTimeMs = 1000200;
+    if (changedHorizon) {
+      let reads = 0;
+      platform.beforeResetRead = async () => {
+        if (++reads === 2) platform.reset.issuance.expiresAtMs = 9000000;
+      };
+      await assert.rejects(control.cleanReset(lease), /horizon|expiry|drain/);
+      assert.equal(platform.operations.filter(effect => effect.kind === 'drain-storage').length, 0);
+    } else {
+      platform.loseDrainReply = true;
+      await assert.rejects(control.cleanReset(lease), /drain reply unknown/);
+      const pending = (await ledger.read()).state.reservation.operation;
+      assert.equal(pending.phase, 'drain-intent');
+      const restarted = new StagingControl({ ...control, ledger, platform });
+      assert.equal((await restarted.cleanReset(lease)).operationId, pending.id);
+      assert.equal(platform.operations.filter(effect => effect.kind === 'drain-storage').length, 1);
+    }
+  }
+});
+
 test('fresh authoritative identity rejects wrong IDs, production, ambiguous origins and wrong credential scope before mutation', async(t) => {
   for (const change of [
     { projectId: 'wrong' }, { environmentId: 'production-id' }, { environmentName: 'production' },
