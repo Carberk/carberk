@@ -1,0 +1,38 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/apps/api
+
+ ❯ src/common/media-conversion-maintenance.spec.ts (2 tests | 1 failed) 42ms
+   ❯ photo conversion maintenance (2)
+     × admits only an exact staging reset executor and refuses malformed binding before serving 33ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/common/media-conversion-maintenance.spec.ts > photo conversion maintenance > admits only an exact staging reset executor and refuses malformed binding before serving
+AssertionError: expected [Function] to throw an error
+
+- Expected:
+null
+
++ Received:
+undefined
+
+ ❯ src/common/media-conversion-maintenance.spec.ts:21:64
+     19|       try {
+     20|         for (const [key, value] of Object.entries({ ...env, ...change …
+     21|         expect(() => createMediaConversionMaintenanceServer()).toThrow…
+       |                                                                ^
+     22|       } finally { vi.unstubAllEnvs(); }
+     23|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  02:41:35
+   Duration  348ms (tests 39%, import 37%, transform 16%, setup 6%, worker 3%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ ccafc35f/apps/api
