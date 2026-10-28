@@ -1,0 +1,151 @@
+{
+  "checkpoint": "6ee05a50",
+  "held": "c7d6c37a04c0a214954aa8d8224d6a33a741db9c",
+  "base": "023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab",
+  "all18FilesByteIdenticalToHeld": true,
+  "files": {
+    "packages/db/CONTEXT.md": {
+      "sha256": "499d668ba6e9a32d556af9122f8b7400e4fa60d4c1d6e57725cecd6ae3f68f44",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/demo-inventory/application/testing/FakeObjectStore.spec.ts": {
+      "sha256": "beaa1e9c6c7663643f4203d4966ad258f28d9ebd0dd8d935c75c2c5508bc8419",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/demo-inventory/application/testing/FakeObjectStore.ts": {
+      "sha256": "06fb503155102c3df9fa0cef4e8368156aa5682f07b33773cf0007985bfa9f44",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/demo-inventory/remove.ts": {
+      "sha256": "882bf15fabf769a4dae4d9c42de36b4fc71488da0a436e0e5bd814903a62ae6b",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/demo-inventory/seed.ts": {
+      "sha256": "62af3bca74e6532ebc059a518e9feb9ef98d4104bfefd14186e671b5fa58489d",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/maintenance-listings.ts": {
+      "sha256": "9cfa53471d5583579f0e82f72e405eb0f1690eb581edb8ed64bf352cac5ee9bd",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/promote-admin.ts": {
+      "sha256": "a908cb36c05bfe3aee64e8bd11c5c943974294be3c030700d0995538706e11ef",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/reviewer-scenario-store.ts": {
+      "sha256": "67deb249487696596ca65b7d4e2d4d3505cb3fb41c4de99a7e99176c5001f06e",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/reviewer-scenario.ts": {
+      "sha256": "ff103e69e1a19034f3f5acef56d0eab71538ff123823719f8cc11282a8a3fdaa",
+      "matchesHeldLineage": true
+    },
+    "packages/db/scripts/ui-fixture.ts": {
+      "sha256": "b7668ddfcc699d556e1400505a862f863c17c9c2b3996c78191c87c60e7b6049",
+      "matchesHeldLineage": true
+    },
+    "packages/db/src/PrismaTesterAccountStore.ts": {
+      "sha256": "3d4f30debb5f81e403c773712dd673e9c3865708c3bf9597cc41018eb7b29f7d",
+      "matchesHeldLineage": true
+    },
+    "packages/db/src/promote-admin.spec.ts": {
+      "sha256": "d7bfad0c286c6e289b60114b1073c9bab958e12abc364c27c60c47cd59266a44",
+      "matchesHeldLineage": true
+    },
+    "packages/db/src/promote-admin.ts": {
+      "sha256": "39246609bafaf668bf28aba47e72d43ffa239b293cbb56c893a4d7324bcc9b39",
+      "matchesHeldLineage": true
+    },
+    "packages/db/src/reviewer-scenario-seed.spec.ts": {
+      "sha256": "406fbe73655c7bc0e3a5af65cc36655b8340ded40a446a6ba501635f850e4743",
+      "matchesHeldLineage": true
+    },
+    "packages/db/src/reviewer-scenario-seed.ts": {
+      "sha256": "dbbd06f00ab812e184df6ce204bb394517f33328f3256ed942f78dd4bfa18e26",
+      "matchesHeldLineage": true
+    },
+    "packages/db/src/tester-accounts.spec.ts": {
+      "sha256": "c5cabc4d0bdad46a1760978c207f390e3bcf1c96b4aec228dc33f664d74e1717",
+      "matchesHeldLineage": true
+    },
+    "packages/db/src/tester-accounts.ts": {
+      "sha256": "cd59e27ddc57b358b689b24fce37231ff39dbde7eaef6d9762522842d098ccad",
+      "matchesHeldLineage": true
+    },
+    "packages/db/tests/maintenance-finite.r7g.e2e.spec.ts": {
+      "sha256": "231d39ad94e5398541066686e0615c2b8966ddfdb447de64cb622512864798e6",
+      "matchesHeldLineage": true
+    }
+  },
+  "prerequisitePatch": "/tmp/897-r7g-recovery-20261029-prerequisite.patch",
+  "prerequisitePatchSHA256": "e5941f1cab4718fdce22b67dd16143df853dde1a9f2f9f6f3d21e028bc9ccfc0",
+  "redCommand": "pnpm --filter @auto-tm/db exec vitest run src/promote-admin.spec.ts src/reviewer-scenario-seed.spec.ts src/tester-accounts.spec.ts scripts/demo-inventory/application/testing/FakeObjectStore.spec.ts --maxWorkers=1 --reporter=json --outputFile=/tmp/897-r7g-recovery-20261029-original-unit.json",
+  "redReceipt": "/tmp/897-r7g-recovery-20261029-original-unit.json",
+  "redReceiptSHA256": "b333f54ae235d02ec37fd0afc9ab9a1b443b9c3ee4394a896445b420c17d6c69",
+  "tests": 72,
+  "passed": 63,
+  "failed": 9,
+  "failures": [
+    {
+      "file": "src/promote-admin.spec.ts",
+      "title": "promotes user and writes correct audit row on success",
+      "fullName": "runPromoteAdmin promotes user and writes correct audit row on success",
+      "classification": "original capability remains required"
+    },
+    {
+      "file": "src/promote-admin.spec.ts",
+      "title": "preserves internal line breaks in reason",
+      "fullName": "runPromoteAdmin preserves internal line breaks in reason",
+      "classification": "original capability remains required"
+    },
+    {
+      "file": "src/promote-admin.spec.ts",
+      "title": "selects the canonical verified email holder and writes a contact-free receipt",
+      "fullName": "runPromoteAdmin selects the canonical verified email holder and writes a contact-free receipt",
+      "classification": "original capability remains required"
+    },
+    {
+      "file": "src/promote-admin.spec.ts",
+      "title": "propagates refused audit so the transaction cannot commit: {\"phone\":\"+99361234567\",\"reason\":\"bootstrap first admin\",\"dryRun\":false}",
+      "fullName": "runPromoteAdmin propagates refused audit so the transaction cannot commit: {\"phone\":\"+99361234567\",\"reason\":\"bootstrap first admin\",\"dryRun\":false}",
+      "classification": "original capability remains required"
+    },
+    {
+      "file": "src/promote-admin.spec.ts",
+      "title": "propagates refused audit so the transaction cannot commit: {\"email\":\"  Coordinator@Campaign.Example.TEST  \",\"reason\":\"  email bootstrap  \",\"dryRun\":false}",
+      "fullName": "runPromoteAdmin propagates refused audit so the transaction cannot commit: {\"email\":\"  Coordinator@Campaign.Example.TEST  \",\"reason\":\"  email bootstrap  \",\"dryRun\":false}",
+      "classification": "original capability remains required"
+    },
+    {
+      "file": "src/reviewer-scenario-seed.spec.ts",
+      "title": "rotates sign-in destinations on stable users and revokes existing sessions without logging credential values",
+      "fullName": "runReviewerScenarioSeed rotates sign-in destinations on stable users and revokes existing sessions without logging credential values",
+      "classification": "original capability remains required"
+    },
+    {
+      "file": "src/reviewer-scenario-seed.spec.ts",
+      "title": "revokes reviewer accounts while preserving stable user ids for audit history",
+      "fullName": "runReviewerScenarioSeed revokes reviewer accounts while preserving stable user ids for audit history",
+      "classification": "original capability remains required"
+    },
+    {
+      "file": "src/reviewer-scenario-seed.spec.ts",
+      "title": "preflights an unsupported final reviewer displayName before changing earlier accounts",
+      "fullName": "preflights an unsupported final reviewer displayName before changing earlier accounts",
+      "classification": "held-added assertion conflicting with accepted scalar convergence"
+    },
+    {
+      "file": "src/tester-accounts.spec.ts",
+      "title": "removes owned buyer/seller testers now, revokes their Sessions, archives active Listings, and repeats as a no-op",
+      "fullName": "temporary tester operator behavior removes owned buyer/seller testers now, revokes their Sessions, archives active Listings, and repeats as a no-op",
+      "classification": "original capability remains required"
+    }
+  ],
+  "narrowCorrectionAuthority": "Coordinator 2026-10-29 grants removing ONLY displayName from held-added protected-field refusal matrix; keep protected-field/original/convergence assertions and RED",
+  "builds": {
+    "contracts": "PASS",
+    "db": "PASS"
+  },
+  "firstCompilers": "FAIL: worker-local bullmq/ioredis dependency imports absent; configured offline worker dependencies installed afterward; rerun deferred to worker timing interval",
+  "resource": "CPU released to worker, no DB/runtime started"
+}
