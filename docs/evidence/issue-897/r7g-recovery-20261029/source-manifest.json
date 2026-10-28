@@ -52,7 +52,8 @@
   },
   "migrationCount": 98,
   "migrationManifestSHA256": "7e6c3b98ddd2a75ef4751be9ff8fb0fbe5b3a7926f3a27eb91e50e3801e78046",
-  "runtimeExecutedThisRecovery": false,
   "loadedSourceProvenance": "not collected; resource interval withheld",
-  "capabilityAcceptance": "OPEN"
+  "capabilityAcceptance": "OPEN",
+  "databaseRuntimeExecutedThisRecovery": false,
+  "focusedOfflineTestsExecutedBeforeSourceOnlySteering": true
 }
