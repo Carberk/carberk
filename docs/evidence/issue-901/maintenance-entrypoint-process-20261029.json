@@ -1,0 +1,129 @@
+{
+  "candidate": "2f1571730b52163f0019d67aa7f5d74a9a525232",
+  "runtime": "v22.22.2",
+  "artifact": "apps/api/dist/src/main.js",
+  "artifactSha256": "61ac8de032436db4a4c62ec1ec98bec93c7a48b7838e366a2c332cf7e8b0fbf0",
+  "sourceSha256": "24f38e0427e6ba2ffca6c97d05e7b16d44d45f0017005ab5d55144617938e26e",
+  "serverSourceSha256": "23a2ac017b7d6b5421dddfc64b5da8615db5075d60796329bac19b6dd0df6b29",
+  "auditSha256": "0fa36f0d824d21a7ce436e2a30f255765f5d0d3688255b5c2e43f3c7fd3b8894",
+  "runs": [
+    {
+      "number": 1,
+      "pid": 84922,
+      "port": 57354,
+      "health": "candidate-bound",
+      "readiness": "businessReady=false",
+      "routes": [
+        {
+          "method": "POST",
+          "route": "/api/v1/auth/sign-in",
+          "status": 503
+        },
+        {
+          "method": "POST",
+          "route": "/api/v1/uploads/presign",
+          "status": 503
+        },
+        {
+          "method": "POST",
+          "route": "/operator/reset",
+          "status": 503
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/listings/1",
+          "status": 503
+        },
+        {
+          "method": "GET",
+          "route": "/socket.io/?EIO=4&transport=polling",
+          "status": 503
+        }
+      ],
+      "applicationModules": [
+        "apps/api/dist/src/common/media-conversion-maintenance.js",
+        "apps/api/dist/src/main.js"
+      ],
+      "loadedBusinessPackages": false,
+      "observedChildProcesses": 0,
+      "auditSha256": "ff1c219df34ac2b30d9c430ab0ae5373a7414831cd5067ce38732ab5bbef5d62",
+      "endSignal": "SIGKILL"
+    },
+    {
+      "number": 2,
+      "pid": 84940,
+      "port": 57354,
+      "health": "candidate-bound",
+      "readiness": "businessReady=false",
+      "routes": [
+        {
+          "method": "POST",
+          "route": "/api/v1/auth/sign-in",
+          "status": 503
+        },
+        {
+          "method": "POST",
+          "route": "/api/v1/uploads/presign",
+          "status": 503
+        },
+        {
+          "method": "POST",
+          "route": "/operator/reset",
+          "status": 503
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/listings/1",
+          "status": 503
+        },
+        {
+          "method": "GET",
+          "route": "/socket.io/?EIO=4&transport=polling",
+          "status": 503
+        }
+      ],
+      "applicationModules": [
+        "apps/api/dist/src/common/media-conversion-maintenance.js",
+        "apps/api/dist/src/main.js"
+      ],
+      "loadedBusinessPackages": false,
+      "observedChildProcesses": 0,
+      "auditSha256": "2a3732854a20b20089ea700f01d65a26b5a72bc0c087c0a88a60f2dd69bc9798",
+      "endSignal": "SIGTERM"
+    }
+  ],
+  "negatives": [
+    {
+      "name": "wrong environment",
+      "exitCode": 1,
+      "admissionRefused": true,
+      "listenerAbsent": true
+    },
+    {
+      "name": "candidate mismatch",
+      "exitCode": 1,
+      "admissionRefused": true,
+      "listenerAbsent": true
+    },
+    {
+      "name": "missing maintenance",
+      "exitCode": 1,
+      "admissionRefused": true,
+      "listenerAbsent": true
+    },
+    {
+      "name": "malformed binding",
+      "exitCode": 1,
+      "admissionRefused": true,
+      "listenerAbsent": true
+    }
+  ],
+  "limitations": [
+    "Local compiled artifact only; does not prove Railway deployment environment snapshots, scheduler exclusion, remote process identity or trusted reset admission.",
+    "Module cache and process tree are bounded observations of the real entrypoint; source inspection supplies the branch ordering.",
+    "Synthetic binding identifies this local experiment; it grants no operation or database authority."
+  ],
+  "remainingChildren": 0,
+  "status": "PASS local artifact/restart proof; provider qualification remains unproven",
+  "driverSha256": "d088ae9372bb3b3d7a4a467159a9b48c517e939dc4102324bc320a42a4ce57e8"
+}
