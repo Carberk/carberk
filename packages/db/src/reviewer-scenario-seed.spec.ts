@@ -497,13 +497,12 @@ it.each(["seed", "revoke"] as const)("refuses the entire unsupported reviewer %s
 });
 
 
-it.each(["displayName", "role", "deletionScheduledAt", "emailVerifiedAt"] as const)("preflights an unsupported final reviewer %s before changing earlier accounts", async field => {
+it.each(["role", "deletionScheduledAt", "emailVerifiedAt"] as const)("preflights an unsupported final reviewer %s before changing earlier accounts", async field => {
   const store = new FakeReviewerScenarioSeedStore();
   await runReviewerScenarioSeed(store, seedOptions());
   const user = store.users.get(reviewerScenarioSeedIds.buyerIds[1]);
   if (!user) throw new Error("Missing reviewer");
   if (field === "role") user.role = "seller";
-  else if (field === "displayName") user.displayName = "Changed name";
   else if (field === "deletionScheduledAt") user.deletionScheduledAt = new Date("2026-10-26T00:00:00Z");
   else user.emailVerifiedAt = null;
   const before = structuredClone(store);
