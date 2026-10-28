@@ -45,7 +45,7 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
     const id = text(/^[a-zA-Z0-9-]{1,80}$/); const hex32 = text(/^[a-f0-9]{32}$/); const hex64 = text(/^[a-f0-9]{64}$/); const sha = text(/^[a-f0-9]{40}$/);
     const base = ['operation', 'phase', 'operationId', 'reservationId', 'candidate', 'identity'];
     // `redis-inventoried` is a remote transport selector, not an S1 ledger phase.
-    const keys = { inventoried: base, rows: [...base, 'expectedInventory'], 'redis-inventoried': base, redis: [...base, 'expectedInventory', 'binding'] };
+    const keys = { inventoried: base, rows: [...base, 'admission', 'expectedInventory'], 'redis-inventoried': base, redis: [...base, 'expectedInventory', 'binding'] };
     const legacyRedis = record(input) && input.phase === 'redis' && exact(input, [...base, 'expectedInventory']) &&
       exact(input.expectedInventory, ['digest']) && hex64(input.expectedInventory.digest);
     if (!record(input) || typeof input.phase !== 'string' ||
@@ -86,6 +86,20 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
     if (!['postgres:', 'postgresql:'].includes(db.protocol) || db.hostname !== 'postgres.railway.internal' || db.search || db.hash) refuse();
     db.username = ''; db.password = '';
     if (db.toString().replace(/\/$/, '') !== p.origins.database) refuse();
+    if (input.phase === 'rows') {
+      const admission = input.admission;
+      const validOwner = text(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/);
+      const sameIdentity = (a, b) => exact(a, ['projectId', 'environmentId', 'services', 'origins']) &&
+        exact(a.services, ['api', 'worker']) && exact(a.origins, ['database']) &&
+        a.projectId === b.projectId && a.environmentId === b.environmentId &&
+        a.services.api === b.services.api && a.services.worker === b.services.worker && a.origins.database === b.origins.database;
+      if (!exact(admission, ['operationId', 'reservationId', 'owner', 'candidate', 'targetIdentity', 'closureGeneration', 'closureEvidenceDigest', 'expectedInventory', 'planDigest']) ||
+          admission.operationId !== input.operationId || admission.reservationId !== input.reservationId || admission.candidate !== input.candidate ||
+          !validOwner(admission.owner) || !hex32(admission.operationId) || !hex32(admission.reservationId) || !sha(admission.candidate) ||
+          !hex32(admission.closureGeneration) || !hex64(admission.closureEvidenceDigest) || !hex64(admission.planDigest) ||
+          !sameIdentity(admission.targetIdentity, p) || !exact(admission.expectedInventory, ['schema', 'retained', 'disposable']) ||
+          !['schema', 'retained', 'disposable'].every(part => admission.expectedInventory[part] === input.expectedInventory[part])) refuse();
+    }
     if (redisPhase) {
       if (p.projectId !== staging.projectId || p.environmentId !== staging.environmentId || p.services.api !== staging.services.api ||
           p.services.worker !== staging.services.worker || p.origins.redis !== staging.redis) refuse();

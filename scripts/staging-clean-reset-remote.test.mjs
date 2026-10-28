@@ -71,3 +71,10 @@ test('malformed legacy requests and partial new bindings remain target refusals 
   assert.deepEqual(preflight(legacyCommand(), { APP_ENV: 'production' }),
     { ports: [], code: 1, output: [], errors: ['Clean reset refused: target'] });
 });
+
+test('rows execution refuses before SQL without a sealed durable closure admission', () => {
+  const payload = { operation: 'clean-reset', phase: 'rows', operationId, reservationId, candidate,
+    identity: { ...structuredClone(identity), origins: { database: identity.origins.database } }, expectedInventory: { schema: '1'.repeat(64), retained: '2'.repeat(64), disposable: '3'.repeat(64) } };
+  const result = preflight(payload);
+  assert.deepEqual(result, { ports: [], code: 1, output: [], errors: ['Clean reset refused: target'] });
+});
