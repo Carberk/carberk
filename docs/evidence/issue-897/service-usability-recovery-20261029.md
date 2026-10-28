@@ -32,3 +32,12 @@ After coordinator resource release:
 No red/green, implementation completion or acceptance is claimed by this draft checkpoint. Missing availability projection remains an explicit contract/evidence gate for any richer audience/activation behavior, not an excuse to infer it from tester status.
 
 Docs: not applicable. Internal route/form repair reuses installed repository components and contracts without changing dependency APIs or versions.
+
+## Observed red, before production edits
+
+Coordinator released R6c interval. `pnpm install --frozen-lockfile` passed, followed by `pnpm --filter @auto-tm/contracts build`.
+
+- `pnpm --filter @auto-tm/admin exec vitest run 'src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx' --maxWorkers=1`: 3 failures. Closure reason contains `Notice reason`; upload picker is enabled before rights evidence exists. Real render and server actions, only HTTP/session boundaries substituted.
+- `pnpm --filter @auto-tm/mobile exec vitest run src/services/HistoryEntry.recovery.spec.tsx test/screens/service-navigation.recovery.spec.tsx src/services/ServiceScreen.spec.tsx test/screens/cabinet-profile-identity.spec.tsx --maxWorkers=1`: 9 failed, 55 passed. Neutral discovery fails on unconditional 100 TMT; six Back controls missing; Account service history row missing. One inventory catalog HTTP handler was missing; added that boundary fixture and reran navigation alone: six genuine missing-Back failures, no setup failure.
+
+Raw local logs: `/tmp/service-admin-red.log`, `/tmp/service-mobile-red.log`, `/tmp/service-navigation-red.log`. Red behavior is preserved in this checkpoint before production edits. These tests establish behavior only; browser/native presentation remains unproved.

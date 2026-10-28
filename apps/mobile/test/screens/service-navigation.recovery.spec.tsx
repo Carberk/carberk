@@ -1,3 +1,6 @@
+import { http, HttpResponse } from "msw";
+import { server } from "../msw";
+
 import { beforeEach, expect, it, vi } from "vitest";
 
 import { ServiceScreen } from "../../src/services/ServiceScreen";
@@ -15,7 +18,7 @@ vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: async () => ({ ca
 vi.mock("expo-image-manipulator", () => ({ SaveFormat: { JPEG: "jpeg" }, ImageManipulator: {} }));
 vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: async () => {} }));
 vi.mock("expo-file-system", () => ({ Paths: { cache: "file:///cache" }, File: class {} }));
-beforeEach(async () => { await clearAuthSession(); routerMock.canGoBack.mockReturnValue(false); });
+beforeEach(async () => { server.use(http.get("*/catalog/brands", () => HttpResponse.json({ items: [], nextCursor: null }))); await clearAuthSession(); routerMock.canGoBack.mockReturnValue(false); });
 it.each([
  ["services", ServiceScreen, "/(tabs)/services"],
  ["business", BusinessScreen, "/(tabs)/services"],
