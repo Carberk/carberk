@@ -306,7 +306,7 @@ export class DiagnosticArtifactWorker {
     for (let offset = 0; offset < grantIds.length; offset += commandWidth) await this.db.$transaction(async tx => {
       const selected = grantIds.slice(offset, offset + commandWidth);
       const current = await tx.diagnosticOwnershipGrant.findMany({ where: { id: { in: selected } } });
-      const grants = [];
+      const grants: typeof current = [];
       for (const id of selected) {
         const row = current.find(item => item.id === id);
         if (!row) throw new DiagnosticWorkerPreparationChanged();
@@ -337,7 +337,7 @@ export class DiagnosticArtifactWorker {
     for (let offset = 0; offset < componentIds.length; offset += commandWidth) await this.db.$transaction(async tx => {
       const selected = componentIds.slice(offset, offset + commandWidth);
       const current = await tx.diagnosticOwnershipComponent.findMany({ where: { identityRecordId: { in: selected } } });
-      const components = [];
+      const components: typeof current = [];
       for (const id of selected) {
         const row = current.find(item => item.identityRecordId === id);
         if (!row) throw new DiagnosticWorkerPreparationChanged();
