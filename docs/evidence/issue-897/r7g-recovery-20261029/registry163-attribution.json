@@ -1,0 +1,58 @@
+{
+  "status": "Attribution measured once and released; NOT native 5s acceptance",
+  "start": "Parent explicit MEASURE START; reset drain ACK and staff no-active-process confirmation held",
+  "run": {
+    "command": "R7G_ATTRIBUTION_MEASURE_START=1 node /tmp/897-r7g-worker-kernel-owner2-20261029/profile163-owner2.cjs --measure",
+    "invocations": 1,
+    "driverSha256": "9e5584bbc9ef5d975a045c28346f5e864f4690e8faaaaa4deebdb953f9985697",
+    "resource": "candidatea-r7g-attribution / candidatea_r7g_attribution_before / 127.0.0.1:55168, 98 baseline + 163",
+    "window": "2026-10-28T22:41:05.007Z..22:41:09.547Z",
+    "limits": { "phases": 6, "statementMs": 15000, "clientMs": 20000, "lockMs": 250, "everyPhase": "READ COMMITTED, worker principal, replication origin, ROLLBACK" },
+    "inputs": "full100 0cc55f9db0bbe795fb2a1c14e4d8b7bef3cb0b0a58ea3299facd1e4ee8990e22 and ten-root slice identical to the pre-163 run",
+    "measurementSha256": "1adbb8cacdb7da1667bd5bf0b0df40a74bbc52f619fdf03e25a6b339585f8290"
+  },
+  "phases": [
+    { "name": "prepare100", "verdict": "P0001 diagnostic_source_scope_limit (same context as pre-163)", "beforeMs": 5099, "afterMs": 1386, "registryCalls": [12596, 4], "registrySelfMs": [3097.6, 1.3] },
+    { "name": "prepare10", "verdict": "PASS (fresh rolled-back receipt uuid)", "beforeMs": 2982, "afterMs": 1562, "registryCalls": [4784, 11], "registrySelfMs": [1177.8, 4.1] },
+    { "name": "parse10", "verdict": "PASS, output hash equal", "beforeMs": 81, "afterMs": 40, "registryCalls": [133, 0] },
+    { "name": "scope10", "verdict": "PASS, 240 entries, output hash equal", "beforeMs": 1058, "afterMs": 432, "registryCalls": [2185, 1] },
+    { "name": "keys10", "verdict": "PASS, 370 keys, output hash equal", "beforeMs": 41, "afterMs": 39, "registryCalls": [1, 0] },
+    { "name": "effects10", "verdict": "PASS, 30 effects, output hash equal", "beforeMs": 77, "afterMs": 49, "registryCalls": [71, 0] }
+  ],
+  "remainingExpensive": {
+    "prepare10": {
+      "totalMs": 1560,
+      "scopeComputedTwice": "diagnostic_source_scope 2 calls, 756ms total (diagnostic_source_scope_before_purge 357.6ms self; diagnostic_source_read 500 calls 260ms self)",
+      "campaignPreparationScope": "campaign_preparation_scope 4 calls, 557ms total, 528.6ms self (campaign_prepare 281ms total)",
+      "parseAndLockKeysTwice": "diagnostic_source_parse 2 calls 42.6ms; diagnostic_source_lock_keys 2 calls 32.5ms",
+      "insertReceiptSelf": "diagnostic_source_insert_receipt 136ms self",
+      "metadata": "diagnostic_source_meta 9757 calls 64ms self (map now constant)"
+    },
+    "prepare100Refusal": {
+      "totalMs": 1386,
+      "parse": "diagnostic_source_parse 224ms total",
+      "scopeUntilCap": "diagnostic_source_add 11881 calls 558ms self 752ms total; diagnostic_source_meta 21956 calls 143.5ms; diagnostic_source_project 12387 calls 116ms; diagnostic_source_disposal_effects 2 calls 147ms self",
+      "preserved": "Single-command full100 scope-limit refusal is the required negative; no cap/graph/scope change"
+    }
+  },
+  "drain": {
+    "verdict": "PASS",
+    "sha256": "0bd146f5f38bd2fb75d231569372503bcbd95a91c5c4a0703820d646ee0780ad (byte-identical to pre-START baseline)",
+    "migrations": "98 ae0f239366f3134887e329f64724ebf5dc916536f0b91613e0481a5459fbde62",
+    "functions": "174 4f69996d0afd78d664de20c956a4be479abd896f691d9114bc6bad3e354512ec",
+    "guards": "354 74f8917631d0ccdc8f7821aec6dfa0f4f9c70ecc9ee1e112b33f3ba4e5113c93",
+    "data": "1db785614db30bef2edd3f023fd4cacc83e3b32718ef62df93d6778fe40a32cb; eight saved classes equal",
+    "receipts": { "source": 0, "campaign": 0 },
+    "clients": 0,
+    "stopped": "docker stop exit 0 at 2026-10-28T22:41:17Z; RELEASE sent"
+  },
+  "limitations": [
+    "Host not quiet-certified: Docker Desktop renderer background CPU reported during preparation; host sample during the run showed the Docker VM at 89.5% (serving the measured queries) plus T3 Code, codex, Wispr Flow and tunnel processes at 1-3% each; after stop, VM 7.8% and Docker Desktop helper 4.3%",
+    "Clone lacks 20261026016200 (parse/scope/lock_keys wrappers), so this compares with the 98-based pre-163 measurement, not the assembled full chain",
+    "Ten-root slice and single full100 command only; not the native100 workset across accepted finite groups"
+  ],
+  "remaining": [
+    "Native 5s across accepted finite groups with a fresh ordinary full100 baseline and the original unchanged test (RED at aa5eed1d, exactly 10 committed)",
+    "Parent decision on the next proposal before any further optimization"
+  ]
+}
