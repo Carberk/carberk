@@ -33,7 +33,7 @@ const db = new PrismaService();
 const root = config.evidenceDir;
 await mkdir(root, { recursive: true });
 const commands = [], orderIds = [], keys = [], dueGrantIds = [], derivedComponentIds = [], nonDueGrantIds = [], nonDueComponentIds = [];
-let currentPeople = config.people;
+let currentPeople = config.people, currentEndpoint = endpoint;
 const orderPeople = new Map();
 const started = Date.now(), deadline = started + 120_000;
 let cutoff;
@@ -44,11 +44,11 @@ const request = async (who, method, path, body, status = 201, binary = false) =>
   const remaining = deadline - Date.now();
   if (remaining <= 0) throw new Error("Producer native120s setup deadline exceeded");
   const input = binary ? body : body === undefined ? undefined : JSON.stringify(body);
-  const response = await fetch(new URL(`/api/v1/diagnostics/${path}`, endpoint), { method,
+  const response = await fetch(new URL(`/api/v1/diagnostics/${path}`, currentEndpoint), { method,
     headers: { authorization: `Bearer ${currentPeople[who].token}`, ...(input === undefined ? {} : { "content-type": binary ? "application/octet-stream" : "application/json" }),
       ...(binary ? { "x-evidence-type": "image/png" } : {}) }, body: input, signal: AbortSignal.timeout(Math.min(5000, remaining)) });
   const text = await response.text();
-  commands.push({ at: new Date().toISOString(), who, method, path, body: binary ? { bytes: body.length, sha256: hash(body) } : body,
+  commands.push({ at: new Date().toISOString(), apiUrl: currentEndpoint.toString(), who, method, path, body: binary ? { bytes: body.length, sha256: hash(body) } : body,
     status: response.status, responseSha256: hash(text), response: text });
   if (response.status !== status) throw new Error(`Ordinary route refused ${method} ${path}: ${response.status}`);
   return text ? JSON.parse(text) : undefined;
@@ -59,10 +59,11 @@ const rights = end => ({ category: "vehicle_observation", purpose: "SYNTHETIC re
   identifiability: "personal", use: ["service"], schedule: { kind: "until", until: end.toISOString(), reason: "Declared fixture retention end" },
   supplierRestrictions: "Synthetic service only", hold: null });
 const visit = async fixture => {
-  currentPeople = fixture.people;
+  currentPeople = fixture.people; currentEndpoint = new URL(fixture.apiUrl);
+  if (currentEndpoint.hostname !== "127.0.0.1") throw new Error("Task-loopback visit API required");
   let order = await post("commissioner", "orders", { requestKey: randomUUID(), centerId: fixture.centerId,
     templateVersionId: fixture.templateId, audience: "listing_public", listingId: fixture.listingId, synthetic: true });
-  orderIds.push(order.id); orderPeople.set(order.id, currentPeople);
+  orderIds.push(order.id); orderPeople.set(order.id, fixture);
   for (const [who, capability] of [["technician", "diagnostics.technician"], ["reviewer", "diagnostics.reviewer"]]) {
     order = await post("reception", `orders/${order.id}/assignments`, { expectedVersion: order.version,
       userId: currentPeople[who].userId, capability, active: true });
@@ -73,7 +74,8 @@ const visit = async fixture => {
   return order;
 };
 const capture = async (order, grantEnd, componentEnd) => {
-  currentPeople = orderPeople.get(order.id);
+  const fixture = orderPeople.get(order.id);
+  currentPeople = fixture.people; currentEndpoint = new URL(fixture.apiUrl);
   const grant = await post("commissioner", `orders/${order.id}/ownership-grant`, { rights: rights(grantEnd) });
   order = await post("technician", `orders/${order.id}/vehicle`, { expectedVersion: order.version, method: "vin", vin: config.vin,
     manualReference: null, observedAt: new Date().toISOString(), mileageKm: 123000, ownershipGrantId: grant.id,
@@ -84,7 +86,8 @@ const capture = async (order, grantEnd, componentEnd) => {
   return { order, grant, raw, component };
 };
 const structured = async captured => {
-  currentPeople = orderPeople.get(captured.order.id);
+  const fixture = orderPeople.get(captured.order.id);
+  currentPeople = fixture.people; currentEndpoint = new URL(fixture.apiUrl);
   const id = randomUUID();
   const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVR4nGP4z8AARwgWXg4ArpMP8aaUSCMAAAAASUVORK5CYII=", "base64");
   const end = new Date(cutoff.getTime() + 3600_000);
