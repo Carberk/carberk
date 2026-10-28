@@ -32,3 +32,22 @@ All new readers display the same nested snapshot metadata. No navigation or prot
 The original contracts, renderer, web and admin behavior criteria have genuine pre-production RED at `9f0d1e94`. Additional mobile parity, negative masking and rollback/retry coverage were drafted afterward; they have no separately executed pre-production RED and are not represented as such. Original assertions in the twenty affected finalize suites are preserved; explicit synthetic display input is added only at existing finalize calls. Targeted new adapter assertions check safe projection, rollback, same-input recovery and immutable readback after center renaming. These offline tests do not establish PostgreSQL lock/race behavior.
 
 Docs: not applicable, internal behavior changes using existing libraries and APIs; no dependency versions or exports changed.
+
+## Focused GREEN at source `c65b0770`
+
+All commands completed before CPU release. Normal configured suites ran with `--maxWorkers=1`; API/worker used `AUTO_TM_TEST_DATABASES=off`, with no database service. No timeout was increased. No manifests or lockfile changed.
+
+- `pnpm --filter @auto-tm/contracts build`: exit 0.
+- `pnpm --filter @auto-tm/db build`: first refused missing `DATABASE_URL` during Prisma config loading. `DATABASE_URL=postgresql://unused:unused@127.0.0.1:1/unused pnpm --filter @auto-tm/db build`: exit 0; generates and compiles only, no DB connection.
+- `pnpm --filter @auto-tm/contracts exec vitest run src/schemas/diagnostics.spec.ts --maxWorkers=1`: exit 0, 15 passed.
+- `AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts --maxWorkers=1`: exit 0, 14 passed, 891 ms suite duration. Includes all three original issued-byte SHA-256 assertions, real embedded glyph/text decoding, both audiences, manual/VIN identity, body findings and unchanged default 5000 ms timeout. Opt-in export tests returned without writing proof files; every-page inspection remains pending.
+- `AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest run src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts --maxWorkers=1`: exit 0, 54 passed. Covers actual report adapter with offline DB boundary, restricted-source omission, nonstandard VIN omission, manual description refusal, write/finish rollback and same-input recovery, exact pin preservation and immutable snapshot readback after center rename. Does not claim SQL race/locking acceptance.
+- `pnpm --filter @auto-tm/admin exec vitest run src/app/diagnostics/DiagnosticWorkspace.spec.tsx --maxWorkers=1`: exit 0, 15 passed.
+- `pnpm --filter @auto-tm/web exec vitest run src/diagnostics/Reader.spec.tsx --maxWorkers=1`: exit 0, 30 passed.
+- `pnpm --filter @auto-tm/mobile exec vitest run src/diagnostics/DiagnosticReader.spec.tsx --maxWorkers=1`: exit 0, 47 passed.
+
+For each of `@auto-tm/contracts`, `@auto-tm/db`, `@auto-tm/api`, `@auto-tm/worker`, `@auto-tm/admin`, `@auto-tm/web`, `@auto-tm/mobile`, both literal command forms `pnpm --filter <workspace> exec tsc --noEmit` and `pnpm --filter <workspace> exec tsc6 --noEmit` exited 0. TypeScript 7 and TypeScript 6 each passed all seven workspaces. Logs use `<workspace>-tsc.txt` / `-tsc6.txt`.
+
+Affected-file lint ran `pnpm exec eslint <exact changed .ts/.tsx paths relative to workspace> --max-warnings 0` inside each of those seven workspaces, deriving paths from `git diff --name-only b71e8412abce19e22ae6c1c6bea9b6e95402d683 HEAD`; all exited 0. `git diff --check` passed. Logs use `<workspace>-lint.txt`.
+
+No full repository tests, container-backed affected e2e, browser/device UI proof or deployed acceptance ran in this focused window. Those remain coordinator assembly gates; the twenty affected finalize fixture assertions have compiler/lint validation here, not executed database acceptance.

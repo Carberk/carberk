@@ -1,0 +1,9 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/apps/mobile
+
+
+ Test Files  1 passed (1)
+      Tests  47 passed (47)
+   Start at  01:44:29
+   Duration  3.05s (tests 89%, setup 4%, import 4%, transform 3%)
+
