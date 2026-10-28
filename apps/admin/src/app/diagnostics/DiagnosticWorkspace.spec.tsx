@@ -150,3 +150,15 @@ it("hides protected decisions when a real action rejects while reading the frame
  fireEvent.click(view.getByRole("button",{name:diagnosticCopy.en.retry}));
  expect(await view.findByRole("button",{name:diagnosticCopy.en.open})).toBeTruthy();
 });
+
+it("keeps the language selector and diagnostic actions at the accessible target and focus contrast", async () => {
+ const view = setup();
+ const language = view.getByRole("combobox", { name: "Language" });
+ expect(language.className).toContain("min-h-11");
+ expect(language.className).toContain("focus-visible:outline-neutral-900");
+ await waitFor(() => expect(view.getByRole("button", { name: diagnosticCopy.en.refresh })).toBeTruthy());
+ const refresh = view.getByRole("button", { name: diagnosticCopy.en.refresh });
+ expect(refresh.className).toContain("min-h-11");
+ expect(refresh.className).toContain("focus-visible:outline-neutral-900");
+ expect(refresh.className).toContain("focus-visible:outline-offset-2");
+});
