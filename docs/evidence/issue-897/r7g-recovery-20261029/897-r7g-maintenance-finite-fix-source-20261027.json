@@ -1,0 +1,58 @@
+{
+  "kind": "R7G_SOURCE_ONLY_BOUNDED_FIX_CHECKPOINT",
+  "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-59a157ce",
+  "branch": "t3/r7g-maintenance-finite-coverage",
+  "basePreFix": "a3de0cb72c238ae271f9bc1e63e00172f75eaf9c",
+  "basePreFixTree": "5b8efa3a582c8ff43304e04355af898bb85bb38e",
+  "head": "2af0c957da08693a84c946cdb0e5d5f78f05cc95",
+  "tree": "6b0b746c9e0ec8268cbf33bdfa947246fed6e274",
+  "clean": true,
+  "patchSHA256": "44bbdb98f1be058a9108a654807a239eae55c54739e64505f7044974de3acb33",
+  "changedManifestSHA256": "eb1eb0e84f6875f3c99cb3068705802353fac5e8317c3821d827fe9df7b42879",
+  "changedPaths": [
+    "packages/db/CONTEXT.md",
+    "packages/db/scripts/demo-inventory/application/testing/FakeObjectStore.spec.ts",
+    "packages/db/scripts/demo-inventory/application/testing/FakeObjectStore.ts",
+    "packages/db/scripts/demo-inventory/seed.ts",
+    "packages/db/scripts/maintenance-listings.ts",
+    "packages/db/scripts/reviewer-scenario-store.ts",
+    "packages/db/src/PrismaTesterAccountStore.ts",
+    "packages/db/src/reviewer-scenario-seed.spec.ts",
+    "packages/db/src/reviewer-scenario-seed.ts",
+    "packages/db/src/tester-accounts.spec.ts",
+    "packages/db/src/tester-accounts.ts",
+    "packages/db/tests/maintenance-finite.r7g.e2e.spec.ts"
+  ],
+  "dispositions": {
+    "standardsP2Fake": "accepted: one seedable FakeObjectStore beside the ObjectStore port, imported by the maintenance fixture and tested for bucket/prefix/selective-delete/refusal semantics",
+    "specP1Listing": "accepted: reviewer fixed Listing IDs are preflighted for personal seller ownership and businessId null before Users/catalog/media/storage; maintenance preparation rechecks source ownership under locks",
+    "specP1Catalog": "accepted: fixed catalog brand/model/region/city ID and slug associations are preflighted before User DML; adapter rechecks inside a Serializable catalog transaction",
+    "specP2Tester": "accepted: no-Session personal-only removal uses one combined account_schedule preparation in the existing 30s transaction; earlier schedules are not postponed, empty Session DML is skipped, derived personal Listings only are archived; sessions, business inventory, unchanged-schedule inventory and uncovered effects refuse before DML",
+    "specP2Display": "accepted: reviewer and demo reruns permit displayName-only scalar convergence using only displayName compare-and-set; protected contact/role/verification/deletion fields remain untouched"
+  },
+  "preserved": {
+    "originalUnsupportedAssertions": true,
+    "originalSixSuitesByteUnchanged": true,
+    "activation": "CLOSED",
+    "B1G1": "OPEN",
+    "capabilityAcceptance": "OPEN",
+    "preFixRuntimeEvidence": "a3de restricted 13/13 remains pre-fix only; no post-fix runtime claim"
+  },
+  "plannedVerification": [
+    "pnpm --filter @auto-tm/contracts build",
+    "pnpm --filter @auto-tm/db build",
+    "pnpm --filter @auto-tm/db typecheck",
+    "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+    "pnpm check:runtime-imports",
+    "owned eslint with --max-warnings 0 including FakeObjectStore and affected paths",
+    "FakeObjectStore.spec.ts and affected offline unit suites",
+    "original affected suites: promote-admin, reviewer-scenario-seed, tester-accounts, demo inventory, tester integration",
+    "restricted maintenance-finite.r7g.e2e.spec.ts with exact accepted150/97 migration, guard/receipt cleanup, foreign rows and object bytes",
+    "reviewer photo unit test and configured offline lifetime test"
+  ],
+  "notRunThisTurn": ["compiler", "build", "lint", "test collection", "imports", "SQL", "storage", "HTTP", "services"],
+  "sourceChecks": {"gitDiffCheck": "PASS", "overviewLinksAndAnchors": 52, "migrationCount": 97, "migrationManifestSHA256": "10407f81780a6e850e979b850ad12994f07205150be4004cfb8935e32fa24191", "fourOriginalSuitesByteIdentical": true, "twoOriginalUnitSuitesOnlyAddedLines": true},
+  "interval": "R8 exclusive; no runtime interval used",
+  "pushed": false,
+  "prCreated": false
+}

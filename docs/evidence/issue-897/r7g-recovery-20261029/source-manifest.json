@@ -1,0 +1,58 @@
+{
+  "base": "023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab",
+  "held": "2af0c957da08693a84c946cdb0e5d5f78f05cc95",
+  "laterOldOwnerHead": "c7d6c37a04c0a214954aa8d8224d6a33a741db9c",
+  "files": {
+    "packages/db/CONTEXT.md": "0746d3eeb7e03a836872028dd8b5eb17b3f66fab33c33e4b980b1191035b9cd5",
+    "packages/db/scripts/demo-inventory/application/testing/FakeObjectStore.spec.ts": "beaa1e9c6c7663643f4203d4966ad258f28d9ebd0dd8d935c75c2c5508bc8419",
+    "packages/db/scripts/demo-inventory/application/testing/FakeObjectStore.ts": "06fb503155102c3df9fa0cef4e8368156aa5682f07b33773cf0007985bfa9f44",
+    "packages/db/scripts/demo-inventory/seed.ts": "62af3bca74e6532ebc059a518e9feb9ef98d4104bfefd14186e671b5fa58489d",
+    "packages/db/scripts/maintenance-listings.ts": "9cfa53471d5583579f0e82f72e405eb0f1690eb581edb8ed64bf352cac5ee9bd",
+    "packages/db/scripts/reviewer-scenario-store.ts": "67deb249487696596ca65b7d4e2d4d3505cb3fb41c4de99a7e99176c5001f06e",
+    "packages/db/src/PrismaTesterAccountStore.ts": "3d4f30debb5f81e403c773712dd673e9c3865708c3bf9597cc41018eb7b29f7d",
+    "packages/db/src/reviewer-scenario-seed.spec.ts": "406fbe73655c7bc0e3a5af65cc36655b8340ded40a446a6ba501635f850e4743",
+    "packages/db/src/reviewer-scenario-seed.ts": "dbbd06f00ab812e184df6ce204bb394517f33328f3256ed942f78dd4bfa18e26",
+    "packages/db/src/tester-accounts.spec.ts": "c5cabc4d0bdad46a1760978c207f390e3bcf1c96b4aec228dc33f664d74e1717",
+    "packages/db/src/tester-accounts.ts": "cd59e27ddc57b358b689b24fce37231ff39dbde7eaef6d9762522842d098ccad",
+    "packages/db/tests/maintenance-finite.r7g.e2e.spec.ts": "231d39ad94e5398541066686e0615c2b8966ddfdb447de64cb622512864798e6"
+  },
+  "artifactManifest": {
+    "/tmp/897-r7g-fix-original.json": {
+      "sha256": "34fc680348ba7af71e5fee054ddde4c00668082524248e826cefeb4574cfa5d4",
+      "bytes": 22448
+    },
+    "/tmp/897-r7g-fix-restricted-1.json": {
+      "sha256": "b88a6d0f52dd8b6bc59737ab5af45ff71adaeee778c2845e3992a6dd985b1d6b",
+      "bytes": 12618
+    },
+    "/tmp/897-r7g-fix-offline.json": {
+      "sha256": "81bdd4106f0acb7779b4796631784d7f087735f807c6eb1325ff192cf9874e3a",
+      "bytes": 48782
+    },
+    "/tmp/897-r7g-original.json": {
+      "sha256": "0d479169a5f3b1132fa4c8bc5afbfa4ed66657293ce9f3113d1554ff4fc36e09",
+      "bytes": 22347
+    },
+    "/tmp/897-r7g-maintenance-verification-20261026.json": {
+      "sha256": "135e920d7a9b741793edeefad4bd586f125c58c43d44b93739d83699e82fb79d",
+      "bytes": 85956
+    },
+    "/tmp/897-r7g-recovery-20261029-offline.json": {
+      "sha256": "6eeaec5822d2269aafcce818b0bb08f8f0cea8b076cdd486c75386d41db2cb3d",
+      "bytes": 11511
+    },
+    "/tmp/897-r7g-recovery-20261029-offline.log": {
+      "sha256": "0fc55ae2c56ac30f69649234c3defbf3118f499ad410b46041db6556374d65b4",
+      "bytes": 217
+    },
+    "/tmp/897-r7g-recovery-20261029-install.log": {
+      "sha256": "80feaa031a490297a02305914ced22acfb968c8059c778272a12bec7509ed26d",
+      "bytes": 741
+    }
+  },
+  "migrationCount": 98,
+  "migrationManifestSHA256": "7e6c3b98ddd2a75ef4751be9ff8fb0fbe5b3a7926f3a27eb91e50e3801e78046",
+  "runtimeExecutedThisRecovery": false,
+  "loadedSourceProvenance": "not collected; resource interval withheld",
+  "capabilityAcceptance": "OPEN"
+}

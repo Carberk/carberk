@@ -29,6 +29,17 @@ class FakeStore implements TesterAccountStore {
   async createUser(user: { id: string; phone: string; email: string }, now: Date): Promise<void> {
     this.users.push({ ...user, role: "buyer", phoneVerifiedAt: now, emailVerifiedAt: now, deletionScheduledAt: null });
   }
+  async removePersonalAccounts(users: TesterUser[], now: Date) {
+    const ids = users.map(user => user.id);
+    if (this.sessionUsers.some(id => ids.includes(id))) {
+      throw new Error("unsupported atomic schedule + Session deletion + Listing archive");
+    }
+    const changed = users.filter(user => user.deletionScheduledAt === null || user.deletionScheduledAt > now).map(user => user.id);
+    if (this.activeListingUsers.some(id => ids.includes(id) && !changed.includes(id))) throw new Error("unsupported unchanged schedule archive");
+    const scheduled = await this.scheduleDeletion(changed, now);
+    const listingsArchived = await this.archiveListings(changed);
+    return { created: 0, scheduled, sessionsDeleted: 0, listingsArchived };
+  }
   async scheduleDeletion(ids: string[], now: Date): Promise<number> {
     let count = 0;
     for (const user of this.users) {
@@ -134,4 +145,40 @@ describe("temporary tester operator behavior", () => {
       await expect(runTesterAccounts(new FakeStore(), { ...options(), reviewerAccountsJson })).rejects.toThrow(/refused/);
     }
   });
+});
+
+it("refuses the complete nonempty tester removal plan before scheduling, Session deletion or Listing archive", async () => {
+  const store = new FakeStore();
+  store.users.push(ownedUser(), ownedUser(2));
+  store.sessionUsers = store.users.map((user) => user.id);
+  store.activeListingUsers = [...store.sessionUsers];
+  const before = structuredClone({ users: store.users, sessions: store.sessionUsers, listings: store.activeListingUsers });
+  await expect(runTesterAccounts(store, options("remove", [account(), account(2)])))
+    .rejects.toThrow("unsupported atomic schedule + Session deletion + Listing archive");
+  expect({ users: store.users, sessions: store.sessionUsers, listings: store.activeListingUsers }).toEqual(before);
+});
+
+it("keeps already-purged tester removal write-free", async () => {
+  const store = new FakeStore();
+  store.users.push({ ...ownedUser(), phone: null, email: null, phoneVerifiedAt: null, emailVerifiedAt: null });
+  const before = structuredClone(store.users);
+  expect(await runTesterAccounts(store, options("remove")))
+    .toEqual({ created: 0, scheduled: 0, sessionsDeleted: 0, listingsArchived: 0 });
+  expect(store.users).toEqual(before);
+});
+
+
+it("schedules no-Session personal testers atomically without postponing an earlier date", async () => {
+  const store = new FakeStore();
+  const earlier = new Date("2026-10-06T00:00:00Z");
+  store.users.push(ownedUser(), { ...ownedUser(2), deletionScheduledAt: earlier });
+  store.activeListingUsers = [must(store.users[0]).id];
+  expect(await runTesterAccounts(store, options("remove", [account(), account(2)])))
+    .toEqual({ created: 0, scheduled: 1, sessionsDeleted: 0, listingsArchived: 1 });
+  expect(store.users.map(user => user.deletionScheduledAt)).toEqual([NOW, earlier]);
+  expect(store.activeListingUsers).toEqual([]);
+  const before = structuredClone(store.users);
+  expect(await runTesterAccounts(store, options("remove", [account(), account(2)])))
+    .toEqual({ created: 0, scheduled: 0, sessionsDeleted: 0, listingsArchived: 0 });
+  expect(store.users).toEqual(before);
 });

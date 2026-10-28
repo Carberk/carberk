@@ -104,6 +104,21 @@ export interface ReviewerScenarioUser {
   phone: string | null;
   email: string | null;
   role: string;
+  displayName: string | null;
+  phoneVerifiedAt: Date | null;
+  emailVerifiedAt: Date | null;
+  deletionScheduledAt: Date | null;
+}
+
+export interface ReviewerScenarioCatalog {
+  brandId: string;
+  brandSlug: string;
+  modelId: string;
+  modelSlug: string;
+  regionId: string;
+  regionSlug: string;
+  cityId: string;
+  citySlug: string;
 }
 
 export interface ReviewerScenarioSeedStore {
@@ -124,16 +139,8 @@ export interface ReviewerScenarioSeedStore {
   }): Promise<void>;
   deleteSessionsByUserIds(userIds: string[]): Promise<number>;
   invalidatePushDevicesByUserIds(userIds: string[], invalidatedAt: Date): Promise<number>;
-  upsertCatalog(input: {
-    brandId: string;
-    brandSlug: string;
-    modelId: string;
-    modelSlug: string;
-    regionId: string;
-    regionSlug: string;
-    cityId: string;
-    citySlug: string;
-  }): Promise<void>;
+  preflightSeed(input: { catalog: ReviewerScenarioCatalog; listings: { id: string; sellerId: string }[] }): Promise<string | null>;
+  upsertCatalog(input: ReviewerScenarioCatalog): Promise<void>;
   upsertListing(input: {
     contactPhone: string;
     id: string;
@@ -388,27 +395,11 @@ export async function runReviewerScenarioSeed(
           `Reviewer scenario revocation refused: configured user slot ${id} is privileged`,
         );
       }
-      await store.revokeUser({
-        id,
-        revokedPhone: `revoked:${id}`,
-        displayName: `Revoked ${id}`,
-      });
       revokedUserIds.push(id);
     }
-
-    await store.deleteSessionsByUserIds(revokedUserIds);
-    await store.invalidatePushDevicesByUserIds(revokedUserIds, options.now);
-    await store.createAuditLog({
-      action: "REVIEWER_SCENARIO_REVOKE",
-      targetType: "reviewer_scenario",
-      targetId: "store-review",
-      details: {
-        mode: "revoke",
-        accountCount: revokedUserIds.length,
-        revokedUserIds,
-        occurredAt: options.now.toISOString(),
-      },
-    });
+    if (revokedUserIds.length > 0) {
+      return safeFailure("Reviewer scenario revocation refused: unsupported contact/display rotation + Session/device revocation; no single accepted finite operation covers the complete plan");
+    }
 
     return {
       exitCode: 0,
@@ -422,23 +413,31 @@ export async function runReviewerScenarioSeed(
   const accountFailure = await assertNoPrivilegedOrHijackedAccounts(store, accounts);
   if (accountFailure) return accountFailure;
 
+  // Discover the whole account plan before catalog, account, media, audit or storage effects.
+  const existingUsers = new Map<string, ReviewerScenarioUser>();
+  for (const account of accounts) {
+    const existing = await store.findUserById(account.id);
+    if (!existing) continue;
+    if (existing.phone !== account.phone || existing.email !== account.email ||
+        existing.role !== account.role ||
+        !existing.phoneVerifiedAt || !existing.emailVerifiedAt || existing.deletionScheduledAt !== null) {
+      return safeFailure("Reviewer scenario seed refused: unsupported existing-source contact/role/deletion rotation; no single accepted finite operation covers the complete plan");
+    }
+    existingUsers.set(account.id, existing);
+  }
+  const sellerAccount = accounts.find(account => account.role === "seller");
+  if (!sellerAccount) return safeFailure("Reviewer scenario seed requires a seller account");
+  const associationFailure = await store.preflightSeed({ catalog: CATALOG,
+    listings: [PRIMARY_LISTING_ID, REPORTABLE_LISTING_ID].map(id => ({ id, sellerId: sellerAccount.id })),
+  });
+  if (associationFailure) return safeFailure(`Reviewer scenario seed refused: ${associationFailure}`);
   const rotatedUserIds: string[] = [];
   const seededUserIds: string[] = [];
   for (const account of accounts) {
-    const existing = await store.findUserById(account.id);
-    if (
-      existing &&
-      (existing.phone !== account.phone || existing.email !== account.email)
-    ) {
-      rotatedUserIds.push(account.id);
-    }
-    const user = await store.upsertUser(account);
+    // Equal source converges without refreshing verification timestamps or User.updatedAt.
+    const existing = existingUsers.get(account.id);
+    const user = existing?.displayName === account.displayName ? existing : await store.upsertUser(account);
     seededUserIds.push(user.id);
-  }
-
-  if (rotatedUserIds.length > 0) {
-    await store.deleteSessionsByUserIds(rotatedUserIds);
-    await store.invalidatePushDevicesByUserIds(rotatedUserIds, options.now);
   }
 
   const buyer = accounts.find((account) => account.role === "buyer");
