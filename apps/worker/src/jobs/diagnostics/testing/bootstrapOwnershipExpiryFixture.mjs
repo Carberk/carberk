@@ -38,7 +38,7 @@ const snapshot = () => owner.$queryRawUnsafe(`SELECT c.relname AS "table",t.tgna
   t.tgfoid::regprocedure::text AS function,t.tgtype::int AS type,pg_get_triggerdef(t.oid) AS definition
   FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
   WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY c.relname,t.tgname`);
-let app;
+const apps = [];
 try {
   await owner.$connect();
   if (mode === "cleanup") {
@@ -134,7 +134,7 @@ try {
     const [ready] = await owner.$queryRawUnsafe("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign");
     if (!ready.source || !ready.campaign) throw new Error("Matched readiness required");
     process.env.DATABASE_URL = urls[0];
-    const { ConfigModule } = apiRequire("@nestjs/config"), { Reflector } = apiRequire("@nestjs/core");
+    const { ConfigModule, ConfigService } = apiRequire("@nestjs/config"), { Reflector } = apiRequire("@nestjs/core");
     const { EventEmitterModule } = apiRequire("@nestjs/event-emitter"), { BullModule } = apiRequire("@nestjs/bullmq");
     const { JwtModule, JwtService } = apiRequire("@nestjs/jwt"), { FastifyAdapter } = apiRequire("@nestjs/platform-fastify");
     const { Test } = apiRequire("@nestjs/testing");
@@ -146,20 +146,48 @@ try {
       credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY ?? "minioadmin", secretAccessKey: process.env.MINIO_SECRET_KEY ?? "minioadmin" } });
     try { await s3.send(new CreateBucketCommand({ Bucket: "diagnostic-test-private" }), { abortSignal: AbortSignal.timeout(5000) }); }
     finally { s3.destroy(); }
-    const secret = randomUUID();
-    const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => ({ DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private", APP_ENV: "test",
-        DIAGNOSTIC_SYNTHETIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_PUBLIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_USER_IDS: allPeople.map(p => p.userId) })] }),
-      EventEmitterModule.forRoot(), BullModule.forRoot({ connection: { url: redis.toString() } }), DiagnosticsModule, JwtModule.register({ global: true, secret })] }).compile();
-    app = testing.createNestApplication(new FastifyAdapter());
-    const jwt = app.get(JwtService);
-    app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
-    await app.listen(0, "127.0.0.1");
-    for (const p of allPeople) p.token = jwt.sign({ sub: p.userId, sid: p.sessionId, role: "buyer" }, { expiresIn: "1h" });
-    const apiUrl = await app.getUrl();
+    const { DIAGNOSTIC_RUNTIME } = load("modules/diagnostics/domain/ports/DiagnosticIntakePort");
+    const environment = Object.freeze({ ...process.env });
+    const instances = [], configs = [];
+    for (let cohort = 0; cohort < 5; cohort += 1) {
+      const members = visits.filter((_, index) => Math.floor(Math.max(0, index - 1) / 25) === cohort);
+      const principals = [...new Map(members.flatMap(visit => Object.values(visit.people)).map(person => [person.userId, person])).values()];
+      if (!principals.length || principals.length > 100) throw new Error("Invalid bounded API cohort");
+      const userIds = Object.freeze(principals.map(person => person.userId));
+      const fixed = Object.freeze({ ...environment, DIAGNOSTIC_PRIVATE_BUCKET: "diagnostic-test-private", APP_ENV: "test",
+        DIAGNOSTIC_SYNTHETIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_PUBLIC_ENABLED: true, DIAGNOSTIC_SYNTHETIC_USER_IDS: userIds });
+      const testing = await Test.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true,
+        ignoreEnvVars: true, skipProcessEnv: true, load: [() => fixed] }), EventEmitterModule.forRoot(),
+        BullModule.forRoot({ connection: { url: redis.toString() } }), DiagnosticsModule,
+        JwtModule.register({ global: true, secret: randomUUID() })] }).compile();
+      const app = testing.createNestApplication(new FastifyAdapter()); apps.push(app);
+      const injected = app.get(ConfigService), runtime = app.get(DIAGNOSTIC_RUNTIME);
+      if (configs.includes(injected) || JSON.stringify(injected.get("DIAGNOSTIC_SYNTHETIC_USER_IDS")) !== JSON.stringify(userIds) ||
+        allPeople.some(person => runtime.syntheticAllowed(person) !== userIds.includes(person.userId))) throw new Error("API cohort configuration bleed");
+      configs.push(injected);
+      const jwt = app.get(JwtService);
+      app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), jwt)); app.useGlobalFilters(new GlobalErrorFilter());
+      await app.listen(0, "127.0.0.1");
+      const apiUrl = await app.getUrl();
+      for (const p of principals) p.token = jwt.sign({ sub: p.userId, sid: p.sessionId, role: "buyer" }, { expiresIn: "1h" });
+      for (const visit of members) visit.apiUrl = apiUrl;
+      instances.push({ cohort, apiUrl, userIds, configServiceDistinct: true, ownPrincipalsAccepted: true,
+        foreignPrincipalsRejected: allPeople.length - principals.length, ignoreEnvVars: true, skipProcessEnv: true });
+    }
+    // Check every instance again after all compositions: later modules must not
+    // mutate an earlier app's injected allowlist or runtime admission snapshot.
+    for (const [index, app] of apps.entries()) {
+      const ids = instances[index].userIds;
+      if (JSON.stringify(app.get(ConfigService).get("DIAGNOSTIC_SYNTHETIC_USER_IDS")) !== JSON.stringify(ids) ||
+        allPeople.some(person => app.get(DIAGNOSTIC_RUNTIME).syntheticAllowed(person) !== ids.includes(person.userId))) throw new Error("Later API cohort changed earlier admission");
+    }
+    await writeFile(join(root, "api-cohorts.json"), JSON.stringify({ apiPid: process.pid, immutableEnvironmentSnapshot: true, instances,
+      recheckedAfterAllCompositions: true }, null, 2), { flag: "wx" });
+    const apiUrl = visits[0].apiUrl;
     const templateRoutes = [];
     for (const [index, visit] of visits.entries()) {
       if (index === 1) { visit.templateId = visits[0].templateId; continue; }
-      const response = await fetch(`${apiUrl}/api/v1/diagnostics/centers/${visit.centerId}/templates`, { method: "POST",
+      const response = await fetch(`${visit.apiUrl}/api/v1/diagnostics/centers/${visit.centerId}/templates`, { method: "POST",
         headers: { authorization: `Bearer ${visit.people.reception.token}`, "content-type": "application/json" }, signal: AbortSignal.timeout(5000),
         body: JSON.stringify({ expectedVersion: 0, synthetic: true, definition: { title: localized, limitations: localized, syntheticNotice: localized,
           checks: [{ id: "brakes", label: localized, required: true, evidenceRequired: false, measurement: null }], panels: [] } }) });
@@ -186,7 +214,7 @@ try {
       }
     }
     const bootstrapReceipt = join(root, "bootstrap.json");
-    const resourceIdentity = { ...config.resourceIdentity, apiPid: process.pid, apiUrl, bootstrapReceipt };
+    const resourceIdentity = { ...config.resourceIdentity, apiPid: process.pid, apiUrl, apiUrls: instances.map(instance => instance.apiUrl), bootstrapReceipt };
     await writeFile(bootstrapReceipt, JSON.stringify({ dependency, migrations, resourceIdentity, roles, people: Object.fromEntries(Object.entries(people).map(([who, p]) => [who, { userId: p.userId, sessionId: p.sessionId }])),
       centerId, listingIds, templateId, vin, visits: visits.map(({ people: group, ...visit }) => ({ ...visit, people: Object.fromEntries(Object.entries(group).map(([who, person]) => [who, { userId: person.userId, sessionId: person.sessionId }])) })), sourceAndLoadedFiles, loadedFiles, readiness: ready, clocks: "real advancing wall clock", commands: "Production template route; cross-context prerequisite writes listed in bootstrap source", cleanup: "Stop this process; run cleanup mode; destroy exact recorded task Compose project with volumes" }, null, 2), { flag: "wx" });
     await writeFile(privatePath, JSON.stringify({ dependency, evidenceDir: root, resourceIdentity, apiUrl, centerId, templateId, listingIds, vin, people, visits, sourceAndLoadedFiles }, null, 2), { mode: 0o600, flag: "wx" });
@@ -199,6 +227,6 @@ try {
   await writeFile(join(root, `bootstrap-first-failure-${Date.now()}.json`), JSON.stringify({ dependency, mode, message: String(error), stack: error?.stack }, null, 2), { flag: "wx" });
   throw error;
 } finally {
-  await app?.close();
+  for (const app of apps) await app.close();
   await owner.onModuleDestroy();
 }
