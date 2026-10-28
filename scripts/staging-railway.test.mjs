@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 const policy = { projectId:'project', environmentId:'stage', environmentName:'staging', services:{api:'api',worker:'worker'}, credentialScope:'project:project:stage',
   origins:{database:'postgresql://postgres.railway.internal:5432/railway',media:'http://minio.railway.internal:9000',publicMedia:'https://media.example',api:'https://api.example'} };
+const cliPolicy = { ...policy, credentialScope: 'cli-session:project:stage' };
 function boundary(overrides = {}) {
   const variables = { APP_ENV:'staging',SMS_DRIVER:'mock',EMAIL_DRIVER:'mock',PUSH_TRANSPORT:'test', REDIS_URL:'redis://u:SECRET@redis.railway.internal:6379/0', DATABASE_URL:'postgresql://user:SECRET@postgres.railway.internal:5432/railway',MINIO_ENDPOINT:policy.origins.media,MINIO_PUBLIC_URL:policy.origins.publicMedia };
   return async (_url, options) => {
@@ -28,6 +29,65 @@ function boundary(overrides = {}) {
 test('Railway attestation reads fresh scoped API identity and origins without returning credentials',async()=>{
   const platform=new RailwayPlatform({token:'SECRET',fetch:boundary()});
   const result=await platform.attest(policy); assert.deepEqual(result,policy); assert.equal(JSON.stringify(result).includes('SECRET'),false);
+});
+test('an existing CLI login attests the exact reserved staging target without exporting a token', async () => {
+  const requests = [];
+  const network = boundary();
+  const platform = new RailwayPlatform({ command: async (program, args) => {
+    requests.push([program, args]);
+    if (args[0] === 'status') return JSON.stringify({ id: 'project',
+      environments: { edges: [{ node: { id: 'stage', name: 'staging', canAccess: true } }] },
+      services: { edges: [{ node: { id: 'api' } }, { node: { id: 'worker' } }] } });
+    assert.equal(args[0], 'api');
+    const response = await network('', { body: JSON.stringify({ query: args[1], variables: JSON.parse(args[3]) }) });
+    return JSON.stringify(await response.json());
+  }, fetch: async () => { throw new Error('CLI login must not extract credentials for direct HTTP'); } });
+  assert.deepEqual(await new StagingControl({ policy: cliPolicy, platform }).attest(), cliPolicy);
+  assert.deepEqual(requests[0], ['railway', ['status', '--project', 'project', '--environment', 'stage', '--json']]);
+  assert.ok(requests.every(([program, args]) => program === 'railway' && !JSON.stringify(args).includes('SECRET')));
+  assert.ok(requests.filter(([, args]) => args[0] === 'api').every(([, args]) => args.at(-1) === '--compact'));
+});
+test('CLI session attestation refuses changed target, denied access and unavailable login before reading variables', async () => {
+  const target = { id: 'project', environments: { edges: [{ node: { id: 'stage', name: 'staging', canAccess: true } }] },
+    services: { edges: [{ node: { id: 'api' } }, { node: { id: 'worker' } }] } };
+  for (const fault of ['project', 'environment', 'production', 'denied', 'service', 'unauthorized']) {
+    const observed = structuredClone(target);
+    if (fault === 'project') observed.id = 'other';
+    if (fault === 'environment') observed.environments.edges[0].node.id = 'other';
+    if (fault === 'production') observed.environments.edges[0].node.name = 'production';
+    if (fault === 'denied') observed.environments.edges[0].node.canAccess = false;
+    if (fault === 'service') observed.services.edges.pop();
+    const commands = [];
+    const platform = new RailwayPlatform({ command: async (_program, args) => {
+      commands.push(args);
+      if (fault === 'unauthorized') throw new Error('Unauthorized SECRET');
+      return JSON.stringify(observed);
+    } });
+    await assert.rejects(platform.attest(cliPolicy), error => !error.message.includes('SECRET'));
+    assert.equal(commands.length, 1, fault);
+    assert.equal(commands[0][0], 'status', fault);
+  }
+});
+test('credential modes cannot masquerade as project tokens or fall back after a scoped-token refusal', async () => {
+  let commands = 0;
+  const command = async () => { commands++; throw new Error('Unexpected CLI command'); };
+  await assert.rejects(new RailwayPlatform({ command }).attest(policy), /credential mode/);
+  await assert.rejects(new RailwayPlatform({ token: 'SECRET', command, fetch: boundary() }).attest(cliPolicy), /credential mode/);
+  await assert.rejects(new RailwayPlatform({ token: 'SECRET', command, fetch: async () => { throw new Error('Unauthorized SECRET'); } }).attest(policy),
+    error => !error.message.includes('SECRET'));
+  assert.equal(commands, 0);
+});
+test('CLI GraphQL failures stay private and an unattested session cannot query', async () => {
+  let commands = 0;
+  const platform = new RailwayPlatform({ command: async () => { commands++; throw new Error('SECRET'); } });
+  await assert.rejects(platform.query('query { anything }'), error => !error.message.includes('SECRET'));
+  assert.equal(commands, 0);
+  for (const output of ['SECRET', JSON.stringify({ errors: [{ message: 'SECRET' }] }), JSON.stringify({ data: null })]) {
+    const failing = new RailwayPlatform({ command: async (_program, args) => args[0] === 'status'
+      ? JSON.stringify({ id: 'project', environments: { edges: [{ node: { id: 'stage', name: 'staging', canAccess: true } }] },
+        services: { edges: [{ node: { id: 'api' } }, { node: { id: 'worker' } }] } }) : output });
+    await assert.rejects(failing.attest(cliPolicy), error => !error.message.includes('SECRET'));
+  }
 });
 test('production, scope mismatch and database host overrides are refused by the actual Railway adapter',async()=>{
   for(const changes of [{production:true},{scope:{projectId:'project',environmentId:'production'}},{variables:{DATABASE_URL:'postgresql://u:SECRET@postgres.railway.internal/db?host=prod'}},{variables:{SMS_DRIVER:'gateway'}}]){

@@ -29,7 +29,8 @@ export class RailwayPlatform {
     Object.assign(this, { token, fetch, authorization });
     this.command = command ?? (async (program, args) => {
       try { return (await run(program, args, { timeout: 120000, maxBuffer: 4 * 1024 * 1024,
-        env: { ...process.env, RAILWAY_TOKEN: this.token, RAILWAY_CALLER: 'skill:use-railway@1.1.3', RAILWAY_AGENT_SESSION: 'staging-control-901' } })).stdout; }
+        env: { ...process.env, ...(this.token ? { RAILWAY_TOKEN: this.token } : {}),
+          RAILWAY_CALLER: 'skill:use-railway@1.1.3', RAILWAY_AGENT_SESSION: 'staging-control-901' } })).stdout; }
       catch { throw new Error('Railway process failed; diagnostics suppressed'); }
     });
   }
@@ -37,8 +38,13 @@ export class RailwayPlatform {
     if (this.authorization !== `${claim.id}:${claim.candidate}`) throw new Error('Explicit reviewed reservation mutation authorization required');
   }
   async query(query, variables = {}) {
-    if (!this.token) throw new Error('Scoped Railway project token required');
     try {
+      if (!this.token) {
+        if (!this.cliTarget) throw new Error();
+        const value = JSON.parse(await this.command('railway', ['api', query, '--variables', JSON.stringify(variables), '--compact']));
+        if (value.errors || !value.data || typeof value.data !== 'object') throw new Error();
+        return value.data;
+      }
       const response = await this.fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Project-Access-Token': this.token },
         body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(30000) });
       const value = await response.json();
@@ -47,15 +53,31 @@ export class RailwayPlatform {
     } catch { throw new Error('Railway authoritative request failed; diagnostics suppressed'); }
   }
   async attest(policy, { requireMock = true } = {}) {
+    this.cliTarget = null;
+    this.redisOrigin = undefined;
     if (policy.environmentName !== 'staging') throw new Error('Production or ambiguous identity refused');
-    const data = await this.query(`query identity($id: String!) { projectToken { projectId environmentId }
-      project(id: $id) { id environments { edges { node { id name } } } services { edges { node { id } } } } }`, { id: policy.projectId });
-    if (data.projectToken.projectId !== policy.projectId || data.projectToken.environmentId !== policy.environmentId || data.project.id !== policy.projectId) throw new Error('Railway credential scope mismatch');
-    const environments = data.project.environments.edges.map(x => x.node);
+    const mode = this.token ? 'project' : 'cli-session';
+    if (policy.credentialScope !== `${mode}:${policy.projectId}:${policy.environmentId}`) throw new Error('Railway credential mode mismatch');
+    let project;
+    if (this.token) {
+      const data = await this.query(`query identity($id: String!) { projectToken { projectId environmentId }
+        project(id: $id) { id environments { edges { node { id name } } } services { edges { node { id } } } } }`, { id: policy.projectId });
+      if (data.projectToken.projectId !== policy.projectId || data.projectToken.environmentId !== policy.environmentId || data.project.id !== policy.projectId) throw new Error('Railway credential scope mismatch');
+      project = data.project;
+    } else {
+      try {
+        project = JSON.parse(await this.command('railway', ['status', '--project', policy.projectId, '--environment', policy.environmentId, '--json']));
+        if (project.id !== policy.projectId || !project.environments?.edges?.some(x =>
+          x.node.id === policy.environmentId && x.node.name === 'staging' && x.node.canAccess === true)) throw new Error();
+      } catch { throw new Error('Railway CLI staging identity unavailable; diagnostics suppressed'); }
+    }
+    const environments = project.environments.edges.map(x => x.node);
     if (environments.filter(x => x.id === policy.environmentId && x.name === 'staging').length !== 1) throw new Error('Authoritative staging identity refused');
     for (const id of Object.values(policy.services)) {
-      if (!data.project.services.edges.some(x => x.node.id === id)) throw new Error('Wrong Railway service');
+      if (!project.services.edges.some(x => x.node.id === id)) throw new Error('Wrong Railway service');
     }
+    // Account-session access is target-attested, never described as a scoped project token.
+    if (!this.token) this.cliTarget = { projectId: policy.projectId, environmentId: policy.environmentId };
     const deliveryOrigins = [];
     for (const [role, serviceId] of Object.entries(policy.services)) {
       const scope = { projectId: policy.projectId, environmentId: policy.environmentId, serviceId };

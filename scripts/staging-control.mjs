@@ -62,7 +62,7 @@ function validPolicy(p) {
       Object.keys(p.origins ?? {}).sort().join(',') !== 'api,database,media,publicMedia') throw new Error('Explicit staging identity schema required');
   if ([p.projectId, p.environmentId, ...Object.values(p.services ?? {})].some(x => typeof x !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(x))) throw new Error('Invalid staging identity IDs');
   if (p.environmentName !== 'staging' || !p.projectId || !p.environmentId ||
-      !p.services?.api || !p.services?.worker || p.credentialScope !== `project:${p.projectId}:${p.environmentId}`) throw new Error('Staging identity or credential scope refused');
+      !p.services?.api || !p.services?.worker || ![`project:${p.projectId}:${p.environmentId}`, `cli-session:${p.projectId}:${p.environmentId}`].includes(p.credentialScope)) throw new Error('Staging identity or credential scope refused');
   if (Object.keys(p.services).some((k) => !['api', 'worker', 'admin', 'web'].includes(k))) throw new Error('Unknown staging service');
   for (const key of ['database', 'media', 'publicMedia', 'api']) {
     let url; try { url = new URL(p.origins[key]); } catch { throw new Error('Explicit staging origins required'); }

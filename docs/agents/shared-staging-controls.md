@@ -17,7 +17,7 @@ Other commands require a credential-free policy JSON with exactly these fields:
     "api": "6db6f1b1-5c7a-4033-88d0-53f5f315bfc0",
     "worker": "24aa02e0-25a9-4e80-9cc2-c1795ef82091"
   },
-  "credentialScope": "project:176ddec0-dd65-4087-b82c-798599fc2ebe:652abc79-fdb0-48b0-9f6c-ad0ff572d7b2",
+  "credentialScope": "cli-session:176ddec0-dd65-4087-b82c-798599fc2ebe:652abc79-fdb0-48b0-9f6c-ad0ff572d7b2",
   "origins": {
     "database": "postgresql://postgres.railway.internal:5432/REPLACE_WITH_VERIFIED_DATABASE",
     "media": "http://minio.railway.internal:9000",
@@ -27,7 +27,11 @@ Other commands require a credential-free policy JSON with exactly these fields:
 }
 ```
 
-The IDs above were read through the Railway CLI on 15 October 2026 UTC. They are discovery evidence only. Origins in the example are placeholders; use the sanitized live-discovery receipt in issue 901 evidence, then revalidate before use. Include `admin`/`web` service IDs when they are part of the candidate. Current read-only discovery found staging worker EMAIL_DRIVER=resend and PUSH_TRANSPORT=fcm. Application mutations correctly refuse that configuration until the coordinator prepares mock email/test push under a reservation. A project token scoped to the exact staging environment must be supplied through `STAGING_RAILWAY_PROJECT_TOKEN` from the operator secret store. Never put its value in arguments, JSON files, commits or evidence. Account-wide credentials are not accepted by the GraphQL adapter.
+The IDs above were read through the Railway CLI on 15 October 2026 UTC. They are discovery evidence only. Origins in the example are placeholders; use the sanitized live-discovery receipt in issue 901 evidence, then revalidate before use. Include `admin`/`web` service IDs when they are part of the candidate. Historical discovery found staging worker EMAIL_DRIVER=resend and PUSH_TRANSPORT=fcm. Application mutations refuse that configuration until the coordinator prepares mock email/test push under a reservation.
+
+Use the [existing CLI login](cli-access.md) with `credentialScope` set to `cli-session:<projectId>:<environmentId>`. The adapter verifies fresh explicit project/environment status, staging name, access and service IDs before reading variables through `railway api`. It verifies the same origins, mock delivery and migration ownership as token mode. This is target attestation using an account session; it does not claim that the credential itself is project-scoped. No CLI-store credential is exported or passed to direct HTTP.
+
+An existing project token remains supported through `STAGING_RAILWAY_PROJECT_TOKEN` with `credentialScope` set to `project:<projectId>:<environmentId>`. That path independently verifies the token's exact project/environment scope. A supplied token's refusal never falls back to the CLI session. Never put token values in arguments, policy JSON, commits or evidence. Both modes retain reservation ownership, reviewed mutation authorization, live runtime checks and restoration gates.
 
 ```sh
 pnpm staging:control identity /tmp/staging-policy.json
