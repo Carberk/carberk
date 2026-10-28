@@ -103,8 +103,18 @@ export const DiagnosticFindingSchema = z.object({
   location: z.object({ panelId: stableId, view: z.enum(["front", "rear", "left", "right", "top"]), x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).strict().nullable(),
 }).strict();
 export const DiagnosticDraftCreateSchema = z.object({ reportId: z.string().uuid(), expectedOrderVersion: z.number().int().nonnegative() }).strict();
+/** Customer-facing vehicle description, distinct from restricted physical identity evidence. */
+export const DiagnosticVehicleDisplaySchema = z.object({ make: restrictedText(80), model: restrictedText(80), year: z.number().int().min(1886).max(2100) }).strict();
+export const DiagnosticReleaseIdentitySchema = z.object({
+  version: z.literal(1),
+  center: z.object({ id: z.string().uuid(), names: LocalizedDiagnosticTextSchema }).strict(),
+  vehicle: z.object({ method: z.enum(["vin", "manual"]), maskedVin: z.string().regex(/^\*{13}[A-HJ-NPR-Z0-9]{4}$/).nullable(),
+    display: DiagnosticVehicleDisplaySchema.nullable(),
+    catalog: z.object({ brandId: z.string().uuid(), modelId: z.string().uuid(), year: z.number().int().nullable() }).strict().nullable(),
+  }).strict(),
+}).strict();
 export const DiagnosticFindingSaveSchema = z.object({ expectedVersion: z.number().int().nonnegative(), finding: DiagnosticFindingSchema }).strict();
-export const DiagnosticReportTransitionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), action: z.enum(["submit", "return", "finalize", "withdraw"]), reason: z.string().trim().min(1).max(1000).optional(), privateSelfReview: z.boolean().optional() }).strict();
+export const DiagnosticReportTransitionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), action: z.enum(["submit", "return", "finalize", "withdraw"]), reason: z.string().trim().min(1).max(1000).optional(), privateSelfReview: z.boolean().optional(), vehicleDisplay: DiagnosticVehicleDisplaySchema.optional() }).strict().refine(value => !value.vehicleDisplay || value.action === "finalize", "Vehicle display is accepted only at finalization");
 export const DiagnosticCorrectionSchema = z.object({ expectedVersion: z.number().int().nonnegative(), successorId: z.string().uuid(), reason: z.string().trim().min(1).max(1000) }).strict();
 /** Links a new physical visit's first report to a released or withdrawn predecessor on another order. */
 /** `proofId` names the pair-bound continuity proof. Omitted proof IDs receive a uniform protected refusal. */
@@ -122,6 +132,7 @@ export const DiagnosticReportSchema = z.object({
   withdrawnAt: z.string().datetime().nullable(), withdrawalReason: z.string().nullable(), version: z.number().int().nonnegative(),
   template: DiagnosticTemplateDefinitionSchema, synthetic: z.boolean(), supersededBy: z.string().uuid().nullable().default(null),
   lineageKind: DiagnosticLineageKindSchema.optional().catch(undefined), successorKind: z.enum(["correction", "reinspection"]).optional().catch(undefined),
+  releaseIdentity: DiagnosticReleaseIdentitySchema.optional(),
 });
 export type DiagnosticFinding = z.infer<typeof DiagnosticFindingSchema>;
 export type DiagnosticDraftCreate = z.infer<typeof DiagnosticDraftCreateSchema>;

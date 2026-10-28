@@ -22,7 +22,7 @@ import { DiagnosticDiscoveryCursor } from "../../../diagnostics/infrastructure/D
 import type { DiagnosticObjects } from "../../../diagnostics/domain/ports/DiagnosticObjects";
 
 type Row = Record<string, unknown>;
-const tables = { user: "users", session: "sessions", staffGrant: "staff_grants", inspectionOrder: "inspection_orders", diagnosticReportRecord: "diagnostic_reports", diagnosticIdentityRecord: "diagnostic_identity_records", diagnosticIdentityEvidence: "diagnostic_identity_evidence", diagnosticIdentityProvenance: "diagnostic_identity_provenance", diagnosticEvidence: "diagnostic_evidence", diagnosticAudit: "diagnostic_audits", diagnosticOrderAssignment: "diagnostic_order_assignments", diagnosticCenterAssignment: "diagnostic_center_assignments", dealershipMember: "dealership_members", diagnosticTemplateVersion: "diagnostic_template_versions", diagnosticPdfArtifact: "diagnostic_pdf_artifacts", diagnosticContinuityRequest: "diagnostic_continuity_requests", diagnosticContinuityProof: "diagnostic_continuity_proofs", listing: "listings" };
+const tables = { diagnosticCenter: "diagnostic_centers", user: "users", session: "sessions", staffGrant: "staff_grants", inspectionOrder: "inspection_orders", diagnosticReportRecord: "diagnostic_reports", diagnosticIdentityRecord: "diagnostic_identity_records", diagnosticIdentityEvidence: "diagnostic_identity_evidence", diagnosticIdentityProvenance: "diagnostic_identity_provenance", diagnosticEvidence: "diagnostic_evidence", diagnosticAudit: "diagnostic_audits", diagnosticOrderAssignment: "diagnostic_order_assignments", diagnosticCenterAssignment: "diagnostic_center_assignments", dealershipMember: "dealership_members", diagnosticTemplateVersion: "diagnostic_template_versions", diagnosticPdfArtifact: "diagnostic_pdf_artifacts", diagnosticContinuityRequest: "diagnostic_continuity_requests", diagnosticContinuityProof: "diagnostic_continuity_proofs", listing: "listings" };
 type Model = keyof typeof tables;
 type Delegate = { findUnique(args: { where: Row }): Promise<Row | null>; findMany(): Promise<Row[]> };
 /** Finite database-boundary protocol replies and atomic rollback. No PostgreSQL
@@ -123,6 +123,7 @@ export function reportPreparedHarness() {
     seed("diagnosticOrderAssignment", { id: id(12 + n), orderId, userId: subject.userId, capability, revokedAt: null });
   }
   const text = { en: "Synthetic", ru: "Synthetic", tk: "Synthetic" };
+  seed("diagnosticCenter", { id: centerId, names: text });
   seed("diagnosticTemplateVersion", { id: id(9), synthetic: true, definition: { title: text, limitations: text, syntheticNotice: text, checks: [{ id: "brakes", label: text, required: false, evidenceRequired: false, measurement: null }], panels: [] } });
   const observation = { method: "manual", vin: null, manualReference: "Synthetic plate", mileageKm: 100, observedAt: "2026-10-25T11:00:00.000Z" };
   seed("inspectionOrder", { id: orderId, centerId, templateVersionId: id(9), status: "arrived", physicalAuthorization: {}, version: 1, identityEvidenceGeneration: 0, synthetic: true, erasedAt: null, listingId: null, audience: "buyer_private", commissionerId: subject.userId, observedVehicle: observation });
@@ -138,5 +139,5 @@ export function reportPreparedHarness() {
       await diagnosticReadPrefix(tx, diagnosticRoots(subject, [order.id]));
       return { proposal, unlocked, locked: await evidence.identity(tx, order, observation, pin) };
     }),
-    clock: (now: Date) => { clock = now; }, onRead: (fn?: () => Promise<void>) => { onRead = fn; }, failFinish: () => { finishFailure = true; }, failWrite: (model: Model) => { writeFailure = model; } };
+    clock: (now: Date) => { clock = now; }, onRead: (fn?: () => Promise<void>) => { onRead = fn; }, clearFailures: () => { finishFailure = false; writeFailure = undefined; }, failFinish: () => { finishFailure = true; }, failWrite: (model: Model) => { writeFailure = model; } };
 }

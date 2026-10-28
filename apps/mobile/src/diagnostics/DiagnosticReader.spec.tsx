@@ -19,6 +19,14 @@ beforeEach(async()=>{
  await clearAuthSession(); await storeAuthSession({accessToken:"synthetic",refreshToken:"refresh",user:{id:user,phone:null,email:null,displayName:null,role:"buyer"}});denied=false;ready=false;downloads=0;
  server.use(http.get("*/diagnostics/reports/:id",()=>denied?HttpResponse.json({code:"DIAGNOSTIC_NO_ACCESS"},{status:403}):HttpResponse.json(report)),http.get("*/diagnostics/reports/:id/documents",()=>HttpResponse.json([{id,locale:"en",state:ready?"ready":"pending",generation:1,rendererVersion:"v1",generatedAt:ready?"2026-10-18T10:00:00.000Z":null,retryAt:null}])),http.get("*/diagnostics/reports/:id/documents/en",({request})=>{expect(request.headers.get("Authorization")).toBe("Bearer synthetic");downloads++;return new HttpResponse(new Uint8Array([37,80,68,70]),{headers:{"Content-Type":"application/pdf"}});}));
 });
+it.each(["en","ru","tk"] as const)("shows safe released vehicle and center facts in %s",async locale=>{
+ const names={en:"Ashgabat test center",ru:"Тестовый центр Ашхабада",tk:"Aşgabat synag merkezi"};
+ server.use(http.get("*/diagnostics/reports/:id",()=>HttpResponse.json({...report,releaseIdentity:{version:1,center:{id,names},vehicle:{method:"manual",maskedVin:null,display:{make:"Toyota",model:"Camry",year:2018},catalog:null}}})));
+ const view=await renderMobile(<DiagnosticReader id={id} audience="private"/>,{locale});
+ expect(await view.findByText(new RegExp(names[locale]))).toBeTruthy();
+ expect(view.getByText(/Toyota Camry 2018/)).toBeTruthy();
+ expect(view.queryByText(/manualReference|identityRecordId/)).toBeNull();
+});
 it.each([["en","Brake response"],["ru","Работа тормозов"],["tk","Tormozlaryň işleýşi"]])("shows complete released findings with localized checks in %s",async(locale,label)=>{
  const view=await renderMobile(<DiagnosticReader id={id} audience="private"/>,{locale});expect(await view.findByText(label??"")).toBeTruthy();expect(view.getByText("Synthetic observed fault")).toBeTruthy();expect(view.getByText(/125 µm/)).toBeTruthy();expect(view.getByText(/±5 µm/)).toBeTruthy();expect(view.getByText(/123.?000/)).toBeTruthy();
 });

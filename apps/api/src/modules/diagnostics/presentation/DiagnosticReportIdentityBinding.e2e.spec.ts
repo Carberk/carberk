@@ -130,12 +130,22 @@ describe("reports retain the identity selected at first draft creation", () => {
     const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const { body: released } = await get("reviewer", `reports/${draft.id}`).expect(200);
     expect(released).toMatchObject({ version: 3, status: "finalized", observedAt: original.observedAt, mileageKm: 123000 });
     const commissionerBefore = (await get("buyer", `reports/${draft.id}`).expect(200)).body;
     const publicRead = () => request.get(`/api/v1/public-diagnostics/reports/${draft.id}`);
     const publicBefore = (await publicRead().expect(200)).body;
+    const safeIdentity = { version: 1, center: { id: centerId, names: localized },
+      vehicle: { method: "manual", maskedVin: null, display: { make: "Synthetic make", model: "Synthetic model", year: 2018 }, catalog: null } };
+    expect(commissionerBefore.releaseIdentity).toEqual(safeIdentity);
+    expect(publicBefore.releaseIdentity).toEqual(safeIdentity);
+    for (const reader of [commissionerBefore, publicBefore]) {
+      expect(JSON.stringify(reader)).not.toContain(original.manualReference);
+      expect(JSON.stringify(reader)).not.toContain(duringDraft.manualReference);
+      expect(JSON.stringify(reader)).not.toContain(ia.id);
+      expect(JSON.stringify(reader)).not.toContain(ia.observationHash);
+    }
 
     ({ body: a } = await post("technician", `orders/${a.id}/vehicle`, { expectedVersion: 9, ...later }).expect(201));
     expect(a).toMatchObject({ version: 10, observedVehicle: later });
@@ -189,7 +199,7 @@ describe("reports retain the identity selected at first draft creation", () => {
     expect(correction).toMatchObject({ status: "draft", version: 0, successorOf: draft.id, lineageKind: "correction", observedAt: original.observedAt, mileageKm: 123000 });
     noPin(correction);
     await post("technician", `reports/${correction.id}/transition`, { expectedVersion: 0, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${correction.id}/transition`, { expectedVersion: 1, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${correction.id}/transition`, { expectedVersion: 1, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const correctedComparison = await get("reviewer", comparisonPath(b.id, correction.id)).expect(200);
     privateNoStore(correctedComparison);
     expect(correctedComparison.body).toEqual({ predecessor: { ...expected.predecessor, reportId: correction.id, reportVersion: 2,

@@ -395,7 +395,7 @@ describe("classified forward ownership on real HTTP and disposable PostgreSQL", 
     await post("technician", `reports/${reportId}/findings`, { expectedVersion: 0, finding: { id: randomUUID(), checkId: "brakes", assessment: "normal",
       explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null } }).expect(201);
     await post("technician", `reports/${reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    const response = await post(reviewer, `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize" });
+    const response = await post(reviewer, `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     for (const artifact of await db.diagnosticPdfArtifact.findMany({ where: { reportId } })) keys.add(artifact.objectKey);
     expect(response.status, JSON.stringify(response.body)).toBe(201);
   }

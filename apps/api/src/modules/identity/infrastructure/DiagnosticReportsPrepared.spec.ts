@@ -5,6 +5,54 @@ import { describe, expect, it } from "vitest";
 import { reportPreparedHarness } from "../application/testing/ReportPreparedHarness";
 const draft = (h: ReturnType<typeof reportPreparedHarness>) => h.reports.create(h.subject, h.orderId, { reportId: h.reportId, expectedOrderVersion: 1 });
 describe("report outer source transactions", () => {
+  it.each([
+    ["1hgcm82633a001234", "*************1234"],
+    ["1HGCM82633A00I234", null],
+    ["SHORT-SECRET-1234", null],
+  ] as const)("releases only the approved safe projection of observed VIN %s", async (vin, maskedVin) => {
+    const h = reportPreparedHarness();
+    const observation = { method: "vin", vin, manualReference: "Restricted internal comment", mileageKm: 100, observedAt: "2026-10-25T11:00:00.000Z" };
+    await h.db.inspectionOrder.update({ where: { id: h.orderId }, data: { observedVehicle: observation } });
+    await h.db.diagnosticIdentityRecord.update({ where: { id: h.id(5) }, data: { observation } });
+    await draft(h);
+    await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
+    const released = await h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", privateSelfReview: true, reason: "Authorized synthetic review" });
+    expect(released.releaseIdentity?.vehicle).toEqual({ method: "vin", maskedVin, display: null, catalog: null });
+    const serialized = JSON.stringify(released);
+    expect(serialized).not.toContain(vin);
+    expect(serialized).not.toContain("Restricted internal comment");
+    expect(serialized).not.toContain(h.id(5));
+  });
+  it("refuses an unidentified manual customer release without changing report, audit or artifact state", async () => {
+    const h = reportPreparedHarness(); await draft(h);
+    await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
+    const before = await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } });
+    const audits = await h.db.diagnosticAudit.findMany();
+    await expect(h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", privateSelfReview: true, reason: "Authorized synthetic review" })).rejects.toThrow("REPORT_INCOMPLETE");
+    expect(await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } })).toEqual(before);
+    expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
+    expect(await h.db.diagnosticPdfArtifact.count()).toBe(0);
+  });
+  it.each(["write", "finish"] as const)("rolls safe identity and every locale intent back on %s failure and retries with the same pinned source", async failure => {
+    const h = reportPreparedHarness(); await draft(h);
+    await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
+    const input = { expectedVersion: 1, action: "finalize" as const, privateSelfReview: true, reason: "Authorized synthetic review", vehicleDisplay: { make: "Toyota", model: "Camry", year: 2018 } };
+    const before = await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } });
+    if (failure === "finish") h.failFinish(); else h.failWrite("diagnosticAudit");
+    await expect(h.reports.transition(h.subject, h.reportId, input)).rejects.toThrow(failure === "finish" ? "r5_finish_rollback" : "r5_actual_write_rollback");
+    expect(await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } })).toEqual(before);
+    expect(await h.db.diagnosticPdfArtifact.count()).toBe(0);
+    h.clearFailures();
+    const released = await h.reports.transition(h.subject, h.reportId, input);
+    expect(released.releaseIdentity).toEqual({ version: 1, center: { id: h.id(6), names: { en: "Synthetic", ru: "Synthetic", tk: "Synthetic" } }, vehicle: { method: "manual", maskedVin: null, display: { make: "Toyota", model: "Camry", year: 2018 }, catalog: null } });
+    expect(JSON.stringify(released)).not.toContain("Synthetic plate");
+    const saved = await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } });
+    expect(saved).toMatchObject({ identityRecordId: h.id(5), identityRecordHash: "a".repeat(64) });
+    expect(await h.db.diagnosticPdfArtifact.count()).toBe(3);
+    await h.db.diagnosticCenter.update({ where: { id: h.id(6) }, data: { names: { en: "Renamed", ru: "Renamed", tk: "Renamed" } } });
+    expect((await h.reports.read(h.subject, h.reportId)).releaseIdentity).toEqual(released.releaseIdentity);
+    expect(await h.db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: h.reportId } })).toEqual(saved);
+  });
   it("creates the original pinned draft and audit through one prepared outer transaction", async () => {
     const h = reportPreparedHarness();
     expect(await draft(h)).toMatchObject({ id: h.reportId, status: "draft", version: 0, findings: [] });
@@ -85,7 +133,7 @@ describe("report outer source transactions", () => {
   it("finalizes with three locale intents, opens an exact correction, and withdraws the retained original", async () => {
     const h = reportPreparedHarness(); await draft(h);
     await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
-    expect(await h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", privateSelfReview: true, reason: "Private authorized review" })).toMatchObject({ status: "finalized", version: 2 });
+    expect(await h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 }, privateSelfReview: true, reason: "Private authorized review" })).toMatchObject({ status: "finalized", version: 2 });
     expect((await h.db.diagnosticPdfArtifact.findMany({ orderBy: { locale: "asc" } })).map(row => [row.locale, row.state, row.reportId])).toEqual([["en", "pending", h.reportId], ["ru", "pending", h.reportId], ["tk", "pending", h.reportId]]);
     const input = { successorId: h.id(50), expectedVersion: 2, reason: "Recording correction" };
     const correction = await h.reports.correct(h.subject, h.reportId, input);
@@ -99,7 +147,7 @@ describe("report outer source transactions", () => {
   it.each(["authority", "epoch", "bytes"] as const)("reauthorizes after object I/O and refuses changed %s", async change => {
     const h = reportPreparedHarness(); await draft(h);
     await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
-    await h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", privateSelfReview: true, reason: "Private authorized review" });
+    await h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 }, privateSelfReview: true, reason: "Private authorized review" });
     const artifact = await h.db.diagnosticPdfArtifact.findFirstOrThrow({ where: { reportId: h.reportId, locale: "en" } });
     const bytes = new Uint8Array([37, 80, 68, 70]); h.stored.set(artifact.objectKey, bytes);
     await h.db.diagnosticPdfArtifact.update({ where: { id: artifact.id }, data: { state: "ready", sha256: h.sha(bytes), sizeBytes: bytes.length, verifiedAt: new Date("2026-10-25T12:00:00Z") } });
@@ -137,7 +185,7 @@ async function privatePair(beforeIssue?: (h: ReturnType<typeof reportPreparedHar
   }
   await h.reports.create(h.subject, h.orderId, { reportId: h.reportId, expectedOrderVersion: 2 });
   await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
-  await h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", privateSelfReview: true, reason: "Authorized fixture review" });
+  await h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 }, privateSelfReview: true, reason: "Authorized fixture review" });
   const issuance = { predecessorId: h.reportId, expectedPredecessorVersion: 2, expectedOrderVersion: 2,
     predecessorIdentityRecordId: h.id(5), candidateIdentityRecordId: rawB, linkingTechnicianId: technician.userId,
     method: "comparative_attestation" as const, rationale: "Same physical manufacturer plate", provenanceRecordIds: [h.id(70), h.id(72)] };
@@ -190,7 +238,7 @@ describe("finite report source effects and unlocked proposal", () => {
     await h.reports.transition(h.subject, h.reportId, { expectedVersion: 0, action: "submit" });
     const before = await h.db.diagnosticReportRecord.findMany(), audits = await h.db.diagnosticAudit.findMany();
     if (failure === "finish") h.failFinish(); else h.failWrite("diagnosticPdfArtifact");
-    await expect(h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", privateSelfReview: true, reason: "Private review" })).rejects.toThrow(failure === "finish" ? "r5_finish_rollback" : "r5_actual_write_rollback");
+    await expect(h.reports.transition(h.subject, h.reportId, { expectedVersion: 1, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 }, privateSelfReview: true, reason: "Private review" })).rejects.toThrow(failure === "finish" ? "r5_finish_rollback" : "r5_actual_write_rollback");
     expect(await h.db.diagnosticReportRecord.findMany()).toEqual(before);
     expect(await h.db.diagnosticAudit.findMany()).toEqual(audits);
     expect(await h.db.diagnosticPdfArtifact.findMany()).toEqual([]);

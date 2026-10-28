@@ -172,7 +172,7 @@ describe("classified physical identity evidence and explicit correction history"
     const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     return (await get("reviewer", `reports/${draft.id}`).expect(200)).body;
   }
   async function bytes(who: Person, path: string, image: Image = red) {
@@ -267,7 +267,7 @@ describe("classified physical identity evidence and explicit correction history"
     }
     const { body: editorial } = await post("technician", `reports/${released.id}/corrections`, { expectedVersion: 3, successorId: randomUUID(), reason: "Synthetic editorial correction" }).expect(201);
     await post("technician", `reports/${editorial.id}/transition`, { expectedVersion: 0, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${editorial.id}/transition`, { expectedVersion: 1, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${editorial.id}/transition`, { expectedVersion: 1, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const inherited = await get("reviewer", comparisonPath(b, editorial.id)).expect(200);
     expect(inherited.body).toEqual({ predecessor: { ...pinned.predecessor, reportId: editorial.id, reportVersion: 2, snapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/) }, candidate: pinned.candidate });
     expect(inherited.body.predecessor.snapshotHash).not.toBe(pinned.predecessor.snapshotHash);

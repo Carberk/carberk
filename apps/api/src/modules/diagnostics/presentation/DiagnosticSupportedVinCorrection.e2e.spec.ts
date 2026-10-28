@@ -341,7 +341,7 @@ describe("supported VIN recording correction continuity", { concurrent: false },
     owned.findings.push(finding.id);
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    const finalized = await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" });
+    const finalized = await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     // Capture server-generated intents before any status assertion can interrupt ownership.
     const documents = await db.diagnosticPdfArtifact.findMany({ where: { reportId } });
     owned.pdfs.push(...documents.map(document => document.id));

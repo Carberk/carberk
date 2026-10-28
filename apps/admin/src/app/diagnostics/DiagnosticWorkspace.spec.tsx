@@ -96,6 +96,9 @@ describe("actual diagnostic staff workspace and server actions",()=>{
   report.status="submitted";report.audience="listing_public";context.capabilities.push("diagnostics.reviewer");const view=setup();await open(view);
   expect((view.getByRole("button",{name:diagnosticCopy.en.finalize}) as HTMLButtonElement).disabled).toBe(true);expect(view.queryByLabelText(diagnosticCopy.en.selfReview)).toBeNull();cleanup();
   report.audience="buyer_private";const privateView=setup();await open(privateView);
+  fireEvent.change(privateView.getByLabelText("Vehicle make"),{target:{value:"Synthetic make"}});
+  fireEvent.change(privateView.getByLabelText("Vehicle model"),{target:{value:"Synthetic model"}});
+  fireEvent.change(privateView.getByLabelText("Vehicle year"),{target:{value:"2018"}});
   fireEvent.change(privateView.getByLabelText(diagnosticCopy.en.reason),{target:{value:"Explicit synthetic founder-authorized private self-review"}});
   fireEvent.click(privateView.getByLabelText(diagnosticCopy.en.selfReview));fireEvent.click(privateView.getByRole("button",{name:diagnosticCopy.en.finalize}));
   await waitFor(()=>expect(transitions).toHaveLength(1));expect(transitions[0]?.privateSelfReview).toBe(true);expect(transitions[0]?.reason).toContain("authorized");

@@ -340,7 +340,7 @@ describe("private VIN correction retained conflict and expired ancestor rights",
     owned.findings.push(finding.id);
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    const finalized = await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" });
+    const finalized = await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     const documents = (await get("technician", `reports/${draft.id}/documents`).expect(200)).body as { id: string }[];
     owned.pdfs.push(...documents.map(document => document.id));
     for (const document of documents) owned.keys.add(`diagnostic-pdf/${draft.id}/${document.id}.pdf`);

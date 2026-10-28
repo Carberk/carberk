@@ -215,7 +215,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     return (await get("reviewer", `reports/${draft.id}`).expect(200)).body;
   }
   async function comparativeBytes(b: Order, reportId: string, p: string, image: Image) {
@@ -461,7 +461,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
       .send(Buffer.from(red.input, "base64")).expect(200);
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const released = (await get("reviewer", `reports/${draft.id}`).expect(200)).body;
     const templates = (await get("reception", `centers/${centerId}/templates`).expect(200)).body;
     const definition = { ...released.template, title: { tk: "Gaýtadan", ru: "Повторная", en: "Private follow-up" } };
@@ -1364,7 +1364,7 @@ describe("first private comparative diagnostic continuity proof issuance", () =>
     const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
     await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     expect((await get("buyer", `reports/${input.reportId}`).expect(200)).body).toMatchObject({ status: "finalized", findings: [finding] });
   });
   it.each(["assignment", "issuer Session", "issuer grant", "B qualification", "A rights"] as const)("fences B handoff usability and action after %s over real HTTP/SQL", async change => {

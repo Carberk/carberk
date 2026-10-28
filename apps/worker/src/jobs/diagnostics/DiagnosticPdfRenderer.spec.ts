@@ -23,6 +23,23 @@ function snapshot(count = 1): D.DiagnosticReleasedSnapshot {
 }
 const fonts = async () => ({ regular: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Regular.ttf")), bold: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Bold.ttf")) });
 const centerNames = { tk: "Aşgabat synag merkezi", ru: "Тестовый центр Ашхабада", en: "Ashgabat test center" };
+it("exports every audience and identity method in each locale for page inspection when requested", async () => {
+  const directory = process.env["DIAGNOSTIC_IDENTITY_PROOF_DIR"];
+  if (!directory) return;
+  await mkdir(directory, { recursive: true });
+  for (const locale of ["tk", "ru", "en"] as const) for (const audience of ["buyer_private", "listing_public"] as const) for (const method of ["manual", "vin"] as const) {
+    const current = snapshot(2);
+    current.report.audience = audience;
+    current.report.releaseIdentity = { version: 1, center: { id: id(70), names: centerNames },
+      vehicle: { method, maskedVin: method === "vin" ? "*************1234" : null, display: { make: "Toyota", model: "Camry", year: 2018 }, catalog: null } };
+    const bytes = await renderDiagnosticPdf({ snapshot: current, locale, generatedAt: now, verificationReference: `/diagnostics/reports/${current.report.id}`, photos: [] }, await fonts());
+    await writeFile(`${directory}/${audience}-${method}-${locale}.pdf`, bytes);
+    const text = await readDiagnosticPdfText(bytes);
+    expect(text).toContain(centerNames[locale]);
+    expect(text).toContain("Toyota Camry 2018");
+    for (const finding of current.report.findings) expect(text).toContain(finding.id);
+  }
+});
 it.each(["tk", "ru", "en"] as const)("prints the immutable vehicle and center identity in %s customer copies", async locale => {
   for (const audience of ["buyer_private", "listing_public"] as const) {
     const legacy = snapshot(2);
@@ -34,7 +51,7 @@ it.each(["tk", "ru", "en"] as const)("prints the immutable vehicle and center id
     expect(text).toContain(centerNames[locale]);
     expect(text).toContain("Toyota Camry 2018");
     expect(text).toContain("*************1234");
-    expect(text).toContain(current.report.orderId);
+    expect(text).toContain(current.report.id);
     expect(text).not.toContain("1HGCM82633A001234");
     expect(text).toContain("123456 km");
     for (const finding of current.report.findings) expect(text).toContain(finding.id);
