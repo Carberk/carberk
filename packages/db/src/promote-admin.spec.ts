@@ -208,3 +208,22 @@ describe("runPromoteAdmin", () => {
     await expect(runPromoteAdmin(deps, options)).rejects.toThrow("audit refused");
   });
 });
+
+it.each(["phone", "email"] as const)("refuses unsupported %s role promotion before role or audit effects", async (selector) => {
+  const user = { id: "finite-user", role: "buyer", emailVerifiedAt: new Date("2026-10-26T00:00:00Z") };
+  const state = { user, audits: [] as unknown[] };
+  const before = structuredClone(state);
+  const deps = createDeps({
+    findUserByPhone: async () => user,
+    findUsersByEmail: async () => [user],
+    updateUserRole: async () => { user.role = "admin"; },
+    createAuditLog: async (audit) => { state.audits.push(audit); },
+  });
+  const result = await runPromoteAdmin(deps, {
+    ...(selector === "phone" ? { phone: "+99361234567" } : { email: "finite@example.test" }),
+    reason: "finite maintenance", dryRun: false,
+  });
+  expect(result.exitCode).toBe(1);
+  expect(result.message).toContain("unsupported User.role promotion");
+  expect(state).toEqual(before);
+});

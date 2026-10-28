@@ -4,7 +4,7 @@ import "dotenv/config";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { PrismaClient, type Prisma } from "../generated/prisma/client/client";
+import { PrismaClient } from "../generated/prisma/client/client";
 import { runPromoteAdmin, type PromoteAdminUser } from "../src/promote-admin";
 
 // ECMAScript String.trim whitespace, also used for legacy stored-email matching.
@@ -62,7 +62,7 @@ async function main(): Promise<number> {
     const result = await runPromoteAdmin(
       {
         // Lock before reading the role, including across phone/email invocations.
-        // A waiter sees admin after commit, so it cannot overwrite before.role or audit twice.
+        // Exact selector and campaign reservation checks also apply to dry-run/no-op/refusal.
         transaction: (work) => prisma.$transaction(async (tx) => {
           // Local to this transaction. Ordinary Users need no campaign candidate;
           // reservation tracking requires the exact runtime SHA for promotion.
@@ -96,14 +96,8 @@ async function main(): Promise<number> {
               for (const user of users) await checkReservation(user);
               return users;
             },
-            updateUserRole: async (userId) => {
-              await tx.user.update({ where: { id: userId }, data: { role: "admin" } });
-            },
-            createAuditLog: async (data) => {
-              await tx.auditLog.create({
-                data: { ...data, details: data.details as Prisma.InputJsonValue },
-              });
-            },
+            updateUserRole: async () => { throw new Error("Unsupported User.role promotion"); },
+            createAuditLog: async () => { throw new Error("Unsupported promotion audit"); },
           });
         }),
       },

@@ -2,7 +2,6 @@ import { AuthSchemas } from "@auto-tm/contracts";
 
 const TM_MOBILE_RE = /^\+993[67]\d{7}$/;
 const ADMIN_ROLE = "admin";
-const ADMIN_BOOTSTRAP_PROMOTE = "ADMIN_BOOTSTRAP_PROMOTE";
 
 export interface PromoteAdminUser {
   id: string;
@@ -11,7 +10,7 @@ export interface PromoteAdminUser {
 }
 
 export interface PromoteAdminDeps {
-  /** All reads lock their returned Users until the role and audit commit together. */
+  /** Reads lock exact selector results for reservation, dry-run, no-op and refusal checks. */
   transaction<T>(work: (tx: PromoteAdminTransaction) => Promise<T>): Promise<T>;
 }
 
@@ -100,23 +99,9 @@ export async function runPromoteAdmin(
       };
     }
 
-    await tx.updateUserRole(user.id, ADMIN_ROLE);
-
-    await tx.createAuditLog({
-      actorId: null,
-      action: ADMIN_BOOTSTRAP_PROMOTE,
-      targetType: "user",
-      targetId: user.id,
-      details: {
-        reason: normalizedReason,
-        before: { role: user.role },
-        after: { role: ADMIN_ROLE },
-      },
-    });
-
     return {
-      exitCode: 0,
-      message: `Promoted user ${user.id} to admin`,
+      exitCode: 1,
+      message: "Promotion refused: unsupported User.role promotion; no accepted finite operation covers role + audit DML",
     };
   });
 }
