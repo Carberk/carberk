@@ -27,7 +27,7 @@ it("hides previously visible inventory after a current unavailable response and 
  // Foreground refresh is owned by the screen and query client. Remounting the
  // same public target must fetch current authority instead of trusting cache.
  server.use(http.get("*/public-marketplace/showrooms/:id", () => HttpResponse.json({ code: "NOT_FOUND" }, { status: 404 })));
- screen.unmount(); const next = await renderMobile(<ShowroomScreen businessId={id} />);
+ await screen.unmount(); const next = await renderMobile(<ShowroomScreen businessId={id} />);
  expect(await next.findByRole("button", { name: "Try again" })).toBeTruthy(); expect(next.queryByText("Ahal Motors")).toBeNull();
 });
 

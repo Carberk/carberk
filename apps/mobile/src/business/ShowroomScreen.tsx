@@ -6,22 +6,27 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { PublicMarketplaceSchemas } from "@auto-tm/contracts";
 
 import { apiClient } from "../api/client";
+import { useSafeBack } from "../navigation/useSafeBack";
+import { HOME_HREF } from "../navigation/homeHref";
 
 import { MarketplaceShareActions } from "./MarketplaceShareActions";
 import { marketplaceCopy, readerLocale } from "./showroomCopy";
 
+import { SafeScreen } from "@/components/navigation/SafeScreen";
+import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { PressableScale } from "@/components/ui/pressable-scale";
 
 export function ShowroomScreen({ businessId }: { businessId: string }) {
+ const goBack = useSafeBack(HOME_HREF);
+ const { t: navigationText } = useTranslation("common");
  const { i18n } = useTranslation(); const locale = readerLocale(i18n.language); const c = marketplaceCopy(locale);
  const query = useInfiniteQuery({ queryKey: ["public-showroom", businessId], initialPageParam: undefined as string | undefined, queryFn: ({ pageParam }) => apiClient.get(`/public-marketplace/showrooms/${encodeURIComponent(businessId)}${pageParam ? `?cursor=${encodeURIComponent(pageParam)}` : ""}`, PublicMarketplaceSchemas.PublicShowroomSchema, { auth: false }), getNextPageParam: page => page.nextCursor ?? undefined, staleTime: 0, enabled: !!businessId });
  useFocusEffect(useCallback(() => { if (businessId) void query.refetch(); }, [businessId, query.refetch]));
  const page = query.data?.pages[0]; const business = page?.business;
- return <><Stack.Screen options={{ title: business?.name ?? "Carberk" }} /><ScrollView className="flex-1 bg-background" contentContainerClassName="gap-4 px-5 py-6 pb-12">
+ return <SafeScreen><StackHeader title={business?.name ?? "Carberk"} leading={<BackButton onPress={goBack} accessibilityLabel={navigationText("back")}/>}/><Stack.Screen options={{ title: business?.name ?? "Carberk" }} /><ScrollView className="flex-1 bg-background" contentContainerClassName="gap-4 px-5 py-6 pb-12">
   {query.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : query.isError ? <><Text accessibilityRole="alert">{c.unavailable}</Text><Button onPress={() => { void query.refetch(); }}><Text>{c.retry}</Text></Button></> : business ? <>
-   <Text className="font-heading text-title-1 font-semibold">{business.name}</Text>
    {business.logoUrl && /^https:\/\//.test(business.logoUrl) ? <Image source={{ uri: business.logoUrl }} className="h-16 w-16 rounded-lg" accessibilityIgnoresInvertColors /> : null}
    {business.city ? <Text>{business.city[locale]}</Text> : null}<Text>{business.identityChecked ? c.checked : c.synthetic}</Text>{business.identityChecked ? <Text className="text-muted-foreground">{c.checkedHelp}</Text> : null}{business.address ? <Text>{business.address}</Text> : null}
    <MarketplaceShareActions kind="showrooms" id={business.id} />
@@ -33,5 +38,5 @@ export function ShowroomScreen({ businessId }: { businessId: string }) {
    {query.hasNextPage ? <Button disabled={query.isFetchingNextPage} onPress={() => { void query.fetchNextPage(); }}><Text>{query.isFetchingNextPage ? c.loading : c.more}</Text></Button> : null}
    {business.description || business.hours || business.services ? <View className="mt-4 gap-3"><Text className="font-heading text-title-2 font-semibold">{c.details}</Text>{business.description ? <Text>{business.description}</Text> : null}{business.hours ? <Text>{c.hours}: {business.hours}</Text> : null}{business.services ? <Text>{c.services}: {business.services}</Text> : null}</View> : null}
   </> : null}
- </ScrollView></>;
+ </ScrollView></SafeScreen>;
 }

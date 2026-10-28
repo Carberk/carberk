@@ -77,3 +77,24 @@ Coordinator explicitly extended scope to the same minimal navigation repair in `
 Showroom render RED: `pnpm --filter @auto-tm/mobile exec vitest run src/business/ShowroomScreen.spec.tsx -t 'keeps direct-entry' --maxWorkers=1` fails specifically with missing button `Back` after real HTTP 404 handling. An earlier all-file attempt hit an existing unawaited asynchronous unmount in its preceding recovery test; the isolated run establishes the genuine missing-control red. Preserve logs `/tmp/service-showroom-red.log`, `/tmp/service-showroom-red2.log`. The preceding test's unmount will be awaited before the final full-file rerun.
 
 Per coordinator, iOS export remains an assembly gate. No new test/build/compiler window will start after this finite window is released without coordination.
+
+## Final writer result
+
+CPU explicitly RELEASED to the coordinator after all focused invocations finished. No background command or acceptance resource remains owned by this writer.
+
+- Final mobile command is the 12-file command above plus `src/business/ShowroomScreen.spec.tsx`, all under `--maxWorkers=1`: **13 files / 185 tests PASS**. Includes the strengthened actual History-purpose read after new-request denial and anonymous public-report direct-entry fallback to Home. Showroom uses the same existing `SafeScreen`/`StackHeader`/`BackButton`/`useSafeBack`; the business name appears once in the header. Showroom RED is pinned at `38e86716`, original recovery RED at `ce6d2189`.
+- `pnpm --filter @auto-tm/mobile typecheck`: **PASS**.
+- `pnpm --filter @auto-tm/mobile exec tsc6 --noEmit`: **PASS**.
+- `pnpm --filter @auto-tm/admin typecheck`: **PASS**.
+- `pnpm --filter @auto-tm/admin exec tsc6 --noEmit`: **PASS**.
+- Affected-file ESLint in both workspaces with `--max-warnings 0`: **PASS**, no broad file sweep or automatic unrelated repair. Mobile targets every changed TS/TSX application/test file, including Showroom, excluding generated route declarations; admin targets `ServiceWorkspace.tsx`, its changed two specs, `UploadRightsForm.tsx`, `uploadRightsCopy.ts`.
+- `CI=1 pnpm --filter @auto-tm/mobile exec expo install --check`: **RED**. Exactly `expo@55.0.31` expects `~55.0.32`, and `expo-sharing@55.0.24` expects `~55.0.25`. No other recommended upgrade; the configured TypeScript exclusion is honored. Manifests/lockfile remain unchanged in this recovery. Coordinator requires an exact scoped patch repair later, not a waiver.
+- `git diff --check`: **PASS**.
+
+Final local logs: `/tmp/service-mobile-final.log`, `/tmp/service-mobile-ts7-final.log`, `/tmp/service-mobile-ts6-final.log`, `/tmp/service-mobile-lint-final.log`, `/tmp/service-mobile-expo-check.log`; admin log paths above remain valid. Tests use the real rendered feature/hooks/server actions and HTTP/MSW/native boundaries; they do not establish real browser or native acceptance.
+
+The installed `@expo/router-server` typed-route generator was called with `EXPO_ROUTER_APP_ROOT` pointing to this checkout's `apps/mobile/app` and output directory `apps/mobile/.expo/types`. It generated the existing tracked declaration file without starting Metro or changing router configuration. Its three-line union delta contains the renamed route; no navigation type was widened or cast around it.
+
+Remaining required assembly evidence: exact two-package Expo repair and dependency recheck; iOS export; repository/hosted applicable gates on assembled candidate; independent review; real deployed customer/operator authorization/state and TK/RU/EN responsive/keyboard proof; native safe-area/back, private-document and actual push acceptance. The absent service-availability projection still limits richer activation/audience behavior. No schema/backend dependency is needed for this bounded provenance form. Full #897 campaign remains selected, and none of these remaining gates is claimed passed.
+
+Implementation is a clean checkpoint handoff for assembly, not final acceptance. No issue PR was created, no integration branch was pushed, no force push was used, and old refs/worktrees/prototype sessions were preserved. PR904 is registered with this thread only for association; its branch was not mutated.
