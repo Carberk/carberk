@@ -1,0 +1,2 @@
+Skipped checking dependencies: typescript. These dependencies are listed in expo.install.exclude in package.json. Learn more: https://docs.expo.dev/more/expo-cli/#configuring-dependency-validation
+Dependencies are up to date
