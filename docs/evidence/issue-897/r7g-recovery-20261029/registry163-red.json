@@ -1,0 +1,39 @@
+{
+  "mode": "old",
+  "assertions": [
+    "all77 independent array-entry lookups equal; unknown/null SQL NULL",
+    "full100 unchanged scope-limit refusal and rollback"
+  ],
+  "timingAcceptance": false,
+  "registryHash": "6d7b15db175c3d3e7779a053e8d459f81cc07c163373600ba42e0e91c3a094be",
+  "scopeRegistryCalls": 2185,
+  "outputHashes": {
+    "scope": "ce8ca056ae0fd41de05091651a8bec465e5469106672ad02cfd64d0503ac4690",
+    "keys": "0a9ccdb801fc32672106e296bcede7e1ed1e9ebaadeaeec78637d06f2c28cc56",
+    "effects": "a27fff81a06c359c5781b848daf2d98cb804048a286b48a6a284e000ff58bc1c"
+  },
+  "outputCounts": {
+    "scope": 240,
+    "keys": 370,
+    "effects": 30
+  },
+  "full100": {
+    "sqlstate": "P0001",
+    "message": "diagnostic_source_scope_limit",
+    "context": "PL/pgSQL function diagnostic_source_scope_before_purge(jsonb) line 44 at RAISE\nPL/pgSQL function diagnostic_source_scope_before_intake(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_finite_fk(jsonb) line 4 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_complete_moderation(jsonb) line 33 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_composition(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_listing_publication(jsonb) line 4 at RETURN\nSQL function \"diagnostic_source_scope\" statement 1\nPL/pgSQL function diagnostic_source_insert_receipt() line 15 at assignment\nSQL statement \"INSERT INTO public.diagnostic_source_commands(command) VALUES(command) RETURNING id\"\nPL/pgSQL function diagnostic_prepare_source(jsonb) line 4 at SQL statement"
+  },
+  "receipts": {
+    "source": 0,
+    "campaign": 0
+  },
+  "verdict": "FAIL",
+  "error": {
+    "message": "scope rematerialized registry 2185 times, beyond its 100-pass enumeration cap",
+    "code": "ERR_ASSERTION"
+  },
+  "status": "genuine functional RED before163",
+  "artifact": {
+    "path": "/tmp/897-r7g-worker-attribution-20261029/registry-old.json",
+    "sha256": "d15cfdea8112fd2df7504a43a1f37bc0ff869b2cbdf0de1580e4eb3a14560c5b"
+  }
+}
