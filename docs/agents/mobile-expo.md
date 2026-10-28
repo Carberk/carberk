@@ -4,6 +4,8 @@ Use this checklist for any `mobile` issue, Expo SDK package change, Metro failur
 
 For component behavior tests, use the [mobile testing guide](mobile-testing.md).
 
+For EAS builds and signing, use the host's [existing CLI session and managed credentials](cli-access.md) before requesting access or a keystore.
+
 ## First rule
 
 Do not patch `node_modules`, Codegen, Metro resolution, or native-package entrypoints until Expo's dependency check has run. Expo Go ships native modules at SDK-specific versions; mismatched JavaScript packages can compile and still crash at runtime.
@@ -78,7 +80,7 @@ pnpm --filter @auto-tm/mobile native:metro -- --env pr-842 --port 8842
 pnpm --filter @auto-tm/mobile native:ios -- --udid <SIMULATOR_UUID> --port 8842
 ```
 
-`--env staging` selects staging. The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
+`--env staging` selects staging. The Railway CLI must support `variables --project`; resolve the current authenticated binary under [CLI access](cli-access.md) and set `RAILWAY_CLI` when another binary precedes it on PATH. Historical host paths and versions are not current access evidence. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
 
 Run `native:ios` from the same worktree after Metro reports its guarded bundle is ready. It verifies the selected bundle against the public-origin receipt in gitignored `.expo/` before any native build. Select a simulator that this session owns; an install and launch replace the app on that selected simulator. Preserve other device and Metro sessions.
 

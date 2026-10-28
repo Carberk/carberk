@@ -16,3 +16,5 @@ Input: issue/specification, supplied integration SHA, allowed scope and evidence
 5. Run [verification](VERIFICATION.md). Inspect the complete diff; update an overview when its documented ownership, boundary, constraint or limitation changes. Report base/head SHAs, exact files, evidence per criterion, commands/results, artifacts, open decisions and missing gates to Chief of Staff.
 
 Stop after verified handoff. No reviewers or writing subagents are dispatched by this role. Scope expansion, architecture/product ambiguity, missing nontrivial design, destructive recovery and semantic conflicts return to Chief of Staff. Follow [bail/recovery](BAIL-AND-RECOVERY.md) on refusal or unavailable evidence; never claim completion while required evidence is blocked.
+
+Send prerequisite, allowed-path, base-SHA and resource questions to Chief of Staff through agent messaging under [delegation authority](../../../docs/agents/coding-workflow.md#delegation-authority), rather than founder-facing question tools. Continue independent work within the current allowance while the coordinator resolves the request.

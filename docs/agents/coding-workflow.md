@@ -10,6 +10,12 @@ Shape unresolved intent with [shape-with-docs](../../.claude/skills/shape-with-d
 
 Chief of Staff uses [run-queue](../../.claude/skills/run-queue/SKILL.md) for one bounded parent specification, including a single-task delivery. Record founder authority, exclusions, selected issues, dependencies and completion evidence in the parent. Select within explicit delegation; product ambiguity, architecture decisions and material scope expansion return to the founder.
 
+## Delegation authority
+
+Chief of Staff resolves implementation and handoff decisions within the founder-authorized outcome. This includes supplying existing prerequisites, choosing a verified base, adjusting a child's allowed paths, fixture/setup repairs, justified verification reruns and resource scheduling. Check active ownership and dependencies, update the dispatch contract, and keep one writer per overlapping contract/file and one assembler. A coordinator-imposed file limit is not a founder approval gate.
+
+Children send these questions to Chief of Staff through agent messaging, with the affected paths, prerequisite and proposed resolution. They do not open founder-facing question or approval requests for routine delegated decisions. Chief of Staff uses recorded authority and resolves the dependency or scope adjustment while other independent work continues. Escalate only a genuinely missing external permission/access or a product/architecture/scope decision outside that authority. A broad autonomous-delivery instruction already authorizes ordinary technical choices within the selected criteria; it does not authorize unrelated product expansion. For hosted access, use the [existing CLI sessions](cli-access.md) before requesting credentials.
+
 ## Implement and assemble
 
 1. Inspect existing branches, worktrees, PRs and durable state before assigning a writer. Resume existing attempts with [resume-issue](../../.claude/skills/resume-issue/SKILL.md).
