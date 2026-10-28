@@ -44,7 +44,7 @@ The admin stylesheet overrides imported shared `--background`, `--border` and ra
 | Primary step button | native `min-h-11 rounded-md border px-4 py-2 text-sm font-medium bg-primary text-primary-foreground` | admin primary `.205` / `.922`, foreground `.985` / `.205` |
 | Primary hover/pressed | `hover:opacity-90 active:opacity-80` | retain readable label, verify composited contrast |
 | Secondary button | native min-height/border/padding above; `bg-background text-foreground hover:bg-muted active:bg-accent` | admin background/muted/accent in both modes |
-| Focus | `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current` | foreground-colored outline against background; never half-opacity ring as sole indicator |
+| Focus | `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100` | explicit existing-palette outline against the adjacent page surface, including primary buttons and language selector; verify rendered contrast |
 | Disabled | native `disabled` plus `disabled:opacity-50` | visible associated reason text; never color alone |
 | Error/status | foreground text, heading/prefix and border; `role=alert` or `role=status` | no red/green-only meaning or low-contrast status-token text |
 

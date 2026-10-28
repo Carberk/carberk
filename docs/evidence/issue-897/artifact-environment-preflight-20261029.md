@@ -16,7 +16,7 @@ The resolved non-secret mapping is:
 | staging | `preview` | `internal` | APK | `tm.auto.app` | `2.0.4` | Node `22.23.2`, pnpm `12.11.2` |
 | production | `production` | `store` | AAB | `com.auto_tm.ynamly` | `2.0.4` | Node `22.23.2`, pnpm `12.11.2` |
 
-The profiles resolve to the existing Carberk app and EAS project owned by `tkmdevelopers`. Staging uses the existing staging web origin and production uses the existing production web origin. The command output reported the expected public API/media/WebSocket environment names without recording values or secrets. No EAS build, signing change, upload, store action or device session ran.
+The profiles resolve to the existing Carberk app and EAS project owned by `tkmdevelopers`. Staging uses the existing staging web origin and production uses the existing production web origin. Name-only `eas env:list <preview|production> --format short` checks confirm `GOOGLE_SERVICES_JSON`, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_MEDIA_URL` and `EXPO_PUBLIC_WS_URL` in both environments. No sensitive values or file contents were requested. Package compatibility of the secret Google services files remains a build/inspection gate. No EAS build, signing change, upload, store action or device session ran.
 
 The eventual candidate record must fill these fields from the actual resulting files and deployed reads:
 
