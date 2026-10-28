@@ -2,6 +2,25 @@
 
 Active Chief of Staff: T3 `mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833`, Sol 6.1 xhigh, full access. Founder launch brief dated 29 October 2026 is current authority. Outcome is a usable, tested internal campaign candidate, exact installable staging APK and signed production AAB, acceptance, protected PR #904 merge and restoration. Full #897 scope remains selected.
 
+## Current continuation checkpoint
+
+Recovery assembly `b17a1f4a9c5ccfa6cfa434b1928c1dd6bd10ace6` incorporates the inspected PDF range `b71e8412..0aee768a` as seven provenance-preserving cherry-picks. Service usability and Expo patch alignment were already assembled at `6d9567a0`. The published PR head remains `023e6a5d`; no candidate deployment, artifact build, full CI, final review or merge is claimed.
+
+PDF focused checks passed: contracts 15, renderer 14, API prepared adapter 54, admin 15, web 30, mobile 47. Both compiler versions and affected lint passed across seven workspaces. Twelve real-font locale/audience/identity PDFs have 36 individually inspected A4 pages; original three issued-byte hashes remain unchanged. Evidence is [the release receipt](../issue-916/identity-release-receipt-20261029.md). PostgreSQL lock/race, affected container suites and deployed acceptance remain open. This source is assembled for combined verification, not a passed candidate.
+
+| Contract or resource | Current owner | Execution state |
+|---|---|---|
+| Integration assembly and PR head publication | Coordinator | Sole writer; only recovery branch advanced |
+| Reset/quiescence/operator scripts | Reset child, `t3-ccafc35f` | Exclusive finite `node --test` window; no DB/container/build/live mutation; CLI-session validation and pure object inventory planning only |
+| Finite maintenance commands and migration 162 | R7g, `t3-630f4e85` | Resumed same writer, source-only until reset window release; dirty unverified compatibility patch and local recovery ref preserved |
+| Ownership cleanup contract | Fresh independent read-only reviewer | Determine permitted transaction boundaries; no cap increase, graph truncation or original assertion change |
+| Retained ownership7 / PG65379 / Redis65378 / MinIO65380 | R6c, currently terminal | Preserved, no active connection or mutation; native ownership remains RED at 5000 ms |
+| Staging, build and emulator sessions | Coordinator | Not reserved or started |
+
+R7g evidence checkpoint `7f5738cb` records a read-only parse of 736 ms, then scope refusal after 4492 ms. Offline exact-predicate replay on retained rows yields at least 1101 keys after the first pass without User inventory expansion. This is a lower bound, not an observed runtime trace. No migration 161 exists. Registry lookup optimization alone cannot close the graph-cardinality failure. The independent transaction-boundary review must precede implementation; original 100-grant, independent-component, refusal, rollback and race obligations remain intact.
+
+The reset writer's current source seam may admit only an exact target-bound `cli-session:` credential scope through the existing platform attestation. It must still reach `QUIESCENCE_EVIDENCE_GAP`. Pure all-version/delete-marker/multipart planning may identify exact deletions and preserved catalog references; it provides neither mutation authority nor execution-exclusion proof. Material exclusion design remains subject to independent review.
+
 ## Authority and baseline
 
 - Sole integration PR: https://github.com/Carberk/carberk/pull/904. Registered with this thread at launch. Draft and blocked.
