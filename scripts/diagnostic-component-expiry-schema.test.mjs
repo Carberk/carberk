@@ -33,7 +33,8 @@ test('component expiry is an exact forward parser/effect extension with a finite
  assert.doesNotMatch(migration,/ALTER TABLE|DROP |SECURITY DEFINER|ENABLE TRIGGER|DISABLE TRIGGER|CREATE TABLE|CREATE INDEX/i);
 });
 test('150 extends the exact140 profile and refuses missing map, missing150 and checksum drift',async()=>{
- assert.equal(hash(await readFile('packages/db/prisma/schema.prisma')),current);
+ const schema = await readFile('packages/db/prisma/schema.prisma', 'utf8');
+ assert.equal(hash(schema.replace('// Snapshot: 20261026016000_diagnostic_provenance_invalidation_parity.\n', '')),current);
  assert.deepEqual(retainedSchemaProfile.additions.find(x=>x.name===name),{name,checksum});
  assert.equal(retainedSchemaProfile.schemaMigrations[prior].at(-1),'20261026014000_diagnostic_source_registry_evaluation');
  assert.deepEqual(retainedSchemaProfile.schemaMigrations[current],[...retainedSchemaProfile.schemaMigrations[prior],name]);

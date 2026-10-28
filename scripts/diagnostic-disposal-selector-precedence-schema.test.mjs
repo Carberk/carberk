@@ -27,7 +27,7 @@ test('disposal correction preserves the historical body except the two JSON extr
 
 test('disposal snapshot adds only120 after registered100 and110 and refuses missing map, missing migration and checksum drift', async () => {
   const schema = await readFile('packages/db/prisma/schema.prisma');
-  assert.equal(createHash('sha256').update(schema.toString().replace('\n// Snapshot: 20261026015000_diagnostic_component_expiry_representation.\n', '').replace('\n// Snapshot: 20261026014000_diagnostic_source_registry_evaluation.\n', '').replace('\n// Snapshot: 20261026013000_diagnostic_purge_audit_details_precedence.\n', '')).digest('hex'), current);
+  assert.equal(createHash('sha256').update(schema.toString().replace('// Snapshot: 20261026016000_diagnostic_provenance_invalidation_parity.\n', '').replace('\n// Snapshot: 20261026015000_diagnostic_component_expiry_representation.\n', '').replace('\n// Snapshot: 20261026014000_diagnostic_source_registry_evaluation.\n', '').replace('\n// Snapshot: 20261026013000_diagnostic_purge_audit_details_precedence.\n', '')).digest('hex'), current);
   assert.deepEqual(retainedSchemaProfile.additions.find(entry => entry.name === name), { name, checksum });
   const priorNames = retainedSchemaProfile.schemaMigrations[prior];
   assert.equal(priorNames.at(-2), '20261026010000_diagnostic_automatic_public_continuity');

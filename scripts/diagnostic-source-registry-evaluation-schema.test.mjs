@@ -69,7 +69,7 @@ test('evaluated registry preserves all historical ordered metadata and refuses h
 });
 
 test('140 snapshot extends exact130 inventory and refuses missing map, missing140 and checksum drift', async () => {
- const schema=await readFile('packages/db/prisma/schema.prisma');assert.equal(hash(schema.toString().replace('\n// Snapshot: 20261026015000_diagnostic_component_expiry_representation.\n', '')),current);
+ const schema=await readFile('packages/db/prisma/schema.prisma');assert.equal(hash(schema.toString().replace('// Snapshot: 20261026016000_diagnostic_provenance_invalidation_parity.\n', '').replace('\n// Snapshot: 20261026015000_diagnostic_component_expiry_representation.\n', '')),current);
  assert.deepEqual(retainedSchemaProfile.additions.find(x=>x.name===name),{name,checksum});
  assert.equal(retainedSchemaProfile.schemaMigrations[prior].at(-1),'20261026013000_diagnostic_purge_audit_details_precedence');
  assert.deepEqual(retainedSchemaProfile.schemaMigrations[current],[...retainedSchemaProfile.schemaMigrations[prior],name]);
