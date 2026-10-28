@@ -157,8 +157,8 @@ describe("prepared diagnostic source kernel against migrated PostgreSQL", () => 
     return fixture.grant;
   }
 
-  function sourceCommand(operation: DiagnosticSourceOperation, rows: Plan[]): DiagnosticSourceCommand {
-    return { ...command(operation, rows), cutoff: null } as unknown as DiagnosticSourceCommand;
+  function sourceCommand<O extends DiagnosticSourceOperation>(operation: O, rows: Plan[]): DiagnosticSourceCommand & { operation: O } {
+    return { ...command(operation, rows), cutoff: null } as unknown as DiagnosticSourceCommand & { operation: O };
   }
 
   beforeAll(async () => {

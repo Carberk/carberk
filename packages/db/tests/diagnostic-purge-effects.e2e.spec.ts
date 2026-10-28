@@ -48,7 +48,7 @@ describe("finite account purge effects on migrated PostgreSQL", () => {
       WHERE t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate'`);
     for (const r of rows.rows) await pool.query(`ALTER TABLE public."${r.table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${r.name}"`);
   }
-  async function command(tx: Tx): Promise<DiagnosticSourceCommand> {
+  async function command(tx: Tx): Promise<DiagnosticSourceCommand & { operation: "account_purge" }> {
     const [row] = await tx.$queryRaw<{ source: DiagnosticSourceTuple }[]>`SELECT diagnostic_source_project(to_jsonb(u),diagnostic_source_meta('users')->'fields') AS source FROM users u WHERE id=${uid}`;
     const source = present(row).source;
     return { operation: "account_purge", roots: [{ table: "users", key: { id: uid } }], rows: [{ table: "users", key: { id: uid }, verb: "update", expected: { source },
@@ -672,7 +672,7 @@ describe("finite account purge effects on migrated PostgreSQL", () => {
       if(boundary==="purge")c=await command(tx);
       if(boundary==="listing"){
         const [l]=await tx.$queryRaw<{source:DiagnosticSourceTuple}[]>`SELECT diagnostic_source_project(to_jsonb(l),diagnostic_source_meta('listings')->'fields') source FROM listings l WHERE id=${listing}`;
-        c={...c,operation:"listing_delete",roots:[{table:"listings",key:{id:present(listing)}},{table:"users",key:{id:foreign}}],rows:[{table:"listings",key:{id:present(listing)},verb:"delete",expected:{source:present(l).source},next:null}]};
+        c={actorUserId:c.actorUserId,sessionId:c.sessionId,cutoff:c.cutoff,campaign:c.campaign,operation:"listing_delete",roots:[{table:"listings",key:{id:present(listing)}},{table:"users",key:{id:foreign}}],rows:[{table:"listings",key:{id:present(listing)},verb:"delete",expected:{source:present(l).source},next:null}]};
       }
       sourcePid=present((await tx.$queryRaw<{pid:number}[]>`SELECT pg_backend_pid() pid`)[0]).pid;if(createFirst)entered.release();
       await withDiagnosticSourceCommand(tx,c,async()=>{if(!createFirst){entered.release();await release.promise;}if(boundary==="session")await tx.session.delete({where:{id:actorSession}});else if(boundary==="purge")await ownerPurge(tx);else await tx.listing.delete({where:{id:listing}});});
