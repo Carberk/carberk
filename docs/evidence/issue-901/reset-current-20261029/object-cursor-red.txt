@@ -1,0 +1,25 @@
+✖ a truncated page cannot skip identities using a cursor absent from that page (5.901458ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 39.96925
+
+✖ failing tests:
+
+test at scripts/staging-clean-reset-storage.test.mjs:110:1
+✖ a truncated page cannot skip identities using a cursor absent from that page (5.901458ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-clean-reset-storage.test.mjs:117:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Storage reset refused/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
