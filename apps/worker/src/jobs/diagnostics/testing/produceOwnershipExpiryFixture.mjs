@@ -59,12 +59,12 @@ const commandsFor = fixture => ({
   send: (who, method, path, body, status, binary) => request(fixture, who, method, path, body, status, binary),
 });
 // Keep every order's command/version sequence serial. Only disjoint actor/center
-// groups overlap, with deterministic index-to-result mapping and at most four
+// groups overlap, with deterministic index-to-result mapping and at most five
 // in-flight HTTP requests. Drain active work on failure before preserving state.
 const parallel = async (items, work) => {
   const results = new Array(items.length);
   let next = 0, stopped = false;
-  const outcomes = await Promise.allSettled(Array.from({ length: Math.min(4, items.length) }, async () => {
+  const outcomes = await Promise.allSettled(Array.from({ length: Math.min(5, items.length) }, async () => {
     while (!stopped) {
       const index = next++;
       if (index >= items.length) return;
