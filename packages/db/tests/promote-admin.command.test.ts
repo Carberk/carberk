@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 
@@ -41,6 +41,7 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
   let db: PrismaClient;
 
   async function promote(...args: string[]): Promise<{ code: number; output: string }> {
+    await sourceGuards(true);
     const env = { ...process.env, DATABASE_URL: databaseUrl };
     try {
       const { stdout, stderr } = await run(`${packageDir}node_modules/.bin/tsx`, ["scripts/promote-admin.ts", ...args], { cwd: packageDir, env });
@@ -81,9 +82,45 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
     }
   }
 
+  async function captureDormantFixture() {
+    guardSnapshot = (await pool.query<{ table: string; name: string; mode: string }>(`SELECT c.relname AS table,t.tgname AS name,t.tgenabled AS mode
+      FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY c.relname,t.tgname`)).rows;
+    // Facts are ordinary preactivation setup; behavior runs with every finite guard enabled.
+    await sourceGuards(false);
+  }
+  let guardSnapshot: { table: string; name: string; mode: string }[] = [];
+  async function sourceGuards(enabled: boolean) {
+    const rows = await pool.query<{ table: string; name: string }>(`SELECT c.relname AS table,t.tgname AS name
+      FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND (t.tgname LIKE 'zz_diagnostic_source_%' OR t.tgname LIKE 'zzzz_campaign_preparation%' OR t.tgname='diagnostic_source_no_truncate')
+      ORDER BY c.relname,t.tgname`);
+    for (const row of rows.rows) await pool.query(`ALTER TABLE public."${row.table}" ${enabled ? "ENABLE" : "DISABLE"} TRIGGER "${row.name}"`);
+    if (enabled) expect((await pool.query("SELECT diagnostic_source_guards_ready() ready")).rows).toEqual([{ ready: true }]);
+  }
+  afterEach(async () => {
+    if (!pool) return;
+    expect((await pool.query("SELECT count(*)::int count FROM diagnostic_source_commands")).rows).toEqual([{ count: 0 }]);
+    for (const row of guardSnapshot) {
+      const mode = ({ O: "ENABLE", D: "DISABLE", R: "ENABLE REPLICA", A: "ENABLE ALWAYS" } as Record<string, string>)[row.mode];
+      if (!mode) throw new Error("Unknown fixture trigger mode");
+      await pool.query(`ALTER TABLE public."${row.table}" ${mode} TRIGGER "${row.name}"`);
+    }
+    expect((await pool.query(`SELECT c.relname AS table,t.tgname AS name,t.tgenabled AS mode
+      FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND NOT t.tgisinternal ORDER BY c.relname,t.tgname`)).rows).toEqual(guardSnapshot);
+  });
+
   beforeAll(async () => {
-    container = await new PostgreSqlContainer("postgres:16-alpine").withUsername("auto_tm").withPassword("auto_tm_test").withDatabase("promote_admin_test").start();
-    databaseUrl = container.getConnectionUri();
+    const supplied = process.env["R7G_PROMOTION_DATABASE_URL"];
+    if (supplied) {
+      const address = new URL(supplied);
+      if (address.hostname !== "127.0.0.1" || ["5432", "6379", "9000"].includes(address.port) || !address.pathname.startsWith("/candidatea_r7g_")) throw new Error("Isolated R7g database required");
+      databaseUrl = supplied;
+    } else {
+      container = await new PostgreSqlContainer("postgres:16-alpine").withUsername("auto_tm").withPassword("auto_tm_test").withDatabase("promote_admin_test").start();
+      databaseUrl = container.getConnectionUri();
+    }
     await run(`${packageDir}node_modules/.bin/prisma`, ["migrate", "deploy"], { cwd: packageDir, env: { ...process.env, DATABASE_URL: databaseUrl } });
     pool = new Pool({ connectionString: databaseUrl });
     waitForClientEnds = trackPoolClientEnds(pool);
@@ -98,6 +135,7 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
   });
 
   beforeEach(async () => {
+    await captureDormantFixture();
     await db.auditLog.deleteMany();
     await db.otpRequest.deleteMany();
     await db.session.deleteMany();
@@ -269,6 +307,7 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
       `SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text), '[]'::jsonb) AS state FROM "${table}" t`,
     )).rows[0]?.state));
     const authBefore = await authState();
+    await sourceGuards(true);
     const names = ["promote-race-phone", "promote-race-email"];
     const commands: { child: ReturnType<typeof execFile>; result: Promise<{ code: number | null; output: string }> }[] = [];
     function startCommand(name: string, ...args: string[]) {

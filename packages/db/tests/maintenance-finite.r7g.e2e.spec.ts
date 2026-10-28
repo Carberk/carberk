@@ -26,6 +26,7 @@ import { PrismaReviewerScenarioSeedStore } from "../scripts/reviewer-scenario-st
 import { accountSourceCommand } from "../src/account-source-command";
 import { PrismaTesterAccountStore } from "../src/PrismaTesterAccountStore";
 import { withDiagnosticSourceCommand } from "../src/diagnostic-source-command";
+import { adminPromotionSourceCommand, reviewerCredentialsSourceCommand, testerRemovalSourceCommand } from "../src/maintenance-source-command";
 import { listingSourceCommand } from "../src/listing-source-command";
 import { parseReviewerScenarioAccounts, reviewerScenarioSeedIds, runReviewerScenarioSeed } from "../src/reviewer-scenario-seed";
 import { parseTesterAccounts, runTesterAccounts } from "../src/tester-accounts";
@@ -81,25 +82,29 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     await new Promise<void>((resolve, reject) => inspector.post("Debugger.enable", error => error ? reject(error) : resolve()));
     const migrations = readdirSync(`${packageDir}prisma/migrations`).sort().filter(name => name !== "migration_lock.toml")
       .map(name => ({ name, sha256: sha256(readFileSync(`${packageDir}prisma/migrations/${name}/migration.sql`)) }));
-    expect(migrations).toHaveLength(98);
-    expect(sha256(JSON.stringify(migrations))).toBe("7e6c3b98ddd2a75ef4751be9ff8fb0fbe5b3a7926f3a27eb91e50e3801e78046");
-    evidence.push({ kind: "source", migrations, pins: ["tests/maintenance-finite.r7g.e2e.spec.ts", "scripts/maintenance-listings.ts", "scripts/demo-inventory/application/testing/FakeObjectStore.ts", "src/account-source-command.ts", "scripts/reviewer-scenario-store.ts", "scripts/promote-admin.ts", "scripts/ui-fixture.ts", "scripts/demo-inventory/seed.ts", "scripts/demo-inventory/remove.ts", "src/reviewer-scenario-seed.ts", "src/promote-admin.ts", "src/tester-accounts.ts", "src/PrismaTesterAccountStore.ts", "generated/prisma/client/client.ts", "dist/src/index.js", "../contracts/dist/index.js"]
+    expect(migrations).toHaveLength(99);
+    expect(sha256(JSON.stringify(migrations))).toBe("7a0b668e071403351356300f5e4d6028bd61c32d2cca9271cdb4bcfcce3e7792");
+    evidence.push({ kind: "source", migrations, pins: ["tests/maintenance-finite.r7g.e2e.spec.ts", "scripts/maintenance-listings.ts", "scripts/demo-inventory/application/testing/FakeObjectStore.ts", "src/account-source-command.ts", "src/maintenance-source-command.ts", "src/PrismaAdminPromotionStore.ts", "src/diagnostic-source-command.ts", "scripts/reviewer-scenario-store.ts", "scripts/promote-admin.ts", "scripts/ui-fixture.ts", "scripts/demo-inventory/seed.ts", "scripts/demo-inventory/remove.ts", "src/reviewer-scenario-seed.ts", "src/promote-admin.ts", "src/tester-accounts.ts", "src/PrismaTesterAccountStore.ts", "generated/prisma/client/client.ts", "dist/src/index.js", "../contracts/dist/index.js"]
       .map(path => ({ path, sha256: sha256(readFileSync(`${packageDir}${path}`)) })) });
-    container = await new PostgreSqlContainer("postgres:17-alpine").start();
-    evidence.push({ kind: "resource", containerId: container.getId(), role });
-    control = new Pool({ connectionString: container.getConnectionUri() });
+    const supplied = process.env["R7G_MAINTENANCE_CONTROL_URL"];
+    if (supplied) {
+      const address = new URL(supplied);
+      if (address.hostname !== "127.0.0.1" || ["5432", "6379", "9000"].includes(address.port) || !address.pathname.startsWith("/candidatea_r7g_")) throw new Error("Isolated R7g control database required");
+    } else container = await new PostgreSqlContainer("postgres:17-alpine").start();
+    evidence.push({ kind: "resource", containerId: container?.getId() ?? "parent-owned-candidatea-r7g", role });
+    control = new Pool({ connectionString: supplied ?? container.getConnectionUri() });
     await control.query(`CREATE ROLE "${role}" LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
   });
   beforeEach(async () => {
     databaseName = `r7g_${randomUUID().replaceAll("-", "")}`;
     await control.query(`CREATE DATABASE "${databaseName}"`);
-    const url = new URL(container.getConnectionUri()); url.pathname = `/${databaseName}`;
+    const url = new URL(process.env["R7G_MAINTENANCE_CONTROL_URL"] ?? container.getConnectionUri()); url.pathname = `/${databaseName}`;
     await run(`${packageDir}node_modules/.bin/prisma`, ["migrate", "deploy"], { cwd: packageDir, env: { ...process.env, DATABASE_URL: url.toString() } });
     observer = new Pool({ connectionString: url.toString() });
     guardSnapshot = await guards();
     const applied = (await observer.query<{ name: string; sha256: string }>('SELECT migration_name AS name,checksum AS sha256 FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name')).rows;
-    expect(applied).toHaveLength(98);
-    expect(sha256(JSON.stringify(applied))).toBe("7e6c3b98ddd2a75ef4751be9ff8fb0fbe5b3a7926f3a27eb91e50e3801e78046");
+    expect(applied).toHaveLength(99);
+    expect(sha256(JSON.stringify(applied))).toBe("7a0b668e071403351356300f5e4d6028bd61c32d2cca9271cdb4bcfcce3e7792");
     evidence.push({ kind: "database", databaseName, applied, guardSnapshot });
     drainOwner = trackPoolClientEnds(observer);
     owner = new PrismaClient({ adapter: new PrismaPg(observer) });
@@ -219,7 +224,7 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     expect(await db.listing.findUnique({ where: { id } })).not.toBeNull();
   });
 
-  it.each(["revoke", "seed"] as const)("reviewer %s refuses the whole unsupported account plan with complete graph/object equality", async mode => {
+  it.each(["revoke", "seed"] as const)("reviewer %s refuses a malformed final credential field with complete graph/object equality", async mode => {
     const before = await snapshot();
     expect(await runReviewerScenarioSeed(new PrismaReviewerScenarioSeedStore(db), {
       ...reviewerOptions, mode, env: { ...reviewerOptions.env, authorization: "wrong" },
@@ -227,9 +232,9 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     expect(await snapshot()).toEqual(before);
     const result = await runReviewerScenarioSeed(new PrismaReviewerScenarioSeedStore(db), {
       ...reviewerOptions, mode,
-      reviewDemoAccountsJson: mode === "seed" ? reviewerJson.replace("r7g-reviewer3", "rotated-reviewer3") : reviewerJson,
+      reviewDemoAccountsJson: reviewerJson.replace("r7g-reviewer3@example.invalid", "malformed-final-email"),
     });
-    expect(result).toMatchObject({ exitCode: 1, message: expect.stringContaining("unsupported") });
+    expect(result).toMatchObject({ exitCode: 1, message: expect.stringContaining("normalized valid") });
     expect(await snapshot()).toEqual(before);
   });
 
@@ -312,16 +317,19 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     expect(await snapshot()).toEqual(after);
   });
 
-  it("a Session on the last tester refuses the whole list before scheduling the first", async () => {
+  it("a Session on the last tester is removed with both schedules and foreign state preserved", async () => {
     const input = { testerAccountsJson: JSON.stringify([
       { phone: "+99370000021", email: "schedule21@example.invalid", code: "123456" },
       { phone: "+99370000001", email: "r7g-tester@example.invalid", code: "123456" },
     ]), reviewerAccountsJson: "[]", now };
     const store = new PrismaTesterAccountStore(db);
     await runTesterAccounts(store, { ...input, mode: "seed" });
-    const before = await snapshot();
-    await expect(runTesterAccounts(store, { ...input, mode: "remove" })).rejects.toThrow("unsupported atomic");
-    expect(await snapshot()).toEqual(before);
+    const foreign = await db.user.findUniqueOrThrow({ where: { id: foreignId } });
+    expect(await runTesterAccounts(store, { ...input, mode: "remove" })).toMatchObject({ scheduled: 2, sessionsDeleted: 1, listingsArchived: 0 });
+    const targets = parseTesterAccounts(input.testerAccountsJson, "[]");
+    expect(await db.user.findMany({ where: { id: { in: targets.map(target => target.id) } }, select: { deletionScheduledAt: true } }))
+      .toEqual([{ deletionScheduledAt: now }, { deletionScheduledAt: now }]);
+    expect(await db.user.findUniqueOrThrow({ where: { id: foreignId } })).toEqual(foreign);
   });
 
   it.each(["business inventory", "collector baseline"])("tester %s refuses before any account effect", async extra => {
@@ -339,11 +347,11 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
       await db.measurementState.create({ data: { key: "inventory_baseline:r7g", epoch: "r7g" } });
     }
     const before = await snapshot();
-    await expect(runTesterAccounts(store, { ...input, mode: "remove" })).rejects.toThrow("unsupported");
+    await expect(runTesterAccounts(store, { ...input, mode: "remove" })).rejects.toThrow("diagnostic_maintenance_tester_extra_effect");
     expect(await snapshot()).toEqual(before);
   });
 
-  it("an unchanged schedule gives no permission to archive newly active personal inventory", async () => {
+  it("an unchanged schedule cleans newly active personal inventory and repeats without writes", async () => {
     const input = { mode: "seed" as const, testerAccountsJson: JSON.stringify([
       { phone: "+99370000061", email: "schedule61@example.invalid", code: "123456" },
     ]), reviewerAccountsJson: "[]", now };
@@ -352,8 +360,9 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     const target = must(parseTesterAccounts(input.testerAccountsJson, "[]")[0]);
     expect(await runTesterAccounts(store, { ...input, mode: "remove" })).toMatchObject({ scheduled: 1 });
     await upsertMaintenanceListing(db, { create: { ...create, id: randomUUID(), sellerId: target.id } });
+    expect(await runTesterAccounts(store, { ...input, mode: "remove" })).toEqual({ created: 0, scheduled: 0, sessionsDeleted: 0, listingsArchived: 1 });
     const before = await snapshot();
-    await expect(runTesterAccounts(store, { ...input, mode: "remove" })).rejects.toThrow("unsupported atomic");
+    expect(await runTesterAccounts(store, { ...input, mode: "remove" })).toEqual({ created: 0, scheduled: 0, sessionsDeleted: 0, listingsArchived: 0 });
     expect(await snapshot()).toEqual(before);
   });
 
@@ -450,11 +459,12 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     } finally { release.release(); await Promise.allSettled([blocker, ...(waiting ? [waiting] : [])]); }
   });
 
-  it("tester complete removal refuses before DML and ordinary absent seed remains available", async () => {
+  it("tester complete removal preserves foreign state and ordinary absent seed remains available", async () => {
     const store = new PrismaTesterAccountStore(db);
-    const before = await snapshot();
-    await expect(runTesterAccounts(store, { mode: "remove", testerAccountsJson: testerJson, reviewerAccountsJson: "[]", now })).rejects.toThrow("unsupported atomic");
-    expect(await snapshot()).toEqual(before);
+    const foreign = await db.user.findUniqueOrThrow({ where: { id: foreignId } });
+    expect(await runTesterAccounts(store, { mode: "remove", testerAccountsJson: testerJson, reviewerAccountsJson: "[]", now }))
+      .toEqual({ created: 0, scheduled: 1, sessionsDeleted: 1, listingsArchived: 0 });
+    expect(await db.user.findUniqueOrThrow({ where: { id: foreignId } })).toEqual(foreign);
     expect(await runTesterAccounts(store, { mode: "seed", testerAccountsJson: testerJson.replace("70000001", "70000002").replace("r7g-tester", "new-tester"), reviewerAccountsJson: "[]", now })).toMatchObject({ created: 1 });
   });
 
@@ -495,19 +505,29 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     expect(await snapshot()).toEqual(before);
   });
 
-  it("real promote-admin command preserves exact lookup/dry-run and refuses role/audit DML", async () => {
+  it("real promote-admin command preserves exact lookup/dry-run and records one finite role audit", async () => {
     const before = await snapshot();
-    expect(await command("scripts/promote-admin.ts", ["--email", "foreign@example.invalid", "--reason", "finite maintenance"])).toMatchObject({ code: 1, output: expect.stringContaining("unsupported User.role promotion") });
-    expect(await command("scripts/promote-admin.ts", ["--email", "foreign@example.invalid", "--reason", "finite maintenance", "--dry-run"])).toMatchObject({ code: 0, output: expect.stringContaining("dry-run") });
+    expect(await command("scripts/promote-admin.ts", ["--email", "foreign@example.invalid", "--reason", "finite maintenance", "--dry-run"]))
+      .toMatchObject({ code: 0, output: expect.stringContaining("dry-run") });
     expect(await snapshot()).toEqual(before);
+    const prior = await db.user.findUniqueOrThrow({ where: { id: foreignId } });
+    expect(await command("scripts/promote-admin.ts", ["--email", "foreign@example.invalid", "--reason", "finite maintenance"]))
+      .toMatchObject({ code: 0, output: expect.stringContaining("Promoted user") });
+    expect(await db.user.findUniqueOrThrow({ where: { id: foreignId } })).toEqual({ ...prior, role: "admin", updatedAt: expect.any(Date) });
+    expect(await db.auditLog.findMany()).toMatchObject([{ actorId: null, action: "ADMIN_BOOTSTRAP_PROMOTE", targetType: "user", targetId: foreignId,
+      details: { reason: "finite maintenance", before: { role: "buyer" }, after: { role: "admin" } } }]);
+    const after = await snapshot();
+    const unchanged = (rows: Record<string, unknown>) => Object.fromEntries(Object.entries(rows).filter(([table]) => table !== "users" && table !== "audit_logs"));
+    expect(unchanged(after.rows)).toEqual(unchanged(before.rows));
+    expect(after.objects).toEqual(before.objects); expect(after.chatObjects).toEqual(before.chatObjects);
   });
 
-  it("supported reviewer and demo seed converge with real MinIO bytes, then unsupported plans preserve them", async () => {
-    const minio = await new GenericContainer("cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285")
+  it("supported reviewer and demo seed converge with real MinIO bytes, then refused configuration preserves them", async () => {
+    const minio = process.env["R7G_MINIO_ENDPOINT"] ? undefined : await new GenericContainer("cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285")
       .withEnvironment({ MINIO_ROOT_USER: "minioadmin", MINIO_ROOT_PASSWORD: "minioadmin" })
       .withCommand(["server", "/data"]).withExposedPorts(9000)
       .withWaitStrategy(Wait.forHttp("/minio/health/live", 9000)).start();
-    const endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
+    const endpoint = process.env["R7G_MINIO_ENDPOINT"] ?? `http://${must(minio).getHost()}:${must(minio).getMappedPort(9000)}`;
     const realStore = createS3ObjectStore({ endpoint, region: "us-east-1", accessKeyId: "minioadmin", secretAccessKey: "minioadmin" });
     const s3 = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" } });
     const originalEnv = Object.fromEntries(["MINIO_ENDPOINT", "MINIO_ACCESS_KEY", "MINIO_SECRET_KEY"].map(key => [key, process.env[key]]));
@@ -574,15 +594,60 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
       expect({ width: meta.width, height: meta.height }).toEqual({ width: media.width, height: media.height });
       const before = await snapshot(), objectsBefore = await bytes();
       expect(await removeDemoInventory({ prisma: db, storage: realStore })).toMatchObject({ exitCode: 1, message: expect.stringContaining("unsupported") });
-      expect(await runReviewerScenarioSeed(reviewer, { ...reviewerOptions, mode: "revoke" })).toMatchObject({ exitCode: 1, message: expect.stringContaining("unsupported") });
+      expect(await runReviewerScenarioSeed(reviewer, { ...reviewerOptions, mode: "revoke", reviewDemoAccountsJson: reviewerJson.replace("r7g-reviewer3@example.invalid", "malformed-final-email") }))
+        .toMatchObject({ exitCode: 1, message: expect.stringContaining("normalized valid") });
       expect(await snapshot()).toEqual(before); expect(await bytes()).toEqual(objectsBefore);
       expect(await db.user.findUniqueOrThrow({ where: { id: foreignId } })).toEqual(foreign);
       evidence.push({ kind: "minio", objects: objectsBefore, metadata: { width: meta.width, height: meta.height, format: meta.format } });
     } finally {
       for (const [key, value] of Object.entries(originalEnv)) { if (value === undefined) Reflect.deleteProperty(process.env, key); else process.env[key] = value; }
-      s3.destroy(); realStore.close(); await minio.stop();
-      evidence.push({ kind: "minioStopped", containerId: minio.getId() });
+      s3.destroy(); realStore.close(); await minio?.stop();
+      evidence.push({ kind: "minioStopped", containerId: minio?.getId() ?? "parent-owned-candidatea-r7g" });
     }
+  });
+
+  it("strict maintenance parser rejects malformed intents, excess roots and protected-field plans without effects", async () => {
+    const before = await snapshot();
+    await db.$transaction(async tx => {
+      const promotion = await adminPromotionSourceCommand(tx, { userId: foreignId, selector: { channel: "email", value: "foreign@example.invalid" }, reason: "parser acceptance" });
+      const tester = must(parseTesterAccounts(testerJson, "[]")[0]);
+      const user = await tx.user.findUniqueOrThrow({ where: { id: tester.id } });
+      const removal = await testerRemovalSourceCommand(tx, { users: [user], now });
+      const accounts = parseReviewerScenarioAccounts(reviewerJson);
+      const target = must(accounts[2]);
+      const reviewer = await reviewerCredentialsSourceCommand(tx, { mode: "rotate", accounts: accounts.map(account => ({ ...account, email: account.id === target.id ? "rotated@example.invalid" : account.email })), changedIds: [target.id], now });
+      // Parser calls perform unlocked discovery only; rejected JSON never receives
+      // a receipt and cannot authorize any protected source write.
+      const first = must(promotion.rows[0]);
+      const invalid = [
+        { ...promotion, intent: { ...promotion.intent, unknown: true } },
+        { ...promotion, intent: { reason: null, selector: { channel: "email", value: "foreign@example.invalid" } } },
+        { ...promotion, roots: [...promotion.roots, { table: "users", key: { id: sellerId } }] },
+        { ...promotion, rows: [{ ...first, next: { ...first.next, phone: "+99365000111" } }] },
+        { ...removal, intent: { mode: "generic_cleanup", at: now.toISOString() } },
+        { ...removal, rows: [...removal.rows, { table: "sessions", key: { id: randomUUID() }, verb: "delete", expected: { source: {} }, next: null }] },
+        { ...reviewer, intent: { mode: "rotate", at: now.toISOString(), accounts: [...accounts].reverse() } },
+      ];
+      for (const payload of invalid) {
+        // Each rejected PostgreSQL statement needs its own outer transaction;
+        // never swallow an aborted command behind a savepoint or mint a receipt.
+        await expect(appPool.query("SELECT public.diagnostic_source_parse($1::jsonb)", [JSON.stringify(payload)])).rejects.toThrow();
+      }
+    });
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it("dormant maintenance preparation refuses before role or audit effects", async () => {
+    const before = await snapshot();
+    const guard = must(guardSnapshot.find(row => row.table === "users" && row.name === "zz_diagnostic_source_target"));
+    await observer.query(`ALTER TABLE public.users DISABLE TRIGGER "${guard.name}"`);
+    try {
+      await expect(db.$transaction(async tx => {
+        const c = await adminPromotionSourceCommand(tx, { userId: foreignId, selector: { channel: "email", value: "foreign@example.invalid" }, reason: "dormant refusal" });
+        await withDiagnosticSourceCommand(tx, c, async () => { throw new Error("Dormant plan reached effects"); });
+      })).rejects.toThrow("diagnostic_source_dormant");
+      expect(await snapshot()).toEqual(before);
+    } finally { await observer.query(`ALTER TABLE public.users ENABLE TRIGGER "${guard.name}"`); }
   });
 
   it("naked protected writes and ordinary User insertion into a contended destination fail without partial effects", async () => {
