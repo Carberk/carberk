@@ -4,6 +4,7 @@ import type { DiagnosticSourceKeys, DiagnosticSourceTable } from "./diagnostic-s
 
 export type { DiagnosticSourceKeys, DiagnosticSourceTable } from "./diagnostic-source-tables";
 export type DiagnosticSourceOperation =
+  | "admin_bootstrap_promote" | "reviewer_credentials_change"
   | "listing_create" | "listing_change" | "listing_delete"
   | "member_create" | "member_replace" | "member_remove" | "member_eligibility"
   | "sign_in_method_change" | "business_eligibility" | "user_eligibility" | "account_schedule" | "account_restore" | "account_purge"
@@ -42,10 +43,13 @@ interface DiagnosticSourceCommandFields {
 /** Moderation metadata describes the complete admin operation. Without it the
  * standalone Identity operation has no admin audit or report action. */
 export type DiagnosticSourceCommand = DiagnosticSourceCommandFields & (
+  | { readonly operation: "admin_bootstrap_promote"; readonly intent: Readonly<{ reason: string; selector: Readonly<{ channel: "phone" | "email"; value: string }> }> }
+  | { readonly operation: "reviewer_credentials_change"; readonly intent: Readonly<{ mode: "rotate" | "revoke"; at: string; accounts: readonly Readonly<{ id: string; phone: string; email: string | null }>[] }> }
+  | { readonly operation: "account_schedule"; readonly intent?: Readonly<{ mode: "tester_remove"; at: string }> }
   | { readonly operation: "user_eligibility"; readonly intent?: Readonly<{
     auditId: string; reason: string; report?: Readonly<{ id: string; reviewedAt: string }>;
   }> }
-  | { readonly operation: Exclude<DiagnosticSourceOperation, "user_eligibility">;
+  | { readonly operation: Exclude<DiagnosticSourceOperation, "user_eligibility" | "admin_bootstrap_promote" | "reviewer_credentials_change" | "account_schedule">;
     readonly intent?: Readonly<{ receptionQualificationIds: readonly string[]; campaignAdmission?: true }> | Readonly<{ campaignAdmission: true }> | Readonly<{ code: string; userId: string; capability: string; qualificationId: string }> | Readonly<{ reason: string }> | Readonly<{ publication: ListingPublicationIntent }> | Readonly<Record<string, never>> }
 );
 

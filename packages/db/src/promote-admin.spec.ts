@@ -209,7 +209,7 @@ describe("runPromoteAdmin", () => {
   });
 });
 
-it.each(["phone", "email"] as const)("refuses unsupported %s role promotion before role or audit effects", async (selector) => {
+it.each(["phone", "email"] as const)("refuses empty-reason %s promotion before role or audit effects", async (selector) => {
   const user = { id: "finite-user", role: "buyer", emailVerifiedAt: new Date("2026-10-26T00:00:00Z") };
   const state = { user, audits: [] as unknown[] };
   const before = structuredClone(state);
@@ -221,9 +221,9 @@ it.each(["phone", "email"] as const)("refuses unsupported %s role promotion befo
   });
   const result = await runPromoteAdmin(deps, {
     ...(selector === "phone" ? { phone: "+99361234567" } : { email: "finite@example.test" }),
-    reason: "finite maintenance", dryRun: false,
+    reason: " \n ", dryRun: false,
   });
   expect(result.exitCode).toBe(1);
-  expect(result.message).toContain("unsupported User.role promotion");
+  expect(result.message).toBe("Reason cannot be empty");
   expect(state).toEqual(before);
 });

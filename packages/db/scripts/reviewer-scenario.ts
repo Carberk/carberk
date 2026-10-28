@@ -54,8 +54,8 @@ async function main(): Promise<number> {
 
     console.log(result.message);
     return result.exitCode;
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+  } catch {
+    console.error("Reviewer scenario failed; transaction or setup refused");
     return 1;
   } finally {
     await prisma.$disconnect();
@@ -67,7 +67,7 @@ main()
   .then((code) => {
     process.exit(code);
   })
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
+  .catch(() => {
+    console.error("Reviewer scenario failed; transaction or setup refused");
     process.exit(1);
   });

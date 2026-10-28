@@ -108,6 +108,7 @@ export interface ReviewerScenarioUser {
   phoneVerifiedAt: Date | null;
   emailVerifiedAt: Date | null;
   deletionScheduledAt: Date | null;
+  suspendedAt?: Date | null;
 }
 
 export interface ReviewerScenarioCatalog {
@@ -121,7 +122,16 @@ export interface ReviewerScenarioCatalog {
   citySlug: string;
 }
 
+export interface ReviewerCredentialChange {
+  mode: "rotate" | "revoke";
+  accounts: readonly { id: string; phone: string; email: string | null; role: ReviewerRole; displayName: string }[];
+  expected: readonly ReviewerScenarioUser[];
+  now: Date;
+  associations: { catalog: ReviewerScenarioCatalog; listings: { id: string; sellerId: string }[] };
+}
+
 export interface ReviewerScenarioSeedStore {
+  changeCredentials(input: ReviewerCredentialChange): Promise<string[]>;
   findUserById(id: string): Promise<ReviewerScenarioUser | null>;
   findUserByPhone(phone: string): Promise<ReviewerScenarioUser | null>;
   findUserByEmail(email: string): Promise<ReviewerScenarioUser | null>;
@@ -385,29 +395,28 @@ export async function runReviewerScenarioSeed(
     return safeFailure(error instanceof Error ? error.message : String(error));
   }
 
+  const associations = { catalog: CATALOG,
+    listings: [PRIMARY_LISTING_ID, REPORTABLE_LISTING_ID].map(id => ({ id, sellerId: SCENARIO_UUIDS.seller1 })),
+  };
   if (options.mode === "revoke") {
-    const revokedUserIds: string[] = [];
-    for (const id of REVIEWER_USER_IDS) {
-      const existing = await store.findUserById(id);
+    const expected: ReviewerScenarioUser[] = [];
+    for (const slot of ACCOUNT_SLOTS) {
+      const existing = await store.findUserById(slot.id);
       if (!existing) continue;
-      if (existing.role !== "buyer" && existing.role !== "seller") {
-        return safeFailure(
-          `Reviewer scenario revocation refused: configured user slot ${id} is privileged`,
-        );
+      if (existing.role !== slot.role || existing.deletionScheduledAt !== null || existing.suspendedAt != null ||
+          !existing.phoneVerifiedAt || !existing.emailVerifiedAt) {
+        return safeFailure("Reviewer scenario revocation refused: privileged or unsupported reviewer source");
       }
-      revokedUserIds.push(id);
+      expected.push(existing);
     }
-    if (revokedUserIds.length > 0) {
-      return safeFailure("Reviewer scenario revocation refused: unsupported contact/display rotation + Session/device revocation; no single accepted finite operation covers the complete plan");
-    }
-
-    return {
-      exitCode: 0,
-      message: `Reviewer scenario revoked ${revokedUserIds.length} accounts`,
-      seededUserIds: [],
-      rotatedUserIds: [],
-      revokedUserIds,
-    };
+    const associationFailure = await store.preflightSeed(associations);
+    if (associationFailure) return safeFailure(`Reviewer scenario revocation refused: ${associationFailure}`);
+    const revokedUserIds = expected.length === 0 ? [] : await store.changeCredentials({
+      mode: "revoke", expected, now: options.now, associations,
+      accounts: ACCOUNT_SLOTS.map(slot => ({ ...slot, phone: `revoked:${slot.id}`, email: null, displayName: `Revoked ${slot.id}` })),
+    });
+    return { exitCode: 0, message: `Reviewer scenario revoked ${revokedUserIds.length} accounts`,
+      seededUserIds: [], rotatedUserIds: [], revokedUserIds };
   }
 
   const accountFailure = await assertNoPrivilegedOrHijackedAccounts(store, accounts);
@@ -418,10 +427,9 @@ export async function runReviewerScenarioSeed(
   for (const account of accounts) {
     const existing = await store.findUserById(account.id);
     if (!existing) continue;
-    if (existing.phone !== account.phone || existing.email !== account.email ||
-        existing.role !== account.role ||
-        !existing.phoneVerifiedAt || !existing.emailVerifiedAt || existing.deletionScheduledAt !== null) {
-      return safeFailure("Reviewer scenario seed refused: unsupported existing-source contact/role/deletion rotation; no single accepted finite operation covers the complete plan");
+    if (existing.role !== account.role || existing.suspendedAt != null ||
+        !existing.phone || !existing.email || !existing.phoneVerifiedAt || !existing.emailVerifiedAt || existing.deletionScheduledAt !== null) {
+      return safeFailure("Reviewer scenario seed refused: unsupported existing-source eligibility or verification");
     }
     existingUsers.set(account.id, existing);
   }
@@ -431,7 +439,13 @@ export async function runReviewerScenarioSeed(
     listings: [PRIMARY_LISTING_ID, REPORTABLE_LISTING_ID].map(id => ({ id, sellerId: sellerAccount.id })),
   });
   if (associationFailure) return safeFailure(`Reviewer scenario seed refused: ${associationFailure}`);
-  const rotatedUserIds: string[] = [];
+  const changedIds = accounts.filter(account => {
+    const existing = existingUsers.get(account.id);
+    return existing && (existing.phone !== account.phone || existing.email !== account.email);
+  }).map(account => account.id);
+  const rotatedUserIds = changedIds.length === 0 ? [] : await store.changeCredentials({
+    mode: "rotate", accounts, expected: [...existingUsers.values()], now: options.now, associations,
+  });
   const seededUserIds: string[] = [];
   for (const account of accounts) {
     // Equal source converges without refreshing verification timestamps or User.updatedAt.
@@ -547,7 +561,7 @@ export async function runReviewerScenarioSeed(
       "Store review scenario report. Deterministic demo data only; not a real moderation case.",
   });
 
-  await store.createAuditLog({
+  if (rotatedUserIds.length === 0) await store.createAuditLog({
     action:
       rotatedUserIds.length > 0
         ? "REVIEWER_SCENARIO_ROTATE"

@@ -1,5 +1,8 @@
 import { Prisma, type PrismaClient } from "../generated/prisma/client/client";
-import { reviewerScenarioSeedIds, type ReviewerScenarioCatalog, type ReviewerScenarioSeedStore, type ReviewerScenarioUser } from "../src/reviewer-scenario-seed";
+import { reviewerScenarioSeedIds, type ReviewerScenarioCatalog, type ReviewerScenarioSeedStore, type ReviewerScenarioUser, type ReviewerCredentialChange } from "../src/reviewer-scenario-seed";
+
+import { withDiagnosticSourceCommand } from "../src/diagnostic-source-command";
+import { reviewerCredentialsSourceCommand, maintenanceAudit, maintenanceAuditDate } from "../src/maintenance-source-command";
 
 import { upsertMaintenanceListing } from "./maintenance-listings";
 import { uploadReviewerPhoto } from "./reviewer-fixtures/uploadReviewerPhoto";
@@ -17,7 +20,7 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
   async findUserById(id: string): Promise<ReviewerScenarioUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true },
+      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true, suspendedAt: true },
     });
     return user;
   }
@@ -25,7 +28,7 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
   async findUserByPhone(phone: string): Promise<ReviewerScenarioUser | null> {
     const user = await this.prisma.user.findUnique({
       where: { phone },
-      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true },
+      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true, suspendedAt: true },
     });
     return user;
   }
@@ -33,7 +36,7 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
   async findUserByEmail(email: string): Promise<ReviewerScenarioUser | null> {
     return this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true },
+      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true, suspendedAt: true },
     });
   }
 
@@ -77,7 +80,7 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
         ...identity,
         role: input.role,
       },
-      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true },
+      select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true, emailVerifiedAt: true, deletionScheduledAt: true, suspendedAt: true },
     });
   }
 
@@ -104,15 +107,71 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
   /** Full fixed-ID/slug and personal Listing association discovery precedes
    * every account/catalog/media effect in the command. */
   async preflightSeed(input: { catalog: ReviewerScenarioCatalog; listings: { id: string; sellerId: string }[] }): Promise<string | null> {
-    const catalogFailure = await this.catalogAssociationFailure(this.prisma, input.catalog);
+    return this.seedAssociationFailure(this.prisma, input);
+  }
+
+  private async seedAssociationFailure(db: Prisma.TransactionClient | PrismaClient, input: {
+    catalog: ReviewerScenarioCatalog; listings: { id: string; sellerId: string }[];
+  }): Promise<string | null> {
+    const catalogFailure = await this.catalogAssociationFailure(db, input.catalog);
     if (catalogFailure) return catalogFailure;
-    const listings = await this.prisma.listing.findMany({
-      where: { id: { in: input.listings.map(row => row.id) } }, select: { id: true, sellerId: true, businessId: true },
-    });
-    if (listings.some(row => row.businessId !== null || row.sellerId !== input.listings.find(target => target.id === row.id)?.sellerId)) {
-      return "foreign Listing association";
-    }
-    return null;
+    const listings = await db.listing.findMany({ where: { id: { in: input.listings.map(row => row.id) } },
+      select: { id: true, sellerId: true, businessId: true } });
+    return listings.some(row => row.businessId !== null || row.sellerId !== input.listings.find(target => target.id === row.id)?.sellerId)
+      ? "foreign Listing association" : null;
+  }
+
+  async changeCredentials(input: ReviewerCredentialChange): Promise<string[]> {
+    return this.prisma.$transaction(async tx => {
+      const validate = async () => {
+        const failure = await this.seedAssociationFailure(tx, input.associations);
+        if (failure) throw new Error(`Reviewer seed refused: ${failure}`);
+        const current = await tx.user.findMany({ where: { id: { in: input.accounts.map(account => account.id) } },
+          select: { id: true, phone: true, email: true, role: true, displayName: true, phoneVerifiedAt: true,
+            emailVerifiedAt: true, deletionScheduledAt: true, suspendedAt: true } });
+        const sameDate = (a: Date | null | undefined, b: Date | null | undefined) => a?.getTime() === b?.getTime();
+        // Preserve the complete unlocked preflight, including absent final slots.
+        for (const account of input.accounts) {
+          const prior = input.expected.find(user => user.id === account.id), user = current.find(user => user.id === account.id);
+          if ((!prior) !== (!user) || (prior && user &&
+            (user.role !== account.role || user.suspendedAt !== null || user.deletionScheduledAt !== null ||
+             !user.phone || !user.email || !user.phoneVerifiedAt || !user.emailVerifiedAt ||
+             user.phone !== prior.phone || user.email !== prior.email || user.role !== prior.role ||
+             !sameDate(user.phoneVerifiedAt, prior.phoneVerifiedAt) || !sameDate(user.emailVerifiedAt, prior.emailVerifiedAt) ||
+             !sameDate(user.deletionScheduledAt, prior.deletionScheduledAt) || !sameDate(user.suspendedAt, prior.suspendedAt)))) {
+            throw new Error("Reviewer credentials refused: source changed");
+          }
+          if (input.mode === "rotate") {
+            const holders = await tx.user.findMany({ where: { OR: [{ phone: account.phone }, { email: account.email }] }, select: { id: true } });
+            if (holders.some(holder => holder.id !== account.id)) throw new Error("Reviewer credentials refused: foreign destination");
+          }
+        }
+        return current;
+      };
+      const current = await validate();
+      const changedIds = input.accounts.filter(account => {
+        const user = current.find(row => row.id === account.id);
+        return user && (input.mode === "revoke" || user.phone !== account.phone || user.email !== account.email);
+      }).map(account => account.id);
+      if (changedIds.length === 0) return [];
+      const command = await reviewerCredentialsSourceCommand(tx, { ...input, changedIds });
+      const audit = await maintenanceAudit(tx, command);
+      await withDiagnosticSourceCommand(tx, command, async () => {
+        await validate();
+        const targets = input.accounts.filter(account => changedIds.includes(account.id));
+        for (const account of targets) {
+          await tx.user.update({ where: { id: account.id }, data: input.mode === "rotate"
+            ? { phone: account.phone, email: account.email, phoneVerifiedAt: input.now, emailVerifiedAt: input.now }
+            : { phone: `revoked:${account.id}`, email: null, emailVerifiedAt: null, displayName: account.displayName } });
+        }
+        const sessions = await tx.session.findMany({ where: { userId: { in: changedIds } }, select: { id: true } });
+        if (sessions.length > 0) await tx.session.deleteMany({ where: { id: { in: sessions.map(session => session.id) } } });
+        const devices = await tx.fcmDevice.findMany({ where: { userId: { in: changedIds }, invalidatedAt: null }, select: { id: true } });
+        if (devices.length > 0) await tx.fcmDevice.updateMany({ where: { id: { in: devices.map(device => device.id) } }, data: { invalidatedAt: input.now } });
+        await tx.auditLog.create({ data: { ...audit, createdAt: maintenanceAuditDate(audit.createdAt) } });
+      });
+      return changedIds;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
   }
 
   private async catalogAssociationFailure(db: Prisma.TransactionClient | PrismaClient, input: ReviewerScenarioCatalog): Promise<string | null> {
