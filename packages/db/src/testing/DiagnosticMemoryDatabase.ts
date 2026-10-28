@@ -19,6 +19,7 @@ function matches(row: Row, where: Row = {}): boolean {
       if (op === "is") return actual === value;
       if (op === "not") return actual !== value;
       if (op === "in") return (value as unknown[]).includes(actual);
+      if (op === "notIn") return actual != null && !(value as unknown[]).includes(actual);
       if (op === "lt") return actual != null && (actual instanceof Date ? actual.getTime() : actual as number) < (value instanceof Date ? value.getTime() : value as number);
       if (op === "lte") return actual != null && (actual instanceof Date ? actual.getTime() : actual as number) <= (value instanceof Date ? value.getTime() : value as number);
       if (op === "gt") return actual != null && (actual instanceof Date ? actual.getTime() : actual as number) > (value instanceof Date ? value.getTime() : value as number);
