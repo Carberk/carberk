@@ -1,0 +1,19 @@
+# Existing operational row-reset dependency
+
+Coordinator dispatch recovered verbatim in substance, 2026-10-29. This supplies the missing handoff context; it selects no new research, product behavior, migration or guard exception. The [independent reset contract, section 6](reset-exclusion-contract-review-20261029.md) and the [sole DB owner's proposal](../issue-897/r7g-recovery-20261029/operational-reset-row-proposal.md) remain inputs for the bounded implementation contract.
+
+The existing fixed executor is `scripts/staging-clean-reset-remote.mjs`, particularly its rows transaction around lines 302-364. The planner in `scripts/staging-clean-reset.mjs` correctly refuses TRUNCATE triggers. Present immutable/domain guards make `TRUNCATE RESTRICT` unsuitable. Blind DELETE does not resolve parent/FK ordering or admission. No new runtime refusal is claimed by this source finding. Preserve a genuine reached executor refusal before production repair.
+
+The required boundary consumes immutable `{operationId,reservationId,owner,candidate,targetIdentity,closureGeneration,closureEvidenceDigest,expectedInventory:{schema,retained,disposable}}` and the exact classified disposal list. It must:
+
+- Preserve reference/protected contents, credentials, configuration, migrations, functions, guards and infrastructure identity.
+- Reuse the existing fixed authenticated operator path, durable reservation/current closure evidence, complete table-lock/re-observation, immutable row receipt and same-operation lost-reply reconciliation. Caller JSON, operation strings or GUCs alone are not authorization.
+- Atomically compare the current schema, exact retained/disposable contents and closure binding under locks before effects. Dispose the selected scenario and explicitly classified obsolete campaign records through a lawful finite protocol. Unknown/stale inventory, extra/protected keys, active receipt/backend authority or changed binding refuses.
+- Commit an immutable completion receipt only with exact disposable absence and retained/schema equality. A lost reply observes/reconciles that same operation. Replay never enlarges the plan.
+- Preserve existing row/Redis recovery semantics and the real ordinary source/campaign negatives. Do not disable triggers, use replication bypass, TRUNCATE, CASCADE wipe, drop/recreate schema, broaden ordinary grants/caps or claim product erasure proof from operational test-data disposal.
+
+The sole DB writer owns any accepted additive migration after the actually used 162, focused real-PG `packages/db/tests/operational-reset-rows.e2e.spec.ts`, and DB overview. No new migration is reserved. The reset writer owns the fixed executor/planner/table manifest and row recovery tests. Parent resolves the shared contract before either changes the other's files.
+
+First proof is the real executor on a fresh disposable migrated fixture, including representative raw/component/anchor/report/proof, Session/device, User/Listing and campaign dependencies. After successful setup/admission, preserve the actual current-guard refusal. The accepted repair must then prove exact disposal and retained equality, wrong/missing principal/operation/closure, stale inventory, extra/protected keys, active receipt/backend, unsupported graph, halfway rollback, unfinished transaction, lost commit reply and write-free completed replay. These are the existing reset acceptance boundary, not a reusable infrastructure project.
+
+Provider exclusion, actual grant lifetime/clock authority, storage socket drain and restoration remain the reset owner's separate required proof. This brief authorizes no live operation or guard widening. The immediate next step is independent review of the existing narrow proposal into an executable contract, followed by one owning implementation dispatch.
