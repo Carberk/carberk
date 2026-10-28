@@ -179,6 +179,14 @@ describe("staging clean-reset remote operation on disposable application schema"
   }, 120000);
   afterAll(async () => { await admin?.end(); await postgres?.stop(); });
 
+  it("current reset A preserves complete state when the fully migrated planner refuses before DELETE", async () => {
+    const before = await snapshot();
+    const outcome = await run(inventoried());
+    expect(await snapshot()).toEqual(before);
+    console.error("Current reset A earliest executor verdict", JSON.stringify(outcome));
+    expect(outcome).toEqual(expect.objectContaining({ code: 0, failure: "" }));
+  });
+
   it("wrong or missing target identity and caller-claimed state refuse before any application read", async () => {
     const before = await snapshot();
     const cases: [string, Record<string, unknown>, Record<string, string | undefined>][] = [];
