@@ -48,6 +48,27 @@ test('opt-in refusal emits only SQLSTATE and numeric positions despite sensitive
   });
 });
 
+test('reset context level adds only value-free identifiers and the PL/pgSQL stack', async () => {
+  const context = { env: { STAGING_TEST_SQL_DIAGNOSTICS_CONTEXT: '1' } };
+  const where = 'PL/pgSQL function diagnostic_source_anchor_guard() line 7 at RAISE\nSQL statement "DELETE FROM x WHERE id=\'secret\'"\n' +
+    'PL/pgSQL function staging_clean_reset_rows.dispose() line 12 at EXECUTE\nPL/pgSQL function inline_code_block line 30 at PERFORM';
+  assert.deepEqual((await query({ code: 'P0001', message: 'diagnostic_source_anchor_receipt', routine: 'exec_stmt_raise', where,
+    detail: 'secret value', internalQuery: 'secret body' }, '1', false, context)).stderr, ['Disposable database query refused',
+    'Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=diagnostic_source_anchor_receipt routine=exec_stmt_raise ' +
+    'stack=diagnostic_source_anchor_guard>staging_clean_reset_rows.dispose']);
+  // Formatted or ordinary message text, malformed identifiers and non-P0001 messages are withheld.
+  for (const message of ['secret value 7', 'guard:secret-value', 'Guard', 'x'.repeat(81)]) {
+    assert.deepEqual((await query({ code: 'P0001', message }, '1', false, context)).stderr,
+      ['Disposable database query refused', 'Disposable database SQL diagnostic: SQLSTATE=P0001']);
+  }
+  assert.deepEqual((await query({ code: '23503', message: 'fk_violation', constraint: 'users_avatarUploadId_fkey', table: 'users',
+    column: 'secret value' }, '1', false, context)).stderr, ['Disposable database query refused',
+    'Disposable database SQL diagnostic: SQLSTATE=23503 constraint=users_avatarUploadId_fkey table=users']);
+  // Without the base level, the context level forwards nothing.
+  assert.deepEqual((await query({ code: 'P0001', message: 'diagnostic_source_anchor_receipt' }, undefined, false, context)).stderr,
+    ['Disposable database query refused']);
+});
+
 test('opt-in refusal rejects malformed fields and leaves successful rows and status unchanged', async () => {
   for (const code of ['42601\nsecret', '42601\n', 'secret', 42601, undefined]) {
     assert.deepEqual((await query({ code, position: '81' }, '1')).stderr, ['Disposable database query refused']);

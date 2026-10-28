@@ -6,6 +6,8 @@
 import { readFileSync } from 'node:fs';
 export { collectResetObjects, resetObjects, s3ResetStorage } from './staging-clean-reset-storage.mjs';
 
+import { createHash } from 'node:crypto';
+
 import { QUEUES } from './staging-clean-reset.mjs';
 
 const text = name => readFileSync(new URL(name, import.meta.url), 'utf8');
@@ -21,6 +23,20 @@ const plannerProgram = `(() => { 'use strict';\n${planner}\nreturn planTables; }
 // the caller's claims with it; a claimed worker ID alone is no attestation.
 const STAGING = { projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2',
   services: { api: '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0', worker: '24aa02e0-25a9-4e80-9cc2-c1795ef82091' }, redis: 'redis://redis.railway.internal:6379/0' };
+
+const canonicalJson = value => Array.isArray(value) ? `[${value.map(canonicalJson).join(',')}]` : value !== null && typeof value === 'object'
+  ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}` : JSON.stringify(value);
+/**
+ * Rows plan digest the controller binds into durable admission: this exact executor artifact,
+ * table manifest, pinned target constants and the observed inventory. The remote program
+ * recomputes it from its own serialized source and refuses any other value.
+ */
+export function cleanResetRowsPlanDigest(expectedInventory) {
+  // The planner is hashed exactly as the remote evaluates it: the embedded pure source, not a transformed import.
+  const embeddedPlanner = new Function(`return ${plannerProgram}`)();
+  return createHash('sha256').update(canonicalJson({ program: [cleanResetMain, embeddedPlanner, cleanResetRedis].map(fn => fn.toString()), manifest,
+    staging: { ...STAGING, queues: QUEUES }, expectedInventory })).digest('hex');
+}
 
 /** Serialized into one fixed remote Node process. There is no arbitrary shell/SQL input. */
 export function cleanResetProgram(payload) {
@@ -99,6 +115,10 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
           !hex32(admission.closureGeneration) || !hex64(admission.closureEvidenceDigest) || !hex64(admission.planDigest) ||
           !sameIdentity(admission.targetIdentity, p) || !exact(admission.expectedInventory, ['schema', 'retained', 'disposable']) ||
           !['schema', 'retained', 'disposable'].every(part => admission.expectedInventory[part] === input.expectedInventory[part])) refuse();
+      // This serialized executor artifact, its manifest and the observed inventory.
+      const planDigest = require('node:crypto').createHash('sha256').update(canonical({ program: [cleanResetMain, planTables, cleanResetRedis].map(fn => fn.toString()),
+        manifest, staging, expectedInventory: input.expectedInventory })).digest('hex');
+      if (admission.planDigest !== planDigest) refuse();
     }
     if (redisPhase) {
       if (p.projectId !== staging.projectId || p.environmentId !== staging.environmentId || p.services.api !== staging.services.api ||
@@ -141,6 +161,8 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
 
     // One fixed operator receipt store for lost-response recovery of the current operation only.
     const OPERATOR = 'staging_clean_reset';
+    // Additive operator-owned row admission store, installed by the sole DB owner's migration.
+    const ROWS = 'staging_clean_reset_rows';
     const operatorDefinition = ['nsp true true', 'rel receipts r p false true true', 'rel receipts_pkey i p false true true',
       ...['operation_id text', 'reservation_id text', 'candidate text', 'project_id text', 'environment_id text', 'phase text',
         'expected jsonb', 'result jsonb', 'committed_at timestamp with time zone'].map((column, index) => `col receipts ${index + 1} ${column} true false false`),
@@ -216,6 +238,10 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
         'tables', (SELECT coalesce(jsonb_object_agg(relname, c), '{}') FROM content),
         'foreignKeys', (SELECT coalesce(jsonb_agg(jsonb_build_object('name', conname, 'from', f, 'to', t) ORDER BY conname, f), '[]') FROM fks),
         'triggers', (SELECT coalesce(jsonb_agg(jsonb_build_object('table', tbl, 'name', tgname, 'functionSchema', fs, 'truncate', tr) ORDER BY tbl, tgname), '[]') FROM trg),
+        -- The migration-owned admission store: present, owned by this operator principal, no other grantee.
+        'admission', (SELECT jsonb_build_object('owned', pg_get_userbyid(n.nspowner) = current_user,
+            'restricted', NOT EXISTS (SELECT 1 FROM aclexplode(n.nspacl) a WHERE a.grantee <> n.nspowner))
+          FROM pg_namespace n WHERE n.nspname = '${ROWS}'),
         'approvedDiagnosticCenters', CASE WHEN to_regclass('public.diagnostic_centers') IS NULL THEN 0 ELSE (xpath('/row/c/text()', query_to_xml(
           'SELECT count(*) AS c FROM public.diagnostic_centers WHERE "operationalApproval" IS NOT NULL', false, true, '')))[1]::text::bigint END,
         'digest', jsonb_build_object(
@@ -232,18 +258,28 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
           SELECT coalesce(jsonb_agg(to_jsonb(x) - 'committed_at'), '[]') INTO held FROM ${OPERATOR}.receipts x WHERE to_jsonb(x)->>'operation_id' = ${operationSql};
         END IF;
         PERFORM set_config('${OPERATOR}.receipts', coalesce(held, '[]'::jsonb)::text, true);
+        held := NULL;
+        IF to_regclass('${ROWS}.completions') IS NOT NULL THEN
+          SELECT coalesce(jsonb_agg(jsonb_build_object('binding', a.binding, 'completed', c.operation_id IS NOT NULL)), '[]') INTO held
+            FROM ${ROWS}.admissions a LEFT JOIN ${ROWS}.completions c ON c.operation_id = a.operation_id WHERE a.operation_id = ${operationSql};
+        END IF;
+        PERFORM set_config('${OPERATOR}.admissions', coalesce(held, '[]'::jsonb)::text, true);
       END $observe$;
-      SELECT '${marker}' || jsonb_build_object('inventory', ${inventorySql}, 'receipts', current_setting('${OPERATOR}.receipts')::jsonb)::text;
+      SELECT '${marker}' || jsonb_build_object('inventory', ${inventorySql}, 'receipts', current_setting('${OPERATOR}.receipts')::jsonb,
+        'admissions', current_setting('${OPERATOR}.admissions')::jsonb)::text;
       COMMIT;`);
-    if (!exact(observed, ['inventory', 'receipts']) || !Array.isArray(observed.receipts)) refused('Invalid inventory');
+    if (!exact(observed, ['inventory', 'receipts', 'admissions']) || !Array.isArray(observed.receipts) || !Array.isArray(observed.admissions)) refused('Invalid inventory');
     const inventory = observed.inventory;
-    if (!exact(inventory, ['backends', 'eventTriggers', 'schemas', 'operator', 'relations', 'tables', 'foreignKeys', 'triggers', 'approvedDiagnosticCenters', 'digest']) ||
+    if (!exact(inventory, ['backends', 'eventTriggers', 'schemas', 'operator', 'relations', 'tables', 'foreignKeys', 'triggers', 'admission', 'approvedDiagnosticCenters', 'digest']) ||
         ![inventory.schemas, inventory.operator, inventory.relations].every(list => Array.isArray(list) && list.every(item => typeof item === 'string')) ||
         !record(inventory.tables)) refused('Invalid inventory');
     if (inventory.backends !== 0) refused('other database backends present');
     if (inventory.eventTriggers !== 0) refused('Unknown event trigger present');
-    const schemas = inventory.schemas.filter(name => name !== OPERATOR);
-    if (!(schemas.length === inventory.schemas.length ? inventory.operator.length === 0 :
+    // Its definitions stay in the schema digest; only its own triggers are not planner input.
+    if (inventory.schemas.includes(ROWS) && !(exact(inventory.admission, ['owned', 'restricted']) && inventory.admission.owned === true &&
+        inventory.admission.restricted === true)) refused(`Invalid operator schema ${ROWS}`);
+    const schemas = inventory.schemas.filter(name => name !== OPERATOR && name !== ROWS);
+    if (!(!inventory.schemas.includes(OPERATOR) ? inventory.operator.length === 0 :
         [operatorDefinition, legacyDefinition].some(definition => same([...inventory.operator].sort(), definition)))) refused(`Invalid operator schema ${OPERATOR}`);
     const cf = schemas.find(name => name.startsWith('cf_'));
     if (cf !== undefined) refused(`cf namespace ${cf} requires separate control disposition`);
@@ -251,18 +287,20 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
     let plan;
     try {
       plan = planTables(manifest, { schemas, tables: Object.entries(inventory.tables).map(([name, rows]) => ({ schema: 'public', name, rows })),
-        foreignKeys: inventory.foreignKeys, triggers: inventory.triggers, cfNamespaces: [], approvedDiagnosticCenters: inventory.approvedDiagnosticCenters });
+        foreignKeys: inventory.foreignKeys.filter(key => !(String(key?.from).startsWith(`${ROWS}.`) && String(key?.to).startsWith(`${ROWS}.`))),
+        triggers: inventory.triggers.filter(trigger => !String(trigger?.table).startsWith(`${ROWS}.`)), cfNamespaces: [],
+        approvedDiagnosticCenters: inventory.approvedDiagnosticCenters }, { mode: 'DELETE' });
     } catch (error) { refused(typeof error?.message === 'string' ? error.message : 'planner refused'); }
     const live = Object.keys(inventory.tables).map(name => `public.${name}`);
-    if (plan.mode !== 'RESTRICT' || !same(plan.retain, retain) || !same(plan.truncate, live.filter(name => !retain.includes(name)).sort()) ||
-        plan.detachTriggers.length || plan.retainedNamespaces.length || plan.restartBlockers.length || !plan.truncate.length) refused('Plan does not match inventory');
+    if (plan.mode !== 'DELETE' || !same(plan.retain, retain) || !same(plan.delete, live.filter(name => !retain.includes(name)).sort()) ||
+        plan.detachTriggers.length || plan.retainedNamespaces.length || plan.restartBlockers.length || !plan.delete.length) refused('Plan does not match inventory');
     const digest = digestOf(inventory.digest);
     const bound = { operation: 'clean-reset', operationId: input.operationId, reservationId: input.reservationId, candidate: input.candidate, environmentId: p.environmentId };
 
     if (input.phase === 'inventoried') {
       console.log(JSON.stringify({ ...bound, phase: 'inventoried', state: 'observed', digest,
         rows: Object.fromEntries(Object.entries(inventory.tables).map(([name, rows]) => [`public.${name}`, rows]).sort(([a], [b]) => a < b ? -1 : 1)),
-        plan: { mode: plan.mode, retain: plan.retain, truncate: plan.truncate } }));
+        plan: { mode: plan.mode, retain: plan.retain, delete: plan.delete } }));
       return;
     }
 
@@ -321,14 +359,20 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
           receipt.operation_id !== input.operationId || receipt.reservation_id !== input.reservationId || receipt.candidate !== input.candidate ||
           receipt.project_id !== p.projectId || receipt.environment_id !== p.environmentId || receipt.phase !== 'rows' ||
           !sameDigest(digestOf(receipt.expected), expected)) refused('Clean-reset operation identity changed');
+      if (observed.admissions.length !== 1 || !exact(observed.admissions[0], ['binding', 'completed']) || observed.admissions[0].completed !== true ||
+          canonical(observed.admissions[0].binding) !== canonical(input.admission)) refused('Clean-reset operation identity changed');
       if (!sameDigest(digestOf(receipt.result), digest)) refused('Inventory changed since observation');
       console.log(JSON.stringify({ ...bound, phase: 'rows', state: 'observed', digest }));
       return;
     }
+    // An admission without the matching executor receipt is never resumed or enlarged.
+    if (observed.admissions.length) refused('Clean-reset operation identity changed');
+    if (!inventory.schemas.includes(ROWS)) refused('Operational row admission unavailable');
     if (!sameDigest(digest, expected)) refused('Inventory changed since observation');
 
-    // One transaction: lock every public table, re-observe under the locks, then truncate exactly the
-    // planned disposable tables RESTRICT and record the receipt. Any deviation commits nothing.
+    // One transaction: lock every public table, re-observe under the locks, then admit the exact sealed
+    // rows, dispose them by the fixed DELETE plan, finish and record the receipt. Any deviation commits nothing.
+    const bindingSql = `convert_from(decode('${require('node:buffer').Buffer.from(canonical(input.admission), 'utf8').toString('hex')}', 'hex'), 'UTF8')::jsonb`;
     const expectedSql = `'${JSON.stringify({ schema: expected.schema, retained: expected.retained, disposable: expected.disposable })}'::jsonb`;
     const outcome = sql(`BEGIN ISOLATION LEVEL READ COMMITTED; ${settings}
       LOCK TABLE ${live.map(table).join(', ')} IN ACCESS EXCLUSIVE MODE;
@@ -358,14 +402,17 @@ function cleanResetMain(input, manifest, planTables, cleanResetRedis, staging) {
           IF ${operatorSql} <> ${operatorDefinitionSql} THEN RAISE EXCEPTION 'Clean reset operator schema invalid'; END IF;
           IF EXISTS (SELECT 1 FROM ${OPERATOR}.receipts WHERE operation_id = ${operationSql}) THEN verdict := 'changed';
           ELSE
-            TRUNCATE TABLE ${plan.truncate.map(table).join(', ')} RESTRICT;
-            after_reset := ${inventorySql};
-            IF after_reset->'digest'->'schema' <> seen->'digest'->'schema' OR after_reset->'digest'->'retained' <> seen->'digest'->'retained' OR
-               EXISTS (SELECT 1 FROM jsonb_each(after_reset->'tables') e WHERE NOT ('public.' || e.key = ANY (${retainSql})) AND e.value <> '0'::jsonb)
-            THEN RAISE EXCEPTION 'Clean reset post-state invalid'; END IF;
-            INSERT INTO ${OPERATOR}.receipts (operation_id, reservation_id, candidate, project_id, environment_id, phase, expected, result, committed_at, redis_state)
-              VALUES (${operationSql}, ${literal(input.reservationId)}, ${literal(input.candidate)}, ${literal(p.projectId)}, ${literal(p.environmentId)}, 'rows',
-                ${expectedSql}, after_reset->'digest', now(), '{}'::jsonb);
+            -- A refusing guard, FK action, lock or limit aborts the whole transaction; nothing commits.
+              PERFORM ${ROWS}.prepare(${bindingSql}, ${ROWS}.observe());
+              PERFORM ${ROWS}.dispose();
+              after_reset := ${inventorySql};
+              IF after_reset->'digest'->'schema' <> seen->'digest'->'schema' OR after_reset->'digest'->'retained' <> seen->'digest'->'retained' OR
+                 EXISTS (SELECT 1 FROM jsonb_each(after_reset->'tables') e WHERE NOT ('public.' || e.key = ANY (${retainSql})) AND e.value <> '0'::jsonb)
+              THEN RAISE EXCEPTION 'operational_reset_post_state'; END IF;
+              PERFORM ${ROWS}.finish(${operationSql}, after_reset->'digest');
+              INSERT INTO ${OPERATOR}.receipts (operation_id, reservation_id, candidate, project_id, environment_id, phase, expected, result, committed_at, redis_state)
+                VALUES (${operationSql}, ${literal(input.reservationId)}, ${literal(input.candidate)}, ${literal(p.projectId)}, ${literal(p.environmentId)}, 'rows',
+                  ${expectedSql}, after_reset->'digest', now(), '{}'::jsonb);
           END IF;
         END IF;
         PERFORM set_config('${OPERATOR}.outcome', jsonb_build_object('verdict', verdict, 'digest', after_reset->'digest')::text, true);

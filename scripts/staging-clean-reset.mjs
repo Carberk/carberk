@@ -184,8 +184,13 @@ export function evaluateWindow(closure, observation) {
 const dispositions = ['retain-reference', 'retain-protected', 'delete', 'refuse-if-nonempty', 'refuse-if-approved'];
 const cfTriggers = ['auth', 'business', 'promotion', 'baseline'];
 
-/** Exact table/trigger/namespace plan for a later S2 transaction. Never cascades, never wildcards. */
-export function planTables(manifest, live) {
+/**
+ * Exact table/trigger/namespace plan for a later S2 transaction. Never cascades, never wildcards.
+ * `DELETE` mode plans the admitted operator row disposal: no TRUNCATE is issued, so a pinned
+ * migration TRUNCATE guard is retained rather than refused. Every other check is identical.
+ */
+export function planTables(manifest, live, { mode = 'RESTRICT', ...unknownOptions } = {}) {
+  if (Object.keys(unknownOptions).length || !['RESTRICT', 'DELETE'].includes(mode)) fail('Exact clean-reset plan mode required');
   if (!exact(manifest, ['version', 'tables', 'migrationTriggers']) || manifest.version !== 1 || !record(manifest.tables) ||
       Object.values(manifest.tables).some(d => !dispositions.includes(d)) || !Array.isArray(manifest.migrationTriggers))
     fail('Exact clean-reset manifest required');
@@ -222,7 +227,8 @@ export function planTables(manifest, live) {
   }
   const detachTriggers = [];
   for (const trigger of l.triggers) {
-    if (trigger.truncate) fail(`TRUNCATE trigger refused: ${trigger.name}`);
+    if (trigger.truncate && (mode !== 'DELETE' || trigger.functionSchema !== 'public' || !manifest.migrationTriggers.includes(`${trigger.table}.${trigger.name}`)))
+      fail(`TRUNCATE trigger refused: ${trigger.name}`);
     if (!Object.hasOwn(manifest.tables, trigger.table)) fail(`Unknown trigger table ${trigger.table}`);
     if (trigger.functionSchema === 'public' && manifest.migrationTriggers.includes(`${trigger.table}.${trigger.name}`)) continue;
     if (namespaces.includes(trigger.functionSchema) && cfTriggers.some(s => trigger.name === `${trigger.functionSchema}_${s}`)) {
@@ -238,8 +244,8 @@ export function planTables(manifest, live) {
   }
   const key = x => `${x.table}\u0000${x.trigger}`;
   return {
-    mode: 'RESTRICT',
-    truncate: [...truncate].sort(),
+    mode,
+    [mode === 'DELETE' ? 'delete' : 'truncate']: [...truncate].sort(),
     retain: Object.entries(manifest.tables).filter(([, d]) => d.startsWith('retain')).map(([n]) => `public.${n}`).sort(),
     detachTriggers: detachTriggers.sort((a, b) => key(a).localeCompare(key(b))),
     redisExclusions: namespaces.map(n => `bull:email-code:de:campaign-${n}-`),
