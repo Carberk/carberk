@@ -9,6 +9,14 @@ const id="11111111-1111-4111-8111-111111111111",next="22222222-2222-4222-8222-22
 const text={en:"Brake response",ru:"Работа тормозов",tk:"Tormozlaryň işleýşi"};
 const report:D.PublicDiagnosticReport={id,audience:"listing_public",status:"finalized",templateVersionId:id,observedAt:"2026-10-17T10:00:00.000Z",mileageKm:123000,findings:[{id,checkId:"brakes",assessment:"fault",explanation:"Synthetic observed fault",evidenceIds:[id],kind:"observed_repair",source:"Synthetic source",measurement:{value:125,unit:"µm",method:"Gauge",uncertainty:"±5 µm"},location:{panelId:"hood",view:"top",x:.5,y:.5}}],authorId:null,reviewerId:null,successorOf:null,supersededBy:next,successorKind:"reinspection",lineageKind:"original",correctionReason:null,returnReason:null,finalizedAt:"2026-10-17T10:00:00.000Z",withdrawnAt:null,withdrawalReason:null,version:3,template:{title:text,limitations:text,syntheticNotice:text,checks:[{id:"brakes",label:text,required:true,evidenceRequired:false,measurement:null},{id:"engine",label:text,required:true,evidenceRequired:false,measurement:null}],panels:[{id:"hood",label:text,views:["top"],evidenceRequired:false}]},synthetic:true};
 describe.each(["en","ru","tk"] as const)("public diagnostic reader in %s",locale=>{
+ it("shows the same safe released vehicle and center facts as the customer PDF",()=>{
+  const names={en:"Ashgabat test center",ru:"Тестовый центр Ашхабада",tk:"Aşgabat synag merkezi"};
+  const current=D.PublicDiagnosticReportSchema.parse({...report,releaseIdentity:{version:1,center:{id,names},vehicle:{method:"vin",maskedVin:"*************1234",display:{make:"Toyota",model:"Camry",year:2018},catalog:null}}});
+  const html=renderToStaticMarkup(createElement(DiagnosticReader,{report:current,documents:[],locale}));
+  expect(html).toContain(names[locale]);
+  expect(html).toContain("Toyota Camry 2018");
+  expect(html).toContain("*************1234");
+ });
  it("renders complete findings, text references, uncertainty and current correction without private intake",()=>{
   const html=renderToStaticMarkup(createElement(DiagnosticReader,{report,documents:[],locale}));
   for(const value of [text[locale],"Synthetic observed fault","125","µm","±5 µm","hood","engine",diagnosticCopy(locale).not_checked])expect(html).toContain(value);
