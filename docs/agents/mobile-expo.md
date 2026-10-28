@@ -34,7 +34,7 @@ CI=1 pnpm --filter @auto-tm/mobile exec expo install --check
 
 ## Android Worklets prefab patches
 
-The workspace carries two native build patches for Expo Modules Core 55.0.26 and Reanimated 4.2.1. They backport [Expo #43863](https://github.com/expo/expo/pull/43863) and [Reanimated #8685](https://github.com/software-mansion/react-native-reanimated/pull/8685), linking Worklets through its published prefab target. The original consumers hardcode an obsolete AGP output path and fail on clean Debug and Release builds. Worklets 0.7.4 already includes the required prefab cache fix.
+The workspace carries two native build patches for Expo Modules Core 55.0.27 and Reanimated 4.2.1. They backport [Expo #43863](https://github.com/expo/expo/pull/43863) and [Reanimated #8685](https://github.com/software-mansion/react-native-reanimated/pull/8685), linking Worklets through its published prefab target. The original consumers hardcode an obsolete AGP output path and fail on clean Debug and Release builds. Worklets 0.7.4 already includes the required prefab cache fix. The Expo 55.0.32 alignment moves Modules Core to 55.0.27; its published CMake source still needs the identical backport, so the patch is retargeted without changing its contents.
 
 Install through pnpm so the committed patches and lockfile apply consistently. Do not copy shared libraries into the old output directory. Remove each patch when its installed package includes the upstream fix, then repeat the clean native build gate.
 
