@@ -13,7 +13,7 @@ import { Text } from "@/components/ui/text";
 export function SupportEntry() {
  const { isAuthenticated } = useAuth(), { i18n } = useTranslation(), c = serviceCopy(i18n.language);
  return <Button accessibilityLabel={isAuthenticated === true ? c.support : c.signedOut} onPress={() => {
-  if (isAuthenticated === true) router.push({ pathname: "/services", params: { purpose: "support" } });
-  else useAuthIntentStore.getState().requireSignIn(router, { returnTo: "/services?purpose=support" });
+  if (isAuthenticated === true) router.push({ pathname: "/service-requests", params: { purpose: "support" } });
+  else useAuthIntentStore.getState().requireSignIn(router, { returnTo: "/service-requests?purpose=support" });
  }}><Text>{isAuthenticated === true ? c.support : c.signedOut}</Text></Button>;
 }

@@ -1,8 +1,7 @@
-import { http, HttpResponse } from "msw";
-import { server } from "../msw";
-
 import { beforeEach, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
 
+import { server } from "../msw";
 import { ServiceScreen } from "../../src/services/ServiceScreen";
 import { BusinessScreen } from "../../src/business/BusinessScreen";
 import { InventoryScreen } from "../../src/business/InventoryScreen";
@@ -10,14 +9,14 @@ import { EnquiriesScreen } from "../../src/business/EnquiriesScreen";
 import { DiagnosticOrders } from "../../src/diagnostics/DiagnosticOrders";
 import DiagnosticReportRoute from "../../app/diagnostics/[id]";
 import { clearAuthSession } from "../../src/auth/session";
-import { renderMobile, fireEvent, routerMock } from "../render";
+import { renderMobile, fireEvent, routerMock, routeParams } from "../render";
 
 vi.mock("expo-secure-store", () => ({ getItemAsync: async () => null, setItemAsync: async () => {}, deleteItemAsync: async () => {} }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "44444444-4444-4444-8444-444444444444" }));
 vi.mock("expo-image-picker", () => ({ launchImageLibraryAsync: async () => ({ canceled: true }) }));
 vi.mock("expo-image-manipulator", () => ({ SaveFormat: { JPEG: "jpeg" }, ImageManipulator: {} }));
 vi.mock("expo-sharing", () => ({ isAvailableAsync: async () => true, shareAsync: async () => {} }));
-vi.mock("expo-file-system", () => ({ Paths: { cache: "file:///cache" }, File: class {} }));
+vi.mock("expo-file-system", () => ({ Paths: { cache: "file:///cache" }, File: class { uri = "file:///cache/report.pdf"; } }));
 beforeEach(async () => { server.use(http.get("*/catalog/brands", () => HttpResponse.json({ items: [], nextCursor: null }))); await clearAuthSession(); routerMock.canGoBack.mockReturnValue(false); });
 it.each([
  ["services", ServiceScreen, "/(tabs)/services"],
@@ -33,4 +32,11 @@ it.each([
  routerMock.canGoBack.mockReturnValue(true);
  await fireEvent.press(view.getByRole("button", { name: "Back" }));
  expect(routerMock.back).toHaveBeenCalledOnce();
+});
+
+it("returns anonymous public-report direct entry to Home without opening private history", async () => {
+ routeParams.audience = "public";
+ const view = await renderMobile(<DiagnosticReportRoute/>);
+ await fireEvent.press(view.getByRole("button", { name: "Back" }));
+ expect(routerMock.replace).toHaveBeenCalledWith("/(tabs)/(search)");
 });

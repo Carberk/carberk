@@ -17,6 +17,9 @@ import { enquiryCopy } from "./enquiryCopy";
 import { readEnquiryDraft, writeEnquiryDraft } from "./enquiryDraftStore";
 
 import { Button } from "@/components/ui/button";
+import { SafeScreen } from "@/components/navigation/SafeScreen";
+import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
+import { useSafeBack } from "@/src/navigation/useSafeBack";
 import { Text } from "@/components/ui/text";
 import { Input } from "@/components/ui/input";
 
@@ -27,6 +30,8 @@ type Change = { enquiry: Enquiry; action: "claim" | "reassign" | "close" | "reop
 
 /** Business identity is explicit on every read/write and cache key. Personal chats retain their own route. */
 export function EnquiriesScreen() {
+ const goBack = useSafeBack("/business");
+ const { t: navigationText } = useTranslation("common");
  const { i18n } = useTranslation(); const c = enquiryCopy(i18n.language);
  const { userId, isAuthenticated } = useAuth(); const workspace = useBusinessWorkspace(); const business = workspace.data?.workspace;
  const businessId = business?.business.id; const options = useInventoryRequestOptions(businessId); const cache = useQueryClient();
@@ -70,7 +75,7 @@ export function EnquiriesScreen() {
  const visible = rows.filter(row => filter === "all" || (filter === "mine" ? row.assigneeId === userId : filter === "unassigned" ? !row.assigneeId : row.status === filter));
  const workspaceDenied = workspace.error instanceof ApiError && (workspace.error.status === 403 || workspace.error.status === 401);
  const allowed = isAuthenticated === true && !!business && !workspace.isError && !inbox.isError;
- return <><Stack.Screen options={{ title: c.title, headerBackTitle: c.back }} /><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+ return <SafeScreen><StackHeader title={c.title} leading={<BackButton onPress={goBack} accessibilityLabel={navigationText("back")}/>}/><Stack.Screen options={{ title: c.title, headerBackTitle: c.back }} /><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
   {isAuthenticated !== true || workspaceDenied || (!workspace.isPending && !workspace.isError && !business) ? <Text accessibilityRole="alert">{c.denied}</Text> : workspace.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{button(c.retry, refresh)}</> : workspace.isPending || inbox.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : inbox.isError ? <><Text accessibilityRole="alert">{inbox.error instanceof ApiError && inbox.error.status === 403 ? c.denied : c.error}</Text>{button(c.retry, refresh)}</> : allowed ? <>
    <Text className="font-heading text-title-2 font-semibold">{business.business.name}</Text>
    {!active ? <Text accessibilityRole="alert">{c.inactive}</Text> : null}
@@ -97,5 +102,5 @@ export function EnquiriesScreen() {
    {inbox.hasNextPage ? button(c.more, () => { void inbox.fetchNextPage(); }, inbox.isFetchingNextPage) : null}
    {button(c.retry, refresh)}
   </> : null}
- </ScrollView></>;
+ </ScrollView></SafeScreen>;
 }

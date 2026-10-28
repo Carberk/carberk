@@ -318,5 +318,5 @@ describe("Back after a push tap", () => {
 it("routes a service update to its private service screen without opening marketplace chat", () => {
  mockPush.mockReset(); mockGetLast.mockReturnValue(null); renderHook(() => useDirectMessagePushRouting());
  responseListener?.(makeResponse({ identifier: "service", data: { kind: "service_update", conversationId: "11111111-1111-4111-8111-111111111111" } }));
- expect(mockPush).toHaveBeenCalledWith({ pathname: "/services", params: { conversationId: "11111111-1111-4111-8111-111111111111" } });
+ expect(mockPush).toHaveBeenCalledWith({ pathname: "/service-requests", params: { conversationId: "11111111-1111-4111-8111-111111111111" } });
 });

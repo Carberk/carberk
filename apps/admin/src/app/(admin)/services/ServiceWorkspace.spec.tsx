@@ -58,6 +58,9 @@ it("keeps a failed operator upload separate from sending and retries its exact s
  await waitFor(() => expect(screen.getByText("Synthetic service reply")).toBeTruthy());
  const file = new File([new Uint8Array([1, 2, 3])], "synthetic.jpg", { type: "image/jpeg" });
  Object.defineProperty(file, "arrayBuffer", { value: async () => new Uint8Array([1, 2, 3]).buffer });
+ fireEvent.change(screen.getByLabelText("Image source"), { target: { value: "synthetic" } });
+ fireEvent.change(screen.getByLabelText("Rights basis"), { target: { value: "Owned synthetic fixture" } });
+ fireEvent.change(screen.getByLabelText("Source and permission evidence"), { target: { value: "Operator-created synthetic test image" } });
  fireEvent.change(screen.getByLabelText("Upload attachment"), { target: { files: [file] } });
  await waitFor(() => expect(screen.getByText("The upload failed. The message has not been sent.")).toBeTruthy()); expect(sends).toHaveLength(0);
  fireEvent.click(screen.getByRole("button", { name: "Retry upload" })); await waitFor(() => expect(screen.getByText("Attachment ready to send")).toBeTruthy());
@@ -94,7 +97,7 @@ it("retries a failed manual awaiting-customer closure with the same notice ident
  });
  const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace/></AdminLocaleProvider>);
  await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy()); fireEvent.click(screen.getByRole("button", { name: "General Support" })); await screen.findByText("Synthetic service reply");
- fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Closing this request. Reply to reopen." } });
+ fireEvent.change(screen.getByLabelText("Close after 14 days awaiting customer: Message"), { target: { value: "Closing this request. Reply to reopen." } });
  fireEvent.change(screen.getByLabelText("Close after 14 days awaiting customer: Reason"), { target: { value: "No requested information for 14 days" } });
  fireEvent.click(screen.getByRole("button", { name: "Close after 14 days awaiting customer" })); await waitFor(() => expect(commands).toHaveLength(1));
  await waitFor(() => expect((screen.getByRole("button", { name: "Close after 14 days awaiting customer" }) as HTMLButtonElement).disabled).toBe(false));

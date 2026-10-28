@@ -51,9 +51,9 @@ it("retrieves a private image through the authenticated service boundary before 
  const screen = await renderMobile(<ServiceScreen/>); await fireEvent.press(await screen.findByRole("button", { name: "General Support" })); await screen.findByText("synthetic-private.jpg");
  expect(reads).toBe(0); await fireEvent.press(screen.getByRole("button", { name: "Private attachment" })); expect(await screen.findByLabelText("synthetic-private.jpg")).toBeTruthy(); expect(reads).toBe(1); if (!screen.root) throw new Error("Missing service view"); expect(getAllHosts(screen.root, "Modal", { visible: true })).toHaveLength(1);
 });
-it("shows the public history explanation and price before sign-in without requesting private history", async () => {
+it("shows neutral public history information before sign-in without requesting private history", async () => {
  await clearAuthSession(); let privateReads = 0; server.use(http.get("*/services/conversations", () => { privateReads++; return HttpResponse.json([]); }));
- const screen = await renderMobile(<ServiceScreen/>); expect(await screen.findByText("Vehicle History: 100 TMT")).toBeTruthy(); expect(screen.getByText(/One available provider is sufficient/)).toBeTruthy(); expect(privateReads).toBe(0);
+ const screen = await renderMobile(<ServiceScreen/>); expect(await screen.findByText("Vehicle History")).toBeTruthy(); expect(screen.queryByText(/100 TMT/)).toBeNull(); expect(screen.getByText(/One available provider is sufficient/)).toBeTruthy(); expect(privateReads).toBe(0);
 });
 it("acknowledges only the service messages actually rendered to the current customer", async () => {
  let through = 0;
@@ -130,7 +130,9 @@ it("warns about the same purchased VIN and opens previous reports without creati
  server.use(http.get("*/services/history/previous", () => HttpResponse.json([{ conversationId: id, vin: "1HGCM82633A004352" }])), http.post("*/services/conversations", () => { created++; return HttpResponse.json({ id, resourceId: id }); }));
  const screen = await renderMobile(<ServiceScreen/>);
  await fireEvent.changeText(await screen.findByLabelText("VIN for enquiry (optional)"), "1hgcm82633a004352");
- await fireEvent.press(await screen.findByRole("button", { name: "Open previous reports" }));
+ await screen.findByRole("button", { name: "Open previous reports" });
+ expect(screen.queryByText(/100 TMT/)).toBeNull();
+ await fireEvent.press(screen.getByRole("button", { name: "Open previous reports" }));
  await screen.findByText(message.body); expect(created).toBe(0);
 });
 it("retains source Listing and proposed VIN when starting a contextual enquiry", async () => {
@@ -234,12 +236,17 @@ it.each([["create", false], ["send", false], ["upload", false], ["create", true]
 
 it("provides a localized way back while keeping existing history after new-request denial", async () => {
  routeParams.purpose = "history";
- server.use(http.post("*/services/conversations", () => HttpResponse.json({ code: "COLLECTION_DISABLED" }, { status: 503 })));
+ server.use(
+  http.post("*/services/conversations", () => HttpResponse.json({ code: "COLLECTION_DISABLED" }, { status: 503 })),
+  http.get("*/services/conversations", () => HttpResponse.json([{ id, purpose: "history", createdAt: "2026-10-15T10:00:00Z" }])),
+  http.get("*/services/conversations/:id", () => HttpResponse.json({ id, resourceId: id, purpose: "history", status: "enquiry", assignmentVersion: 0, assigned: false, operatorName: null, sourceListingId: null, canSend: true, messages: [message], lastSequence: 1, readThrough: 0, unread: 1, hasMore: false })),
+  http.get("*/services/conversations/:id/history", () => HttpResponse.json({ synthetic: true, quotes: [], order: null, payments: [] })),
+ );
  const screen = await renderMobile(<ServiceScreen/>);
  expect(screen.queryByText("Vehicle History: 100 TMT")).toBeNull();
  await fireEvent.press(screen.getByRole("button", { name: "New request" }));
  await screen.findByText("This service is not available yet.");
- await fireEvent.press(await screen.findByRole("button", { name: "General Support" }));
+ await fireEvent.press(await screen.findByRole("button", { name: "Vehicle History" }));
  await screen.findByText(message.body);
  expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
 });

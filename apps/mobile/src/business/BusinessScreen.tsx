@@ -16,10 +16,15 @@ import { businessCopy } from "./copy";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { SafeScreen } from "@/components/navigation/SafeScreen";
+import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
+import { useSafeBack } from "@/src/navigation/useSafeBack";
 import { Text } from "@/components/ui/text";
 
 type Receipt = { token: string; expiresAt: string; userId: string | null };
 export function BusinessScreen() {
+ const goBack = useSafeBack("/(tabs)/services");
+ const { t: navigationText } = useTranslation("common");
  const { i18n } = useTranslation(); const c = businessCopy(i18n.language);
  const { userId, isAuthenticated } = useAuth(); const query = useBusinessWorkspace(); const action = useBusinessAction();
  const [token, setToken] = useState(""); const [recipient, setRecipient] = useState(""); const [name, setName] = useState(""); const [message, setMessage] = useState(""); const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -39,7 +44,7 @@ export function BusinessScreen() {
  }
  const control = (label: string, onPress: () => void, disabled = false) => <Button disabled={action.isPending || disabled} onPress={onPress}><Text>{action.isPending ? c.working : label}</Text></Button>;
  const heading = (text: string) => <Text className="mt-5 font-heading text-title-3 font-semibold">{text}</Text>;
- return <><Stack.Screen options={{ title: c.title, headerBackTitle: c.back }} /><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
+ return <SafeScreen><StackHeader title={c.title} leading={<BackButton onPress={goBack} accessibilityLabel={navigationText("back")}/>}/><Stack.Screen options={{ title: c.title, headerBackTitle: c.back }} /><ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
   {isAuthenticated !== true ? <><Text>{c.signedOut}</Text>{control(c.signIn, () => useAuthIntentStore.getState().requireSignIn(router, { returnTo: "/business" }))}</> : <>
    {message ? <Text accessibilityRole="alert" className="text-foreground">{message}</Text> : null}
    {query.isPending ? <Text accessibilityRole="progressbar">{c.loading}</Text> : query.isError ? <><Text accessibilityRole="alert">{c.error}</Text>{control(c.retry, () => { void query.refetch(); })}</> : <>
@@ -68,5 +73,5 @@ export function BusinessScreen() {
     {control(c.retry, () => { void query.refetch(); })}
    </>}
   </>}
- </ScrollView></>;
+ </ScrollView></SafeScreen>;
 }

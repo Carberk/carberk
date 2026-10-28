@@ -10,8 +10,8 @@ import { HomeHeader } from "./HomeHeader";
 describe("Home See all press feedback", () => {
   it("opens public Vehicle History information from the compact Home entry", async () => {
     const screen = await renderMobile(<HomeHeader/>);
-    await fireEvent.press(screen.getByRole("button", { name: "Vehicle History: 100 TMT" }));
-    expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/services", params: { purpose: "history" } });
+    await fireEvent.press(screen.getByRole("button", { name: "Vehicle History" }));
+    expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/service-requests", params: { purpose: "history" } });
   });
   it("returns to a plain label after release, cancellation and opening Results", async () => {
     server.use(http.get("http://localhost:3006/api/v1/listings/count", () => HttpResponse.json({ totalMatching: 4 })));
