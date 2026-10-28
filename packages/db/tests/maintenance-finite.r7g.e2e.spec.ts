@@ -105,7 +105,12 @@ describe("R7g maintenance callers on restricted PostgreSQL", () => {
     const applied = (await observer.query<{ name: string; sha256: string }>('SELECT migration_name AS name,checksum AS sha256 FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name')).rows;
     expect(applied).toHaveLength(99);
     expect(sha256(JSON.stringify(applied))).toBe("cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a");
-    evidence.push({ kind: "database", databaseName, applied, guardSnapshot });
+    const functions = (await observer.query<{ proname: string; definition: string }>(`SELECT p.proname,pg_get_functiondef(p.oid) definition
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'
+      AND (p.proname LIKE 'diagnostic_%' OR p.proname LIKE 'campaign_%') ORDER BY p.proname,p.oid`)).rows;
+    const functionsHash = sha256(JSON.stringify(functions));
+    expect(functionsHash).toBe("873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3");
+    evidence.push({ kind: "database", databaseName, applied, guardSnapshot, functionsHash });
     drainOwner = trackPoolClientEnds(observer);
     owner = new PrismaClient({ adapter: new PrismaPg(observer) });
     await observer.query(`GRANT USAGE ON SCHEMA public TO "${role}"`);

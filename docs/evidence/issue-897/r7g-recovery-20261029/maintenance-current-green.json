@@ -1,0 +1,1845 @@
+{
+  "status": "passed bounded local maintenance scope; full candidate/matrix acceptance remains open",
+  "sourceCommit": "de18af37857ad130c00c14404f5ce360e937d25e",
+  "sourceTree": "6002098d27c8b8c5764dde06bb5192cfb1ea15d7",
+  "sourcePatch": "Only restricted-fixture loaded SQL fingerprint capture/assertion added after source commit; all production bytes unchanged",
+  "sourceFiles": [
+    {
+      "path": "packages/db/prisma/migrations/20261026016200_diagnostic_maintenance_compatibility/migration.sql",
+      "sha256": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379"
+    },
+    {
+      "path": "packages/db/src/reviewer-scenario-seed.ts",
+      "sha256": "e3b6569a0886455d572a4587699926a83e018aec47e9a09dcafacbb7ffcc4ea5"
+    },
+    {
+      "path": "packages/db/scripts/reviewer-scenario-store.ts",
+      "sha256": "d0a9552fbca9a15420fbcee12319663104b912d2551d06475ad813f8803cd204"
+    },
+    {
+      "path": "packages/db/src/PrismaAdminPromotionStore.ts",
+      "sha256": "64fddb927dfaa99d3d9331a96a3001e6344cb8eea51ebd6905b518a21ca142c7"
+    },
+    {
+      "path": "packages/db/src/PrismaTesterAccountStore.ts",
+      "sha256": "c2e52d4c8f649c7603d3ae395cfa1618dc6e74037f42058aeecd920637ee2c5a"
+    },
+    {
+      "path": "packages/db/src/maintenance-source-command.ts",
+      "sha256": "4af974b2a1dba650f90e3cf89b4fde2f8a3ddac8bc0c1cd7402171b44324543d"
+    },
+    {
+      "path": "packages/db/src/diagnostic-source-command.ts",
+      "sha256": "de430bdb2c90e6a5b92d07cd33fa152d12ed96b28bd15deb4ea6a818155f71a4"
+    },
+    {
+      "path": "packages/db/tests/maintenance-finite.r7g.e2e.spec.ts",
+      "sha256": "aff358a51d2272e687e5d818b1df6b67bb659e18d87728f1adf6dd53dd9fe973"
+    },
+    {
+      "path": "packages/db/tests/promote-admin.command.test.ts",
+      "sha256": "ecc1749f4ff8be757131e2b316dbc96f247c7c2c351a8274c50b13f6c6cc6dc4"
+    },
+    {
+      "path": "packages/db/tests/tester-accounts.e2e.spec.ts",
+      "sha256": "2700f17f42d426892728dd27910a98745a7cb6abbd9b45a9e1a9dc7fb12dfa2e"
+    }
+  ],
+  "migrationManifest": {
+    "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+    "manifest": [
+      {
+        "name": "20260513201407_init",
+        "sha256": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860"
+      },
+      {
+        "name": "20260514090000_multi_device_sessions_and_role_split",
+        "sha256": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0"
+      },
+      {
+        "name": "20260514100000_otp_request_ip",
+        "sha256": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc"
+      },
+      {
+        "name": "20260514104615_delete_me_cascades",
+        "sha256": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193"
+      },
+      {
+        "name": "20260518081943_add_engine_type_transmission_drive_type",
+        "sha256": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841"
+      },
+      {
+        "name": "20260518083234_s4_listings_crud",
+        "sha256": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010"
+      },
+      {
+        "name": "20260518180741_add_seller_terms_to_listing",
+        "sha256": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454"
+      },
+      {
+        "name": "20260608010000_s7_admin_moderation",
+        "sha256": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a"
+      },
+      {
+        "name": "20260609000000_account_deletion_grace",
+        "sha256": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698"
+      },
+      {
+        "name": "20260711000000_add_condition_disclosure_to_listing",
+        "sha256": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846"
+      },
+      {
+        "name": "20260711100000_add_inspection_interest",
+        "sha256": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176"
+      },
+      {
+        "name": "20260713000000_s10_rich_chat_foundation",
+        "sha256": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e"
+      },
+      {
+        "name": "20260713170000_add_notification_history_status",
+        "sha256": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61"
+      },
+      {
+        "name": "20260719010000_align_prisma_schema_with_existing_database",
+        "sha256": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8"
+      },
+      {
+        "name": "20260922000000_add_user_sign_in_methods",
+        "sha256": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016"
+      },
+      {
+        "name": "20260923000000_add_sign_in_code_channel",
+        "sha256": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97"
+      },
+      {
+        "name": "20260928000000_add_listing_price_tmt",
+        "sha256": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009"
+      },
+      {
+        "name": "20260929000000_add_listing_public_number",
+        "sha256": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8"
+      },
+      {
+        "name": "20260929120000_add_brand_logo_key",
+        "sha256": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488"
+      },
+      {
+        "name": "20260929130000_damaged_condition_disclosure",
+        "sha256": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0"
+      },
+      {
+        "name": "20261002000000_remove_reported_listing_status",
+        "sha256": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0"
+      },
+      {
+        "name": "20261002120000_add_media_uploads",
+        "sha256": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a"
+      },
+      {
+        "name": "20261003120000_add_otp_request_purpose",
+        "sha256": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40"
+      },
+      {
+        "name": "20261003180000_add_verified_contact_phones",
+        "sha256": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41"
+      },
+      {
+        "name": "20261003180100_clear_unverified_listing_contact_phones",
+        "sha256": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e"
+      },
+      {
+        "name": "20261005120000_add_user_name_number_and_avatar_index",
+        "sha256": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085"
+      },
+      {
+        "name": "20261007120000_conditional_upload_protocol",
+        "sha256": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481"
+      },
+      {
+        "name": "20261007130000_exclusive_upload_adoption",
+        "sha256": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451"
+      },
+      {
+        "name": "20261007130100_backfill_upload_adoption_state",
+        "sha256": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249"
+      },
+      {
+        "name": "20261011130000_correct_lugong_liugong_models",
+        "sha256": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b"
+      },
+      {
+        "name": "20261011140000_add_listing_media_thumb_hash",
+        "sha256": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d"
+      },
+      {
+        "name": "20261011150000_expand_conditional_media_manifest",
+        "sha256": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490"
+      },
+      {
+        "name": "20261014120000_restore_relisted_listings_published_at",
+        "sha256": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718"
+      },
+      {
+        "name": "20261015003500_listing_view_counts",
+        "sha256": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d"
+      },
+      {
+        "name": "20261015010000_staff_capabilities",
+        "sha256": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43"
+      },
+      {
+        "name": "20261015020000_business_membership",
+        "sha256": "7a60b7b21b212c9bf38a14522eb937eb9762044039d05e6e16b7e76d1093c00a"
+      },
+      {
+        "name": "20261015030000_business_inventory",
+        "sha256": "49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8"
+      },
+      {
+        "name": "20261015040000_first_party_measurement",
+        "sha256": "5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c"
+      },
+      {
+        "name": "20261015050000_service_foundations",
+        "sha256": "66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a"
+      },
+      {
+        "name": "20261015060000_business_enquiries",
+        "sha256": "4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8"
+      },
+      {
+        "name": "20261015070000_diagnostic_intake",
+        "sha256": "9f5ce216f2dd4cbbcb75c9ce78d058244f5262170e51815c111c66563b32ebc6"
+      },
+      {
+        "name": "20261015080000_service_push_subscriptions",
+        "sha256": "e2b04ea8e7f1c33924261fb2fcc0669c1c99dcfe628b8b0e8f0c7007ee47cf3b"
+      },
+      {
+        "name": "20261015120000_listing_video_foundation",
+        "sha256": "8b1b907dbeb942c840330ca3a8f3ef9264ec0008c393f3d51d7961bd7305687b"
+      },
+      {
+        "name": "20261015130000_support_operations",
+        "sha256": "57389de2321c518efe4f1a96adf7ae5bbf7df6b7224ff97c6a854f2708c88163"
+      },
+      {
+        "name": "20261015140000_video_playback_authority",
+        "sha256": "019b9ea21c459d9e4e5df313f97957eba80a043ada053d8bd80fd13515b86eae"
+      },
+      {
+        "name": "20261015150000_history_orders",
+        "sha256": "1eb35867354f2d8fcf9d15fdff2ce584eeeb4cdb252e4a5d47ce6c2a298a19b2"
+      },
+      {
+        "name": "20261015160000_showroom_public_fields",
+        "sha256": "2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b"
+      },
+      {
+        "name": "20261015170000_video_processing_fences",
+        "sha256": "ff8a5579df352a389385aeb47f78caed985301995c569c3a5b21db2e022f779b"
+      },
+      {
+        "name": "20261015180000_history_delivery",
+        "sha256": "2d08ccc88142214fe0f22c29a1dd5ecf84239bc730f6076cab2e1104e724248d"
+      },
+      {
+        "name": "20261015190000_diagnostic_reports",
+        "sha256": "4be9efc71ddd57f2b6b32efef199576d81d432d193580d8db41dcc44155ff3fd"
+      },
+      {
+        "name": "20261015200000_measurement_insights",
+        "sha256": "dd412d0bc61628e4333dfb9b607b022f23742c17c9c59529acea91d9e3f325e0"
+      },
+      {
+        "name": "20261015210000_history_recovery_offers",
+        "sha256": "8da84698db0e7f080a865daf5fceda3a43892e5454f86981855d597b678094e2"
+      },
+      {
+        "name": "20261015220000_diagnostic_evidence_leases",
+        "sha256": "497b8aab18f382eefd0d68f7be0f7ad8622b1c9975e31488ec324811b5b1f61a"
+      },
+      {
+        "name": "20261015230000_video_claim_target",
+        "sha256": "39d9c56041a02cf6d74f3a967adc37c37dbbc05f4a5487876a9abf4fbb5647d8"
+      },
+      {
+        "name": "20261015240000_history_source_facts",
+        "sha256": "593a00d00ee4f0c686c05e07cbdeae60996b50252e0d350b341ad502c7bde8bd"
+      },
+      {
+        "name": "20261015250000_video_source_manifest",
+        "sha256": "da45934af2bd21968d582661738ee13a1394320d442e0847abc53db01c01194d"
+      },
+      {
+        "name": "20261015260000_video_write_protocol",
+        "sha256": "8c79eec4d6e7b465a6599f9d9e2224a327c3715cc8d95179c4c69ff9341c7708"
+      },
+      {
+        "name": "20261015270000_history_mileage_not_null",
+        "sha256": "1081bd33f8c08b353ce4c0fa163ecf17d97eaee1d1a1ac7871c5e9f3d23add92"
+      },
+      {
+        "name": "20261015280000_diagnostic_association_invalidation",
+        "sha256": "565854648750b86cceff78a86cff7693c9210510a3835b26f195928ed765baee"
+      },
+      {
+        "name": "20261015290000_conversation_measurement_cohorts",
+        "sha256": "350160257c66c5fb3a3dcd7b3681ceeefec89f35748de452a9599ee955675540"
+      },
+      {
+        "name": "20261021100000_diagnostic_reinspection_lineage",
+        "sha256": "d0f4aa1d73192bfffe468458f977c853483d8e2a43efca29e7a8f6aa83dc37d2"
+      },
+      {
+        "name": "20261021110000_diagnostic_identity_records",
+        "sha256": "b5919c3d4d5fd9f52a14c8a4f973fe7caa3e3e4c6611ff08e188579397ad1d70"
+      },
+      {
+        "name": "20261021120000_diagnostic_report_identity_pin",
+        "sha256": "1d299c923af088efc1b49d9e2b8124bef6c4a0476fc300ed78ab8e63d4a1e83c"
+      },
+      {
+        "name": "20261021130000_diagnostic_identity_evidence",
+        "sha256": "5351553647b355dc59eadf25a02e84aa7916e1b33da2117b00e40f47d49ecb82"
+      },
+      {
+        "name": "20261021140000_diagnostic_continuity_proofs",
+        "sha256": "77c6cab3b6731e9203556bcfa78a4ff2661d3a71db597a7b3c6150db925e5cb0"
+      },
+      {
+        "name": "20261021150000_diagnostic_continuity_proof_consumption",
+        "sha256": "f25d566779839d76749f9320ba102d6e282fbba365468c68e0d49eeed460a222"
+      },
+      {
+        "name": "20261021160000_diagnostic_automatic_vin_proof",
+        "sha256": "83176fd55e353ef02de460a42dd41471c3f07120c228a6df80ff71f829502acd"
+      },
+      {
+        "name": "20261022180000_diagnostic_public_continuity",
+        "sha256": "32fe0a8cb64aaaf187390b5c6a2fa72fe6a260547602ffdf572959409ea68a3f"
+      },
+      {
+        "name": "20261023090000_diagnostic_ownership_components",
+        "sha256": "f43b2c04ef6ed9f447acfc0e5ebf326a577b3cd1d96539439c43f05f537cad01"
+      },
+      {
+        "name": "20261023100000_diagnostic_ownership_disposal_same_graph",
+        "sha256": "cdb43cc361fd783c1e6d66d5eccef118861ef3e9ac4a75b233fc8b527b8ec547"
+      },
+      {
+        "name": "20261023110000_diagnostic_continuity_requests",
+        "sha256": "83188077748f02bf96d74d9588805f173129199333a8d4e9c160547e38fb52a2"
+      },
+      {
+        "name": "20261023120000_diagnostic_ownership_grants",
+        "sha256": "3696e93cfc56f13a95d8e38fd72e3e985d43105ce17ffdf7d5f7ce273efac3df"
+      },
+      {
+        "name": "20261023130000_diagnostic_source_kernel",
+        "sha256": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf"
+      },
+      {
+        "name": "20261024010000_diagnostic_source_guard_repair",
+        "sha256": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3"
+      },
+      {
+        "name": "20261024020000_campaign_preparation",
+        "sha256": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429"
+      },
+      {
+        "name": "20261024030000_diagnostic_purge_effects",
+        "sha256": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba"
+      },
+      {
+        "name": "20261024040000_diagnostic_intake_effects",
+        "sha256": "9d9155637143e152ac63baf255d074fe768ff0c4bcb4ec041dd75b32404903a5"
+      },
+      {
+        "name": "20261024050000_diagnostic_kernel_invariants",
+        "sha256": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8"
+      },
+      {
+        "name": "20261024060000_diagnostic_source_correction",
+        "sha256": "55fa19d86c4f30d6c6abab96985dfbfb7bc30b0e6d928da1f63ba8fdbd13b7f6"
+      },
+      {
+        "name": "20261024070000_diagnostic_user_eligibility",
+        "sha256": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e"
+      },
+      {
+        "name": "20261024080000_diagnostic_moderation_complete_effects",
+        "sha256": "a82144b10637924c522188c2511fab6f906ee7ecc803875189155c3e8289e6c0"
+      },
+      {
+        "name": "20261024090000_diagnostic_message_enquiry_fences",
+        "sha256": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c"
+      },
+      {
+        "name": "20261024100000_diagnostic_signin_intake_object_owners",
+        "sha256": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6"
+      },
+      {
+        "name": "20261024110000_diagnostic_user_insert_fence",
+        "sha256": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271"
+      },
+      {
+        "name": "20261024120000_diagnostic_account_noop_enquiry",
+        "sha256": "aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f"
+      },
+      {
+        "name": "20261024130000_diagnostic_intake_campaign_composition",
+        "sha256": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed"
+      },
+      {
+        "name": "20261025010000_diagnostic_report_source_effects",
+        "sha256": "a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9"
+      },
+      {
+        "name": "20261025015000_diagnostic_runtime_transport_corrections",
+        "sha256": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424"
+      },
+      {
+        "name": "20261025017500_diagnostic_effect_scope_alias_correction",
+        "sha256": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f"
+      },
+      {
+        "name": "20261025019000_diagnostic_user_insert_error_transport",
+        "sha256": "a6b7b46c95fd74f8e6f7b962bcb899b2575df7ec1db1f26962bc5853305d0e74"
+      },
+      {
+        "name": "20261025020000_diagnostic_listing_publication_effects",
+        "sha256": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39"
+      },
+      {
+        "name": "20261026010000_diagnostic_automatic_public_continuity",
+        "sha256": "886f521df508f121e306d3b3d27591845fd57484beac666482c330576c50844e"
+      },
+      {
+        "name": "20261026011000_diagnostic_bootstrap_capability_qualification",
+        "sha256": "d7265b92ba944af1a62055a6ffd6ce9316f1203b75384929a89c3da86f8ccc3d"
+      },
+      {
+        "name": "20261026012000_diagnostic_disposal_selector_precedence",
+        "sha256": "ac9e5b810a7cc7fd2d8ff6e8f4bc60b76d48368e0e7330ce766a449586e6aaef"
+      },
+      {
+        "name": "20261026013000_diagnostic_purge_audit_details_precedence",
+        "sha256": "a4473bed2ff325a5b7a1a1c58220d5ef754592373545bc99d508606e4869442d"
+      },
+      {
+        "name": "20261026014000_diagnostic_source_registry_evaluation",
+        "sha256": "6d3ea989e90a1169fa7f5b46cecfc6e4d1e0a23e8fde774916e54bb1d2592756"
+      },
+      {
+        "name": "20261026015000_diagnostic_component_expiry_representation",
+        "sha256": "e0b3068681544bb5e48d016047e8a7e4304b3a737fb9c6e17ef547897c90e6cf"
+      },
+      {
+        "name": "20261026016000_diagnostic_provenance_invalidation_parity",
+        "sha256": "87dd1162b90c334137859cbaf4afd61af068f50602a4ec438d041b22364e95b1"
+      },
+      {
+        "name": "20261026016200_diagnostic_maintenance_compatibility",
+        "sha256": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-scalar.json",
+      "sha256": "5d1bba4706e15362a2106179b73748cf65a85f43ed81692a4e1656d682fb0d93",
+      "passed": 75,
+      "failed": 0,
+      "pending": 0,
+      "tests": [
+        {
+          "title": "runPromoteAdmin returns error for invalid phone format",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin returns error for empty reason after trim",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin returns error for reason over 1000 chars",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin returns non-zero when no user matches the phone",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin returns zero as no-op when user is already admin, without writing audit",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin dry-run validates but writes nothing",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin promotes user and writes correct audit row on success",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin preserves internal line breaks in reason",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses invalid selector combinations without writes: {}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses invalid selector combinations without writes: {\"phone\":\"+99361234567\",\"email\":\"staff@example.test\"}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses invalid selector combinations without writes: {\"phone\":\"\",\"email\":\"staff@example.test\"}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin selects the canonical verified email holder and writes a contact-free receipt",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses malformed email \"invalid\"",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses malformed email \"\"",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses malformed email \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@example.test\"",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses absent, unverified or ambiguous email holders: {\"holders\":[]}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses absent, unverified or ambiguous email holders: {\"holders\":[{\"id\":\"email-user\",\"role\":\"buyer\",\"emailVerifiedAt\":null}]}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses absent, unverified or ambiguous email holders: {\"holders\":[{\"id\":\"email-user\",\"role\":\"buyer\",\"emailVerifiedAt\":\"2026-10-20T00:00:00.000Z\"},{\"id\":\"legacy-holder\",\"role\":\"buyer\",\"emailVerifiedAt\":\"2026-10-20T00:00:00.000Z\"}]}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin refuses absent, unverified or ambiguous email holders: {\"holders\":[{\"id\":\"email-user\",\"role\":\"buyer\",\"emailVerifiedAt\":\"2026-10-20T00:00:00.000Z\"},{\"id\":\"unverified-holder\",\"role\":\"buyer\",\"emailVerifiedAt\":null}]}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin keeps email buyer dryRun=true write-free",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin keeps email admin dryRun=false write-free",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin propagates refused audit so the transaction cannot commit: {\"phone\":\"+99361234567\",\"reason\":\"bootstrap first admin\",\"dryRun\":false}",
+          "status": "passed"
+        },
+        {
+          "title": "runPromoteAdmin propagates refused audit so the transaction cannot commit: {\"email\":\"  Coordinator@Campaign.Example.TEST  \",\"reason\":\"  email bootstrap  \",\"dryRun\":false}",
+          "status": "passed"
+        },
+        {
+          "title": "refuses empty-reason phone promotion before role or audit effects",
+          "status": "passed"
+        },
+        {
+          "title": "refuses empty-reason email promotion before role or audit effects",
+          "status": "passed"
+        },
+        {
+          "title": "parseReviewerScenarioAccounts maps 3 to 5 secret-managed accounts to deterministic buyer/seller slots without exposing codes",
+          "status": "passed"
+        },
+        {
+          "title": "parseReviewerScenarioAccounts rejects malformed or duplicate phone and email input",
+          "status": "passed"
+        },
+        {
+          "title": "reviewerScenarioSeedIds uses UUIDs for every identifier the API validates",
+          "status": "passed"
+        },
+        {
+          "title": "runReviewerScenarioSeed refuses unsafe environments unless the narrow authorization and reviewer-era guards are present",
+          "status": "passed"
+        },
+        {
+          "title": "runReviewerScenarioSeed creates deterministic buyer/seller users, listings, chat starting point, and reportable content",
+          "status": "passed"
+        },
+        {
+          "title": "runReviewerScenarioSeed converges on rerun without duplicating users, listings, conversations, messages, or reports",
+          "status": "passed"
+        },
+        {
+          "title": "runReviewerScenarioSeed refuses to create or reuse privileged reviewer accounts",
+          "status": "passed"
+        },
+        {
+          "title": "runReviewerScenarioSeed rotates sign-in destinations on stable users and revokes existing sessions without logging credential values",
+          "status": "passed"
+        },
+        {
+          "title": "runReviewerScenarioSeed revokes reviewer accounts while preserving stable user ids for audit history",
+          "status": "passed"
+        },
+        {
+          "title": "gives each fixed reviewer Listing three ordered fixture images and keeps them on rerun",
+          "status": "passed"
+        },
+        {
+          "title": "stores the seller's own sign-in phone so archived reviewer Listings can republish",
+          "status": "passed"
+        },
+        {
+          "title": "refuses a privileged final reviewer seed target before any scenario effect",
+          "status": "passed"
+        },
+        {
+          "title": "refuses a privileged final reviewer revoke target before any scenario effect",
+          "status": "passed"
+        },
+        {
+          "title": "preflights an unsupported final reviewer role before changing earlier accounts",
+          "status": "passed"
+        },
+        {
+          "title": "preflights an unsupported final reviewer deletionScheduledAt before changing earlier accounts",
+          "status": "passed"
+        },
+        {
+          "title": "preflights an unsupported final reviewer emailVerifiedAt before changing earlier accounts",
+          "status": "passed"
+        },
+        {
+          "title": "refuses a foreign fixed Listing before creating accounts, catalog or media",
+          "status": "passed"
+        },
+        {
+          "title": "converges displayName-only drift while preserving verified contacts and ownership",
+          "status": "passed"
+        },
+        {
+          "title": "rolls back every reviewer credential and security effect when sessions fails",
+          "status": "passed"
+        },
+        {
+          "title": "rolls back every reviewer credential and security effect when devices fails",
+          "status": "passed"
+        },
+        {
+          "title": "rolls back every reviewer credential and security effect when audit fails",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seeds 30 ordinary Users with both verified methods and repeats without changing them",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior accepts an empty list for both modes without changing an unrelated User",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a buyer User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a buyer User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a seller User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a seller User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a admin User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a admin User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a moderator User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior seed refuses a moderator User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a buyer User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a buyer User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a seller User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a seller User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a admin User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a admin User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a moderator User's phone before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior remove refuses a moderator User's email before changing any tester",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior removes owned buyer/seller testers now, revokes their Sessions, archives active Listings, and repeats as a no-op",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior refuses an owned tester elevated to admin",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior refuses an owned tester elevated to moderator",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior never reseeds a scheduled or purged tester and removes a purged tester as a no-op",
+          "status": "passed"
+        },
+        {
+          "title": "temporary tester operator behavior refuses invalid, over-limit, duplicate and reviewer-overlapping input without exposing entries",
+          "status": "passed"
+        },
+        {
+          "title": "refuses a privileged final tester before scheduling, Session deletion or Listing archive",
+          "status": "passed"
+        },
+        {
+          "title": "keeps already-purged tester removal write-free",
+          "status": "passed"
+        },
+        {
+          "title": "schedules no-Session personal testers atomically without postponing an earlier date",
+          "status": "passed"
+        },
+        {
+          "title": "cleans Sessions and active personal inventory without postponing an earlier tester schedule",
+          "status": "passed"
+        },
+        {
+          "title": "lists only matching bucket prefixes and removes only the selected keys",
+          "status": "passed"
+        },
+        {
+          "title": "refuses both kinds of storage mutation without changing seeded bytes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-repeat-parser.json",
+      "sha256": "f391942f563a126b8389e53cad449c435ba0bd39e3692d60345b30a75a7627e5",
+      "passed": 11,
+      "failed": 0,
+      "pending": 29,
+      "tests": [
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL supports finite Listing create/change/hard-delete, preserving foreign rows and ordinary scalar/media effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer revoke refuses a malformed final credential field with complete graph/object equality",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer seed refuses a malformed final credential field with complete graph/object equality",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer foreign seller at a fixed Listing ID refuses before every effect",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer business inventory at a fixed Listing ID refuses before every effect",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer brand slug collision refuses before all effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer brand ID collision refuses before all effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer model slug collision refuses before all effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer model ID collision refuses before all effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer region slug collision refuses before all effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer city slug collision refuses before all effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL schedules a whole no-Session tester list once and archives only its personal inventory",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a Session on the last tester is removed with both schedules and foreign state preserved",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL tester business inventory refuses before any account effect",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL tester collector baseline refuses before any account effect",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL an unchanged schedule cleans newly active personal inventory and repeats without writes",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a personal archive error rolls back every tester schedule and its finite receipt",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL an opposing account schedule makes removal stale without any partial schedule",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a reviewer refresh cannot overwrite an owner changed while finite preparation waits",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL tester complete removal preserves foreign state and ordinary absent seed remains available",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL demo Listing-only convergence remains supported when no User deletion or rotation is planned",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL demo remove and stale-seller seed refuse before row or object effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL equal reviewer source and tester empty removal are read-only, while a missing ordinary reviewer can be created",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL the real UI fixture refuses replacement before Listing/catalog/media/object mutation",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL real promote-admin command preserves exact lookup/dry-run and records one finite role audit",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL supported reviewer and demo seed converge with real MinIO bytes, then refused configuration preserves them",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke repeats without security, audit or historical content writes",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer dirty repeat cleans new security dependencies without rewriting its tombstone",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer mixed repeat rolls back every slot and new security dependency on audit failure",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer tombstone display drift refuses the complete dirty repeat without effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer failure at sessions rolls back the complete account/security/audit graph",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer failure at fcm_devices rolls back the complete account/security/audit graph",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer failure at audit_logs rolls back the complete account/security/audit graph",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer rotate atomically changes credentials, Sessions, active devices and one contact-free audit",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke atomically changes credentials, Sessions, active devices and one contact-free audit",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL strict maintenance parser rejects malformed intents, excess roots and protected-field plans without effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL dormant maintenance preparation refuses before role or audit effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL naked protected writes and ordinary User insertion into a contended destination fail without partial effects",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a failed finite Listing write rolls back its receipt and full graph",
+          "status": "skipped"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL an opposing prepared source change makes the waiting caller stale without applying its scalar patch",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-original-full.json",
+      "sha256": "eddf152b5dd3aca408409c13a5f8dd2f5943d59e5d8b19c6f2a8e9e7a40471cb",
+      "passed": 18,
+      "failed": 0,
+      "pending": 0,
+      "tests": [
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL existing phone selection promotes the verified phone holder and records the exact contact-free audit",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL existing phone selection refuses a missing or malformed phone, and keeps dry-run and already-admin write-free",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL selector contract requires exactly one of --phone and --email and writes nothing otherwise",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL verified email selection promotes the existing holder of the canonical address without creating Users, Sessions, TOTP or tokens",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL verified email selection dry-run identifies the verified holder and writes nothing",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL verified email selection an already-admin holder is a successful no-op without audit",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL verified email selection refuses an address held by no User, including one only awaiting a sign-in code, and creates no User",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL verified email selection refuses an address whose canonical form is held by more than one User",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL role and audit atomicity a refused audit leaves the phone-selected User's role unchanged",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL role and audit atomicity a refused audit leaves the email-selected User's role unchanged",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL serializes real phone and email promotions of the same buyer with one original-role receipt",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL serializes the opposite email-first promotion order with one original-role receipt",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL canonical email promotion first excludes a concurrent ambiguous holder before promotion effects",
+          "status": "passed"
+        },
+        {
+          "title": "admin:promote command — disposable migrated PostgreSQL canonical email creation first excludes a concurrent ambiguous holder before promotion effects",
+          "status": "passed"
+        },
+        {
+          "title": "tester operator Prisma transaction integration seeds 30 Users with both methods, preserves generated identity and profile across reruns, then removes Sessions without touching another User",
+          "status": "passed"
+        },
+        {
+          "title": "tester operator Prisma transaction integration refuses a conflict at the end of the list before creating any User",
+          "status": "passed"
+        },
+        {
+          "title": "tester operator Prisma transaction integration removal preflights all roles and rolls back before revoking or scheduling an ordinary tester",
+          "status": "passed"
+        },
+        {
+          "title": "tester operator Prisma transaction integration concurrent seeds never duplicate or take over Users",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-restricted-full.json",
+      "sha256": "305a1ade3306d2915917479fea160c139de1e9c46d64dd6ad9eea873669ce30b",
+      "passed": 40,
+      "failed": 0,
+      "pending": 0,
+      "tests": [
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL supports finite Listing create/change/hard-delete, preserving foreign rows and ordinary scalar/media effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer revoke refuses a malformed final credential field with complete graph/object equality",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer seed refuses a malformed final credential field with complete graph/object equality",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer foreign seller at a fixed Listing ID refuses before every effect",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL reviewer business inventory at a fixed Listing ID refuses before every effect",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer brand slug collision refuses before all effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer brand ID collision refuses before all effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer model slug collision refuses before all effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer model ID collision refuses before all effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer region slug collision refuses before all effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL foreign reviewer city slug collision refuses before all effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL schedules a whole no-Session tester list once and archives only its personal inventory",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a Session on the last tester is removed with both schedules and foreign state preserved",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL tester business inventory refuses before any account effect",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL tester collector baseline refuses before any account effect",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL an unchanged schedule cleans newly active personal inventory and repeats without writes",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a personal archive error rolls back every tester schedule and its finite receipt",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL an opposing account schedule makes removal stale without any partial schedule",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a reviewer refresh cannot overwrite an owner changed while finite preparation waits",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL tester complete removal preserves foreign state and ordinary absent seed remains available",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL demo Listing-only convergence remains supported when no User deletion or rotation is planned",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL demo remove and stale-seller seed refuse before row or object effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL equal reviewer source and tester empty removal are read-only, while a missing ordinary reviewer can be created",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL the real UI fixture refuses replacement before Listing/catalog/media/object mutation",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL real promote-admin command preserves exact lookup/dry-run and records one finite role audit",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL supported reviewer and demo seed converge with real MinIO bytes, then refused configuration preserves them",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke repeats without security, audit or historical content writes",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer dirty repeat cleans new security dependencies without rewriting its tombstone",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer mixed repeat rolls back every slot and new security dependency on audit failure",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer tombstone display drift refuses the complete dirty repeat without effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer failure at sessions rolls back the complete account/security/audit graph",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer failure at fcm_devices rolls back the complete account/security/audit graph",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer failure at audit_logs rolls back the complete account/security/audit graph",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer rotate atomically changes credentials, Sessions, active devices and one contact-free audit",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke atomically changes credentials, Sessions, active devices and one contact-free audit",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL strict maintenance parser rejects malformed intents, excess roots and protected-field plans without effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL dormant maintenance preparation refuses before role or audit effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL naked protected writes and ordinary User insertion into a contended destination fail without partial effects",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL a failed finite Listing write rolls back its receipt and full graph",
+          "status": "passed"
+        },
+        {
+          "title": "R7g maintenance callers on restricted PostgreSQL an opposing prepared source change makes the waiting caller stale without applying its scalar patch",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-build.log",
+      "sha256": "e8a263dec96367b13c066619babcd374728c11e5df1d4f12ed11188072a04b00",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-final-ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-final-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-final-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-runtime-imports.log",
+      "sha256": "2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97",
+      "exitCode": 0
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-original-loaded.json",
+      "sha256": "0d221e1921c58ff04d20b7a80561a2056fd21c4874df7eedb3443ea370b875cd"
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-repeat-parser-loaded.json",
+      "sha256": "37900b3ea745a1d99cb26c2d79a936ba62a9218d873f85b903dad0c1a6e6e027"
+    },
+    {
+      "path": "/tmp/897-r7g-runtime-20261029/current-restricted-full-loaded.json",
+      "sha256": "1d5b9efdf49eefccbf3a38d1d5bd01adad29b3d5485ee71a405615ce68814f3b"
+    }
+  ],
+  "originalDatabases": [
+    {
+      "database": "/candidatea_r7g_promotion",
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "receipts": [
+        {
+          "source": 0,
+          "campaign": 0
+        }
+      ]
+    },
+    {
+      "database": "/candidatea_r7g_tester",
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "receipts": [
+        {
+          "source": 0,
+          "campaign": 0
+        }
+      ]
+    }
+  ],
+  "restrictedDatabaseChecks": [
+    {
+      "database": "r7g_49c06c1045df48ba9d0223dbd450d022",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_fb1092803e30400bb0d71b38b4b21dbe",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_735eba6cded14039ab938089bada2f8d",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_15de0ed6905a468d944d6d14281bfc64",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_fe77ac8d99f84f8ea0b49581418aea2e",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_3732e4dad41447aa97b35d59e18cc1ff",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_6338a7a4bda54d55bb6dbe81d5055951",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_ea59df1d248c47eb805998d97ae81979",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_24145ad9c6154c05925ffaa78f755c23",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_68925963f81a4776bd54d7bd101cb416",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_1ef2d2ce5232404f992a0d98afcba118",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_72ce57caaf6d4fac8366a9c906acb1cd",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_8e030751489e4dc6a9931f64dbe3560f",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_48001a5ae6ab4ef6a400bde136c7c690",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_98c374be7f1d43f393067be97d5b1a96",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_0bea28b1915342989d33b85e5e72afd1",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_d9c9db94c88241cfbbb4ef74602b920d",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_29b9b35f60364227b85536b2459e6420",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_f89f321d83b144038773d05109d1a6c2",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_7a002d9acee142e6afe41eaf16055675",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_d16332a40ec04207983634beb39af2e7",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_935330b862f84b2283ccbd871e693810",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_c5f2f6d1fb244cf092510a0a1279a247",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_1fedad23546a4a4e9b01026e37a49be0",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_98fdc5a6573a416cac0a3a5bb78295a7",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_c8f2a9d5e6d44e52b36f4692fdf515a7",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_59b2874400e74aa6891de8a192f0d845",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_d6e4c90b9ad04c178a284244509ce33c",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_58570791e253475793ddade997dc8e10",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_871ae28c1f5244c180a1af5e8cb543b9",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_dc4a49437c7a410aa502b606d8266908",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_1330883045ab42108e0a38654c2f1be0",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_e7ac5c51b85c4606963561a96751634c",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_0e254cf963f34e0ab0b30a472dbc34b4",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_b6fd2646ed754536906a78e6b91023f0",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_428d82e455c94b949af01813b3ac6d04",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_371acc264c8a408d991249bbbbab2d5c",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_24ce0304116b4e1294ad12cdefdf4c6f",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_d32e525b05f1439ab8065344111673dc",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    },
+    {
+      "database": "r7g_21eea768f00a45af96102a5174cfe12d",
+      "migrationCount": 99,
+      "manifestHash": "cf20ed35b61750574ffd627f162a6e89178fdc0282c262877c9deb6989ad278a",
+      "functionsHash": "873c0a1bb4405e2f26daaff3f9850146cf0f3be6c2cba016f55c7052fae5ddd3",
+      "guardSnapshotHash": "ba6e0ebf9a3e42a97f62ad3d88e72e654480d84bfd68c6ddf4efab11b090ccc6",
+      "guardsRestored": true,
+      "databaseRemoved": true
+    }
+  ],
+  "loadedScripts": [
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/tests/maintenance-finite.r7g.e2e.spec.ts",
+      "sha256": "3410d4a57e3cace797386f996e0c945dec6a1f674bb39c180d590ea4239aae3e"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/generated/prisma/client/client.ts",
+      "sha256": "e1e461eea7b70c0cf7c02db861b1a05887dd4484afb52c3c11a14cfd6765ce14"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/generated/prisma/client/internal/class.ts",
+      "sha256": "d05f21fcb2c30cdb4f61d537e6598e3b928da7e7e1db8058c5e384f87fa614a7"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/generated/prisma/client/internal/prismaNamespace.ts",
+      "sha256": "a75d3c35f3a84f85d7fbe7de239e33c395f3491ab60f8eea636ee09a72d35b3c"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/generated/prisma/client/enums.ts",
+      "sha256": "37d0295d1b364f6e9146a1efdb73460fccdf95ef2cf06f29e45cb6034fa590c2"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/application/testing/FakeObjectStore.ts",
+      "sha256": "ddad55288b19dc3c1c13007e006bb8cfb11d449b75b8cf64d00b8f0836573959"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/content.ts",
+      "sha256": "677513097b92a0a071e3fce0247243968351273367a8cbaf56a63efe107402ed"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/marker.ts",
+      "sha256": "845c573b371cc0c79dac6aba3b9646aa3b792cc396d8861933c3db1945fb3d3f"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/manifest.ts",
+      "sha256": "53cc84ac4d7702ffdfedde5a1c3c43946a7cd3a05a6508d609675f74a55bc5ee"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/photos.manifest.json",
+      "sha256": "297cda953aaa2a3c791be24f05af6355fedc1aba9892424f21bd5acf4dfdbb1e"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/remove.ts",
+      "sha256": "618703b5399791d5573269c49a9befffecd561f04e4e833ba4c1621ab9040431"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/result.ts",
+      "sha256": "76e53be7907cf7bd9694bdd336dc2c029a21185fb6d8cb5bc4a93c8f5273593b"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/seed.ts",
+      "sha256": "6ab0eaad33d462ab0a9eef569e63a8690789c81712636bb71cd043bf5a88c63a"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/maintenance-listings.ts",
+      "sha256": "c7164dc965335b9ec6bbf9e80e4a2eaab84322b1bf68a0b51a33f8175647c49a"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/src/diagnostic-source-command.ts",
+      "sha256": "536eda41a3c788e38df3fe228e5bb2bbba9e7839768a67970059ee744cfb67bb"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/photos.ts",
+      "sha256": "15a98c2e969b41287fdb0dce5820cde3de8873eaa31600f94624ccbde98707d1"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/upload-queue.ts",
+      "sha256": "76501dc12cf83e3954fcd72b26a0a6f0dd804f4bd514269f950193b58a0d04cc"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/demo-inventory/storage.ts",
+      "sha256": "cdd11c30e4766983e38c68873c74e25c35156a90dce0a16e6e593404aee5cdc8"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/reviewer-scenario-store.ts",
+      "sha256": "2ac7dfc024b50745fd29d75bfa74dd40d9a1a7acaa5187a49496648576bb2ed8"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/src/reviewer-scenario-seed.ts",
+      "sha256": "255303881690f17696e7499c0a17f5e23c53a499da97a56004bccd57a65fe81d"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/src/maintenance-source-command.ts",
+      "sha256": "ddc1b5bcb7007cb06d7e2cb088e55b00e75d0ccd3d1ade443760b71a38d9abe1"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/scripts/reviewer-fixtures/uploadReviewerPhoto.ts",
+      "sha256": "7703a092afa35048ed74624b0133f4c3e3de02499da9847f36ad17ff1e6ced39"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/src/account-source-command.ts",
+      "sha256": "2d861077bb5a9d7ca7fedcc6f805e9415d4da2b79ec8c7cc92e3b718c1beff65"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/src/PrismaTesterAccountStore.ts",
+      "sha256": "bef8eaee867299de84b585b479e55a0ccf4d46f25e051ef1b53455676c1c290e"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/src/tester-accounts.ts",
+      "sha256": "1859bb0406f7168dfd387e589f2407b990ad799e236f795281c9f1d446205b77"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/src/listing-source-command.ts",
+      "sha256": "b734c108dd972b7b2aabfdda25e6908b777b7021c6bd3befb355361e5abff1d7"
+    },
+    {
+      "url": "file:///Users/bagtyyar/.t3/worktrees/carberk/t3-630f4e85/packages/db/tests/helpers/track-pool-client-ends.ts",
+      "sha256": "035fc197f5a4d1293b3c939408d319dafaa9667a0b3f195d78c64f1816cc937c"
+    }
+  ],
+  "loadedSourcePins": [
+    {
+      "path": "tests/maintenance-finite.r7g.e2e.spec.ts",
+      "sha256": "aff358a51d2272e687e5d818b1df6b67bb659e18d87728f1adf6dd53dd9fe973"
+    },
+    {
+      "path": "scripts/maintenance-listings.ts",
+      "sha256": "9cfa53471d5583579f0e82f72e405eb0f1690eb581edb8ed64bf352cac5ee9bd"
+    },
+    {
+      "path": "scripts/demo-inventory/application/testing/FakeObjectStore.ts",
+      "sha256": "06fb503155102c3df9fa0cef4e8368156aa5682f07b33773cf0007985bfa9f44"
+    },
+    {
+      "path": "src/account-source-command.ts",
+      "sha256": "e5b93d70925e4f18571d8c182c41178def84476a3a2eaa18b5251bb8f8aaf872"
+    },
+    {
+      "path": "src/maintenance-source-command.ts",
+      "sha256": "4af974b2a1dba650f90e3cf89b4fde2f8a3ddac8bc0c1cd7402171b44324543d"
+    },
+    {
+      "path": "src/PrismaAdminPromotionStore.ts",
+      "sha256": "64fddb927dfaa99d3d9331a96a3001e6344cb8eea51ebd6905b518a21ca142c7"
+    },
+    {
+      "path": "src/diagnostic-source-command.ts",
+      "sha256": "de430bdb2c90e6a5b92d07cd33fa152d12ed96b28bd15deb4ea6a818155f71a4"
+    },
+    {
+      "path": "scripts/reviewer-scenario-store.ts",
+      "sha256": "d0a9552fbca9a15420fbcee12319663104b912d2551d06475ad813f8803cd204"
+    },
+    {
+      "path": "scripts/promote-admin.ts",
+      "sha256": "ed0a2a6b9b554e8f162140f135decf31610e832f5b0b088dfea3c51941b10fc8"
+    },
+    {
+      "path": "scripts/ui-fixture.ts",
+      "sha256": "b7668ddfcc699d556e1400505a862f863c17c9c2b3996c78191c87c60e7b6049"
+    },
+    {
+      "path": "scripts/demo-inventory/seed.ts",
+      "sha256": "62af3bca74e6532ebc059a518e9feb9ef98d4104bfefd14186e671b5fa58489d"
+    },
+    {
+      "path": "scripts/demo-inventory/remove.ts",
+      "sha256": "882bf15fabf769a4dae4d9c42de36b4fc71488da0a436e0e5bd814903a62ae6b"
+    },
+    {
+      "path": "src/reviewer-scenario-seed.ts",
+      "sha256": "e3b6569a0886455d572a4587699926a83e018aec47e9a09dcafacbb7ffcc4ea5"
+    },
+    {
+      "path": "src/promote-admin.ts",
+      "sha256": "b841b504558ba07c166b232b87ed29544e03dc1446c3b25b5cae332316829242"
+    },
+    {
+      "path": "src/tester-accounts.ts",
+      "sha256": "02a35eda08d55de140d51615c81a497abde806c7a79f76a39601b191a9d9b90f"
+    },
+    {
+      "path": "src/PrismaTesterAccountStore.ts",
+      "sha256": "c2e52d4c8f649c7603d3ae395cfa1618dc6e74037f42058aeecd920637ee2c5a"
+    },
+    {
+      "path": "generated/prisma/client/client.ts",
+      "sha256": "38799fcca916ddb476ea8a55dcbd0c6b738a02e84abdabc401e4f08f11ed9f5e"
+    },
+    {
+      "path": "dist/src/index.js",
+      "sha256": "914daa81026d2410cbf3192ba80d45b8027dba6ed75aa6073539d1ff609717f5"
+    },
+    {
+      "path": "../contracts/dist/index.js",
+      "sha256": "5f928c529c3e9bd27a3eb81b24902cdee1f48e08a03787f6044ea622e5a39b94"
+    }
+  ],
+  "resource": {
+    "project": "candidatea-r7g",
+    "postgresPort": 60936,
+    "minioPort": 60937,
+    "redis": false,
+    "state": "stopped",
+    "drain": {
+      "connections": [],
+      "leftoverDbs": [],
+      "leftoverRoles": [],
+      "receipts": [
+        {
+          "database": "/candidatea_r7g_promotion",
+          "source": 0,
+          "campaign": 0
+        },
+        {
+          "database": "/candidatea_r7g_tester",
+          "source": 0,
+          "campaign": 0
+        }
+      ]
+    },
+    "drainArtifact": {
+      "path": "/tmp/897-r7g-runtime-20261029/current-drain.json",
+      "sha256": "1eaf0e89b5a84f2c19b32def1a61757024009822ca664fcc6661bc5c5dff29c1"
+    },
+    "stopArtifact": {
+      "path": "/tmp/897-r7g-runtime-20261029/current-services-stop.log",
+      "sha256": "6c9371b432c90a9b11815e5d489ca89908d68ba65841a376d22d2c9d304df997"
+    }
+  },
+  "remainingUnknown": [
+    "Full assembled Standards/Spec and configured combined gates",
+    "HTTP sign-in/refresh, pending-deletion/AdminGuard/TOTP/staff/diagnostic unavailable cross-context checks",
+    "Broader opposing contact/Session/device/purge/Listing/business/proof races and consumed proof/report retry/retention matrix",
+    "Deployed acceptance/restoration and activation"
+  ]
+}
