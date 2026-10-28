@@ -34,6 +34,7 @@ it("exports every audience and identity method in each locale for page inspectio
       vehicle: { method, maskedVin: method === "vin" ? "*************1234" : null, display: { make: "Toyota", model: "Camry", year: 2018 }, catalog: null } };
     const bytes = await renderDiagnosticPdf({ snapshot: current, locale, generatedAt: now, verificationReference: `/diagnostics/reports/${current.report.id}`, photos: [] }, await fonts());
     await writeFile(`${directory}/${audience}-${method}-${locale}.pdf`, bytes);
+    await writeFile(`${directory}/${audience}-${method}-${locale}.snapshot.json`, JSON.stringify(current, null, 2));
     const text = await readDiagnosticPdfText(bytes);
     expect(text).toContain(centerNames[locale]);
     expect(text).toContain("Toyota Camry 2018");
