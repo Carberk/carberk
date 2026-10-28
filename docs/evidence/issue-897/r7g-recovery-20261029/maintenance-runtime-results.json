@@ -1,0 +1,709 @@
+{
+  "status": "runtime checkpoint; acceptance incomplete",
+  "sourceParent": "f98abfe747a66010af1f303870ec9bb2ce15d6d8",
+  "sourceFiles": [
+    {
+      "path": "packages/db/prisma/migrations/20261026016200_diagnostic_maintenance_compatibility/migration.sql",
+      "sha256": "41f9c26ac199d7b75fa4f857972dbfd93e946801d4f8cb4cb04604c1a0908dfa"
+    },
+    {
+      "path": "packages/db/src/PrismaAdminPromotionStore.ts",
+      "sha256": "64fddb927dfaa99d3d9331a96a3001e6344cb8eea51ebd6905b518a21ca142c7"
+    },
+    {
+      "path": "packages/db/scripts/reviewer-scenario-store.ts",
+      "sha256": "c33dd315406961e3546042debd64de1f8c01a3d01bc415b75f50b0bf3fcec62a"
+    },
+    {
+      "path": "packages/db/tests/maintenance-finite.r7g.e2e.spec.ts",
+      "sha256": "2bb46b029de0849c7709618bfaf0d98762866f451dc3f5c607e480dbca8e243c"
+    },
+    {
+      "path": "packages/db/tests/promote-admin.command.test.ts",
+      "sha256": "ecc1749f4ff8be757131e2b316dbc96f247c7c2c351a8274c50b13f6c6cc6dc4"
+    },
+    {
+      "path": "packages/db/tests/tester-accounts.e2e.spec.ts",
+      "sha256": "2700f17f42d426892728dd27910a98745a7cb6abbd9b45a9e1a9dc7fb12dfa2e"
+    }
+  ],
+  "migrationManifest": {
+    "manifestHash": "4a3315f44edfb6dc0533f0134ae0274ff031482a8b86437aac2d65cfacc61d52",
+    "manifest": [
+      {
+        "name": "20260513201407_init",
+        "sha256": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860"
+      },
+      {
+        "name": "20260514090000_multi_device_sessions_and_role_split",
+        "sha256": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0"
+      },
+      {
+        "name": "20260514100000_otp_request_ip",
+        "sha256": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc"
+      },
+      {
+        "name": "20260514104615_delete_me_cascades",
+        "sha256": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193"
+      },
+      {
+        "name": "20260518081943_add_engine_type_transmission_drive_type",
+        "sha256": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841"
+      },
+      {
+        "name": "20260518083234_s4_listings_crud",
+        "sha256": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010"
+      },
+      {
+        "name": "20260518180741_add_seller_terms_to_listing",
+        "sha256": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454"
+      },
+      {
+        "name": "20260608010000_s7_admin_moderation",
+        "sha256": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a"
+      },
+      {
+        "name": "20260609000000_account_deletion_grace",
+        "sha256": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698"
+      },
+      {
+        "name": "20260711000000_add_condition_disclosure_to_listing",
+        "sha256": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846"
+      },
+      {
+        "name": "20260711100000_add_inspection_interest",
+        "sha256": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176"
+      },
+      {
+        "name": "20260713000000_s10_rich_chat_foundation",
+        "sha256": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e"
+      },
+      {
+        "name": "20260713170000_add_notification_history_status",
+        "sha256": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61"
+      },
+      {
+        "name": "20260719010000_align_prisma_schema_with_existing_database",
+        "sha256": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8"
+      },
+      {
+        "name": "20260922000000_add_user_sign_in_methods",
+        "sha256": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016"
+      },
+      {
+        "name": "20260923000000_add_sign_in_code_channel",
+        "sha256": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97"
+      },
+      {
+        "name": "20260928000000_add_listing_price_tmt",
+        "sha256": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009"
+      },
+      {
+        "name": "20260929000000_add_listing_public_number",
+        "sha256": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8"
+      },
+      {
+        "name": "20260929120000_add_brand_logo_key",
+        "sha256": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488"
+      },
+      {
+        "name": "20260929130000_damaged_condition_disclosure",
+        "sha256": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0"
+      },
+      {
+        "name": "20261002000000_remove_reported_listing_status",
+        "sha256": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0"
+      },
+      {
+        "name": "20261002120000_add_media_uploads",
+        "sha256": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a"
+      },
+      {
+        "name": "20261003120000_add_otp_request_purpose",
+        "sha256": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40"
+      },
+      {
+        "name": "20261003180000_add_verified_contact_phones",
+        "sha256": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41"
+      },
+      {
+        "name": "20261003180100_clear_unverified_listing_contact_phones",
+        "sha256": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e"
+      },
+      {
+        "name": "20261005120000_add_user_name_number_and_avatar_index",
+        "sha256": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085"
+      },
+      {
+        "name": "20261007120000_conditional_upload_protocol",
+        "sha256": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481"
+      },
+      {
+        "name": "20261007130000_exclusive_upload_adoption",
+        "sha256": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451"
+      },
+      {
+        "name": "20261007130100_backfill_upload_adoption_state",
+        "sha256": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249"
+      },
+      {
+        "name": "20261011130000_correct_lugong_liugong_models",
+        "sha256": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b"
+      },
+      {
+        "name": "20261011140000_add_listing_media_thumb_hash",
+        "sha256": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d"
+      },
+      {
+        "name": "20261011150000_expand_conditional_media_manifest",
+        "sha256": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490"
+      },
+      {
+        "name": "20261014120000_restore_relisted_listings_published_at",
+        "sha256": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718"
+      },
+      {
+        "name": "20261015003500_listing_view_counts",
+        "sha256": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d"
+      },
+      {
+        "name": "20261015010000_staff_capabilities",
+        "sha256": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43"
+      },
+      {
+        "name": "20261015020000_business_membership",
+        "sha256": "7a60b7b21b212c9bf38a14522eb937eb9762044039d05e6e16b7e76d1093c00a"
+      },
+      {
+        "name": "20261015030000_business_inventory",
+        "sha256": "49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8"
+      },
+      {
+        "name": "20261015040000_first_party_measurement",
+        "sha256": "5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c"
+      },
+      {
+        "name": "20261015050000_service_foundations",
+        "sha256": "66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a"
+      },
+      {
+        "name": "20261015060000_business_enquiries",
+        "sha256": "4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8"
+      },
+      {
+        "name": "20261015070000_diagnostic_intake",
+        "sha256": "9f5ce216f2dd4cbbcb75c9ce78d058244f5262170e51815c111c66563b32ebc6"
+      },
+      {
+        "name": "20261015080000_service_push_subscriptions",
+        "sha256": "e2b04ea8e7f1c33924261fb2fcc0669c1c99dcfe628b8b0e8f0c7007ee47cf3b"
+      },
+      {
+        "name": "20261015120000_listing_video_foundation",
+        "sha256": "8b1b907dbeb942c840330ca3a8f3ef9264ec0008c393f3d51d7961bd7305687b"
+      },
+      {
+        "name": "20261015130000_support_operations",
+        "sha256": "57389de2321c518efe4f1a96adf7ae5bbf7df6b7224ff97c6a854f2708c88163"
+      },
+      {
+        "name": "20261015140000_video_playback_authority",
+        "sha256": "019b9ea21c459d9e4e5df313f97957eba80a043ada053d8bd80fd13515b86eae"
+      },
+      {
+        "name": "20261015150000_history_orders",
+        "sha256": "1eb35867354f2d8fcf9d15fdff2ce584eeeb4cdb252e4a5d47ce6c2a298a19b2"
+      },
+      {
+        "name": "20261015160000_showroom_public_fields",
+        "sha256": "2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b"
+      },
+      {
+        "name": "20261015170000_video_processing_fences",
+        "sha256": "ff8a5579df352a389385aeb47f78caed985301995c569c3a5b21db2e022f779b"
+      },
+      {
+        "name": "20261015180000_history_delivery",
+        "sha256": "2d08ccc88142214fe0f22c29a1dd5ecf84239bc730f6076cab2e1104e724248d"
+      },
+      {
+        "name": "20261015190000_diagnostic_reports",
+        "sha256": "4be9efc71ddd57f2b6b32efef199576d81d432d193580d8db41dcc44155ff3fd"
+      },
+      {
+        "name": "20261015200000_measurement_insights",
+        "sha256": "dd412d0bc61628e4333dfb9b607b022f23742c17c9c59529acea91d9e3f325e0"
+      },
+      {
+        "name": "20261015210000_history_recovery_offers",
+        "sha256": "8da84698db0e7f080a865daf5fceda3a43892e5454f86981855d597b678094e2"
+      },
+      {
+        "name": "20261015220000_diagnostic_evidence_leases",
+        "sha256": "497b8aab18f382eefd0d68f7be0f7ad8622b1c9975e31488ec324811b5b1f61a"
+      },
+      {
+        "name": "20261015230000_video_claim_target",
+        "sha256": "39d9c56041a02cf6d74f3a967adc37c37dbbc05f4a5487876a9abf4fbb5647d8"
+      },
+      {
+        "name": "20261015240000_history_source_facts",
+        "sha256": "593a00d00ee4f0c686c05e07cbdeae60996b50252e0d350b341ad502c7bde8bd"
+      },
+      {
+        "name": "20261015250000_video_source_manifest",
+        "sha256": "da45934af2bd21968d582661738ee13a1394320d442e0847abc53db01c01194d"
+      },
+      {
+        "name": "20261015260000_video_write_protocol",
+        "sha256": "8c79eec4d6e7b465a6599f9d9e2224a327c3715cc8d95179c4c69ff9341c7708"
+      },
+      {
+        "name": "20261015270000_history_mileage_not_null",
+        "sha256": "1081bd33f8c08b353ce4c0fa163ecf17d97eaee1d1a1ac7871c5e9f3d23add92"
+      },
+      {
+        "name": "20261015280000_diagnostic_association_invalidation",
+        "sha256": "565854648750b86cceff78a86cff7693c9210510a3835b26f195928ed765baee"
+      },
+      {
+        "name": "20261015290000_conversation_measurement_cohorts",
+        "sha256": "350160257c66c5fb3a3dcd7b3681ceeefec89f35748de452a9599ee955675540"
+      },
+      {
+        "name": "20261021100000_diagnostic_reinspection_lineage",
+        "sha256": "d0f4aa1d73192bfffe468458f977c853483d8e2a43efca29e7a8f6aa83dc37d2"
+      },
+      {
+        "name": "20261021110000_diagnostic_identity_records",
+        "sha256": "b5919c3d4d5fd9f52a14c8a4f973fe7caa3e3e4c6611ff08e188579397ad1d70"
+      },
+      {
+        "name": "20261021120000_diagnostic_report_identity_pin",
+        "sha256": "1d299c923af088efc1b49d9e2b8124bef6c4a0476fc300ed78ab8e63d4a1e83c"
+      },
+      {
+        "name": "20261021130000_diagnostic_identity_evidence",
+        "sha256": "5351553647b355dc59eadf25a02e84aa7916e1b33da2117b00e40f47d49ecb82"
+      },
+      {
+        "name": "20261021140000_diagnostic_continuity_proofs",
+        "sha256": "77c6cab3b6731e9203556bcfa78a4ff2661d3a71db597a7b3c6150db925e5cb0"
+      },
+      {
+        "name": "20261021150000_diagnostic_continuity_proof_consumption",
+        "sha256": "f25d566779839d76749f9320ba102d6e282fbba365468c68e0d49eeed460a222"
+      },
+      {
+        "name": "20261021160000_diagnostic_automatic_vin_proof",
+        "sha256": "83176fd55e353ef02de460a42dd41471c3f07120c228a6df80ff71f829502acd"
+      },
+      {
+        "name": "20261022180000_diagnostic_public_continuity",
+        "sha256": "32fe0a8cb64aaaf187390b5c6a2fa72fe6a260547602ffdf572959409ea68a3f"
+      },
+      {
+        "name": "20261023090000_diagnostic_ownership_components",
+        "sha256": "f43b2c04ef6ed9f447acfc0e5ebf326a577b3cd1d96539439c43f05f537cad01"
+      },
+      {
+        "name": "20261023100000_diagnostic_ownership_disposal_same_graph",
+        "sha256": "cdb43cc361fd783c1e6d66d5eccef118861ef3e9ac4a75b233fc8b527b8ec547"
+      },
+      {
+        "name": "20261023110000_diagnostic_continuity_requests",
+        "sha256": "83188077748f02bf96d74d9588805f173129199333a8d4e9c160547e38fb52a2"
+      },
+      {
+        "name": "20261023120000_diagnostic_ownership_grants",
+        "sha256": "3696e93cfc56f13a95d8e38fd72e3e985d43105ce17ffdf7d5f7ce273efac3df"
+      },
+      {
+        "name": "20261023130000_diagnostic_source_kernel",
+        "sha256": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf"
+      },
+      {
+        "name": "20261024010000_diagnostic_source_guard_repair",
+        "sha256": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3"
+      },
+      {
+        "name": "20261024020000_campaign_preparation",
+        "sha256": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429"
+      },
+      {
+        "name": "20261024030000_diagnostic_purge_effects",
+        "sha256": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba"
+      },
+      {
+        "name": "20261024040000_diagnostic_intake_effects",
+        "sha256": "9d9155637143e152ac63baf255d074fe768ff0c4bcb4ec041dd75b32404903a5"
+      },
+      {
+        "name": "20261024050000_diagnostic_kernel_invariants",
+        "sha256": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8"
+      },
+      {
+        "name": "20261024060000_diagnostic_source_correction",
+        "sha256": "55fa19d86c4f30d6c6abab96985dfbfb7bc30b0e6d928da1f63ba8fdbd13b7f6"
+      },
+      {
+        "name": "20261024070000_diagnostic_user_eligibility",
+        "sha256": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e"
+      },
+      {
+        "name": "20261024080000_diagnostic_moderation_complete_effects",
+        "sha256": "a82144b10637924c522188c2511fab6f906ee7ecc803875189155c3e8289e6c0"
+      },
+      {
+        "name": "20261024090000_diagnostic_message_enquiry_fences",
+        "sha256": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c"
+      },
+      {
+        "name": "20261024100000_diagnostic_signin_intake_object_owners",
+        "sha256": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6"
+      },
+      {
+        "name": "20261024110000_diagnostic_user_insert_fence",
+        "sha256": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271"
+      },
+      {
+        "name": "20261024120000_diagnostic_account_noop_enquiry",
+        "sha256": "aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f"
+      },
+      {
+        "name": "20261024130000_diagnostic_intake_campaign_composition",
+        "sha256": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed"
+      },
+      {
+        "name": "20261025010000_diagnostic_report_source_effects",
+        "sha256": "a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9"
+      },
+      {
+        "name": "20261025015000_diagnostic_runtime_transport_corrections",
+        "sha256": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424"
+      },
+      {
+        "name": "20261025017500_diagnostic_effect_scope_alias_correction",
+        "sha256": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f"
+      },
+      {
+        "name": "20261025019000_diagnostic_user_insert_error_transport",
+        "sha256": "a6b7b46c95fd74f8e6f7b962bcb899b2575df7ec1db1f26962bc5853305d0e74"
+      },
+      {
+        "name": "20261025020000_diagnostic_listing_publication_effects",
+        "sha256": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39"
+      },
+      {
+        "name": "20261026010000_diagnostic_automatic_public_continuity",
+        "sha256": "886f521df508f121e306d3b3d27591845fd57484beac666482c330576c50844e"
+      },
+      {
+        "name": "20261026011000_diagnostic_bootstrap_capability_qualification",
+        "sha256": "d7265b92ba944af1a62055a6ffd6ce9316f1203b75384929a89c3da86f8ccc3d"
+      },
+      {
+        "name": "20261026012000_diagnostic_disposal_selector_precedence",
+        "sha256": "ac9e5b810a7cc7fd2d8ff6e8f4bc60b76d48368e0e7330ce766a449586e6aaef"
+      },
+      {
+        "name": "20261026013000_diagnostic_purge_audit_details_precedence",
+        "sha256": "a4473bed2ff325a5b7a1a1c58220d5ef754592373545bc99d508606e4869442d"
+      },
+      {
+        "name": "20261026014000_diagnostic_source_registry_evaluation",
+        "sha256": "6d3ea989e90a1169fa7f5b46cecfc6e4d1e0a23e8fde774916e54bb1d2592756"
+      },
+      {
+        "name": "20261026015000_diagnostic_component_expiry_representation",
+        "sha256": "e0b3068681544bb5e48d016047e8a7e4304b3a737fb9c6e17ef547897c90e6cf"
+      },
+      {
+        "name": "20261026016000_diagnostic_provenance_invalidation_parity",
+        "sha256": "87dd1162b90c334137859cbaf4afd61af068f50602a4ec438d041b22364e95b1"
+      },
+      {
+        "name": "20261026016200_diagnostic_maintenance_compatibility",
+        "sha256": "41f9c26ac199d7b75fa4f857972dbfd93e946801d4f8cb4cb04604c1a0908dfa"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "name": "original-first",
+      "artifact": "/tmp/897-r7g-runtime-20261029/original-first.json",
+      "sha256": "a89327f6dbcb0f9473cd24e4edd7eb7b9b7b6cef9ab6a71badb36d13607b3c44",
+      "total": 15,
+      "passed": 9,
+      "failed": 6,
+      "pending": 0,
+      "failures": [
+        "admin:promote command — disposable migrated PostgreSQL existing phone selection promotes the verified phone holder and records the exact contact-free audit",
+        "admin:promote command — disposable migrated PostgreSQL verified email selection promotes the existing holder of the canonical address without creating Users, Sessions, TOTP or tokens",
+        "admin:promote command — disposable migrated PostgreSQL verified email selection dry-run identifies the verified holder and writes nothing",
+        "admin:promote command — disposable migrated PostgreSQL verified email selection an already-admin holder is a successful no-op without audit",
+        "admin:promote command — disposable migrated PostgreSQL serializes real phone and email promotions of the same buyer with one original-role receipt",
+        "tester operator Prisma transaction integration seeds 30 Users with both methods, preserves generated identity and profile across reruns, then removes Sessions without touching another User"
+      ]
+    },
+    {
+      "name": "original-green-attempt",
+      "artifact": "/tmp/897-r7g-runtime-20261029/original-green-attempt.json",
+      "sha256": "87355943e30652e28f8b01a922233beb499426592bee73fdf96e82c4a785fbec",
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    {
+      "name": "restricted-first",
+      "artifact": "/tmp/897-r7g-runtime-20261029/restricted-first.json",
+      "sha256": "b2213e8fd8564c74438a1793fbcf4e51a0f0d4ff49c3333e9dd60cf1d06f2dc5",
+      "total": 31,
+      "passed": 30,
+      "failed": 1,
+      "pending": 0,
+      "failures": [
+        "R7g maintenance callers on restricted PostgreSQL naked protected writes and ordinary User insertion into a contended destination fail without partial effects"
+      ]
+    },
+    {
+      "name": "parser-valid-red",
+      "artifact": "/tmp/897-r7g-runtime-20261029/parser-valid-red.json",
+      "sha256": "282a46b935e9ae0b31364def2dfacf245f0c521f67915b8fad6fa08774b549c6",
+      "total": 31,
+      "passed": 1,
+      "failed": 1,
+      "pending": 29,
+      "failures": [
+        "R7g maintenance callers on restricted PostgreSQL strict maintenance parser rejects malformed intents, excess roots and protected-field plans without effects"
+      ]
+    },
+    {
+      "name": "compound-reviewer-red",
+      "artifact": "/tmp/897-r7g-runtime-20261029/compound-reviewer-red.json",
+      "sha256": "8bd9953de93ab0c1dacd7c16a0044887e333f5146f3e719c13c8be162ca5ae8c",
+      "total": 33,
+      "passed": 0,
+      "failed": 2,
+      "pending": 31,
+      "failures": [
+        "R7g maintenance callers on restricted PostgreSQL compound reviewer rotate atomically changes credentials, Sessions, active devices and one contact-free audit",
+        "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke atomically changes credentials, Sessions, active devices and one contact-free audit"
+      ]
+    },
+    {
+      "name": "compound-parser-green-attempt",
+      "artifact": "/tmp/897-r7g-runtime-20261029/compound-parser-green-attempt.json",
+      "sha256": "5505eb11770b4cddea00e96031291328803cafd913b939a892405a7957b88646",
+      "total": 33,
+      "passed": 2,
+      "failed": 2,
+      "pending": 29,
+      "failures": [
+        "R7g maintenance callers on restricted PostgreSQL compound reviewer rotate atomically changes credentials, Sessions, active devices and one contact-free audit",
+        "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke atomically changes credentials, Sessions, active devices and one contact-free audit"
+      ]
+    },
+    {
+      "name": "compound-parser-green2",
+      "artifact": "/tmp/897-r7g-runtime-20261029/compound-parser-green2.json",
+      "sha256": "bff30d0639db7c1c87252523540d6a4991bcd5d1e8be6a4b213c3d6fdb9c8bbe",
+      "total": 33,
+      "passed": 2,
+      "failed": 2,
+      "pending": 29,
+      "failures": [
+        "R7g maintenance callers on restricted PostgreSQL compound reviewer rotate atomically changes credentials, Sessions, active devices and one contact-free audit",
+        "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke atomically changes credentials, Sessions, active devices and one contact-free audit"
+      ]
+    },
+    {
+      "name": "compound-parser-green3",
+      "artifact": "/tmp/897-r7g-runtime-20261029/compound-parser-green3.json",
+      "sha256": "a350a5a08c261c1b4211640a2585198322d7b44d952e908a995fb2eb45bf2832",
+      "total": 33,
+      "passed": 4,
+      "failed": 0,
+      "pending": 29,
+      "failures": []
+    },
+    {
+      "name": "original-final",
+      "artifact": "/tmp/897-r7g-runtime-20261029/original-final.json",
+      "sha256": "1bc6d9089deec77583448197bcc6da7bd027ee786fee0866a9555a7cdf7ebf33",
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    {
+      "name": "restricted-complete",
+      "artifact": "/tmp/897-r7g-runtime-20261029/restricted-complete.json",
+      "sha256": "94545d9693eb23cc5a2d394a8759b9517c8ca327d0164a842370db39f90e3fe2",
+      "total": 36,
+      "passed": 35,
+      "failed": 1,
+      "pending": 0,
+      "failures": [
+        "R7g maintenance callers on restricted PostgreSQL supported reviewer and demo seed converge with real MinIO bytes, then refused configuration preserves them"
+      ]
+    },
+    {
+      "name": "promotion-races",
+      "artifact": "/tmp/897-r7g-runtime-20261029/promotion-races.json",
+      "sha256": "74a34041e6a72106bdccfe2aefd09cd3c53c8433b7fa56e79d54bfc17eb9211b",
+      "total": 18,
+      "passed": 2,
+      "failed": 2,
+      "pending": 14,
+      "failures": [
+        "admin:promote command — disposable migrated PostgreSQL canonical email promotion first excludes a concurrent ambiguous holder before promotion effects",
+        "admin:promote command — disposable migrated PostgreSQL canonical email creation first excludes a concurrent ambiguous holder before promotion effects"
+      ]
+    },
+    {
+      "name": "promotion-races2",
+      "artifact": "/tmp/897-r7g-runtime-20261029/promotion-races2.json",
+      "sha256": "521b058478714194dc9e555db3fd399aa3117bba2b223140aa8243309975de6f",
+      "total": 18,
+      "passed": 2,
+      "failed": 0,
+      "pending": 16,
+      "failures": []
+    },
+    {
+      "name": "revoke-repeat-red",
+      "artifact": "/tmp/897-r7g-runtime-20261029/revoke-repeat-red.json",
+      "sha256": "657dbda5ed10ec9f6f4ed47adea100bb3e15d2db7f2357ecf793dad216cffc32",
+      "total": 37,
+      "passed": 0,
+      "failed": 1,
+      "pending": 36,
+      "failures": [
+        "R7g maintenance callers on restricted PostgreSQL compound reviewer revoke repeats without security, audit or historical content writes"
+      ]
+    },
+    {
+      "name": "minio-fixture-green",
+      "artifact": "/tmp/897-r7g-runtime-20261029/minio-fixture-green.json",
+      "sha256": "1342f16f73e44b94353779e9867a41eb60985e6f14c0d7374338701965485494",
+      "total": 37,
+      "passed": 1,
+      "failed": 0,
+      "pending": 36,
+      "failures": []
+    },
+    {
+      "name": "scalar-final",
+      "artifact": "/tmp/897-r7g-runtime-20261029/scalar-final.json",
+      "sha256": "6d0c3260d27b1575f0f11657a9329dd7f3cbbdd217974070efac7a7e9ac36fcf",
+      "total": 75,
+      "passed": 75,
+      "failed": 0,
+      "pending": 0,
+      "failures": []
+    },
+    {
+      "name": "original-expanded-final",
+      "artifact": "/tmp/897-r7g-runtime-20261029/original-expanded-final.json",
+      "sha256": "ec59433e6ab754133a81a5ff843cabff4cbddfe8cb3bee8ae498c63f9884aaca",
+      "total": 18,
+      "passed": 17,
+      "failed": 1,
+      "pending": 0,
+      "failures": [
+        "tester operator Prisma transaction integration seeds 30 Users with both methods, preserves generated identity and profile across reruns, then removes Sessions without touching another User"
+      ]
+    }
+  ],
+  "additional": [
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/loaded-first.private.json",
+      "sha256": "dc26e902f57a1e6f442d4d25f0f05a1a9aa493fd16a679b9731304a20b39251f",
+      "private": true
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/promotion-first-output.private.txt",
+      "sha256": "36c8f55e704dbae804aaa7dc969d1f9583b5fe457a1054d6dcdd90b53da07a19",
+      "private": true
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/postgres-first.private.log",
+      "sha256": "e5b04f61f12bfe1f041a1a308f13722128ef943e5f52065c4192913a6eb1575c",
+      "private": true
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/loaded-repair1.json",
+      "sha256": "118ab3e32a38924e814a3a015e524d8f09b386c4810a301395a097c6f2ce6f5b",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/loaded-restricted-complete.json",
+      "sha256": "58a497af183a13aab3056d339e269abe342f3cc8c2a12206a4a7e6cd3771f7e6",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/loaded-compound-parser-green3.json",
+      "sha256": "8b763ff2c1aa43ef34bd7e93273a8adf37108ec1ae2bba54f2946e4ecc84c3a1",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/drain.json",
+      "sha256": "1eaf0e89b5a84f2c19b32def1a61757024009822ca664fcc6661bc5c5dff29c1",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/ts7.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/db-build.log",
+      "sha256": "1121a9d7cf36d8bd256a7c36421d6e92e4d2540ab4cbb0e08a39b657ca7b935a",
+      "private": false
+    },
+    {
+      "artifact": "/tmp/897-r7g-runtime-20261029/services-stop.log",
+      "sha256": "042788a629700199d8d249310b802d9c0dd7efe2915c9a03138499fb2bbaeef4",
+      "private": false
+    }
+  ],
+  "resource": {
+    "project": "candidatea-r7g",
+    "postgresPort": 60936,
+    "minioPort": 60937,
+    "redis": false,
+    "ownerRole": "r7g_fixture_owner",
+    "state": "stopped",
+    "drain": {
+      "connections": [],
+      "leftoverDbs": [],
+      "leftoverRoles": [],
+      "receipts": [
+        {
+          "database": "/candidatea_r7g_promotion",
+          "source": 0,
+          "campaign": 0
+        },
+        {
+          "database": "/candidatea_r7g_tester",
+          "source": 0,
+          "campaign": 0
+        }
+      ]
+    }
+  }
+}

@@ -83,7 +83,7 @@ export class PrismaAdminPromotionStore implements PromoteAdminDeps {
           // Dry-run, refusal and existing-admin outcomes are confirmed with the
           // same locked selector, never by preparing a write-free command.
           if (selector.channel === "email") {
-            await tx.$queryRaw`SELECT pg_advisory_xact_lock(897100,hashtext(jsonb_build_array('canonical_email',${selector.value}::text)::text))`;
+            await tx.$queryRaw`SELECT pg_advisory_xact_lock(897100,hashtext(jsonb_build_array('canonical_email',${selector.value}::text)::text))::text`;
           }
           const locked = await this.select(tx, selector, true);
           if (JSON.stringify(locked) !== JSON.stringify(selected)) throw new Error("Promotion selector changed");
@@ -121,7 +121,7 @@ export class PrismaAdminPromotionStore implements PromoteAdminDeps {
       return this.prisma.$transaction(async tx => {
         await tx.$queryRaw`SELECT set_config('autotm.admin_promote_candidate',${this.candidate},true)`;
         if (prior.selector.channel === "email") {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(897100,hashtext(jsonb_build_array('canonical_email',${prior.selector.value}::text)::text))`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(897100,hashtext(jsonb_build_array('canonical_email',${prior.selector.value}::text)::text))::text`;
         }
         const users = await this.select(tx, prior.selector, true);
         const user = users[0];

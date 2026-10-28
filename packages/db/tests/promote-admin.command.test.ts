@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -291,7 +292,7 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
     });
   });
 
-  it("serializes real phone and email promotions of the same buyer with one original-role receipt", async () => {
+  async function promotionRace(first: "phone" | "email") {
     const user = await db.user.create({ data: {
       phone: PHONE, phoneVerifiedAt: VERIFIED_AT,
       email: COORDINATOR_EMAIL, emailVerifiedAt: VERIFIED_AT,
@@ -356,10 +357,10 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
         FOR EACH ROW WHEN (OLD."role" = 'buyer' AND NEW."role" = 'admin')
         EXECUTE FUNCTION pause_promotion_race()`);
 
-      const phone = startCommand(must(names[0]), "--phone", PHONE, "--reason", REASON);
+      const phone = startCommand(must(names[0]), first === "phone" ? "--phone" : "--email", first === "phone" ? PHONE : COORDINATOR_EMAIL, "--reason", REASON);
       // The BEFORE UPDATE trigger is reached with the first command holding the User lock.
       const phonePid = await blockedBackend(must(names[0]), holderPid);
-      const email = startCommand(must(names[1]), "--email", COORDINATOR_EMAIL, "--reason", REASON);
+      const email = startCommand(must(names[1]), first === "phone" ? "--email" : "--phone", first === "phone" ? COORDINATOR_EMAIL : PHONE, "--reason", REASON);
       await blockedBackend(must(names[1]), phonePid);
       // Reconfirm the first command is still held at the storage barrier before release.
       expect(await blockedBackend(must(names[0]), holderPid)).toBe(phonePid);
@@ -398,5 +399,81 @@ describe("admin:promote command — disposable migrated PostgreSQL", () => {
         }
       }
     }
+  }
+  it("serializes real phone and email promotions of the same buyer with one original-role receipt", () => promotionRace("phone"));
+  it("serializes the opposite email-first promotion order with one original-role receipt", () => promotionRace("email"));
+  it.each(["promotion", "creation"] as const)("canonical email %s first excludes a concurrent ambiguous holder before promotion effects", async first => {
+    const user = await emailUser(COORDINATOR_EMAIL);
+    const before = await snapshot();
+    await sourceGuards(true);
+    const barrier = await pool.connect();
+    const name = `r7g-canonical-${first}`;
+    const url = new URL(databaseUrl); url.searchParams.set("application_name", name);
+    let child: ReturnType<typeof execFile> | undefined;
+    let result: Promise<{ code: number | null; output: string }> | undefined;
+    const start = () => {
+      result = new Promise(resolve => {
+        child = execFile(process.execPath, ["--import", "tsx", "scripts/promote-admin.ts", "--email", COORDINATOR_EMAIL, "--reason", REASON],
+          { cwd: packageDir, env: { ...process.env, DATABASE_URL: url.toString() } },
+          (error, stdout, stderr) => resolve({ code: error ? typeof error.code === "number" ? error.code : null : 0, output: stdout + stderr }));
+      });
+      return result;
+    };
+    const blocked = async (pid: number) => {
+      const deadline = performance.now() + 3000;
+      while (performance.now() < deadline) {
+        const rows = (await pool.query(`SELECT pid FROM pg_stat_activity WHERE datname=current_database()
+          AND application_name=$1 AND state='active' AND $2=ANY(pg_blocking_pids(pid))`, [name, pid])).rows;
+        if (rows.length === 1) return;
+      }
+      throw new Error("Canonical race did not reach its actual PostgreSQL blocker");
+    };
+    let pauseInstalled = false;
+    try {
+      await barrier.query("BEGIN");
+      const pid = must((await barrier.query<{ pid: number }>("SELECT pg_backend_pid() pid")).rows[0]).pid;
+      if (first === "promotion") {
+        await barrier.query("SELECT pg_advisory_xact_lock(901,905)");
+        await pool.query(`CREATE FUNCTION r7g_canonical_pause() RETURNS trigger LANGUAGE plpgsql AS $$
+          BEGIN PERFORM pg_advisory_xact_lock(901,905); RETURN NEW; END $$`);
+        await pool.query(`CREATE TRIGGER r7g_canonical_pause BEFORE UPDATE OF role ON users
+          FOR EACH ROW EXECUTE FUNCTION r7g_canonical_pause()`);
+        pauseInstalled = true;
+        const pending = start(); await blocked(pid);
+        await expect(pool.query('INSERT INTO users(id,email,"emailVerifiedAt","updatedAt") VALUES($1,$2,$3,$3)',
+          [randomUUID(), COORDINATOR_EMAIL.toUpperCase(), VERIFIED_AT]))
+          .rejects.toMatchObject({ code: "40001", message: "diagnostic_source_user_insert_busy" });
+        await barrier.query("ROLLBACK");
+        expect((await pending).code).toBe(0);
+        expect(await db.user.count()).toBe(1);
+        expect(await db.auditLog.count()).toBe(1);
+        expect(await db.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({ role: "admin" });
+      } else {
+        const inserted = randomUUID();
+        await barrier.query('INSERT INTO users(id,email,"emailVerifiedAt","updatedAt") VALUES($1,$2,$3,$3)',
+          [inserted, COORDINATOR_EMAIL.toUpperCase(), VERIFIED_AT]);
+        const pending = start(); await blocked(pid);
+        await barrier.query("COMMIT");
+        expect((await pending).code).toBe(1);
+        expect(await db.auditLog.findMany()).toEqual(before.audits);
+        expect(await db.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({ role: "buyer", updatedAt: UPDATED_AT });
+        expect(await db.user.findUniqueOrThrow({ where: { id: inserted } })).toMatchObject({ email: COORDINATOR_EMAIL.toUpperCase(), role: "buyer" });
+      }
+      expect((await snapshot()).sessions).toEqual(before.sessions);
+      expect((await snapshot()).staffGrants).toEqual(before.staffGrants);
+    } finally {
+      await barrier.query("ROLLBACK"); barrier.release(true);
+      try {
+        await pool.query("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND application_name=$1", [name]);
+      } finally {
+        if (child && child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+        if (result) await result;
+        if (pauseInstalled) {
+          await pool.query("DROP TRIGGER r7g_canonical_pause ON users");
+          await pool.query("DROP FUNCTION r7g_canonical_pause()");
+        }
+      }
+    }
   });
+
 });

@@ -166,7 +166,7 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
         const sessions = await tx.session.findMany({ where: { userId: { in: changedIds } }, select: { id: true } });
         if (sessions.length > 0) await tx.session.deleteMany({ where: { id: { in: sessions.map(session => session.id) } } });
         const devices = await tx.fcmDevice.findMany({ where: { userId: { in: changedIds }, invalidatedAt: null }, select: { id: true } });
-        if (devices.length > 0) await tx.fcmDevice.updateMany({ where: { id: { in: devices.map(device => device.id) } }, data: { invalidatedAt: input.now } });
+        if (devices.length > 0) await tx.fcmDevice.updateMany({ where: { id: { in: devices.map(device => device.id) } }, data: { invalidatedAt: input.now, updatedAt: maintenanceAuditDate(audit.createdAt) } });
         await tx.auditLog.create({ data: { ...audit, createdAt: maintenanceAuditDate(audit.createdAt) } });
       });
       return changedIds;
