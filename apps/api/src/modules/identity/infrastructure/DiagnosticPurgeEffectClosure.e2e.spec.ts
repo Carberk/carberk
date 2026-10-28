@@ -224,7 +224,7 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     const orderA = await db.inspectionOrder.findUniqueOrThrow({ where: { id: a.id } });
     const draft = await reports.create(subject("technician"), a.id, { reportId: randomUUID(), expectedOrderVersion: orderA.version });
     const submitted = await reports.transition(subject("technician"), draft.id, { expectedVersion: draft.version, action: "submit" });
-    const released = await reports.transition(subject("predecessorReviewer"), draft.id, { expectedVersion: submitted.version, action: "finalize" });
+    const released = await reports.transition(subject("predecessorReviewer"), draft.id, { expectedVersion: submitted.version, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     const orderB = await db.inspectionOrder.findUniqueOrThrow({ where: { id: b.id } });
     const issued = await proofs.issue(subject("reviewer"), b.id, D.DiagnosticContinuityProofIssuanceSchema.parse({ predecessorId: released.id,
       expectedPredecessorVersion: released.version, expectedOrderVersion: orderB.version, predecessorIdentityRecordId: a.rawId,
@@ -912,7 +912,7 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
     const orderA = await db.inspectionOrder.findUniqueOrThrow({ where: { id: a.id } });
     const draft = await reports.create(subject("technician"), a.id, { reportId: randomUUID(), expectedOrderVersion: orderA.version });
     const submitted = await reports.transition(subject("technician"), draft.id, { expectedVersion: draft.version, action: "submit" });
-    const released = await reports.transition(subject("predecessorReviewer"), draft.id, { expectedVersion: submitted.version, action: "finalize" });
+    const released = await reports.transition(subject("predecessorReviewer"), draft.id, { expectedVersion: submitted.version, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     const orderB = await db.inspectionOrder.findUniqueOrThrow({ where: { id: b.id } });
     const issueRequest = await proofs.prepareRequest(subject("reviewer"), b.id, { kind: "issue" });
     const issue = D.DiagnosticContinuityRequestExecuteSchema.parse({ kind: "issue", command: { predecessorId: released.id, expectedPredecessorVersion: released.version, expectedOrderVersion: orderB.version,

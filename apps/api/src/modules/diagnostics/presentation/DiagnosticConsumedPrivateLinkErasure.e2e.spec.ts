@@ -322,7 +322,7 @@ describe("consumed private diagnostic link after predecessor material rights exp
     owned.findings.push(finding.id);
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     return (await get("reviewer", `reports/${draft.id}`).expect(200)).body;
   }
   async function comparativeBytes(b: Order, reportId: string, p: string, image: Image) {

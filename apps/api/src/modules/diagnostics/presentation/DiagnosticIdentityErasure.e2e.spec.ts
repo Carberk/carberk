@@ -170,7 +170,7 @@ describe("diagnostic identity history after product account deletion and due pur
       const finding = { id: randomUUID(), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: [], kind: null, source: null, measurement: null, location: null };
       await post("technician", `reports/${reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
       await post("technician", `reports/${reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-      await post("reviewer", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+      await post("reviewer", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
       const staff = (await get("reviewer", `reports/${reportId}`).expect(200)).body;
       const customer = (await get(commissioner, `reports/${reportId}`).expect(200)).body;
       expect(staff).toMatchObject({ id: reportId, status: "finalized", version: 3, authorId: suite.id("technician"), reviewerId: suite.id("reviewer"),

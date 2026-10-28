@@ -145,7 +145,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     const saves = await Promise.all([post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding }), post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding })]);
     expect(saves.map(row => row.status).sort()).toEqual([201, 409]);
     await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const read = await get("buyer", `reports/${report.id}`).expect(200);
     expect(read.body.findings).toEqual([finding]); expect(read.body.authorId).toBeNull();
     expect((await db.diagnosticPdfArtifact.findMany({ where: { reportId: report.id }, orderBy: { locale: "asc" } })).map(row => [row.locale, row.state])).toEqual([["en", "pending"], ["ru", "pending"], ["tk", "pending"]]);
@@ -157,7 +157,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     const { report } = await draft(); const finding = normal();
     await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const before = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: report.id } });
     const correctionId = randomUUID();
     const correction = await post("technician", `reports/${report.id}/corrections`, { expectedVersion: 3, successorId: correctionId, reason: "Corrected explanation" }).expect(201);
@@ -171,7 +171,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     const { report } = await draft();
     await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
     await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const pending = await get("buyer", `reports/${report.id}/documents`).expect(200);
     expect(pending.body.map((item: { locale: string; state: string }) => [item.locale, item.state])).toEqual([["en", "pending"], ["ru", "pending"], ["tk", "pending"]]);
     expect(JSON.stringify(pending.body)).not.toMatch(/objectKey|sha256|diagnostic-pdf\//);
@@ -191,7 +191,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     const { report } = await draft(audience);
     await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
     await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const storage = app.get<DiagnosticObjects>(DIAGNOSTIC_OBJECTS);
     const artifact = await db.diagnosticPdfArtifact.findFirstOrThrow({ where: { reportId: report.id, locale: "tk" } });
     const bytes = await readFile(resolve(__dirname, "../../../../../../docs/evidence/issue-916/pdf/short-tk.pdf"));
@@ -257,7 +257,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     await publicGet(`listings/${suite.id("public-car")}`).expect(404);
     await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const availability = await publicGet(`listings/${suite.id("public-car")}`).expect(200);
     expect(availability.body).toEqual({ listingId: suite.id("public-car"), reportId: report.id, observedAt: now.toISOString(), mileageKm: 123000, synthetic: true });
     expect(availability.headers["cache-control"]).toContain("no-store");
@@ -337,7 +337,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     await request.put(`/api/v1/diagnostics/reports/${first.id}/evidence/${worn.evidenceIds[0]}?findingId=${worn.id}&expectedVersion=0`).set(headers("technician")).set("content-type", "application/octet-stream").set("x-evidence-type", "image/jpeg").send(image).expect(200);
     await post("technician", `reports/${first.id}/findings`, { expectedVersion: 0, finding: worn }).expect(201);
     await post("technician", `reports/${first.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const released = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: first.id } });
     const releasedArtifacts = await db.diagnosticPdfArtifact.findMany({ where: { reportId: first.id }, orderBy: { locale: "asc" } });
     expect((await publicGet(`listings/${suite.id("public-car")}`).expect(200)).body.reportId).toBe(first.id);
@@ -376,8 +376,8 @@ describe("diagnostic authoring and immutable audience release", () => {
       const serviced = normal();
       await post("technician", `reports/${reinspection.id}/findings`, { expectedVersion: 0, finding: serviced }).expect(201);
       await post("technician", `reports/${reinspection.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-      await post("technician", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(403);
-      await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+      await post("technician", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(403);
+      await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
 
       const availability = await publicGet(`listings/${suite.id("public-car")}`).expect(200);
       expect(availability.body).toEqual({ listingId: suite.id("public-car"), reportId: reinspection.id, observedAt: later.toISOString(), mileageKm: 123500, synthetic: true });
@@ -421,7 +421,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     await upload(first.id, worn.evidenceIds[0]!, worn.id, image);
     await post("technician", `reports/${first.id}/findings`, { expectedVersion: 0, finding: worn }).expect(201);
     await post("technician", `reports/${first.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
 
     const secondOrder = await arrive(template.id, "listing_public", new Date("2026-10-01T00:00:00.000Z"), 120000);
     const reason = "Follow-up visit after repair";
@@ -454,7 +454,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     await upload(reinspection.id, repaired.evidenceIds[0]!, repaired.id, image);
     await post("technician", `reports/${reinspection.id}/findings`, { expectedVersion: 0, finding: repaired }).expect(201);
     await post("technician", `reports/${reinspection.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${reinspection.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
 
     // A correction of the reinspection reuses that visit's evidence and never the earlier visit's.
     const correction = await post("technician", `reports/${reinspection.id}/corrections`, { expectedVersion: 3, successorId: randomUUID(), reason: "Corrected wording" }).expect(201);
@@ -491,7 +491,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     const finding = normal();
     await post("technician", `reports/${first.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${first.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${first.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     const secondOrder = await arrive(template.id, "listing_public", new Date("2026-10-01T00:00:00.000Z"), 120000, revisitTechnician);
     // Released bytes, hash and artifacts of the predecessor; no contender may change them.
     const released = async () => {
@@ -608,7 +608,7 @@ describe("diagnostic authoring and immutable audience release", () => {
     const { report } = await draft();
     await post("technician", `reports/${report.id}/findings`, { expectedVersion: 0, finding: normal() }).expect(201);
     await post("technician", `reports/${report.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize" }).expect(201);
+    await post("reviewer", `reports/${report.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(201);
     for (const path of [`reports/${report.id}`, `reports/${report.id}/documents`, `reports/${report.id}/documents/tk`]) {
       const denied = await request.get(`/api/v1/public-diagnostics/${path}`).expect(404);
       expect(JSON.stringify(denied.body)).not.toContain(report.id);

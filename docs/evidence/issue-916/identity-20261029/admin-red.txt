@@ -1,0 +1,39 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/apps/admin
+
+ ❯ src/app/diagnostics/DiagnosticWorkspace.spec.tsx (15 tests | 1 failed | 14 skipped) 37ms
+   ❯ actual diagnostic staff workspace and server actions (13)
+     × requires an intentional customer vehicle description before releasing a manual inspection 36ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/diagnostics/DiagnosticWorkspace.spec.tsx > actual diagnostic staff workspace and server actions > requires an intentional customer vehicle description before releasing a manual inspection
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/app/diagnostics/DiagnosticWorkspace.spec.tsx:47:29
+     45|   const view=setup();await open(view);
+     46|   const finalize=view.getByRole("button",{name:diagnosticCopy.en.final…
+     47|   expect(finalize.disabled).toBe(true);
+       |                             ^
+     48|   fireEvent.change(view.getByLabelText("Vehicle make"),{target:{value:…
+     49|   fireEvent.change(view.getByLabelText("Vehicle model"),{target:{value…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  01:32:09
+   Duration  454ms (environment 39%, import 31%, transform 20%, tests 10%, worker 1%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ dde97944/apps/admin
+

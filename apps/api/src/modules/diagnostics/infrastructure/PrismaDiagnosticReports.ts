@@ -9,6 +9,7 @@ import type { DiagnosticReinspectionComparison, DiagnosticReportsPort } from "..
 import { DiagnosticReportAccess } from "./DiagnosticReportAccess";
 import { DiagnosticAuthority } from "./DiagnosticAuthority";
 import { DiagnosticPublicBindings } from "./DiagnosticPublicBindings";
+import { diagnosticListingDigest } from "./PrismaDiagnosticIntake";
 import { canonical, PrismaDiagnosticIdentityEvidence } from "./PrismaDiagnosticIdentityEvidence";
 
 import { diagnosticMutation, diagnosticPlannedRow, diagnosticReadPrefix, diagnosticRoots, diagnosticReceiptPrefix, diagnosticHasPrefix } from "./DiagnosticPreparedIntake";
@@ -58,6 +59,32 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
   }
   private async model(tx: Tx, row: Row): Promise<DiagnosticReport> {
     return new DiagnosticReport(row.state as unknown as DiagnosticReportState, await this.definition(tx, row));
+  }
+  /** Only the first-draft pin may identify this release. Raw matching material never
+   * enters the customer snapshot; recheck this proposal under the retained graph locks. */
+  private async releaseIdentity(tx: Tx, row: Row, order: Order, display: DiagnosticSchemas.DiagnosticReportTransition["vehicleDisplay"]) {
+    if (!row.identityRecordId || !row.identityRecordHash) throw new DiagnosticRuleError("REPORT_INCOMPLETE");
+    const identity = await tx.diagnosticIdentityRecord.findUnique({ where: { id: row.identityRecordId } });
+    const center = await tx.diagnosticCenter.findUnique({ where: { id: order.centerId } });
+    if (!identity || identity.erasedAt || identity.orderId !== order.id || identity.observationHash !== row.identityRecordHash || !center) throw new DiagnosticRuleError("REPORT_INCOMPLETE");
+    const observation = DiagnosticSchemas.DiagnosticObservedVehicleSchema.innerType().omit({ expectedVersion: true }).parse(identity.observation);
+    const state = row.state as unknown as DiagnosticReportState;
+    if (observation.observedAt !== state.observedAt || observation.mileageKm !== state.mileageKm) throw new DiagnosticRuleError("REPORT_INCOMPLETE");
+    if (observation.method === "manual" && !display) throw new DiagnosticRuleError("REPORT_INCOMPLETE");
+    const vin = observation.method === "vin" ? observation.vin?.trim().toUpperCase() : null;
+    const maskedVin = vin && /^[A-HJ-NPR-Z0-9]{17}$/.test(vin) ? `*************${vin.slice(-4)}` : null;
+    // Catalog IDs describe only a still-validated association to this pinned observation.
+    // Names are deliberately supplied by the reviewer, never read from mutable catalog rows.
+    let catalog = null;
+    if (order.listingId && order.associationValidatedAt && order.listingIdentityDigest && canonical(order.observedVehicle) === canonical(identity.observation)) {
+      const listing = await tx.listing.findUnique({ where: { id: order.listingId } });
+      if (listing && !listing.deletedAt && diagnosticListingDigest(listing) === order.listingIdentityDigest &&
+        (observation.method === "manual" || listing.vin?.trim().toUpperCase() === vin)) {
+        catalog = { brandId: listing.brandId, modelId: listing.modelId, year: listing.year };
+      }
+    }
+    return DiagnosticSchemas.DiagnosticReleaseIdentitySchema.parse({ version: 1, center: { id: center.id, names: center.names },
+      vehicle: { method: observation.method, maskedVin, display: display ?? null, catalog } });
   }
   private async dto(tx: Tx, row: Row, subject: DiagnosticSubject, staff: boolean, exactReceipt = false): Promise<DiagnosticSchemas.DiagnosticReportRecord> {
     const state = row.state as unknown as DiagnosticReportState;
@@ -281,7 +308,10 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
       try { next = compute(model); }
       catch (error) { const { row } = await this.load(tx, subject, reportId, capability); this.version(row, input.expectedVersion); throw error; }
       const audit = this.auditData(subject, order, reportId, `REPORT_${input.action.toUpperCase()}`, { ...(input.reason ? { reason: input.reason } : {}), privateSelfReview: input.privateSelfReview === true && model.state.authorId === subject.userId });
-      const snapshot = input.action === "finalize" ? json({ report: next, template: await this.definition(tx, initial), synthetic: true }) : null;
+      let identity: ReturnType<typeof DiagnosticSchemas.DiagnosticReleaseIdentitySchema.parse> | null = null;
+      try { if (input.action === "finalize") identity = await this.releaseIdentity(tx, initial, order, input.vehicleDisplay); }
+      catch (error) { const { row } = await this.load(tx, subject, reportId, capability); this.version(row, input.expectedVersion); throw error; }
+      const snapshot = identity ? json({ report: { ...next, releaseIdentity: identity }, template: await this.definition(tx, initial), synthetic: true }) : null;
       const snapshotHash = snapshot ? createHash("sha256").update(canonical(snapshot)).digest("hex") : null;
       const final = snapshot && snapshotHash ? { snapshot, snapshotHash, finalizedAt: now } : null;
       const reportNext = { state: json(next), status: next.status, version: initial.version + 1, updatedAt: now,
@@ -314,6 +344,7 @@ export class PrismaDiagnosticReports implements DiagnosticReportsPort {
           await this.evidence(tx, row, current);
           if (!participants) throw denied();
           await this.publicBindings.candidate(tx, currentOrder, participants);
+          if (canonical(await this.releaseIdentity(tx, row, currentOrder, input.vehicleDisplay)) !== canonical(identity)) throw denied();
         }
         const saved = await tx.diagnosticReportRecord.update({ where: { id: reportId }, data: reportNext });
         if (final) {

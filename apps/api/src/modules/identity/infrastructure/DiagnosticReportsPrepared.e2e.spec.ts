@@ -126,7 +126,7 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
   const finding = (ids: string[] = []): D.DiagnosticFinding => ({ id: id("finding"), checkId: "brakes", assessment: "normal", explanation: null, evidenceIds: ids, kind: null, source: null, measurement: null, location: null });
   const draft = (version = 1) => reports.create(subject(), orderId, { reportId, expectedOrderVersion: version });
   const submit = (version = 0) => reports.transition(subject(), reportId, { expectedVersion: version, action: "submit" });
-  const finalize = (version = 1) => reports.transition(subject(), reportId, { expectedVersion: version, action: "finalize", privateSelfReview: true, reason: "Private authorized review" });
+  const finalize = (version = 1) => reports.transition(subject(), reportId, { expectedVersion: version, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 }, privateSelfReview: true, reason: "Private authorized review" });
   async function state() {
     const orders = [orderId, id("b")];
     return {
@@ -506,7 +506,7 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
     expect(await proofs.consume(linker(), b, input)).toEqual(created);
     expect(await proofs.useHandoff(linker(), b, proof.id, input)).toEqual({ reportId: input.reportId });
     await reports.transition(linker(), input.reportId, { expectedVersion: 0, action: "submit" });
-    expect(await reports.transition(subject(), input.reportId, { expectedVersion: 1, action: "finalize" })).toMatchObject({ status: "finalized", id: input.reportId });
+    expect(await reports.transition(subject(), input.reportId, { expectedVersion: 1, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } })).toMatchObject({ status: "finalized", id: input.reportId });
     expect(await db.diagnosticPdfArtifact.count({ where: { reportId: input.reportId } })).toBe(3);
   });
   it("comparison provenance delivery repeats current pair/material validation after disposal during I/O", async () => {

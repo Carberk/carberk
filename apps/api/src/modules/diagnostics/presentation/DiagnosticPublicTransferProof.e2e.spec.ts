@@ -657,7 +657,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     owned.findings.push(finding.id);
     await post("technician", `reports/${draft.id}/findings`, { expectedVersion: 0, finding }).expect(201);
     await post("technician", `reports/${draft.id}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    const finalized = await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize" });
+    const finalized = await post("reviewer", `reports/${draft.id}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     // Capture server-generated intents before any status assertion can interrupt ownership.
     const documents = await db.diagnosticPdfArtifact.findMany({ where: { reportId } });
     owned.pdfs.push(...documents.map(document => document.id));
@@ -857,8 +857,8 @@ describe("public continuity across different sellers and Listings", { concurrent
     owned.findings.push(findingB.id);
     await post("technician", `reports/${reportId}/findings`, { expectedVersion: 0, finding: findingB }).expect(201);
     await post("technician", `reports/${reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-    await post("technician", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize" }).expect(403);
-    const finalized = await post("reviewer", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize" });
+    await post("technician", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(403);
+    const finalized = await post("reviewer", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     const documentsB = await db.diagnosticPdfArtifact.findMany({ where: { reportId } });
     owned.pdfs.push(...documentsB.map(row => row.id));
     for (const row of documentsB) owned.keys.add(`diagnostic-pdf/${reportId}/${row.id}.pdf`);
@@ -1252,7 +1252,7 @@ describe("public continuity across different sellers and Listings", { concurrent
       await denied(await get(who, comparisonPath(p.b, p.released.id)));
     }
     const finding = await submitLinked(input.reportId);
-    await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }).expect(403);
+    await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }).expect(403);
     // The Listing card selects the latest release. B follows A in time rather
     // than tying at the frozen clock and letting random report IDs decide.
     now = new Date("2026-10-21T12:01:00.000Z");
@@ -1371,13 +1371,13 @@ describe("public continuity across different sellers and Listings", { concurrent
       owned.findings.push(finding.id);
       await post("technician", `reports/${input.reportId}/findings`, { expectedVersion: 0, finding }).expect(201);
       await post("technician", `reports/${input.reportId}/transition`, { expectedVersion: 1, action: "submit" }).expect(201);
-      await denied(await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" }));
+      await denied(await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } }));
       expect((await get("reviewer", `reports/${input.reportId}`).expect(200)).body).toMatchObject({ version: 2, status: "submitted", findings: [finding] });
       expect(await db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } })).toEqual(consumed);
       await moderatePersonal("sellerB", false);
       // A changes after consumption; B publication must never re-run A admission.
       await post("reviewer", `reports/${p.released.id}/transition`, { expectedVersion: 3, action: "withdraw", reason: "Independent A history" }).expect(201);
-      const finalized = await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize" });
+      const finalized = await post("reviewer", `reports/${input.reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
       const pdfs = await db.diagnosticPdfArtifact.findMany({ where: { reportId: input.reportId } });
       owned.pdfs.push(...pdfs.map(row => row.id));
       for (const row of pdfs) owned.keys.add(`diagnostic-pdf/${input.reportId}/${row.id}.pdf`);
@@ -1485,7 +1485,7 @@ describe("public continuity across different sellers and Listings", { concurrent
     return finding;
   }
   async function finalizeLinked(reportId: string) {
-    const response = await post("reviewer", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize" });
+    const response = await post("reviewer", `reports/${reportId}/transition`, { expectedVersion: 2, action: "finalize", vehicleDisplay: { make: "Synthetic make", model: "Synthetic model", year: 2018 } });
     const documents = await db.diagnosticPdfArtifact.findMany({ where: { reportId } });
     owned.pdfs.push(...documents.map(row => row.id));
     for (const row of documents) owned.keys.add(`diagnostic-pdf/${reportId}/${row.id}.pdf`);

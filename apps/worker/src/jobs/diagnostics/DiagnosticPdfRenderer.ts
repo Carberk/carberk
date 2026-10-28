@@ -75,6 +75,19 @@ export async function renderDiagnosticPdf(input: DiagnosticPdfInput, fonts: Diag
   }
   function heading(value: string) { ensure(45); y -= 10; text(value, 14, bold); y -= 5; }
   addPage(); heading(copy.title);
+  const identity = report.releaseIdentity;
+  if (identity) {
+    const labels = {
+      tk: { center: "Merkez", vehicle: "Ulag", visit: "Barlag salgylanmasy", manual: "El bilen şahsyýet kesgitlenmesi ýazyldy", restricted: "Ulag belgisi ýazyldy; elýeterlilik çäklendirilen" },
+      ru: { center: "Центр", vehicle: "Автомобиль", visit: "Номер осмотра", manual: "Ручная идентификация зафиксирована", restricted: "Идентификатор записан; доступ ограничен" },
+      en: { center: "Inspection center", vehicle: "Vehicle", visit: "Visit reference", manual: "Manual identification recorded", restricted: "Identifier recorded; restricted" },
+    }[input.locale];
+    text(`${labels.center}: ${identity.center.names[input.locale]}`);
+    const display = identity.vehicle.display;
+    if (display) text(`${labels.vehicle}: ${display.make} ${display.model} ${display.year}`);
+    text(identity.vehicle.maskedVin ? `VIN: ${identity.vehicle.maskedVin}` : identity.vehicle.method === "manual" ? labels.manual : labels.restricted);
+    text(`${labels.visit}: ${report.id}`);
+  }
   text(`${copy.observed}: ${report.observedAt}`); text(`${copy.mileage}: ${report.mileageKm} km`);
   text(`${copy.template}: ${report.templateVersionId}`); text(`${copy.title}: ${report.id}`);
   // Noto Sans does not contain U+2192; pdf-lib otherwise emits its missing
