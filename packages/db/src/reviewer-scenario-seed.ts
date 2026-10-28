@@ -111,6 +111,14 @@ export interface ReviewerScenarioUser {
   suspendedAt?: Date | null;
 }
 
+/** Only the exact successful revoke output is eligible for repeat cleanup. */
+export function isRevokedReviewerUser(user: ReviewerScenarioUser): boolean {
+  return ACCOUNT_SLOTS.some(slot => slot.id === user.id && slot.role === user.role) &&
+    user.phone === `revoked:${user.id}` && user.email === null && user.emailVerifiedAt === null &&
+    user.displayName === `Revoked ${user.id}` && user.phoneVerifiedAt !== null &&
+    user.suspendedAt === null && user.deletionScheduledAt === null;
+}
+
 export interface ReviewerScenarioCatalog {
   brandId: string;
   brandSlug: string;
@@ -403,8 +411,9 @@ export async function runReviewerScenarioSeed(
     for (const slot of ACCOUNT_SLOTS) {
       const existing = await store.findUserById(slot.id);
       if (!existing) continue;
-      if (existing.role !== slot.role || existing.deletionScheduledAt !== null || existing.suspendedAt != null ||
-          !existing.phoneVerifiedAt || !existing.emailVerifiedAt) {
+      if (!isRevokedReviewerUser(existing) && (existing.role !== slot.role || existing.deletionScheduledAt !== null || existing.suspendedAt != null ||
+          !/^\+993[0-9]{8}$/.test(existing.phone ?? "") || !existing.email ||
+          !existing.phoneVerifiedAt || !existing.emailVerifiedAt)) {
         return safeFailure("Reviewer scenario revocation refused: privileged or unsupported reviewer source");
       }
       expected.push(existing);

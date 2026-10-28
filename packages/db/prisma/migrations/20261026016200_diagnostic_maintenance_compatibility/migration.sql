@@ -16,6 +16,13 @@ LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS $$
  WHEN 'dbda60a2-a7f6-4230-a993-9ec73f30dc6d' THEN 'seller'
  WHEN '30157e67-4129-4984-afe1-c4cd014f68ed' THEN 'buyer' END
 $$;
+CREATE FUNCTION public.diagnostic_maintenance_reviewer_revoked(uid text,r jsonb) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS $$
+ SELECT (r->>'id'=uid AND r->>'role'=public.diagnostic_maintenance_reviewer_role(uid)
+  AND r->>'phone'='revoked:'||uid AND r->'email'='null' AND r->'emailVerifiedAt'='null'
+  AND r->>'displayName'='Revoked '||uid AND r->>'phoneVerifiedAt' IS NOT NULL
+  AND r->'suspendedAt'='null' AND r->'deletionScheduledAt'='null') IS TRUE
+$$;
 CREATE FUNCTION public.diagnostic_maintenance_selected(c jsonb) RETURNS boolean
 LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS $$
  SELECT c->>'operation' IN ('admin_bootstrap_promote','reviewer_credentials_change')
@@ -184,8 +191,9 @@ BEGIN
    uid:=account_item->>'id'; stored:=public.diagnostic_source_read('users',jsonb_build_object('id',uid));
    IF (jsonb_typeof(account_item)='object' AND account_item-ARRAY['id','phone','email']='{}' AND account_item ?& ARRAY['id','phone','email']
     AND public.diagnostic_maintenance_reviewer_role(uid) IS NOT NULL) IS NOT TRUE THEN RAISE EXCEPTION 'diagnostic_maintenance_roster'; END IF;
-   IF stored IS NOT NULL AND (stored->>'role' IS DISTINCT FROM public.diagnostic_maintenance_reviewer_role(uid)
+   IF stored IS NOT NULL AND NOT (i->>'mode'='revoke' AND public.diagnostic_maintenance_reviewer_revoked(uid,stored)) AND (stored->>'role' IS DISTINCT FROM public.diagnostic_maintenance_reviewer_role(uid)
     OR stored->>'suspendedAt' IS NOT NULL OR stored->>'deletionScheduledAt' IS NOT NULL
+    OR (i->>'mode'='revoke' AND ((stored->>'phone' ~ '^\+993[0-9]{8}$') IS NOT TRUE OR stored->>'email' IS NULL))
     OR stored->>'phoneVerifiedAt' IS NULL OR stored->>'emailVerifiedAt' IS NULL) THEN RAISE EXCEPTION 'diagnostic_maintenance_reviewer_source'; END IF;
    IF i->>'mode'='rotate' THEN
     IF (jsonb_typeof(account_item->'phone')='string' AND account_item->>'phone' ~ '^\+993[0-9]{8}$'

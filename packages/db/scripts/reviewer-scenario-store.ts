@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "../generated/prisma/client/client";
-import { reviewerScenarioSeedIds, type ReviewerScenarioCatalog, type ReviewerScenarioSeedStore, type ReviewerScenarioUser, type ReviewerCredentialChange } from "../src/reviewer-scenario-seed";
+import { isRevokedReviewerUser, reviewerScenarioSeedIds, type ReviewerScenarioCatalog, type ReviewerScenarioSeedStore, type ReviewerScenarioUser, type ReviewerCredentialChange } from "../src/reviewer-scenario-seed";
 import { withDiagnosticSourceCommand } from "../src/diagnostic-source-command";
 import { reviewerCredentialsSourceCommand, maintenanceAudit, maintenanceAuditDate } from "../src/maintenance-source-command";
 
@@ -123,6 +123,12 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
   async changeCredentials(input: ReviewerCredentialChange): Promise<string[]> {
     return this.prisma.$transaction(async tx => {
       const validate = async () => {
+        if (input.mode === "revoke" && (input.accounts.length !== reviewerScenarioSeedIds.userIds.length ||
+          input.accounts.some((account, index) => account.id !== reviewerScenarioSeedIds.userIds[index] ||
+            account.role !== (reviewerScenarioSeedIds.sellerIds.some(id => id === account.id) ? "seller" : "buyer") ||
+            account.phone !== `revoked:${account.id}` || account.email !== null || account.displayName !== `Revoked ${account.id}`))) {
+          throw new Error("Reviewer credentials refused: invalid revoke roster");
+        }
         const failure = await this.seedAssociationFailure(tx, input.associations);
         if (failure) throw new Error(`Reviewer seed refused: ${failure}`);
         const current = await tx.user.findMany({ where: { id: { in: input.accounts.map(account => account.id) } },
@@ -134,8 +140,11 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
           const prior = input.expected.find(user => user.id === account.id), user = current.find(user => user.id === account.id);
           if ((!prior) !== (!user) || (prior && user &&
             (user.role !== account.role || user.suspendedAt !== null || user.deletionScheduledAt !== null ||
-             !user.phone || !user.email || !user.phoneVerifiedAt || !user.emailVerifiedAt ||
+             (!(input.mode === "revoke" && isRevokedReviewerUser(user)) &&
+              (!user.phone || !user.email || !user.phoneVerifiedAt || !user.emailVerifiedAt ||
+               (input.mode === "revoke" && !/^\+993[0-9]{8}$/.test(user.phone)))) ||
              user.phone !== prior.phone || user.email !== prior.email || user.role !== prior.role ||
+             (input.mode === "revoke" && isRevokedReviewerUser(user) && user.displayName !== prior.displayName) ||
              !sameDate(user.phoneVerifiedAt, prior.phoneVerifiedAt) || !sameDate(user.emailVerifiedAt, prior.emailVerifiedAt) ||
              !sameDate(user.deletionScheduledAt, prior.deletionScheduledAt) || !sameDate(user.suspendedAt, prior.suspendedAt)))) {
             throw new Error("Reviewer credentials refused: source changed");
@@ -148,12 +157,21 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
         return current;
       };
       const current = await validate();
+      const currentIds = input.accounts.filter(account => current.some(user => user.id === account.id)).map(account => account.id);
       const changedIds = input.accounts.filter(account => {
         const user = current.find(row => row.id === account.id);
-        return user && (input.mode === "revoke" || user.phone !== account.phone || user.email !== account.email);
+        return user && (input.mode === "revoke" ? !isRevokedReviewerUser(user) : user.phone !== account.phone || user.email !== account.email);
       }).map(account => account.id);
-      if (changedIds.length === 0) return [];
-      const command = await reviewerCredentialsSourceCommand(tx, { ...input, changedIds });
+      if (input.mode === "revoke" && changedIds.length === 0) {
+        const sessions = await tx.session.count({ where: { userId: { in: currentIds } } });
+        const devices = await tx.fcmDevice.count({ where: { userId: { in: currentIds }, invalidatedAt: null } });
+        await validate();
+        if (sessions === 0 && devices === 0) return [];
+      } else if (changedIds.length === 0) return [];
+      // A dirty/mixed revoke prepares every existing slot, even an unchanged
+      // tombstone. It never skips that slot's security dependencies.
+      const operationIds = input.mode === "revoke" ? currentIds : changedIds;
+      const command = await reviewerCredentialsSourceCommand(tx, { ...input, changedIds: operationIds });
       const audit = await maintenanceAudit(tx, command);
       await withDiagnosticSourceCommand(tx, command, async () => {
         await validate();
@@ -163,13 +181,13 @@ export class PrismaReviewerScenarioSeedStore implements ReviewerScenarioSeedStor
             ? { phone: account.phone, email: account.email, phoneVerifiedAt: input.now, emailVerifiedAt: input.now }
             : { phone: `revoked:${account.id}`, email: null, emailVerifiedAt: null, displayName: account.displayName } });
         }
-        const sessions = await tx.session.findMany({ where: { userId: { in: changedIds } }, select: { id: true } });
+        const sessions = await tx.session.findMany({ where: { userId: { in: operationIds } }, select: { id: true } });
         if (sessions.length > 0) await tx.session.deleteMany({ where: { id: { in: sessions.map(session => session.id) } } });
-        const devices = await tx.fcmDevice.findMany({ where: { userId: { in: changedIds }, invalidatedAt: null }, select: { id: true } });
+        const devices = await tx.fcmDevice.findMany({ where: { userId: { in: operationIds }, invalidatedAt: null }, select: { id: true } });
         if (devices.length > 0) await tx.fcmDevice.updateMany({ where: { id: { in: devices.map(device => device.id) } }, data: { invalidatedAt: input.now, updatedAt: maintenanceAuditDate(audit.createdAt) } });
         await tx.auditLog.create({ data: { ...audit, createdAt: maintenanceAuditDate(audit.createdAt) } });
       });
-      return changedIds;
+      return operationIds;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
   }
 
