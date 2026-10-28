@@ -1,0 +1,136 @@
+{
+  "status": "functional GREEN; measured comparison/native acceptance NOT STARTED",
+  "redCommit": "9d9caf3a",
+  "migration": "20261026016300_diagnostic_registry_metadata_lookup",
+  "migrationSha256": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7",
+  "testSha256": "27b6db26ff805bce557bc398f69efdc668a4b1f7fa4c484b4dae0d0050e2d704",
+  "sourceRepair": "Installation derives constant map from sole unchanged registry; PL/pgSQL immutable metadata initializer reuses map in cached expression. No scope/lock/limit/authority/effect changes.",
+  "historical99Unchanged": true,
+  "newManifestCount": 100,
+  "red": {
+    "mode": "old",
+    "assertions": [
+      "all77 independent array-entry lookups equal; unknown/null SQL NULL",
+      "full100 unchanged scope-limit refusal and rollback"
+    ],
+    "timingAcceptance": false,
+    "registryHash": "6d7b15db175c3d3e7779a053e8d459f81cc07c163373600ba42e0e91c3a094be",
+    "scopeRegistryCalls": 2185,
+    "outputHashes": {
+      "scope": "ce8ca056ae0fd41de05091651a8bec465e5469106672ad02cfd64d0503ac4690",
+      "keys": "0a9ccdb801fc32672106e296bcede7e1ed1e9ebaadeaeec78637d06f2c28cc56",
+      "effects": "a27fff81a06c359c5781b848daf2d98cb804048a286b48a6a284e000ff58bc1c"
+    },
+    "outputCounts": {
+      "scope": 240,
+      "keys": 370,
+      "effects": 30
+    },
+    "full100": {
+      "sqlstate": "P0001",
+      "message": "diagnostic_source_scope_limit",
+      "context": "PL/pgSQL function diagnostic_source_scope_before_purge(jsonb) line 44 at RAISE\nPL/pgSQL function diagnostic_source_scope_before_intake(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_finite_fk(jsonb) line 4 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_complete_moderation(jsonb) line 33 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_composition(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_listing_publication(jsonb) line 4 at RETURN\nSQL function \"diagnostic_source_scope\" statement 1\nPL/pgSQL function diagnostic_source_insert_receipt() line 15 at assignment\nSQL statement \"INSERT INTO public.diagnostic_source_commands(command) VALUES(command) RETURNING id\"\nPL/pgSQL function diagnostic_prepare_source(jsonb) line 4 at SQL statement"
+    },
+    "receipts": {
+      "source": 0,
+      "campaign": 0
+    },
+    "verdict": "FAIL",
+    "error": {
+      "message": "scope rematerialized registry 2185 times, beyond its 100-pass enumeration cap",
+      "code": "ERR_ASSERTION"
+    }
+  },
+  "green": {
+    "mode": "new",
+    "assertions": [
+      "exact77 map and immutable invoker/search_path attributes",
+      "installation preserves historical metadata owner/ACL/volatility/search_path/invoker",
+      "duplicate installation drift refuses before replacements",
+      "null-name installation drift refuses before replacements",
+      "missing-entry installation drift refuses before replacements",
+      "metadata-drift installation drift refuses before replacements",
+      "all77 independent array-entry lookups equal; unknown/null SQL NULL",
+      "complete successful10 scope/keys/effects equal OLD",
+      "full100 unchanged scope-limit refusal and rollback",
+      "scope registry materialization bounded by existing100-pass enumeration cap"
+    ],
+    "timingAcceptance": false,
+    "registryHash": "6d7b15db175c3d3e7779a053e8d459f81cc07c163373600ba42e0e91c3a094be",
+    "scopeRegistryCalls": 1,
+    "outputHashes": {
+      "scope": "ce8ca056ae0fd41de05091651a8bec465e5469106672ad02cfd64d0503ac4690",
+      "keys": "0a9ccdb801fc32672106e296bcede7e1ed1e9ebaadeaeec78637d06f2c28cc56",
+      "effects": "a27fff81a06c359c5781b848daf2d98cb804048a286b48a6a284e000ff58bc1c"
+    },
+    "outputCounts": {
+      "scope": 240,
+      "keys": 370,
+      "effects": 30
+    },
+    "full100": {
+      "sqlstate": "P0001",
+      "message": "diagnostic_source_scope_limit",
+      "context": "PL/pgSQL function diagnostic_source_scope_before_purge(jsonb) line 44 at RAISE\nPL/pgSQL function diagnostic_source_scope_before_intake(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_finite_fk(jsonb) line 4 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_complete_moderation(jsonb) line 33 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_composition(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_listing_publication(jsonb) line 4 at RETURN\nSQL function \"diagnostic_source_scope\" statement 1\nPL/pgSQL function diagnostic_source_insert_receipt() line 15 at assignment\nSQL statement \"INSERT INTO public.diagnostic_source_commands(command) VALUES(command) RETURNING id\"\nPL/pgSQL function diagnostic_prepare_source(jsonb) line 4 at SQL statement"
+    },
+    "receipts": {
+      "source": 0,
+      "campaign": 0
+    },
+    "verdict": "PASS"
+  },
+  "drain": {
+    "project": "candidatea-r7g-attribution",
+    "port": 49356,
+    "database": "candidatea_r7g_attribution_before",
+    "allPublicDataUnchanged": true,
+    "dataHash": "1db785614db30bef2edd3f023fd4cacc83e3b32718ef62df93d6778fe40a32cb",
+    "otherFunctionsUnchanged": true,
+    "functionHash": "4f69996d0afd78d664de20c956a4be479abd896f691d9114bc6bad3e354512ec",
+    "guardHash": "74f8917631d0ccdc8f7821aec6dfa0f4f9c70ecc9ee1e112b33f3ba4e5113c93",
+    "guardsUnchanged": true,
+    "receipts": {
+      "source": 0,
+      "campaign": 0
+    },
+    "clients": []
+  },
+  "checks": {
+    "TS7": "PASS",
+    "TS6": "PASS",
+    "affectedLint": "PASS after import-group warning corrected",
+    "functional": "PASS"
+  },
+  "artifacts": {
+    "registry-old.json": {
+      "path": "/tmp/897-r7g-worker-attribution-20261029/registry-old.json",
+      "sha256": "d15cfdea8112fd2df7504a43a1f37bc0ff869b2cbdf0de1580e4eb3a14560c5b"
+    },
+    "registry-old-output.private.json": {
+      "path": "/tmp/897-r7g-worker-attribution-20261029/registry-old-output.private.json",
+      "sha256": "f6e9e6c2b68e2613d67eab6234dd82549337fb8a1b50cef88e48d75244e953b3"
+    },
+    "registry-new.json": {
+      "path": "/tmp/897-r7g-worker-attribution-20261029/registry-new.json",
+      "sha256": "cfca3d753e99193a11c73d25fbdf2a81fe0691f1435e657e22e096e5149a5881"
+    },
+    "registry163-drain.json": {
+      "path": "/tmp/897-r7g-worker-attribution-20261029/registry163-drain.json",
+      "sha256": "7ebe9bb3ecb16b965f2d2caf1c70aa6099b9d9b1a0b83197b4803ecb148b6990"
+    },
+    "profile163.cjs": {
+      "path": "/tmp/897-r7g-worker-attribution-20261029/profile163.cjs",
+      "sha256": "3cbd32dced456a970146135a1ab5e00ab3d3305f9ee5bcc3449db723f2bc97d9"
+    }
+  },
+  "nextProof": {
+    "command": "R7G_ATTRIBUTION_MEASURE_START=1 node /tmp/897-r7g-worker-attribution-20261029/profile163.cjs --measure",
+    "status": "READY, explicit measured START required",
+    "scope": "same fixed6 phases, same limits, compare attribution baseline only; no native",
+    "remaining": [
+      "Original5s ordinary native criterion",
+      "Fresh full100 ordinary producer baseline",
+      "Unchanged full100 semantic scope-limit refusal is unresolved; no cap/graph change proposed"
+    ]
+  }
+}
