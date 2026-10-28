@@ -40,6 +40,20 @@ beforeEach(()=>{
 });
 afterEach(()=>{cleanup();vi.unstubAllGlobals();});
 describe("actual diagnostic staff workspace and server actions",()=>{
+ it("requires an intentional customer vehicle description before releasing a manual inspection",async()=>{
+  report.status="submitted";report.authorId="66666666-6666-4666-8666-666666666666";context.capabilities.push("diagnostics.reviewer");
+  const view=setup();await open(view);
+  const finalize=view.getByRole("button",{name:diagnosticCopy.en.finalize}) as HTMLButtonElement;
+  expect(finalize.disabled).toBe(true);
+  fireEvent.change(view.getByLabelText("Vehicle make"),{target:{value:"Toyota"}});
+  fireEvent.change(view.getByLabelText("Vehicle model"),{target:{value:"Camry"}});
+  fireEvent.change(view.getByLabelText("Vehicle year"),{target:{value:"2018"}});
+  expect(finalize.disabled).toBe(false);
+  fireEvent.click(finalize);
+  await waitFor(()=>expect(transitions).toHaveLength(1));
+  expect(transitions[0]).toEqual({expectedVersion:0,action:"finalize",vehicleDisplay:{make:"Toyota",model:"Camry",year:2018}});
+  expect(JSON.stringify(transitions)).not.toContain("Synthetic manual match");
+ });
  it.each(["en","ru","tk"] as const)("shows explicit unassessed state and saves an intentional result in %s",async locale=>{
   const c=diagnosticCopy[locale],view=setup(locale);expect(view.getByRole("status").textContent).toBe(c.loading);await open(view,locale);
   expect(view.getByText(c.unchecked)).toBeTruthy();fireEvent.click(view.getByRole("button",{name:c.finding}));

@@ -22,6 +22,37 @@ function snapshot(count = 1): D.DiagnosticReleasedSnapshot {
       findings: Array.from({ length: count }, (_, i) => ({ id: id(10 + i), checkId: i === 0 ? "brakes" : `panel_${i}`, assessment: "normal", explanation: `Observation ${i + 1}: ${glyphs}`, evidenceIds: [], kind: null, source: null, measurement: i === 0 ? { value: 2.5, unit: "mm", method: "Caliper", uncertainty: "±0.1 mm" } : null, location: i === 0 ? null : { panelId: `panel_${i}`, view: (["front", "rear", "left", "right", "top"] as const)[(i - 1) % 5], x: 0.2 + (i % 4) * 0.15, y: 0.3 + (i % 3) * 0.15 } })) } });
 }
 const fonts = async () => ({ regular: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Regular.ttf")), bold: await readFile(join(__dirname, "../../../assets/fonts/NotoSans-Bold.ttf")) });
+const centerNames = { tk: "Aşgabat synag merkezi", ru: "Тестовый центр Ашхабада", en: "Ashgabat test center" };
+it.each(["tk", "ru", "en"] as const)("prints the immutable vehicle and center identity in %s customer copies", async locale => {
+  for (const audience of ["buyer_private", "listing_public"] as const) {
+    const legacy = snapshot(2);
+    const current = D.DiagnosticReleasedSnapshotSchema.parse({ ...legacy, report: { ...legacy.report, audience,
+      releaseIdentity: { version: 1, center: { id: id(70), names: centerNames },
+        vehicle: { method: "vin", maskedVin: "*************1234", display: { make: "Toyota", model: "Camry", year: 2018 }, catalog: null } } } });
+    const bytes = await renderDiagnosticPdf({ snapshot: current, locale, generatedAt: now, verificationReference: "/diagnostics/reports/record", photos: [] }, await fonts());
+    const text = await readDiagnosticPdfText(bytes);
+    expect(text).toContain(centerNames[locale]);
+    expect(text).toContain("Toyota Camry 2018");
+    expect(text).toContain("*************1234");
+    expect(text).toContain(current.report.orderId);
+    expect(text).not.toContain("1HGCM82633A001234");
+    expect(text).toContain("123456 km");
+    for (const finding of current.report.findings) expect(text).toContain(finding.id);
+  }
+});
+it.each(["tk", "ru", "en"] as const)("prints human-readable manual vehicle identification in %s without restricted workshop notes", async locale => {
+  const legacy = snapshot();
+  const current = D.DiagnosticReleasedSnapshotSchema.parse({ ...legacy, report: { ...legacy.report,
+    releaseIdentity: { version: 1, center: { id: id(70), names: centerNames },
+      vehicle: { method: "manual", maskedVin: null, display: { make: "Toyota", model: "Camry", year: 2018 }, catalog: null } } } });
+  const bytes = await renderDiagnosticPdf({ snapshot: current, locale, generatedAt: now, verificationReference: "/private/diagnostics/record", photos: [] }, await fonts());
+  const text = await readDiagnosticPdfText(bytes);
+  expect(text).toContain(centerNames[locale]);
+  expect(text).toContain("Toyota Camry 2018");
+  expect(text).toContain(locale === "tk" ? "El bilen şahsyýet kesgitlenmesi ýazyldy" : locale === "ru" ? "Ручная идентификация зафиксирована" : "Manual identification recorded");
+  expect(text).not.toContain("manualReference");
+  expect(text).not.toContain("identityRecordId");
+});
 it.each(["tk", "ru", "en"] as const)("renders actual A4 %s bytes with embedded fonts and protects evidence completeness", async locale => {
   const bytes = await renderDiagnosticPdf({ snapshot: snapshot(2), locale, generatedAt: now, verificationReference: "/private/diagnostics/record", photos: [] }, await fonts());
   expect(await renderDiagnosticPdf({ snapshot: snapshot(2), locale, generatedAt: now, verificationReference: "/private/diagnostics/record", photos: [] }, await fonts())).toEqual(bytes);
