@@ -1,8 +1,10 @@
 // Task-owned real-PG functional regression. No timing threshold or native acceptance.
+/* eslint-disable @typescript-eslint/no-require-imports -- Standalone task-owned PostgreSQL driver. */
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+
 const { Client } = require('pg');
 const root = process.env.R7G_REGISTRY_EVIDENCE;
 if (!root) throw new Error('R7G_REGISTRY_EVIDENCE must identify the task-only fixture');
@@ -28,6 +30,43 @@ async function stats(client) { await client.query('SELECT pg_stat_clear_snapshot
     assert.equal(registry.length, 77); assert.equal(new Set(registry.map(entry => entry.table)).size, 77);
     const all = (await worker.query("SELECT entry->>'table' name,entry expected,public.diagnostic_source_meta(entry->>'table') actual FROM jsonb_array_elements(public.diagnostic_source_registry()) entry")).rows;
     for (const entry of all) assert.deepEqual(entry.actual, entry.expected);
+    if (mode === 'new') {
+      const map = (await worker.query('SELECT public.diagnostic_source_registry_map() value')).rows[0].value;
+      assert.deepEqual(map, Object.fromEntries(registry.map(entry => [entry.table, entry])));
+      const attributes = (await owner.query("SELECT provolatile,prosecdef,proconfig FROM pg_proc WHERE oid='public.diagnostic_source_meta(text)'::regprocedure")).rows[0];
+      assert.equal(attributes.provolatile, 'i'); assert.equal(attributes.prosecdef, false);
+      assert.deepEqual(attributes.proconfig, ['search_path=pg_catalog, public']);
+      receipt.assertions.push('exact77 map and immutable invoker/search_path attributes');
+      const migration = fs.readFileSync(path.join(__dirname, '../prisma/migrations/20261026016300_diagnostic_registry_metadata_lookup/migration.sql'), 'utf8');
+      // Reapply the historical metadata body inside a rolled-back transaction,
+      // then install163 and prove CREATE OR REPLACE retains its owner/ACL.
+      await owner.query('BEGIN');
+      try {
+        const historical = fs.readFileSync(path.join(__dirname, '../prisma/migrations/20261023130000_diagnostic_source_kernel/migration.sql'), 'utf8');
+        const oldMeta = historical.slice(historical.indexOf('CREATE FUNCTION public.diagnostic_source_meta('), historical.indexOf('CREATE FUNCTION public.diagnostic_source_project('));
+        await owner.query(oldMeta.replace('CREATE FUNCTION', 'CREATE OR REPLACE FUNCTION'));
+        await owner.query('DROP FUNCTION public.diagnostic_source_registry_map()');
+        const identitySql = "SELECT proowner::regrole::text owner,proacl::text acl,provolatile,prosecdef,proconfig FROM pg_proc WHERE oid='public.diagnostic_source_meta(text)'::regprocedure";
+        const beforeIdentity = (await owner.query(identitySql)).rows[0];
+        await owner.query(migration);
+        assert.deepEqual((await owner.query(identitySql)).rows[0], beforeIdentity);
+      } finally { await owner.query('ROLLBACK'); }
+      receipt.assertions.push('installation preserves historical metadata owner/ACL/volatility/search_path/invoker');
+      for (const [name, entries] of [
+        ['duplicate', [...registry.slice(0, 76), registry[0]]],
+        ['null-name', [{ ...registry[0], table: null }, ...registry.slice(1)]],
+        ['missing-entry', registry.slice(1)],
+        ['metadata-drift', [{ ...registry[0], namespace: -1 }, ...registry.slice(1)]],
+      ]) {
+        await owner.query('BEGIN');
+        try {
+          const body = 'SELECT ' + "'" + JSON.stringify(entries).replaceAll("'", "''") + "'::jsonb";
+          await owner.query("CREATE OR REPLACE FUNCTION public.diagnostic_source_registry() RETURNS jsonb LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,public AS '" + body.replaceAll("'", "''") + "'");
+          await assert.rejects(owner.query(migration), error => error.code === 'P0001' && error.message === 'diagnostic_source_registry_metadata_drift');
+        } finally { await owner.query('ROLLBACK'); }
+        receipt.assertions.push(name + ' installation drift refuses before replacements');
+      }
+    }
     const nulls = (await worker.query("SELECT public.diagnostic_source_meta(NULL) n,public.diagnostic_source_meta('not_a_registered_table') u")).rows[0];
     assert.deepEqual(nulls, { n: null, u: null });
     receipt.assertions.push('all77 independent array-entry lookups equal; unknown/null SQL NULL');
