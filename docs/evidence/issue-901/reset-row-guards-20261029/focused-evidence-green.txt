@@ -1,0 +1,29 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-e0d6ff2a/packages/db
+
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > seals server-observed full OLD tuples and rejects commit without finish 67ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > the admitted full OLD raw record can be deleted before its parent order 40ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an ordinary or forged GUC raw DELETE retains the original guard refusal 2ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > the admitted full OLD source anchor can be deleted before its parent order 55ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an ordinary, forged GUC or non-operator source anchor DELETE retains the original receipt refusal 44ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an admission authorizes no source anchor INSERT or UPDATE 89ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > a source anchor changed after admission no longer matches its sealed OLD tuple 42ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > the admitted full OLD ownership component can be deleted before its raw record 42ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an ordinary, forged GUC or non-operator ownership component DELETE retains the original diagnostic_ownership_immutable refusal 51ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an admission authorizes no ownership component INSERT or UPDATE 81ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > a sealed ownership component changed after admission no longer matches its OLD tuple 43ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > the admitted full OLD identity evidence can be deleted before its parent order 40ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an ordinary, forged GUC or non-operator identity evidence DELETE retains the original diagnostic_identity_evidence_immutable refusal 42ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an admission authorizes no identity evidence INSERT or UPDATE 78ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > a sealed identity evidence changed after admission no longer matches its OLD tuple 40ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > a principal without operator ownership cannot observe, seal or forge the store 1ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > missing or malformed binding fields, stale inventory and duplicate admission roll back without effects 221ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > sealed OLD bytes cannot authorize a changed tuple or a protected reference 78ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > an admitted operation cannot be updated, deleted or truncated directly 123ms
+ ✓ tests/operational-reset-rows.e2e.spec.ts > operator-owned operational reset row admission > over 10000 disposable tuples refuses before any admission or DELETE 519ms
+
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Start at  15:03:35
+   Duration  5.09s (tests 96%, import 4%)
+

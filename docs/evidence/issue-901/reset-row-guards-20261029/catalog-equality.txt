@@ -1,0 +1,44 @@
+# Mechanical and live catalog equality, source 4ed39fc229ff1714fdb2416ab43085b6e56a98e2
+# base database: fresh postgres:16-alpine migrated from parent fc77bc55 before any edit; after database: fresh, migrated from this source
+
+## Text: reserved replacement minus the three branch lines equals the sole historical body
+diagnostic_ownership_guard equal historicalBody 94d49b3830fca3c3540b5c1b3ea4569021210cb83396d51ad6ca95d68c438cdc replacementBody 2792dd6dafcfb702fec8618a3c6abaa78c64fe7a6e5e3f906e5ad64fca411bdb branchAfterLine " IF TG_OP='DELETE' THEN" nextLine '  IF EXISTS (SELECT 1 FROM diagnostic_identity_records WHERE id=OLD."identityRecordId") THEN RAISE EXCEPTION \'diagnostic_ownership_immutable\'; END IF;'
+diagnostic_identity_evidence_guard equal historicalBody 50a9be60e17901d4d964cb5b70f2e9fda8e558bcd706678c3997a5240dab103c replacementBody 727b0d3510d0cdfcea37247f1dc8e7d6f0239e119433276ddd3ef4d744fa2865 branchAfterLine " IF TG_OP='DELETE' THEN" nextLine '  IF EXISTS (SELECT 1 FROM inspection_orders o WHERE o.id=OLD."orderId") THEN RAISE EXCEPTION \'diagnostic_identity_evidence_immutable\'; END IF;'
+diagnostic_identity_provenance_guard equal historicalBody aa68f4d8c3b3b974d9602e4bde1eda83b46543bbb2a19143f3716b8460f3cdd8 replacementBody e65bb6a4bc1b3f583f171c8c20f9dcb79dd47c82f839171f3161ef4266cf770e branchAfterLine " IF TG_OP='DELETE' THEN" nextLine '  IF EXISTS (SELECT 1 FROM inspection_orders o WHERE o.id=OLD."orderId") THEN RAISE EXCEPTION \'diagnostic_identity_provenance_immutable\'; END IF;'
+diagnostic_ownership_grant_guard equal historicalBody 005b525e5efc58a4d4efa21467795ca5c1e934174f4b7efb1056354e557703b5 replacementBody 5a15456ec3ac3468fce1fc0d7da710b98bcc84d060c079168b3f0f0714f63d17 branchAfterLine " IF TG_OP='DELETE' THEN" nextLine '  IF EXISTS (SELECT 1 FROM inspection_orders WHERE id=OLD."orderId") THEN RAISE EXCEPTION \'diagnostic_ownership_grant_immutable\'; END IF;'
+
+## Live: base prosrc equals the historical body before editing
+diagnostic_ownership_guard base prosrc equals historical body: yes
+diagnostic_identity_evidence_guard base prosrc equals historical body: yes
+diagnostic_identity_provenance_guard base prosrc equals historical body: yes
+diagnostic_ownership_grant_guard base prosrc equals historical body: yes
+
+## Live: catalog comparison base -> after
+functions: base      205 after      205; changed definitions:
+   1 < diagnostic_identity_evidence_guard() <md5> v false - postgres -
+   1 < diagnostic_identity_provenance_guard() <md5> v false - postgres -
+   1 < diagnostic_ownership_grant_guard() <md5> v false - postgres -
+   1 < diagnostic_ownership_guard() <md5> v false - postgres -
+   1 < staging_clean_reset_rows.certified_graph() <md5> i false search_path=pg_catalog postgres {postgres=X/postgres}
+   1 > diagnostic_identity_evidence_guard() <md5> v false - postgres -
+   1 > diagnostic_identity_provenance_guard() <md5> v false - postgres -
+   1 > diagnostic_ownership_grant_guard() <md5> v false - postgres -
+   1 > diagnostic_ownership_guard() <md5> v false - postgres -
+   1 > staging_clean_reset_rows.certified_graph() <md5> i false search_path=pg_catalog postgres {postgres=X/postgres}
+triggers: base      359 after      359; identical incl. enabled state:
+yes
+disabled public triggers (base/after): 284/284
+certified graph holds (base/after): t/t
+certificate base e737ec1fb7ea5e59c7da1edd0259b9147f841027e72cbee0e0984b49a6358b7d
+certificate after c68a3184cbe4b878c5e41e5c216b89cc4ebda399bb7105ff46db17fb0c05316a
+diagnostic_ownership_guard after prosrc = base prosrc + 3 branch lines at body line 5 : yes
+diagnostic_identity_evidence_guard after prosrc = base prosrc + 3 branch lines at body line 5 : yes
+diagnostic_identity_provenance_guard after prosrc = base prosrc + 3 branch lines at body line 4 : yes
+diagnostic_ownership_grant_guard after prosrc = base prosrc + 3 branch lines at body line 4 : yes
+graph() input lines base/after: 492 / 492
+changed input lines: 4 removed, 4 added; identical apart from the function md5: True
+  changed trigger: diagnostic_identity_evidence_guard ON public.diagnostic_identity_evidence
+  changed trigger: diagnostic_identity_provenance_guard ON public.diagnostic_identity_provenance
+  changed trigger: diagnostic_ownership_grant_guard ON public.diagnostic_ownership_grants
+  changed trigger: diagnostic_ownership_guard ON public.diagnostic_ownership_components
+fk lines changed: 0

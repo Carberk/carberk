@@ -1,0 +1,51 @@
+# Rolled-back probes on the loopback inspection PostgreSQL (postgres:16-alpine)
+# base = migrated from parent fc77bc55 before any edit; after = migrated from source 4ed39fc2
+
+## 1. Ordinary (non-admitted) order DELETE cascades through every changed guard's parent-absent branch
+## remaining = raw, component, evidence, provenance, grant counts after the order DELETE
+```sql
+\set ON_ERROR_STOP 1
+BEGIN;
+SET LOCAL session_replication_role = replica;
+INSERT INTO users(id,"displayName","updatedAt") VALUES('oc-user','Ordinary cascade',now());
+INSERT INTO diagnostic_centers(id,code,names) VALUES('oc-center','oc-center','{}');
+INSERT INTO diagnostic_template_versions(id,"centerId",version,definition) VALUES('oc-template','oc-center',1,'{}');
+INSERT INTO inspection_orders(id,"centerId","templateVersionId","commissionerId","requestKey",audience,epoch,"updatedAt","observedVehicle")
+ VALUES('oc-order','oc-center','oc-template','oc-user','oc-order','buyer_private','oc-order',now(),'{}');
+INSERT INTO diagnostic_identity_records(id,"orderId","orderVersion",observation,"observationHash","recordedById","recordedAt")
+ SELECT 'oc-raw',id,version,'{}',repeat('a',64),'oc-user',now() FROM inspection_orders WHERE id='oc-order';
+INSERT INTO diagnostic_ownership_components("identityRecordId","orderId","orderVersion",state) SELECT 'oc-raw',id,version,'unavailable' FROM inspection_orders WHERE id='oc-order';
+INSERT INTO diagnostic_identity_evidence(id,"orderId","orderVersion","identityRecordId","rightsUntil","recordedAt","observationHash","recordHash",identifiers,provenance,rights)
+ SELECT 'oc-evidence',id,version,'oc-raw',now()+interval '1 day',now(),repeat('a',64),repeat('d',64),'[]','[]','{}' FROM inspection_orders WHERE id='oc-order';
+INSERT INTO diagnostic_identity_provenance(id,"orderId","contentType","declaredSizeBytes","rightsUntil",epoch,rights) VALUES('oc-provenance','oc-order','image/jpeg',1,now()+interval '1 day','oc-order','{}');
+INSERT INTO diagnostic_ownership_grants(id,"orderId",state,"erasedAt") VALUES('oc-grant','oc-order','erased',now());
+SET LOCAL session_replication_role = origin;
+DELETE FROM inspection_orders WHERE id='oc-order';
+SELECT 'remaining '||(SELECT count(*) FROM diagnostic_identity_records WHERE id='oc-raw')||(SELECT count(*) FROM diagnostic_ownership_components WHERE "identityRecordId"='oc-raw')
+ ||(SELECT count(*) FROM diagnostic_identity_evidence WHERE id='oc-evidence')||(SELECT count(*) FROM diagnostic_identity_provenance WHERE id='oc-provenance')||(SELECT count(*) FROM diagnostic_ownership_grants WHERE id='oc-grant');
+ROLLBACK;
+```
+inspect901: remaining 00000
+inspect901_after: remaining 00000
+
+## 2. Mutual users.suspendedById pair: admitted by prepare, refused only inside dispose after earlier deletes
+```sql
+\set ON_ERROR_STOP 1
+\set VERBOSITY verbose
+BEGIN;
+SET LOCAL session_replication_role = replica;
+INSERT INTO users(id,"displayName","updatedAt") VALUES('mc-a','Mutual A',now()),('mc-b','Mutual B',now()),('mc-c','Chain C',now());
+UPDATE users SET "suspendedById"='mc-b' WHERE id='mc-a';
+UPDATE users SET "suspendedById"='mc-a' WHERE id='mc-b';
+INSERT INTO sessions(id,"userId","refreshTokenHash","expiresAt") VALUES('mc-session','mc-c','mc-fixture',now()+interval '1 hour');
+SET LOCAL session_replication_role = origin;
+SELECT 'prepared '||staging_clean_reset_rows.prepare('{"operationId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","reservationId":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","owner":"operator-901","candidate":"cccccccccccccccccccccccccccccccccccccccc","targetIdentity":{"projectId":"p","environmentId":"e","services":{"api":"a","worker":"w"},"origins":{"database":"postgresql://postgres.railway.internal:5432/railway"}},"closureGeneration":"dddddddddddddddddddddddddddddddd","closureEvidenceDigest":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","expectedInventory":{"schema":"1111111111111111111111111111111111111111111111111111111111111111","retained":"2222222222222222222222222222222222222222222222222222222222222222","disposable":"3333333333333333333333333333333333333333333333333333333333333333"},"planDigest":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}'::jsonb, staging_clean_reset_rows.observe())::text;
+SELECT staging_clean_reset_rows.dispose();
+ROLLBACK;
+```
+inspect901_after:
+prepared {"planDigest": "3f605fb7080b2fac720854f1f1c21748c0d5f3e220b623ab49366ecc3b43b1b0", "tupleCount": 4, "operationId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+ERROR:  P0001: operational_reset_dispose_incomplete:users
+CONTEXT:  PL/pgSQL function staging_clean_reset_rows.dispose() line 19 at RAISE
+LOCATION:  exec_stmt_raise, pl_exec.c:3897
+probe users remaining after rollback: 0
