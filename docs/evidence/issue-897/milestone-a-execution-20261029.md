@@ -32,6 +32,8 @@ Claude Sonnet5.5/high completed the saved worker diagnosis, now [recorded here](
 
 Next proofs are the finite worker decision and its selected repair, the next reset guard RED/GREEN, then trusted row/campaign/controller closure and source assembly. Artifact preflight remains ready; builds wait for a pinned resulting source. No staging/deployment/device/build reservation or measured interval is active at this checkpoint. PR904 remains the one linked draft integration PR.
 
+Claude Sonnet5.5/high also owns `release897-staff-render-r1-20261029`, based on1168eff6, for rendered verification of the selected existing staff journey only. It may use real components/styles with isolated synthetic network fixtures and record desktop/tablet/light/dark/zoom/locale/focus/contrast evidence. It may not edit production source or claim native-copy or multi-actor runtime acceptance. Local render processes must drain before the finite worker measurement; no native device or shared staging slot is assigned.
+
 ## Authority and baseline
 
 - Sole integration PR: https://github.com/Carberk/carberk/pull/904. Registered with this thread at launch. Draft and blocked.
