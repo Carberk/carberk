@@ -1,0 +1,68 @@
+[
+ {
+  "step": "tab to image 5 opener",
+  "found": true,
+  "n": 22
+ },
+ {
+  "step": "Enter on opener (image fails): focus",
+  "f": {
+   "el": "h4#_r_a_-recovery \"Deňeşdirmäni dikeltmek\"",
+   "focusVisible": true,
+   "outline": "auto 1px offset 0px #d0d0d0",
+   "outlineW": 1,
+   "outlineVsPage": 1.55,
+   "outlineVsControl": 1.55,
+   "pageBg": "#ffffff",
+   "controlBg": "#ffffff",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "276x24",
+   "tabindex": "-1",
+   "disabled": null,
+   "ariaDisabled": null,
+   "invalid": null,
+   "describedby": ""
+  },
+  "alert": [
+   "Gerekli surat elýeterli däl. Dikeldilenden soň baglamaga rug"
+  ],
+  "ack": "0/9 · Suraty we ýazgy mazmunyny gözden geçirdim",
+  "buttons": [
+   "Goragly suraty täzeden ýükle: Bagly mate",
+   "Deňeşdirmäni täzeden ýükle",
+   "Öňki hasabat saýlawlaryna dolan"
+  ]
+ },
+ {
+  "step": "Tab -> Retry",
+  "found": true,
+  "n": 1
+ },
+ {
+  "step": "Enter on Retry while server still fails: focus",
+  "f": "h4#_r_a_-recovery \"Deňeşdirmäni dikeltmek\"",
+  "alerts": 1
+ },
+ {
+  "step": "Enter on Retry after server recovery: focus + status",
+  "f": "p[role=status] \"Tassyklaýjy surat elýeterli. Iki barlagy we ähli gerekli materiallary \"",
+  "status": [
+   "Tassyklaýjy surat elýeterli. Iki barlagy we ähli gerekli mat"
+  ],
+  "ack": "0/9 · Suraty we ýazgy mazmunyny gözden geçirdim",
+  "issueButtonPresent": false
+ },
+ {
+  "step": "Enter on Reload comparison: focus",
+  "found": true,
+  "f": "h3 \"Şu barlagy deňeşdir\"",
+  "ack": "0/9 · Suraty we ýazgy mazmunyny gözden geçirdim"
+ },
+ {
+  "step": "Enter on Back to candidates: focus",
+  "found": true,
+  "f": "h3 \"Rugsatly öňki barlagy tap\"",
+  "pairGone": true
+ }
+]

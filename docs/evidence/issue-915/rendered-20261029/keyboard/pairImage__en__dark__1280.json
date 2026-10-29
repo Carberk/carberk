@@ -1,0 +1,68 @@
+[
+ {
+  "step": "tab to image 5 opener",
+  "found": true,
+  "n": 22
+ },
+ {
+  "step": "Enter on opener (image fails): focus",
+  "f": {
+   "el": "h4#_r_a_-recovery \"Comparison recovery\"",
+   "focusVisible": true,
+   "outline": "auto 1px offset 0px #3f3f3f",
+   "outlineW": 1,
+   "outlineVsPage": 1.89,
+   "outlineVsControl": 1.89,
+   "pageBg": "#0a0a0a",
+   "controlBg": "#0a0a0a",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "1132x24",
+   "tabindex": "-1",
+   "disabled": null,
+   "ariaDisabled": null,
+   "invalid": null,
+   "describedby": ""
+  },
+  "alert": [
+   "A required image is unavailable. Review the complete pair an"
+  ],
+  "ack": "0/9 · I reviewed this image and its record context",
+  "buttons": [
+   "Retry protected image: Complete bound ma",
+   "Reload comparison",
+   "Back to candidates"
+  ]
+ },
+ {
+  "step": "Tab -> Retry",
+  "found": true,
+  "n": 1
+ },
+ {
+  "step": "Enter on Retry while server still fails: focus",
+  "f": "h4#_r_a_-recovery \"Comparison recovery\"",
+  "alerts": 1
+ },
+ {
+  "step": "Enter on Retry after server recovery: focus + status",
+  "f": "p[role=status] \"Supporting image is available. Review both visits and all required mat\"",
+  "status": [
+   "Supporting image is available. Review both visits and all re"
+  ],
+  "ack": "0/9 · I reviewed this image and its record context",
+  "issueButtonPresent": false
+ },
+ {
+  "step": "Enter on Reload comparison: focus",
+  "found": true,
+  "f": "h3 \"Compare this inspection\"",
+  "ack": "0/9 · I reviewed this image and its record context"
+ },
+ {
+  "step": "Enter on Back to candidates: focus",
+  "found": true,
+  "f": "h3 \"Find an authorized previous inspection\"",
+  "pairGone": true
+ }
+]

@@ -1,0 +1,67 @@
+[
+ {
+  "step": "tab to first handoff row",
+  "found": true,
+  "n": 9,
+  "order": [
+   "select \"Язык\"  r=17.93",
+   "button \"К назначенным осмотрам\"  r=17.93",
+   "button \"Загрузить текущую версию\"  r=17.93",
+   "button \"Осмотр и идентификация\"  r=17.93",
+   "button \"Связать предыдущий осмотр\"  r=17.93",
+   "button \"Отчёты и редакции\"  r=17.93",
+   "button \"Проверить состояние операции\"  r=17.93",
+   "button \"Проверить осмотр и передачу\"  r=17.93",
+   "button \"Доступное разрешение для этого осмотра 1\"  r=17.93"
+  ]
+ },
+ {
+  "step": "Enter in textarea: newline, no submit",
+  "value": "line one\nline two",
+  "writes": 0
+ },
+ {
+  "step": "tab to Review",
+  "found": true,
+  "f": "button \"Проверить создание связанного отчёта\""
+ },
+ {
+  "step": "Enter on Review: focus",
+  "f": "h3 \"Проверить создание связанного отчёта\""
+ },
+ {
+  "step": "Enter on consume with lost reply: focus + alert",
+  "f": "body",
+  "alerts": [
+   "Действие недоступно. Обновите данные и проверьте их.",
+   "Результат не подтверждён. До повтора проверьте состояние. Перезагрузка не восстановит ввод"
+  ],
+  "writes": [
+   "continuity-requests",
+   "execute"
+  ]
+ },
+ {
+  "step": "Check operation status: focus + buttons",
+  "f": "button \"Проверить состояние операции\"",
+  "btns": [
+   "Проверить состояние операции",
+   "Повторить точную неизменённую операцию",
+   "Изменить решение"
+  ]
+ },
+ {
+  "step": "Retry exact reachable",
+  "found": true
+ },
+ {
+  "step": "Enter on Retry exact: focus + writes",
+  "f": "body",
+  "writes": [
+   "continuity-requests",
+   "execute",
+   "execute"
+  ],
+  "result": true
+ }
+]

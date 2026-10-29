@@ -1,0 +1,68 @@
+[
+ {
+  "step": "tab to image 5 opener",
+  "found": true,
+  "n": 22
+ },
+ {
+  "step": "Enter on opener (image fails): focus",
+  "f": {
+   "el": "h4#_r_a_-recovery \"Восстановление сравнения\"",
+   "focusVisible": true,
+   "outline": "auto 1px offset 0px #d0d0d0",
+   "outlineW": 1,
+   "outlineVsPage": 1.55,
+   "outlineVsControl": 1.55,
+   "pageBg": "#ffffff",
+   "controlBg": "#ffffff",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "1132x24",
+   "tabindex": "-1",
+   "disabled": null,
+   "ariaDisabled": null,
+   "invalid": null,
+   "describedby": ""
+  },
+  "alert": [
+   "Нужное изображение недоступно. После восстановления заново п"
+  ],
+  "ack": "0/9 · Я проверил изображение и контекст записи",
+  "buttons": [
+   "Повторить загрузку защищённого изображен",
+   "Загрузить сравнение заново",
+   "К вариантам предыдущего отчёта"
+  ]
+ },
+ {
+  "step": "Tab -> Retry",
+  "found": true,
+  "n": 1
+ },
+ {
+  "step": "Enter on Retry while server still fails: focus",
+  "f": "h4#_r_a_-recovery \"Восстановление сравнения\"",
+  "alerts": 1
+ },
+ {
+  "step": "Enter on Retry after server recovery: focus + status",
+  "f": "p[role=status] \"Подтверждающее изображение доступно. Заново проверьте оба осмотра и вс\"",
+  "status": [
+   "Подтверждающее изображение доступно. Заново проверьте оба ос"
+  ],
+  "ack": "0/9 · Я проверил изображение и контекст записи",
+  "issueButtonPresent": false
+ },
+ {
+  "step": "Enter on Reload comparison: focus",
+  "found": true,
+  "f": "h3 \"Сравнить этот осмотр\"",
+  "ack": "0/9 · Я проверил изображение и контекст записи"
+ },
+ {
+  "step": "Enter on Back to candidates: focus",
+  "found": true,
+  "f": "h3 \"Найти доступный предыдущий осмотр\"",
+  "pairGone": true
+ }
+]

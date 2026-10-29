@@ -1,0 +1,36 @@
+heading2 "Structured identity history" {"focused":true,"level":2}
+button "Read identity history" {"invalid":"false"}
+heading3 "Recorded physical identity · 7" {"level":3}
+group ""
+DisclosureTriangle "Current staff member" {"expanded":false}
+form ""
+heading3 "Record complete evidence" {"level":3}
+heading4 "Recorded physical identity" {"level":4}
+group "Rights for this supporting image" {"invalid":"false"}
+textbox "Purpose · Required" {"invalid":"false","readonly":false,"required":true} desc="0/300"
+textbox "Authority basis · Required" {"invalid":"false","readonly":false,"required":true} desc="0/500"
+textbox "Source provenance · Required" {"invalid":"false","readonly":false,"required":true} desc="0/1000"
+textbox "Retention reason · Required" {"invalid":"false","readonly":false,"required":true} desc="0/500"
+combobox "Identifiability · Required" {"invalid":"true","expanded":false}
+textbox "Supplier restrictions, optional" {"invalid":"false","readonly":false,"required":false} desc="0/1000"
+button "Select JPEG, PNG or WebP, up to 10 MiB · Optional" {"disabled":true,"invalid":"false"} desc="Complete the image rights before choosing an image."
+button "Stage classification and upload" {"disabled":true,"invalid":"false"}
+group "Physical identifier · 1/20" {"invalid":"false"}
+group "Physical identifier 1" {"invalid":"false"}
+heading4 "Physical identifier 1" {"level":4}
+combobox "Identifier kind · Required" {"invalid":"true","expanded":false}
+textbox "Location · Required" {"invalid":"false","readonly":false,"required":true} desc="0/300"
+textbox "Observed value · Required" {"invalid":"false","readonly":false,"required":true} desc="0/500"
+group "Select verified support · 0/20 · Required" {"invalid":"false"}
+button "Remove unsent identifier" {"invalid":"false"}
+button "Add identifier, maximum 20" {"invalid":"false"}
+group "Rights for this identity record" {"invalid":"false"}
+textbox "Purpose · Required" {"invalid":"false","readonly":false,"required":true} desc="0/300"
+textbox "Authority basis · Required" {"invalid":"false","readonly":false,"required":true} desc="0/500"
+textbox "Source provenance · Required" {"invalid":"false","readonly":false,"required":true} desc="0/1000"
+textbox "Retention reason · Required" {"invalid":"false","readonly":false,"required":true} desc="0/500"
+combobox "Identifiability · Required" {"invalid":"true","expanded":false}
+textbox "Supplier restrictions, optional" {"invalid":"false","readonly":false,"required":false} desc="0/1000"
+button "Record complete evidence" {"disabled":true,"invalid":"false"}
+group ""
+DisclosureTriangle "Intake and assignment" {"expanded":false}

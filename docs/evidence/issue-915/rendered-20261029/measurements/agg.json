@@ -1,0 +1,1244 @@
+{
+ "jobs": 464,
+ "kinds": {
+  "boundary-contrast": 2054,
+  "text-contrast(disabled-exempt)": 248,
+  "clipped-overflow": 4,
+  "text-contrast": 170,
+  "field-text-contrast": 24
+ },
+ "overflow": [
+  {
+   "id": "intake__en__light__384",
+   "kind": "clipped-overflow",
+   "el": "input#_r_3_-manual \"Manual decision reference · Required\"",
+   "sw": 505,
+   "cw": 342
+  },
+  {
+   "id": "intake__en__dark__384",
+   "kind": "clipped-overflow",
+   "el": "input#_r_3_-manual \"Manual decision reference · Required\"",
+   "sw": 505,
+   "cw": 342
+  },
+  {
+   "id": "intake__ru__light__384",
+   "kind": "clipped-overflow",
+   "el": "input#_r_3_-manual \"Основание ручного решения · Обязательно\"",
+   "sw": 505,
+   "cw": 342
+  },
+  {
+   "id": "intake__tk__light__384",
+   "kind": "clipped-overflow",
+   "el": "input#_r_3_-manual \"El bilen çözgüdiň salgysy · Hökmany\"",
+   "sw": 505,
+   "cw": 342
+  }
+ ],
+ "unique": [
+  {
+   "kind": "boundary-contrast",
+   "theme": "dark",
+   "el": "select \"Language\"",
+   "min": 1.24,
+   "n": 126,
+   "ex": "intake__en__dark__1280",
+   "fg": "#222222",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "dark",
+   "el": "select \"Язык\"",
+   "min": 1.24,
+   "n": 16,
+   "ex": "capture-errors__ru__dark__1280",
+   "fg": "#222222",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "dark",
+   "el": "select \"Dil\"",
+   "min": 1.24,
+   "n": 16,
+   "ex": "capture-errors__tk__dark__1280",
+   "fg": "#222222",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Language\"",
+   "min": 1.26,
+   "n": 126,
+   "ex": "intake__en__light__1280",
+   "fg": "#e5e5e5",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Язык\"",
+   "min": 1.26,
+   "n": 90,
+   "ex": "intake__ru__light__1280",
+   "fg": "#e5e5e5",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Dil\"",
+   "min": 1.26,
+   "n": 90,
+   "ex": "intake__tk__light__1280",
+   "fg": "#e5e5e5",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Back to assigned work\"",
+   "min": 2.43,
+   "n": 126,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Load current version\"",
+   "min": 2.43,
+   "n": 126,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Visit and identity\"",
+   "min": 2.43,
+   "n": 122,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Link a previous inspection\"",
+   "min": 2.43,
+   "n": 122,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Reports and revisions\"",
+   "min": 2.43,
+   "n": 122,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-observedAt \"Actual inspection time, UTC · Required\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-mileage \"Recorded mileage, km · Required\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Vehicle matching method · Required\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-manual \"Manual decision reference · Required\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Record observed vehicle\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "intake__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Select report\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "bonly-done__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Assessment\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "bonly-done__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "textarea \"Decision reason\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "bonly-done__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Submit for review\"",
+   "min": 2.43,
+   "n": 4,
+   "ex": "bonly-done__en__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"К назначенным осмотрам\"",
+   "min": 2.43,
+   "n": 90,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Загрузить текущую версию\"",
+   "min": 2.43,
+   "n": 90,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Осмотр и идентификация\"",
+   "min": 2.43,
+   "n": 87,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Связать предыдущий осмотр\"",
+   "min": 2.43,
+   "n": 87,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Отчёты и редакции\"",
+   "min": 2.43,
+   "n": 87,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-observedAt \"Фактическое время осмотра, UTC · Обязательно\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-mileage \"Пробег при осмотре, км · Обязательно\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Способ сопоставления автомобиля · Обязательно\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-manual \"Основание ручного решения · Обязательно\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Записать данные автомобиля\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Выбрать отчёт\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Оценка\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "textarea \"Причина решения\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Отправить на проверку\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__ru__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Bellenen işlere dolan\"",
+   "min": 2.43,
+   "n": 90,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Häzirki wersiýany ýükle\"",
+   "min": 2.43,
+   "n": 90,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Barlag we şahsyýet\"",
+   "min": 2.43,
+   "n": 87,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Öňki barlagy bagla\"",
+   "min": 2.43,
+   "n": 87,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Hasabatlar we wersiýalar\"",
+   "min": 2.43,
+   "n": 87,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-observedAt \"Hakyky barlag wagty, UTC · Hökmany\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-mileage \"Barlagdaky ýol, km · Hökmany\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Awtoulagy gabat getiriş usuly · Hökmany\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "input#_r_3_-manual \"El bilen çözgüdiň salgysy · Hökmany\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Gözegçilik maglumatlaryny ýaz\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "intake__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "select \"Hasabaty saýla\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Baha\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "textarea \"Çözgüdiň sebäbi\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "boundary-contrast",
+   "theme": "light",
+   "el": "button \"Barlaga iber\"",
+   "min": 2.43,
+   "n": 3,
+   "ex": "bonly-done__tk__light__1280",
+   "fg": "#a8a6a0",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "clipped-overflow",
+   "theme": "light",
+   "el": "input#_r_3_-manual \"Manual decision reference · Required\"",
+   "min": 99,
+   "n": 1,
+   "ex": "intake__en__light__384"
+  },
+  {
+   "kind": "clipped-overflow",
+   "theme": "dark",
+   "el": "input#_r_3_-manual \"Manual decision reference · Required\"",
+   "min": 99,
+   "n": 1,
+   "ex": "intake__en__dark__384"
+  },
+  {
+   "kind": "clipped-overflow",
+   "theme": "light",
+   "el": "input#_r_3_-manual \"Основание ручного решения · Обязательно\"",
+   "min": 99,
+   "n": 1,
+   "ex": "intake__ru__light__384"
+  },
+  {
+   "kind": "clipped-overflow",
+   "theme": "light",
+   "el": "input#_r_3_-manual \"El bilen çözgüdiň salgysy · Hökmany\"",
+   "min": 99,
+   "n": 1,
+   "ex": "intake__tk__light__384"
+  },
+  {
+   "kind": "field-text-contrast",
+   "theme": "dark",
+   "el": "input#_r_3_-observedAt \"Actual inspection time, UTC · Required\"",
+   "min": 1.04,
+   "n": 4,
+   "ex": "intake__en__dark__1280",
+   "fg": "#fafaf9",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "field-text-contrast",
+   "theme": "dark",
+   "el": "input#_r_3_-mileage \"Recorded mileage, km · Required\"",
+   "min": 1.04,
+   "n": 4,
+   "ex": "intake__en__dark__1280",
+   "fg": "#fafaf9",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "field-text-contrast",
+   "theme": "dark",
+   "el": "select \"Vehicle matching method · Required\"",
+   "min": 1.04,
+   "n": 4,
+   "ex": "intake__en__dark__1280",
+   "fg": "#fafaf9",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "field-text-contrast",
+   "theme": "dark",
+   "el": "input#_r_3_-manual \"Manual decision reference · Required\"",
+   "min": 1.04,
+   "n": 4,
+   "ex": "intake__en__dark__1280",
+   "fg": "#fafaf9",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "field-text-contrast",
+   "theme": "dark",
+   "el": "select \"Select report\"",
+   "min": 1.04,
+   "n": 4,
+   "ex": "bonly-done__en__dark__1280",
+   "fg": "#fafaf9",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "field-text-contrast",
+   "theme": "dark",
+   "el": "textarea \"Decision reason\"",
+   "min": 1.04,
+   "n": 4,
+   "ex": "bonly-done__en__dark__1280",
+   "fg": "#fafaf9",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast",
+   "theme": "dark",
+   "el": "p \"Synthetic inspections only. Live center booking remains closed.\"",
+   "min": 2.53,
+   "n": 126,
+   "ex": "intake__en__dark__1280",
+   "fg": "#525251",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "text-contrast",
+   "theme": "dark",
+   "el": "p \"No assessment has been recorded. No result defaults Normal.\"",
+   "min": 2.53,
+   "n": 4,
+   "ex": "bonly-done__en__dark__1280",
+   "fg": "#525251",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "text-contrast",
+   "theme": "dark",
+   "el": "p \"Editorial correction preserves the original physical date, mileage and\"",
+   "min": 2.53,
+   "n": 4,
+   "ex": "bonly-done__en__dark__1280",
+   "fg": "#525251",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "text-contrast",
+   "theme": "dark",
+   "el": "p \"New physical inspection starts empty under current intake and template\"",
+   "min": 2.53,
+   "n": 4,
+   "ex": "bonly-done__en__dark__1280",
+   "fg": "#525251",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "text-contrast",
+   "theme": "dark",
+   "el": "p \"Только синтетические осмотры. Запись в реальный центр закрыта.\"",
+   "min": 2.53,
+   "n": 16,
+   "ex": "capture-errors__ru__dark__1280",
+   "fg": "#525251",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "text-contrast",
+   "theme": "dark",
+   "el": "p \"Diňe emeli barlaglar. Hakyky merkeze ýazylmak ýapyk.\"",
+   "min": 2.53,
+   "n": 16,
+   "ex": "capture-errors__tk__dark__1280",
+   "fg": "#525251",
+   "bg": "#0a0a0a"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Start linked empty report for this physical visit\"",
+   "min": 3.34,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#fdfdfd",
+   "bg": "#8b8b8b"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Начать пустой связанный отчёт для этого физического осмотра\"",
+   "min": 3.34,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#fdfdfd",
+   "bg": "#8b8b8b"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Şu fiziki barlag üçin bagly boş hasabaty başlat\"",
+   "min": 3.34,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#fdfdfd",
+   "bg": "#8b8b8b"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Remove unsent identifier\"",
+   "min": 3.41,
+   "n": 4,
+   "ex": "stale__en__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Add identifier, maximum 20\"",
+   "min": 3.41,
+   "n": 4,
+   "ex": "stale__en__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Back to assigned work\"",
+   "min": 3.41,
+   "n": 8,
+   "ex": "busy__en__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Load current version\"",
+   "min": 3.41,
+   "n": 8,
+   "ex": "busy__en__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Visit and identity\"",
+   "min": 3.41,
+   "n": 8,
+   "ex": "busy__en__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Link a previous inspection\"",
+   "min": 3.41,
+   "n": 8,
+   "ex": "busy__en__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Reports and revisions\"",
+   "min": 3.41,
+   "n": 8,
+   "ex": "busy__en__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Удалить неотправленный идентификатор\"",
+   "min": 3.41,
+   "n": 3,
+   "ex": "stale__ru__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Добавить идентификатор, не более 20\"",
+   "min": 3.41,
+   "n": 3,
+   "ex": "stale__ru__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"К назначенным осмотрам\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__ru__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Загрузить текущую версию\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__ru__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Осмотр и идентификация\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__ru__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Связать предыдущий осмотр\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__ru__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Отчёты и редакции\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__ru__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Iberilmedik kesgitleýjini aýyr\"",
+   "min": 3.41,
+   "n": 3,
+   "ex": "stale__tk__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Kesgitleýji goş, iň köp 20\"",
+   "min": 3.41,
+   "n": 3,
+   "ex": "stale__tk__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Bellenen işlere dolan\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__tk__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Häzirki wersiýany ýükle\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__tk__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Barlag we şahsyýet\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__tk__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Öňki barlagy bagla\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__tk__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Hasabatlar we wersiýalar\"",
+   "min": 3.41,
+   "n": 6,
+   "ex": "busy__tk__light__1280",
+   "fg": "#8b8b8b",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Check operation status\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "busy__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Find an authorized previous inspection\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "busy__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Restart handoff review\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Return to visit without linking\"",
+   "min": 3.71,
+   "n": 8,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Check current visit and handoff\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Usable handoff for this inspection 1\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Usable handoff for this inspection 2\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Usable handoff for this inspection 3\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Load more handoffs\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Edit decision\"",
+   "min": 3.71,
+   "n": 4,
+   "ex": "bonly-lost__en__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Проверить состояние операции\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "busy__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Найти доступный предыдущий осмотр\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "busy__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Начать проверку ссылки заново\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Вернуться к осмотру без связи\"",
+   "min": 3.71,
+   "n": 6,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Проверить осмотр и передачу\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Доступное разрешение для этого осмотра 1\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Доступное разрешение для этого осмотра 2\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Доступное разрешение для этого осмотра 3\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Загрузить ещё разрешения\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Изменить решение\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__ru__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Amalyň ýagdaýyny barla\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "busy__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Rugsatly öňki barlagy tap\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "busy__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Salgy barlagyny täzeden başla\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Baglamazdan barlaga dolan\"",
+   "min": 3.71,
+   "n": 6,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Häzirki barlagy we geçirişi barla\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Şu barlag üçin ulanyp bolýan rugsat 1\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Şu barlag üçin ulanyp bolýan rugsat 2\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Şu barlag üçin ulanyp bolýan rugsat 3\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Has köp rugsat ýükle\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "light",
+   "el": "button \"Karary üýtget\"",
+   "min": 3.71,
+   "n": 3,
+   "ex": "bonly-lost__tk__light__1280",
+   "fg": "#858585",
+   "bg": "#ffffff"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "dark",
+   "el": "button \"Start linked empty report for this physical visit\"",
+   "min": 4.26,
+   "n": 4,
+   "ex": "bonly-lost__en__dark__1280",
+   "fg": "#111111",
+   "bg": "#787878"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "dark",
+   "el": "button \"Начать пустой связанный отчёт для этого физического осмотра\"",
+   "min": 4.26,
+   "n": 2,
+   "ex": "bonly-lost__ru__dark__1280",
+   "fg": "#111111",
+   "bg": "#787878"
+  },
+  {
+   "kind": "text-contrast(disabled-exempt)",
+   "theme": "dark",
+   "el": "button \"Şu fiziki barlag üçin bagly boş hasabaty başlat\"",
+   "min": 4.26,
+   "n": 2,
+   "ex": "bonly-lost__tk__dark__1280",
+   "fg": "#111111",
+   "bg": "#787878"
+  }
+ ]
+}

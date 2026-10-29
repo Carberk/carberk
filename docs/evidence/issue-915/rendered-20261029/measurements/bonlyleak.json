@@ -1,0 +1,32 @@
+{
+ "en": {
+  "aLeaks": [],
+  "forbiddenRequests": [],
+  "writes": [
+   "11111111-1111-4111-8111-000000000001/continuity-requests",
+   "11111111-1111-4111-8111-000000000005/execute"
+  ],
+  "reportsPanel": "Reports and revisions | Select report | Draft · 9333e28a-abe0-40f0-a43a-e3b881566dd2 | Status | Draft | Actual inspection time, UTC | 24/10/2026, 10:00:00 UTC | Recorded mile",
+  "historyRow": false
+ },
+ "ru": {
+  "aLeaks": [],
+  "forbiddenRequests": [],
+  "writes": [
+   "11111111-1111-4111-8111-000000000001/continuity-requests",
+   "11111111-1111-4111-8111-000000000005/execute"
+  ],
+  "reportsPanel": "Отчёты и редакции | Выбрать отчёт | Черновик · d8e22592-08f8-44f3-95a8-ed52384c7dc3 | Статус | Черновик | Фактическое время осмотра, UTC | 24.10.2026, 10:00:00 UTC | Пробег п",
+  "historyRow": false
+ },
+ "tk": {
+  "aLeaks": [],
+  "forbiddenRequests": [],
+  "writes": [
+   "11111111-1111-4111-8111-000000000001/continuity-requests",
+   "11111111-1111-4111-8111-000000000005/execute"
+  ],
+  "reportsPanel": "Hasabatlar we wersiýalar | Hasabaty saýla | Taslama · b178fd8c-2be0-41ec-9459-915e1434e7e7 | Ýagdaý | Taslama | Hakyky barlag wagty, UTC | 10/24/2026, 10:00:00 AM UTC | Barla",
+  "historyRow": false
+ }
+}

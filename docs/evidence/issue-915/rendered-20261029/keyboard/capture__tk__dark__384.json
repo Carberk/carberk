@@ -1,0 +1,136 @@
+[
+ {
+  "step": "tab-order to submit (capture form, includes earlier controls)",
+  "found": true,
+  "stops": 39,
+  "order": [
+   "select \"Dil\"  r=17.98",
+   "button \"Bellenen işlere dolan\"  r=17.98",
+   "button \"Häzirki wersiýany ýükle\"  r=17.98",
+   "button \"Barlag we şahsyýet\"  r=17.98",
+   "button \"Öňki barlagy bagla\"  r=17.98",
+   "button \"Hasabatlar we wersiýalar\"  r=17.98",
+   "button \"Şahsyýet taryhyny oka\"  r=17.98",
+   "summary \"Häzirki işgär\"  r=1.89",
+   "textarea#r_0_-image-purpose \"Maksat · Hökmany\"  r=17.98",
+   "textarea#_r_0_-image-basis \"Ygtyýaryň esasy · Hökmany\"  r=17.98",
+   "textarea#_-image-provenance \"Çeşmäniň gelip çykyşy · Hökmany\"  r=17.98",
+   "textarea#age-scheduleReason \"Saklamagyň sebäbi · Hökmany\"  r=17.98",
+   "select#ge-identifiability \"Şahsyýeti kesgitlemek · Hökmany\"  r=17.98",
+   "input#_r_0_-image-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_0_-image-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_0_-image-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_0_-image-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_0_-image-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_0_-image-until \"Rugsatly gutarýan wagt, UTC · Hökmany\" [!fv]  r=1.89",
+   "textarea#image-restrictions \"Üpjün edijiniň çäklendirmeleri, hökmany däl\"  r=17.98",
+   "button \"Toparlamany ýaz we ýükle\"  r=17.98",
+   "select#_r_1_-kind-0 \"Kesgitleýjiniň görnüşi · Hökmany\"  r=17.98",
+   "input#_r_1_-location-0 \"Ýerleşýän ýeri · Hökmany\"  r=17.98",
+   "input#_r_1_-value-0 \"Görlen baha · Hökmany\"  r=17.98",
+   "button \"Iberilmedik kesgitleýjini aýyr\"  r=17.98",
+   "button \"Kesgitleýji goş, iň köp 20\"  r=17.98",
+   "textarea#_1_-record-purpose \"Maksat · Hökmany\"  r=17.98 [off-viewport]",
+   "textarea#_r_1_-record-basis \"Ygtyýaryň esasy · Hökmany\"  r=17.98",
+   "textarea#-record-provenance \"Çeşmäniň gelip çykyşy · Hökmany\"  r=17.98",
+   "textarea#ord-scheduleReason \"Saklamagyň sebäbi · Hökmany\"  r=17.98",
+   "select#rd-identifiability \"Şahsyýeti kesgitlemek · Hökmany\"  r=17.98",
+   "input#_r_1_-record-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_1_-record-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_1_-record-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_1_-record-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_1_-record-until \"Rugsatly gutarýan wagt, UTC · Hökmany\"  r=17.98",
+   "input#_r_1_-record-until \"Rugsatly gutarýan wagt, UTC · Hökmany\" [!fv]  r=1.89",
+   "textarea#ecord-restrictions \"Üpjün edijiniň çäklendirmeleri, hökmany däl\"  r=17.98",
+   "button \"Doly subutnamany ýaz\"  r=17.98"
+  ]
+ },
+ {
+  "step": "focus-ring failures on tab path",
+  "count": 1,
+  "ringBad": [
+   "summary \"Häzirki işgär\""
+  ]
+ },
+ {
+  "step": "Enter on submit (blank form): focus lands on",
+  "f": {
+   "el": "textarea#_1_-record-purpose \"Maksat · Hökmany\"",
+   "focusVisible": true,
+   "outline": "solid 2px offset 2px #f4f4f2",
+   "outlineW": 2,
+   "outlineVsPage": 17.98,
+   "outlineVsControl": 17.98,
+   "pageBg": "#0a0a0a",
+   "controlBg": "#0a0a0a",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "310x66",
+   "tabindex": null,
+   "disabled": false,
+   "ariaDisabled": null,
+   "invalid": "true",
+   "describedby": "0/300 | Ýalňyşlyk: görkezilen çägiň içinde doly baha giriziň."
+  },
+  "summary": "Hökmany meýdanlary we kesgitleýji ýerleriniň tapawudyny barlaň.Şu şahsyýet ýazgysyna bolan hukuklar: Maksat: Ýalňyşlyk: görkezilen çägiň içinde doly baha giriziň.Şu şahsyýet ýazgysyna bolan hukuklar: "
+ },
+ {
+  "step": "shift-tab back to Add identifier",
+  "found": true,
+  "n": 1
+ },
+ {
+  "step": "Enter on Add identifier: focus",
+  "f": {
+   "el": "h4 \"Fiziki kesgitleýji 2\"",
+   "focusVisible": true,
+   "outline": "auto 1px offset 0px #3f3f3f",
+   "outlineW": 1,
+   "outlineVsPage": 1.89,
+   "outlineVsControl": 1.89,
+   "pageBg": "#0a0a0a",
+   "controlBg": "#0a0a0a",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "276x24",
+   "tabindex": "-1",
+   "disabled": null,
+   "ariaDisabled": null,
+   "invalid": null,
+   "describedby": ""
+  }
+ },
+ {
+  "step": "Tab after new identifier heading",
+  "f": "select#_r_1_-kind-1 \"Kesgitleýjiniň görnüşi · Hökmany\""
+ },
+ {
+  "step": "Enter on submit with appended identifier",
+  "f": "textarea#_1_-record-purpose \"Maksat · Hökmany\"",
+  "summaryItems": [
+   "Fiziki kesgitleýji 2: Kesgitleýjiniň görnüşi: Ýalňyşlyk: görkezilen çägiň içinde",
+   "Fiziki kesgitleýji 2: Ýerleşýän ýeri: Ýalňyşlyk: görkezilen çägiň içinde doly ba",
+   "Fiziki kesgitleýji 2: Görlen baha: Ýalňyşlyk: görkezilen çägiň içinde doly baha ",
+   "Fiziki kesgitleýji 2: Barlanan goldawy saýla: Ýalňyşlyk: görkezilen çägiň içinde"
+  ]
+ },
+ {
+  "step": "shift-tab to summary link",
+  "found": true,
+  "link": "a \"Fiziki kesgitleýji 2: Barlanan goldawy saýla: Ýalňyşlyk: görkezilen çä\""
+ },
+ {
+  "step": "Enter on summary link moves focus to",
+  "f": "fieldset#_r_1_-support-1 \"Barlanan goldawy saýla · 0/20 · HökmanyÝalňyşlyk: görkezilen çägiň içi\"",
+  "invalid": "true",
+  "describedby": " | Ýalňyşlyk: görkezilen çägiň içinde doly baha giriziň."
+ },
+ {
+  "step": "tab to Remove identifier 2",
+  "found": true
+ },
+ {
+  "step": "Enter on Remove: focus",
+  "f": "h4 \"Fiziki kesgitleýji 1\""
+ }
+]
