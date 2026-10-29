@@ -1,0 +1,225 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-58ab493d/packages/db
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > wrong or missing target identity and caller-claimed state refuse before any application read 1147ms
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > an existing cf namespace obstructing DELETE is refused at inventory; its control disposition stays separate S2 work
+Disposable PG lifecycle: role=sql-child ordinal=1 pid=606 connectedAtMs=876731901 closedAtMs=876731957
+Disposable PG activity: ordinal=1 count=0 pids=none
+Disposable PG attribution: ordinal=1 rows=none
+Disposable reset DB boundary: child=1 settledAtMs=876731853 startedAtMs=876731853 exitedAtMs=876731960 lastFixtureClose=pid=605 connectedAtMs=876731851 closedAtMs=876731852
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > an existing cf namespace obstructing DELETE is refused at inventory; its control disposition stays separate S2 work
+Disposable PG lifecycle: role=sql-child ordinal=2 pid=607 connectedAtMs=876732000 closedAtMs=876732053
+Disposable PG activity: ordinal=2 count=0 pids=none
+Disposable PG attribution: ordinal=2 rows=none
+Disposable reset DB boundary: child=2 settledAtMs=876731961 startedAtMs=876731963 exitedAtMs=876732055 lastFixtureClose=pid=605 connectedAtMs=876731851 closedAtMs=876731852
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > an existing cf namespace obstructing DELETE is refused at inventory; its control disposition stays separate S2 work 1181ms
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=3 pid=847 connectedAtMs=876733089 closedAtMs=876733140
+Disposable PG activity: ordinal=3 count=0 pids=none
+Disposable PG attribution: ordinal=3 rows=none
+Disposable reset DB boundary: child=3 settledAtMs=876733027 startedAtMs=876733028 exitedAtMs=876733142 lastFixtureClose=pid=846 connectedAtMs=876733026 closedAtMs=876733027
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=4 pid=855 connectedAtMs=876733183 closedAtMs=876733230
+Disposable PG activity: ordinal=4 count=0 pids=none
+Disposable PG attribution: ordinal=4 rows=none
+Disposable reset DB boundary: child=4 settledAtMs=876733144 startedAtMs=876733145 exitedAtMs=876733233 lastFixtureClose=pid=846 connectedAtMs=876733026 closedAtMs=876733027
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=5 pid=1088 connectedAtMs=876734224 closedAtMs=876734281
+Disposable PG activity: ordinal=5 count=0 pids=none
+Disposable PG attribution: ordinal=5 rows=none
+Disposable reset DB boundary: child=5 settledAtMs=876734170 startedAtMs=876734171 exitedAtMs=876734283 lastFixtureClose=pid=1087 connectedAtMs=876734168 closedAtMs=876734169
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=6 pid=1096 connectedAtMs=876734326 closedAtMs=876734372
+Disposable PG activity: ordinal=6 count=0 pids=none
+Disposable PG attribution: ordinal=6 rows=none
+Disposable reset DB boundary: child=6 settledAtMs=876734285 startedAtMs=876734286 exitedAtMs=876734374 lastFixtureClose=pid=1087 connectedAtMs=876734168 closedAtMs=876734169
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=7 pid=1335 connectedAtMs=876735420 closedAtMs=876735468
+Disposable PG activity: ordinal=7 count=0 pids=none
+Disposable PG attribution: ordinal=7 rows=none
+Disposable reset DB boundary: child=7 settledAtMs=876735361 startedAtMs=876735363 exitedAtMs=876735471 lastFixtureClose=pid=1328 connectedAtMs=876735360 closedAtMs=876735361
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=8 pid=1337 connectedAtMs=876735516 closedAtMs=876735562
+Disposable PG activity: ordinal=8 count=0 pids=none
+Disposable PG attribution: ordinal=8 rows=none
+Disposable reset DB boundary: child=8 settledAtMs=876735473 startedAtMs=876735474 exitedAtMs=876735564 lastFixtureClose=pid=1328 connectedAtMs=876735360 closedAtMs=876735361
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=9 pid=1569 connectedAtMs=876736442 closedAtMs=876736489
+Disposable PG activity: ordinal=9 count=0 pids=none
+Disposable PG attribution: ordinal=9 rows=none
+Disposable reset DB boundary: child=9 settledAtMs=876736400 startedAtMs=876736400 exitedAtMs=876736491 lastFixtureClose=pid=1568 connectedAtMs=876736398 closedAtMs=876736399
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=10 pid=1576 connectedAtMs=876736536 closedAtMs=876736586
+Disposable PG activity: ordinal=10 count=0 pids=none
+Disposable PG attribution: ordinal=10 rows=none
+Disposable reset DB boundary: child=10 settledAtMs=876736492 startedAtMs=876736493 exitedAtMs=876736588 lastFixtureClose=pid=1568 connectedAtMs=876736398 closedAtMs=876736399
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=11 pid=1809 connectedAtMs=876737383 closedAtMs=876737435
+Disposable PG activity: ordinal=11 count=0 pids=none
+Disposable PG attribution: ordinal=11 rows=none
+Disposable reset DB boundary: child=11 settledAtMs=876737333 startedAtMs=876737334 exitedAtMs=876737439 lastFixtureClose=pid=1801 connectedAtMs=876737332 closedAtMs=876737333
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=12 pid=1810 connectedAtMs=876737480 closedAtMs=876737525
+Disposable PG activity: ordinal=12 count=0 pids=none
+Disposable PG attribution: ordinal=12 rows=none
+Disposable reset DB boundary: child=12 settledAtMs=876737440 startedAtMs=876737441 exitedAtMs=876737527 lastFixtureClose=pid=1801 connectedAtMs=876737332 closedAtMs=876737333
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=13 pid=2049 connectedAtMs=876738584 closedAtMs=876738636
+Disposable PG activity: ordinal=13 count=0 pids=none
+Disposable PG attribution: ordinal=13 rows=none
+Disposable reset DB boundary: child=13 settledAtMs=876738525 startedAtMs=876738526 exitedAtMs=876738639 lastFixtureClose=pid=2048 connectedAtMs=876738523 closedAtMs=876738524
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically
+Disposable PG lifecycle: role=sql-child ordinal=14 pid=2050 connectedAtMs=876738683 closedAtMs=876738730
+Disposable PG activity: ordinal=14 count=0 pids=none
+Disposable PG attribution: ordinal=14 rows=none
+Disposable reset DB boundary: child=14 settledAtMs=876738641 startedAtMs=876738641 exitedAtMs=876738732 lastFixtureClose=pid=2048 connectedAtMs=876738523 closedAtMs=876738524
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically 6642ms
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > another backend on the database refuses observation and deletion
+Disposable PG lifecycle: role=sql-child ordinal=15 pid=2290 connectedAtMs=876739655 closedAtMs=876739700
+Disposable PG activity: ordinal=15 count=1 pids=2282
+Disposable PG attribution: ordinal=15 rows=2282:other:other:known
+Disposable reset DB boundary: child=15 settledAtMs=876739602 startedAtMs=876739606 exitedAtMs=876739702 lastFixtureClose=pid=2281 connectedAtMs=876739600 closedAtMs=876739601
+Disposable PG lifecycle: role=sql-child ordinal=16 pid=2291 connectedAtMs=876739741 closedAtMs=876739789
+Disposable PG activity: ordinal=16 count=1 pids=2282
+Disposable PG attribution: ordinal=16 rows=2282:other:other:known
+Disposable reset DB boundary: child=16 settledAtMs=876739602 startedAtMs=876739704 exitedAtMs=876739790 lastFixtureClose=pid=2281 connectedAtMs=876739600 closedAtMs=876739601
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > another backend on the database refuses observation and deletion 1088ms
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=17 pid=2411 connectedAtMs=876740268 closedAtMs=876740330
+Disposable PG activity: ordinal=17 count=0 pids=none
+Disposable PG attribution: ordinal=17 rows=none
+Disposable reset DB boundary: child=17 settledAtMs=876740205 startedAtMs=876740206 exitedAtMs=876740332 lastFixtureClose=pid=2409 connectedAtMs=876740201 closedAtMs=876740204
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=18 pid=2413 connectedAtMs=876740377 closedAtMs=876740422
+Disposable PG activity: ordinal=18 count=0 pids=none
+Disposable PG attribution: ordinal=18 rows=none
+Disposable reset DB boundary: child=18 settledAtMs=876740339 startedAtMs=876740340 exitedAtMs=876740424 lastFixtureClose=pid=2412 connectedAtMs=876740337 closedAtMs=876740339
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=19 pid=2532 connectedAtMs=876740915 closedAtMs=876740963
+Disposable PG activity: ordinal=19 count=0 pids=none
+Disposable PG attribution: ordinal=19 rows=none
+Disposable reset DB boundary: child=19 settledAtMs=876740856 startedAtMs=876740862 exitedAtMs=876740965 lastFixtureClose=pid=2531 connectedAtMs=876740853 closedAtMs=876740854
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=20 pid=2652 connectedAtMs=876741418 closedAtMs=876741466
+Disposable PG activity: ordinal=20 count=0 pids=none
+Disposable PG attribution: ordinal=20 rows=none
+Disposable reset DB boundary: child=20 settledAtMs=876741368 startedAtMs=876741369 exitedAtMs=876741468 lastFixtureClose=pid=2651 connectedAtMs=876741359 closedAtMs=876741367
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=21 pid=2654 connectedAtMs=876741517 closedAtMs=876741562
+Disposable PG activity: ordinal=21 count=0 pids=none
+Disposable PG attribution: ordinal=21 rows=none
+Disposable reset DB boundary: child=21 settledAtMs=876741477 startedAtMs=876741477 exitedAtMs=876741564 lastFixtureClose=pid=2653 connectedAtMs=876741472 closedAtMs=876741476
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=22 pid=2773 connectedAtMs=876742020 closedAtMs=876742070
+Disposable PG activity: ordinal=22 count=0 pids=none
+Disposable PG attribution: ordinal=22 rows=none
+Disposable reset DB boundary: child=22 settledAtMs=876741957 startedAtMs=876741960 exitedAtMs=876742072 lastFixtureClose=pid=2772 connectedAtMs=876741954 closedAtMs=876741955
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=23 pid=2893 connectedAtMs=876742603 closedAtMs=876742656
+Disposable PG activity: ordinal=23 count=0 pids=none
+Disposable PG attribution: ordinal=23 rows=none
+Disposable reset DB boundary: child=23 settledAtMs=876742543 startedAtMs=876742545 exitedAtMs=876742658 lastFixtureClose=pid=2892 connectedAtMs=876742540 closedAtMs=876742542
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=24 pid=2895 connectedAtMs=876742704 closedAtMs=876742756
+Disposable PG activity: ordinal=24 count=0 pids=none
+Disposable PG attribution: ordinal=24 rows=none
+Disposable reset DB boundary: child=24 settledAtMs=876742665 startedAtMs=876742665 exitedAtMs=876742759 lastFixtureClose=pid=2894 connectedAtMs=876742662 closedAtMs=876742664
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger
+Disposable PG lifecycle: role=sql-child ordinal=25 pid=3014 connectedAtMs=876743206 closedAtMs=876743254
+Disposable PG activity: ordinal=25 count=0 pids=none
+Disposable PG attribution: ordinal=25 rows=none
+Disposable reset DB boundary: child=25 settledAtMs=876743149 startedAtMs=876743151 exitedAtMs=876743257 lastFixtureClose=pid=3013 connectedAtMs=876743147 closedAtMs=876743148
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger 3495ms
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a database refusal keeps the exact sanitized public failure while the private transport receipt preserves its first SQL refusal
+Disposable PG lifecycle: role=sql-child ordinal=26 pid=3136 connectedAtMs=876743761 closedAtMs=876743812
+Disposable PG activity: ordinal=26 count=0 pids=none
+Disposable PG attribution: ordinal=26 rows=none
+Disposable reset DB boundary: child=26 settledAtMs=876743699 startedAtMs=876743701 exitedAtMs=876743814 lastFixtureClose=pid=3135 connectedAtMs=876743697 closedAtMs=876743699
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a database refusal keeps the exact sanitized public failure while the private transport receipt preserves its first SQL refusal
+Disposable PG lifecycle: role=sql-child ordinal=27 pid=3255 connectedAtMs=876744322 closedAtMs=876744376
+Disposable PG activity: ordinal=27 count=0 pids=none
+Disposable PG attribution: ordinal=27 rows=none
+Disposable reset DB boundary: child=27 settledAtMs=876744260 startedAtMs=876744265 exitedAtMs=876744378 lastFixtureClose=pid=3254 connectedAtMs=876744258 closedAtMs=876744259
+Disposable PG lifecycle: role=sql-child ordinal=28 pid=3263 connectedAtMs=876744418 closedAtMs=876744510
+Disposable reset DB boundary: child=28 settledAtMs=876744260 startedAtMs=876744380 exitedAtMs=876744512 lastFixtureClose=pid=3254 connectedAtMs=876744258 closedAtMs=876744259
+Private SQL envelope: Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=operational_reset_unsupported_cycle routine=exec_stmt_raise stack=staging_clean_reset_rows.prepare
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a database refusal keeps the exact sanitized public failure while the private transport receipt preserves its first SQL refusal 1250ms
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+Disposable PG lifecycle: role=sql-child ordinal=29 pid=3386 connectedAtMs=876745034 closedAtMs=876745086
+Disposable PG activity: ordinal=29 count=0 pids=none
+Disposable PG attribution: ordinal=29 rows=none
+Disposable reset DB boundary: child=29 settledAtMs=876744966 startedAtMs=876744968 exitedAtMs=876745089 lastFixtureClose=pid=3385 connectedAtMs=876744964 closedAtMs=876744966
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+Disposable PG lifecycle: role=sql-child ordinal=30 pid=3615 connectedAtMs=876745996 closedAtMs=876746051
+Disposable PG activity: ordinal=30 count=0 pids=none
+Disposable PG attribution: ordinal=30 rows=none
+Disposable reset DB boundary: child=30 settledAtMs=876745934 startedAtMs=876745940 exitedAtMs=876746054 lastFixtureClose=pid=3614 connectedAtMs=876745931 closedAtMs=876745932
+Disposable PG lifecycle: role=sql-child ordinal=31 pid=3623 connectedAtMs=876746093 closedAtMs=876746195
+Disposable reset DB boundary: child=31 settledAtMs=876745934 startedAtMs=876746055 exitedAtMs=876746198 lastFixtureClose=pid=3614 connectedAtMs=876745931 closedAtMs=876745932
+Private SQL envelope: Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=diagnostic_ownership_immutable routine=exec_stmt_raise stack=diagnostic_ownership_guard>staging_clean_reset_rows.dispose
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+Admitted reset A executor verdict {"code":1,"failure":"Clean reset refused: database operation failed","sqlDiagnostic":"Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=diagnostic_ownership_immutable routine=exec_stmt_raise stack=diagnostic_ownership_guard>staging_clean_reset_rows.dispose"}
+
+ × scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion 1730ms
+   → expected [ 1, …(1) ] to deeply equal [ +0, '' ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+AssertionError: expected [ 1, …(1) ] to deeply equal [ +0, '' ]
+
+- Expected
++ Received
+
+  [
+-   0,
+-   "",
++   1,
++   "Clean reset refused: database operation failed",
+  ]
+
+ ❯ scripts/staging-clean-reset.e2e.spec.ts:403:49
+    401|     console.error("Admitted reset A executor verdict", JSON.stringify(…
+    402|       sqlDiagnostic: completed.subprocesses?.at(-1)?.sqlDiagnostic }));
+    403|     expect([completed.code, completed.failure]).toEqual([0, ""]);
+       |                                                 ^
+    404|     expect(completed.receipt).toEqual({ ...bound, phase: "rows", state…
+    405|       digest: { schema: before.schema, retained: before.retained, disp…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  14:29:27
+   Duration  19.63s (tests 99%, import 1%)
+
+pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts   6.52s user 1.55s system 40% cpu 19.852 total
