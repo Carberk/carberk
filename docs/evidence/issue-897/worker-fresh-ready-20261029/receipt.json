@@ -3,10 +3,10 @@
   "parent": "fc77bc55cd83fdaa502aba236697d4b3c5260659",
   "migrations": {
     "count": 102,
-    "manifestSha256": "feb38a1b8e8c9c7cc4fffb701ff0d0e90c49a446409eb6804dd5a5aa4cf49555",
+    "manifestSha256": "dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc",
     "newest": {
       "migration_name": "20261029190000_operational_reset_row_admission",
-      "checksum": "4c709daa44670a550876f06cdf7226fb43c6eb7b306146a80c802f25856946ce"
+      "checksum": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd"
     },
     "added": {
       "20261026016200_diagnostic_maintenance_compatibility": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379",

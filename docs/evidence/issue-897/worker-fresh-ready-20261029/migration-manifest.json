@@ -1,7 +1,7 @@
 {
   "parent": "fc77bc55cd83fdaa502aba236697d4b3c5260659",
   "count": 102,
-  "note": "Prisma checksum is sha256 of migration.sql. Last entry is the unpublished operational reset-row admission migration.",
+  "note": "Prisma checksum is sha256 of migration.sql. Last entry is the current candidate operational reset-row admission migration; this manifest is refreshed after the lawful self-reference-cycle guard addition.",
   "migrations": [
     {
       "migration_name": "20260513201407_init",
@@ -409,7 +409,11 @@
     },
     {
       "migration_name": "20261029190000_operational_reset_row_admission",
-      "checksum": "4c709daa44670a550876f06cdf7226fb43c6eb7b306146a80c802f25856946ce"
+      "checksum": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd"
     }
-  ]
+  ],
+  "newest": {
+    "migration_name": "20261029190000_operational_reset_row_admission",
+    "checksum": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd"
+  }
 }

@@ -16,10 +16,10 @@ Both scripts required exactly 98 migrations ending at `20261026016000`, so they 
 
 | Item | Value |
 |---|---|
-| Migrations | 102, manifest SHA-256 `feb38a1b8e8c9c7cc4fffb701ff0d0e90c49a446409eb6804dd5a5aa4cf49555` ([manifest](migration-manifest.json)) |
-| Prior chain | the first 101 equal the decision manifest `62c0801e…` by name and checksum; the only addition is `20261029190000_operational_reset_row_admission` (`4c709daa…`) |
+| Migrations | 102, manifest SHA-256 `dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc` ([manifest](migration-manifest.json)) |
+| Prior chain | the first 101 equal the decision manifest `62c0801e…` by name and checksum; the only addition is `20261029190000_operational_reset_row_admission` (`a46a2ea2…`) |
 | 162 / 163 / 164 | `aebf91d7…` / `e6447a2c…` / `fe7358f9…` |
-| Reset-row SQL | unpublished and root-owned. It adds sealed-OLD DELETE branches to `diagnostic_identity_record_immutable` and `diagnostic_source_anchor_guard`; the INSERT/UPDATE branches the producer uses are unchanged. If this file changes before START, run `pin` and refresh only the manifest |
+| Reset-row SQL | current candidate and root-owned. The migration includes the direct sealed-OLD guard branches and the pre-admission certified self-reference-cycle refusal; INSERT/UPDATE producer paths remain unchanged. If this file changes before START, refresh the manifest and exact pin.
 | Bootstrap / producer | `bfaa1e66…` / `8ada8f01…` |
 | Expiry spec / Batch spec | `4fc9ad84…` / `1a2d9b3a…` |
 | Caller source + compiled | eight files in receipt.json (`DiagnosticOwnershipGrants`, `DiagnosticOwnershipCapture`, `PrismaDiagnosticIntake`, `PrismaDiagnosticContinuityProofs`, `.ts` and `dist .js`) |
