@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -19,6 +19,38 @@ const anchorFixture = `SET LOCAL session_replication_role = replica;
   INSERT INTO diagnostic_source_anchors("orderId",state,"firstRecordId",source,"createdTransaction") VALUES('reset-a-order','pending','reset-a-raw','{}','1');
   SET LOCAL session_replication_role = origin`;
 const deleteAnchor = `DELETE FROM diagnostic_source_anchors WHERE "orderId"='reset-a-order'`;
+// Owning guards that refuse a child DELETE while its parent exists. Each row is arranged like the anchor;
+// `change` is an UPDATE the guard ordinarily refuses, and also the post-admission tuple change.
+const arranged = (sql: string) => `SET LOCAL session_replication_role = replica; ${sql}; SET LOCAL session_replication_role = origin`;
+const ownedRows = [
+  { row: "ownership component", parent: "raw record", table: "diagnostic_ownership_components", reads: "diagnostic_identity_records",
+    insert: `INSERT INTO diagnostic_ownership_components("identityRecordId","orderId","orderVersion",state)
+      SELECT 'reset-a-raw',id,version,'unavailable' FROM inspection_orders WHERE id='reset-a-order'`,
+    remove: `DELETE FROM diagnostic_ownership_components WHERE "identityRecordId"='reset-a-raw'`,
+    change: `UPDATE diagnostic_ownership_components SET state='erased',"erasedAt"=now() WHERE "identityRecordId"='reset-a-raw'`,
+    refusals: { remove: "diagnostic_ownership_immutable", insert: "diagnostic_ownership_binding", change: "diagnostic_ownership_immutable" } },
+  { row: "identity evidence", parent: "parent order", table: "diagnostic_identity_evidence", reads: "inspection_orders",
+    insert: `INSERT INTO diagnostic_identity_evidence(id,"orderId","orderVersion","identityRecordId","rightsUntil","recordedAt","observationHash","recordHash",identifiers,provenance,rights)
+      SELECT 'reset-a-evidence',id,version,'reset-a-raw',now()+interval '1 day',now(),repeat('a',64),repeat('d',64),'[]','[]','{}' FROM inspection_orders WHERE id='reset-a-order'`,
+    remove: `DELETE FROM diagnostic_identity_evidence WHERE id='reset-a-evidence'`,
+    change: `UPDATE diagnostic_identity_evidence SET "recordHash"=repeat('e',64) WHERE id='reset-a-evidence'`,
+    refusals: { remove: "diagnostic_identity_evidence_immutable", insert: "diagnostic_identity_evidence_binding", change: "diagnostic_identity_evidence_immutable" } },
+  { row: "identity provenance", parent: "parent order", table: "diagnostic_identity_provenance", reads: "inspection_orders",
+    insert: `INSERT INTO diagnostic_identity_provenance(id,"orderId","contentType","declaredSizeBytes","rightsUntil",epoch,rights)
+      VALUES('reset-a-provenance','reset-a-order','image/jpeg',1,now()+interval '1 day','reset-a-order','{}')`,
+    remove: `DELETE FROM diagnostic_identity_provenance WHERE id='reset-a-provenance'`,
+    change: `UPDATE diagnostic_identity_provenance SET "contentType"='image/png' WHERE id='reset-a-provenance'`,
+    refusals: { remove: "diagnostic_identity_provenance_immutable", insert: "diagnostic_identity_provenance_binding", change: "diagnostic_identity_provenance_immutable" } },
+  { row: "ownership grant", parent: "parent order", table: "diagnostic_ownership_grants", reads: "inspection_orders",
+    insert: `INSERT INTO diagnostic_ownership_grants(id,"orderId",state,"erasedAt") VALUES('reset-a-grant','reset-a-order','erased',now())`,
+    remove: `DELETE FROM diagnostic_ownership_grants WHERE id='reset-a-grant'`,
+    change: `UPDATE diagnostic_ownership_grants SET "erasedAt"="erasedAt"-interval '1 day' WHERE id='reset-a-grant'`,
+    refusals: { remove: "diagnostic_ownership_grant_immutable", insert: "diagnostic_ownership_grant_source", change: "diagnostic_ownership_grant_immutable" } },
+] as const;
+async function admit(client: PoolClient): Promise<void> {
+  const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
+  await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(), observed]);
+}
 
 describe("operator-owned operational reset row admission", () => {
   let container: StartedPostgreSqlContainer;
@@ -140,6 +172,71 @@ describe("operator-owned operational reset row admission", () => {
       await client.query(`SET LOCAL session_replication_role = replica;
         UPDATE diagnostic_source_anchors SET state='changed' WHERE "orderId"='reset-a-order'; SET LOCAL session_replication_role = origin`);
       await expect(client.query(deleteAnchor)).rejects.toThrow("operational_reset_old_tuple_changed");
+    } finally { await client.query("ROLLBACK"); client.release(); }
+  });
+
+  for (const owned of ownedRows) {
+    it(`the admitted full OLD ${owned.row} can be deleted before its ${owned.parent}`, async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(arranged(owned.insert));
+        await admit(client);
+        expect((await client.query(owned.remove)).rowCount).toBe(1);
+      } finally { await client.query("ROLLBACK"); client.release(); }
+    });
+
+    it(`an ordinary, forged GUC or non-operator ${owned.row} DELETE retains the original ${owned.refusals.remove} refusal`, async () => {
+      const client = await pool.connect();
+      try {
+        for (const caller of ["ordinary", "forged", "non-operator"] as const) {
+          await client.query("BEGIN");
+          await client.query(arranged(owned.insert));
+          if (caller === "forged") await client.query("SELECT set_config('staging_clean_reset_rows.binding',$1,true)", [JSON.stringify(binding())]);
+          if (caller === "non-operator") {
+            // The admission is held by this backend and transaction, but not by the deleting principal.
+            await admit(client);
+            await client.query(`CREATE ROLE reset_runtime_fixture NOLOGIN; GRANT SELECT, DELETE ON ${owned.table} TO reset_runtime_fixture;
+              GRANT SELECT ON ${owned.reads} TO reset_runtime_fixture; SET LOCAL ROLE reset_runtime_fixture`);
+          }
+          await expect(client.query(owned.remove), caller).rejects.toThrow(owned.refusals.remove);
+          await client.query("ROLLBACK");
+        }
+      } finally { await client.query("ROLLBACK"); client.release(); }
+    });
+
+    it(`an admission authorizes no ${owned.row} INSERT or UPDATE`, async () => {
+      const client = await pool.connect();
+      try {
+        for (const [sql, refusal] of [[owned.insert, owned.refusals.insert], [owned.change, owned.refusals.change]] as const) {
+          await client.query("BEGIN");
+          if (sql === owned.change) await client.query(arranged(owned.insert));
+          await admit(client);
+          await expect(client.query(sql), sql).rejects.toThrow(refusal);
+          await client.query("ROLLBACK");
+        }
+      } finally { await client.query("ROLLBACK"); client.release(); }
+    });
+
+    it(`a sealed ${owned.row} changed after admission no longer matches its OLD tuple`, async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(arranged(owned.insert));
+        await admit(client);
+        await client.query(arranged(owned.change));
+        await expect(client.query(owned.remove)).rejects.toThrow("operational_reset_old_tuple_changed");
+      } finally { await client.query("ROLLBACK"); client.release(); }
+    });
+  }
+
+  it("an ordinary order DELETE still cascades through each owning guard's parent-absent branch", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const owned of ownedRows) await client.query(arranged(owned.insert));
+      expect((await client.query(`DELETE FROM inspection_orders WHERE id='reset-a-order'`)).rowCount).toBe(1);
+      for (const { table } of ownedRows) expect({ table, rows: (await client.query(`SELECT count(*)::int AS rows FROM ${table}`)).rows[0].rows }).toEqual({ table, rows: 0 });
     } finally { await client.query("ROLLBACK"); client.release(); }
   });
 
