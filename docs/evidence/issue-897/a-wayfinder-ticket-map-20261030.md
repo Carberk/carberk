@@ -4,6 +4,9 @@ This is the dispatch contract for the fresh A coordinator. It is based on the
 clean handoff checkpoint `52d901c50af1dde97ea22bda8efb1fdf21f169b1` on
 `agent/release897-candidate-a-20261029`. The candidate is the internal campaign
 scope only; unfinished B prototype work and analytics activation are excluded.
+Analytics work in A is compatibility and safety evidence only. B, C and
+C-Activation retain the founder's separate gates. Only the Program Parent may
+declare A complete.
 
 ## Reconciled starting state
 
@@ -31,20 +34,22 @@ scope only; unfinished B prototype work and analytics activation are excluded.
   reset shared databases, deploy, build native artifacts, assemble the
   candidate, publish/merge PR #904, or claim final acceptance. The coordinator
   owns those serialized operations.
-- A worker that finds a source defect records a bounded patch proposal and
+- All source and tests are read-only for evidence tickets A-02 through A-08.
+  Their only writable paths are their ticket evidence directories and `/tmp`.
+  A worker that finds a source or test defect records a bounded patch proposal and
   stops; the coordinator schedules the single fix round after independent
   review. No duplicate campaign, coordinator, native full100, broad timing
   audit, or B/analytics work may be started.
 
 ## Tickets
 
-### A-01 — Independent Standards/Spec review
+### A-01 — Independent Standards review
 
 - **Owner:** delegated Sol 6.1 review worker; coordinator records disposition.
 - **Base:** `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
-- **Allowed paths:** read-only source/tests/docs; write only
-  `docs/evidence/issue-897/a-01-standards-spec-review-20261030.md` in the
-  worker worktree.
+- **Allowed paths:** read-only source/tests/docs, no file writes. The
+  coordinator records the returned report in
+  `docs/evidence/issue-897/a-01-standards-spec-review-20261030.md`.
 - **Depends on:** none; must complete before A-09 and before final CI/release.
 - **Non-goals:** no source edits, no B prototype or analytics review, no
   re-running accepted evidence.
@@ -54,9 +59,11 @@ scope only; unfinished B prototype work and analytics activation are excluded.
   finding.
 - **Evidence:** review markdown with file/line findings, Standards/Spec
   disposition, and a bounded-fix decision.
-- **Gate:** PASS only with no blocker, or with one bounded fix list accepted by
-  the coordinator; FAIL on any unbounded scope, contract, privacy, or standards
-  violation.
+- **Gate:** FAIL/open while any blocking finding is unresolved. Accepting a
+  bounded fix list does not pass review. The coordinator records every
+  disposition, completed fix and affected verification. A material scope or
+  architecture change returns to independent review. A-11 supplies the separate
+  Spec context.
 
 ### A-02 — Restricted worker capacity, rollback, and race matrix
 
@@ -84,9 +91,9 @@ scope only; unfinished B prototype work and analytics activation are excluded.
 
 - **Owner:** delegated Sol 6.1 API/worker evidence worker.
 - **Base:** `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
-- **Allowed paths:** `apps/api/src/modules/diagnostics/**` (read-only),
-  `apps/worker/src/jobs/diagnosticAccountErasure.ts` and adjacent diagnostic
-  tests (read-only), plus
+- **Allowed paths:** source/tests read-only across API callers, campaign
+  namespace admission, source cleanup, worker erasure and service callers;
+  write only
   `docs/evidence/issue-897/a-03-caller-privacy-matrix-20261030/`.
 - **Depends on:** A-02 for worker erasure outcomes; A-01 may later disposition
   findings.
@@ -97,13 +104,18 @@ scope only; unfinished B prototype work and analytics activation are excluded.
   erasure, predecessor erasure, and adversarial cross-order access. Compare
   outcomes to `docs/prd/features/50-reports-tier.md` and the diagnostics
   overview.
+  Reclassify the original R7c namespace, R8 admission/private/erasure, R4 source
+  cleanup and R6a service caller assertions from current source and historical
+  receipts before selecting suites. Preserve their required assertions and
+  unpassed dispositions; do not equate diagnostics-only coverage with this
+  cross-context gate.
 - **Evidence:** matrix receipt with each caller/namespace/role, expected
   disclosure, observed response, erasure result, and exact command.
 - **Gate:** PASS only if every required cell is green and private bytes/IDs
   remain inaccessible across namespaces; FAIL on any unauthorized read,
   identity leak, or untested required cell.
 
-### A-04 — Lawful reset lifecycle and hosted restoration proofs
+### A-04 — Lawful reset lifecycle proof and hosted plan
 
 - **Owner:** delegated Sol 6.1 reset evidence worker; coordinator owns actual
   shared reset, deployment and restoration operations.
@@ -122,10 +134,11 @@ scope only; unfinished B prototype work and analytics activation are excluded.
   grant/clock horizon, controller handoff, restoration, and clean-reset
   behavior using the repository reset-control and focused DB commands; record
   RED-first preservation and post-run cleanup.
-- **Evidence:** reset lifecycle receipt plus hosted restoration receipt with
-  reservation, migration hash, state snapshots, and restoration confirmation.
+- **Evidence:** isolated reset lifecycle receipt and exact hosted execution
+  plan with migration hash, state snapshots and cleanup. A-07 records actual
+  hosted restoration; A-04 does not claim it.
 - **Gate:** PASS when all refusal/rollback/expiry paths preserve state, lawful
-  disposal drains only the reserved namespace, and the environment is restored;
+  disposal drains only the reserved namespace, and the isolated fixture is restored;
   FAIL on destructive ambiguity, missing negative proof, or un-restored state.
 
 ### A-05 — Staff continuity protected/native journey acceptance
@@ -160,7 +173,9 @@ scope only; unfinished B prototype work and analytics activation are excluded.
   assembly SHA if A-09 changes source).
 - **Allowed paths:** repository configuration and package scripts read-only;
   write only `docs/evidence/issue-897/a-06-combined-ci-20261030/`.
-- **Depends on:** A-01, A-02, A-03, A-04, A-05 and any A-09 fix.
+- **Depends on:** A-01/A-11 dispositions, A-02, A-03, isolated A-04,
+  local A-05 evidence and any A-09 fix. Hosted/native A-05 proof is scheduled
+  in A-07/A-08, so it does not create a CI/deployment dependency cycle.
 - **Non-goals:** no workflow relaxation, skipped required lane, or unrelated
   dependency update.
 - **Verification:** run configured root checks and applicable API/worker/DB/
@@ -223,7 +238,7 @@ scope only; unfinished B prototype work and analytics activation are excluded.
 - **Base:** the exact reviewed candidate SHA, normally `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
 - **Allowed paths:** only files named by A-01's bounded finding; matching tests
   and `docs/evidence/issue-897/a-09-fix-20261030/`.
-- **Depends on:** A-01 review. A-02–A-05 may continue only when their paths
+- **Depends on:** A-01 and A-11 reports. A-02–A-05 may continue only when their paths
   are disjoint from the proposed fix.
 - **Non-goals:** no opportunistic refactor, scope expansion, contract rewrite,
   B/analytics work, or second fix round without a new independent review.
@@ -258,13 +273,108 @@ scope only; unfinished B prototype work and analytics activation are excluded.
   protected merge/restoration are verified; FAIL leaves refs and evidence
   preserved for recovery.
 
+### A-11 — Independent Spec review
+
+- **Owner:** fresh delegated Sol 6.1 Spec reviewer, not an implementer;
+  coordinator records dispositions.
+- **Base:** `52d901c50af1dde97ea22bda8efb1fdf21f169b1`; record the actual
+  checkout HEAD and prove source equality before review.
+- **Allowed paths:** read-only repository and governing issue evidence; no
+  edits, formatting, commits or pushes. Coordinator writes
+  `docs/evidence/issue-897/a-11-spec-review-20261030.md`.
+- **Depends on:** map recorded; available slot after A-01. It is the independent
+  Spec context of the same initial review round, not a repeat of Standards.
+- **Non-goals:** no B product implementation or analytics product completion,
+  no accepted-work reruns and no replacement of missing runtime evidence with
+  source searches.
+- **Verification:** `git diff --name-status <main-base> 52d901c50` and direct
+  source/test/evidence inspection for every selected A criterion. Quote the
+  governing criterion for every finding. Return at most 400 words with reviewed
+  SHA, actual provider/client, verdict, missing/partial criteria and blockers
+  with file/line references.
+- **Evidence:** returned report and coordinator-recorded dispositions.
+- **Gate:** FAIL/open for missing required acceptance or incorrect behavior.
+  Merge stays blocked until dispositions, completed fixes and affected evidence
+  pass. Material scope or architecture changes require independent review.
+
+## Concrete command catalog and resource gates
+
+Commands below are selectors, not evidence of successful execution. Each run
+receipt records the exact argv/env names, immutable checkout HEAD, source base,
+exit code, counts, log path and cleanup. Private URLs, tokens and actor data stay
+out of public evidence. A future ticket's new base is pinned before dispatch;
+no symbolic final-SHA placeholder is an execution authorization.
+
+- A-01/A-11 inspect `git diff --name-status origin/main...52d901c50` and trace
+  production callers and tests. No runtime resource or timing reservation.
+- A-02 runs `pnpm --filter @auto-tm/worker exec vitest run
+  src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts
+  --maxWorkers=1` only with the exact case manifest and
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE=1`. Each of `later-failure`,
+  `shared-multiple`, `oldest-capacity`, `overlimit`,
+  `worker-first-second-worker`, `second-worker-first-worker`,
+  `worker-first-capture`, `capture-first-worker`, `worker-first-proof-use` and
+  `proof-use-first-worker` has its own
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_CASE` selector and distinct ordinary task
+  DB. Restricted erasure selectors are
+  `src/jobs/diagnostics/DiagnosticWorkerPreparation.e2e.spec.ts` and
+  `src/jobs/diagnostics/DiagnosticIdentityRetention.e2e.spec.ts`; the worker
+  records the exact enabled scenario env before any run. The accepted ordinary
+  expiry suite is excluded. A-02 owns the next exclusive CPU/timing slot;
+  setup/reset and host-heavy execution await a concrete resource manifest.
+- A-03 candidates are `pnpm --filter @auto-tm/db exec vitest run
+  tests/campaign-preparation.e2e.spec.ts tests/diagnostic-intake-effects.e2e.spec.ts
+  tests/diagnostic-purge-effects.e2e.spec.ts tests/service-history-callers.e2e.spec.ts
+  --maxWorkers=1` and selected API diagnostic presentation suites. The worker
+  maps old assertions to current source and lists exact suite/test-name
+  selectors before the coordinator authorizes a serialized heavy run.
+- A-04 lightweight commands are `node --test
+  scripts/staging-clean-reset-remote.test.mjs
+  scripts/staging-clean-reset-storage.test.mjs scripts/staging-quiescence.test.mjs
+  scripts/staging-campaign.test.mjs`. The selected
+  `pnpm --filter @auto-tm/db exec vitest run
+  tests/operational-reset-rows.e2e.spec.ts --maxWorkers=1 --testNamePattern
+  '<remaining-case-selector>'` is queued after A-02 and requires a concrete
+  selector/resource manifest. Accepted cycle/guard cases are not re-executed.
+- A-05 local selectors are `pnpm --filter @auto-tm/admin exec vitest run
+  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx
+  src/app/diagnostics/DiagnosticWorkspace.spec.tsx
+  src/app/diagnostics/DiagnosticWorkspace.transport.spec.tsx` and selected
+  `apps/mobile/src/diagnostics` / `src/services` suites, recorded before the
+  run. No device/browser/hosted resource is claimed by the worker.
+- A-06 follows configured CI commands: `pnpm check:glossary`,
+  `pnpm test:ci-lane`, `pnpm lint`, `pnpm typecheck`,
+  `pnpm --filter @auto-tm/admin verify:runtime`, `pnpm test:api`,
+  `pnpm test:db`, `pnpm test:frontend`, `pnpm test:root`, and the API image
+  runtime workflow. TS6 counterparts use
+  `pnpm --filter <affected-package> exec tsc6 --noEmit`; TS7 uses the package
+  `typecheck` script. Hosted CI supplies disposable container evidence.
+- A-07 first reads `pnpm staging:control help`,
+  `pnpm staging:control discover` and `pnpm staging:control inspect`.
+  Operational command argv must come from the reserved target's runbook and
+  installed CLI help. No reservation/identity/configuration is inferred.
+- A-08 preparation uses `eas config --platform android --profile staging
+  --json --non-interactive` and the production counterpart. Serialized builds
+  use the checked-in profiles with `eas build --platform android --profile
+  staging --non-interactive` and the production counterpart after exact-SHA
+  gates. Coordinator verifies `shasum -a 256 <APK> <AAB>`, Android package and
+  signing metadata, and the device launch. Existing profile preflight is
+  retained, not rerun as a substitute for artifacts.
+- A-09's exact paths/tests are supplied only after both review reports; its
+  verification includes real component/network interactions, package TS7,
+  TS6, lint and affected build/runtime checks.
+- A-10 uses `git ls-remote`, `gh pr view 904`, effective protected-check reads,
+  and a protected squash merge only after Parent acceptance. It never bypasses
+  checks, self-approves, or force-pushes.
+
 ## Dependency order
 
 1. Record this map and commit it. Reconcile/inspect PR state without mutation.
-2. Start A-01, A-02, and the read-only portion of A-04 in parallel. Start A-03
+2. Start A-01, A-02, and the read-only portion of A-04 in parallel. A-11
+   follows A-01 in the freed read-only slot. Start A-03
    after A-02's worker receipt, then A-05 after A-03; reset/database and hosted
    operations remain coordinator-serialized.
-3. If A-01 requires a bounded change, run A-09 once, assemble, and rerun only
+3. If A-01/A-11 require bounded changes, run A-09 once, assemble, and rerun only
    affected gates.
 4. Run A-06 on the coherent assembled SHA.
 5. Run A-07 and A-08 serially under the coordinator, using A-06's SHA.

@@ -1,6 +1,10 @@
 # Milestone A execution state
 
-Active Chief of Staff: T3 `mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833`, Sol 6.1 xhigh, full access, resumed in the same worktree after parent compaction failure. Founder launch and recovery briefs dated 29 October 2026 are current authority. Outcome is a usable, tested internal campaign candidate, exact installable staging APK and signed production AAB, acceptance, protected PR #904 merge and restoration. Full #897 scope remains selected.
+Active coordinator: T3 `mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230`, Sol 6.1 xhigh/priority, full access, supervised by the Release Program Parent. Resumed the same clean worktree from `52d901c50af1dde97ea22bda8efb1fdf21f169b1`. The former coordinator `mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833` is preserved as historical handoff evidence, not an active writer.
+
+Current authority is the founder's fresh-coordinator brief and Parent's contract clarification on 30 October. A is the internal campaign candidate only. Unfinished B prototype work and analytics product completion/real collection remain outside A; B, C and C-Activation retain their separate founder gates. Only the Parent declares A complete. Exact APK/AAB, required deployed/native evidence, protected PR #904 delivery and restoration remain open A requirements.
+
+The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-coordinator-dispatch-20261030.md) own current tickets, exact bases, paths, commands, resources, task/thread/worktree identities and dependency order. PR #904 was explicitly fast-forwarded from `023e6a5d` to the candidate with no history rewrite; see the [reconciliation receipt](a-10-pr-reconciliation-20261030.md). A-01 returned FAIL with bounded Standards finding S1 accepted/open; the separate Spec review is queued in the freed slot. A-02 and A-04 remain evidence-only. Accepted reset-cycle, staff/API, static and fresh ordinary full100 evidence is preserved. The detailed rows below are historical snapshots where superseded by this state.
 
 ## Active critical path
 
