@@ -12,6 +12,7 @@ in isolated worktrees. Their candidate identity remains the exact handoff base
 | A-01 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a01-standards-spec-20261030-r1` | returned FAIL, S1 accepted/open | isolated |
 | A-02 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-worker-restricted-20261030-r1` | running | isolated |
 | A-04 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a04-reset-runtime-20261030-r1` | running | isolated |
+| A-11 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r1` | running, separate Spec context | isolated |
 
 A-03 and A-05 wait for their declared receipts. A-06 through A-10 remain
 blocked by the dependency order in the Wayfinder map. No child is authorized
@@ -62,3 +63,22 @@ Pending resource metadata is not a passed gate or permission to use another
 worker's resources. Shared resets/setup, contracts, deployed mutation, native
 builds, artifact generation, assembly and final acceptance remain serialized
 under this coordinator. Analytics in A is compatibility/safety only.
+
+## A-11 initial identity
+
+- Task ID: `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r1`.
+- Child thread: `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r1`.
+- Worktree: `/Users/bagtyyar/.t3/worktrees/carberk/t3-6c55a0a5`.
+- Branch: `t3/issue-897-milestone-a-spec-review`.
+- Initial checkout: `a8b5aa0d08c2898eef5247e59b800fb196e1ccde`.
+- Source base: `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
+- Main/base: `9fde309c3da17f2661fe9c266504e6e56a1b97c9`, also the
+  current candidate/main merge base.
+- Selection returned exactly `codex_work`, `gpt-6.1-sol`, xhigh/priority,
+  full access and worktree isolation. No runtime/CPU/device resources.
+
+The `52d901c50..a8b5aa0d` diff contains only five files under
+`docs/evidence/issue-897`: the map, reconciliation, dispatch, Standards report
+and updated execution record. The same source/test/config comparison used for
+the first wave exited 0. Lightweight coordinator verification passed
+`pnpm check:agent-docs`, `pnpm check:glossary` and `git diff --check`.
