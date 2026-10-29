@@ -13,6 +13,12 @@ const binding = () => ({ operationId: operation, reservationId: "b".repeat(32), 
     origins: { database: "postgresql://postgres.railway.internal:5432/railway" } },
   closureGeneration: "d".repeat(32), closureEvidenceDigest: "e".repeat(64),
   expectedInventory: { schema: "1".repeat(64), retained: "2".repeat(64), disposable: "3".repeat(64) }, planDigest: "f".repeat(64) });
+// Fixture arrangement only: an anchor holding the first record needs a source receipt, so it is inserted
+// inside the test transaction with replication-role triggers off; every guard is enabled again before use.
+const anchorFixture = `SET LOCAL session_replication_role = replica;
+  INSERT INTO diagnostic_source_anchors("orderId",state,"firstRecordId",source,"createdTransaction") VALUES('reset-a-order','pending','reset-a-raw','{}','1');
+  SET LOCAL session_replication_role = origin`;
+const deleteAnchor = `DELETE FROM diagnostic_source_anchors WHERE "orderId"='reset-a-order'`;
 
 describe("operator-owned operational reset row admission", () => {
   let container: StartedPostgreSqlContainer;
@@ -74,6 +80,66 @@ describe("operator-owned operational reset row admission", () => {
         await expect(client.query("DELETE FROM diagnostic_identity_records WHERE id='reset-a-raw'")).rejects.toThrow("diagnostic_identity_record_immutable");
         await client.query("ROLLBACK");
       }
+    } finally { await client.query("ROLLBACK"); client.release(); }
+  });
+
+  it("the admitted full OLD source anchor can be deleted before its parent order", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(anchorFixture);
+      const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
+      await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(), observed]);
+      expect((await client.query(deleteAnchor)).rowCount).toBe(1);
+    } finally { await client.query("ROLLBACK"); client.release(); }
+  });
+
+  it("an ordinary, forged GUC or non-operator source anchor DELETE retains the original receipt refusal", async () => {
+    const client = await pool.connect();
+    try {
+      for (const caller of ["ordinary", "forged", "non-operator"] as const) {
+        await client.query("BEGIN");
+        await client.query(anchorFixture);
+        if (caller === "forged") await client.query("SELECT set_config('staging_clean_reset_rows.binding',$1,true)", [JSON.stringify(binding())]);
+        if (caller === "non-operator") {
+          // The admission is held by this backend and transaction, but not by the deleting principal.
+          const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
+          await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(), observed]);
+          await client.query(`CREATE ROLE reset_runtime_fixture NOLOGIN; GRANT SELECT, DELETE ON diagnostic_source_anchors TO reset_runtime_fixture;
+            GRANT SELECT ON diagnostic_source_commands TO reset_runtime_fixture; SET LOCAL ROLE reset_runtime_fixture`);
+        }
+        await expect(client.query(deleteAnchor), caller).rejects.toThrow("diagnostic_source_anchor_receipt");
+        await client.query("ROLLBACK");
+      }
+    } finally { await client.query("ROLLBACK"); client.release(); }
+  });
+
+  it("an admission authorizes no source anchor INSERT or UPDATE", async () => {
+    const client = await pool.connect();
+    try {
+      for (const sql of [`INSERT INTO diagnostic_source_anchors("orderId",state,source,"createdTransaction") VALUES('reset-a-order','pending','{}','1')`,
+        `UPDATE diagnostic_source_anchors SET state='changed' WHERE "orderId"='reset-a-order'`]) {
+        await client.query("BEGIN");
+        if (sql.startsWith("UPDATE")) await client.query(anchorFixture);
+        const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
+        await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(), observed]);
+        await expect(client.query(sql), sql).rejects.toThrow("diagnostic_source_anchor_receipt");
+        await client.query("ROLLBACK");
+      }
+    } finally { await client.query("ROLLBACK"); client.release(); }
+  });
+
+  it("a source anchor changed after admission no longer matches its sealed OLD tuple", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(anchorFixture);
+      const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
+      await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(), observed]);
+      // A post-admission change, applied with triggers off, leaves the same key under different bytes.
+      await client.query(`SET LOCAL session_replication_role = replica;
+        UPDATE diagnostic_source_anchors SET state='changed' WHERE "orderId"='reset-a-order'; SET LOCAL session_replication_role = origin`);
+      await expect(client.query(deleteAnchor)).rejects.toThrow("operational_reset_old_tuple_changed");
     } finally { await client.query("ROLLBACK"); client.release(); }
   });
 
