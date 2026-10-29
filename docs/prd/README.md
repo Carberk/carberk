@@ -107,6 +107,7 @@ Per-component specs live in [`ui/components/`](ui/components/).
 | [85](ops/85-launch-analytics-plan.md) | Launch analytics and scaling plan |
 | [86](ops/86-admin-bootstrap-runbook.md) | Admin bootstrap runbook |
 | [88](ops/88-play-console-submission.md) | Google Play Console submission pack |
+| [91](ops/91-release-program-charter.md) | Release program charter for milestones A, B and C |
 
 ## How to write a PRD page
 
