@@ -345,6 +345,146 @@ BEGIN
  RETURN NEW;
 END $$;
 
+-- The ownership guard gains the same branch ahead of its raw-existence check. Everything
+-- else is the unchanged 20261023090000 definition.
+CREATE OR REPLACE FUNCTION diagnostic_ownership_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE raw diagnostic_identity_records; o inspection_orders; l listings; m dealership_members; expected text;
+BEGIN
+ IF TG_OP='DELETE' THEN
+  IF current_user=(SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='staging_clean_reset_rows') THEN
+   IF staging_clean_reset_rows.allows_old(TG_TABLE_NAME,to_jsonb(OLD)) THEN RETURN OLD; END IF;
+  END IF;
+  IF EXISTS (SELECT 1 FROM diagnostic_identity_records WHERE id=OLD."identityRecordId") THEN RAISE EXCEPTION 'diagnostic_ownership_immutable'; END IF;
+  RETURN OLD;
+ END IF;
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW."identityRecordId",NEW."orderId",NEW."orderVersion") IS DISTINCT FROM ROW(OLD."identityRecordId",OLD."orderId",OLD."orderVersion")
+   OR (NEW."declaredById" IS NOT NULL AND NEW."declaredById" IS DISTINCT FROM OLD."declaredById")
+   OR (OLD.state IN ('unavailable','erased') AND NEW IS DISTINCT FROM OLD)
+   OR (OLD.state='available' AND NEW.state NOT IN ('available','erased'))
+   OR (NEW.state='available' AND (to_jsonb(NEW)-'declaredById') IS DISTINCT FROM (to_jsonb(OLD)-'declaredById'))
+  THEN RAISE EXCEPTION 'diagnostic_ownership_immutable'; END IF;
+  RETURN NEW;
+ END IF;
+ SELECT * INTO raw FROM diagnostic_identity_records WHERE id=NEW."identityRecordId" AND "ownershipCaptureTransaction"=pg_current_xact_id()::text;
+ SELECT * INTO o FROM inspection_orders WHERE id=NEW."orderId";
+ IF (raw.id IS NOT NULL AND raw."orderId"=NEW."orderId" AND raw."orderVersion"=NEW."orderVersion"
+   AND raw."erasedAt" IS NULL AND o.id IS NOT NULL AND o.version=NEW."orderVersion" AND o."erasedAt" IS NULL
+   AND o."observedVehicle"=raw.observation) IS NOT TRUE OR NEW.state='erased' THEN RAISE EXCEPTION 'diagnostic_ownership_binding'; END IF;
+ IF NEW.state='unavailable' THEN RETURN NEW; END IF;
+ SELECT * INTO l FROM listings WHERE id=o."listingId";
+ IF l."businessId" IS NOT NULL THEN SELECT * INTO m FROM dealership_members WHERE "userId"=o."commissionerId"; END IF;
+ -- PostgreSQL sha256(bytea) avoids introducing a new extension. Assemble exactly
+ -- the existing JSON.stringify array, preserving spaces inside source values.
+ expected:=encode(sha256(convert_to('['||to_json(l.id)::text||','||to_json(l."sellerId")::text||','||COALESCE(to_json(l."businessId")::text,'null')||','||COALESCE(to_json(upper(btrim(l.vin)))::text,'null')||','||to_json(l."brandId")::text||','||to_json(l."modelId")::text||','||COALESCE(to_json(l.year)::text,'null')||']','UTF8')),'hex');
+ IF (o.audience='listing_public' AND l.id IS NOT NULL AND l."deletedAt" IS NULL
+   AND NEW.scope='diagnostic_ownership_continuity' AND NEW."sourceListingId"=l.id AND NEW."identityDigest"=expected
+   AND NEW."sellerId"=l."sellerId" AND NEW."commissionerId"=o."commissionerId"
+   AND EXISTS (SELECT 1 FROM users u WHERE u.id=l."sellerId" AND u."deletionScheduledAt" IS NULL AND (u."phoneVerifiedAt" IS NOT NULL OR u."emailVerifiedAt" IS NOT NULL))
+   AND EXISTS (SELECT 1 FROM users u WHERE u.id=o."commissionerId" AND u."deletionScheduledAt" IS NULL AND (u."phoneVerifiedAt" IS NOT NULL OR u."emailVerifiedAt" IS NOT NULL))
+   AND NEW."businessId" IS NOT DISTINCT FROM l."businessId"
+   AND ((l."businessId" IS NULL AND NEW."membershipId" IS NULL) OR
+    (l."businessId" IS NOT NULL AND m.id IS NOT NULL AND m."dealershipId"=l."businessId" AND m.status='active' AND NEW."membershipId"=m.id))
+   AND NEW."declaredById"=raw."recordedById" AND NEW."declaredAt"=raw."recordedAt"
+   AND NEW."rightsUntil">clock_timestamp() AT TIME ZONE 'UTC' AND diagnostic_ownership_rights_valid(NEW.rights,NEW."rightsUntil")
+   AND NOT EXISTS (SELECT 1 FROM diagnostic_identity_records earlier LEFT JOIN diagnostic_ownership_components c ON c."identityRecordId"=earlier.id
+    WHERE earlier."orderId"=o.id AND earlier."orderVersion"<raw."orderVersion" AND
+     (c.state IS DISTINCT FROM 'available' OR c."rightsUntil" IS NULL OR c."rightsUntil"<=clock_timestamp() AT TIME ZONE 'UTC'))) IS NOT TRUE
+ THEN RAISE EXCEPTION 'diagnostic_ownership_source'; END IF;
+ RETURN NEW;
+END $$;
+
+-- The identity evidence guard gains the same branch ahead of its parent-order check.
+-- Everything else is the unchanged 20261021130000 definition.
+CREATE OR REPLACE FUNCTION diagnostic_identity_evidence_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE item JSONB;
+BEGIN
+ IF TG_OP='DELETE' THEN
+  IF current_user=(SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='staging_clean_reset_rows') THEN
+   IF staging_clean_reset_rows.allows_old(TG_TABLE_NAME,to_jsonb(OLD)) THEN RETURN OLD; END IF;
+  END IF;
+  IF EXISTS (SELECT 1 FROM inspection_orders o WHERE o.id=OLD."orderId") THEN RAISE EXCEPTION 'diagnostic_identity_evidence_immutable'; END IF;
+  RETURN OLD;
+ END IF;
+ IF TG_OP='INSERT' THEN
+  IF NEW."erasedAt" IS NOT NULL OR NEW."recordedById" IS NULL OR jsonb_typeof(NEW.provenance)<>'array' OR jsonb_array_length(NEW.provenance)=0
+   OR jsonb_typeof(NEW.identifiers)<>'array' OR jsonb_array_length(NEW.identifiers)=0 OR (NEW."supersedesId" IS NULL) <> (NEW.explanation IS NULL)
+   OR NOT EXISTS (SELECT 1 FROM inspection_orders o WHERE o.id=NEW."orderId" AND o.version=NEW."orderVersion" AND o."erasedAt" IS NULL AND o.synthetic)
+   OR NOT EXISTS (SELECT 1 FROM diagnostic_identity_records i WHERE i.id=NEW."identityRecordId" AND i."orderId"=NEW."orderId"
+    AND i."erasedAt" IS NULL AND i."observationHash"=NEW."observationHash")
+   OR (NEW."supersedesId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM diagnostic_identity_evidence p WHERE p.id=NEW."supersedesId"
+    AND p."orderId"=NEW."orderId" AND p."erasedAt" IS NULL AND p."orderVersion"<NEW."orderVersion"))
+  THEN RAISE EXCEPTION 'diagnostic_identity_evidence_binding'; END IF;
+  FOR item IN SELECT value FROM jsonb_array_elements(NEW.provenance) LOOP
+   IF NOT EXISTS (SELECT 1 FROM diagnostic_identity_provenance p WHERE p.id=item->>'id' AND p."orderId"=NEW."orderId" AND p.state='verified'
+    AND p."cleanupRequestedAt" IS NULL AND p."erasedAt" IS NULL AND p.sha256=item->>'sha256' AND p.mime=item->>'mime' AND p."sizeBytes"=(item->>'sizeBytes')::int)
+   THEN RAISE EXCEPTION 'diagnostic_identity_evidence_binding'; END IF;
+  END LOOP;
+  RETURN NEW;
+ END IF;
+ IF ROW(NEW.id,NEW."orderId",NEW."orderVersion",NEW."identityRecordId",NEW."supersedesId",NEW."rightsUntil",NEW."recordedAt")
+   IS DISTINCT FROM ROW(OLD.id,OLD."orderId",OLD."orderVersion",OLD."identityRecordId",OLD."supersedesId",OLD."rightsUntil",OLD."recordedAt")
+  OR (NEW."recordedById" IS NOT NULL AND NEW."recordedById" IS DISTINCT FROM OLD."recordedById")
+  OR (OLD."erasedAt" IS NOT NULL AND NEW."erasedAt" IS DISTINCT FROM OLD."erasedAt")
+  OR (NEW."erasedAt" IS NULL AND ROW(NEW."observationHash",NEW.identifiers,NEW.provenance,NEW.rights,NEW.explanation,NEW."recordHash")
+   IS DISTINCT FROM ROW(OLD."observationHash",OLD.identifiers,OLD.provenance,OLD.rights,OLD.explanation,OLD."recordHash"))
+ THEN RAISE EXCEPTION 'diagnostic_identity_evidence_immutable'; END IF;
+ RETURN NEW;
+END $$;
+
+-- The identity provenance guard gains the same branch ahead of its parent-order check.
+-- Everything else is the unchanged 20261021130000 definition.
+CREATE OR REPLACE FUNCTION diagnostic_identity_provenance_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP='DELETE' THEN
+  IF current_user=(SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='staging_clean_reset_rows') THEN
+   IF staging_clean_reset_rows.allows_old(TG_TABLE_NAME,to_jsonb(OLD)) THEN RETURN OLD; END IF;
+  END IF;
+  IF EXISTS (SELECT 1 FROM inspection_orders o WHERE o.id=OLD."orderId") THEN RAISE EXCEPTION 'diagnostic_identity_provenance_immutable'; END IF;
+  RETURN OLD;
+ END IF;
+ IF TG_OP='INSERT' THEN
+  IF NEW.state<>'staged' OR NEW."objectKey" IS NOT NULL OR NEW."erasedAt" IS NOT NULL OR NEW."cleanupRequestedAt" IS NOT NULL OR NEW."createdById" IS NULL
+   OR NOT EXISTS (SELECT 1 FROM inspection_orders o WHERE o.id=NEW."orderId" AND o."erasedAt" IS NULL AND o.synthetic)
+  THEN RAISE EXCEPTION 'diagnostic_identity_provenance_binding'; END IF;
+  RETURN NEW;
+ END IF;
+ IF ROW(NEW.id,NEW."orderId",NEW."contentType",NEW."declaredSizeBytes",NEW."rightsUntil",NEW."createdAt")
+   IS DISTINCT FROM ROW(OLD.id,OLD."orderId",OLD."contentType",OLD."declaredSizeBytes",OLD."rightsUntil",OLD."createdAt")
+  OR (OLD."objectKey" IS NOT NULL AND ROW(NEW."objectKey",NEW.sha256,NEW."sizeBytes",NEW.mime) IS DISTINCT FROM ROW(OLD."objectKey",OLD.sha256,OLD."sizeBytes",OLD.mime))
+  OR (OLD."objectKey" IS NULL AND NEW."objectKey" IS NOT NULL AND (OLD.state<>'staged' OR OLD."cleanupRequestedAt" IS NOT NULL))
+  OR (NEW."erasedAt" IS NULL AND NEW.rights IS DISTINCT FROM OLD.rights)
+  OR (OLD."erasedAt" IS NOT NULL AND NEW."erasedAt" IS DISTINCT FROM OLD."erasedAt")
+  OR (NEW."createdById" IS NOT NULL AND NEW."createdById" IS DISTINCT FROM OLD."createdById")
+  OR (OLD."cleanupRequestedAt" IS NOT NULL AND NEW."cleanupRequestedAt" IS DISTINCT FROM OLD."cleanupRequestedAt")
+  OR (OLD.state IN ('cleanup_pending','removed') AND NEW.state IN ('staged','verified'))
+ THEN RAISE EXCEPTION 'diagnostic_identity_provenance_immutable'; END IF;
+ RETURN NEW;
+END $$;
+
+-- The ownership grant guard gains the same branch ahead of its parent-order check.
+-- Everything else is the unchanged 20261023120000 definition.
+CREATE OR REPLACE FUNCTION diagnostic_ownership_grant_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP='DELETE' THEN
+  IF current_user=(SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='staging_clean_reset_rows') THEN
+   IF staging_clean_reset_rows.allows_old(TG_TABLE_NAME,to_jsonb(OLD)) THEN RETURN OLD; END IF;
+  END IF;
+  IF EXISTS (SELECT 1 FROM inspection_orders WHERE id=OLD."orderId") THEN RAISE EXCEPTION 'diagnostic_ownership_grant_immutable'; END IF;
+  RETURN OLD;
+ ELSIF TG_OP='UPDATE' THEN
+  IF NEW.id IS DISTINCT FROM OLD.id OR NEW."orderId" IS DISTINCT FROM OLD."orderId"
+   OR (NEW IS DISTINCT FROM OLD AND (OLD.state='erased' OR NEW.state<>'erased')) THEN RAISE EXCEPTION 'diagnostic_ownership_grant_immutable'; END IF;
+  IF NEW.state='erased' AND EXISTS (SELECT 1 FROM diagnostic_ownership_components WHERE "grantId"=OLD.id AND state='available') THEN RAISE EXCEPTION 'diagnostic_ownership_grant_disposal_required'; END IF;
+  RETURN NEW;
+ END IF;
+ IF diagnostic_ownership_grant_current(NEW,clock_timestamp() AT TIME ZONE 'UTC') IS NOT TRUE
+  OR EXISTS (SELECT 1 FROM diagnostic_identity_records WHERE "orderId"=NEW."orderId")
+  OR NOT EXISTS (SELECT 1 FROM sessions s WHERE s.id=NEW."sessionId" AND s."userId"=NEW."grantorId" AND s."expiresAt">clock_timestamp() AT TIME ZONE 'UTC')
+ THEN RAISE EXCEPTION 'diagnostic_ownership_grant_source'; END IF;
+ RETURN NEW;
+END $$;
+
 -- Certify the final graph only after every owning guard change above, and prove the fixed
 -- order: exact disposable set, every non-self FK child before its parent except the refused
 -- avatar cycle, and no retained table referencing disposable data.
