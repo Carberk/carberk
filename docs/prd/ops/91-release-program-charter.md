@@ -13,12 +13,14 @@ The parent release thread owns program scope, dependencies, ticket-map authority
 
 ## Current authority
 
-Milestone A remains owned by the existing coordinator until its handoff is durable:
+Milestone A stays on the existing candidate branch. The old coordinator is preserved as the historical source, and the fresh coordinator owns continuation from the durable handoff:
 
-- Thread: [A coordinator](t3-thread://v1/mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833)
+- Old thread: [A handoff source](t3-thread://v1/mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833)
+- Current thread: [A coordinator](t3-thread://v1/mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230)
 - PR: [#904](https://github.com/Carberk/carberk/pull/904)
 - Branch: `agent/release897-candidate-a-20261029`
 - Candidate base recorded by the A execution record: `agent/spec-897-campaign` at `023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab`
+- Durable handoff checkpoint: `52d901c50af1dde97ea22bda8efb1fdf21f169b1`
 - A execution record: `docs/evidence/issue-897/milestone-a-execution-20261029.md` on the A branch
 
 The analytics audit thread is evidence only. It is not a coordinator and cannot authorize product implementation. Analytics responsibilities remain split as follows:
@@ -122,4 +124,4 @@ The replacement A coordinator may start only after the current A thread records 
 
 The parent then verifies the receipt against the branch and PR, waits for the current coordinator and its children to settle, and only then launches a fresh A coordinator attached to the same worktree. The replacement resumes from the recorded SHA. It does not reset the branch, duplicate writers or reinterpret preserved evidence.
 
-As of this charter, that handoff is pending. No replacement A coordinator is launched and no B or C implementation worker is started.
+The old coordinator recorded the handoff at `52d901c50af1dde97ea22bda8efb1fdf21f169b1` with no active child writer. The fresh A coordinator is attached to the same worktree and is writing the Wayfinder ticket map before dispatch. No B or C implementation worker is started.
