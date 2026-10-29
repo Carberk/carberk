@@ -12,6 +12,7 @@ import { DiagnosticAuthority } from "./DiagnosticAuthority";
 
 type Tx = Prisma.TransactionClient;
 type Order = Prisma.InspectionOrderGetPayload<object>;
+type DiagnosticIntakeSourceOperation = Exclude<DiagnosticSourceCommand["operation"], "user_eligibility" | "admin_bootstrap_promote" | "reviewer_credentials_change" | "account_schedule">;
 const denial = () => new DiagnosticRuleError("DIAGNOSTIC_NO_ACCESS");
 const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 export { diagnosticListingDigest } from "./diagnosticListingDigest";
@@ -35,7 +36,7 @@ export class PrismaDiagnosticIntake implements DiagnosticIntakePort {
     @Inject(DiagnosticPublicBindings) private readonly publicBindings: DiagnosticPublicBindings,
     @Inject(DIAGNOSTIC_RUNTIME) private readonly runtime: DiagnosticRuntime) {}
 
-  private command(subject: DiagnosticSubject, operation: Exclude<DiagnosticSourceCommand["operation"], "user_eligibility">, rows: DiagnosticSourceRow[], ids: string[], cutoff: Date | null = null): Exclude<DiagnosticSourceCommand, { operation: "user_eligibility" }> {
+  private command(subject: DiagnosticSubject, operation: DiagnosticIntakeSourceOperation, rows: DiagnosticSourceRow[], ids: string[], cutoff: Date | null = null): Extract<DiagnosticSourceCommand, { operation: DiagnosticIntakeSourceOperation }> {
     return { operation, roots: diagnosticRoots(subject, ids), rows, actorUserId: subject.userId, sessionId: subject.sessionId, cutoff, campaign: null };
   }
   private async plannedAudit(tx: Tx, subject: DiagnosticSubject, row: Pick<Order, "id" | "centerId">, action: string, details: Prisma.InputJsonValue = {}) {
