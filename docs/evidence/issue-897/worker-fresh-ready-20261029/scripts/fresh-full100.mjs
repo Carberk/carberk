@@ -8,7 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const ROOT = "/Users/bagtyyar/.t3/worktrees/carberk/t3-52806f37";
+const ROOT = "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029";
 const TOOLS = "/tmp/897-r6c-fresh-ready-20261029";
 const RUN = "/tmp/897-r6c-fresh102-20261029";
 const PROJECT = "auto_tm_ci_897_r6c_fresh102_20261029";
