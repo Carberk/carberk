@@ -174,7 +174,7 @@ it("uses palette surfaces, text and boundaries for legacy diagnostic fields", as
   expect(control.className).toContain("text-foreground");
  }
  fireEvent.click(view.getByRole("button", { name: continuityCopy.en.visit }));
- fireEvent.click(view.getByText(continuityCopy.en.intake, { selector: "summary" }));
+ fireEvent.click(view.getByText(diagnosticCopy.en.intake, { selector: "summary" }));
  const observedAt = view.getByLabelText(`${diagnosticCopy.en.observedAt} · Required`);
  expect(observedAt.className).toContain("border-text-secondary");
  expect(observedAt.className).toContain("bg-background");

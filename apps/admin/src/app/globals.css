@@ -22,8 +22,17 @@ html, body { background-color: var(--background); color: var(--text-primary); }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50; }
+    @apply border-border; }
+  *:focus-visible {
+    outline: 2px solid var(--text-secondary);
+    outline-offset: 2px; }
   body {
     @apply bg-background text-foreground; }
   html {
     @apply font-sans; } }
+
+select[aria-label="Language"],
+select[aria-label="Язык"],
+select[aria-label="Dil"] {
+  border-color: var(--text-secondary);
+}
