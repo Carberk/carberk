@@ -2,9 +2,10 @@
 // From repo root, after sequential builds and task-owned service provisioning:
 // DIAGNOSTIC_WORKER_FIXTURE_OWNER_URL=... node .../bootstrapOwnershipExpiryFixture.mjs serve CONFIG.json
 // Stop this exact process after evidence collection, then run the same command with cleanup.
-// CONFIG contains evidenceDir and resourceIdentity {composeProject,ports}; no ownership rows.
+// CONFIG contains evidenceDir, resourceIdentity {composeProject,ports} and migrationPin
+// {manifestPath,manifestSha256} for the exact current chain; no ownership rows.
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, resolve, relative } from "node:path";
 
@@ -34,6 +35,24 @@ const owner = new PrismaService();
 process.env.DATABASE_URL = previousUrl;
 const quote = name => `"${name.replaceAll('"', '""')}"`;
 const hash = value => createHash("sha256").update(value).digest("hex");
+// The finished database chain and the checked-out migration directory must both equal
+// the pinned manifest. A changed or unpublished migration refuses; it is never skipped.
+const pinnedMigrations = async rows => {
+  const pin = config.migrationPin;
+  if (!pin?.manifestPath || !/^[0-9a-f]{64}$/.test(pin.manifestSha256 ?? "")) throw new Error("Exact current migration manifest pin required");
+  const bytes = await readFile(pin.manifestPath);
+  if (hash(bytes) !== pin.manifestSha256) throw new Error("Migration manifest pin mismatch");
+  const expected = JSON.parse(bytes).migrations, directory = resolve("packages/db/prisma/migrations"), disk = [];
+  const byName = (a, b) => (a.migration_name < b.migration_name ? -1 : 1);
+  for (const entry of (await readdir(directory, { withFileTypes: true })).filter(item => item.isDirectory())) {
+    disk.push({ migration_name: entry.name, checksum: hash(await readFile(join(directory, entry.name, "migration.sql"))) });
+  }
+  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  if (!expected?.length || !same(rows.map(({ migration_name, checksum }) => ({ migration_name, checksum })).sort(byName), expected) || !same(disk.sort(byName), expected)) {
+    throw new Error("Current migration chain differs from the pinned manifest");
+  }
+  return pin;
+};
 const snapshot = () => owner.$queryRawUnsafe(`SELECT c.relname AS "table",t.tgname AS name,t.tgenabled::text AS mode,
   t.tgfoid::regprocedure::text AS function,t.tgtype::int AS type,pg_get_triggerdef(t.oid) AS definition
   FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -68,7 +87,9 @@ try {
       rolesRemoved: state.roles, resourceIdentity: config.resourceIdentity, remaining: "Destroy only recorded task Compose project with volumes after retaining evidence. Storage and fixture rows are contained there." }, null, 2), { flag: "wx" });
   } else {
     const migrations = await owner.$queryRawUnsafe("SELECT migration_name,checksum FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY migration_name");
-    if (migrations.length !== 98 || !migrations.at(-1).migration_name.startsWith("20261026016000") || migrations.at(-1).checksum !== "87dd1162b90c334137859cbaf4afd61af068f50602a4ec438d041b22364e95b1") throw new Error("Published160/98 required");
+    const [unfinished] = await owner.$queryRawUnsafe("SELECT count(*)::int AS n FROM _prisma_migrations WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL");
+    if (unfinished.n) throw new Error("Every migration must be finished and none rolled back");
+    const migrationPin = await pinnedMigrations(migrations);
     // Empty task DB prevents global due queues or Session expiry contaminating cleanup.
     if (await owner.user.count() || await owner.inspectionOrder.count()) throw new Error("Preserve nonempty database; use a fresh task-owned database");
     const triggers = await snapshot();
@@ -215,9 +236,9 @@ try {
     }
     const bootstrapReceipt = join(root, "bootstrap.json");
     const resourceIdentity = { ...config.resourceIdentity, apiPid: process.pid, apiUrl, apiUrls: instances.map(instance => instance.apiUrl), bootstrapReceipt };
-    await writeFile(bootstrapReceipt, JSON.stringify({ dependency, migrations, resourceIdentity, roles, people: Object.fromEntries(Object.entries(people).map(([who, p]) => [who, { userId: p.userId, sessionId: p.sessionId }])),
+    await writeFile(bootstrapReceipt, JSON.stringify({ dependency, migrations, migrationPin, resourceIdentity, roles, people: Object.fromEntries(Object.entries(people).map(([who, p]) => [who, { userId: p.userId, sessionId: p.sessionId }])),
       centerId, listingIds, templateId, vin, visits: visits.map(({ people: group, ...visit }) => ({ ...visit, people: Object.fromEntries(Object.entries(group).map(([who, person]) => [who, { userId: person.userId, sessionId: person.sessionId }])) })), sourceAndLoadedFiles, loadedFiles, readiness: ready, clocks: "real advancing wall clock", commands: "Production template route; cross-context prerequisite writes listed in bootstrap source", cleanup: "Stop this process; run cleanup mode; destroy exact recorded task Compose project with volumes" }, null, 2), { flag: "wx" });
-    await writeFile(privatePath, JSON.stringify({ dependency, evidenceDir: root, resourceIdentity, apiUrl, centerId, templateId, listingIds, vin, people, visits, sourceAndLoadedFiles }, null, 2), { mode: 0o600, flag: "wx" });
+    await writeFile(privatePath, JSON.stringify({ dependency, evidenceDir: root, migrationPin, resourceIdentity, apiUrl, centerId, templateId, listingIds, vin, people, visits, sourceAndLoadedFiles }, null, 2), { mode: 0o600, flag: "wx" });
     await writeFile(join(root, "caller-env.private.json"), JSON.stringify({ apiDatabaseUrl: urls[0], workerDatabaseUrl: urls[1], producerDatabaseUrl: urls[2], producerConfig: privatePath }, null, 2), { mode: 0o600, flag: "wx" });
     // No polling or fabricated delay. Parent runs producer/test in this reserved
     // interval, then sends this exact process SIGTERM for graceful closure.

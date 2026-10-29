@@ -3,7 +3,7 @@
 // node apps/worker/src/jobs/diagnostics/testing/produceOwnershipExpiryFixture.mjs CONFIG.json
 // CONFIG is private task-owned input; never include bearer tokens in evidence.
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readFile, readdir, mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -12,6 +12,22 @@ const dependency = "023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab";
 const require = createRequire(resolve("apps/worker/package.json"));
 const { PrismaService } = require("@auto-tm/db");
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+// Same pin as the bootstrap: the finished database chain and the checked-out
+// migration directory must both equal the manifest named by the private config.
+const pinnedMigrations = async (rows, pin) => {
+  if (!pin?.manifestPath || !/^[0-9a-f]{64}$/.test(pin.manifestSha256 ?? "")) throw new Error("Exact current migration manifest pin required");
+  const bytes = await readFile(pin.manifestPath);
+  if (hash(bytes) !== pin.manifestSha256) throw new Error("Migration manifest pin mismatch");
+  const expected = JSON.parse(bytes).migrations, directory = resolve("packages/db/prisma/migrations"), disk = [];
+  const byName = (a, b) => (a.migration_name < b.migration_name ? -1 : 1);
+  for (const entry of (await readdir(directory, { withFileTypes: true })).filter(item => item.isDirectory())) {
+    disk.push({ migration_name: entry.name, checksum: hash(await readFile(join(directory, entry.name, "migration.sql"))) });
+  }
+  const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  if (!expected?.length || !same(rows.map(({ migration_name, checksum }) => ({ migration_name, checksum })).sort(byName), expected) || !same(disk.sort(byName), expected)) {
+    throw new Error("Current migration chain differs from the pinned manifest");
+  }
+};
 const configPath = process.argv[2];
 if (!configPath) throw new Error("Explicit private producer config required");
 const config = JSON.parse(await readFile(configPath, "utf8"));
@@ -127,7 +143,9 @@ const structured = async captured => {
 try {
   await db.$connect();
   const migrations = await db.$queryRawUnsafe("SELECT migration_name,checksum FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY migration_name");
-  if (migrations.length !== 98 || !migrations.at(-1).migration_name.startsWith("20261026016000") || migrations.at(-1).checksum !== "87dd1162b90c334137859cbaf4afd61af068f50602a4ec438d041b22364e95b1") throw new Error("Exact accepted160 required");
+  const [unfinished] = await db.$queryRawUnsafe("SELECT count(*)::int AS n FROM _prisma_migrations WHERE finished_at IS NULL OR rolled_back_at IS NOT NULL");
+  if (unfinished.n) throw new Error("Every migration must be finished and none rolled back");
+  await pinnedMigrations(migrations, config.migrationPin);
   const files = {};
   const required = ["apps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipGrants.ts",
     "apps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipCapture.ts",
