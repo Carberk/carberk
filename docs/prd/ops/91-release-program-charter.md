@@ -19,18 +19,18 @@ Milestone A stays on the existing candidate branch. The old coordinator is prese
 - Current thread: [A coordinator](t3-thread://v1/mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230)
 - PR: [#904](https://github.com/Carberk/carberk/pull/904)
 - Branch: `agent/release897-candidate-a-20261029`
-- Candidate base recorded by the A execution record: `agent/spec-897-campaign` at `023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab`
+- Original PR head before reconciliation: `agent/spec-897-campaign` at `023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab`
 - Durable handoff checkpoint: `52d901c50af1dde97ea22bda8efb1fdf21f169b1`
 - A execution record: `docs/evidence/issue-897/milestone-a-execution-20261029.md` on the A branch
 
-The analytics audit thread is evidence only. It is not a coordinator and cannot authorize product implementation. Analytics responsibilities remain split as follows:
+The [analytics audit thread](t3-thread://v1/mcp:db60eb22-7b75-40a7-8a09-5634011efe56) supplies evidence. It cannot authorize product implementation. Analytics responsibilities remain split as follows:
 
 - A checks compatibility and safety boundaries.
 - B implements the approved product measurement behavior.
 - C verifies native and deployed behavior on the combined candidate.
 - C-Activation separately approves diagnostics, alerts, collection rights, regional delivery, disclosure readiness and real collection.
 
-The approved prototype is a design input, not a production branch to merge. B uses the frozen contract and decisions in `prototype-candidate-preview/CONTRACT.md`, `DECISIONS.md` and `VERIFICATION.md`, with the approved source reference pinned at `f876ac97a3946649f87d986ff6eeb7ccd9f5bdc1`. The preview branch remains throwaway.
+B uses the frozen contract and decisions in `prototype-candidate-preview/CONTRACT.md`, `DECISIONS.md` and `VERIFICATION.md`. The freeze receipt must identify the approved prototype artifact's own immutable commit and digest. `f876ac97a3946649f87d986ff6eeb7ccd9f5bdc1` is its audited application source reference, not the approved prototype artifact SHA. The preview branch remains throwaway and is not merged into production.
 
 ## Dependency graph
 
@@ -38,7 +38,8 @@ The approved prototype is a design input, not a production branch to merge. B us
 flowchart TD
   H[Durable A handoff] --> A1[A coordinator resumes PR #904]
   A1 --> A2[Parent accepts A internal candidate]
-  A2 --> B0[B spec and ticket freeze]
+  A1 -. planning only .-> B0[B spec and ticket freeze]
+  A2 --> B1
   B0 --> B1[B implementation in isolated worktrees]
   B1 --> B2[Parent accepts B prototype implementation]
   B2 --> C0[C assembles A plus B]
@@ -47,32 +48,17 @@ flowchart TD
   C2 --> C3[Exact signed candidate]
   C3 --> C4[Parent accepts C]
   C4 --> X[C-Activation decision]
-
-  A2 -. planning only, no code .-> B0
-  A1 --> S[Shared contracts and staging gates]
-  S --> A2
-  S --> B1
-  S --> C2
 ```
 
-Planning for B may proceed before A acceptance. B code, migrations, shared contract changes and production tests must wait for A2. C cannot start until B2.
+Planning and spec freeze for B may proceed during A. B implementation requires both parent acceptance of A and the B freeze. This includes B code, migrations, shared contract changes and production tests. C cannot start until B acceptance.
 
 ## Ticket-map authority
 
-The parent issue and the existing A execution record are the source of ticket scope. A coordinators may create and dispatch A Wayfinder tickets. They must not create a duplicate of a ticket that already has a live writer or preserved checkpoint.
+The parent owns milestone scope. The A coordinator owns the [A Wayfinder ticket map at `46e82c394`](https://github.com/Carberk/carberk/blob/46e82c3942edeccfb66c81d7f7375b51d9f534fe/docs/evidence/issue-897/a-wayfinder-ticket-map-20261030.md), committed before dispatch. That map and the A execution record own A ticket dependencies; this charter does not maintain a second map. The coordinator records material changes for parent disposition and preserves live writers and checkpoints.
 
-The current A dependency map is:
+Parent oversight on 30 October 2026 verified PR #904 and both candidate refs at `dc8549ba21cd40704a377e7bdea3438e44b75ad7`, following ancestor-only fast-forward reconciliation. The [reconciliation receipt](https://github.com/Carberk/carberk/blob/dc8549ba21cd40704a377e7bdea3438e44b75ad7/docs/evidence/issue-897/a-10-pr-reconciliation-20261030.md) and [dispatch ledger](https://github.com/Carberk/carberk/blob/dc8549ba21cd40704a377e7bdea3438e44b75ad7/docs/evidence/issue-897/a-coordinator-dispatch-20261030.md) preserve provenance. A-01, A-02 and A-04 were running in isolated Sol 6.1 xhigh/priority worktrees. A-03 and A-05 awaited dependencies. No ticket or milestone pass is implied.
 
-| Chain | Existing tickets | Dependency rule |
-|---|---|---|
-| Listing views | #874 → #899 | The view contract precedes fingerprint expiry and collection release. Keep this counter separate from analytics. |
-| Shared authority and staging | #900 → #901 | Purpose-scoped staff authority precedes guarded staging operations and resets. |
-| Dealer path | #902 → #908 → #909 → #910 | Business admission precedes inventory, shared enquiries and public discovery. |
-| Service and history | #903 → #911 → #912 → #913 | Service authority precedes Support and Vehicle History operations, then delivery and archive reuse. |
-| Diagnostics | #907 → #914 → #915 → #916 | Intake and audience rules precede authoring, immutable release and reader/PDF delivery. |
-| Measurement and operations | #905 → #917, #918, #919 → #920 | The typed first-party contract precedes scorecards, rights-qualified knowledge, watchdogs and hosting readiness. |
-
-This map is a dependency map, not permission to widen A scope. A ticket is ready only when its coordinator has recorded the exact base SHA and all blockers are closed. If the map needs a material change, the coordinator records the reason and returns it to the parent.
+Review stays open while blocking findings remain, even when a fix list is accepted. The parent directed the coordinator to record actual worker HEADs, concrete verification commands and exclusive resources, and to keep evidence work read-only until a separate fix dispatch. Final acceptance uses the resulting assembled SHA and affected verification.
 
 B's ticket map is created from the frozen prototype contract. At minimum it must separate shared contracts, mobile implementation, admin implementation, worker/PDF work and integration verification. A B worker may own only disjoint paths and resources. No B ticket may edit PR #904's branch.
 
@@ -124,4 +110,4 @@ The replacement A coordinator may start only after the current A thread records 
 
 The parent then verifies the receipt against the branch and PR, waits for the current coordinator and its children to settle, and only then launches a fresh A coordinator attached to the same worktree. The replacement resumes from the recorded SHA. It does not reset the branch, duplicate writers or reinterpret preserved evidence.
 
-The old coordinator recorded the handoff at `52d901c50af1dde97ea22bda8efb1fdf21f169b1` with no active child writer. The fresh A coordinator is attached to the same worktree and is writing the Wayfinder ticket map before dispatch. No B or C implementation worker is started.
+The old coordinator recorded the handoff at `52d901c50af1dde97ea22bda8efb1fdf21f169b1` with no active child writer. The fresh A coordinator attached to the same worktree and committed the Wayfinder map before dispatch. A remains open. B implementation, C verification and C-Activation remain gated.
