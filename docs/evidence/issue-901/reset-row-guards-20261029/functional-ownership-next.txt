@@ -1,0 +1,53 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-e0d6ff2a/packages/db
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > wrong or missing target identity and caller-claimed state refuse before any application read 837ms
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > an existing cf namespace obstructing DELETE is refused at inventory; its control disposition stays separate S2 work 1084ms
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > unknown schema, table, trigger, retained reference into deleted data and protected content refuse atomically 6414ms
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > another backend on the database refuses observation and deletion 1223ms
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a stale observation refuses deletion: a later row, an added FK between known tables or a redefined known trigger 4297ms
+
+Private SQL envelope: Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=operational_reset_unsupported_cycle routine=exec_stmt_raise stack=staging_clean_reset_rows.prepare
+
+ ✓ scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > a database refusal keeps the exact sanitized public failure while the private transport receipt preserves its first SQL refusal 1163ms
+
+Private SQL envelope: Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=diagnostic_identity_evidence_immutable routine=exec_stmt_raise stack=diagnostic_identity_evidence_guard>staging_clean_reset_rows.dispose
+
+Admitted reset A executor verdict {"code":1,"failure":"Clean reset refused: database operation failed","sqlDiagnostic":"Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=diagnostic_identity_evidence_immutable routine=exec_stmt_raise stack=diagnostic_identity_evidence_guard>staging_clean_reset_rows.dispose"}
+
+ × scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion 1650ms
+   → expected [ 1, …(1) ] to deeply equal [ +0, '' ]
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+AssertionError: expected [ 1, …(1) ] to deeply equal [ +0, '' ]
+
+- Expected
++ Received
+
+  [
+-   0,
+-   "",
++   1,
++   "Clean reset refused: database operation failed",
+  ]
+
+ ❯ scripts/staging-clean-reset.e2e.spec.ts:403:49
+    401|     console.error("Admitted reset A executor verdict", JSON.stringify(…
+    402|       sqlDiagnostic: completed.subprocesses?.at(-1)?.sqlDiagnostic }));
+    403|     expect([completed.code, completed.failure]).toEqual([0, ""]);
+       |                                                 ^
+    404|     expect(completed.receipt).toEqual({ ...bound, phase: "rows", state…
+    405|       digest: { schema: before.schema, retained: before.retained, disp…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  15:02:29
+   Duration  20.21s (tests 99%, import 1%)

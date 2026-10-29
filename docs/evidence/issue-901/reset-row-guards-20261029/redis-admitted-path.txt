@@ -1,0 +1,13 @@
+ ✓ scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts > real interrupted Redis intent and lost Lua reply on disposable transports > classifies uninterrupted initial completion before any recovery RED 6190ms
+ ✓ scripts/staging-clean-reset-redis-recovery.e2e.spec.ts > bounded Redis completion and completed-state recovery on disposable PostgreSQL and Redis > deletes only inventoried state, preserves rows authority, and replays exact completed state without writes 6967ms
+ ✓ scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts > real interrupted Redis intent and lost Lua reply on disposable transports > keeps actual pending without a marker closed with zero further writes 5184ms
+ ✓ scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts > real interrupted Redis intent and lost Lua reply on disposable transports > recovers actual Lua completion after its transport reply is lost, then replays read-only 9666ms
+ ✓ scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts > real interrupted Redis intent and lost Lua reply on disposable transports > recovers pending PG once after a real Redis restart reloads the actual completed marker 5593ms
+ ✓ scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts > real interrupted Redis intent and lost Lua reply on disposable transports > refuses pending PG after a real Redis restart loses the marker even with empty queues 6269ms
+ ✓ scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts > real interrupted Redis intent and lost Lua reply on disposable transports > replays actual completed PG read-only after Redis marker loss and refuses contradictory post-state 6385ms
+ ✓ scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts > real interrupted Redis intent and lost Lua reply on disposable transports > a held maintenance backend permits target inventory and row deletion 4226ms
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Duration  43.93s (tests 99%, import 1%)
+pnpm exec vitest run scripts/staging-clean-reset-redis-recovery.e2e.spec.ts    14.22s user 4.33s system 41% cpu 44.215 total
+exit 0

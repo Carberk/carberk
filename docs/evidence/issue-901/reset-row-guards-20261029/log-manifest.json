@@ -1,0 +1,192 @@
+[
+  {
+    "receipt": "functional-base-red.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/functional-base-red.log",
+    "rawSha256": "b5ec6666f052b7be9e8760045d42a6d0fc746da87f69e74c10e34a2e0399fd87",
+    "receiptSha256": "b5ec6666f052b7be9e8760045d42a6d0fc746da87f69e74c10e34a2e0399fd87",
+    "source": "parent fc77bc55, before any edit",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "focused-ownership-red.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-ownership-red.log",
+    "rawSha256": "229068ca626a5909daa6775fb199aae38030776bcc9e9226213c1cc594b6d015",
+    "receiptSha256": "229068ca626a5909daa6775fb199aae38030776bcc9e9226213c1cc594b6d015",
+    "source": "ownership tests added, migration unchanged",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "focused-ownership-green.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-ownership-green.log",
+    "rawSha256": "6b99a4046cdc5d9d2d8494a2d02eb934ec3aed6e217ed3285471fa810e5dcaa1",
+    "receiptSha256": "6b99a4046cdc5d9d2d8494a2d02eb934ec3aed6e217ed3285471fa810e5dcaa1",
+    "source": "ownership branch added",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "functional-ownership-next.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/functional-after-ownership.log",
+    "rawSha256": "c8fa2d3c0dad25f38795a1c5aa9d4d782434dde5070a66fe37c326bb0e05aa5b",
+    "receiptSha256": "0a95e4c4e4f0b2542d72413bcfb2dc5f3356fd414e6c30fb22fb7b01ea2d7092",
+    "source": "ownership branch added",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts --reporter=verbose; receipt drops bounded transport lines"
+  },
+  {
+    "receipt": "focused-evidence-red.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-evidence-red.log",
+    "rawSha256": "90c7802f1fa5e296581590567588e60fa0e3037d37e784b38d75563909b7c957",
+    "receiptSha256": "90c7802f1fa5e296581590567588e60fa0e3037d37e784b38d75563909b7c957",
+    "source": "evidence tests added, evidence guard unchanged",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "focused-evidence-green.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-evidence-green.log",
+    "rawSha256": "ce6d6fe8076b4378ed2ef6a15626ba918fde8a47b6531daae16a0b5cabe95c49",
+    "receiptSha256": "ce6d6fe8076b4378ed2ef6a15626ba918fde8a47b6531daae16a0b5cabe95c49",
+    "source": "evidence branch added",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "functional-evidence-next.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/functional-after-evidence.log",
+    "rawSha256": "55d814a6437e305a93e426f67ff0e666f43a0ff263f026c058c42d5413b0e435",
+    "receiptSha256": "4e98b60c93a47c568a01b146f23b4c88c4070f3e59c6226ce2003687d431fa78",
+    "source": "evidence branch added",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts --reporter=verbose; receipt drops bounded transport lines"
+  },
+  {
+    "receipt": "focused-provenance-red.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-provenance-red.log",
+    "rawSha256": "59fc00cc6dd8b6ef3d593d370bc0fddcca523cd19523f0b125e0d54cf638b508",
+    "receiptSha256": "59fc00cc6dd8b6ef3d593d370bc0fddcca523cd19523f0b125e0d54cf638b508",
+    "source": "provenance tests added, provenance guard unchanged",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "focused-provenance-green.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-provenance-green.log",
+    "rawSha256": "957e3dba518054af3baaab49056cc08f245b7a65470c091b90b38b78ed69e57d",
+    "receiptSha256": "957e3dba518054af3baaab49056cc08f245b7a65470c091b90b38b78ed69e57d",
+    "source": "provenance branch added",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "functional-provenance-next.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/functional-after-provenance.log",
+    "rawSha256": "5ae3444c336bc7046b894690bc02bef792e276d7c5b6ada416fa1e0289be701a",
+    "receiptSha256": "4c2b4d260b543ba1f8ba25bd6959f61b3e647a951b10a3d324bddf26bcee9c7d",
+    "source": "provenance branch added",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts --reporter=verbose; receipt drops bounded transport lines"
+  },
+  {
+    "receipt": "focused-grant-red.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-grant-red.log",
+    "rawSha256": "61c8bad84586bf7dfe04348290787772c9c1c8d888a4e0fcd5d4650f4c698e2d",
+    "receiptSha256": "61c8bad84586bf7dfe04348290787772c9c1c8d888a4e0fcd5d4650f4c698e2d",
+    "source": "grant tests added, grant guard unchanged",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "focused-grant-green.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-grant-green.log",
+    "rawSha256": "2589f7e2abbf5e6160875449a89339d04ca68f1c11f9910a2fdf805de5cb503c",
+    "receiptSha256": "2589f7e2abbf5e6160875449a89339d04ca68f1c11f9910a2fdf805de5cb503c",
+    "source": "grant branch added (final migration bytes)",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "focused-final-green.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/focused-final-green.log",
+    "rawSha256": "bb4d6fc9a0c57feea2d005a7d4dc33145f4643bdd6820f3eb3f35185688d81b2",
+    "receiptSha256": "bb4d6fc9a0c57feea2d005a7d4dc33145f4643bdd6820f3eb3f35185688d81b2",
+    "source": "final committed bytes of 4ed39fc2 (adds ordinary CASCADE test, tuple typing)",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "functional-final-green.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/functional-final-green.log",
+    "rawSha256": "18da1ca92793a6c338e5f02fd29fb79a292c3ffad8b1d043ad9e9dfd20bded5c",
+    "receiptSha256": "18da1ca92793a6c338e5f02fd29fb79a292c3ffad8b1d043ad9e9dfd20bded5c",
+    "source": "commit 4ed39fc2, clean tree",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "redis-admitted-path.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/redis-final.log",
+    "rawSha256": "01c3abead5fd62d422b9d64f0a42f2671828da94d950e343ef0d5d507a51726a",
+    "receiptSha256": "f3836723b0c98ae991cfe2a280beac652a3f17e781a8d150a026b59e0da0aebb",
+    "source": "commit 4ed39fc2, clean tree; receipt keeps result and summary lines only",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset-redis-recovery.e2e.spec.ts scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "node-reset-units.txt",
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/node-reset-units.log",
+    "rawSha256": "a7d41de262feb1d61cbb70438d59f49d0fead117aca715ee4b60a6b5c055edaf",
+    "receiptSha256": "a7d41de262feb1d61cbb70438d59f49d0fead117aca715ee4b60a6b5c055edaf",
+    "source": "4ed39fc2 sources (scripts unchanged from parent)",
+    "command": "node --test scripts/staging-clean-reset.test.mjs scripts/staging-clean-reset-remote.test.mjs scripts/testing/query-disposable-postgres.test.cjs"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/functional-after-grant.log",
+    "rawSha256": "0676a815ec4e24c3244ed9054f39763a4d2d78d764df3cc1c0e90daeae9fa1fb",
+    "source": "grant branch added, before the final spec-only edits",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts --reporter=verbose",
+    "summarizedIn": "first representative GREEN 7/7; superseded by functional-final-green.txt on the commit"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/redis-admitted-path.log",
+    "rawSha256": "8916fdb34f89fe87a81ce1bd56d032cde18e477b42cd93725c90ee6618310905",
+    "source": "grant branch added, before the final spec-only edits",
+    "command": "same as redis-admitted-path.txt",
+    "summarizedIn": "8/8; superseded by the commit run"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/eslint-focused.log",
+    "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "summarizedIn": "pnpm exec eslint tests/operational-reset-rows.e2e.spec.ts --max-warnings=0 (packages/db)"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/db-typecheck.log",
+    "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+    "summarizedIn": "pnpm typecheck (packages/db)"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/setup-install.log",
+    "rawSha256": "e4ac3fadfea0b235dd2a9c4f8b10597d5f816c3c8e4eafe674cf6ba3b156e897",
+    "summarizedIn": "SETUP pnpm install --frozen-lockfile"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/setup-contracts-build.log",
+    "rawSha256": "2f7b3ad27825bfa7d109e19317a1c17969e85249b89857a40fd14382e392cd66",
+    "summarizedIn": "SETUP pnpm --filter @auto-tm/contracts build"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/setup-db-generate.log",
+    "rawSha256": "6249d64d41469daa96bfc3929279e0a11264503db6e46f7f7d275e6386849e04",
+    "summarizedIn": "SETUP prisma generate (inert DATABASE_URL)"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-e0d6ff2a/logs/setup-db-build.log",
+    "rawSha256": "8b77e7460ecc6215c17f5dad198d0d8cd7bd0c3f6f1c051bcdf38a922e5ba5b9",
+    "summarizedIn": "SETUP pnpm --filter @auto-tm/db build (inert DATABASE_URL)"
+  },
+  {
+    "receipt": "catalog-equality.txt",
+    "receiptSha256": "36edb15b2cf4bbe6d9bedcc2f5eb2156e6f1ba18b206a25986e1073f70f46dcd",
+    "generatedFrom": "/tmp/t3-e0d6ff2a/tools/body_equality.py and live_equality.sh against the base and after inspection databases"
+  },
+  {
+    "receipt": "probes.txt",
+    "receiptSha256": "07e924af64270f0d00dd836d41a7b63432006f5dbf6a3ba4428f6802973c1d1b",
+    "generatedFrom": "/tmp/t3-e0d6ff2a/tools/ordinary-cascade.sql and mutual-suspension.sql, rolled back"
+  }
+]
