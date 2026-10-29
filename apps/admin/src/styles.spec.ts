@@ -24,4 +24,16 @@ describe("admin Tailwind entrypoint", () => {
     );
     expect(result.css).not.toContain("--font-sans: var(--font-sans);");
   });
+
+  it("uses the semantic palette for language boundaries and focus indicators", async () => {
+    const source = await readFile(stylesheetPath, "utf8");
+
+    expect(source).toContain('select[aria-label="Language"]');
+    expect(source).toContain('select[aria-label="Язык"]');
+    expect(source).toContain('select[aria-label="Dil"]');
+    expect(source).toContain("border-color: var(--text-secondary)");
+    expect(source).toContain("*:focus-visible");
+    expect(source).toContain("outline: 2px solid var(--text-secondary)");
+    expect(source).not.toContain("outline-ring/50");
+  });
 });

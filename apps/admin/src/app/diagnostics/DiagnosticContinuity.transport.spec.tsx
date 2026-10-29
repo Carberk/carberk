@@ -71,6 +71,7 @@ it("requires B intention review and sends only the explicit B command", async ()
  const final = screen.getByRole("button", { name: c.consume }).closest("section") as HTMLElement;
  expect(final.textContent).toContain("Authorized physical visit B"); expect(final.textContent).toContain("129,000"); expect(final.textContent).toContain("Synthetic template"); expect(final.textContent).toContain("Buyer private"); expect(writes).toEqual([]);
  fireEvent.click(within(final).getByRole("button", { name: c.consume })); await screen.findAllByRole("button", { name: c.result });
+ expect(document.activeElement).toBe(screen.getAllByRole("heading", { name: c.handoff }).at(-1));
  expect(writes.at(-1)?.body).toEqual({ kind: "consume", command: { proofId, reportId: expect.any(String), expectedOrderVersion: 7, reason: "My intended physical visit" } });
 });
 it.each([
@@ -115,6 +116,7 @@ it("checks uncertain execution status before enabling exact unchanged retry", as
  await screen.findByText(c.uncertain); expect(screen.queryByRole("button", { name: c.retryExact })).toBeNull();
  await waitFor(() => expect(screen.getByRole("button", { name: c.status }).hasAttribute("disabled")).toBe(false)); fireEvent.click(screen.getByRole("button", { name: c.status }));
  fireEvent.click(await screen.findByRole("button", { name: c.retryExact })); await screen.findAllByRole("button", { name: c.result });
+ expect(document.activeElement).toBe(screen.getAllByRole("heading", { name: c.handoff }).at(-1));
  const commands = writes.filter(item => item.path.endsWith("/execute")); expect(commands).toHaveLength(2); expect(commands[1]).toEqual(commands[0]);
 });
 it("renders all 41 bound materials and removes issuance controls", async () => {
@@ -151,6 +153,7 @@ it("preserves a reason across locale changes and offers an explicit dirty leave 
 it("uploads no bytes before classification and records a complete correction using genuinely new verified support", async () => {
  setup(); fireEvent.click(await screen.findByRole("button", { name: c.visit })); fireEvent.click(screen.getByRole("button", { name: c.loadIdentity }));
  fireEvent.click(await screen.findByRole("button", { name: c.correction })); fireEvent.click(screen.getByRole("button",{name:c.replacement}));
+ await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: c.correction })));
  const file = new File([new Uint8Array([1, 2, 3, 4])], "synthetic-private.png", { type: "image/png" });
  expect((screen.getByLabelText(`${c.file} · ${c.optional}`) as HTMLInputElement).disabled).toBe(true);
  expect(screen.getByRole("button", { name: c.stage }).getAttribute("aria-disabled")==="true").toBe(true); expect(writes).toEqual([]);

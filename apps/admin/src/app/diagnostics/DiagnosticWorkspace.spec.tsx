@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/re
 import type { DiagnosticSchemas as D } from "@auto-tm/contracts";
 
 import { DiagnosticWorkspace } from "./DiagnosticWorkspace";
+import { continuityCopy } from "./continuity-copy";
 import { diagnosticCopy } from "./copy";
 
 import { AdminLanguageSwitch, AdminLocaleProvider } from "@/lib/i18n";
@@ -155,10 +156,30 @@ it("keeps the language selector and diagnostic actions at the accessible target 
  const view = setup();
  const language = view.getByRole("combobox", { name: "Language" });
  expect(language.className).toContain("min-h-11");
- expect(language.className).toContain("focus-visible:outline-neutral-900");
  await waitFor(() => expect(view.getByRole("button", { name: diagnosticCopy.en.refresh })).toBeTruthy());
  const refresh = view.getByRole("button", { name: diagnosticCopy.en.refresh });
  expect(refresh.className).toContain("min-h-11");
- expect(refresh.className).toContain("focus-visible:outline-neutral-900");
+ expect(refresh.className).toContain("border-text-secondary");
  expect(refresh.className).toContain("focus-visible:outline-offset-2");
+});
+
+it("uses palette surfaces, text and boundaries for legacy diagnostic fields", async () => {
+ const view = setup();
+ await open(view);
+ const reportSelect = view.getByRole("combobox", { name: diagnosticCopy.en.selectReport });
+ const reason = view.getByRole("textbox", { name: diagnosticCopy.en.reason });
+ for (const control of [reportSelect, reason]) {
+  expect(control.className).toContain("border-text-secondary");
+  expect(control.className).toContain("bg-background");
+  expect(control.className).toContain("text-foreground");
+ }
+ fireEvent.click(view.getByRole("button", { name: continuityCopy.en.visit }));
+ fireEvent.click(view.getByText(continuityCopy.en.intake, { selector: "summary" }));
+ const observedAt = view.getByLabelText(`${diagnosticCopy.en.observedAt} · Required`);
+ expect(observedAt.className).toContain("border-text-secondary");
+ expect(observedAt.className).toContain("bg-background");
+ expect(observedAt.className).toContain("text-foreground");
+ expect(view.getByRole("button", { name: diagnosticCopy.en.observe }).className).toContain("border-text-secondary");
+ expect(view.getByText(diagnosticCopy.en.scope).className).toContain("text-text-secondary");
+ expect(view.getByText(diagnosticCopy.en.unchecked).className).toContain("text-text-secondary");
 });
