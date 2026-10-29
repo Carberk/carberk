@@ -27,6 +27,9 @@ interface OwnershipExpiryFixture {
 }
 const fixturePath = process.env["DIAGNOSTIC_WORKER_OWNERSHIP_FIXTURE"];
 const enabled = process.env["DIAGNOSTIC_WORKER_OWNERSHIP_ACCEPTANCE"] === "1" || process.env["DIAGNOSTIC_WORKER_PREPARATION_ACCEPTANCE"] === "1";
+// Finite verification budget for refusal, full100 cleanup and assertions, sized
+// from worker-width-decision-20261029. This is not an ownership-retention SLO.
+const budgetMs = 60_000;
 
 describe.skipIf(!enabled)("full grant queue with independently due ownership", () => {
   const db = new PrismaService();
@@ -135,7 +138,7 @@ describe.skipIf(!enabled)("full grant queue with independently due ownership", (
     // race evidence. It runs only while the existing bounded caller is active.
     let sampling = false;
     const timer = setInterval(() => {
-      if (Date.now() - started >= 5000) { clearInterval(timer); return; }
+      if (Date.now() - started >= budgetMs) { clearInterval(timer); return; }
       if (sampling || !owner) return;
       sampling = true;
       void owner.$queryRaw`SELECT pid,state,wait_event_type,wait_event,left(query,1200) AS query,
@@ -202,5 +205,5 @@ describe.skipIf(!enabled)("full grant queue with independently due ownership", (
         error: error instanceof Error ? { message: error.message, stack: error.stack } : String(error) }, null, 2), { flag: "wx" });
       throw error;
     }
-  });
+  }, budgetMs);
 });
