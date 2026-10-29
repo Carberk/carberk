@@ -4,7 +4,7 @@
 
 ## Verdict
 
-The saved RED is not a fixture or ownership-composition defect. It is also not an observed source correctness defect. It is a performance mismatch between the unchanged five-second oracle and the ten-root serial design, and it can be shown from the saved timings alone. Three measurement gaps remain; they are listed below. The unchanged native command should not be rerun on any fixture until the mismatch is resolved.
+The saved RED shows a budget mismatch on the measured 98-migration candidate. It does not identify a fixture or ownership-composition defect, and it does not establish full worker correctness. The timings warn against another native attempt without a finite cost decision. They do not prove that the assembled candidate with 162, 163 and 164 cannot meet the budget. The authority for five seconds also needs a short source/criterion trace because the test has no explicit timeout or elapsed-time assertion.
 
 ## State transitions reconstructed from the saved artifacts
 
@@ -29,21 +29,21 @@ Two timing facts that earlier receipts did not state:
 1. Everything except `diagnostic_prepare_source` is small. Discovery is about 0.3 ms per call, disposal is about 100 ms per group, and the pre-prepare reads are about 45 ms. One group costs about 3.1 s in the accepted call and about 1.7 s in the refused call.
 2. The refused and accepted prepares are the same ten roots, the same PID (10029) and the same source bytes. The accepted one is 1.9 times slower (2.93 s against 1.55 s). That ratio equals the clone's pre-163 against post-163 prepare10 ratio (2982 ms against 1562 ms), yet this native run had no 163. Run-to-run variance on one backend is therefore as large as the effect attributed to 163 in a single shot. Call counts and registry self-time in the attribution are deterministic, but no wall-clock claim from a single pair of runs is safe.
 
-## Why the unchanged oracle cannot pass this design
+## Budget warning from the saved candidate
 
 The test body contains the refused cleanup, which has to prepare group 1 before it reaches the first denied `UPDATE`. That used 1.68 s. About 3.3 s remain for the accepted call. It must then prepare 10 grant groups plus the residual-component group, which is 11 prepared commands. The proof-expiry phase adds a twelfth only if proofs remain after the pair is disposed. That allows about 300 ms per prepared command, including about 150 ms of non-prepare work per group. A whole group costs 1.7 s (refused) to 3.1 s (accepted), so the shortfall is about 6 to 10 times. Eleven prepares at the best observed 1.55 s sum to at least about 17 s.
 
-The proposed source-only indexed primary-key helper cannot close that gap alone. The best attribution breakdown (post-163 clone, ten-root prepare, 1560 ms) has these row-read and lock sites:
+The older post-163 ten-root attribution reports these row-read and lock costs inside a 1560 ms prepare:
 
 - `diagnostic_source_read`: 260 ms
 - `campaign_preparation_scope` self time: 528.6 ms
 - `diagnostic_source_insert_receipt` self time: 136 ms
 
-Together they are about 925 ms. If they went to zero, about 635 ms per prepare would remain, so eleven prepares need at least 7 s against 3.3 s. The remaining cost is scope fixed-point self time, parse, lock keys and metadata. Removing either of the two fresh READ COMMITTED revalidations is forbidden. This is a static bound from saved numbers, not a measurement.
+Their reported times sum to about 925 ms. Subtracting that sum from the prepare time suggests a remaining cost, but nested function timings, variance and the missing 162 wrappers prevent treating this arithmetic as a lower bound on the new candidate. The accepted 164 candidate must be measured before deciding feasibility. Removing either fresh READ COMMITTED revalidation remains outside the authorized repair.
 
 ## Correctness status
 
-No defect was observed. The first-refusal rollback and the group 1 closure (grant, derived component, anchor) match the contract. The batched source is correct on the evidence available, but that evidence covers one group of ten independent visits.
+No defect was observed in the first-refusal rollback or group 1 closure. That evidence covers ten independent visits and does not prove the batched source correct overall.
 
 The real fixture is not ten independent visits. The comparative pair straddles groups: the candidate grant `1742ffa5` is in group 2, the predecessor grant `9f31c4c0` is in group 7, and the report, proof and request hang off that pair. Group 2 is therefore the first group with the shared-proof closure, with larger shared-staff closure and later-group replanning. Its graph size, cap fit and effect counts have never been measured. The 10-root measurement says nothing about it.
 
@@ -74,9 +74,9 @@ Unproved:
 
 Not another native run, not a source edit, not a cap, partition, guard or oracle change.
 
-1. Coordinator decision, using this note: the unchanged 5 s oracle appears unreachable under ten-root serial prepare, and the registry predicate proposal cannot reach it alone. If the criterion is to stay as written, any further design must reduce the number of prepared commands or the cost of one without removing a revalidation or a cap. If it cannot, that is a contract question for the founder, not something the implementers can waive.
-2. If the coordinator wants evidence before deciding, authorize one rolled-back attribution on a disposable clone of the assembled 100-migration chain with the batched worker source. Time `diagnostic_prepare_source` for group 2 (the shared-proof group) and for widths that fit the cap, under the same limits as the 163 attribution, and repeat each width at least three times to size the variance. Record the per-table key counts before each guard so the cap fit per width is known. No native call.
-3. Only after that, decide the repair, and then run the native command once on a fresh fixture.
+1. Trace five seconds to its governing source. Distinguish a product SLO, accepted verification budget and coordinator-imposed runner default. A harness correction needs evidence and review; it must preserve every behavioral assertion, finite execution and any genuine SLO.
+2. The founder has authorized one rolled-back comparison on a disposable clone of the actual assembled chain including 164, with the byte-pinned batched worker. Measure the original shared-proof group 2 and only diagnostic widths that fit the unchanged cap, three repeats per selected width, with the existing statement/client/lock limits and host-load/fingerprint evidence. This does not change production partition width or supply acceptance.
+3. Choose the smallest evidence-backed repair, then prove the complete ordinary full100 path and races on a fresh fixture. No repeated native attempts or speculative worker rounds precede that decision.
 
 ## Fresh disposable fixture recipe (proposal; not run)
 
