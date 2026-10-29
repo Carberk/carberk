@@ -1,0 +1,71 @@
+{
+  "verdict": "GREEN: one fresh ordinary full100 ownership-expiry acceptance",
+  "candidate": {
+    "head": "8461cdbedba07d825dd1b1d84ccca6dcb94931eb",
+    "branch": "agent/release897-candidate-a-20261029",
+    "migrationCount": 102,
+    "manifestSha256": "dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc",
+    "resetMigrationSha256": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd"
+  },
+  "fixture": {
+    "composeProject": "auto_tm_ci_897_r6c_fresh102_20261029",
+    "postgresPort": 56391,
+    "redisPort": 56392,
+    "minioPort": 56390,
+    "sourceFingerprint": "0b444233967c116f5bdc7317a29a1916",
+    "cloneFingerprint": "0b444233967c116f5bdc7317a29a1916",
+    "ordinaryProducer": "GREEN",
+    "dueGrants": 100,
+    "derivedComponents": 100,
+    "independentComponent": true,
+    "nonDueGrants": 2,
+    "nonDueComponents": 1,
+    "orders": 102
+  },
+  "native": {
+    "testFiles": 1,
+    "tests": 1,
+    "exit": 0,
+    "vitestDurationMs": 11000,
+    "acceptedCleanupElapsedMs": 9697,
+    "totalElapsedMs": 10276,
+    "assertionsAfterAcceptedMs": 15,
+    "refusedCallRolledBack": true,
+    "acceptedCleanupCommitted": true,
+    "receipts": "0/0"
+  },
+  "postState": {
+    "grants": {"erased": 100, "available": 2},
+    "components": {"erased": 101, "available": 1},
+    "anchors": {"erased": 101, "unchanged": 1},
+    "orders": {"retained": 102},
+    "raw": {"retained": 102},
+    "reports": {"retained": 1},
+    "proofs": {"removed": true},
+    "requests": {"removed": true}
+  },
+  "restoration": {
+    "connectionsAfterDrain": 0,
+    "receiptsAfterDrain": "0/0",
+    "bootstrapRestored": true,
+    "taskContainersAfterCleanup": 0
+  },
+  "host": {"preflightLoad": "2.98 3.26 3.24", "hostLoadClaim": "not a quiet-host timing claim"},
+  "artifacts": {
+    "nativeLog": {"path": "/tmp/897-r6c-fresh102-20261029/native-ownership_attempt1.log", "sha256": "9dffe666ad29e70296c6f58705825b0824c410cd56d3cbde3e6ae4daf3213e84"},
+    "before": {"path": "/tmp/897-r6c-fresh102-20261029/native-ownership_attempt1/before.json", "sha256": "10829f9d97510857fb40bf83eedf80cc10e1c96d18eb7bc5770208cefa36f97a"},
+    "after": {"path": "/tmp/897-r6c-fresh102-20261029/native-ownership_attempt1/after.json", "sha256": "3022c45df39d2d709eb684f7098b116487e3d7515c61b7e2f4358620dcc1480a"},
+    "phases": {"path": "/tmp/897-r6c-fresh102-20261029/native-ownership_attempt1/phases.json", "sha256": "10fd5bf50989ba1a9433a59c6fde0f6075003ea90789c5c52844f4a6fbe40f0c"},
+    "statementObservations": {"path": "/tmp/897-r6c-fresh102-20261029/native-ownership_attempt1/statement-observations.json", "sha256": "c7143cdfc9248f6c1ab0a880ca942a9a42542e77ae908beaaf5052d0af23d3a1"},
+    "fixture": {"path": "/tmp/897-r6c-fresh102-20261029/bootstrap/fixture.json", "sha256": "d4c06de026907678504e032f22477eea5fe85fe984bdda918e47eb4e93ef285f"},
+    "bootstrap": {"path": "/tmp/897-r6c-fresh102-20261029/bootstrap/bootstrap.json", "sha256": "76368e9d6f63928155e06c739957cfc360e9e7da36b6fc204921f1b9524f83c2"},
+    "producer": {"path": "/tmp/897-r6c-fresh102-20261029/bootstrap/producer.json", "sha256": "83b4cfea9f5299935c0ba7a04a4e0e3fce8d55845c4d404ea2c38c8bdd200ec8"},
+    "loadedBytes": {"path": "/tmp/897-r6c-fresh102-20261029/bootstrap/loaded-bytes.json", "sha256": "ccb8332243d0870faf6a7fec9c0df492a5544388e05871cd0f5405350643b729"},
+    "restoration": {"path": "/tmp/897-r6c-fresh102-20261029/bootstrap/bootstrap-restoration.json", "sha256": "af9da476188ab9b96be517f3235041e236dc825fc20b5e41fefa15bf6905fc49"}
+  },
+  "limits": [
+    "This is one ordinary fixture acceptance; the restricted, capacity and race matrix remains open.",
+    "The original 5-second Vitest default was not reinstated; the reviewed per-test budget is 60 seconds.",
+    "Raw private runtime files remain under the task-local /tmp path and were not copied into the repository."
+  ]
+}

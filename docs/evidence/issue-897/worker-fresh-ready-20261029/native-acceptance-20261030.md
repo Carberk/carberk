@@ -1,0 +1,7 @@
+# Fresh ownership full100 acceptance — 2026-10-30
+
+The current candidate (`8461cdbed`, 102 migrations, including registry 163/164 and the reset-row cycle guard) passed one fresh ordinary ownership-expiry acceptance. The producer created 100 due grants, 100 derived components, one independent due component, two non-due grants, one non-due component, 102 orders and the shared closure rows.
+
+The refused cleanup rolled back first. The accepted cleanup then committed and the single Vitest file passed 1/1 in 11.00s under the reviewed per-test 60-second budget. Final state has 100 grants erased and two non-due grants available; 101 components erased (the 100 derived plus the independent component) and one non-due component available; 101 anchors erased and one unchanged; all 102 orders, 102 raw records and the report retained; proofs and requests removed; and source/campaign receipts at `0/0`. The source and template clone fingerprints were both `0b444233967c116f5bdc7317a29a1916`.
+
+The task database drained to zero connections before cleanup. Bootstrap trigger/role restoration completed, the exact Compose project was destroyed, and no task containers remain. Exact raw-output paths and SHA-256 values are in [native-acceptance-20261030.json](native-acceptance-20261030.json). This receipt does not close the restricted-role, capacity, race/concurrency, reset-provider/storage, review, CI, deployed, or artifact gates.
