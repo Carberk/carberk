@@ -295,6 +295,56 @@ BEGIN
  RETURN NEW;
 END $$;
 
+-- The source anchor guard gains the same branch ahead of its source-receipt and parent
+-- checks. Everything after it is the unchanged 20261024050000 definition.
+CREATE OR REPLACE FUNCTION public.diagnostic_source_anchor_guard() RETURNS trigger
+LANGUAGE plpgsql VOLATILE SET search_path = pg_catalog, public AS $$
+DECLARE receipt public.diagnostic_source_commands; raw public.diagnostic_identity_records; component public.diagnostic_ownership_components;
+ grant_row public.diagnostic_ownership_grants; oid text; plan jsonb; initial boolean;
+BEGIN
+ IF TG_OP='DELETE' AND current_user=(SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname='staging_clean_reset_rows') THEN
+  IF staging_clean_reset_rows.allows_old(TG_TABLE_NAME,to_jsonb(OLD)) THEN RETURN OLD; END IF;
+ END IF;
+ oid:=CASE WHEN TG_OP='DELETE' THEN OLD."orderId" ELSE NEW."orderId" END;
+ SELECT * INTO receipt FROM public.diagnostic_source_commands WHERE backend_pid=pg_backend_pid() AND full_transaction_id=pg_current_xact_id()::text;
+ IF receipt.id IS NULL OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(receipt.scope) s WHERE s->>'table'='inspection_orders' AND s->'key'->>'id'=oid) THEN RAISE EXCEPTION 'diagnostic_source_anchor_receipt'; END IF;
+ IF TG_OP='DELETE' THEN
+  IF EXISTS (SELECT 1 FROM public.inspection_orders WHERE id=oid) THEN RAISE EXCEPTION 'diagnostic_source_anchor_immutable'; END IF;
+  RETURN OLD;
+ ELSIF TG_OP='INSERT' THEN
+  IF receipt.command->>'operation' NOT IN ('order_create','intake_create') OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(receipt.command->'rows') r
+   WHERE r->>'table'='inspection_orders' AND r->'key'->>'id'=oid AND r->>'verb'='insert') THEN RAISE EXCEPTION 'diagnostic_source_no_anchor_backfill'; END IF;
+  NEW.state:='pending'; NEW."firstRecordId":=NULL; NEW.source:=public.diagnostic_source_anchor_origin(oid); NEW."createdTransaction":=pg_current_xact_id()::text;
+  RETURN NEW;
+ END IF;
+ IF (OLD.state='unchanged' AND NEW.state NOT IN ('unchanged','changed','erased'))
+  OR NEW."orderId" IS DISTINCT FROM OLD."orderId" OR NEW."createdTransaction" IS DISTINCT FROM OLD."createdTransaction"
+  OR (OLD.state IN ('changed','unavailable','erased') AND NEW.state NOT IN (OLD.state,'erased'))
+  OR (NEW.source IS DISTINCT FROM OLD.source AND NOT (NEW.state='erased' AND NEW.source IS NULL))
+  OR (OLD."firstRecordId" IS NOT NULL AND NEW."firstRecordId" IS DISTINCT FROM OLD."firstRecordId" AND NEW.state<>'erased') THEN RAISE EXCEPTION 'diagnostic_source_anchor_immutable'; END IF;
+ IF NEW.state='erased' THEN
+  IF EXISTS (SELECT 1 FROM public.diagnostic_ownership_components c JOIN public.diagnostic_identity_records r ON r.id=c."identityRecordId"
+   JOIN public.inspection_orders o ON o.id=r."orderId" WHERE c."identityRecordId"=OLD."firstRecordId" AND c.state='available' AND r."erasedAt" IS NULL AND o."erasedAt" IS NULL) THEN RAISE EXCEPTION 'diagnostic_source_anchor_disposal'; END IF;
+  NEW.source:=NULL; NEW."firstRecordId":=NULL; RETURN NEW;
+ END IF;
+ IF OLD."firstRecordId" IS NULL AND NEW."firstRecordId" IS NOT NULL THEN
+  IF receipt.command->>'operation'<>'observation_append' THEN RAISE EXCEPTION 'diagnostic_source_first_slot'; END IF;
+  SELECT value INTO plan FROM jsonb_array_elements(receipt.command->'rows') r WHERE r->>'table'='diagnostic_identity_records'
+   AND r->>'verb'='insert' AND r->'key'->>'id'=NEW."firstRecordId" AND r->'next'->>'orderId'=oid;
+  SELECT * INTO raw FROM public.diagnostic_identity_records WHERE id=NEW."firstRecordId" AND "orderId"=oid AND "ownershipCaptureTransaction"=pg_current_xact_id()::text;
+  SELECT * INTO component FROM public.diagnostic_ownership_components WHERE "identityRecordId"=raw.id AND "orderId"=oid;
+  SELECT * INTO grant_row FROM public.diagnostic_ownership_grants WHERE id=component."grantId";
+  IF plan IS NULL OR raw.id IS NULL OR component."identityRecordId" IS NULL THEN RAISE EXCEPTION 'diagnostic_source_first_slot'; END IF;
+  -- Claim only the immutable first slot. A changed shell remains changed; a no-grant
+  -- capture succeeds unavailable. Existing source/grant guards check exact bindings.
+  IF OLD.state='pending' THEN
+   NEW.state:=CASE WHEN component.state='available' AND public.diagnostic_ownership_grant_current(grant_row,clock_timestamp() AT TIME ZONE 'UTC') IS TRUE THEN 'unchanged' ELSE 'unavailable' END;
+  ELSE NEW.state:=OLD.state; END IF;
+ ELSIF NEW.state='unchanged' AND OLD.state<>'unchanged' THEN RAISE EXCEPTION 'diagnostic_source_anchor_immutable';
+ END IF;
+ RETURN NEW;
+END $$;
+
 -- Certify the final graph only after every owning guard change above, and prove the fixed
 -- order: exact disposable set, every non-self FK child before its parent except the refused
 -- avatar cycle, and no retained table referencing disposable data.
