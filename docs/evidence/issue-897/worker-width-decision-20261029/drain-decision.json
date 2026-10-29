@@ -1,0 +1,50 @@
+{
+  "hashes": {
+    "functions": "c6b87edc0d969814e2c06b9b8b120625c18db817cac615790b37b4cc3328f117",
+    "functionCount": 190,
+    "guards": "74f8917631d0ccdc8f7821aec6dfa0f4f9c70ecc9ee1e112b33f3ba4e5113c93",
+    "guardCount": 354,
+    "migrations": "ca4bced0ab2cebc6097051d7826f2b97f7643e640fc6b18cf74b811d07506587",
+    "migrationCount": 101,
+    "data": "a43ba3b55123b0bec8a60cc8764a6c45de5ea323ade14aa26b23772fddfb6533",
+    "workerFunctionPrivileges": "e05c208f3ad5d11fbb763617890a62c2fe2bccafa4444b8969f07376dbd37b15",
+    "workerTablePrivileges": "56a2a53f051a5cd12094cbd482c02d1c2af4335c86126d01c3b88f83b15f39de",
+    "tablePrivileges": "aa6227c3056fa1007ad59e7a4fbaa5527cd5d3f6db9e0f2e2bb1a30825e85945",
+    "functionAcl": "5b2242aae9d8fcf50fd08b0508764f839028c279e7cab091d649553fa3436b7d"
+  },
+  "equalToPreMeasurement": {
+    "functions": true,
+    "functionCount": true,
+    "guards": true,
+    "guardCount": true,
+    "migrations": true,
+    "migrationCount": true,
+    "data": true,
+    "workerFunctionPrivileges": true,
+    "workerTablePrivileges": true,
+    "tablePrivileges": true,
+    "functionAcl": true
+  },
+  "receipts": {
+    "source": 0,
+    "campaign": 0
+  },
+  "clients": [],
+  "eightClassCounts": {
+    "grants": 102,
+    "components": 102,
+    "orders": 102,
+    "raw": 102,
+    "reports": 1,
+    "anchors": 102,
+    "proofs": 1,
+    "requests": 1
+  },
+  "states": {
+    "grantsavailable": 102,
+    "grantserased": 0,
+    "componentsavailable": 102,
+    "componentserased": 0
+  },
+  "allEqual": true
+}

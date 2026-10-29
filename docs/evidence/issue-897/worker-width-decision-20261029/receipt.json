@@ -1,0 +1,1575 @@
+{
+  "status": "Diagnostic only; NOT acceptance; no native/test/producer run; no production, partition, cap, guard, revalidation or assertion change",
+  "parent": {
+    "head": "728c726b889ed4ed8d0bb3c1c04bad3d7697de0d",
+    "migrationCount": 101,
+    "migrationManifestSha256": "62c0801e82b228cd4bb2aa26845e35e5e4714215bdb338c47cc7b2dd140f8b90",
+    "manifestFile": "migration-manifest.json",
+    "first98EqualSavedClone": true,
+    "chainTail": {
+      "20261026016200_diagnostic_maintenance_compatibility": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379",
+      "20261026016300_diagnostic_registry_metadata_lookup": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7",
+      "20261026016400_diagnostic_source_key_predicate": "fe7358f92acaeae0b57a442cf8e7b4aa28b56ee03aa6177fd7fb271a93bafdb6 (equal at bb4cf5f5f)"
+    },
+    "keyPredicateSpecSha256": "6529917ccb8ce923a6bc8ac6dff78c9fdbf247195da0fa24ae41d67915ce6b4b"
+  },
+  "workerSource": {
+    "commit": "65024d5271cd7f5fda8e921e34fca9f9a957b089",
+    "aa5eed1d": "aa5eed1d7b597bf75ed06397adce42e37e2532f0",
+    "note": "Blobs read with git show, hashed, identical at 65024d52 and aa5eed1d. Not copied into the checkout: measurement needed only the partition/selection logic (width 10 at DiagnosticArtifactWorker.ts line 305), copies live in /tmp/897-r7g-decision-20261029/src, so the tree stays free of duplicate worker source for the parent assembler.",
+    "sha256": {
+      "apps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts": "0282e35b40555cfc32122fd0a0d2d153248d0f9c5fed120326e37b72139bd8b4",
+      "apps/worker/src/jobs/diagnostics/DiagnosticWorkerPreparation.ts": "5b1dd2534cbf14649f780eac42ed1a146c808ab82a320f8109b76558139bb05f",
+      "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipExpiry.e2e.spec.ts": "d44f8fd62a6bb4fb48c8e7a2eab1ad075bdb96d9befe3bfba8c79afdd826dc3e",
+      "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts": "1a2d9b3a8747ff75dad4c32f43136a5759c0589f4a5976b80260eb6f69163953",
+      "apps/worker/src/jobs/diagnostics/DiagnosticWorkerPreparation.e2e.spec.ts": "74bf9e4e7db4d449ca54ebc6173cb2ef81f2f2d368f53329d9d416a0c859e3be",
+      "apps/worker/src/jobs/diagnostics/DiagnosticWorkerSelection.spec.ts": "e16b77092a8e688178738f62b03a6cbe82fe4188db004ada6070d445b9204565",
+      "apps/worker/src/jobs/diagnostics/testing/bootstrapOwnershipExpiryFixture.mjs": "ad2e061cc62cae15191e53ccccd46822baf71b4549e3c6527a4ae100998cdad1",
+      "apps/worker/src/jobs/diagnostics/testing/produceOwnershipExpiryFixture.mjs": "f9c908773296cfe6f5b6f78d46b6daa6ec689f538bf376e7129d92e645d6a795",
+      "packages/db/src/testing/DiagnosticMemoryDatabase.ts": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "apps/worker/vitest.config.mts": "3a2a5df706d50b5d4c8be9853448577778458cedd68f23e9a4dbba1eaed6d6f8"
+    }
+  },
+  "inputs": {
+    "savedDumpSha256": "9d981c29a09de25a2ea6953f4ef86c02d83f6e068328d2cd6233d8872b623537",
+    "savedBeforeSha256": "510779e454b9bbbac1fd66f21aadcb9731f9eff8c0f7fc269551cbfb0d8dd50f",
+    "normalized100CommandSha256": "0cc55f9db0bbe795fb2a1c14e4d8b7bef3cb0b0a58ea3299facd1e4ee8990e22",
+    "retainedOwnership7Accessed": false,
+    "retainedBeforeExport": "read from the saved private export only (retained-before.private.json sha256 6fea81a2cd6aa3337b8a8bb18059944f43abdd1e852d08662215109d70a3ea1c)",
+    "cutoff": "2026-10-28T17:28:34.998Z",
+    "workerOrderEqualsSavedCommandOrder": true,
+    "distinctRightsUntilAmongDue": 1,
+    "sharedProofPair": {
+      "candidateIndex": 11,
+      "predecessorIndex": 68
+    }
+  },
+  "clone": {
+    "image": "postgres:16-alpine (16.15)",
+    "loopbackOnly": true,
+    "container": "r7g-decision-pg-262ac29e",
+    "port": 57128,
+    "database": "r7g_decision_before",
+    "track_functions": "all",
+    "settings": {
+      "autovacuum": "on",
+      "default_transaction_isolation": "read committed",
+      "jit": "on",
+      "lock_timeout": "0",
+      "max_connections": "100",
+      "random_page_cost": "4",
+      "shared_buffers": "16384",
+      "statement_timeout": "0",
+      "track_functions": "all",
+      "work_mem": "4096"
+    },
+    "workerRole": {
+      "name": "r6c_ownership_worker_0997c81081f6",
+      "attributes": {
+        "rolname": "r6c_ownership_worker_0997c81081f6",
+        "rolsuper": false,
+        "rolinherit": true,
+        "rolcreaterole": false,
+        "rolcreatedb": false,
+        "rolcanlogin": true,
+        "rolreplication": false,
+        "rolbypassrls": false
+      },
+      "memberships": []
+    },
+    "workerSession": {
+      "database": "r7g_decision_before",
+      "principal": "r6c_ownership_worker_0997c81081f6",
+      "isolation": "read committed",
+      "replication": "origin",
+      "tracking": "all",
+      "source": true,
+      "campaign": true
+    },
+    "reconstruction": {
+      "eightClasses": {
+        "grants": {
+          "count": 102,
+          "expected": 102,
+          "actualHash": "def6790e621f82488e35b7588a86a092fdef101ebd73b303264c48d74420867b",
+          "expectedHash": "def6790e621f82488e35b7588a86a092fdef101ebd73b303264c48d74420867b",
+          "exact": true
+        },
+        "components": {
+          "count": 102,
+          "expected": 102,
+          "actualHash": "a88c966bc27494a7a85c4360016f7e54b80f9d31cb36f7afec8195979b1d4f5f",
+          "expectedHash": "a88c966bc27494a7a85c4360016f7e54b80f9d31cb36f7afec8195979b1d4f5f",
+          "exact": true
+        },
+        "orders": {
+          "count": 102,
+          "expected": 102,
+          "actualHash": "c06f11d3642e3a3bc4afa6ef2bd0ad5447bfb32199053c7c84fd380c9eea4c33",
+          "expectedHash": "c06f11d3642e3a3bc4afa6ef2bd0ad5447bfb32199053c7c84fd380c9eea4c33",
+          "exact": true
+        },
+        "raw": {
+          "count": 102,
+          "expected": 102,
+          "actualHash": "ebac2d7e405643dee0f940ec04b224450e08230822518b97902f6a322baab91e",
+          "expectedHash": "ebac2d7e405643dee0f940ec04b224450e08230822518b97902f6a322baab91e",
+          "exact": true
+        },
+        "reports": {
+          "count": 1,
+          "expected": 1,
+          "actualHash": "32885f393fadb4c31e05a53da5efa366a3b07fa89ce4af973fa446490c625aa1",
+          "expectedHash": "32885f393fadb4c31e05a53da5efa366a3b07fa89ce4af973fa446490c625aa1",
+          "exact": true
+        },
+        "anchors": {
+          "count": 102,
+          "expected": 102,
+          "actualHash": "eb472ce5de6dcd340449e4f4b6af0fec8e3138fd3fb14f0902d06926decfa0a4",
+          "expectedHash": "eb472ce5de6dcd340449e4f4b6af0fec8e3138fd3fb14f0902d06926decfa0a4",
+          "exact": true
+        },
+        "proofs": {
+          "count": 1,
+          "expected": 1,
+          "actualHash": "610948c81d8ab6310cc284fd04dd15b4d0eb156bc163e56f325a19b3e3a90868",
+          "expectedHash": "610948c81d8ab6310cc284fd04dd15b4d0eb156bc163e56f325a19b3e3a90868",
+          "exact": true
+        },
+        "requests": {
+          "count": 1,
+          "expected": 1,
+          "actualHash": "b1548692defc5f6e161dc6faa7222b94e6b87e34ae43056d7e5e483b06dd54e4",
+          "expectedHash": "b1548692defc5f6e161dc6faa7222b94e6b87e34ae43056d7e5e483b06dd54e4",
+          "exact": true
+        }
+      },
+      "reconstructedRows": {
+        "grants": 102,
+        "components": 102,
+        "anchors": 102
+      },
+      "allOriginal100CommandSourceTuplesEqual": true,
+      "restoreEqualsSavedRetainedExport": {
+        "functionsMatchRetained": true,
+        "guardsMatchRetained": true,
+        "dataMatchRetained": true
+      },
+      "fp98": {
+        "functions": "70ca9b9c160b7038246fd9192abc174bc79ebd9879842b2bfcf831bfd230da72",
+        "functionCount": 173,
+        "guards": "74f8917631d0ccdc8f7821aec6dfa0f4f9c70ecc9ee1e112b33f3ba4e5113c93",
+        "guardCount": 354,
+        "migrations": "ae0f239366f3134887e329f64724ebf5dc916536f0b91613e0481a5459fbde62",
+        "migrationCount": 98,
+        "data": "1db785614db30bef2edd3f023fd4cacc83e3b32718ef62df93d6778fe40a32cb",
+        "workerFunctionPrivileges": "2d8bfcf35ef8a084b9dedfe5b9e222f797cb394d407e40068864f9ad07556d49",
+        "workerTablePrivileges": "56a2a53f051a5cd12094cbd482c02d1c2af4335c86126d01c3b88f83b15f39de",
+        "tablePrivileges": "aa6227c3056fa1007ad59e7a4fbaa5527cd5d3f6db9e0f2e2bb1a30825e85945",
+        "functionAcl": "cf20fe636b2511c453da883ec73da0e83a107e7174fb5b0fa5c28e0a7f606dfb"
+      },
+      "vsPriorClone": {
+        "data": true,
+        "functions": true,
+        "guards": true,
+        "tablePrivileges": true,
+        "workerFunctionPrivileges": true,
+        "workerTablePrivileges": true,
+        "priorDataHash": "1db785614db30bef2edd3f023fd4cacc83e3b32718ef62df93d6778fe40a32cb"
+      },
+      "vsPriorCloneAllEqual": true
+    },
+    "appliedChain": {
+      "method": "prisma migrate deploy (cwd packages/db of this worktree, CLI from t3-630f4e85) applied 162, 163, 164 only",
+      "migrationRowsEqualManifest": true,
+      "migrationStatus": {
+        "total": 101,
+        "finished": 101
+      },
+      "fp101": {
+        "functions": "c6b87edc0d969814e2c06b9b8b120625c18db817cac615790b37b4cc3328f117",
+        "functionCount": 190,
+        "guards": "74f8917631d0ccdc8f7821aec6dfa0f4f9c70ecc9ee1e112b33f3ba4e5113c93",
+        "guardCount": 354,
+        "migrations": "ca4bced0ab2cebc6097051d7826f2b97f7643e640fc6b18cf74b811d07506587",
+        "migrationCount": 101,
+        "data": "a43ba3b55123b0bec8a60cc8764a6c45de5ea323ade14aa26b23772fddfb6533",
+        "workerFunctionPrivileges": "e05c208f3ad5d11fbb763617890a62c2fe2bccafa4444b8969f07376dbd37b15",
+        "workerTablePrivileges": "56a2a53f051a5cd12094cbd482c02d1c2af4335c86126d01c3b88f83b15f39de",
+        "tablePrivileges": "aa6227c3056fa1007ad59e7a4fbaa5527cd5d3f6db9e0f2e2bb1a30825e85945",
+        "functionAcl": "5b2242aae9d8fcf50fd08b0508764f839028c279e7cab091d649553fa3436b7d"
+      },
+      "functionDiffVs98": {
+        "added": 17,
+        "addedNames": [
+          "campaign_source_mutations_before_maintenance(jsonb,jsonb)",
+          "diagnostic_maintenance_audit(jsonb)",
+          "diagnostic_maintenance_changed(jsonb)",
+          "diagnostic_maintenance_email(text)",
+          "diagnostic_maintenance_reviewer_revoked(text,jsonb)",
+          "diagnostic_maintenance_reviewer_role(text)",
+          "diagnostic_maintenance_selected(jsonb)",
+          "diagnostic_maintenance_sessions(jsonb)",
+          "diagnostic_maintenance_trim(text)",
+          "diagnostic_source_account_effects_before_maintenance(jsonb)",
+          "diagnostic_source_allows_before_maintenance(text,text,text)",
+          "diagnostic_source_fk_effects_before_maintenance(jsonb)",
+          "diagnostic_source_key_predicate(text,jsonb)",
+          "diagnostic_source_lock_keys_before_maintenance(jsonb,jsonb)",
+          "diagnostic_source_parse_before_maintenance(jsonb)",
+          "diagnostic_source_registry_map()",
+          "diagnostic_source_scope_before_maintenance(jsonb)"
+        ],
+        "changed": [
+          "campaign_preparation_scope(jsonb)",
+          "campaign_source_mutations(jsonb,jsonb)",
+          "diagnostic_purge_row_guard()",
+          "diagnostic_source_account_effects(jsonb)",
+          "diagnostic_source_allows(text,text,text)",
+          "diagnostic_source_fk_effects(jsonb)",
+          "diagnostic_source_insert_receipt()",
+          "diagnostic_source_lock_keys(jsonb,jsonb)",
+          "diagnostic_source_meta(text)",
+          "diagnostic_source_parse(jsonb)",
+          "diagnostic_source_read(text,jsonb)",
+          "diagnostic_source_scope(jsonb)",
+          "diagnostic_user_insert_fence()"
+        ],
+        "removed": []
+      },
+      "workerFunctionPrivilegeDiff": [
+        {
+          "function": "campaign_source_mutations_before_maintenance(jsonb,jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_audit(jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_changed(jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_email(text)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_reviewer_revoked(text,jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_reviewer_role(text)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_selected(jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_sessions(jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_maintenance_trim(text)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_account_effects_before_maintenance(jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_allows_before_maintenance(text,text,text)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_fk_effects_before_maintenance(jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_key_predicate(text,jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_lock_keys_before_maintenance(jsonb,jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_parse_before_maintenance(jsonb)",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_registry_map()",
+          "before": "absent",
+          "execute": true
+        },
+        {
+          "function": "diagnostic_source_scope_before_maintenance(jsonb)",
+          "before": "absent",
+          "execute": true
+        }
+      ],
+      "aclOwnerVolatility": "all 17 added functions: owner postgres, no ACL (default), search_path=pg_catalog, public",
+      "workerTablePrivilegesUnchanged": true,
+      "tablePrivilegesUnchanged": true,
+      "guardsUnchangedFrom98": true,
+      "dataChangedFrom98": "only _prisma_migrations (98 to 101 rows)",
+      "registryHash": "6d7b15db175c3d3e7779a053e8d459f81cc07c163373600ba42e0e91c3a094be",
+      "registryMapAndHelperPresent": {
+        "a": "diagnostic_source_registry_map()",
+        "b": "diagnostic_source_key_predicate(text,jsonb)"
+      }
+    }
+  },
+  "sizing": {
+    "note": "UNTIMED scope calls and one untimed full prepare dry-run; selection only, never reported as measurement. Cap guard (diagnostic_source_scope_before_purge): step>100 OR total scope entries>1000 at pass entry.",
+    "capGuardSourceSha256": "089d9fbc951dcf1c5445aac97d02f350db252231a4a0057a15041bf76bda699a",
+    "ranges": [
+      {
+        "range": [
+          0,
+          10
+        ],
+        "width": 10,
+        "verdict": "PASS",
+        "entries": 240,
+        "lockKeys": 370,
+        "scopeHash": "ce8ca056ae0fd41d",
+        "commandSha256": "6731f3337886e05b"
+      },
+      {
+        "range": [
+          10,
+          20
+        ],
+        "width": 10,
+        "verdict": "PASS",
+        "entries": 275,
+        "lockKeys": 423,
+        "scopeHash": "55d7debf40f548fe",
+        "commandSha256": "ced3dd93b85c3356"
+      },
+      {
+        "range": [
+          0,
+          20
+        ],
+        "width": 20,
+        "verdict": "PASS",
+        "entries": 515,
+        "lockKeys": 793,
+        "scopeHash": "26a0b35c8170dfa5",
+        "commandSha256": "d8a852efcb724ca8"
+      },
+      {
+        "range": [
+          0,
+          40
+        ],
+        "width": 40,
+        "verdict": "PASS",
+        "entries": 995,
+        "lockKeys": 1533,
+        "scopeHash": "1ac37dd570887bf4",
+        "commandSha256": "4f77b430ed9712db"
+      },
+      {
+        "range": [
+          0,
+          35
+        ],
+        "width": 35,
+        "verdict": "PASS",
+        "entries": 875,
+        "lockKeys": 1348,
+        "scopeHash": "42e364b8ece352f7",
+        "commandSha256": "d8d60729a26b71f4"
+      },
+      {
+        "range": [
+          0,
+          41
+        ],
+        "width": 41,
+        "verdict": "ERROR",
+        "error": "diagnostic_source_scope_limit",
+        "commandSha256": "bd3da3c93081e8b3"
+      },
+      {
+        "range": [
+          40,
+          80
+        ],
+        "width": 40,
+        "verdict": "PASS",
+        "entries": 995,
+        "lockKeys": 1533,
+        "scopeHash": "57994c40c89920aa",
+        "commandSha256": "e5d3269feb9f1d7f"
+      },
+      {
+        "range": [
+          80,
+          100
+        ],
+        "width": 20,
+        "verdict": "PASS",
+        "entries": 480,
+        "lockKeys": 740,
+        "scopeHash": "9ad54220b1dccab0",
+        "commandSha256": "873bc7d40aca456b"
+      },
+      {
+        "range": [
+          20,
+          40
+        ],
+        "width": 20,
+        "verdict": "PASS",
+        "entries": 480,
+        "lockKeys": 740,
+        "scopeHash": "ef1a780926f4e64b",
+        "commandSha256": "c4eaa10780d0942d"
+      }
+    ],
+    "group1ScopeHashEqualsRegistry163Receipt": true,
+    "prepare40DryRun": "PASS scope 995 keys 1533 effects 122",
+    "largestPrefixFittingCap": 40,
+    "width41": "P0001 diagnostic_source_scope_limit (entries over 1000)",
+    "partitionWidth40AllGroupsFit": "[0:40]=995, [40:80]=995, [80:100]=480 entries"
+  },
+  "measurement": {
+    "driverSha256": "a7d51bd95f2eb715dde0bb45d8acdd1c51d523fbd2f26702280d3d78ef99bb38",
+    "limits": {
+      "statementMs": 15000,
+      "clientMs": 20000,
+      "lockMs": 250,
+      "isolation": "READ COMMITTED",
+      "rounds": 3
+    },
+    "window": [
+      "2026-10-29T06:39:59.670Z",
+      "2026-10-29T06:41:07.367Z"
+    ],
+    "commands": {
+      "w10_group2": {
+        "range": [
+          10,
+          20
+        ],
+        "roots": 10,
+        "sha256": "ced3dd93b85c33569c2aba3f5c3497e3eb500ba627cfcb42fe1e95487629eb67"
+      },
+      "w20_prefix": {
+        "range": [
+          0,
+          20
+        ],
+        "roots": 20,
+        "sha256": "d8a852efcb724ca808205d85cfa855e421444f6c739a97d8af1972788302fc7d"
+      },
+      "w40_prefix": {
+        "range": [
+          0,
+          40
+        ],
+        "roots": 40,
+        "sha256": "4f77b430ed9712dbfc22e5db7699e1946a197a48f9cc28389aa913fe64fa65e3"
+      }
+    },
+    "status": "FINISHED",
+    "runs": [
+      {
+        "round": 1,
+        "name": "w10_group2",
+        "width": 10,
+        "elapsedMs": 1266.9,
+        "transactionMs": 1294.2,
+        "verdict": "PASS",
+        "scopeEntries": 275,
+        "lockKeys": 423,
+        "effects": 32,
+        "msPerScopeEntry": 4.61,
+        "scopeHash": "55d7debf40f548febb1417d9a8ce127cd29a11866adaf48456a51d8a89372379",
+        "outputsEqualSizingScope": true,
+        "cleanHost": true,
+        "busyBefore": 0,
+        "busyAfter": 0,
+        "loadBefore": "{ 2.93 3.47 3.22 }",
+        "loadAfter": "{ 2.93 3.47 3.22 }",
+        "dockerBefore": "0.00% 48.53MiB / 7.653GiB",
+        "dockerAfter": "0.02% 48.33MiB / 7.653GiB",
+        "pid": 97,
+        "start": "2026-10-29T06:40:00.777Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 702,
+            "totalMs": 962
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 19471,
+            "selfMs": 133,
+            "totalMs": 134
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 8882,
+            "selfMs": 76,
+            "totalMs": 76
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 7280,
+            "selfMs": 54,
+            "totalMs": 190
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 51,
+            "totalMs": 118
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 37,
+            "totalMs": 43
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            1263,
+            3
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            1260,
+            17
+          ],
+          "diagnostic_source_scope": [
+            2,
+            983,
+            0
+          ],
+          "campaign_preparation_scope": [
+            4,
+            118,
+            51
+          ],
+          "diagnostic_source_read": [
+            570,
+            37,
+            12
+          ],
+          "diagnostic_source_add": [
+            7280,
+            190,
+            54
+          ],
+          "diagnostic_source_key_predicate": [
+            1945,
+            60,
+            32
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            962,
+            702
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            52,
+            11
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            50,
+            29,
+            29
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "name": "w20_prefix",
+        "width": 20,
+        "elapsedMs": 2335.7,
+        "transactionMs": 2362.5,
+        "verdict": "PASS",
+        "scopeEntries": 515,
+        "lockKeys": 793,
+        "effects": 62,
+        "msPerScopeEntry": 4.54,
+        "scopeHash": "26a0b35c8170dfa56e85e4acdb279e4745379969b2d0cbb3f4172d767fa99120",
+        "outputsEqualSizingScope": true,
+        "cleanHost": true,
+        "busyBefore": 0,
+        "busyAfter": 0,
+        "loadBefore": "{ 2.77 3.43 3.20 }",
+        "loadAfter": "{ 2.79 3.42 3.20 }",
+        "dockerBefore": "1.13% 48.7MiB / 7.653GiB",
+        "dockerAfter": "0.05% 48.34MiB / 7.653GiB",
+        "pid": 99,
+        "start": "2026-10-29T06:40:05.829Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 1309,
+            "totalMs": 1739
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 36311,
+            "selfMs": 159,
+            "totalMs": 160
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 13640,
+            "selfMs": 136,
+            "totalMs": 325
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 16612,
+            "selfMs": 135,
+            "totalMs": 135
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 117,
+            "totalMs": 125
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 89,
+            "totalMs": 233
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            2332,
+            5
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            2327,
+            27
+          ],
+          "diagnostic_source_scope": [
+            2,
+            1777,
+            0
+          ],
+          "campaign_preparation_scope": [
+            4,
+            233,
+            89
+          ],
+          "diagnostic_source_read": [
+            1070,
+            56,
+            21
+          ],
+          "diagnostic_source_add": [
+            13640,
+            325,
+            136
+          ],
+          "diagnostic_source_key_predicate": [
+            3645,
+            102,
+            62
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            1739,
+            1309
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            92,
+            24
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            100,
+            47,
+            47
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "name": "w40_prefix",
+        "width": 40,
+        "elapsedMs": 5320.9,
+        "transactionMs": 5353.8,
+        "verdict": "PASS",
+        "scopeEntries": 995,
+        "lockKeys": 1533,
+        "effects": 122,
+        "msPerScopeEntry": 5.35,
+        "scopeHash": "1ac37dd570887bf46f0d5ea29206ed04d544a71021bfac461c10b5500d15ee21",
+        "outputsEqualSizingScope": true,
+        "cleanHost": true,
+        "busyBefore": 0,
+        "busyAfter": 0,
+        "loadBefore": "{ 2.79 3.42 3.20 }",
+        "loadAfter": "{ 2.65 3.38 3.19 }",
+        "dockerBefore": "0.02% 48.34MiB / 7.653GiB",
+        "dockerAfter": "0.05% 48.81MiB / 7.653GiB",
+        "pid": 100,
+        "start": "2026-10-29T06:40:11.516Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 2770,
+            "totalMs": 3949
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 69991,
+            "selfMs": 460,
+            "totalMs": 460
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 430,
+            "totalMs": 450
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 26360,
+            "selfMs": 425,
+            "totalMs": 921
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 32072,
+            "selfMs": 289,
+            "totalMs": 289
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 170,
+            "totalMs": 451
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            5318,
+            6
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            5312,
+            50
+          ],
+          "diagnostic_source_scope": [
+            2,
+            4037,
+            1
+          ],
+          "campaign_preparation_scope": [
+            4,
+            451,
+            170
+          ],
+          "diagnostic_source_read": [
+            2070,
+            134,
+            43
+          ],
+          "diagnostic_source_add": [
+            26360,
+            921,
+            425
+          ],
+          "diagnostic_source_key_predicate": [
+            7045,
+            226,
+            127
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            3949,
+            2770
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            198,
+            72
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            200,
+            82,
+            82
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "name": "w10_group2",
+        "width": 10,
+        "elapsedMs": 1298.4,
+        "transactionMs": 1322.8,
+        "verdict": "PASS",
+        "scopeEntries": 275,
+        "lockKeys": 423,
+        "effects": 32,
+        "msPerScopeEntry": 4.72,
+        "scopeHash": "55d7debf40f548febb1417d9a8ce127cd29a11866adaf48456a51d8a89372379",
+        "outputsEqualSizingScope": true,
+        "cleanHost": true,
+        "busyBefore": 0,
+        "busyAfter": 0,
+        "loadBefore": "{ 2.60 3.36 3.18 }",
+        "loadAfter": "{ 2.60 3.36 3.18 }",
+        "dockerBefore": "0.02% 48.69MiB / 7.653GiB",
+        "dockerAfter": "0.02% 48.81MiB / 7.653GiB",
+        "pid": 101,
+        "start": "2026-10-29T06:40:20.196Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 713,
+            "totalMs": 988
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 19471,
+            "selfMs": 138,
+            "totalMs": 139
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 8882,
+            "selfMs": 82,
+            "totalMs": 82
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 7280,
+            "selfMs": 57,
+            "totalMs": 201
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 49,
+            "totalMs": 114
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 41,
+            "totalMs": 47
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            1295,
+            3
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            1292,
+            17
+          ],
+          "diagnostic_source_scope": [
+            2,
+            1013,
+            0
+          ],
+          "campaign_preparation_scope": [
+            4,
+            114,
+            49
+          ],
+          "diagnostic_source_read": [
+            570,
+            40,
+            13
+          ],
+          "diagnostic_source_add": [
+            7280,
+            201,
+            57
+          ],
+          "diagnostic_source_key_predicate": [
+            1945,
+            61,
+            32
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            988,
+            713
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            55,
+            11
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            50,
+            31,
+            31
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "name": "w20_prefix",
+        "width": 20,
+        "elapsedMs": 2429.6,
+        "transactionMs": 2455.8,
+        "verdict": "PASS",
+        "scopeEntries": 515,
+        "lockKeys": 793,
+        "effects": 62,
+        "msPerScopeEntry": 4.72,
+        "scopeHash": "26a0b35c8170dfa56e85e4acdb279e4745379969b2d0cbb3f4172d767fa99120",
+        "outputsEqualSizingScope": true,
+        "cleanHost": false,
+        "busyBefore": 0,
+        "busyAfter": 5,
+        "loadBefore": "{ 2.71 3.37 3.19 }",
+        "loadAfter": "{ 2.73 3.36 3.18 }",
+        "dockerBefore": "1.13% 49.34MiB / 7.653GiB",
+        "dockerAfter": "0.03% 49.03MiB / 7.653GiB",
+        "pid": 103,
+        "start": "2026-10-29T06:40:25.481Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 1359,
+            "totalMs": 1810
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 36311,
+            "selfMs": 164,
+            "totalMs": 164
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 16612,
+            "selfMs": 142,
+            "totalMs": 142
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 13640,
+            "selfMs": 140,
+            "totalMs": 337
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 122,
+            "totalMs": 130
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 93,
+            "totalMs": 244
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            2425,
+            5
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            2420,
+            28
+          ],
+          "diagnostic_source_scope": [
+            2,
+            1850,
+            0
+          ],
+          "campaign_preparation_scope": [
+            4,
+            244,
+            93
+          ],
+          "diagnostic_source_read": [
+            1070,
+            62,
+            24
+          ],
+          "diagnostic_source_add": [
+            13640,
+            337,
+            140
+          ],
+          "diagnostic_source_key_predicate": [
+            3645,
+            107,
+            66
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            1810,
+            1359
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            97,
+            25
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            100,
+            49,
+            49
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "name": "w40_prefix",
+        "width": 40,
+        "elapsedMs": 11239.4,
+        "transactionMs": 11291.1,
+        "verdict": "PASS",
+        "scopeEntries": 995,
+        "lockKeys": 1533,
+        "effects": 122,
+        "msPerScopeEntry": 11.3,
+        "scopeHash": "1ac37dd570887bf46f0d5ea29206ed04d544a71021bfac461c10b5500d15ee21",
+        "outputsEqualSizingScope": true,
+        "cleanHost": false,
+        "busyBefore": 5,
+        "busyAfter": 5,
+        "loadBefore": "{ 2.73 3.36 3.18 }",
+        "loadAfter": "{ 10.74 5.08 3.80 }",
+        "dockerBefore": "0.01% 49.03MiB / 7.653GiB",
+        "dockerAfter": "0.01% 49.48MiB / 7.653GiB",
+        "pid": 104,
+        "start": "2026-10-29T06:40:31.222Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 4156,
+            "totalMs": 6118
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 1656,
+            "totalMs": 3507
+          },
+          {
+            "fn": "campaign_row_namespaces",
+            "calls": 7960,
+            "selfMs": 1043,
+            "totalMs": 1043
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 69991,
+            "selfMs": 825,
+            "totalMs": 825
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 674,
+            "totalMs": 718
+          },
+          {
+            "fn": "diagnostic_source_key_predicate",
+            "calls": 7045,
+            "selfMs": 668,
+            "totalMs": 926
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            11236,
+            16
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            11219,
+            69
+          ],
+          "diagnostic_source_scope": [
+            2,
+            6366,
+            1
+          ],
+          "campaign_preparation_scope": [
+            4,
+            3507,
+            1656
+          ],
+          "diagnostic_source_read": [
+            2070,
+            230,
+            85
+          ],
+          "diagnostic_source_add": [
+            26360,
+            1517,
+            651
+          ],
+          "diagnostic_source_key_predicate": [
+            7045,
+            926,
+            668
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            6118,
+            4156
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            423,
+            133
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            200,
+            190,
+            190
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "name": "w10_group2",
+        "width": 10,
+        "elapsedMs": 1375.7,
+        "transactionMs": 1389,
+        "verdict": "PASS",
+        "scopeEntries": 275,
+        "lockKeys": 423,
+        "effects": 32,
+        "msPerScopeEntry": 5,
+        "scopeHash": "55d7debf40f548febb1417d9a8ce127cd29a11866adaf48456a51d8a89372379",
+        "outputsEqualSizingScope": true,
+        "cleanHost": false,
+        "busyBefore": 5,
+        "busyAfter": 4,
+        "loadBefore": "{ 10.74 5.08 3.80 }",
+        "loadAfter": "{ 10.20 5.06 3.80 }",
+        "dockerBefore": "0.00% 49.48MiB / 7.653GiB",
+        "dockerAfter": "0.01% 49.61MiB / 7.653GiB",
+        "pid": 106,
+        "start": "2026-10-29T06:40:46.771Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 763,
+            "totalMs": 1065
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 19471,
+            "selfMs": 147,
+            "totalMs": 147
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 8882,
+            "selfMs": 90,
+            "totalMs": 90
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 7280,
+            "selfMs": 62,
+            "totalMs": 218
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 57,
+            "totalMs": 128
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 41,
+            "totalMs": 47
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            1374,
+            3
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            1371,
+            17
+          ],
+          "diagnostic_source_scope": [
+            2,
+            1088,
+            0
+          ],
+          "campaign_preparation_scope": [
+            4,
+            128,
+            57
+          ],
+          "diagnostic_source_read": [
+            570,
+            43,
+            15
+          ],
+          "diagnostic_source_add": [
+            7280,
+            218,
+            62
+          ],
+          "diagnostic_source_key_predicate": [
+            1945,
+            66,
+            36
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            1065,
+            763
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            53,
+            11
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            50,
+            29,
+            29
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "name": "w20_prefix",
+        "width": 20,
+        "elapsedMs": 3422.4,
+        "transactionMs": 3441.8,
+        "verdict": "PASS",
+        "scopeEntries": 515,
+        "lockKeys": 793,
+        "effects": 62,
+        "msPerScopeEntry": 6.65,
+        "scopeHash": "26a0b35c8170dfa56e85e4acdb279e4745379969b2d0cbb3f4172d767fa99120",
+        "outputsEqualSizingScope": true,
+        "cleanHost": false,
+        "busyBefore": 4,
+        "busyAfter": 8,
+        "loadBefore": "{ 10.20 5.06 3.80 }",
+        "loadAfter": "{ 9.94 5.10 3.82 }",
+        "dockerBefore": "0.01% 49.61MiB / 7.653GiB",
+        "dockerAfter": "0.01% 49.83MiB / 7.653GiB",
+        "pid": 107,
+        "start": "2026-10-29T06:40:51.438Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 1745,
+            "totalMs": 2383
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 239,
+            "totalMs": 261
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 36311,
+            "selfMs": 236,
+            "totalMs": 236
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 16612,
+            "selfMs": 192,
+            "totalMs": 192
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 178,
+            "totalMs": 453
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 13640,
+            "selfMs": 175,
+            "totalMs": 418
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            3420,
+            5
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            3415,
+            46
+          ],
+          "diagnostic_source_scope": [
+            2,
+            2446,
+            0
+          ],
+          "campaign_preparation_scope": [
+            4,
+            453,
+            178
+          ],
+          "diagnostic_source_read": [
+            1070,
+            146,
+            60
+          ],
+          "diagnostic_source_add": [
+            13640,
+            418,
+            175
+          ],
+          "diagnostic_source_key_predicate": [
+            3645,
+            211,
+            135
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            2383,
+            1745
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            128,
+            34
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            100,
+            62,
+            62
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "name": "w40_prefix",
+        "width": 40,
+        "elapsedMs": 7887.1,
+        "transactionMs": 7934.3,
+        "verdict": "PASS",
+        "scopeEntries": 995,
+        "lockKeys": 1533,
+        "effects": 122,
+        "msPerScopeEntry": 7.93,
+        "scopeHash": "1ac37dd570887bf46f0d5ea29206ed04d544a71021bfac461c10b5500d15ee21",
+        "outputsEqualSizingScope": true,
+        "cleanHost": false,
+        "busyBefore": 5,
+        "busyAfter": 5,
+        "loadBefore": "{ 9.94 5.10 3.82 }",
+        "loadAfter": "{ 8.87 5.03 3.81 }",
+        "dockerBefore": "0.01% 49.83MiB / 7.653GiB",
+        "dockerAfter": "0.01% 50.01MiB / 7.653GiB",
+        "pid": 108,
+        "start": "2026-10-29T06:40:58.151Z",
+        "topFunctionsBySelf": [
+          {
+            "fn": "diagnostic_source_scope_before_purge",
+            "calls": 2,
+            "selfMs": 3743,
+            "totalMs": 5568
+          },
+          {
+            "fn": "diagnostic_source_meta",
+            "calls": 69991,
+            "selfMs": 680,
+            "totalMs": 681
+          },
+          {
+            "fn": "diagnostic_source_add",
+            "calls": 26360,
+            "selfMs": 628,
+            "totalMs": 1414
+          },
+          {
+            "fn": "diagnostic_source_lock_keys_before_intake",
+            "calls": 2,
+            "selfMs": 517,
+            "totalMs": 545
+          },
+          {
+            "fn": "diagnostic_source_project",
+            "calls": 32072,
+            "selfMs": 513,
+            "totalMs": 513
+          },
+          {
+            "fn": "campaign_preparation_scope",
+            "calls": 4,
+            "selfMs": 382,
+            "totalMs": 957
+          }
+        ],
+        "keyFunctions": {
+          "diagnostic_prepare_source": [
+            1,
+            7883,
+            11
+          ],
+          "diagnostic_source_insert_receipt": [
+            1,
+            7872,
+            64
+          ],
+          "diagnostic_source_scope": [
+            2,
+            5741,
+            1
+          ],
+          "campaign_preparation_scope": [
+            4,
+            957,
+            382
+          ],
+          "diagnostic_source_read": [
+            2070,
+            219,
+            81
+          ],
+          "diagnostic_source_add": [
+            26360,
+            1414,
+            628
+          ],
+          "diagnostic_source_key_predicate": [
+            7045,
+            391,
+            235
+          ],
+          "diagnostic_source_scope_before_purge": [
+            2,
+            5568,
+            3743
+          ],
+          "diagnostic_source_disposal_effects": [
+            5,
+            341,
+            133
+          ],
+          "diagnostic_ownership_disposal_scope": [
+            200,
+            132,
+            132
+          ]
+        }
+      }
+    ],
+    "finalReceipts": {
+      "source": 0,
+      "campaign": 0
+    },
+    "remainingClients": [],
+    "rawFileSha256": "8827e3b2590338653279262f63a19b7069ff61a6456ab9fb58e5cd8e8516988f",
+    "rawFile": "/tmp/897-r7g-decision-20261029/measurement-decision.json"
+  },
+  "drain": {
+    "hashes": {
+      "functions": "c6b87edc0d969814e2c06b9b8b120625c18db817cac615790b37b4cc3328f117",
+      "functionCount": 190,
+      "guards": "74f8917631d0ccdc8f7821aec6dfa0f4f9c70ecc9ee1e112b33f3ba4e5113c93",
+      "guardCount": 354,
+      "migrations": "ca4bced0ab2cebc6097051d7826f2b97f7643e640fc6b18cf74b811d07506587",
+      "migrationCount": 101,
+      "data": "a43ba3b55123b0bec8a60cc8764a6c45de5ea323ade14aa26b23772fddfb6533",
+      "workerFunctionPrivileges": "e05c208f3ad5d11fbb763617890a62c2fe2bccafa4444b8969f07376dbd37b15",
+      "workerTablePrivileges": "56a2a53f051a5cd12094cbd482c02d1c2af4335c86126d01c3b88f83b15f39de",
+      "tablePrivileges": "aa6227c3056fa1007ad59e7a4fbaa5527cd5d3f6db9e0f2e2bb1a30825e85945",
+      "functionAcl": "5b2242aae9d8fcf50fd08b0508764f839028c279e7cab091d649553fa3436b7d"
+    },
+    "equalToPreMeasurement": {
+      "functions": true,
+      "functionCount": true,
+      "guards": true,
+      "guardCount": true,
+      "migrations": true,
+      "migrationCount": true,
+      "data": true,
+      "workerFunctionPrivileges": true,
+      "workerTablePrivileges": true,
+      "tablePrivileges": true,
+      "functionAcl": true
+    },
+    "receipts": {
+      "source": 0,
+      "campaign": 0
+    },
+    "clients": [],
+    "eightClassCounts": {
+      "grants": 102,
+      "components": 102,
+      "orders": 102,
+      "raw": 102,
+      "reports": 1,
+      "anchors": 102,
+      "proofs": 1,
+      "requests": 1
+    },
+    "states": {
+      "grantsavailable": 102,
+      "grantserased": 0,
+      "componentsavailable": 102,
+      "componentserased": 0
+    },
+    "allEqual": true
+  },
+  "stopped": "container stopped (exit 0) and removed with its volume at 2026-10-29T06:41:59Z"
+}
