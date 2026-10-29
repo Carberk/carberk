@@ -1,0 +1,415 @@
+{
+  "parent": "fc77bc55cd83fdaa502aba236697d4b3c5260659",
+  "count": 102,
+  "note": "Prisma checksum is sha256 of migration.sql. Last entry is the unpublished operational reset-row admission migration.",
+  "migrations": [
+    {
+      "migration_name": "20260513201407_init",
+      "checksum": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860"
+    },
+    {
+      "migration_name": "20260514090000_multi_device_sessions_and_role_split",
+      "checksum": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0"
+    },
+    {
+      "migration_name": "20260514100000_otp_request_ip",
+      "checksum": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc"
+    },
+    {
+      "migration_name": "20260514104615_delete_me_cascades",
+      "checksum": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193"
+    },
+    {
+      "migration_name": "20260518081943_add_engine_type_transmission_drive_type",
+      "checksum": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841"
+    },
+    {
+      "migration_name": "20260518083234_s4_listings_crud",
+      "checksum": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010"
+    },
+    {
+      "migration_name": "20260518180741_add_seller_terms_to_listing",
+      "checksum": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454"
+    },
+    {
+      "migration_name": "20260608010000_s7_admin_moderation",
+      "checksum": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a"
+    },
+    {
+      "migration_name": "20260609000000_account_deletion_grace",
+      "checksum": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698"
+    },
+    {
+      "migration_name": "20260711000000_add_condition_disclosure_to_listing",
+      "checksum": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846"
+    },
+    {
+      "migration_name": "20260711100000_add_inspection_interest",
+      "checksum": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176"
+    },
+    {
+      "migration_name": "20260713000000_s10_rich_chat_foundation",
+      "checksum": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e"
+    },
+    {
+      "migration_name": "20260713170000_add_notification_history_status",
+      "checksum": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61"
+    },
+    {
+      "migration_name": "20260719010000_align_prisma_schema_with_existing_database",
+      "checksum": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8"
+    },
+    {
+      "migration_name": "20260922000000_add_user_sign_in_methods",
+      "checksum": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016"
+    },
+    {
+      "migration_name": "20260923000000_add_sign_in_code_channel",
+      "checksum": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97"
+    },
+    {
+      "migration_name": "20260928000000_add_listing_price_tmt",
+      "checksum": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009"
+    },
+    {
+      "migration_name": "20260929000000_add_listing_public_number",
+      "checksum": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8"
+    },
+    {
+      "migration_name": "20260929120000_add_brand_logo_key",
+      "checksum": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488"
+    },
+    {
+      "migration_name": "20260929130000_damaged_condition_disclosure",
+      "checksum": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0"
+    },
+    {
+      "migration_name": "20261002000000_remove_reported_listing_status",
+      "checksum": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0"
+    },
+    {
+      "migration_name": "20261002120000_add_media_uploads",
+      "checksum": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a"
+    },
+    {
+      "migration_name": "20261003120000_add_otp_request_purpose",
+      "checksum": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40"
+    },
+    {
+      "migration_name": "20261003180000_add_verified_contact_phones",
+      "checksum": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41"
+    },
+    {
+      "migration_name": "20261003180100_clear_unverified_listing_contact_phones",
+      "checksum": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e"
+    },
+    {
+      "migration_name": "20261005120000_add_user_name_number_and_avatar_index",
+      "checksum": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085"
+    },
+    {
+      "migration_name": "20261007120000_conditional_upload_protocol",
+      "checksum": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481"
+    },
+    {
+      "migration_name": "20261007130000_exclusive_upload_adoption",
+      "checksum": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451"
+    },
+    {
+      "migration_name": "20261007130100_backfill_upload_adoption_state",
+      "checksum": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249"
+    },
+    {
+      "migration_name": "20261011130000_correct_lugong_liugong_models",
+      "checksum": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b"
+    },
+    {
+      "migration_name": "20261011140000_add_listing_media_thumb_hash",
+      "checksum": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d"
+    },
+    {
+      "migration_name": "20261011150000_expand_conditional_media_manifest",
+      "checksum": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490"
+    },
+    {
+      "migration_name": "20261014120000_restore_relisted_listings_published_at",
+      "checksum": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718"
+    },
+    {
+      "migration_name": "20261015003500_listing_view_counts",
+      "checksum": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d"
+    },
+    {
+      "migration_name": "20261015010000_staff_capabilities",
+      "checksum": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43"
+    },
+    {
+      "migration_name": "20261015020000_business_membership",
+      "checksum": "7a60b7b21b212c9bf38a14522eb937eb9762044039d05e6e16b7e76d1093c00a"
+    },
+    {
+      "migration_name": "20261015030000_business_inventory",
+      "checksum": "49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8"
+    },
+    {
+      "migration_name": "20261015040000_first_party_measurement",
+      "checksum": "5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c"
+    },
+    {
+      "migration_name": "20261015050000_service_foundations",
+      "checksum": "66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a"
+    },
+    {
+      "migration_name": "20261015060000_business_enquiries",
+      "checksum": "4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8"
+    },
+    {
+      "migration_name": "20261015070000_diagnostic_intake",
+      "checksum": "9f5ce216f2dd4cbbcb75c9ce78d058244f5262170e51815c111c66563b32ebc6"
+    },
+    {
+      "migration_name": "20261015080000_service_push_subscriptions",
+      "checksum": "e2b04ea8e7f1c33924261fb2fcc0669c1c99dcfe628b8b0e8f0c7007ee47cf3b"
+    },
+    {
+      "migration_name": "20261015120000_listing_video_foundation",
+      "checksum": "8b1b907dbeb942c840330ca3a8f3ef9264ec0008c393f3d51d7961bd7305687b"
+    },
+    {
+      "migration_name": "20261015130000_support_operations",
+      "checksum": "57389de2321c518efe4f1a96adf7ae5bbf7df6b7224ff97c6a854f2708c88163"
+    },
+    {
+      "migration_name": "20261015140000_video_playback_authority",
+      "checksum": "019b9ea21c459d9e4e5df313f97957eba80a043ada053d8bd80fd13515b86eae"
+    },
+    {
+      "migration_name": "20261015150000_history_orders",
+      "checksum": "1eb35867354f2d8fcf9d15fdff2ce584eeeb4cdb252e4a5d47ce6c2a298a19b2"
+    },
+    {
+      "migration_name": "20261015160000_showroom_public_fields",
+      "checksum": "2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b"
+    },
+    {
+      "migration_name": "20261015170000_video_processing_fences",
+      "checksum": "ff8a5579df352a389385aeb47f78caed985301995c569c3a5b21db2e022f779b"
+    },
+    {
+      "migration_name": "20261015180000_history_delivery",
+      "checksum": "2d08ccc88142214fe0f22c29a1dd5ecf84239bc730f6076cab2e1104e724248d"
+    },
+    {
+      "migration_name": "20261015190000_diagnostic_reports",
+      "checksum": "4be9efc71ddd57f2b6b32efef199576d81d432d193580d8db41dcc44155ff3fd"
+    },
+    {
+      "migration_name": "20261015200000_measurement_insights",
+      "checksum": "dd412d0bc61628e4333dfb9b607b022f23742c17c9c59529acea91d9e3f325e0"
+    },
+    {
+      "migration_name": "20261015210000_history_recovery_offers",
+      "checksum": "8da84698db0e7f080a865daf5fceda3a43892e5454f86981855d597b678094e2"
+    },
+    {
+      "migration_name": "20261015220000_diagnostic_evidence_leases",
+      "checksum": "497b8aab18f382eefd0d68f7be0f7ad8622b1c9975e31488ec324811b5b1f61a"
+    },
+    {
+      "migration_name": "20261015230000_video_claim_target",
+      "checksum": "39d9c56041a02cf6d74f3a967adc37c37dbbc05f4a5487876a9abf4fbb5647d8"
+    },
+    {
+      "migration_name": "20261015240000_history_source_facts",
+      "checksum": "593a00d00ee4f0c686c05e07cbdeae60996b50252e0d350b341ad502c7bde8bd"
+    },
+    {
+      "migration_name": "20261015250000_video_source_manifest",
+      "checksum": "da45934af2bd21968d582661738ee13a1394320d442e0847abc53db01c01194d"
+    },
+    {
+      "migration_name": "20261015260000_video_write_protocol",
+      "checksum": "8c79eec4d6e7b465a6599f9d9e2224a327c3715cc8d95179c4c69ff9341c7708"
+    },
+    {
+      "migration_name": "20261015270000_history_mileage_not_null",
+      "checksum": "1081bd33f8c08b353ce4c0fa163ecf17d97eaee1d1a1ac7871c5e9f3d23add92"
+    },
+    {
+      "migration_name": "20261015280000_diagnostic_association_invalidation",
+      "checksum": "565854648750b86cceff78a86cff7693c9210510a3835b26f195928ed765baee"
+    },
+    {
+      "migration_name": "20261015290000_conversation_measurement_cohorts",
+      "checksum": "350160257c66c5fb3a3dcd7b3681ceeefec89f35748de452a9599ee955675540"
+    },
+    {
+      "migration_name": "20261021100000_diagnostic_reinspection_lineage",
+      "checksum": "d0f4aa1d73192bfffe468458f977c853483d8e2a43efca29e7a8f6aa83dc37d2"
+    },
+    {
+      "migration_name": "20261021110000_diagnostic_identity_records",
+      "checksum": "b5919c3d4d5fd9f52a14c8a4f973fe7caa3e3e4c6611ff08e188579397ad1d70"
+    },
+    {
+      "migration_name": "20261021120000_diagnostic_report_identity_pin",
+      "checksum": "1d299c923af088efc1b49d9e2b8124bef6c4a0476fc300ed78ab8e63d4a1e83c"
+    },
+    {
+      "migration_name": "20261021130000_diagnostic_identity_evidence",
+      "checksum": "5351553647b355dc59eadf25a02e84aa7916e1b33da2117b00e40f47d49ecb82"
+    },
+    {
+      "migration_name": "20261021140000_diagnostic_continuity_proofs",
+      "checksum": "77c6cab3b6731e9203556bcfa78a4ff2661d3a71db597a7b3c6150db925e5cb0"
+    },
+    {
+      "migration_name": "20261021150000_diagnostic_continuity_proof_consumption",
+      "checksum": "f25d566779839d76749f9320ba102d6e282fbba365468c68e0d49eeed460a222"
+    },
+    {
+      "migration_name": "20261021160000_diagnostic_automatic_vin_proof",
+      "checksum": "83176fd55e353ef02de460a42dd41471c3f07120c228a6df80ff71f829502acd"
+    },
+    {
+      "migration_name": "20261022180000_diagnostic_public_continuity",
+      "checksum": "32fe0a8cb64aaaf187390b5c6a2fa72fe6a260547602ffdf572959409ea68a3f"
+    },
+    {
+      "migration_name": "20261023090000_diagnostic_ownership_components",
+      "checksum": "f43b2c04ef6ed9f447acfc0e5ebf326a577b3cd1d96539439c43f05f537cad01"
+    },
+    {
+      "migration_name": "20261023100000_diagnostic_ownership_disposal_same_graph",
+      "checksum": "cdb43cc361fd783c1e6d66d5eccef118861ef3e9ac4a75b233fc8b527b8ec547"
+    },
+    {
+      "migration_name": "20261023110000_diagnostic_continuity_requests",
+      "checksum": "83188077748f02bf96d74d9588805f173129199333a8d4e9c160547e38fb52a2"
+    },
+    {
+      "migration_name": "20261023120000_diagnostic_ownership_grants",
+      "checksum": "3696e93cfc56f13a95d8e38fd72e3e985d43105ce17ffdf7d5f7ce273efac3df"
+    },
+    {
+      "migration_name": "20261023130000_diagnostic_source_kernel",
+      "checksum": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf"
+    },
+    {
+      "migration_name": "20261024010000_diagnostic_source_guard_repair",
+      "checksum": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3"
+    },
+    {
+      "migration_name": "20261024020000_campaign_preparation",
+      "checksum": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429"
+    },
+    {
+      "migration_name": "20261024030000_diagnostic_purge_effects",
+      "checksum": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba"
+    },
+    {
+      "migration_name": "20261024040000_diagnostic_intake_effects",
+      "checksum": "9d9155637143e152ac63baf255d074fe768ff0c4bcb4ec041dd75b32404903a5"
+    },
+    {
+      "migration_name": "20261024050000_diagnostic_kernel_invariants",
+      "checksum": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8"
+    },
+    {
+      "migration_name": "20261024060000_diagnostic_source_correction",
+      "checksum": "55fa19d86c4f30d6c6abab96985dfbfb7bc30b0e6d928da1f63ba8fdbd13b7f6"
+    },
+    {
+      "migration_name": "20261024070000_diagnostic_user_eligibility",
+      "checksum": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e"
+    },
+    {
+      "migration_name": "20261024080000_diagnostic_moderation_complete_effects",
+      "checksum": "a82144b10637924c522188c2511fab6f906ee7ecc803875189155c3e8289e6c0"
+    },
+    {
+      "migration_name": "20261024090000_diagnostic_message_enquiry_fences",
+      "checksum": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c"
+    },
+    {
+      "migration_name": "20261024100000_diagnostic_signin_intake_object_owners",
+      "checksum": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6"
+    },
+    {
+      "migration_name": "20261024110000_diagnostic_user_insert_fence",
+      "checksum": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271"
+    },
+    {
+      "migration_name": "20261024120000_diagnostic_account_noop_enquiry",
+      "checksum": "aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f"
+    },
+    {
+      "migration_name": "20261024130000_diagnostic_intake_campaign_composition",
+      "checksum": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed"
+    },
+    {
+      "migration_name": "20261025010000_diagnostic_report_source_effects",
+      "checksum": "a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9"
+    },
+    {
+      "migration_name": "20261025015000_diagnostic_runtime_transport_corrections",
+      "checksum": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424"
+    },
+    {
+      "migration_name": "20261025017500_diagnostic_effect_scope_alias_correction",
+      "checksum": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f"
+    },
+    {
+      "migration_name": "20261025019000_diagnostic_user_insert_error_transport",
+      "checksum": "a6b7b46c95fd74f8e6f7b962bcb899b2575df7ec1db1f26962bc5853305d0e74"
+    },
+    {
+      "migration_name": "20261025020000_diagnostic_listing_publication_effects",
+      "checksum": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39"
+    },
+    {
+      "migration_name": "20261026010000_diagnostic_automatic_public_continuity",
+      "checksum": "886f521df508f121e306d3b3d27591845fd57484beac666482c330576c50844e"
+    },
+    {
+      "migration_name": "20261026011000_diagnostic_bootstrap_capability_qualification",
+      "checksum": "d7265b92ba944af1a62055a6ffd6ce9316f1203b75384929a89c3da86f8ccc3d"
+    },
+    {
+      "migration_name": "20261026012000_diagnostic_disposal_selector_precedence",
+      "checksum": "ac9e5b810a7cc7fd2d8ff6e8f4bc60b76d48368e0e7330ce766a449586e6aaef"
+    },
+    {
+      "migration_name": "20261026013000_diagnostic_purge_audit_details_precedence",
+      "checksum": "a4473bed2ff325a5b7a1a1c58220d5ef754592373545bc99d508606e4869442d"
+    },
+    {
+      "migration_name": "20261026014000_diagnostic_source_registry_evaluation",
+      "checksum": "6d3ea989e90a1169fa7f5b46cecfc6e4d1e0a23e8fde774916e54bb1d2592756"
+    },
+    {
+      "migration_name": "20261026015000_diagnostic_component_expiry_representation",
+      "checksum": "e0b3068681544bb5e48d016047e8a7e4304b3a737fb9c6e17ef547897c90e6cf"
+    },
+    {
+      "migration_name": "20261026016000_diagnostic_provenance_invalidation_parity",
+      "checksum": "87dd1162b90c334137859cbaf4afd61af068f50602a4ec438d041b22364e95b1"
+    },
+    {
+      "migration_name": "20261026016200_diagnostic_maintenance_compatibility",
+      "checksum": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379"
+    },
+    {
+      "migration_name": "20261026016300_diagnostic_registry_metadata_lookup",
+      "checksum": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7"
+    },
+    {
+      "migration_name": "20261026016400_diagnostic_source_key_predicate",
+      "checksum": "fe7358f92acaeae0b57a442cf8e7b4aa28b56ee03aa6177fd7fb271a93bafdb6"
+    },
+    {
+      "migration_name": "20261029190000_operational_reset_row_admission",
+      "checksum": "4c709daa44670a550876f06cdf7226fb43c6eb7b306146a80c802f25856946ce"
+    }
+  ]
+}
