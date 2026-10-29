@@ -51,6 +51,40 @@ async function admit(client: PoolClient): Promise<void> {
   const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
   await client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(), observed]);
 }
+const selfReferenceCycles = [
+  {
+    name: "users.suspendedById",
+    arrange: `SET LOCAL session_replication_role = replica;
+      INSERT INTO users(id,"displayName","updatedAt") VALUES ('reset-cycle-user-a','Reset cycle user A',now()),('reset-cycle-user-b','Reset cycle user B',now());
+      UPDATE users SET "suspendedById"='reset-cycle-user-b' WHERE id='reset-cycle-user-a';
+      UPDATE users SET "suspendedById"='reset-cycle-user-a' WHERE id='reset-cycle-user-b';
+      SET LOCAL session_replication_role = origin`,
+    rows: `SELECT id,"suspendedById" FROM users
+      WHERE id IN ('reset-cycle-user-a','reset-cycle-user-b') ORDER BY id`,
+  },
+  {
+    name: "diagnostic_reports.predecessorId",
+    arrange: `SET LOCAL session_replication_role = replica;
+      INSERT INTO diagnostic_reports(id,"orderId","templateVersionId","predecessorId",audience,status,state,"updatedAt") VALUES
+        ('reset-cycle-report-a','reset-a-order','reset-a-template','reset-cycle-report-b','buyer_private','draft',
+          '{"id":"reset-cycle-report-a","orderId":"reset-a-order","templateVersionId":"reset-a-template","audience":"buyer_private","status":"draft"}',now()),
+        ('reset-cycle-report-b','reset-a-order','reset-a-template','reset-cycle-report-a','buyer_private','draft',
+          '{"id":"reset-cycle-report-b","orderId":"reset-a-order","templateVersionId":"reset-a-template","audience":"buyer_private","status":"draft"}',now());
+      SET LOCAL session_replication_role = origin`,
+    rows: `SELECT id,"predecessorId" FROM diagnostic_reports
+      WHERE id IN ('reset-cycle-report-a','reset-cycle-report-b') ORDER BY id`,
+  },
+  {
+    name: "diagnostic_identity_evidence.supersedesId",
+    arrange: `SET LOCAL session_replication_role = replica;
+      INSERT INTO diagnostic_identity_evidence(id,"orderId","orderVersion","identityRecordId","rightsUntil","recordedAt","observationHash","recordHash",identifiers,provenance,rights,"supersedesId") VALUES
+        ('reset-cycle-evidence-a','reset-a-order',1,'reset-a-raw',now()+interval '1 day',now(),repeat('a',64),repeat('d',64),'[]','[]','{}','reset-cycle-evidence-b'),
+        ('reset-cycle-evidence-b','reset-a-order',2,'reset-a-raw',now()+interval '1 day',now(),repeat('b',64),repeat('e',64),'[]','[]','{}','reset-cycle-evidence-a');
+      SET LOCAL session_replication_role = origin`,
+    rows: `SELECT id,"supersedesId" FROM diagnostic_identity_evidence
+      WHERE id IN ('reset-cycle-evidence-a','reset-cycle-evidence-b') ORDER BY id`,
+  },
+] as const;
 
 describe("operator-owned operational reset row admission", () => {
   let container: StartedPostgreSqlContainer;
@@ -308,5 +342,24 @@ describe("operator-owned operational reset row admission", () => {
       await expect(client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(),observed])).rejects.toThrow("operational_reset_plan_limit");
     } finally { await client.query("ROLLBACK"); client.release(); }
   });
+
+  for (const cycle of selfReferenceCycles) {
+    it(`refuses a certified mutual ${cycle.name} cycle during prepare before row effects`, async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(cycle.arrange);
+        const before = (await client.query(cycle.rows)).rows;
+        const observed = (await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value;
+        await client.query("SAVEPOINT cycle_prepare");
+        await expect(client.query("SELECT staging_clean_reset_rows.prepare($1::jsonb,$2::jsonb)", [binding(),observed]))
+          .rejects.toThrow("operational_reset_unsupported_cycle");
+        await client.query("ROLLBACK TO SAVEPOINT cycle_prepare");
+        expect((await client.query("SELECT staging_clean_reset_rows.observe() AS value")).rows[0].value).toEqual(observed);
+        expect((await client.query(cycle.rows)).rows).toEqual(before);
+        expect((await client.query("SELECT count(*)::int AS count FROM staging_clean_reset_rows.admissions")).rows[0].count).toBe(0);
+      } finally { await client.query("ROLLBACK"); client.release(); }
+    });
+  }
 
 });

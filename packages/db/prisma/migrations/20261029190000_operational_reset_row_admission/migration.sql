@@ -38,6 +38,38 @@ LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $fn$
  SELECT '{"diagnostic_identity_evidence":"supersedesId","diagnostic_reports":"predecessorId","users":"suspendedById"}'::jsonb
 $fn$;
 
+-- Certified self-reference edges must be acyclic before any disposal effect. The fixed
+-- DELETE loop can remove a self-reference leaf, but it cannot lawfully widen to an UPDATE
+-- or cascade when a row participates in a cycle.
+CREATE FUNCTION staging_clean_reset_rows.has_certified_self_reference_cycle() RETURNS boolean
+LANGUAGE plpgsql VOLATILE SET search_path=pg_catalog,public AS $fn$
+DECLARE relation_name text; self_column text; has_cycle boolean;
+BEGIN
+ FOR relation_name,self_column IN
+   SELECT key,value#>>'{}' FROM jsonb_each(staging_clean_reset_rows.self_references()) ORDER BY key
+ LOOP
+  EXECUTE format($sql$
+    WITH RECURSIVE edges AS (
+      SELECT id::text AS node,%1$I::text AS next_node
+      FROM public.%2$I
+      WHERE %1$I IS NOT NULL
+    ), walk(start_node,node,path) AS (
+      SELECT node,node,ARRAY[node]::text[] FROM edges
+      UNION ALL
+      SELECT w.start_node,e.next_node,w.path||e.next_node
+      FROM walk w JOIN edges e ON e.node=w.node
+      WHERE NOT e.next_node=ANY(w.path)
+    )
+    SELECT EXISTS (
+      SELECT 1 FROM walk w JOIN edges e ON e.node=w.node
+      WHERE e.next_node=w.start_node
+    )
+  $sql$,self_column,relation_name) INTO has_cycle;
+  IF has_cycle THEN RETURN true; END IF;
+ END LOOP;
+ RETURN false;
+END $fn$;
+
 -- Exact FK columns/actions and trigger/function definitions the fixed plan was proved against.
 CREATE FUNCTION staging_clean_reset_rows.graph() RETURNS text
 LANGUAGE sql STABLE SET search_path=pg_catalog AS $fn$
@@ -146,9 +178,12 @@ BEGIN
  SELECT coalesce(sum(value::bigint),0) INTO total FROM jsonb_each_text(actual->'counts') c
   WHERE staging_clean_reset_rows.classification()->>c.key NOT LIKE 'retain%';
  IF total>10000 THEN RAISE EXCEPTION 'operational_reset_plan_limit'; END IF;
- -- users.avatarUploadId (NO ACTION) and media_uploads.userId (CASCADE) form an actual cycle.
- -- No DELETE-only order disposes both without a cascade or UPDATE, so it refuses.
- IF EXISTS(SELECT 1 FROM public.users WHERE "avatarUploadId" IS NOT NULL) THEN RAISE EXCEPTION 'operational_reset_unsupported_cycle'; END IF;
+ -- users.avatarUploadId (NO ACTION) and media_uploads.userId (CASCADE) form an actual
+ -- cross-table cycle; certified self-reference cycles are refused by the same pre-effect
+ -- contract. No DELETE-only order disposes either shape without a cascade or UPDATE.
+ IF EXISTS(SELECT 1 FROM public.users WHERE "avatarUploadId" IS NOT NULL)
+   OR staging_clean_reset_rows.has_certified_self_reference_cycle()
+ THEN RAISE EXCEPTION 'operational_reset_unsupported_cycle'; END IF;
  CREATE TEMP TABLE operational_reset_sealed(relation text NOT NULL, old_hash text NOT NULL, old jsonb NOT NULL) ON COMMIT DROP;
  FOR t IN SELECT key FROM jsonb_each(staging_clean_reset_rows.classification()) WHERE value#>>'{}' NOT LIKE 'retain%' ORDER BY key LOOP
   EXECUTE format('INSERT INTO pg_temp.operational_reset_sealed SELECT %L,md5(to_jsonb(r)::text),to_jsonb(r) FROM public.%I r',t,t);
