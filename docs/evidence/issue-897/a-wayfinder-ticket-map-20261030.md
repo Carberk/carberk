@@ -10,8 +10,10 @@ declare A complete.
 
 ## Reconciled starting state
 
-- Coordinator branch `agent/release897-candidate-a-20261029` and its remote
-  currently point to candidate `998e2cfa47a7c33ffd097ea0ffb07e36aaaa5284`.
+- Coordinator branch `agent/release897-candidate-a-20261029` currently carries
+  docs checkpoint `638683943`; the final assembled source/test SHA for the A-09
+  fix is `99097510f84c6d682bf9838f82a629f36dd5b442`. Future CI, review and
+  acceptance packets must name the exact assembled SHA they exercise.
 - PR #904 remains open/draft on `agent/spec-897-campaign` at its separately
   verified head `b6dac5d17c140c8fd307a24df56d4a82ed070625`. The PR ref is not
   implied to equal the coordinator candidate. The earlier fast-forward and
