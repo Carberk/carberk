@@ -12,7 +12,7 @@ in isolated worktrees. Their candidate identity remains the exact handoff base
 | A-01 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a01-standards-spec-20261030-r1` | returned FAIL, S1 accepted/open | isolated |
 | A-02 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-worker-restricted-20261030-r1` | terminal FAIL; evidence imported | isolated |
 | A-04 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a04-reset-runtime-20261030-r1` | terminal FAIL/open; evidence imported | isolated |
-| A-11 | r1 `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r1`; r2 `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r2` | r1 usage-limit failure; r2 running | isolated |
+| A-11 | r1 `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r1`; r2 `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r2` | r1 usage-limit failure; r2 terminal FAIL/open, report recorded | isolated |
 
 A-03 and A-05 wait for their declared receipts. A-06 through A-10 remain
 blocked by the dependency order in the Wayfinder map. No child is authorized
@@ -82,6 +82,14 @@ The `52d901c50..a8b5aa0d` diff contains only five files under
 and updated execution record. The same source/test/config comparison used for
 the first wave exited 0. Lightweight coordinator verification passed
 `pnpm check:agent-docs`, `pnpm check:glossary` and `git diff --check`.
+
+The r2 retry ran in `/Users/bagtyyar/.t3/worktrees/carberk/t3-a38766b5`,
+branch `t3/issue-897-milestone-a-spec-review-1`, at immutable HEAD
+`69948805f6f41f199634300ba2fbaf8c38630be1`. Its source/test/migration/config
+comparison to `52d901c50af1dde97ea22bda8efb1fdf21f169b1` exited 0. It returned
+FAIL/open with blockers A-02, A-04, A-03 and A-05–A-10, and no source-fix
+finding. The coordinator recorded the report at
+`a-11-spec-review-20261030.md`; A-09 therefore has no A-11 source paths.
 
 ## A-02 terminal receipt and resource release
 

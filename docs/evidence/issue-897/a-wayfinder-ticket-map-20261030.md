@@ -235,12 +235,17 @@ declare A complete.
 
 - **Owner:** delegated Sol 6.1 implementation worker; coordinator assembles and
   reruns affected checks.
-- **Base:** the exact reviewed candidate SHA, normally `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
-- **Allowed paths:** only files named by the accepted blocking findings from
-  both independent axes, A-01 Standards S1 and any accepted A-11 Spec finding;
-  matching tests and `docs/evidence/issue-897/a-09-fix-20261030/`. The
-  coordinator fills the exact A-11 paths after its report. No path outside the
-  combined allow-list is writable.
+- **Base:** the exact assembled review source,
+  `6a902544f6135273b19c6bc46e37813034fe68fa`. Its post-review changes are
+  evidence-only and have source/config equality to the reviewed
+  `69948805f6f41f199634300ba2fbaf8c38630be1` state.
+- **Allowed paths:** A-01 Standards S1 names exactly
+  `apps/admin/src/app/diagnostics/DiagnosticIdentity.tsx`,
+  `apps/admin/src/app/diagnostics/DiagnosticContinuity.tsx`, and
+  `apps/admin/src/app/(admin)/services/UploadRightsForm.tsx`, plus their
+  affected component tests and `docs/evidence/issue-897/a-09-fix-20261030/`.
+  A-11 returned no source-fix finding, so it adds no source path to this
+  allow-list. No path outside this combined disposition is writable.
 - **Depends on:** A-01 and A-11 reports. A-02–A-05 may continue only when their paths
   are disjoint from the proposed fix.
 - **Non-goals:** no opportunistic refactor, scope expansion, contract rewrite,
