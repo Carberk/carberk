@@ -10,6 +10,18 @@ declare A complete.
 
 ## Reconciled starting state
 
+Parent accepted the A-01 and bounded A-09 S1/S2 gates on exact assembled
+source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`, after reading
+both independent reports, the affected verification receipt and this gate.
+This is ticket-scope acceptance only: **2 passed, 9 open; A is NOT accepted**.
+
+| Tickets | Current state |
+|---|---|
+| A-01, A-09 (bounded S1/S2) | PASS, Parent accepted on exact source above |
+| A-02 | FAIL/open; bounded offline producer repair active |
+| A-03, A-04, A-11 | FAIL/open; required evidence incomplete |
+| A-05, A-06, A-07, A-08, A-10 | Waiting on their recorded dependencies |
+
 - Coordinator branch `agent/release897-candidate-a-20261029` currently carries
   docs checkpoint `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`; the assembled
   source/verification SHA for the A-09 S2 fix is
@@ -279,6 +291,11 @@ case bodies and cleanup remain required.
 
 ### A-09 — One bounded fix round after independent review (conditional)
 
+**Current result: PASS for the bounded S1/S2 fix, Parent accepted on
+`4b2c8a6f6161f9c825945637f6f848c64adeb145`.** The original dispatch contract
+below is historical; it grants no new edit authority. New prerequisites have
+their own explicit bounded contracts under their owning acceptance tickets.
+
 - **Owner:** delegated Sol 6.1 implementation worker; coordinator assembles and
   reruns affected checks.
 - **Base:** the exact assembled review source,
@@ -308,16 +325,19 @@ case bodies and cleanup remain required.
 - **Gate:** PASS when the named finding is fixed with no new scope and all
   affected checks are green; FAIL otherwise, returning to coordinator review.
 
-#### A-09 S2 follow-up round
+#### A-09 S2 follow-up round — PASS
 
 Assembled verification checkpoint `4b2c8a6f6161f9c825945637f6f848c64adeb145`
 passes all 334 affected tests, both admin TypeScript compilers, lint and runtime
 verification. Its receipt is `a-09-s2-assembled-verification-20261030.md`.
-S1/S2 remain FAIL/open until the fresh independent review returns. The repair
-slot is released; A-02 fixture production still requires the separately scoped
-producer dependency repair recorded in its preparation receipt.
+Independent Standards r3 returned PASS and closes S1/S2 on that source.
+Independent Spec r4 found no additional source defect and retains its separate
+FAIL/open acceptance evidence findings. Parent accepted the bounded A-09 gate.
+The repair slot is released; A-02 fixture production still requires its
+separately scoped producer dependency repair.
 
-The post-fix A-01 review returned FAIL/open on S2. The first A-09 round fixed
+Historical S2 dispatch: the first post-fix A-01 review returned FAIL/open on S2.
+The first A-09 round fixed
 operation-site reads but left optional ambient fallbacks and production parents
 that omit the dependencies. The follow-up may change only the three S1 modules,
 their production composition/provider boundaries (`DiagnosticWorkspace`,
@@ -325,8 +345,9 @@ their production composition/provider boundaries (`DiagnosticWorkspace`,
 rendered/network tests, and the A-09 evidence directory. It must make the
 dependencies required at the module boundary and exercise the real parents with
 deterministic providers. No other feature, B, analytics, reset, deployment,
-native, artifact or release path is in scope. S2 remains FAIL/open until this
-round is assembled, verified and independently reviewed again.
+native, artifact or release path was in scope. At that checkpoint S2 remained
+FAIL/open until assembly, affected verification and another independent review.
+Those obligations are now satisfied by the exact receipt/reports above.
 
 ### A-10 — Current-PR reconciliation, protected merge, and final acceptance
 

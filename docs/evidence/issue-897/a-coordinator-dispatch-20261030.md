@@ -2,6 +2,12 @@
 
 ## Current immutable review identities and disposition
 
+Parent accepted A-01 PASS and the bounded A-09 S1/S2 PASS on exact assembled
+source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Count:
+**2 passed, 9 open**. A-02 is active offline producer repair; A-03/A-04/A-11
+are FAIL/open; A-05/A-06/A-07/A-08/A-10 wait. A is NOT accepted. Earlier S1/S2
+FAIL/open entries below are historical and superseded by returned reports.
+
 Both review rounds were launched from actual immutable HEAD
 `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`, reviewing source/verification SHA
 `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Coordinator read-back confirmed
@@ -72,6 +78,10 @@ timing/CPU contract are recorded before work; no resource or slot exists yet.
   private root `/tmp/897-r6c-a02r2-20261030`. No foreign `65379` access.
 
 ## Planned A-09R reset profile prerequisite
+
+This is an unlaunched A-04 prerequisite plan, not a reopening of the accepted
+A-09 S1/S2 gate and not a new task map. It was recorded before Parent's status
+correction. No worker is launched for that status correction.
 
 The accepted A-11 A-04 finding is separately bounded in
 `a-04-reset-runtime-20261030/profile-repair/contract.md`, exact source/base
@@ -148,8 +158,9 @@ the existing A-02/A-03/A-04/A-05–A-10 evidence gaps, with no new source defect
   and source-equality audit. Exact executable receipts and selectors must be
   supplied before assembly; this plan is not a run receipt.
 - Evidence: `a-09-fix-20261030/` with source checkpoint, evidence-inclusive
-  HEAD, exact commands/results and path audit. S2 stays FAIL/open until
-  assembly, affected verification and another independent review pass.
+  HEAD, exact commands/results and path audit. At this historical dispatch S2
+  stayed FAIL/open until assembly, affected verification and independent review;
+  all have since passed on `4b2c8a6f…`, accepted by Parent above.
 
 The original dispatch entries below are history. No accepted ordinary full100,
 reset-cycle, staff/API or static evidence is invalidated by a planning commit.
@@ -187,7 +198,7 @@ blocked by the dependency order in the Wayfinder map. No child is authorized
 to create another coordinator, publish/merge PR #904, mutate shared staging,
 build native artifacts, or claim final acceptance.
 
-The bounded A-09 fix round is now the only implementation child:
+Historical initial S1 dispatch (terminal; not an active child):
 
 - Task ID: `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a09-s1-fix-20261030-r1`.
 - Child thread: `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a09-s1-fix-20261030-r1`.
@@ -215,8 +226,9 @@ The existing active A-09 child is in
 checkpoint was `6a902544f6135273b19c6bc46e37813034fe68fa`. The intervening
 commit changes only the A-11 report, ticket map and dispatch ledger. The
 source/test/config comparison from `52d901c50` to that actual HEAD exited 0.
-S1 remains FAIL/open until the source fix is assembled and affected
-verification names that assembled SHA.
+At this historical checkpoint S1 remained FAIL/open until assembly and affected
+verification named the assembled SHA. The later S2 round and independent
+review above resolve the finding on `4b2c8a6f…`.
 
 ### A-09 assembly and post-fix review
 
@@ -231,7 +243,8 @@ other non-documentation delta from `52d901c50`.
 Coordinator verification on the assembled SHA passed the same 334 focused
 rendered/network tests, admin TS7/TS6/lint/build/runtime, worker TS7/TS6 and
 focused seam lint. See [assembled verification](a-09-fix-assembled-verification-20261030.md).
-S1 remains FAIL/open until post-fix independent review returns.
+At this historical checkpoint S1 remained FAIL/open pending post-fix review.
+The later S2 report above records its resolved disposition.
 
 The next independent round reviews `git diff 52d901c50af1dde97ea22bda8efb1fdf21f169b1...99097510f84c6d682bf9838f82a629f36dd5b442 -- apps packages scripts .github infra pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json`.
 Standards A-01 r2 and Spec A-11 r3 use separate isolated Sol 6.1 xhigh/priority

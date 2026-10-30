@@ -8,6 +8,11 @@ The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-
 
 ## Active critical path
 
+Parent accepted A-01 PASS and bounded A-09 S1/S2 PASS on exact assembled
+source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Current count
+is **2 passed, 9 open**: A-02 active offline repair; A-03/A-04/A-11 FAIL/open;
+A-05/A-06/A-07/A-08/A-10 waiting. This does not accept A or mutate PR #904.
+
 Current review disposition: independent A-01 r3 is PASS on `4b2c8a6f…`,
 recorded in `a-01-s2-standards-review-20261030.md`. S1/S2 are closed on that
 source after S2 assembly and coordinator verification: 334 affected tests,
