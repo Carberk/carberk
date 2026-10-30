@@ -135,6 +135,42 @@
           "retryInSeconds"
         ]
       },
+      "RateLimitedResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "RATE_LIMITED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "$ref": "#/components/schemas/RateLimitedDetails"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "details",
+          "timestamp",
+          "requestId"
+        ]
+      },
       "InvalidOtpDetails": {
         "type": "object",
         "properties": {
@@ -943,6 +979,76 @@
             "type": "string",
             "format": "uuid"
           },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -1035,6 +1141,38 @@
             "format": "date-time"
           },
           "isFavorited": {
+            "type": "boolean"
+          },
+          "enginePower": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true
+          },
+          "driveTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bodyTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "colorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hasVin": {
+            "type": "boolean"
+          },
+          "acceptsExchange": {
+            "type": "boolean"
+          },
+          "installmentAvailable": {
+            "type": "boolean"
+          },
+          "allowCalls": {
+            "type": "boolean"
+          },
+          "allowChat": {
             "type": "boolean"
           }
         },
@@ -1064,6 +1202,76 @@
             "type": "string",
             "format": "uuid"
           },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -1158,6 +1366,38 @@
           "isFavorited": {
             "type": "boolean"
           },
+          "enginePower": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true
+          },
+          "driveTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bodyTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "colorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hasVin": {
+            "type": "boolean"
+          },
+          "acceptsExchange": {
+            "type": "boolean"
+          },
+          "installmentAvailable": {
+            "type": "boolean"
+          },
+          "allowCalls": {
+            "type": "boolean"
+          },
+          "allowChat": {
+            "type": "boolean"
+          },
           "galleryKeys": {
             "type": "array",
             "items": {
@@ -1174,10 +1414,7 @@
             },
             "maxItems": 8
           },
-          "allowCalls": {
-            "type": "boolean"
-          },
-          "allowChat": {
+          "hasContactPhone": {
             "type": "boolean"
           },
           "seller": {
@@ -1233,6 +1470,76 @@
           "sellerId": {
             "type": "string",
             "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
           },
           "seller": {
             "type": "object",
@@ -1469,6 +1776,10 @@
             "type": "integer",
             "minimum": 0
           },
+          "viewsToday": {
+            "type": "integer",
+            "minimum": 0
+          },
           "favoriteCount": {
             "type": "integer",
             "minimum": 0
@@ -1666,6 +1977,76 @@
       "ListingDraft": {
         "type": "object",
         "properties": {
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -1996,6 +2377,76 @@
       "CreateDraftRequest": {
         "type": "object",
         "properties": {
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "initialPayload": {
             "type": "object",
             "properties": {
@@ -2491,6 +2942,76 @@
                   "type": "string",
                   "format": "uuid"
                 },
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
+                },
                 "status": {
                   "type": "string",
                   "enum": [
@@ -2585,6 +3106,38 @@
                 "isFavorited": {
                   "type": "boolean"
                 },
+                "enginePower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "driveTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bodyTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "colorId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "hasVin": {
+                  "type": "boolean"
+                },
+                "acceptsExchange": {
+                  "type": "boolean"
+                },
+                "installmentAvailable": {
+                  "type": "boolean"
+                },
+                "allowCalls": {
+                  "type": "boolean"
+                },
+                "allowChat": {
+                  "type": "boolean"
+                },
                 "galleryKeys": {
                   "type": "array",
                   "items": {
@@ -2601,10 +3154,7 @@
                   },
                   "maxItems": 8
                 },
-                "allowCalls": {
-                  "type": "boolean"
-                },
-                "allowChat": {
+                "hasContactPhone": {
                   "type": "boolean"
                 },
                 "seller": {
@@ -2659,6 +3209,13 @@
       "ListingCountQuery": {
         "type": "object",
         "properties": {
+          "sellerType": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "business"
+            ]
+          },
           "brandId": {
             "type": "string",
             "format": "uuid"
@@ -2746,6 +3303,13 @@
       "ListingModelCountQuery": {
         "type": "object",
         "properties": {
+          "sellerType": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "business"
+            ]
+          },
           "brandId": {
             "type": "string",
             "format": "uuid"
@@ -2818,6 +3382,13 @@
       "ListingBrandCountQuery": {
         "type": "object",
         "properties": {
+          "sellerType": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "business"
+            ]
+          },
           "cityId": {
             "type": "string",
             "format": "uuid"
@@ -2907,6 +3478,76 @@
                   "type": "string",
                   "format": "uuid"
                 },
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
+                },
                 "status": {
                   "type": "string",
                   "enum": [
@@ -3000,6 +3641,38 @@
                 },
                 "isFavorited": {
                   "type": "boolean"
+                },
+                "enginePower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "driveTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bodyTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "colorId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "hasVin": {
+                  "type": "boolean"
+                },
+                "acceptsExchange": {
+                  "type": "boolean"
+                },
+                "installmentAvailable": {
+                  "type": "boolean"
+                },
+                "allowCalls": {
+                  "type": "boolean"
+                },
+                "allowChat": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -3073,6 +3746,76 @@
             "items": {
               "type": "object",
               "properties": {
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
+                },
                 "id": {
                   "type": "string",
                   "format": "uuid"
@@ -3271,6 +4014,76 @@
             "type": "string",
             "format": "uuid"
           },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "logoUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "city": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "tk": {
+                    "type": "string"
+                  },
+                  "ru": {
+                    "type": "string"
+                  },
+                  "en": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tk",
+                  "ru",
+                  "en"
+                ]
+              },
+              "identityChecked": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              },
+              "hours": {
+                "type": "string",
+                "nullable": true
+              },
+              "services": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "logoUrl",
+              "city",
+              "identityChecked"
+            ]
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -3365,6 +4178,38 @@
           "isFavorited": {
             "type": "boolean"
           },
+          "enginePower": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true
+          },
+          "driveTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bodyTypeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "colorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hasVin": {
+            "type": "boolean"
+          },
+          "acceptsExchange": {
+            "type": "boolean"
+          },
+          "installmentAvailable": {
+            "type": "boolean"
+          },
+          "allowCalls": {
+            "type": "boolean"
+          },
+          "allowChat": {
+            "type": "boolean"
+          },
           "galleryKeys": {
             "type": "array",
             "items": {
@@ -3384,10 +4229,7 @@
           "contactPhone": {
             "type": "string"
           },
-          "allowCalls": {
-            "type": "boolean"
-          },
-          "allowChat": {
+          "hasContactPhone": {
             "type": "boolean"
           }
         },
@@ -3423,6 +4265,76 @@
                 "sellerId": {
                   "type": "string",
                   "format": "uuid"
+                },
+                "businessId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "business": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "logoUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "city": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "tk": {
+                          "type": "string"
+                        },
+                        "ru": {
+                          "type": "string"
+                        },
+                        "en": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tk",
+                        "ru",
+                        "en"
+                      ]
+                    },
+                    "identityChecked": {
+                      "type": "boolean"
+                    },
+                    "address": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hours": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "services": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "logoUrl",
+                    "city",
+                    "identityChecked"
+                  ]
                 },
                 "status": {
                   "type": "string",
@@ -3518,6 +4430,38 @@
                 "isFavorited": {
                   "type": "boolean"
                 },
+                "enginePower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "driveTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bodyTypeId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "colorId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "hasVin": {
+                  "type": "boolean"
+                },
+                "acceptsExchange": {
+                  "type": "boolean"
+                },
+                "installmentAvailable": {
+                  "type": "boolean"
+                },
+                "allowCalls": {
+                  "type": "boolean"
+                },
+                "allowChat": {
+                  "type": "boolean"
+                },
                 "galleryKeys": {
                   "type": "array",
                   "items": {
@@ -3537,10 +4481,7 @@
                 "contactPhone": {
                   "type": "string"
                 },
-                "allowCalls": {
-                  "type": "boolean"
-                },
-                "allowChat": {
+                "hasContactPhone": {
                   "type": "boolean"
                 }
               },
@@ -3593,6 +4534,10 @@
       "PresignRequest": {
         "type": "object",
         "properties": {
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -4982,16 +5927,23 @@
         "type": "object",
         "properties": {
           "uploadUrl": {
-            "type": "string",
-            "format": "uri"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "string",
+                "pattern": "^\\/conversations\\/[0-9a-f-]+\\/attachments\\/[0-9a-f-]+\\/bytes$"
+              }
+            ]
           },
           "key": {
             "type": "string"
           },
           "expiresIn": {
             "type": "integer",
-            "minimum": 0,
-            "exclusiveMinimum": true
+            "minimum": 0
           },
           "maxSizeBytes": {
             "type": "integer",
@@ -7474,6 +8426,27 @@
           "auditLogId"
         ]
       },
+      "StaffCapability": {
+        "type": "string",
+        "enum": [
+          "support.operations",
+          "history.fulfilment",
+          "history.payment.verify",
+          "history.payment.history",
+          "history.export",
+          "founder.refund.approve",
+          "staff.manage",
+          "founder.control",
+          "founder.admission",
+          "founder.recovery",
+          "diagnostics.reception",
+          "diagnostics.technician",
+          "diagnostics.reviewer",
+          "diagnostics.templates",
+          "analytics.aggregate",
+          "analytics.investigate"
+        ]
+      },
       "UnsuspendUserRequest": {
         "type": "object",
         "properties": {
@@ -8263,6 +9236,295 @@
     "parameters": {}
   },
   "paths": {
+    "/api/v1/staff/capabilities": {
+      "get": {
+        "summary": "Current staff capabilities and elevation",
+        "tags": [
+          "Identity"
+        ],
+        "responses": {
+          "200": {
+            "description": "Current scoped staff or pending admin summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "support.operations",
+                          "history.fulfilment",
+                          "history.payment.verify",
+                          "history.payment.history",
+                          "history.export",
+                          "founder.refund.approve",
+                          "staff.manage",
+                          "founder.control",
+                          "founder.admission",
+                          "founder.recovery",
+                          "diagnostics.reception",
+                          "diagnostics.technician",
+                          "diagnostics.reviewer",
+                          "diagnostics.templates",
+                          "analytics.aggregate",
+                          "analytics.investigate"
+                        ]
+                      }
+                    },
+                    "elevated": {
+                      "type": "boolean"
+                    },
+                    "adminTotpExpiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "capabilities",
+                    "elevated"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current active staff Session required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/staff/grants": {
+      "post": {
+        "summary": "Grant or revoke a named staff capability with audit",
+        "tags": [
+          "Identity"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetUserId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "capability": {
+                    "type": "string",
+                    "enum": [
+                      "support.operations",
+                      "history.fulfilment",
+                      "history.payment.verify",
+                      "history.payment.history",
+                      "history.export",
+                      "founder.refund.approve",
+                      "staff.manage",
+                      "founder.control",
+                      "founder.admission",
+                      "founder.recovery",
+                      "diagnostics.reception",
+                      "diagnostics.technician",
+                      "diagnostics.reviewer",
+                      "diagnostics.templates",
+                      "analytics.aggregate",
+                      "analytics.investigate"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "grant": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "targetUserId",
+                  "capability",
+                  "reason",
+                  "grant"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Authoritative audited transition, or idempotent no-op"
+          },
+          "400": {
+            "description": "Invalid staff change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Explicit current elevated management authority required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/users/{id}/remove-photo": {
       "post": {
         "summary": "Remove a User's Profile Photo as a moderator",
@@ -10664,52 +11926,58 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "integer"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RateLimitedResponse"
                     },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_FAILED",
-                        "UNAUTHORIZED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "USER_NOT_FOUND",
-                        "CONFLICT",
-                        "RATE_LIMITED",
-                        "OTP_EXPIRED",
-                        "OTP_ALREADY_USED",
-                        "INVALID_OTP",
-                        "OTP_LOCKED",
-                        "OTP_NOT_FOUND",
-                        "SIGN_IN_METHOD_TAKEN",
-                        "INVALID_DISPLAY_NAME",
-                        "INTERNAL"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "VALIDATION_FAILED",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "NOT_FOUND",
+                            "USER_NOT_FOUND",
+                            "CONFLICT",
+                            "OTP_EXPIRED",
+                            "OTP_ALREADY_USED",
+                            "INVALID_OTP",
+                            "OTP_LOCKED",
+                            "OTP_NOT_FOUND",
+                            "SIGN_IN_METHOD_TAKEN",
+                            "INVALID_DISPLAY_NAME",
+                            "INTERNAL"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "code",
+                        "message",
+                        "timestamp",
+                        "requestId"
                       ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "nullable": true
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "code",
-                    "message",
-                    "timestamp",
-                    "requestId"
                   ]
                 }
               }
@@ -11198,52 +12466,58 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "integer"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RateLimitedResponse"
                     },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_FAILED",
-                        "UNAUTHORIZED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "USER_NOT_FOUND",
-                        "CONFLICT",
-                        "RATE_LIMITED",
-                        "OTP_EXPIRED",
-                        "OTP_ALREADY_USED",
-                        "INVALID_OTP",
-                        "OTP_LOCKED",
-                        "OTP_NOT_FOUND",
-                        "SIGN_IN_METHOD_TAKEN",
-                        "INVALID_DISPLAY_NAME",
-                        "INTERNAL"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "VALIDATION_FAILED",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "NOT_FOUND",
+                            "USER_NOT_FOUND",
+                            "CONFLICT",
+                            "OTP_EXPIRED",
+                            "OTP_ALREADY_USED",
+                            "INVALID_OTP",
+                            "OTP_LOCKED",
+                            "OTP_NOT_FOUND",
+                            "SIGN_IN_METHOD_TAKEN",
+                            "INVALID_DISPLAY_NAME",
+                            "INTERNAL"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "code",
+                        "message",
+                        "timestamp",
+                        "requestId"
                       ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "nullable": true
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "code",
-                    "message",
-                    "timestamp",
-                    "requestId"
                   ]
                 }
               }
@@ -13178,52 +14452,58 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "integer"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RateLimitedResponse"
                     },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_FAILED",
-                        "UNAUTHORIZED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "USER_NOT_FOUND",
-                        "CONFLICT",
-                        "RATE_LIMITED",
-                        "OTP_EXPIRED",
-                        "OTP_ALREADY_USED",
-                        "INVALID_OTP",
-                        "OTP_LOCKED",
-                        "OTP_NOT_FOUND",
-                        "SIGN_IN_METHOD_TAKEN",
-                        "INVALID_DISPLAY_NAME",
-                        "INTERNAL"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "VALIDATION_FAILED",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "NOT_FOUND",
+                            "USER_NOT_FOUND",
+                            "CONFLICT",
+                            "OTP_EXPIRED",
+                            "OTP_ALREADY_USED",
+                            "INVALID_OTP",
+                            "OTP_LOCKED",
+                            "OTP_NOT_FOUND",
+                            "SIGN_IN_METHOD_TAKEN",
+                            "INVALID_DISPLAY_NAME",
+                            "INTERNAL"
+                          ]
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "nullable": true
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "code",
+                        "message",
+                        "timestamp",
+                        "requestId"
                       ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "nullable": true
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
                     }
-                  },
-                  "required": [
-                    "statusCode",
-                    "code",
-                    "message",
-                    "timestamp",
-                    "requestId"
                   ]
                 }
               }
@@ -13375,6 +14655,96 @@
         "responses": {
           "200": {
             "description": "Logged out"
+          }
+        }
+      }
+    },
+    "/api/v1/listings/{id}/views": {
+      "post": {
+        "summary": "Signal an explicitly viewed Listing detail",
+        "description": "Public. Send only after a loaded, focused, foreground detail remains visible for two seconds. Installation identity takes precedence over optional authentication. No identity, owner/admin, inactive, deleted or duplicate daily signals do not increment. Collection is disabled until retention and disclosure gates pass.",
+        "tags": [
+          "Listings"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "x-app-install-id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Signal accepted without revealing whether it counted"
+          },
+          "400": {
+            "description": "Malformed app identifier",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -14032,6 +15402,18 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "personal",
+                "business"
+              ]
+            },
+            "required": false,
+            "name": "sellerType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid"
             },
             "required": false,
@@ -14239,6 +15621,18 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "personal",
+                "business"
+              ]
+            },
+            "required": false,
+            "name": "sellerType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid"
             },
             "required": true,
@@ -14409,6 +15803,18 @@
           "Listings"
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "personal",
+                "business"
+              ]
+            },
+            "required": false,
+            "name": "sellerType",
+            "in": "query"
+          },
           {
             "schema": {
               "type": "string",

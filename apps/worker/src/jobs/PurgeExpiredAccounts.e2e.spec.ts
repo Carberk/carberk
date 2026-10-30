@@ -31,6 +31,12 @@ describeWithDatabase("PurgeExpiredAccounts — Postgres", () => {
   const now = new Date();
   const expiredUserId = randomUUID();
   const otherUserId = randomUUID();
+  const stockUserId = randomUUID();
+  const businessId = randomUUID();
+  const brandId = randomUUID();
+  const modelId = randomUUID();
+  const regionId = randomUUID();
+  const cityId = randomUUID();
   const expiredPhone = suitePhone("expired");
   const otherPhone = suitePhone("other");
   const strangerPhone = suitePhone("stranger");
@@ -50,7 +56,16 @@ describeWithDatabase("PurgeExpiredAccounts — Postgres", () => {
         ],
       },
     });
-    await prisma.user.deleteMany({ where: { id: { in: [expiredUserId, otherUserId] } } });
+    await prisma.listingMedia.deleteMany({ where: { listing: { sellerId: stockUserId } } });
+    await prisma.mediaUpload.deleteMany({ where: { userId: stockUserId } });
+    await prisma.listing.deleteMany({ where: { sellerId: stockUserId } });
+    await prisma.listingDraft.deleteMany({ where: { userId: stockUserId } });
+    await prisma.dealership.deleteMany({ where: { id: businessId } });
+    await prisma.city.deleteMany({ where: { id: cityId } });
+    await prisma.region.deleteMany({ where: { id: regionId } });
+    await prisma.model.deleteMany({ where: { id: modelId } });
+    await prisma.brand.deleteMany({ where: { id: brandId } });
+    await prisma.user.deleteMany({ where: { id: { in: [expiredUserId, otherUserId, stockUserId] } } });
     await prisma.onModuleDestroy();
   });
 
@@ -126,4 +141,35 @@ describeWithDatabase("PurgeExpiredAccounts — Postgres", () => {
     });
     expect(purged).toEqual({ phone: null, deletionScheduledAt: null });
   });
+
+  it("retains business stock, adopted media and contact after the creator is purged", async () => {
+    const label = { nameRu: "Synthetic", nameTk: "Synthetic", nameEn: "Synthetic" };
+    await prisma.user.create({ data: { id: stockUserId, phone: suitePhone("stock"), phoneVerifiedAt: now, deletionScheduledAt: new Date(now.getTime() - 1000) } });
+    await prisma.brand.create({ data: { id: brandId, slug: `purge-${brandId}`, ...label } });
+    await prisma.model.create({ data: { id: modelId, brandId, slug: "synthetic", ...label } });
+    await prisma.region.create({ data: { id: regionId, slug: `purge-${regionId}`, ...label } });
+    await prisma.city.create({ data: { id: cityId, regionId, slug: "synthetic", ...label } });
+    const contactPhone = suitePhone("business-contact");
+    await prisma.dealership.create({ data: { id: businessId, name: "Synthetic stock", slug: `purge-${businessId}`, contactPhone, contactConfirmedAt: now } });
+    await prisma.dealershipMember.create({ data: { dealershipId: businessId, userId: stockUserId, role: "sales" } });
+    const listingData = { sellerId: stockUserId, brandId, modelId, cityId, priceAmount: 100, contactPhone };
+    const stock = await prisma.listing.create({ data: { ...listingData, businessId, status: "active", publishedAt: now } });
+    const personal = await prisma.listing.create({ data: { ...listingData, status: "archived", archivedByDeletion: true } });
+    const sharedDraft = await prisma.listingDraft.create({ data: { userId: stockUserId, businessId, payload: { contactPhone } } });
+    const personalDraft = await prisma.listingDraft.create({ data: { userId: stockUserId, payload: {} } });
+    const upload = await prisma.mediaUpload.create({ data: { userId: stockUserId, businessId, key: `pending/purge-${stock.id}/original.webp`, kind: "image", contentType: "image/webp", state: "ADOPTED", claimTargetType: "listing", claimTargetId: stock.id } });
+    const media = await prisma.listingMedia.create({ data: { listingId: stock.id, uploadId: upload.id, key: upload.key, kind: "image", sortOrder: 0 } });
+
+    await new PurgeExpiredAccounts(prisma).execute({ now });
+
+    expect(await prisma.user.findUniqueOrThrow({ where: { id: stockUserId }, select: { phone: true } })).toEqual({ phone: null });
+    expect(await prisma.listing.findUniqueOrThrow({ where: { id: stock.id }, select: { status: true, contactPhone: true, publishedAt: true, businessId: true } })).toEqual({ status: "active", contactPhone, publishedAt: now, businessId });
+    expect(await prisma.listingMedia.findUnique({ where: { id: media.id } })).not.toBeNull();
+    expect((await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } })).state).toBe("ADOPTED");
+    expect(await prisma.listingDraft.findUnique({ where: { id: sharedDraft.id } })).not.toBeNull();
+    expect(await prisma.listingDraft.findUnique({ where: { id: personalDraft.id } })).toBeNull();
+    expect((await prisma.listing.findUniqueOrThrow({ where: { id: personal.id } })).contactPhone).toBeNull();
+    expect((await prisma.dealership.findUniqueOrThrow({ where: { id: businessId } })).contactPhone).toBe(contactPhone);
+  });
+
 });

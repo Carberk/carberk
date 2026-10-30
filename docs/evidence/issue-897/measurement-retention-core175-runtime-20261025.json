@@ -1,0 +1,727 @@
+{
+  "status": "PUSHABLE_AFFECTED_IMPLEMENTATION_AND_ISOLATED_RUNTIME_CHECKPOINT_PARENT_INSPECTION_PENDING",
+  "role": "same sole implementation owner; no nested agents; parent owns combined integration and G1 acceptance",
+  "branch": "agent/issue-897-measurement-retention-20261025",
+  "base": "de80c7b572a8e2b5df832774bef751a6e299fc4f",
+  "baseTree": "8190e99411eadb4904c9187b2fc31555f4cdc9e5",
+  "sourceHead": "ba1e48e2958c541fa4e44f079c93098113b267a7",
+  "sourceTree": "72b27f010f54a9d304e605d462e4d25e2a467149",
+  "acceptedPriorSource": {
+    "head": "5737f27eedcecd5eeb7d8e96396cfb1f005c6b71",
+    "tree": "c2f8115be7b0e366e635f3701a88803bd5614806",
+    "productionUnchanged": true,
+    "fixtureChangesPendingInspection": true,
+    "path": "/tmp/897-retention-purge-parent-source-acceptance-20261025.json",
+    "sha256": "2b7069116c97d97f2015b0992c2e5fce0a8d0484ac849d2315df1d31fccc7398"
+  },
+  "dependency": {
+    "head": "0184929480c8b63a218480a88a0ae7730a881a52",
+    "tree": "7cccc15b8848344996392881ed55ee5b7e5ced40",
+    "parent": "30f93f05ebc672a99038d70cf2b2955613262667",
+    "merge": "17778f740e3e62134020060cabd2b11645ad2d54",
+    "mergeTree": "e9493bc3a1054478749719e9fad8c167066ffd3b",
+    "inheritedExactBytes": true,
+    "migrationMirrorSha256": {
+      "150": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+      "175": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f"
+    },
+    "paths": [
+      {
+        "path": "apps/api/src/modules/listings/infrastructure/DiagnosticRuntimeTransport.r7b.e2e.spec.ts",
+        "blob": "2392105c55dd28ddd69094c940ecc98a6e610344",
+        "sha256": "0f20a9fb821863ad24cb92a71158b075d2adad349c9a4845a90f959769566afa"
+      },
+      {
+        "path": "docs/evidence/issue-897/runtime-effect-alias-dependency-20261025.md",
+        "blob": "9d1f359d1f37941e74875fee3c94c51533f8021c",
+        "sha256": "4edc58d5540e339ab681ef35442ab068174cb0ccfd54589fc34d9ccaa1a32fc8"
+      },
+      {
+        "path": "docs/evidence/issue-897/runtime-transport-dependency-20261025.md",
+        "blob": "2777d73259549ef337f0a7290d592bdaf2bd5331",
+        "sha256": "acd5e7218ab5e79ae749d8a272b149d281208db5921c82749696a7127872d34e"
+      },
+      {
+        "path": "packages/db/prisma/migrations/20261025015000_diagnostic_runtime_transport_corrections/migration.sql",
+        "blob": "c80bcaf2db52992a4d5322900d4496bc93219f0f",
+        "sha256": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424"
+      },
+      {
+        "path": "packages/db/prisma/migrations/20261025017500_diagnostic_effect_scope_alias_correction/migration.sql",
+        "blob": "24b8909dbbc9ee36839186ecaa461bb7b454ccc9",
+        "sha256": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f"
+      },
+      {
+        "path": "packages/db/prisma/schema.prisma",
+        "blob": "9041e790b6ea3f2bd6a49c8d1d6dbc6b036f78a0",
+        "sha256": "1ceb4d0f3cf7deca417721eb2fa2bbc3e36c18adb1b9f2ed8404fc7fa78930c8"
+      },
+      {
+        "path": "packages/db/src/campaign-preparation.ts",
+        "blob": "95235086aebab0c41c65362e04d378b62784aa9e",
+        "sha256": "0b047bd812bfa6190bf44a6ddaafbf92206296bc2704e8b3c235a5f3b6801181"
+      },
+      {
+        "path": "packages/db/src/diagnostic-source-command.ts",
+        "blob": "c8f92bafe9c5b0c6742e83ae87fd357e4dc1c17b",
+        "sha256": "d8cc1db636b920d2600ac84eb815d4864d132b91806549df606976f99c8ce8a3"
+      },
+      {
+        "path": "scripts/diagnostic-effect-scope-alias-correction-schema.test.mjs",
+        "blob": "21828dd8d5afdd7db88209c61a48db7074316198",
+        "sha256": "574a76ac40c732206e6faa08c5545d2d54e0ae761aa0f3fab64d57189f5db866"
+      },
+      {
+        "path": "scripts/diagnostic-runtime-profile-validation.test.mjs",
+        "blob": "380e311ade5922eecd831780c6fcff4bc46944ff",
+        "sha256": "921a211f7e3ce2daa3b680456250fba47037db78c765188975d50bf3fd475b0e"
+      },
+      {
+        "path": "scripts/diagnostic-runtime-transport-corrections-schema.test.mjs",
+        "blob": "585fee149ce4590879ba50084e219371bc7daea8",
+        "sha256": "d0a3a3fac533014bfa32a418a2228e753895d154f67f64b8ca45358367e8be00"
+      },
+      {
+        "path": "scripts/staging-schema.mjs",
+        "blob": "318ca0521b4170389ce05eb9502f549d607ab8ab",
+        "sha256": "495d7684f2dd30a9daddc8b9826cd0ac1d06e9f1a5594f01e7e337e9d94ca6cd"
+      },
+      {
+        "path": "scripts/testing/retained-schema/20261025015000_diagnostic_runtime_transport_corrections.sql",
+        "blob": "c80bcaf2db52992a4d5322900d4496bc93219f0f",
+        "sha256": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424"
+      },
+      {
+        "path": "scripts/testing/retained-schema/20261025017500_diagnostic_effect_scope_alias_correction.sql",
+        "blob": "24b8909dbbc9ee36839186ecaa461bb7b454ccc9",
+        "sha256": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f"
+      }
+    ],
+    "receipt": {
+      "path": "/tmp/897-runtime-core175-parent-source-acceptance-20261025.json",
+      "sha256": "e6d521219e9f45fe8817d919d7d316d23ea09a4a3627f1eba410059a2788e001"
+    },
+    "originalPurgeDependency": {
+      "head": "311637ca601780fdcffb74def6e88ce473aba339",
+      "tree": "322437213c9e3db5fe379d04ff65994d2e291f39",
+      "merge": "eb54e756d33014662abe6116804257763e24eb72",
+      "receipt": "/tmp/897-r6c-parent-source-acceptance-20261025.json",
+      "handoff": "/tmp/897-r6c-account-purge-20261025-handoff.md",
+      "files": [
+        {
+          "path": "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts",
+          "sha256": "e39e2dddbc7636f72dd32d55bf87f625e86ba3ab5eb4588b028f186224f363e2",
+          "gitBlob": "16e9a81527f091531de1c8f856c7a9c5e0113763"
+        },
+        {
+          "path": "apps/worker/src/jobs/PurgeExpiredAccounts.ts",
+          "sha256": "21db23db29df4668404a79a12f86f0e8936a00ef47acff88c9a0a530dd96c63b",
+          "gitBlob": "cc4c157dfbd7d4c47605ebdf6be61b66216ee3a1"
+        },
+        {
+          "path": "apps/worker/src/jobs/diagnosticAccountErasure.ts",
+          "sha256": "e3d0bcbb5dd872567b1659f4199e245e1f40ed89990a878df9b1637a95473fa9",
+          "gitBlob": "332b006971dd25bcf87063f68f63d944cc65d48e"
+        },
+        {
+          "path": "apps/worker/src/jobs/serviceAccountErasure.ts",
+          "sha256": "35c8e73694ac252796743c0786f61b07d745637b1287f54fd7c07618b50c71ca",
+          "gitBlob": "64f1f42b858041f41d18ed4dffc56c3f30bf727d"
+        },
+        {
+          "path": "apps/worker/src/jobs/video/videoAccountErasure.ts",
+          "sha256": "28290d2549ad775919b0acfd1520f220d5f00800dad3ef641853cf67ee6b759b",
+          "gitBlob": "f12b7d59378a0e0ae4a0b63ba0acf2f53c66abdc"
+        }
+      ],
+      "status": "Historical source acceptance; affected caller assumptions withdrawn by parent and now corrected under narrow ownership."
+    },
+    "claimsTransportConsumed": false,
+    "publicationAncestryConsumed": false,
+    "uncommittedSQLFragments": false
+  },
+  "authority": {
+    "path": "/tmp/897-founder-autonomous-candidate-authority-20261025.md",
+    "sha256": "a7a11b7266943f09d3760951215f50411a03096213de349d919615b2d2c0444f"
+  },
+  "preflight": {
+    "path": "/tmp/897-retention-core175-preflight.json",
+    "sha256": "6c1bd311cedf5378c5a157beba86a1833175a9a15afece5ccf92a8b7936fb585"
+  },
+  "environment": {
+    "container": "carberk897-retention-core175-t3433c86f9",
+    "containerId": "7f7c4d40dcb439e927fd0b42648495c61854de145126ca918a52fb39a52ece83",
+    "host": "127.0.0.1",
+    "port": 53830,
+    "timezone": "America/New_York",
+    "postgresImage": "postgres:17-alpine",
+    "sharedResourcesUsed": false,
+    "parentDiagnosticDuplicated": false,
+    "databaseTimezone": "UTC",
+    "databaseVersion": "PostgreSQL17.11 aarch64 Alpine",
+    "databaseRole": "postgres superuser in disposable fixture only",
+    "isolation": "4worker clones from actual migrated template; original repository global setup/teardown",
+    "lastRunPreflight": "Before full4 command, tool trace recorded ba1e48e2/tree72b27f0, same exact container and worker database count0. No production byte changes."
+  },
+  "fixtureCorrection": {
+    "paths": [
+      "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts",
+      "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts"
+    ],
+    "preparation": "Replace assumption that prepare reaches row lock inside300ms by observation until actual caller blocks or settles under unchanged Prisma transaction bound. A rejection/settlement without lock fails with outcome and pg_stat_activity. No production or test timeout increased.",
+    "queue": "Assert observed direct tuple queue retention->purge and purge->collector. Keep exact purge1/retention0/collectoraccepted and foreignevent preservation.",
+    "drain": "All started tasks immediately rejection-handled; all gates finally released and promises allSettled; fixture close releases/drains again.",
+    "assertionsWeakened": false,
+    "productionChangesSinceParentInspection": false
+  },
+  "ownedSourceFiles": [
+    {
+      "path": "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts",
+      "sha256": "00b2a69cb60399025ba81ccc9f1a31f5ec9ea816c98bfe8a7ba6e2f8d22fe871",
+      "gitBlob": "7b8bf85ab0d4d5f160982e69663c2417505bc981"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts",
+      "sha256": "ae3a7bd1d570edcd4f64947fd38bd7a7b9219b8d876073c6f0c0cef4c95e928f",
+      "gitBlob": "4de5f2ea20775af5f15eebef78c9162d408af9fe"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.spec.ts",
+      "sha256": "53c57dd6a005fea4167ee5744363303e928b4ec695947fd381bd512c69f2b794",
+      "gitBlob": "6c7b3ca349a32fe7b6c6f3c74e5dde55cdb52a30"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.ts",
+      "sha256": "8d1b872dc72f3ad238d0232cbfd62af692a60bf0eaefcdb94f48e100bf8f7bc3",
+      "gitBlob": "4647660bad3a721e45794c3d17e0f52e34f72a1a"
+    },
+    {
+      "path": "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts",
+      "sha256": "ddc9a2faec05e93d97cb20366dd4768e91f2893587f7518b8e2771ab58cfd354",
+      "gitBlob": "640aa67c88dd4b6fec3d6b994dd03ddb8ca94aa3"
+    },
+    {
+      "path": "apps/worker/src/jobs/PurgeExpiredAccounts.ts",
+      "sha256": "40049f67159f309662c80d18e476940f95f8219741021d30d02af84d13b78581",
+      "gitBlob": "8588e524ebbd948ecffe71704f95b51ee2ea4c4a"
+    },
+    {
+      "path": "apps/worker/src/jobs/application/testing/MeasurementRetentionDatabase.ts",
+      "sha256": "faed8c142c49c6250f9549cb6f977df9bc351a5e9e5447a1d64426441c93978d",
+      "gitBlob": "b5e721a0e8bd0f4e6a9a728421e5465f9c97105a"
+    },
+    {
+      "path": "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts",
+      "sha256": "a8830ef918e69289eb4a8c59c4cd1d0796dd9762f3bccbe1e2b355406274ed4a",
+      "gitBlob": "ebc77369e20b8696ad0d2a5c43a5aaf9d8042493"
+    },
+    {
+      "path": "apps/worker/src/jobs/diagnosticAccountErasure.ts",
+      "sha256": "f54c5f55171694f030ff105bc9114319e16fd7b50ca6acfffb620fa1651779cf",
+      "gitBlob": "3d7ccadc481bf59edfdd217e421d0b7114f0b3fe"
+    },
+    {
+      "path": "apps/worker/src/jobs/serviceAccountErasure.ts",
+      "sha256": "61eaa717162555a1249cc1a2bc6b51adfe1fbd170632601b5dc95d4d4af14570",
+      "gitBlob": "f5676704b516a06078a18c25cb07e3965860f8ef"
+    },
+    {
+      "path": "apps/worker/src/jobs/video/videoAccountErasure.ts",
+      "sha256": "54149d179d55b98959b78dfc97ba22688920c1830e6ab6589265e43c901551d8",
+      "gitBlob": "7507862b1e46f2c47de2da61b73dd66117ee7265"
+    }
+  ],
+  "unchanged": [
+    {
+      "path": "apps/worker/src/jobs/ExpireMeasurement.ts",
+      "sha256": "0167ee8385a3286ecf76446ba7ceb8e5c500dfb0bb9e1555ef056de51d17b5fe"
+    },
+    {
+      "path": "apps/worker/src/jobs/PrismaListingViewRetentionLedger.ts",
+      "sha256": "88c47c3975e4e283a0a0bcdc7c7b73b2643d8d375c4da50c28824e1d72a7a1e6"
+    },
+    {
+      "path": "apps/worker/src/jobs/ExpireListingViewFingerprints.ts",
+      "sha256": "449c8806da9939789e9027bfb0f3856bcbe90cec40e028bdabc7c49960c8efbf"
+    }
+  ],
+  "effectInventory": {
+    "path": "docs/evidence/issue-897/measurement-retention-effects-20261025.json",
+    "sha256": "981341e99d3f5e67cfe6298dd791c5e7ad4e756ce67d1f92b84c4fe2273cd415",
+    "physicalForeignKeys": 45,
+    "triggerDefinitions": 300,
+    "query": "/tmp/897-purge-effect-inventory.sql",
+    "querySha256": "82a4f062df3a2accaddd68ab0979978be7999337bd86b4cd61a408fa17cfb72c",
+    "provenance": "Exact core150 migration deploy in task-only retention_inventory; all45 FK entries and300 relevant trigger definitions captured, then DB dropped and container stopped/removed.",
+    "currentVerification": "Exact retained inventory byte match to5737; additive175 introduces no tables/FKs/triggers. All owned production identical5737. Prior complete direct/callee/trigger/FK trace retained in original MD.",
+    "audit": {
+      "path": "/tmp/897-retention-core175-source-audit.log",
+      "sha256": "09426e425b8a8be31cd8f5a408f3fd9c613b226145a05c9ab4a94aacc5db06f3"
+    }
+  },
+  "offlineRedGreenHistory": {
+    "originalRetention": {
+      "files": 2,
+      "passed": 4,
+      "failed": 2
+    },
+    "originalGreen": {
+      "files": 2,
+      "passed": 6
+    },
+    "detail": "Busy/absent collector attempted fact deletion before prefix. ExactUTC/intent RED2fail4pass; missing-measurement erasure RED retained principal. All historical commands/logs/hashes retained in prior receipt.",
+    "currentOffline": {
+      "files": 43,
+      "passed": 311,
+      "failed": 0,
+      "skipped": 0
+    },
+    "staticTests": 1,
+    "typecheckTS7": true,
+    "typecheckTS6": true,
+    "lint": true,
+    "build": true,
+    "sourceNote": "Unit/types/full-lint ran on final fixture observer before final queue comment and string correction. Final34 runtime, build, focused lint and source audit used exactba1 source."
+  },
+  "checks": [
+    {
+      "label": "db-build",
+      "command": "DATABASE_URL=postgresql://nonconnecting:nonconnecting@127.0.0.1:1/retention_generation pnpm --filter @auto-tm/db build > /tmp/897-retention-core175-db-build.log 2>&1",
+      "commandSha256": "5ca7f9525b45765b53dccd2e5ad238e6496efd8da10c01f4800dd0e146610b3c",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-db-build.log",
+      "sha256": "124976b20fa1a46ae72dd7964a307675390472286247f6718ac07f574241afb9"
+    },
+    {
+      "label": "offline-unit",
+      "command": "pnpm --filter @auto-tm/worker test:unit > /tmp/897-retention-core175-unit.log 2>&1",
+      "commandSha256": "d3a0409be81862f4b3a8d504b7fa6887d619594c844054bfd90136e8d77479d4",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-unit.log",
+      "sha256": "1ae23741d323d94e93a64554fb00f556ad8ea6085e753b0839ecacadeec496a9"
+    },
+    {
+      "label": "typecheck",
+      "command": "pnpm --filter @auto-tm/worker typecheck > /tmp/897-retention-core175-typecheck.log 2>&1",
+      "commandSha256": "617a2141cc82fd7468193522892f0e3c44bd54a552fffac213e070ff7f1a4cbe",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-typecheck.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "label": "ts6",
+      "command": "pnpm --filter @auto-tm/worker exec tsc6 --noEmit > /tmp/897-retention-core175-ts6.log 2>&1",
+      "commandSha256": "b1e2ff501f4432ab05543b961d3b9a4f9dfd0e985ca8d8f482ca24f3a1bfb752",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-ts6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "lint",
+      "command": "pnpm --filter @auto-tm/worker lint > /tmp/897-retention-core175-lint.log 2>&1",
+      "commandSha256": "daa406f5c76b4eca2fd08f9654973333f484b7425eb3574e2cf291b02a6ca204",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+    },
+    {
+      "label": "static",
+      "command": "node --test scripts/diagnostic-effect-scope-alias-correction-schema.test.mjs > /tmp/897-retention-core175-static.log 2>&1",
+      "commandSha256": "34b5d2f3287021f46c248048c74dc2c6e6ae6e7f69cb2f60993ada16dd50abe6",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-static.log",
+      "sha256": "6f0ead8c36fa7a0d86d746d6fc4b8d65279cb3241cf03aa61659e0c3ed0eb041"
+    },
+    {
+      "label": "build",
+      "command": "pnpm --filter @auto-tm/worker build > /tmp/897-retention-core175-build.log 2>&1",
+      "commandSha256": "4f5f15b5c3cb178f46bb2a91dd9621c02621a3e0542b51e42aaf15b0ac166a81",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-build.log",
+      "sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538"
+    },
+    {
+      "label": "final-focused-lint",
+      "command": "pnpm --filter @auto-tm/worker exec eslint src/jobs/MeasurementRetentionOrdering.e2e.spec.ts src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts --max-warnings 0 > /tmp/897-retention-core175-final-focused-lint.log 2>&1",
+      "commandSha256": "d2ed316fa3be194fb331a7d8789d67d2aaea3301e7870ddc97f5b7f76182f845",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-final-focused-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "source-audit",
+      "command": "python3 /tmp/897-retention-core175-source-audit.py > /tmp/897-retention-core175-source-audit.log 2>&1",
+      "commandSha256": "2393fd87821ad3a3066a440470485670ce3a839b0aeb9dda8fba365c05e395dc",
+      "exitCode": 0,
+      "path": "/tmp/897-retention-core175-source-audit.log",
+      "sha256": "09426e425b8a8be31cd8f5a408f3fd9c613b226145a05c9ab4a94aacc5db06f3"
+    }
+  ],
+  "newRuntimeRuns": [
+    {
+      "label": "core175-full1",
+      "source": "17778f740e3e62134020060cabd2b11645ad2d54",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:53830/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts --reporter=verbose > /tmp/897-retention-core175-full1.log 2>&1",
+      "commandSha256": "6261edfb5d4610dc71ed145772226e6efcdec2101a8a644a07c200536097f1c0",
+      "exitCode": 1,
+      "passed": 32,
+      "failed": 2,
+      "notSelected": 0,
+      "path": "/tmp/897-retention-core175-full1.log",
+      "sha256": "8b91a29f6c7dcd9ada404486ce4758138c067883631943ca76601e4621e2d4b1",
+      "detail": "Unchanged34 matrix.32 pass; two fixture300ms lock-observation failures."
+    },
+    {
+      "label": "core175-race-diagnostic2",
+      "source": "17778f740e3e62134020060cabd2b11645ad2d54 + uncommitted activity-only error diagnostic",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:53830/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts -t 'orders the exact production purge dependency and retention in retention-first|drains actual collector, purge and retention overlap' --reporter=verbose > /tmp/897-retention-core175-race-diagnostic2.log 2>&1",
+      "commandSha256": "74603fcbd6cdd8b188ce3c20578e8852d191d274e64675c0c42cf0f68f9cdd54",
+      "exitCode": 1,
+      "passed": 0,
+      "failed": 2,
+      "notSelected": 31,
+      "path": "/tmp/897-retention-core175-race-diagnostic2.log",
+      "sha256": "bbf7c4ee6174c0adc35c98f280b867089bf8e771a9a143086cb71157ea368306",
+      "detail": "Actual prepare active with wait_event null after300ms; held collectors visible, no kernel failure established."
+    },
+    {
+      "label": "core175-race-correction3",
+      "source": "17778f740e3e62134020060cabd2b11645ad2d54 + caller-lifetime observer, before queue-edge correction",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:53830/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts -t 'orders the exact production purge dependency and retention in retention-first|drains actual collector, purge and retention overlap' --reporter=verbose > /tmp/897-retention-core175-race-correction3.log 2>&1",
+      "commandSha256": "b0e22cebef8458d5f4ef1dc674a6d6d44afb17cb943ccb0dd07d8cbb8e99ad80",
+      "exitCode": 1,
+      "passed": 1,
+      "failed": 1,
+      "notSelected": 31,
+      "path": "/tmp/897-retention-core175-race-correction3.log",
+      "sha256": "94a84fa60ca057d38b94ee534e5ea4a8d1e55bc720cb11afb6c75f48fd23d2a3",
+      "detail": "Retention-first passes exact stale-graph refusal. Overlap exposes direct retention->purge tuple queue, not retention->collector."
+    },
+    {
+      "label": "core175-full4",
+      "source": "ba1e48e2958c541fa4e44f079c93098113b267a7",
+      "command": "TZ=America/New_York GITHUB_ACTIONS=true CI=true DATABASE_URL=postgresql://postgres:retention_disposable_only@127.0.0.1:53830/postgres pnpm --filter @auto-tm/worker exec vitest run src/jobs/MeasurementRetentionOrdering.e2e.spec.ts src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts --reporter=verbose > /tmp/897-retention-core175-full4.log 2>&1",
+      "commandSha256": "6629ca018f5f4b223cde17d2809f720ffb1fe1b803664c8ff9bead2baf81c9b1",
+      "exitCode": 0,
+      "passed": 34,
+      "failed": 0,
+      "notSelected": 0,
+      "path": "/tmp/897-retention-core175-full4.log",
+      "sha256": "2f381eb96431fa3cb3270a5e814904a19c43b85b674aec7f30759fc8572ff1c8",
+      "detail": "All34 pass; specific completion/refusal/rollback/foreign isolation and actual lock queue assertions retained."
+    }
+  ],
+  "currentMatrix": [
+    {
+      "name": "src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts > measurement expiry on disposable PostgreSQL > erases exact-boundary raw/outbox only and preserves fresh facts and core user",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > keeps six independent limits, inclusive boundaries, cascade counts and backlog",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > refuses absent collector before facts and leaves bootstrap and delivery closed",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > uses the actual current epoch fence while expiring restored older-epoch due facts",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > SKIP LOCKED leaves a locked due record and reports its exact lag",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > times out at a busy collector before deleting any raw, outbox or parent",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls the entire sweep back after the real measurement_records delete",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls the entire sweep back after the real measurement_outbox delete",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls the entire sweep back after the real measurement_principals delete",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls the entire sweep back after the real measurement_visits delete",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls the entire sweep back after the real measurement_rollups delete",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls the entire sweep back after the real measurement_investigation_exports delete",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > serializes actual collector append and retention in collector-first order",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > serializes actual collector append and retention in retention-first order",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > orders the exact production purge dependency and retention in purge-first order with specific completion or stale-graph refusal",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > orders the exact production purge dependency and retention in retention-first order with specific completion or stale-graph refusal",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > drains actual collector, purge and retention overlap with specific committed outcomes",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > serializes overlapping real sweeps without double-counting",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > allows the real prepared purge to complete for an already-erased measurement account beside foreign retention",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > finishes exact-boundary purge with linked guest cascades and global export invalidation while preserving independent and foreign data",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls back actual purge and cascades after measurementInvestigationExport.deleteMany",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls back actual purge and cascades after measurementPrincipal.deleteMany",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls back actual purge and cascades after user.update",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > rolls back actual purge and cascades after diagnostic_finish_source",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > refuses the actual stale purge snapshot after future changes before rediscovery",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > refuses the actual stale purge snapshot after cleared changes before rediscovery",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > refuses the actual stale purge snapshot after phone changes before rediscovery",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > refuses the actual stale purge snapshot after email changes before rediscovery",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > preserves foreign guest data during actual guest erasure in guest-first order",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > preserves foreign guest data during actual guest erasure in retention-first order",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > serializes actual restore rotation and retention in restore-first order",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > serializes actual restore rotation and retention in retention-first order",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > allows actual authenticated bootstrap without a late User lock in bootstrap-first order",
+      "result": "passed"
+    },
+    {
+      "name": "src/jobs/MeasurementRetentionOrdering.e2e.spec.ts > G1 adjacent measurement retention on real PostgreSQL > allows actual authenticated bootstrap without a late User lock in retention-first order",
+      "result": "passed"
+    }
+  ],
+  "counts": {
+    "authoredNew": 33,
+    "authoredExistingRetained": 1,
+    "authoredTotal": 34,
+    "lastRunExecuted": 34,
+    "lastRunPassed": 34,
+    "lastRunFailed": 0,
+    "lastRunSkipped": 0,
+    "historicalSuiteRuns": 9,
+    "newSuiteRuns": 4,
+    "cumulativeSuiteRuns": 13,
+    "historicalCaseAttempts": 121,
+    "historicalPassAttempts": 76,
+    "historicalFailAttempts": 45,
+    "newCaseAttempts": 72,
+    "newPassAttempts": 67,
+    "newFailAttempts": 5,
+    "cumulativeCaseAttempts": 193,
+    "cumulativePassAttempts": 143,
+    "cumulativeFailAttempts": 50,
+    "cumulativeNotSelectedAcrossDiagnosticFilters": 189,
+    "countersReset": false,
+    "httpRuns": 0,
+    "hostedCIRuns": 0,
+    "deviceRuns": 0
+  },
+  "specificOutcomes": {
+    "purgeFirst": "real prepared purge purgedCount1; subsequent sweep0; own principal/old facts/visit gone, foreign intact",
+    "retentionFirst": "sweep3; actual purge diagnostic_source_graph_changed refusal; account principal retained, due raw/outbox/visit removed, foreign intact",
+    "threeWay": "actual collector accepted; actual purge1; sweep0; foreign event retained; backlog empty; account principal gone; queue edges asserted and all tasks drained",
+    "finish": "exact now due in America/New_York; real bootstrap-linked guest current visit and own facts removed; independent guest/foreign principals/visits/records/outbox retained; all restricted exports invalidated; foreign session/rollup/epoch retained; receipt0",
+    "purgeRollback": "after actual exportsdelete/principaldelete/Userupdate/finish, exact injected error; own principal/visit/raw/outbox/export/PII/due cutoff restored, foreign fact retained, receipt0",
+    "staleRefusal": "future/cleared due or phone/email change produces purge0 before preparation; account and foreign facts retained, receipt0"
+  },
+  "history": {
+    "previousReceipt": {
+      "path": "docs/evidence/issue-897/measurement-retention-ordering-20261025.json",
+      "sha256": "1bbb20e57672c85a851f52b33d0e40c32ae4b67e68c82bd7cc161749a7e4a7a7"
+    },
+    "previousMarkdown": {
+      "path": "docs/evidence/issue-897/measurement-retention-ordering-20261025.md",
+      "sha256": "872761558d0070e9969904c367af794bd464e6899dcec99cd8d18cfc60823379"
+    },
+    "allPriorRuntimeRuns": [
+      {
+        "log": "/tmp/897-retention-postgres-run1.log",
+        "passed": 1,
+        "failed": 24,
+        "notSelected": 0,
+        "disposition": "fixture setup type char unsupported; fixed cast to text"
+      },
+      {
+        "log": "/tmp/897-retention-postgres-run2.log",
+        "passed": 21,
+        "failed": 4,
+        "notSelected": 0,
+        "disposition": "four actual purge callers return zero before preparation due timestamp parse"
+      },
+      {
+        "log": "/tmp/897-retention-postgres-purge-run3.log",
+        "passed": 0,
+        "failed": 4,
+        "notSelected": 20,
+        "disposition": "lawful one-day-overdue purge fixtures; all blocked by parser diagnostic_source_command"
+      },
+      {
+        "log": "/tmp/897-retention-postgres-purge-diagnosis4.log",
+        "passed": 1,
+        "failed": 0,
+        "notSelected": 24,
+        "disposition": "new explicit diagnosis proves exact production intent refusal preserves all own/foreign data and no receipt"
+      },
+      {
+        "log": "/tmp/897-retention-postgres-direct-final.log",
+        "passed": 22,
+        "failed": 0,
+        "notSelected": 4,
+        "disposition": "final source remaining direct matrix; four known purge gates expressly excluded, not green"
+      },
+      {
+        "log": "/tmp/897-purge-correction-postgres-noop.log",
+        "passed": 2,
+        "failed": 2,
+        "notSelected": 24,
+        "disposition": "Future/cleared pass, new phone/email fixture violates verified pair constraints; corrected fixture only"
+      },
+      {
+        "log": "/tmp/897-purge-correction-postgres-noop2.log",
+        "passed": 4,
+        "failed": 1,
+        "notSelected": 23,
+        "disposition": "Four real stale snapshots pass, positive reveals full User JSON violates exact source projection"
+      },
+      {
+        "log": "/tmp/897-purge-correction-postgres-projection3.log",
+        "passed": 0,
+        "failed": 1,
+        "notSelected": 32,
+        "disposition": "Projected actual exact-boundary caller now reaches shared parser42725"
+      },
+      {
+        "log": "/tmp/897-purge-core150-full.log",
+        "passed": 25,
+        "failed": 9,
+        "notSelected": 0,
+        "sourceHead": "2bd93f388053188f8e804adc26203a6ca41b69a5",
+        "sourceTree": "f72dfae5f0490be6ec12f9920e07213a59feaa2c",
+        "disposition": "Full latest34-case matrix: shared effects local e ambiguity42702 masks all9 purge preparation/completion/rollback gates"
+      }
+    ],
+    "priorFull34NineBeforePreparation": {
+      "path": "/tmp/897-purge-core150-full.log",
+      "sha256": "3c8c32e9e69cecd28cf64573408a22f7b3d0e6bb172e702f0f36f95f88da8c5a"
+    },
+    "allPriorCommandsAndLogHashes": "Unmodified prior tracked JSON, its original artifacts and refs retained.",
+    "refsRetained": [
+      "bc6fab896a0743cf132d79ce9a7fa6446bc41b6f",
+      "de11b8d82e15045e0a8879190466bc917de793ca",
+      "a45fff31cca4eeb04242a8d510caaf236102e7b5",
+      "7082b9bc78370793ca7c80b821f486a0a1d61697",
+      "7427c8a76cd5deb9490b38897a9c1c230fb0fba0",
+      "6a42352dfe311d361fbf10d27ddfab5d2e058865",
+      "2bd93f388053188f8e804adc26203a6ca41b69a5",
+      "5737f27eedcecd5eeb7d8e96396cfb1f005c6b71"
+    ]
+  },
+  "cleanup": {
+    "container": "carberk897-retention-core175-t3433c86f9",
+    "containerId": "7f7c4d40dcb439e927fd0b42648495c61854de145126ca918a52fb39a52ece83",
+    "workerDatabasesRemainingBeforeStop": 0,
+    "nonTemplateDatabasesBeforeStop": [
+      "postgres"
+    ],
+    "stopped": true,
+    "removedByDockerRm": true,
+    "sharedResourcesTouched": false,
+    "logs": [
+      {
+        "path": "/tmp/897-retention-core175-cleanup-prestop.log",
+        "sha256": "573c9ab891e1919ece8265a634d3b1cdf672507edf6e8ec8656362d9f5e43484"
+      },
+      {
+        "path": "/tmp/897-retention-core175-cleanup-stop.log",
+        "sha256": "59833aca2620a1656210fc3c9ee94abb42e93a4f7cc38bc83eb069c7b17e6a8f"
+      },
+      {
+        "path": "/tmp/897-retention-core175-cleanup-removed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "artifactHashes": [
+    {
+      "path": "/tmp/897-retention-core175-source-audit.py",
+      "sha256": "613f6028beffe348649260df523e5fdc596ac2cf4ff57a9a32ce49a530b5f5d3"
+    },
+    {
+      "path": "/tmp/897-retention-core175-image.log",
+      "sha256": "6757f0691aaaef07ddd5c7069d2814404dec689064a3729746c4adc46c37198f"
+    },
+    {
+      "path": "/tmp/897-retention-core175-container.txt",
+      "sha256": "89503eb8551a91c7c40a7feebe2cdb47be19ab78cda032df021da4dc33ea4485"
+    }
+  ],
+  "remainingDefects": [],
+  "limits": [
+    "No reached production defect remains in this34case affected matrix.",
+    "This is a task-owned PostgreSQL superuser fixture result, not app-role/HTTP/hosted/operational admission or combined G1 evidence.",
+    "Complete populated service/video/diagnostic erasure branches remain parent matrix responsibility; this suite preserves their real caller assertions and preparation/completion.",
+    "Parent must inspect two fixture changes and assembled independent review/combined gates remain."
+  ],
+  "sourceAcceptanceClaimed": false,
+  "runtimeAcceptanceClaimed": false,
+  "G1AcceptanceClaimed": false
+}

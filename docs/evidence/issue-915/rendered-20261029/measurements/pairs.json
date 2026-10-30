@@ -1,0 +1,114 @@
+{
+ "light": {
+  "body_h1": {
+   "fg": "#171717",
+   "bg": "#ffffff",
+   "ratio": 17.93
+  },
+  "page_subtitle_neutral600": {
+   "fg": "#525251",
+   "bg": "#ffffff",
+   "ratio": 7.82
+  },
+  "help_text_secondary": {
+   "fg": "#525251",
+   "bg": "#ffffff",
+   "ratio": 7.82
+  },
+  "error_text": {
+   "fg": "#171717",
+   "bg": "#ffffff",
+   "ratio": 17.93
+  },
+  "field_text_continuity": {
+   "fg": "#0a0a0a",
+   "bg": "#ffffff",
+   "ratio": 19.8
+  },
+  "secondary_button_continuity": {
+   "fg": "#171717",
+   "bg": "#ffffff",
+   "ratio": 17.93
+  },
+  "primary_button_enabled_lookalike": {
+   "fg": "#fafafa",
+   "bg": "#171717",
+   "ratio": 17.18
+  },
+  "legacy_button_neutral400": {
+   "fg": "#171717",
+   "bg": "#ffffff",
+   "ratio": 17.93
+  },
+  "legacy_border": "rgb(168, 166, 160)",
+  "continuity_border": "rgb(82, 82, 81)",
+  "border_token_text_secondary": "rgb(82, 82, 81)",
+  "language_select": {
+   "fg": "#171717",
+   "bg": "#fafaf9",
+   "ratio": 17.17
+  },
+  "language_border": "oklch(0.922 0 0)",
+  "summary_link": {
+   "fg": "#171717",
+   "bg": "#ffffff",
+   "ratio": 17.93
+  }
+ },
+ "dark": {
+  "body_h1": {
+   "fg": "#fafaf9",
+   "bg": "#0a0a0a",
+   "ratio": 18.96
+  },
+  "page_subtitle_neutral600": {
+   "fg": "#525251",
+   "bg": "#0a0a0a",
+   "ratio": 2.53
+  },
+  "help_text_secondary": {
+   "fg": "#d2d0cb",
+   "bg": "#0a0a0a",
+   "ratio": 12.85
+  },
+  "error_text": {
+   "fg": "#fafaf9",
+   "bg": "#0a0a0a",
+   "ratio": 18.96
+  },
+  "field_text_continuity": {
+   "fg": "#fafafa",
+   "bg": "#0a0a0a",
+   "ratio": 18.97
+  },
+  "secondary_button_continuity": {
+   "fg": "#fafaf9",
+   "bg": "#0a0a0a",
+   "ratio": 18.96
+  },
+  "primary_button_enabled_lookalike": {
+   "fg": "#171717",
+   "bg": "#e5e5e5",
+   "ratio": 14.23
+  },
+  "legacy_button_neutral400": {
+   "fg": "#fafaf9",
+   "bg": "#0a0a0a",
+   "ratio": 18.96
+  },
+  "legacy_border": "rgb(168, 166, 160)",
+  "continuity_border": "rgb(210, 208, 203)",
+  "border_token_text_secondary": "rgb(210, 208, 203)",
+  "language_select": {
+   "fg": "#fafaf9",
+   "bg": "#171717",
+   "ratio": 17.17
+  },
+  "language_border": "oklch(1 0 0 / 0.1)",
+  "summary_link": {
+   "fg": "#fafaf9",
+   "bg": "#0a0a0a",
+   "ratio": 18.96
+  }
+ }
+}

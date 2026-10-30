@@ -55,6 +55,7 @@ import {
 import { recomputeListingPricesTmt } from "../src/listing-prices";
 
 import { FIXTURE_PHOTOS } from "./fixture-photos";
+import { deleteMaintenanceListings, upsertMaintenanceListing } from "./maintenance-listings";
 
 const PHOTO_BUCKET = "listing-photos";
 
@@ -547,15 +548,19 @@ async function main(): Promise<void> {
     modelMap.set(`${model.brandId}:${model.nameEn}`, model.id);
   }
 
+  // A nonempty User replacement plan is unsupported. Refuse it before Listing,
+  // cascade, media or object effects; a fresh fixture still creates ordinary Users.
+  const fixtureUserIds = [...Object.values(SELLER_IDS), BUYER_ID, UNNAMED_ID, LONG_NAME_ID];
+  if (await prisma.user.count({ where: { id: { in: fixtureUserIds } } }) > 0) {
+    throw new Error("UI fixture refused: unsupported physical User DELETE; account_purge requires a surviving exact erasure UPDATE");
+  }
+
   // Wipe prior fixture rows (cascades clear media, conversations, messages).
   const allListingIds = [
     ...CARS.map((_, index) => listingId(index)),
     NO_PHOTO_LISTING_ID,
   ];
-  await prisma.listing.deleteMany({ where: { id: { in: allListingIds } } });
-  await prisma.user.deleteMany({
-    where: { id: { in: [...Object.values(SELLER_IDS), BUYER_ID, UNNAMED_ID, LONG_NAME_ID] } },
-  });
+  await deleteMaintenanceListings(prisma, { id: { in: allListingIds } });
 
   // The name number and the avatar index are fixed here, not left to the
   // column's random default, so screenshots of these Users are reproducible.
@@ -655,8 +660,8 @@ async function main(): Promise<void> {
       media.push({ key: `${baseKey}/original.webp`, sortOrder: order, width, height });
     }
 
-    await prisma.listing.create({
-      data: {
+    await upsertMaintenanceListing(prisma, {
+      create: {
         id,
         sellerId: SELLER_IDS[car.sellerKey],
         brandId,
@@ -695,8 +700,8 @@ async function main(): Promise<void> {
   const almeraModelId = modelMap.get(`${almeraBrandId}:Almera`);
   const almeraCity = cityMap.get("Tejen");
   if (almeraModelId && almeraCity) {
-    await prisma.listing.create({
-      data: {
+    await upsertMaintenanceListing(prisma, {
+      create: {
         id: NO_PHOTO_LISTING_ID,
         sellerId: SELLER_IDS.aygul,
         brandId: almeraBrandId,

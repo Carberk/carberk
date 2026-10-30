@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'tm.auto.video'
+version = '0.1.0'
+
+android {
+  namespace 'tm.auto.video'
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+    testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+  }
+}
+
+dependencies {
+  // SDK 55 expo-video uses 1.8.0. Keep one native Media3 graph.
+  implementation 'androidx.media3:media3-transformer:1.8.0'
+  implementation 'androidx.media3:media3-effect:1.8.0'
+  androidTestImplementation 'androidx.test:runner:1.6.2'
+  androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+}

@@ -1,0 +1,130 @@
+{
+  "report": {
+    "id": "11111111-1111-4111-8111-000000000001",
+    "orderId": "11111111-1111-4111-8111-000000000002",
+    "audience": "buyer_private",
+    "status": "finalized",
+    "templateVersionId": "11111111-1111-4111-8111-000000000003",
+    "observedAt": "2026-10-17T00:00:00.000Z",
+    "mileageKm": 123456,
+    "findings": [
+      {
+        "id": "11111111-1111-4111-8111-000000000010",
+        "checkId": "brakes",
+        "assessment": "normal",
+        "explanation": "Observation 1: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin",
+        "evidenceIds": [],
+        "kind": null,
+        "source": null,
+        "measurement": {
+          "value": 2.5,
+          "unit": "mm",
+          "method": "Caliper",
+          "uncertainty": "±0.1 mm"
+        },
+        "location": null
+      },
+      {
+        "id": "11111111-1111-4111-8111-000000000011",
+        "checkId": "panel_1",
+        "assessment": "normal",
+        "explanation": "Observation 2: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin",
+        "evidenceIds": [],
+        "kind": null,
+        "source": null,
+        "measurement": null,
+        "location": {
+          "panelId": "panel_1",
+          "view": "front",
+          "x": 0.35,
+          "y": 0.44999999999999996
+        }
+      }
+    ],
+    "authorId": "11111111-1111-4111-8111-000000000004",
+    "reviewerId": "11111111-1111-4111-8111-000000000005",
+    "successorOf": null,
+    "correctionReason": null,
+    "returnReason": null,
+    "finalizedAt": "2026-10-18T00:00:00.000Z",
+    "withdrawnAt": null,
+    "withdrawalReason": null,
+    "releaseIdentity": {
+      "version": 1,
+      "center": {
+        "id": "11111111-1111-4111-8111-000000000070",
+        "names": {
+          "tk": "Aşgabat synag merkezi",
+          "ru": "Тестовый центр Ашхабада",
+          "en": "Ashgabat test center"
+        }
+      },
+      "vehicle": {
+        "method": "vin",
+        "maskedVin": "*************1234",
+        "display": {
+          "make": "Toyota",
+          "model": "Camry",
+          "year": 2018
+        },
+        "catalog": null
+      }
+    }
+  },
+  "template": {
+    "title": {
+      "tk": "Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin",
+      "ru": "Синтетический образец",
+      "en": "Synthetic sample"
+    },
+    "limitations": {
+      "tk": "Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin",
+      "ru": "Синтетический образец",
+      "en": "Synthetic sample"
+    },
+    "syntheticNotice": {
+      "tk": "Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin",
+      "ru": "Синтетический образец",
+      "en": "Synthetic sample"
+    },
+    "checks": [
+      {
+        "id": "brakes",
+        "label": {
+          "tk": "Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin",
+          "ru": "Синтетический образец",
+          "en": "Synthetic sample"
+        },
+        "required": true,
+        "evidenceRequired": false,
+        "measurement": {
+          "unit": "mm",
+          "method": {
+            "tk": "Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin",
+            "ru": "Синтетический образец",
+            "en": "Synthetic sample"
+          }
+        }
+      }
+    ],
+    "panels": [
+      {
+        "id": "panel_1",
+        "label": {
+          "tk": "Bölek 1",
+          "ru": "Панель 1",
+          "en": "Panel 1"
+        },
+        "views": [
+          "front",
+          "rear",
+          "left",
+          "right",
+          "top"
+        ],
+        "evidenceRequired": false
+      }
+    ]
+  },
+  "synthetic": true
+}

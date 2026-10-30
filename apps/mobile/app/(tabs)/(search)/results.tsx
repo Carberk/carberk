@@ -6,6 +6,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { usePublicDiagnosticAvailability } from "../../../src/diagnostics/PublicDiagnosticAction";
+import { useMeasurementScreen } from "../../../src/measurement/useMeasurementScreen";
 import { ApiError } from "../../../src/api/client";
 import { useListings } from "../../../src/api/listings/useListings";
 import { useListingCount } from "../../../src/api/listings/useListingCount";
@@ -39,6 +41,7 @@ import { timing } from "@/lib/motion";
 
 /** Results keeps the applied query in search params and leaves its list mounted on Listing navigation. */
 export default function ResultsScreen() {
+  useMeasurementScreen("results",{eventName:"discovery_opened",purpose:"product_improvement",payload:{screen:"results"}});
   const { t } = useTranslation();
   const goBack = useSafeBack(HOME_HREF);
   const params = useLocalSearchParams<ResultsRouteState>();
@@ -63,6 +66,11 @@ export default function ResultsScreen() {
   useFeedFavoriteReplay(returnTo);
   const feed = useListings({ filters: applied, viewerId: viewer?.userId ?? null });
   const count = useListingCount({ filters: applied });
+  const total=count.isEnabled&&count.isSuccess?count.data.totalMatching:null;
+  const resultCount=total===null?null:total===0?"zero":total<=5?"1_5":total<=20?"6_20":"21_plus";
+  useMeasurementScreen("results",resultCount&&!feed.isError?{eventName:"search_completed",purpose:"product_improvement",payload:{resultCount,filters:{
+    ...(applied.brandId?{brandId:applied.brandId}:{}),...(applied.cityId?{cityId:applied.cityId}:{}),...(applied.modelId?{modelId:applied.modelId}:{}),...(applied.condition?{condition:applied.condition}:{}),
+  }}}:null,JSON.stringify(applied));
   const items = feed.data?.pages.flatMap((page) => page.items) ?? [];
   // Include a selected brand even when there are no matching Listings, so its names remain visible.
   const catalog = useFeedCatalogMaps(items, filters.active.brandId ? [filters.active.brandId] : []);
@@ -89,7 +97,7 @@ export default function ResultsScreen() {
     }
   }, [floated]);
   const reset = () => { filters.replace({ sort }); router.setParams(writeResultsRouteState({ sort })); };
-  const remove = (group: ChipGroup) => commit(group === "city" ? { cityId: undefined } : group === "price" ? { priceMin: undefined, priceMax: undefined } : { yearMin: undefined, yearMax: undefined });
+  const remove = (group: ChipGroup) => commit(group === "seller" ? { sellerType: undefined } : group === "city" ? { cityId: undefined } : group === "price" ? { priceMin: undefined, priceMax: undefined } : { yearMin: undefined, yearMax: undefined });
   // The form is its own screen: it opens with what Results shows, and its Show N updates this screen in place.
   const openParameters = () => router.push({ pathname: PARAMETERS_PATH, params: { ...writeResultsRouteState(applied), returnToResults: "1" } });
   const chipsProps = { filters: applied, cityName: filters.active.cityId ? catalog.cityName(filters.active.cityId) : undefined, onOpen: openParameters, onRemove: remove };
@@ -108,6 +116,7 @@ export default function ResultsScreen() {
   // The count and the brand/city names are separate queries. After an outage they must reload with the feed.
   // Only queries a mounted screen is watching: failed queries left behind by other screens stay untouched.
   const retry = () => { void queryClient.refetchQueries({ type: "active", predicate: (query) => query.state.status === "error" || query.state.fetchStatus === "paused" }); };
+  const diagnosticAvailability = usePublicDiagnosticAvailability(items.map(item => item.id));
   const empty = offline ? <FeedError error={new ApiError("NETWORK_ERROR", 0)} onRetry={retry} /> : feed.isPending ? <View accessibilityLabel={t("resultsLoading")} className="gap-3">{[0, 1, 2].map((id) => <ListingLargeCardSkeleton key={id} />)}</View>
     : feed.isError ? <FeedError error={feed.error} onRetry={retry} />
       : filters.count ? <FilteredEmpty onReset={reset} /> : <FeedEmpty />;
@@ -117,7 +126,7 @@ export default function ResultsScreen() {
     <ResultsHeader count={count.data} sort={sort} onSort={() => setSortOpen(true)} onBack={goBack} />
     <FlatList testID="results-list" data={feed.isPending || feed.isError ? [] : items} keyExtractor={(item) => item.id} ListHeaderComponent={header} ListEmptyComponent={empty}
       contentContainerClassName="grow" contentContainerStyle={{ paddingBottom: tabBarSpace + (items.length ? 68 : 8) }} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}
-      renderItem={({ item, index }) => <ListingLargeCard listing={item} enterOrder={enterOrder(index)} onPress={(id) => router.push(`/(public)/listings/${id}`)}
+      renderItem={({ item, index }) => <ListingLargeCard listing={item} diagnostic={diagnosticAvailability.get(item.id)} enterOrder={enterOrder(index)} onPress={(id) => router.push(`/(public)/listings/${id}`)}
         brandName={catalog.brandName(item.brandId)} modelName={catalog.modelName(item.modelId)} cityName={catalog.cityName(item.cityId)}
         transmissionName={transmissions.data?.items.find((entry) => entry.id === item.transmissionId)?.name}
         engineTypeName={engineTypes.data?.items.find((entry) => entry.id === item.engineTypeId)?.name}

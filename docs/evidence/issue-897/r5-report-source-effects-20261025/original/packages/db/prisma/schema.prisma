@@ -1,0 +1,2122 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma/client"
+  moduleFormat = "cjs"
+}
+
+/// ============================================================
+/// IDENTITY
+/// ============================================================
+
+enum UserRole {
+  buyer
+  seller
+  moderator
+  admin
+}
+
+enum SignInCodeChannel {
+  phone
+  email
+}
+
+/// Storage form of `SignInCodePurpose` in @auto-tm/contracts (ADR-0081).
+/// Identity infrastructure holds the one mapping between the two.
+enum CodePurpose {
+  sign_in
+  sign_in_method
+  account_deletion
+  listing_contact_phone
+}
+
+model User {
+  diagnosticContinuityRequests DiagnosticContinuityRequest[]
+  diagnosticCenterAssignments DiagnosticCenterAssignment[]
+  diagnosticCommissions InspectionOrder[] @relation("DiagnosticCommissioner")
+  diagnosticOrderAssignments DiagnosticOrderAssignment[]
+  publishedDiagnosticTemplates DiagnosticTemplateVersion[] @relation("DiagnosticTemplatePublisher")
+  diagnosticAuditEntries DiagnosticAudit[] @relation("DiagnosticAuditActor")
+  diagnosticIdentityRecords DiagnosticIdentityRecord[] @relation("DiagnosticIdentityRecorder")
+  diagnosticIdentityEvidence DiagnosticIdentityEvidence[] @relation("DiagnosticIdentityEvidenceRecorder")
+  diagnosticIdentityProvenance DiagnosticIdentityProvenance[] @relation("DiagnosticIdentityProvenanceCreator")
+  id              String    @id @default(uuid())
+  /// Sign-in Methods (ADR-0054). Each value is stored only with its verified-at
+  /// time; the migration adds `users_phone_verified_check` / `users_email_verified_check`.
+  phone           String?   @unique
+  phoneVerifiedAt DateTime?
+  email           String?   @unique
+  emailVerifiedAt DateTime?
+  displayName     String?
+  /// Generated Name number and Assigned Avatar index (#638), kept for the life
+  /// of the account. The API draws both (`GeneratedIdentity.ts`); the database
+  /// default and the `users_nameNumber_range_check` / `users_avatarIndex_range_check`
+  /// constraints from the migration hold the same ranges.
+  nameNumber      Int       @default(dbgenerated("(((1000)::double precision + floor((random() * (9000)::double precision))))::integer"))
+  avatarIndex     Int       @default(dbgenerated("(floor((random() * (12)::double precision)))::integer"))
+  /// Object key of the Profile Photo's original, or null when the User has none.
+  /// Written only with `avatarUploadId`, by the Listings Profile Photo link.
+  avatarKey       String?
+  /// Private link to the upload behind `avatarKey` (ADR-0088). Never published.
+  avatarUploadId  String?      @unique
+  avatarUpload    MediaUpload? @relation("ProfilePhotoUpload", fields: [avatarUploadId], references: [id], onDelete: NoAction)
+  avatarUrl       String?
+  locale          String    @default("ru")
+  role            UserRole  @default(buyer)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  suspendedAt         DateTime?
+  suspendedById       String?
+  suspendedBy         User?     @relation("UserSuspensions", fields: [suspendedById], references: [id], onDelete: SetNull)
+  suspensionReason    String?
+  deletionScheduledAt DateTime?
+
+  supportCasesAsCustomer SupportCase[] @relation("SupportCustomer")
+  supportCasesAssigned SupportCase[] @relation("SupportAssignee")
+  historyRequestsAsCustomer VehicleHistoryRequest[] @relation("HistoryCustomer")
+  historyRequestsAssigned VehicleHistoryRequest[] @relation("HistoryAssignee")
+  serviceMessages ServiceMessage[] @relation("ServiceMessageAuthor")
+  serviceUploads ServiceAttachment[] @relation("ServiceUploadOwner")
+  serviceReadStates ServiceReadState[]
+  serviceAuditEntries ServiceAudit[] @relation("ServiceAuditActor")
+  otpRequests                  OtpRequest[]
+  sessions                     Session[]
+  videoGrants                  VideoGrant[] @relation("VideoGrantOwner")
+  dealershipMemberships        DealershipMember[]
+  ownedVehicles                OwnedVehicle[]
+  blockedUsers                 BlockedUser[]             @relation("Blocker")
+  blockedBy                    BlockedUser[]             @relation("Blocked")
+  listings                     Listing[]
+  favorites                    Favorite[]
+  savedSearches                SavedSearch[]
+  conversationParticipations   ConversationParticipant[]
+  fcmDevices                   FcmDevice[]
+  notificationHistory          NotificationHistory[]
+  notificationPreferences      NotificationPreference?
+  auditLogs                    AuditLog[]
+  blogPosts                    BlogPost[]
+  conversationsAsBuyer         Conversation[]            @relation("Buyer")
+  conversationsAsSeller        Conversation[]            @relation("Seller")
+  listingDrafts                ListingDraft[]
+  verifiedContactPhones        VerifiedContactPhone[]
+  mediaUploads                 MediaUpload[]
+  businessInvitations          DealershipInvitation[]
+  measurementPrincipals        MeasurementPrincipal[]
+  staffGrants                  StaffGrant[]
+  totpEnrollment               TotpEnrollment?
+  reportsSubmitted             ContentReport[]           @relation("Reporter")
+  reportsReviewed              ContentReport[]           @relation("Reviewer")
+  inspectionInterestsRequested InspectionInterest[]      @relation("InspectionInterestRequester")
+  suspendedUsers               User[]                    @relation("UserSuspensions")
+
+  @@index([deletionScheduledAt])
+  @@map("users")
+}
+
+model OtpRequest {
+  id          String            @id @default(uuid())
+  /// Why the code was issued; each verify accepts only its own purpose (ADR-0081).
+  purpose     CodePurpose
+  channel     SignInCodeChannel
+  destination String
+  /// Temporary deployment compatibility alias. New code reads channel + destination.
+  phone       String?
+  codeHash    String
+  expiresAt   DateTime
+  verifiedAt  DateTime?
+  attempts    Int               @default(0)
+  userId      String?
+  user        User?             @relation(fields: [userId], references: [id])
+  businessId String?
+  ip          String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([channel, destination, createdAt])
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+  @@map("otp_requests")
+}
+
+model Session {
+  diagnosticContinuityRequests DiagnosticContinuityRequest[]
+  videoGrants VideoGrant[] @relation("VideoGrantSession")
+  id                 String    @id @default(uuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash   String    @unique
+  deviceLabel        String?
+  userAgent          String?
+  expiresAt          DateTime
+  createdAt          DateTime  @default(now())
+  lastSeenAt         DateTime  @default(now())
+  adminTotpExpiresAt DateTime?
+  servicePushSubscriptions ServicePushSubscription[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+enum DealershipMemberRole {
+  owner
+  sales
+}
+
+model Dealership {
+  address String?
+  description String?
+  hours String?
+  services String?
+  /// Checked business identity is never a claim about vehicle condition.
+  status String @default("recovery")
+  admissionMode String @default("synthetic")
+  admittedAt DateTime?
+  checkedEvidence String?
+  listings Listing[]
+  drafts ListingDraft[]
+  uploads MediaUpload[]
+  enquiries Conversation[]
+  contactPhone String?
+  contactConfirmedAt DateTime?
+  invitations DealershipInvitation[]
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
+  logoUrl   String?
+  cityId    String?
+  city      City?    @relation(fields: [cityId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       DealershipMember[]
+  ownedVehicles OwnedVehicle[]
+
+  @@map("dealerships")
+}
+
+model DealershipMember {
+  status String @default("active")
+  id           String               @id @default(uuid())
+  dealershipId String
+  dealership   Dealership           @relation(fields: [dealershipId], references: [id])
+  userId       String               @unique
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         DealershipMemberRole
+  createdAt    DateTime             @default(now())
+
+  @@map("dealership_members")
+}
+
+model DealershipInvitation {
+  id String @id @default(uuid())
+  dealershipId String
+  dealership Dealership @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+  recipientUserId String
+  recipient User @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  role DealershipMemberRole @default(sales)
+  tokenHash String @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  redeemedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([dealershipId])
+  @@map("dealership_invitations")
+}
+
+model OwnedVehicle {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dealershipId String?
+  dealership   Dealership? @relation(fields: [dealershipId], references: [id])
+  brand        String
+  model        String
+  year         Int?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("owned_vehicles")
+}
+
+model BlockedUser {
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@map("blocked_users")
+}
+
+model TotpEnrollment {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  encryptedSecret String
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  backupCodes TotpBackupCode[]
+
+  @@map("totp_enrollments")
+}
+
+model TotpBackupCode {
+  id               String         @id @default(uuid())
+  totpEnrollmentId String
+  totpEnrollment   TotpEnrollment @relation(fields: [totpEnrollmentId], references: [id], onDelete: Cascade)
+  codeHash         String
+  usedAt           DateTime?
+
+  @@map("totp_backup_codes")
+}
+
+/// ============================================================
+/// CATALOG
+/// ============================================================
+
+model Brand {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  /// Object key in the `catalog-assets` bucket; null means the app shows a letter fallback.
+  logoKey   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  models   Model[]
+  listings Listing[]
+
+  @@map("brands")
+}
+
+model Model {
+  id        String   @id @default(uuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id])
+  slug      String
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  generations Generation[]
+  listings    Listing[]
+
+  @@unique([brandId, slug])
+  @@map("models")
+}
+
+model Generation {
+  id        String   @id @default(uuid())
+  modelId   String
+  model     Model    @relation(fields: [modelId], references: [id])
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  yearStart Int?
+  yearEnd   Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("generations")
+}
+
+model Color {
+  id        String   @id @default(uuid())
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  hex       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("colors")
+}
+
+model BodyType {
+  id        String   @id @default(uuid())
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("body_types")
+}
+
+model EngineType {
+  id        String   @id @default(uuid())
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings Listing[]
+
+  @@map("engine_types")
+}
+
+model Transmission {
+  id        String   @id @default(uuid())
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings Listing[]
+
+  @@map("transmissions")
+}
+
+model DriveType {
+  id        String   @id @default(uuid())
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings Listing[]
+
+  @@map("drive_types")
+}
+
+model Region {
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cities   City[]
+  listings Listing[]
+
+  @@map("regions")
+}
+
+model City {
+  id        String   @id @default(uuid())
+  regionId  String
+  region    Region   @relation(fields: [regionId], references: [id])
+  slug      String
+  nameRu    String
+  nameTk    String
+  nameEn    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dealerships Dealership[]
+  listings    Listing[]
+
+  @@unique([regionId, slug])
+  @@map("cities")
+}
+
+/// ============================================================
+/// LISTINGS
+/// ============================================================
+
+enum ListingStatus {
+  draft
+  pending_review
+  active
+  sold
+  archived
+  rejected
+  banned
+}
+
+enum ListingCondition {
+  new
+  used
+}
+
+enum Currency {
+  TMT
+  USD
+  AED
+}
+
+model Listing {
+  diagnosticOrders InspectionOrder[]
+  pendingVideoGenerationId String?
+  pendingVideoGeneration VideoGeneration? @relation("PendingListingVideo", fields: [pendingVideoGenerationId], references: [id], onDelete: SetNull)
+  activeVideoGenerationId String?
+  activeVideoRevision Int @default(0)
+  activeVideoGeneration VideoGeneration? @relation("ActiveListingVideo", fields: [activeVideoGenerationId], references: [id], onDelete: SetNull)
+  availabilityConfirmedAt DateTime?
+  lastEditedById String?
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  id            String        @id @default(uuid())
+  publicNumber  Int           @unique @default(autoincrement())
+  sellerId      String
+  seller        User          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  status        ListingStatus @default(draft)
+  brandId       String
+  brand         Brand         @relation(fields: [brandId], references: [id])
+  modelId       String
+  model         Model         @relation(fields: [modelId], references: [id])
+  generationId  String?
+  colorId       String?
+  bodyTypeId    String?
+  cityId        String
+  city          City          @relation(fields: [cityId], references: [id])
+  year          Int?
+  mileageKm     Int?
+  priceAmount   Float
+  priceCurrency Currency      @default(TMT)
+  /// priceAmount converted to TMT at the current exchange rate; drives price sort and range.
+  priceTmt      Float?
+  description   String?
+  deletedAt     DateTime?
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // S4 additions
+  vin                  String?
+  condition            ListingCondition?
+  engineTypeId         String?
+  engineType           EngineType?       @relation(fields: [engineTypeId], references: [id])
+  transmissionId       String?
+  transmission         Transmission?     @relation(fields: [transmissionId], references: [id])
+  driveTypeId          String?
+  driveType            DriveType?        @relation(fields: [driveTypeId], references: [id])
+  enginePower          Int?
+  regionId             String?
+  region               Region?           @relation(fields: [regionId], references: [id])
+  locationText         String?
+  soldAt               DateTime?
+  viewCount            Int               @default(0)
+  favoriteCount        Int               @default(0)
+  contactPhone         String?
+  allowCalls           Boolean           @default(true)
+  allowChat            Boolean           @default(true)
+  acceptsExchange      Boolean           @default(false)
+  installmentAvailable Boolean           @default(false)
+  archivedByDeletion   Boolean           @default(false)
+
+  // Seller condition disclosure (ADR-0052). `damaged` is nullable only so the
+  // migration applies to existing rows; publish and edit require it.
+  damaged         Boolean?
+  knownIssuesText String?
+
+  supportCases SupportCase[]
+  vehicleHistoryRequests VehicleHistoryRequest[]
+  media               ListingMedia[]
+  favorites           Favorite[]
+  conversations       Conversation[]
+  inspectionInterests InspectionInterest[]
+  viewDays            ListingViewDay[]
+  viewFingerprints    ListingViewFingerprint[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([status, priceTmt, id])
+  @@index([status, year, id])
+  @@index([status, mileageKm, id])
+  @@index([brandId, modelId, status])
+  @@index([cityId, status])
+  @@index([businessId, status, updatedAt(sort: Desc)], map: "listings_business_inventory")
+  @@map("listings")
+}
+
+enum MediaKind {
+  image
+  video
+}
+
+model ListingMedia {
+  id         String    @id @default(uuid())
+  listingId  String
+  listing    Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  kind       MediaKind
+  key        String
+  sortOrder  Int
+  width      Int?
+  height     Int?
+  durationMs Int?
+  posterKey  String?
+  /// Optional base64 ThumbHash; legacy media stays null until an explicit backfill.
+  thumbHash  String?
+  createdAt  DateTime  @default(now())
+
+  // The server-recorded upload this row adopted (ADR-0079). One row per upload.
+  // Null only for legacy rows that duplicated a key already owned by another
+  // row: removing such a row never deletes storage objects.
+  uploadId String?      @unique
+  upload   MediaUpload? @relation(fields: [uploadId], references: [id], onDelete: NoAction)
+
+  @@index([listingId, sortOrder])
+  @@map("listing_media")
+}
+
+/// Provenance of a presigned upload (ADR-0079). Presign creates the row for the
+/// calling User; a ListingMedia row adopts it at most once. A key without a row
+/// authorizes nothing, and deletion authority follows the adopting row.
+model MediaUpload {
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key         String        @unique
+  kind        MediaKind
+  contentType String
+  // Null for rows backfilled from media that existed before the table.
+  sizeBytes   Int?
+  /// Closed SQL protocol set: legacy, conditional-v1 images, video-v1 prepared sources.
+  writeProtocol String @default("legacy")
+  /// SQL guard keeps V1 video source inventory a bounded exact singleton in its server namespace.
+  objectKeys String[] @default([])
+  createdAt   DateTime      @default(now())
+  media       ListingMedia?
+
+  // One adopter across Listing media and Profile Photos (ADR-0088). The row
+  // lock on this record decides every claim; the unique relation columns are
+  // only additional constraints. AVAILABLE, PREPARING, ADOPTED, RETIRED, DELETED.
+  state           String    @default("AVAILABLE")
+  claimToken      String?
+  /// SQL guard permits video_session only while PREPARING under video-v1 with its matching session token.
+  claimTargetType String?
+  claimTargetId   String?
+  claimDeadline   DateTime?
+  retiredAt       DateTime?
+  profileOf       User?     @relation("ProfilePhotoUpload")
+
+  @@index([state, claimDeadline])
+  @@index([claimToken])
+
+  @@index([userId, createdAt])
+  @@index([businessId, createdAt], map: "media_uploads_business_owner")
+  @@map("media_uploads")
+}
+
+/// Durable deletion work for a retired upload (ADR-0088), written in the
+/// transaction that releases its adopter. It has no foreign key, so it outlives
+/// the upload row and its User. The worker never deletes LEGACY_PENDING work.
+model MediaUploadCleanup {
+  uploadId      String    @id
+  key           String
+  objectKeys    String[]
+  writeProtocol String
+  status        String    @default("PENDING")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@map("media_upload_cleanups")
+}
+
+model VideoUploadSession {
+  protocolVersion Int?
+  targetKind String?
+  targetId String?
+  targetRevision Int?
+  storageUploadId String?
+  posterMs Int?
+  idempotencyKey String?
+  idempotencyHash String?
+  completionFence String?
+  cancelledAt DateTime?
+  completedAt DateTime?
+  id String @id @default(uuid())
+  uploadId String @unique
+  userId String
+  listingId String?
+  state String @default("UPLOADING")
+  sourceKey String
+  sizeBytes Int?
+  sha256 String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([state, expiresAt])
+  @@unique([userId, idempotencyKey])
+  @@map("video_upload_sessions")
+}
+
+model VideoGeneration {
+  pendingForListings Listing[] @relation("PendingListingVideo")
+  sessionId String?
+  completionFence String?
+  targetRevision Int?
+  processingVersion String?
+  sourceSha256 String?
+  sourceWidth Int?
+  sourceHeight Int?
+  activeForListings Listing[] @relation("ActiveListingVideo")
+  id String @id @default(uuid())
+  listingId String
+  uploadId String
+  state String @default("PROCESSING")
+  manifest Json?
+  durationMs Int?
+  posterKey String?
+  createdAt DateTime @default(now())
+  readyAt DateTime?
+  retiredAt DateTime?
+  @@index([listingId, state])
+  @@map("video_generations")
+}
+
+/// Durable private work, never queue success as readiness. Legacy sessions have no work.
+model VideoProcessWork {
+  generationId String @id
+  uploadId String
+  sessionId String
+  completionFence String
+  targetRevision Int
+  processingVersion String
+  state String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  @@index([state, nextAttemptAt])
+  @@map("video_process_work")
+}
+
+/// No cascade: exact deletion authority survives account/upload/session deletion.
+model VideoCleanupWork {
+  id String @id @default(uuid())
+  uploadId String
+  sessionId String?
+  generationId String?
+  writeProtocol String @default("video-v1")
+  sourceKey String?
+  storageUploadId String?
+  objectKeys String[] @default([])
+  state String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseToken String?
+  leaseExpiresAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  @@index([state, nextAttemptAt])
+  @@index([uploadId])
+  @@map("video_cleanup_work")
+}
+
+model VideoGrant {
+  ownerUserId String?
+  ownerSessionId String?
+  owner User? @relation("VideoGrantOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  session Session? @relation("VideoGrantSession", fields: [ownerSessionId], references: [id], onDelete: Cascade)
+  id String @id @default(uuid())
+  secretHash String @unique
+  listingId String
+  generationId String
+  purpose String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([listingId, generationId, expiresAt])
+  @@index([ownerUserId, ownerSessionId, expiresAt])
+  @@map("video_grants")
+}
+
+/// A number a seller confirmed by SMS code for their Listings (ADR-0081). Owned
+/// by Listings; never a Sign-in Method and never touches `User.phone`. Reusable
+/// while now < confirmedAt + 7 days. Several sellers may confirm one number.
+model VerifiedContactPhone {
+  id          String   @id @default(uuid())
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  phone       String
+  confirmedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sellerId, phone])
+  @@map("verified_contact_phones")
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+  @@map("favorites")
+}
+
+model ListingDraft {
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([businessId, updatedAt(sort: Desc)], map: "listing_drafts_business_inventory")
+  @@map("listing_drafts")
+}
+
+model ExchangeRate {
+  id           String   @id @default(uuid())
+  fromCurrency Currency
+  toCurrency   Currency
+  rate         Float
+  updatedAt    DateTime @updatedAt
+  setByUserId  String?
+
+  @@unique([fromCurrency, toCurrency])
+  @@map("exchange_rates")
+}
+
+/// ============================================================
+/// SUBSCRIPTIONS
+/// ============================================================
+
+model SavedSearch {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filters      Json
+  pushEnabled  Boolean   @default(true)
+  lastDigestAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("saved_searches")
+}
+
+/// ============================================================
+/// CONVERSATIONS
+/// ============================================================
+
+enum MessageKind {
+  text
+  image
+  post_ref
+  system
+}
+
+model Conversation {
+  businessId String?
+  business Dealership? @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  assigneeId String?
+  enquiryState String @default("open")
+  version Int @default(0)
+  enquiryAudit BusinessEnquiryAudit[]
+  id            String    @id @default(uuid())
+  listingId     String
+  listing       Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId       String
+  buyer         User      @relation("Buyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId      String
+  seller        User      @relation("Seller", fields: [sellerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime?
+  lastMessageId String?
+  /// Canonical accepted cohort references. Never reconstructed from historical timestamps.
+  firstBuyerMessageId String?
+  firstSellerReplyId String?
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([businessId, enquiryState, assigneeId, updatedAt(sort: Desc)], map: "conversations_business_inbox")
+  @@unique([listingId, buyerId])
+  @@index([sellerId])
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+/// Business responsibility changes keep their actor attribution after membership departure.
+model BusinessEnquiryAudit {
+  id String @id @default(uuid())
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  version Int
+  actorId String?
+  action String
+  previousAssigneeId String?
+  assigneeId String?
+  enquiryState String
+  createdAt DateTime @default(now())
+
+  @@unique([conversationId, version])
+  @@map("business_enquiry_audits")
+}
+
+model ConversationParticipant {
+  id              String       @id @default(uuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime     @default(now())
+  mutedAt         DateTime?
+  lastReadAt      DateTime?
+  lastDeliveredAt DateTime?
+
+  @@unique([conversationId, userId])
+  @@index([userId, lastReadAt])
+  @@index([userId, lastDeliveredAt])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id              String       @id @default(uuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId        String
+  kind            MessageKind
+  body            String?
+  metadata        Json?
+  createdAt       DateTime     @default(now())
+  deletedAt       DateTime?
+  clientMessageId String?
+
+  @@unique([conversationId, senderId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+/// ============================================================
+/// NOTIFICATIONS
+/// ============================================================
+
+enum PushPlatform {
+  android
+  ios
+  web
+}
+
+model FcmDevice {
+  id            String       @id @default(uuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token         String       @unique
+  platform      PushPlatform
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deviceId      String?
+  registeredAt  DateTime     @default(now())
+  lastUsedAt    DateTime     @default(now())
+  invalidatedAt DateTime?
+  servicePushSubscriptions ServicePushSubscription[]
+
+  @@index([userId])
+  @@index([userId, invalidatedAt])
+  @@map("fcm_devices")
+}
+
+enum NotificationCategory {
+  direct_messages
+  saved_search_matches
+  listing_activity
+  admin_announcements
+  blog_activity
+  marketing
+}
+
+enum NotificationHistoryStatus {
+  pending
+  delivered
+  failed
+}
+
+model NotificationHistory {
+  id              String                    @id @default(uuid())
+  userId          String
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        NotificationCategory
+  status          NotificationHistoryStatus @default(pending)
+  title           String
+  body            String
+  data            Json?
+  deliveryDetails Json?
+  readAt          DateTime?
+  createdAt       DateTime                  @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notification_history")
+}
+
+model NotificationPreference {
+  id      String @id @default(uuid())
+  userId  String @unique
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  optOuts Json
+
+  @@map("notification_preferences")
+}
+
+/// ============================================================
+/// CONTENT
+/// ============================================================
+
+model BlogPost {
+  id          String    @id @default(uuid())
+  slug        String    @unique
+  locale      String
+  title       String
+  body        String
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  publishedAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([locale, publishedAt(sort: Desc)])
+  @@map("blog_posts")
+}
+
+/// ============================================================
+/// ADMIN
+/// ============================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String
+  targetId   String
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
+  @@index([createdAt, id])
+  @@index([action, createdAt, id])
+  @@index([targetType, targetId, createdAt, id])
+  @@map("audit_logs")
+}
+
+model ContentReport {
+  id             String    @id @default(uuid())
+  reporterUserId String?
+  reporter       User?     @relation("Reporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  targetType     String
+  targetId       String
+  reason         String
+  details        String?
+  status         String    @default("pending")
+  reviewedById   String?
+  reviewedBy     User?     @relation("Reviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  messageContext Json?
+
+  @@index([status, createdAt, id])
+  @@index([targetType, targetId, status])
+  @@index([reporterUserId, createdAt, id])
+  @@map("content_reports")
+}
+
+/// ============================================================
+/// REPORTS
+/// ============================================================
+
+model InspectionInterest {
+  id                  String   @id @default(uuid())
+  listingId           String   @map("listing_id")
+  requesterUserId     String   @map("requester_user_id")
+  side                String
+  willingnessToPayTmt Int?     @map("willingness_to_pay_tmt")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  requester User    @relation("InspectionInterestRequester", fields: [requesterUserId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, requesterUserId])
+  @@index([listingId, createdAt])
+  @@index([requesterUserId, createdAt])
+  @@map("inspection_interests")
+}
+
+/// Durable counts only. No viewer identifier or raw view events.
+model ListingViewDay {
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  day       Int
+  count     Int @default(0)
+
+  @@id([listingId, day])
+  @@map("listing_view_days")
+}
+
+/// Daily scoped one-way fingerprints. #899 sweeps immutable expiresAt within 5m.
+model ListingViewFingerprint {
+  listingId   String
+  listing     Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  day         Int
+  fingerprint String @db.Char(64)
+  expiresAt   DateTime
+
+  @@id([listingId, day, fingerprint])
+  @@index([expiresAt])
+  @@map("listing_view_fingerprints")
+}
+
+/// Explicit purpose capability. Revocations retain transition history in AuditLog.
+model StaffGrant {
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability String
+  grantedAt DateTime @default(now())
+  revokedAt DateTime?
+  @@id([userId, capability])
+  @@map("staff_grants")
+}
+
+/// First-party collection identity is erasable and never part of core account recovery.
+model MeasurementState {
+  key   String @id
+  epoch String
+  @@map("measurement_state")
+}
+
+model MeasurementPrincipal {
+  id             String @id
+  pseudonym      String @unique
+  generation     String @unique
+  epoch          String
+  kind           String
+  userId         String? @unique
+  user           User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capabilityHash String? @unique
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  visits         MeasurementVisit[] @relation("VisitPrincipal")
+  associatedVisits MeasurementVisit[] @relation("CurrentVisitAccount")
+  events         MeasurementRecord[]
+  outbox         MeasurementOutbox[]
+  @@index([expiresAt])
+  @@map("measurement_principals")
+}
+
+model MeasurementVisit {
+  id              String @id
+  principalId     String
+  principal       MeasurementPrincipal @relation("VisitPrincipal", fields: [principalId], references: [id], onDelete: Cascade)
+  linkedAccountId String?
+  linkedAccount   MeasurementPrincipal? @relation("CurrentVisitAccount", fields: [linkedAccountId], references: [id], onDelete: Cascade)
+  startedAt       DateTime
+  foregroundAt    DateTime
+  endedAt         DateTime?
+  events          MeasurementRecord[]
+  @@index([principalId])
+  @@index([linkedAccountId])
+  @@map("measurement_visits")
+}
+
+model MeasurementRecord {
+  id          String @id
+  principalId String
+  principal   MeasurementPrincipal @relation(fields: [principalId], references: [id], onDelete: Cascade)
+  visitId     String?
+  visit       MeasurementVisit? @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  event       Json
+  origin      String
+  environment String
+  population  String
+  conversionEligible Boolean @default(false)
+  occurredAt  DateTime
+  receivedAt  DateTime
+  expiresAt   DateTime
+  @@index([expiresAt])
+  @@index([principalId, occurredAt])
+  @@map("measurement_records")
+}
+
+/// Captures an already-authorized generation at the source commit, never at delivery.
+model MeasurementOutbox {
+  id          String @id
+  principalId String
+  principal   MeasurementPrincipal @relation(fields: [principalId], references: [id], onDelete: Cascade)
+  generation  String
+  epoch       String
+  environment String
+  population  String
+  conversionEligible Boolean @default(false)
+  event       Json
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  @@index([expiresAt])
+  @@map("measurement_outbox")
+}
+
+// Service owners are separate from Listing Conversations and InspectionInterest.
+model SupportCase {
+  id String @id @default(uuid())
+  customerId String? @unique
+  customer User? @relation("SupportCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  assigneeId String?
+  assignee User? @relation("SupportAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignmentVersion Int @default(0)
+  sourceListingId String?
+  sourceListing Listing? @relation(fields: [sourceListingId], references: [id], onDelete: SetNull)
+  status String @default("open")
+  closedAt DateTime?
+  unansweredSince DateTime?
+  awaitingCustomerSince DateTime?
+  priority String @default("ordinary")
+  investigationState String @default("none")
+  escalatedAt DateTime?
+  mode String @default("synthetic")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  conversation ServiceConversation?
+  @@index([assigneeId, status, createdAt])
+  @@index([priority, unansweredSince])
+  @@map("support_cases")
+}
+model VehicleHistoryRequest {
+  id String @id @default(uuid())
+  customerId String?
+  customer User? @relation("HistoryCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  assigneeId String?
+  assignee User? @relation("HistoryAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignmentVersion Int @default(0)
+  sourceListingId String?
+  sourceListing Listing? @relation(fields: [sourceListingId], references: [id], onDelete: SetNull)
+  proposedVin String?
+  confirmedVin String?
+  status String @default("enquiry")
+  mode String @default("synthetic")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  conversation ServiceConversation?
+  quotes HistoryQuote[]
+  order HistoryOrder?
+  @@index([customerId, createdAt])
+  @@index([assigneeId, status, createdAt])
+  @@map("vehicle_history_requests")
+}
+model ServiceConversation {
+  id String @id @default(uuid())
+  purpose String
+  supportCaseId String? @unique
+  supportCase SupportCase? @relation(fields: [supportCaseId], references: [id], onDelete: Restrict)
+  historyRequestId String? @unique
+  historyRequest VehicleHistoryRequest? @relation(fields: [historyRequestId], references: [id], onDelete: Restrict)
+  lifecycleEpoch Int @default(0)
+  lastSequence Int @default(0)
+  erasedAt DateTime?
+  createdAt DateTime @default(now())
+  messages ServiceMessage[]
+  attachments ServiceAttachment[]
+  readStates ServiceReadState[]
+  outbox ServiceOutbox[]
+  pushSubscriptions ServicePushSubscription[]
+  erasureFence ServiceErasureFence?
+  @@map("service_conversations")
+}
+model ServicePushSubscription {
+  id String @id @default(uuid())
+  sessionId String
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  deviceId String
+  device FcmDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  lifecycleEpoch Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([sessionId, deviceId, conversationId])
+  @@index([conversationId, lifecycleEpoch])
+  @@index([sessionId, deviceId])
+  @@map("service_push_subscriptions")
+}
+model ServiceMessage {
+  id String @id @default(uuid())
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sequence Int
+  clientMessageId String
+  senderId String?
+  sender User? @relation("ServiceMessageAuthor", fields: [senderId], references: [id], onDelete: SetNull)
+  senderKind String
+  visibility String @default("customer")
+  body String?
+  attachmentId String? @unique
+  attachment ServiceAttachment? @relation("ServiceMessageAttachment", fields: [attachmentId], references: [id], onDelete: Restrict)
+  requestHash String
+  createdAt DateTime @default(now())
+  @@unique([conversationId, senderId, clientMessageId])
+  @@unique([conversationId, sequence])
+  @@index([conversationId, createdAt])
+  @@map("service_messages")
+}
+model ServiceAttachment {
+  id String @id @default(uuid())
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  uploaderId String?
+  uploader User? @relation("ServiceUploadOwner", fields: [uploaderId], references: [id], onDelete: SetNull)
+  lifecycleEpoch Int
+  category String
+  visibility String
+  state String @default("staged")
+  stagingKey String @unique
+  objectKey String? @unique
+  contentType String
+  expectedBytes Int
+  sizeBytes Int?
+  sha256 String?
+  filename String
+  rights Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  adoptedAt DateTime?
+  removedAt DateTime?
+  message ServiceMessage? @relation("ServiceMessageAttachment")
+  @@index([state, expiresAt])
+  @@map("service_attachments")
+}
+model ServiceReadState {
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSequence Int @default(0)
+  updatedAt DateTime @updatedAt
+  @@id([conversationId, userId])
+  @@map("service_read_states")
+}
+model ServiceAudit {
+  id String @id @default(uuid())
+  actorId String?
+  actor User? @relation("ServiceAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  purpose String
+  resourceId String
+  action String
+  reason String?
+  targetStaffId String?
+  assignmentVersion Int?
+  createdAt DateTime @default(now())
+  @@index([purpose, resourceId, createdAt])
+  @@map("service_audits")
+}
+model ServiceOutbox {
+  id String @id @default(uuid())
+  conversationId String
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  eventType String
+  sequence Int
+  visibility String
+  lifecycleEpoch Int
+  createdAt DateTime @default(now())
+  deliveredAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  @@unique([conversationId, eventType, sequence])
+  @@index([deliveredAt, nextAttemptAt])
+  @@map("service_outbox")
+}
+model ServiceErasureFence {
+  conversationId String @id
+  conversation ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  epoch Int
+  objectKeys Json
+  erasedAt DateTime @default(now())
+  cleanupCompletedAt DateTime?
+  @@map("service_erasure_fences")
+}
+
+
+/// One center and one plan. Operational approval is separate from software preparation.
+model DiagnosticCenter {
+  id String @id @default(uuid())
+  code String @unique @default("ashgabat")
+  planCode String @default("standard")
+  names Json
+  operationalApproval Json?
+  createdAt DateTime @default(now())
+  assignments DiagnosticCenterAssignment[]
+  templates DiagnosticTemplateVersion[]
+  orders InspectionOrder[]
+  audits DiagnosticAudit[]
+  @@map("diagnostic_centers")
+}
+
+model DiagnosticCenterAssignment {
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability String
+  qualifiedUntil DateTime?
+  assignedAt DateTime @default(now())
+  revokedAt DateTime?
+  @@unique([centerId, userId, capability])
+  @@index([userId, revokedAt])
+  @@map("diagnostic_center_assignments")
+}
+
+/// Published content never changes. Attribution can be erased independently.
+model DiagnosticTemplateVersion {
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  version Int
+  definition Json
+  synthetic Boolean @default(true)
+  publishedById String?
+  publishedBy User? @relation("DiagnosticTemplatePublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt DateTime @default(now())
+  orders InspectionOrder[]
+  reports DiagnosticReportRecord[]
+  @@unique([centerId, version])
+  @@map("diagnostic_template_versions")
+}
+
+model InspectionOrder {
+  sourceAnchor DiagnosticSourceAnchor?
+  ownershipGrant DiagnosticOwnershipGrant?
+  continuityRequests DiagnosticContinuityRequest[]
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  templateVersionId String
+  templateVersion DiagnosticTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  commissionerId String?
+  commissioner User? @relation("DiagnosticCommissioner", fields: [commissionerId], references: [id], onDelete: SetNull)
+  requestKey String
+  audience String
+  listingId String?
+  listing Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  status String @default("requested")
+  version Int @default(0)
+  epoch String @default(uuid())
+  physicalAuthorization Json?
+  publicationAuthorization Json?
+  observedVehicle Json?
+  listingIdentityDigest String?
+  associationValidatedAt DateTime?
+  /// Monotonic structured identity-evidence generation: appends and erasure/rights invalidation.
+  identityEvidenceGeneration Int @default(0)
+  synthetic Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  erasedAt DateTime?
+  assignments DiagnosticOrderAssignment[]
+  reports DiagnosticReportRecord[]
+  audits DiagnosticAudit[]
+  identityRecords DiagnosticIdentityRecord[]
+  identityEvidence DiagnosticIdentityEvidence[]
+  identityProvenance DiagnosticIdentityProvenance[]
+  continuityProofCandidates DiagnosticContinuityProof[] @relation("ContinuityProofCandidate")
+  @@unique([commissionerId, requestKey])
+  @@index([commissionerId, createdAt(sort: Desc)])
+  @@index([centerId, status, createdAt])
+  @@index([listingId, audience])
+  @@map("inspection_orders")
+}
+
+/// Center capability alone grants no access to a buyer-private commission.
+model DiagnosticOrderAssignment {
+  id String @id @default(uuid())
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  capability String
+  assignedAt DateTime @default(now())
+  revokedAt DateTime?
+  @@unique([orderId, userId, capability])
+  @@index([userId, revokedAt])
+  @@map("diagnostic_order_assignments")
+}
+
+/// Restricted, append-only physical identity observation of one visit, bound to
+/// the order version its write produced. Erasure clears content; nothing rewrites it.
+model DiagnosticIdentityRecord {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderVersion Int
+  observation Json?
+  observationHash String?
+  recordedById String?
+  recordedBy User? @relation("DiagnosticIdentityRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedAt DateTime
+  erasedAt DateTime?
+  reports DiagnosticReportRecord[]
+  evidence DiagnosticIdentityEvidence[]
+  ownership DiagnosticOwnershipComponent?
+  /// Server-only transaction receipt for forward component INSERT, not an ownership history witness.
+  ownershipCaptureTransaction String?
+  @@unique([orderId, orderVersion])
+  @@index([recordedById])
+  @@map("diagnostic_identity_records")
+}
+
+/// Classified upload intent recorded before bytes, then one exact sanitized private object.
+/// Shares the report-evidence object namespace; ids are disjoint across both owners.
+model DiagnosticIdentityProvenance {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  contentType String
+  declaredSizeBytes Int
+  rights Json?
+  rightsUntil DateTime
+  objectKey String? @unique
+  sha256 String?
+  sizeBytes Int?
+  mime String?
+  state String @default("staged")
+  epoch String @default(uuid())
+  writeLeaseUntil DateTime?
+  cleanupLeaseUntil DateTime?
+  cleanupAttempts Int @default(0)
+  cleanupFailureCode String?
+  createdById String?
+  createdBy User? @relation("DiagnosticIdentityProvenanceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  erasedAt DateTime?
+  @@index([orderId, state])
+  @@index([createdById])
+  @@map("diagnostic_identity_provenance")
+}
+
+/// Restricted immutable structured identity evidence. A correction is a complete new record
+/// with one explicit predecessor; erasure clears content in place and nothing rewrites it.
+model DiagnosticIdentityEvidence {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderVersion Int
+  identityRecordId String
+  identityRecord DiagnosticIdentityRecord @relation(fields: [identityRecordId], references: [id], onDelete: Cascade)
+  observationHash String?
+  identifiers Json?
+  provenance Json?
+  rights Json?
+  rightsUntil DateTime
+  supersedesId String? @unique
+  supersedes DiagnosticIdentityEvidence? @relation("DiagnosticIdentityCorrections", fields: [supersedesId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  successor DiagnosticIdentityEvidence? @relation("DiagnosticIdentityCorrections")
+  explanation String?
+  recordHash String?
+  recordedById String?
+  recordedBy User? @relation("DiagnosticIdentityEvidenceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedAt DateTime
+  erasedAt DateTime?
+  reports DiagnosticReportRecord[]
+  @@unique([orderId, orderVersion])
+  @@index([identityRecordId])
+  @@index([recordedById])
+  @@map("diagnostic_identity_evidence")
+}
+
+/// Content-free state transitions. Consent, identifiers and observations stay private.
+model DiagnosticAudit {
+  id String @id @default(uuid())
+  centerId String
+  center DiagnosticCenter @relation(fields: [centerId], references: [id], onDelete: Restrict)
+  orderId String?
+  order InspectionOrder? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  actorId String?
+  actor User? @relation("DiagnosticAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action String
+  details Json
+  createdAt DateTime @default(now())
+  @@index([orderId, createdAt])
+  @@map("diagnostic_audits")
+}
+
+/// Synthetic operational records. Live payment/provider activation is separate.
+model HistoryQuote {
+  erasedAt DateTime?
+  id String @id @default(uuid())
+  requestId String
+  request VehicleHistoryRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  vin String?
+  amount Int @default(100)
+  providers Json
+  preflightOutcome String
+  preflightEvidence String?
+  refundRule String
+  windowStart DateTime
+  windowEnd DateTime
+  feasible Boolean
+  offeredById String?
+  createdAt DateTime @default(now())
+  supersededAt DateTime?
+  acceptedAt DateTime?
+  order HistoryOrder?
+  @@index([requestId, createdAt])
+  @@map("history_quotes")
+}
+model HistoryCapacityDay {
+  day String @id
+  slotLimit Int
+  morningLimit Int
+  evidence String
+  mode String @default("synthetic")
+  createdAt DateTime @default(now())
+  orders HistoryOrder[]
+  @@map("history_capacity_days")
+}
+model HistoryProviderAllowance {
+  provider String
+  day String
+  allowance Int
+  consumed Int @default(0)
+  resetAt DateTime
+  evidence String
+  mode String @default("synthetic")
+  @@id([provider, day])
+  @@map("history_provider_allowances")
+}
+model HistoryOrder {
+  recoveryOfferedAt DateTime?
+  recoveryOfferedDeadline DateTime?
+  recoveryOfferExpiresAt DateTime?
+  bookings HistoryBooking[]
+  deliveries HistoryDelivery[]
+  version Int @default(0)
+  id String @id @default(uuid())
+  requestId String @unique
+  request VehicleHistoryRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  quoteId String @unique
+  quote HistoryQuote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  day String
+  capacity HistoryCapacityDay @relation(fields: [day], references: [day], onDelete: Restrict)
+  morning Boolean
+  state String @default("held")
+  holdExpiresAt DateTime
+  paidAt DateTime?
+  receivedAt DateTime?
+  promiseAt DateTime
+  recoveryUsed Boolean @default(false)
+  recoveryAgreedAt DateTime?
+  recoveryDeadline DateTime?
+  escalatedAt DateTime?
+  rights Json
+  erasedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  payments HistoryPayment[]
+  purchase HistoryPurchaseIntent?
+  refund HistoryRefund?
+  @@index([day, state, holdExpiresAt])
+  @@index([state, paidAt])
+  @@map("history_orders")
+}
+model HistoryPayment {
+  verifiedFunds Boolean @default(false)
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  clientPaymentId String
+  attachmentId String?
+  claim String?
+  amount Int?
+  receivedAt DateTime?
+  confirmedAt DateTime?
+  confirmedById String?
+  evidence String?
+  state String @default("submitted")
+  createdAt DateTime @default(now())
+  @@unique([orderId, clientPaymentId])
+  @@index([orderId, state])
+  @@map("history_payments")
+}
+model HistoryPurchaseIntent {
+  sourceArtifactId String?
+  deliveries HistoryDelivery[]
+  id String @id @default(uuid())
+  orderId String @unique
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  vin String?
+  providers Json
+  state String @default("prepared")
+  externalReference String?
+  createdById String?
+  createdAt DateTime @default(now())
+  reconciledAt DateTime?
+  @@map("history_purchase_intents")
+}
+model HistoryRefund {
+  id String @id @default(uuid())
+  orderId String @unique
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  reason String
+  state String @default("pending")
+  approvedById String?
+  approvedAt DateTime?
+  executedById String?
+  executedAt DateTime?
+  executionReference String?
+  createdAt DateTime @default(now())
+  @@map("history_refunds")
+}
+
+/// Explicit renewed booking acceptance never rewrites the original accepted offer.
+model HistoryBooking {
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  clientBookingId String
+  vin String?
+  providers Json
+  amount Int
+  refundRule String
+  windowStart DateTime
+  windowEnd DateTime
+  acceptedAt DateTime
+  erasedAt DateTime?
+  @@unique([orderId, clientBookingId])
+  @@map("history_bookings")
+}
+/// Original provider bytes are independent of a purchaser's communication attachment.
+model HistoryArtifact {
+  id String @id @default(uuid())
+  provider String
+  vin String?
+  originalDate DateTime
+  mileageObservedAt DateTime?
+  /// SQL couples a present mileage value to a nonnull unit and source date.
+  mileageValue Int?
+  mileageUnit String?
+  vehicleIdentity String?
+  sourceObservations Json @default("[]")
+  sourceListingId String?
+  acquiredForOrderId String?
+  objectKey String @unique
+  sha256 String
+  sizeBytes Int
+  expectedPages Int
+  verifiedPages Int?
+  rights Json
+  provenance String?
+  state String @default("staged")
+  verifiedById String?
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  restrictedAt DateTime?
+  removedAt DateTime?
+  deliveries HistoryDelivery[]
+  @@index([vin, provider, state])
+  @@map("history_artifacts")
+}
+model HistoryDelivery {
+  id String @id @default(uuid())
+  orderId String
+  order HistoryOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  artifactId String
+  artifact HistoryArtifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  purchaseIntentId String
+  purchaseIntent HistoryPurchaseIntent @relation(fields: [purchaseIntentId], references: [id], onDelete: Restrict)
+  sharedLink String?
+  linkApprovedAt DateTime?
+  deliveredById String?
+  deliveredAt DateTime
+  erasedAt DateTime?
+  @@unique([orderId, artifactId])
+  @@map("history_deliveries")
+}
+/// Independent durable byte cleanup survives private linkage erasure and retries.
+model HistoryArtifactCleanup {
+  artifactId String @id
+  objectKey String
+  sha256 String
+  epoch Int @default(1)
+  requestedAt DateTime @default(now())
+  completedAt DateTime?
+  @@map("history_artifact_cleanup")
+}
+
+/// Pinned authoring revision. The released snapshot never changes after finalization.
+model DiagnosticReportRecord {
+  id String @id
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  templateVersionId String
+  templateVersion DiagnosticTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  predecessorId String? @unique
+  /// Immutable: a new physical visit on another order, not a same-order correction.
+  reinspection Boolean @default(false)
+  predecessor DiagnosticReportRecord? @relation("DiagnosticCorrections", fields: [predecessorId], references: [id], onDelete: Restrict)
+  successor DiagnosticReportRecord? @relation("DiagnosticCorrections")
+  audience String
+  status String @default("draft")
+  version Int @default(0)
+  state Json
+  snapshot Json?
+  snapshotHash String?
+  /// Restricted raw observation selected at first draft; never part of a released snapshot.
+  identityRecordId String?
+  identityRecordHash String?
+  identityRecord DiagnosticIdentityRecord? @relation(fields: [identityRecordId], references: [id], onDelete: Restrict)
+  /// Restricted structured leaf selected at first draft, absent when none existed; never backfilled.
+  identityEvidenceId String?
+  identityEvidenceHash String?
+  identityEvidence DiagnosticIdentityEvidence? @relation(fields: [identityEvidenceId], references: [id], onDelete: Restrict)
+  continuityProofPredecessors DiagnosticContinuityProof[] @relation("ContinuityProofPredecessor")
+  /// Private reinspection only: the consumed proof and expected order version, immutable exact-retry binding.
+  continuityRequestId String? @unique
+  continuityRequestSessionId String?
+  continuityProofId String? @unique
+  reinspectionOrderVersion Int?
+  finalizedAt DateTime?
+  withdrawnAt DateTime?
+  withdrawalReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  erasedAt DateTime?
+  evidence DiagnosticEvidence[]
+  artifacts DiagnosticPdfArtifact[]
+  @@index([orderId, createdAt])
+  @@map("diagnostic_reports")
+}
+
+/// Private comparative and unchanged normalized-VIN proofs share the same immutable consumption binding.
+/// Restricted proof content follows the shortest declared evidence/provenance rights.
+/// Invalidation is permanent even if current source values are later restored.
+model DiagnosticContinuityProof {
+  requestId String? @unique
+  id String @id
+  predecessorReportId String?
+  predecessorReport DiagnosticReportRecord? @relation("ContinuityProofPredecessor", fields: [predecessorReportId], references: [id], onDelete: Restrict)
+  candidateOrderId String?
+  candidateOrder InspectionOrder? @relation("ContinuityProofCandidate", fields: [candidateOrderId], references: [id], onDelete: Restrict)
+  predecessorOrderId String?
+  issuerId String?
+  issuerSessionId String?
+  linkingTechnicianId String?
+  /// Minimal restricted reader envelope, never exposed by ordinary report readers.
+  content Json?
+  /// Server-only audiences, historical commissioners, immutable pins, classification
+  /// hashes, authorizations, candidate/observation/authority generations.
+  bindings Json?
+  rightsUntil DateTime
+  issuedAt DateTime
+  invalidatedAt DateTime?
+  /// Set once by the consuming reinspection; a consumed proof is never invalidated or reused.
+  consumedReportId String? @unique
+  consumedAt DateTime?
+  erasedAt DateTime?
+  @@index([candidateOrderId, id])
+  @@index([predecessorReportId])
+  @@index([predecessorOrderId])
+  @@index([rightsUntil, erasedAt])
+  @@map("diagnostic_continuity_proofs")
+}
+
+/// Object identity is exact and immutable. Storage never exposes a public URL.
+model DiagnosticEvidence {
+  writeLeaseUntil DateTime?
+  cleanupLeaseUntil DateTime?
+  cleanupAttempts Int @default(0)
+  cleanupFailureCode String?
+  id String @id
+  reportId String
+  report DiagnosticReportRecord @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  findingId String
+  objectKey String @unique
+  sha256 String
+  sizeBytes Int
+  mime String
+  state String @default("staged")
+  epoch String @default(uuid())
+  createdById String?
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  @@index([reportId, findingId, state])
+  @@map("diagnostic_evidence")
+}
+
+/// Durable per-locale artifact intent. Reader release is independent of generation.
+model DiagnosticPdfArtifact {
+  id String @id
+  reportId String
+  report DiagnosticReportRecord @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  snapshotHash String
+  locale String
+  rendererVersion String
+  generation Int @default(1)
+  epoch String @default(uuid())
+  state String @default("pending")
+  objectKey String @unique
+  sha256 String?
+  sizeBytes Int?
+  attempts Int @default(0)
+  retryAt DateTime?
+  failureCode String?
+  leaseUntil DateTime?
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+  cleanupRequestedAt DateTime?
+  cleanupCompletedAt DateTime?
+  @@unique([reportId, locale, rendererVersion, generation])
+  @@index([state, retryAt])
+  @@map("diagnostic_pdf_artifacts")
+}
+
+/// Anonymous snapshots contain permitted aggregates only, never event or actor maps.
+model MeasurementRollup {
+  key String @id
+  version Int
+  epoch String
+  environment String
+  population String
+  windowFrom DateTime
+  windowTo DateTime
+  completeThrough DateTime
+  inputDigest String
+  lateRecords Int @default(0)
+  metrics Json
+  generatedAt DateTime
+  expiresAt DateTime
+  @@index([expiresAt])
+  @@index([environment, population, windowFrom, windowTo])
+  @@map("measurement_rollups")
+}
+
+/// Short-lived investigative artifacts require current session authority on every read.
+model MeasurementInvestigationExport {
+  id String @id
+  actorId String
+  sessionId String
+  epoch String
+  reason String
+  auditId String
+  scope Json
+  evidence Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  @@index([expiresAt])
+  @@index([actorId, sessionId])
+  @@map("measurement_investigation_exports")
+}
+
+/// Rights are versioned independently of measurement retention. Unresolved rights quarantine sources.
+model MarketKnowledgeSource {
+  id String @id
+  version Int @default(1)
+  epoch String
+  status String @default("quarantined")
+  provenance Json
+  purposes Json
+  reuseRights Json
+  redistributionRights Json
+  restrictions Json
+  identifiabilityReview Json
+  destinations Json
+  accessPolicy Json
+  retentionBasis String
+  expiresAt DateTime?
+  revokedAt DateTime?
+  updatedAt DateTime @updatedAt
+  derivatives MarketKnowledgeDatasetSource[]
+  @@map("market_knowledge_sources")
+}
+
+/// Anonymous derivatives are withheld unless every current source fence still matches.
+model MarketKnowledgeDataset {
+  id String @id
+  version Int
+  epoch String
+  derivationVersion String
+  status String @default("quarantined")
+  review Json
+  data Json
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+  invalidatedAt DateTime?
+  sources MarketKnowledgeDatasetSource[]
+  @@index([status])
+  @@map("market_knowledge_datasets")
+}
+
+model MarketKnowledgeDatasetSource {
+  datasetId String
+  dataset MarketKnowledgeDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  sourceId String
+  source MarketKnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  sourceVersion Int
+  sourceEpoch String
+  @@id([datasetId, sourceId])
+  @@index([sourceId])
+  @@map("market_knowledge_dataset_sources")
+}
+
+/// Forward-only classified source ownership. No row for a historical raw means unavailable.
+/// Personal linkage and identifying declaration text are cleared together at the component end.
+/// Disposal refreshes component IDs only within its unchanged locked graph.
+/// SQL function version: 20261023100000_diagnostic_ownership_disposal_same_graph.
+model DiagnosticOwnershipComponent {
+  grantId String?
+  grant DiagnosticOwnershipGrant? @relation(fields: [grantId], references: [id], onDelete: NoAction)
+  identityRecordId String @id
+  identityRecord DiagnosticIdentityRecord @relation(fields: [identityRecordId], references: [id], onDelete: Cascade)
+  orderId String
+  orderVersion Int
+  state String
+  scope String?
+  sourceListingId String?
+  identityDigest String?
+  sellerId String?
+  commissionerId String?
+  businessId String?
+  membershipId String?
+  rights Json?
+  rightsUntil DateTime?
+  declaredById String?
+  declaredAt DateTime?
+  erasedAt DateTime?
+  @@unique([orderId, orderVersion])
+  @@index([grantId])
+  @@index([sellerId])
+  @@index([commissionerId])
+  @@index([declaredById])
+  @@index([rightsUntil, state])
+  @@map("diagnostic_ownership_components")
+}
+
+
+/// Restricted service linkage only. No command, digest or protected selector is staged here.
+model DiagnosticContinuityRequest {
+  id String @id
+  createdAt DateTime @default(now())
+  actorId String
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  sessionId String
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  orderId String
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind String
+  @@index([actorId, sessionId, orderId, id])
+  @@map("diagnostic_continuity_requests")
+}
+
+/// One source-authenticated grant per visit, never backfilled or replaced.
+/// Erasure clears all personal content and retains only id/order/state.
+model DiagnosticOwnershipGrant {
+  id String @id
+  orderId String @unique
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  state String
+  listingId String?
+  identityDigest String?
+  sellerId String?
+  commissionerId String?
+  businessId String?
+  membershipId String?
+  grantorId String?
+  grantorMembershipId String?
+  sessionId String?
+  rights Json?
+  rightsUntil DateTime?
+  declaredAt DateTime?
+  erasedAt DateTime?
+  components DiagnosticOwnershipComponent[]
+  @@index([sellerId])
+  @@index([commissionerId])
+  @@index([grantorId])
+  @@index([rightsUntil, state])
+  @@map("diagnostic_ownership_grants")
+}
+
+/// Transient preparation only. Finish deletes it; deferred SQL rejects a live receipt at commit.
+model DiagnosticSourceCommand {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  backend_pid Int @default(dbgenerated("pg_backend_pid()"))
+  full_transaction_id String @default(dbgenerated("(pg_current_xact_id())::text"))
+  command Json
+  scope Json @default("[]")
+  lock_keys Json @default("[]")
+  effects Json @default("[]")
+  campaigns Json @default("[]")
+  @@unique([backend_pid, full_transaction_id])
+  @@map("diagnostic_source_commands")
+}
+
+/// Created for prepared NEW orders only. Missing historical shells stay unavailable.
+model DiagnosticSourceAnchor {
+  orderId String @id
+  order InspectionOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  state String
+  firstRecordId String?
+  source Json?
+  createdTransaction String
+  @@map("diagnostic_source_anchors")
+}
+
+// Forward SQL guard inventory: 20261024010000_diagnostic_source_guard_repair.
+
+/// Transient campaign fence preparation, independent of source ownership receipts.
+/// SQL derives identity/scope on INSERT and requires DELETE before transaction commit.
+model CampaignPreparation {
+  id                  String @id @db.Uuid
+  backend_pid         Int
+  full_transaction_id String
+  mutations           Json
+  scope               Json
+
+  @@unique([backend_pid, full_transaction_id])
+  @@map("campaign_preparations")
+}
+
+// Forward SQL effect inventory: 20261024030000_diagnostic_purge_effects.
+
+// Dormant finite intake/bootstrap/audit effect inventory: 20261024040000_diagnostic_intake_effects.
+
+// Retained finite source invariant checkpoint 20261024050000. No data backfill.
+
+// Dormant source correction inventory: 20261024060000_diagnostic_source_correction.
+
+// Dormant finite moderation inventory: 20261024070000_diagnostic_user_eligibility.
+
+// Dormant complete moderation effects: 20261024080000_diagnostic_moderation_complete_effects.
+
+// Dormant Message absence and Business enquiry effects: 20261024090000_diagnostic_message_enquiry_fences.
+
+// Dormant Sign-in Method, intake selection and object ownership: 20261024100000_diagnostic_signin_intake_object_owners.
+
+// Dormant ordinary User INSERT destination fence: 20261024110000_diagnostic_user_insert_fence.
+
+// Dormant exact restore no-op enquiry alternatives: 20261024120000_diagnostic_account_noop_enquiry.
+
+// Snapshot: 20261024130000_diagnostic_intake_campaign_composition.

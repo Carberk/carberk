@@ -1,0 +1,16 @@
+$ tsc --noEmit
+src/diagnostics/DiagnosticReader.tsx(28,11): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,77): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,129): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,191): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,238): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,286): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,352): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,401): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+src/diagnostics/DiagnosticReader.tsx(28,444): error TS2339: Property 'releaseIdentity' does not exist on type '{ id: string; audience: "buyer_private" | "listing_public"; status: "draft" | "finalized" | "returned" | "submitted" | "withdrawn"; templateVersionId: string; observedAt: string; ... 15 more ...; successorKind?: unknown; }'.
+[ELIFECYCLE] Command failed with exit code 1.
+Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL
+
+  × "pnpm recursive run" failed in /Users/bagtyyar/.t3/worktrees/carberk/
+  │ agent-release897-candidate-a-20261029/apps/mobile
+

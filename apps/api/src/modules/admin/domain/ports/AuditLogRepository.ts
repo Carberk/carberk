@@ -10,6 +10,7 @@ export interface AuditLogRow {
 
 export interface AuditLogRepository {
   findMany(params: {
+    allowedActions?: readonly string[];
     action?: string | undefined;
     targetType?: string | undefined;
     targetId?: string | undefined;
@@ -18,6 +19,7 @@ export interface AuditLogRepository {
   }): Promise<{ items: AuditLogRow[]; total: number }>;
   create(
     data: {
+      id?: string;
       actorId: string | null;
       action: string;
       targetType: string;

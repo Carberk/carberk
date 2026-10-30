@@ -1,0 +1,61 @@
+heading2 "Öňki barlagy bagla" {"level":2}
+heading3 "Häzirki sessiýada kesilen amallar" {"level":3}
+button "Amalyň ýagdaýyny barla" {"invalid":"false"}
+heading3 "Rugsatly öňki barlagy tap" {"level":3}
+button "Rugsatly öňki barlagy tap" {"invalid":"false"}
+button "Şu barlagy deňeşdir" {"invalid":"false"}
+button "Şu barlagy deňeşdir" {"invalid":"false"}
+heading3 "Şu barlagy deňeşdir" {"level":3}
+button "Bellenen işlere dolan" {"invalid":"false"}
+region "Öňki barlag A"
+heading4 "Öňki barlag A" {"level":4}
+group ""
+DisclosureTriangle "Goragly ýazgylaryň salgylary" {"expanded":false}
+heading5 "Ýazylan fiziki şahsyýet" {"level":5}
+group ""
+DisclosureTriangle "Häzirki işgär" {"expanded":false}
+group ""
+DisclosureTriangle "Häzirki işgär" {"expanded":false}
+region "Häzirki barlag B"
+heading4 "Häzirki barlag B" {"level":4}
+group ""
+DisclosureTriangle "Goragly ýazgylaryň salgylary" {"expanded":false}
+heading5 "Ýazylan fiziki şahsyýet" {"level":5}
+group ""
+DisclosureTriangle "Häzirki işgär" {"expanded":false}
+group ""
+DisclosureTriangle "Häzirki işgär" {"expanded":false}
+heading3 "Bagly materiallaryň doly toplumy · 9/40" {"level":3}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 1 · Öňki barlag A: VIN möhüri, Windshield base, " {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 1 · Öňki barlag A: VIN mö" {"disabled":true,"invalid":"false","checked":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 2 · Öňki barlag A: VIN möhüri, Windshield base, " {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 2 · Öňki barlag A: VIN mö" {"disabled":true,"invalid":"false","checked":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 3 · Öňki barlag A: Öndürijiniň tagtasy, Door pil" {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 3 · Öňki barlag A: Öndüri" {"disabled":true,"invalid":"false","checked":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 4 · Öňki barlag A: VIN möhüri, Windshield base, " {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 4 · Öňki barlag A: VIN mö" {"disabled":true,"invalid":"false","checked":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 5 · Öňki barlag A: Şassi möhüri, Floor pan under" {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 5 · Öňki barlag A: Şassi " {"disabled":true,"invalid":"false","checked":"false"}
+region "Deňeşdirmäni dikeltmek"
+heading4 "Deňeşdirmäni dikeltmek" {"focused":true,"level":4}
+alert "" {"live":"assertive","atomic":true}
+button "Goragly suraty täzeden ýükle: Bagly materiallaryň doly toplumy 5 · Öňki barlag A: Şassi möhüri, Floor pan unde" {"invalid":"false"}
+button "Deňeşdirmäni täzeden ýükle" {"invalid":"false"}
+button "Öňki hasabat saýlawlaryna dolan" {"invalid":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 6 · Häzirki barlag B: Öndürijiniň tagtasy, Front" {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 6 · Häzirki barlag B: Önd" {"disabled":true,"invalid":"false","checked":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 7 · Häzirki barlag B: Öndürijiniň tagtasy, Front" {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 7 · Häzirki barlag B: Önd" {"disabled":true,"invalid":"false","checked":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 8 · Häzirki barlag B: Öndürijiniň tagtasy, Front" {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 8 · Häzirki barlag B: Önd" {"disabled":true,"invalid":"false","checked":"false"}
+button "Saklanan suraty gözden geçir Bagly materiallaryň doly toplumy 9 · Häzirki barlag B: Öndürijiniň tagtasy, Front" {"invalid":"false"}
+checkbox "Suraty we ýazgy mazmunyny gözden geçirdim · Hökmany Bagly materiallaryň doly toplumy 9 · Häzirki barlag B: Önd" {"disabled":true,"invalid":"false","checked":"false"}
+button "Indiki tassyklanmadyk suraty gözden geçir" {"invalid":"false"}
+heading3 "Karara geç" {"level":3}
+button "Rugsatly tehnikleri täzele" {"invalid":"false"}
+combobox "Bir tehnigi saýla · Hökmany" {"invalid":"true","expanded":false}
+group "Barlaglaryň baglanyşygyny deňeşdirmegiň usuly" {"invalid":"false"}
+combobox "Barlaglaryň baglanyşygyny deňeşdirmegiň usuly · Hökmany" {"invalid":"true","expanded":false} desc="Tekstiň gabat gelmegi baglamaga rugsat bermeýär. Serwer häzirki subutnamalary, y"
+textbox "Çözgüdiň sebäbi · Hökmany" {"invalid":"false","readonly":false,"required":true} desc="0/1000"
+checkbox "Bu gözegçilikler şol bir awtoulaga degişli diýip netije çykarýaryn · Hökmany" {"invalid":"false","checked":"false"}
+button "Berlişi gözden geçir" {"disabled":true,"invalid":"false"}

@@ -1,0 +1,16 @@
+{
+  "sourceCopyCorrection": "Accepted publication intent type initially omitted; exact34ede dependency now copied; db-build-corrected passes",
+  "mechanical": "R7d uuid factory ctor arguments composed in R1 and publication fixture; configured isolated globalSetup path accepted alongside original local marker",
+  "offlineRun": {
+    "api": "280files pass12fail,2959tests pass97fail6skip,2worker errors",
+    "worker": "42files pass2fail,319pass4fail",
+    "failures": [
+      "AvatarContactDatabase cannot interpret accepted633f/5b supplied-claim discovery shape;21 affected cases",
+      "Publication media/upload adapters issue raw SELECT pg_advisory_xact_lock without ::text; strict accepted5b fake refuses unsupported_void_result,24 affected cases",
+      "Other Identity/diagnostic readers retain403/500 failures outside assembly ownership; no gate activation",
+      "API hook/worker timeouts and SMTP deadline failure retained; no timeout increase",
+      "Local B5 all3 deadlines with accepted observer retained; no production inference or repeat"
+    ]
+  },
+  "boundary": "No generic fake escape, no assertion or production change to hide failures. Parent routes remaining owners; coherent diagnostic intermediate not final acceptance."
+}

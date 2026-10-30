@@ -12,7 +12,7 @@ overrides:
 
 # Official Android prefab backports, reviewed separately in PR #859.
 patchedDependencies:
-  "expo-modules-core@55.0.26": patches/expo-modules-core@55.0.26.patch
+  "expo-modules-core@55.0.27": patches/expo-modules-core@55.0.27.patch
   "react-native-reanimated@4.2.1": patches/react-native-reanimated@4.2.1.patch
 
 # pnpm 12.11+ links agent skills that dependencies ship into the workspace's

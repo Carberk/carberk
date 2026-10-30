@@ -1,0 +1,9 @@
+# First-party client delivery
+
+[MeasurementQueue](MeasurementQueue.ts) validates client-owned events and bounds buffering/retry. [MeasurementHttpSender](MeasurementHttpSender.ts) resolves credentials only when delivering to the supplied first-party origin. Tokens and raw account/install values never belong in event envelopes.
+
+[MeasurementHost](MeasurementHost.ts) owns asynchronous bootstrap, immutable server visits and local queue generations. [Native composition](nativeMeasurement.ts) stores issued identity and optional operator synthetic proof in SecureStore, while AsyncStorage holds the bounded event buffer. Root startup listens for foreground and auth changes; actor changes synchronously revoke eligibility and request persisted erasure. A separately generated local queue generation prevents old actor buffers reattaching when the same account signs in again. Current guest association is kept only long enough for the immediate sign-in bootstrap. Durable server erasure/restore fences remain necessary.
+
+Collection defaults off through EXPO_PUBLIC_MEASUREMENT_ENABLED. The server separately decides purpose/population eligibility; enabling a build flag cannot activate public staging or production collection. Call intent enqueues synchronously from the real contact action. No core UI action awaits bootstrap, persistence or flush. [The rendered outage scenario](MeasurementCoreOutage.spec.tsx) exercises that same host and real contact component while bootstrap is unavailable. Public Listing-view identity/timers remain separate.
+
+The [shared dictionary](../../../../packages/contracts/src/schemas/measurement.ts) owns names and payloads; [the specification](../../../../docs/prd/ops/85-launch-analytics-plan.md) owns intended semantics. Authoritative outcome facts belong to source transactions and cannot be guessed by clients. Other approved client event families still need their source integrations and evidence.

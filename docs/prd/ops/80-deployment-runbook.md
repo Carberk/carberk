@@ -9,7 +9,19 @@ The following foundation paragraph records the 2026-09-13 evidence, not current 
 
 ## Integration acceptance transition
 
-The [accepted ADR-0098](../../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) prepares one shared staging acceptance lane. [Reservation operations](../../agents/shared-staging.md) own candidate identity, exclusive mutations, disposable data and restoration to latest `main`. Activation awaits guarded fixtures/resets and transition evidence. Repository tests retain hosted disposable services; production promotion stays a separate release action. Historical evidence below establishes only its dated claims; inspect current deployment IDs, SHAs and readiness for a new release.
+The [accepted ADR-0098](../../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) prepares one shared staging acceptance lane. [Reservation operations](../../agents/shared-staging.md) own candidate identity, exclusive mutations, disposable data and restoration to latest `main`. The [executable staging controls](../../agents/shared-staging-controls.md) distinguish implemented commands from pending activation evidence. Activation awaits independent executable review, hosted fixture proof, authoritative scoped identity/origins and a reserved deployed restoration drill. Repository tests retain hosted disposable services; production promotion stays a separate release action. Historical evidence below establishes only its dated claims; inspect current deployment IDs, SHAs and readiness for a new release.
+
+### Prelaunch environment reset (until public launch)
+
+The founder declared staging and production application data disposable until public launch ([#897](https://github.com/Carberk/carberk/issues/897#issuecomment-6314266361)). The [clean-acceptance contract](../../evidence/issue-901/prelaunch-clean-acceptance-contract-20261021.md#3-minimal-operator-contract) owns the procedure. Each target needs its own manifest, inventory and reference delta, protected-configuration list, verified quiescence including the signed-upload window, phase receipts, reseed proof and restoration. No reviewed implementation exists yet. Do not reset either environment by hand.
+
+Production keeps the rules in [Production foundation](#production-foundation-what-duplication-taught-us): volume-file deletion is human-run and there is no unscoped flush. It also keeps the currently documented Play App access configuration and recreates only its matching reference actors and data. A production reset authorizes no production deployment. The public-launch checklist removes this authority and disables production invocation in code.
+
+## Operational monitoring alerts
+
+The founder-selected monitoring route is authenticated Gmail SMTP from `tkmdevelopers@gmail.com` to `bagtyyarkowusow.dev@gmail.com`. Resend remains the sign-in email and OTP driver. SMTP alerts default closed and belong only to the separate watchdog service. Configure the server-only variables and rotate its app password through [SMTP runtime and rotation guidance](../../evidence/issue-919/smtp-alert-transport.md). Keep credential values out of commands, files, logs and evidence. This procedure does not establish live staging configuration.
+
+Before claiming deployed alert readiness, inspect the exact candidate and use the applicable staging reservation/control workflow for any staging configuration or deployed test. Record a harmless synthetic incident, bounded SMTP acceptance and durable receipt, repeat/restart suppression, actual founder inbox receipt and acknowledgment. Recovery delivery is a separate controlled transition. A local adapter acceptance test or SMTP acceptance alone cannot satisfy the deployed-topology or human acknowledgment gate. Restore staging and release its reservation after acceptance. Existing founder coverage remains Monday-Friday 08:00-20:00 Asia/Shanghai, with weekends best effort and no 24/7 response promise. See [monitoring human response](81-monitoring-alarms.md#human-response).
 
 ## Pre-flight checklist
 
@@ -44,6 +56,8 @@ a build argument. If unset, the page shows «Фото профиля недос�
 photo removal until the preview can be displayed.
 
 ## Railway era — staging and reviewer-only production
+
+Use the host's [existing Railway CLI authentication](../../agents/cli-access.md) and explicit target IDs. Missing project-token environment variables alone are not an access blocker.
 
 ### Production foundation: what duplication taught us
 
@@ -622,8 +636,8 @@ If restore fails or takes too long for beta operations, private beta launch is b
 ## Post-deploy
 
 - Update `CHANGELOG.md` with the version + summary
-- Telegram message to AutoTM channel: "v0.X.Y deployed — <summary>"
-- Monitor Grafana for 30 min
+- Record the deployment summary in release evidence and recheck the selected Gmail SMTP monitoring receipt gate when monitoring changes
+- Observe deployed health/readiness for 30 min; use Grafana only when its deployment is verified
 - Close any deployment-related GitHub issues
 - Record whether rollback, restore, alert, and feature-flag drills remain current for the launch gate
 

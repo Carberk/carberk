@@ -7,6 +7,7 @@ import {
   type ReviewerScenarioSeedOptions,
   type ReviewerScenarioSeedStore,
   type ReviewerScenarioUser,
+  type ReviewerCredentialChange,
 } from "./reviewer-scenario-seed";
 
 const NOW = new Date("2026-08-09T12:00:00.000Z");
@@ -98,6 +99,36 @@ class FakeReviewerScenarioSeedStore implements ReviewerScenarioSeedStore {
     return id ? (this.users.get(id) ?? null) : null;
   }
 
+  credentialFault: "sessions" | "devices" | "audit" | null = null;
+  async changeCredentials(input: ReviewerCredentialChange): Promise<string[]> {
+    const before = structuredClone(this);
+    try {
+      const ids: string[] = [];
+      for (const account of input.accounts) {
+        const user = this.users.get(account.id);
+        if (!user) continue;
+        if (user.role !== account.role || user.deletionScheduledAt !== null || !user.phoneVerifiedAt || !user.emailVerifiedAt) {
+          throw new Error("Unsupported reviewer source");
+        }
+        if (input.mode === "rotate" && user.phone === account.phone && user.email === account.email) continue;
+        ids.push(account.id);
+        if (input.mode === "revoke") await this.revokeUser({ id: account.id, revokedPhone: account.phone, displayName: account.displayName });
+        else await this.upsertUser({ ...account, email: account.email ?? "" });
+      }
+      if (this.credentialFault === "sessions") throw new Error("Session deletion refused");
+      await this.deleteSessionsByUserIds(ids);
+      if (this.credentialFault === "devices") throw new Error("Device invalidation refused");
+      await this.invalidatePushDevicesByUserIds(ids);
+      if (this.credentialFault === "audit") throw new Error("Credential audit refused");
+      await this.createAuditLog({ action: input.mode === "rotate" ? "REVIEWER_SCENARIO_ROTATE" : "REVIEWER_SCENARIO_REVOKE",
+        targetType: "reviewer_scenario", targetId: "store-review", details: input.mode === "rotate"
+          ? { mode: "seed", accountCount: input.accounts.length, seededUserIds: input.accounts.map(account => account.id),
+            rotatedUserIds: ids, occurredAt: input.now.toISOString() }
+          : { mode: "revoke", accountCount: ids.length, revokedUserIds: ids, occurredAt: input.now.toISOString() } });
+      return ids;
+    } catch (error) { Object.assign(this, before); throw error; }
+  }
+
   async upsertUser(input: {
     id: string;
     phone: string;
@@ -115,6 +146,8 @@ class FakeReviewerScenarioSeedStore implements ReviewerScenarioSeedStore {
       phone: input.phone,
       email: input.email,
       role: input.role,
+      displayName: input.displayName, phoneVerifiedAt: new Date("2026-10-26T00:00:00Z"),
+      emailVerifiedAt: new Date("2026-10-26T00:00:00Z"), deletionScheduledAt: null,
     };
     this.users.set(input.id, row);
     this.usersByPhone.set(input.phone, input.id);
@@ -144,6 +177,13 @@ class FakeReviewerScenarioSeedStore implements ReviewerScenarioSeedStore {
   async invalidatePushDevicesByUserIds(userIds: string[]): Promise<number> {
     this.invalidatedDeviceUserIds.push(...userIds);
     return userIds.length;
+  }
+
+  async preflightSeed(input: { catalog: unknown; listings: { id: string; sellerId: string }[] }): Promise<string | null> {
+    return input.listings.some(target => {
+      const row = this.listings.get(target.id);
+      return row && row.sellerId !== target.sellerId;
+    }) ? "foreign Listing association" : null;
   }
 
   async upsertCatalog(): Promise<void> {
@@ -394,6 +434,7 @@ describe("runReviewerScenarioSeed", () => {
       phone: "+99365000001",
       email: "0001@autotm.bagtyyar.dev",
       role: "admin",
+      displayName: "Privileged", phoneVerifiedAt: null, emailVerifiedAt: null, deletionScheduledAt: null,
     });
     store.usersByPhone.set("+99365000001", reviewerScenarioSeedIds.buyerIds[0]);
 
@@ -470,4 +511,69 @@ it("stores the seller's own sign-in phone so archived reviewer Listings can repu
   const store = new FakeReviewerScenarioSeedStore();
   await runReviewerScenarioSeed(store, seedOptions());
   for (const listing of store.listings.values()) expect(listing.contactPhone).toBe("+99365000002");
+});
+
+it.each(["seed", "revoke"] as const)("refuses a privileged final reviewer %s target before any scenario effect", async (mode) => {
+  const store = new FakeReviewerScenarioSeedStore();
+  await runReviewerScenarioSeed(store, seedOptions());
+  const last = store.users.get(reviewerScenarioSeedIds.buyerIds[1]);
+  if (!last) throw new Error("Missing final reviewer");
+  last.role = "admin";
+  const before = structuredClone(store);
+  const result = await runReviewerScenarioSeed(store, seedOptions({
+    mode,
+    // The final account changes, so an implementation that mutates earlier slots fails equality.
+    reviewDemoAccountsJson: reviewerJson(["+99365000001", "+99365000002", "+99365000903"]),
+  }));
+  expect(result.exitCode).toBe(1);
+  expect(result.message).toMatch(/privileged|unsupported/);
+  expect(structuredClone(store)).toEqual(before);
+});
+
+
+it.each(["role", "deletionScheduledAt", "emailVerifiedAt"] as const)("preflights an unsupported final reviewer %s before changing earlier accounts", async field => {
+  const store = new FakeReviewerScenarioSeedStore();
+  await runReviewerScenarioSeed(store, seedOptions());
+  const user = store.users.get(reviewerScenarioSeedIds.buyerIds[1]);
+  if (!user) throw new Error("Missing reviewer");
+  if (field === "role") user.role = "seller";
+  else if (field === "deletionScheduledAt") user.deletionScheduledAt = new Date("2026-10-26T00:00:00Z");
+  else user.emailVerifiedAt = null;
+  const before = structuredClone(store);
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 1, message: expect.stringContaining("unsupported") });
+  expect(structuredClone(store)).toEqual(before);
+});
+
+
+it("refuses a foreign fixed Listing before creating accounts, catalog or media", async () => {
+  const store = new FakeReviewerScenarioSeedStore();
+  const foreign = { id: reviewerScenarioSeedIds.primaryListingId, sellerId: "foreign", damaged: false, knownIssuesText: null };
+  store.listings.set(foreign.id, foreign);
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 1, message: expect.stringContaining("Listing association") });
+  expect([...store.users]).toEqual([]);
+  expect(store.catalogSeeded).toBe(false);
+  expect([...store.media]).toEqual([]);
+  expect([...store.listings.values()]).toEqual([foreign]);
+  expect(store.auditLogs).toEqual([]);
+});
+
+it("converges displayName-only drift while preserving verified contacts and ownership", async () => {
+  const store = new FakeReviewerScenarioSeedStore();
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 0 });
+  const before = structuredClone([...store.users.values()]);
+  for (const user of store.users.values()) user.displayName = "Presentation drift";
+  expect(await runReviewerScenarioSeed(store, seedOptions())).toMatchObject({ exitCode: 0, rotatedUserIds: [] });
+  expect([...store.users.values()]).toEqual(before);
+});
+
+
+it.each(["sessions", "devices", "audit"] as const)("rolls back every reviewer credential and security effect when %s fails", async fault => {
+  const store = new FakeReviewerScenarioSeedStore();
+  await runReviewerScenarioSeed(store, seedOptions());
+  store.credentialFault = fault;
+  const before = structuredClone(store);
+  await expect(runReviewerScenarioSeed(store, seedOptions({
+    reviewDemoAccountsJson: reviewerJson(["+99365000901", "+99365000902", "+99365000903"]),
+  }))).rejects.toThrow(/refused/);
+  expect(structuredClone(store)).toEqual(before);
 });

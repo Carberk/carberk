@@ -1,0 +1,61 @@
+heading2 "Link a previous inspection" {"level":2}
+heading3 "Interrupted operations in this current Session" {"level":3}
+button "Check operation status" {"invalid":"false"}
+heading3 "Find an authorized previous inspection" {"level":3}
+button "Find an authorized previous inspection" {"invalid":"false"}
+button "Compare this inspection" {"invalid":"false"}
+button "Compare this inspection" {"invalid":"false"}
+heading3 "Compare this inspection" {"level":3}
+button "Back to assigned work" {"invalid":"false"}
+region "Previous inspection A"
+heading4 "Previous inspection A" {"level":4}
+group ""
+DisclosureTriangle "Restricted record references" {"expanded":false}
+heading5 "Recorded physical identity" {"level":5}
+group ""
+DisclosureTriangle "Current staff member" {"expanded":false}
+group ""
+DisclosureTriangle "Current staff member" {"expanded":false}
+region "Current inspection B"
+heading4 "Current inspection B" {"level":4}
+group ""
+DisclosureTriangle "Restricted record references" {"expanded":false}
+heading5 "Recorded physical identity" {"level":5}
+group ""
+DisclosureTriangle "Current staff member" {"expanded":false}
+group ""
+DisclosureTriangle "Current staff member" {"expanded":false}
+heading3 "Complete bound material set · 9/40" {"level":3}
+button "Review retained image Complete bound material set 1 · Previous inspection A: VIN stamp, Windshield base, drive" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 1 · Previous inspection A:" {"disabled":true,"invalid":"false","checked":"false"}
+button "Review retained image Complete bound material set 2 · Previous inspection A: VIN stamp, Windshield base, drive" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 2 · Previous inspection A:" {"disabled":true,"invalid":"false","checked":"false"}
+button "Review retained image Complete bound material set 3 · Previous inspection A: Manufacturer plate, Door pillar, " {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 3 · Previous inspection A:" {"disabled":true,"invalid":"false","checked":"false"}
+button "Review retained image Complete bound material set 4 · Previous inspection A: VIN stamp, Windshield base, drive" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 4 · Previous inspection A:" {"disabled":true,"invalid":"false","checked":"false"}
+button "Review retained image Complete bound material set 5 · Previous inspection A: Chassis stamp, Floor pan under th" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 5 · Previous inspection A:" {"disabled":true,"invalid":"false","checked":"false"}
+region "Comparison recovery"
+heading4 "Comparison recovery" {"focused":true,"level":4}
+alert "" {"live":"assertive","atomic":true}
+button "Retry protected image: Complete bound material set 5 · Previous inspection A: Chassis stamp, Floor pan under t" {"invalid":"false"}
+button "Reload comparison" {"invalid":"false"}
+button "Back to candidates" {"invalid":"false"}
+button "Review retained image Complete bound material set 6 · Current inspection B: Manufacturer plate, Front-left str" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 6 · Current inspection B: " {"disabled":true,"invalid":"false","checked":"false"}
+button "Review retained image Complete bound material set 7 · Current inspection B: Manufacturer plate, Front-left str" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 7 · Current inspection B: " {"disabled":true,"invalid":"false","checked":"false"}
+button "Review retained image Complete bound material set 8 · Current inspection B: Manufacturer plate, Front-left str" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 8 · Current inspection B: " {"disabled":true,"invalid":"false","checked":"false"}
+button "Review retained image Complete bound material set 9 · Current inspection B: Manufacturer plate, Front-left str" {"invalid":"false"}
+checkbox "I reviewed this image and its record context · Required Complete bound material set 9 · Current inspection B: " {"disabled":true,"invalid":"false","checked":"false"}
+button "Review next unacknowledged image" {"invalid":"false"}
+heading3 "Continue to decision" {"level":3}
+button "Refresh eligible technicians" {"invalid":"false"}
+combobox "Select one technician · Required" {"invalid":"true","expanded":false}
+group "Continuity comparison method" {"invalid":"false"}
+combobox "Continuity comparison method · Required" {"invalid":"true","expanded":false} desc="Matching text does not authorize a link. The server checks current evidence, aut"
+textbox "Decision reason · Required" {"invalid":"false","readonly":false,"required":true} desc="0/1000"
+checkbox "I conclude these observations concern the same vehicle · Required" {"invalid":"false","checked":"false"}
+button "Review issuance" {"disabled":true,"invalid":"false"}

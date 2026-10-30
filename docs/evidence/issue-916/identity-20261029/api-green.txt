@@ -1,0 +1,8 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/apps/api
+
+
+ Test Files  1 passed (1)
+      Tests  54 passed (54)
+   Start at  01:44:03
+   Duration  806ms (tests 53%, import 23%, transform 22%, setup 1%)

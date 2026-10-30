@@ -1,0 +1,53 @@
+Expo Autolinking module resolution enabled
+Starting Metro Bundler
+
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+iOS node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+| (node:15228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:15228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:15228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:15228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:15228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:15228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:15228) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/entry.js ▓▓▓▓░░░░░░░░░░░░ 28.1% ( 560/1057)
+iOS node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 86.3% (3291/3545)
+iOS node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (3951/3951)
+iOS Bundled 11188ms node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/entry.js (3951 modules)
+
+› Assets (31):
+../../node_modules/.pnpm/@react-navigation+elements@2.9.17_@react-navigation+native@7.2.4_react-native@0.83.10_@_45c3d9f9369765cc689eaf5d4330b7d2/node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.png (653B)
+../../node_modules/.pnpm/@react-navigation+elements@2.9.17_@react-navigation+native@7.2.4_react-native@0.83.10_@_45c3d9f9369765cc689eaf5d4330b7d2/node_modules/@react-navigation/elements/lib/module/assets/back-icon.png (4 variations | 566B)
+../../node_modules/.pnpm/@react-navigation+elements@2.9.17_@react-navigation+native@7.2.4_react-native@0.83.10_@_45c3d9f9369765cc689eaf5d4330b7d2/node_modules/@react-navigation/elements/lib/module/assets/clear-icon.png (4 variations | 425B)
+../../node_modules/.pnpm/@react-navigation+elements@2.9.17_@react-navigation+native@7.2.4_react-native@0.83.10_@_45c3d9f9369765cc689eaf5d4330b7d2/node_modules/@react-navigation/elements/lib/module/assets/close-icon.png (4 variations | 235B)
+../../node_modules/.pnpm/@react-navigation+elements@2.9.17_@react-navigation+native@7.2.4_react-native@0.83.10_@_45c3d9f9369765cc689eaf5d4330b7d2/node_modules/@react-navigation/elements/lib/module/assets/search-icon.png (3 variations | 582B)
+../../node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/assets/arrow_down.png (9.5KB)
+../../node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/assets/error.png (469B)
+../../node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/assets/file.png (138B)
+../../node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/assets/forward.png (188B)
+../../node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/assets/pkg.png (364B)
+../../node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/assets/sitemap.png (465B)
+../../node_modules/.pnpm/expo-router@55.0.18_2162522a4b81cf0c2f2316e884d6e3f5/node_modules/expo-router/assets/unmatched.png (4.8KB)
+assets/fonts/Geist-Bold.ttf (129KB)
+assets/fonts/Geist-Light.ttf (125KB)
+assets/fonts/Geist-Medium.ttf (128KB)
+assets/fonts/Geist-Regular.ttf (126KB)
+assets/fonts/Geist-SemiBold.ttf (128KB)
+assets/fonts/GeistMono-Medium.ttf (149KB)
+assets/fonts/GeistMono-Regular.ttf (149KB)
+assets/images/splash-icon.png (29KB)
+
+› ios bundles (1):
+_expo/static/js/ios/entry-85e404914377f0c29c200f778309c49c.hbc (9.1MB)
+
+› Files (1):
+metadata.json (2.1KB)
+
+Exported: dist

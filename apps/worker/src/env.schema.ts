@@ -16,6 +16,25 @@ const BaseSchema = z.object({
   AUTOTM_COMMIT_SHA: z.string().min(1).default("unknown"),
   /** Operator-only startup mode: no business request handlers or queue consumers run. */
   PHOTO_CONVERSION_MAINTENANCE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  SERVICE_SYNTHETIC_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  SERVICE_SYNTHETIC_USER_IDS: z.string().default("[]").transform((value, ctx) => {
+    try { return z.array(z.string().uuid()).max(50).parse(JSON.parse(value)); }
+    catch { ctx.addIssue({ code: "custom", message: "Service synthetic IDs must be a JSON UUID array" }); return z.NEVER; }
+  }),
+  MEASUREMENT_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  MEASUREMENT_COLLECTOR_EPOCH: z.string().uuid().optional(),
+  MEASUREMENT_EVIDENCE_REF: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
+  MEASUREMENT_SYNTHETIC_CAPABILITY_EXPIRES_AT: z.string().datetime().optional(),
+  VIDEO_PROCESSING_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  VIDEO_CLEANUP_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  VIDEO_ROLLOUT_ENABLED: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+  VIDEO_PRIVATE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .refine(value => !["listing-photos", "listing-videos", "chat-attachments", "catalog-assets"].includes(value), "Video requires a separate private bucket").default("listing-video-private"),
+  VIDEO_TESTER_USER_IDS: z.string().default("").transform((value, ctx) => {
+    const parsed = z.array(z.string().uuid()).max(50).safeParse(value.split(",").map(id => id.trim()).filter(Boolean));
+    if (parsed.success) return [...new Set(parsed.data)];
+    ctx.addIssue({ code: "custom", message: "Expected at most 50 tester User UUIDs" }); return z.NEVER;
+  }),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
 
   DATABASE_URL: z.string().url(),
@@ -216,9 +235,11 @@ function validateEmailContract(env: BaseEnv, add: (path: string, message: string
 }
 
 export const EnvSchema = BaseSchema.superRefine((env, ctx) => {
+  if (env.APP_ENV === "production" && env.SERVICE_SYNTHETIC_ENABLED) ctx.addIssue({ code: "custom", path: ["SERVICE_SYNTHETIC_ENABLED"], message: "Synthetic service collection is forbidden in production" });
   const add = (path: string, message: string) =>
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
 
+  if (env.MEASUREMENT_ENABLED && (!env.MEASUREMENT_COLLECTOR_EPOCH || !env.MEASUREMENT_EVIDENCE_REF)) add("MEASUREMENT_ENABLED", "Measurement requires externally provisioned collector epoch and admitted evidence");
   validateEndpoints(env, add);
   validatePushContract(env, add);
   validateEmailContract(env, add);

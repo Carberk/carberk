@@ -1,0 +1,46 @@
+# Full-v3 text Support retention source checkpoint, 2026-10-21
+
+Source attempt2 after reached hosted RED run39557809075/API119081707241, under #901/#897/PR904. This implements root's selected internal resolver toward the unchanged retention case. **Hosted GREEN is not claimed.** The supplied log `/tmp/carberk-next-release-20261021/232a66c3-api-119081707241.raw.plain.log:2541-2649` reports actual `Unsupported campaign service` on the deadline worker. Root confirms ordinary setup, foreign reopening68/87, deadline-minus1 zero work and rollback snapshots. No additional RED or integration run was performed here.
+
+## Ownership and authority
+
+Reused the clean owned host worktree `t3-7bcc481b`. Created `agent/issue-901-v3-support-retention-source-green-20261021` at exact published test base `232a66c38a253980fadc523ba924f77d9c444127`. Pushed the reservation before edits, then independent GitHub git/ref API readback returned that exact base. Pushes use one45-second bounded attempt with `http.lowSpeedLimit=1000` and `http.lowSpeedTime=20`. Prior decision branch at `bc1b3e235a71f9d47fa4e08a48718d0a3214bec2` and prior source branch at `306de760bb39c9ab37c90c8ca146dc1bc3fb4bf2` remain preserved.
+
+Read root's held selection at `/Users/bagtyyar/.t3/worktrees/carberk/t3-e6e4c507/docs/evidence/issue-901/full-v3-support-worker-resolver-selection-20261021.md` without modifying or cherry-picking it. Read retention test/next-boundary notes, service graph/worker/Restrict-FK plan, Support spec, workflow/run-issue, standards/domain/runtime guidance, source/schema/overviews, worker/store and journal/reset. No agents/reviewers, PRs, GitHub body edits or operational actions.
+
+## Changes and boundaries
+
+[CampaignSupportRetention](../../../apps/worker/src/jobs/CampaignSupportRetention.ts) discovers only validated catalog `cf_[a-f0-9]{32}` names. It queries the existing exact case/conversation/fence journal claims, including deleted keys. Scalar matches preserve malformed-key claims for strict integrity refusal rather than ordinary fallback. Unreadable namespaces throw; competing claims refuse. There is no global directory, caller-selected namespace, application schema/ownership column, actor-email inference, fabricated Session or process ownership cache.
+
+Discovery is classification only. A claimed resource enters an ordinary-bound transaction with tracked service tables locked first in reset order, then untracked attachment/subscription FK dependents, then the namespace advisory fence. It repeats discovery and calls the namespace lifecycle authority with the full serving candidate and explicit existing worker time. Missing/nonboolean authority results refuse. Only a valid false disposition skips work; ordinary work follows its original callback only after a fully inspected no-claim result.
+
+The v3 fixture adds a contract-hashed `campaign_support_lifecycle_authority` and one hash field in its existing operational manifest. No Prisma schema/migration or new namespace is introduced. The authority runs the existing complete binding/integrity/preflight checks, including journal/event versions, actual row hashes, tracking/schema/contract hashes, trigger inventory and foreign FK/scalar/JSON edges. It proves exact current case/conversation ownership, current candidate/full-v3 lifecycle, due closed synthetic text state, and absence of attachments/subscriptions. Reopened cases return no work. Corrupt/partial/competing claims refuse. Valid disposed or wholly absent journaled work returns no work without adoption.
+
+The real [worker](../../../apps/worker/src/jobs/ExpireServiceContent.ts) keeps its selectors, case-before-conversation row locks, time input, transition policy, limits, timeouts, ordinary processing and queue composition. Campaign purge uses the authorized transaction. The transaction-local snapshot is scoped to exact namespace/candidate/resource/phase/time; it alone grants nothing. Every trigger exception separately checks table locks, contract/schema/journal/event/tracking hashes, exact snapshot hashes in durable events, current parent ownership/hashes and permitted OLD/NEW shape. The existing generic OLD hash, key reuse, parent, cleaning/disposed and caps checks remain. Only these text transitions are added:
+
+- Epoch0→1 conversation erasure at worker time, preserving all other conversation fields.
+- New exact epoch1 empty-manifest fence; deletion of owned message/outbox/read-state rows for that conversation.
+- Reason-only updates of existing retained service audits, preserving their IDs and other fields.
+- Exact case identity unlink/version+1 after content is absent, preserving closedAt/status/policy fields.
+- One null-actor/reason/target SERVICE_CONTENT_PURGED audit with original resource and prior assignment version.
+- Exact pending→completed fence UPDATE after authorized restarted cleanup, preserving its epoch/manifest/erasedAt.
+
+Restart cleanup resolves durable conversation/fence journal claims after customer/assignee nulling. Authority requires exact current fence hash, epoch1, matching erased conversation, empty manifest, absent content and owned purge audit. The worker rereads the selected epoch/manifest before calling the **unchanged real** `S3RetiredObjectStore.deleteAndVerify([])` inside that serialization, including bucket versioning inspection. Failure keeps the fence pending. Completion retains the existing conditional predicate. The ordinary cleanup callback keeps its prior behavior.
+
+`service_erasure_fences` now uses `{conversationId}` in tracking, integrity, inventory, foreign/preflight and reset. Reset requires completed-empty exact epoch/erasedAt proof before entering cleaning and again before disposal, then deletes the dependent fence before the Restrict-FK conversation. Existing retained audit redaction, terminal hash/row checks, tombstones and lost-response retry neutrality remain unchanged. Caps remain128 records/2048 events; no timeout, retry or concurrency configuration changed.
+
+## Verification
+
+- `AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/worker exec vitest run src/jobs/CampaignSupportRetention.spec.ts src/jobs/ExpireServiceContent.campaign.spec.ts src/jobs/serviceRetention.spec.ts src/jobs/S3RetiredObjectStore.spec.ts`: 4files/19tests pass. Real resolver, worker and store run; only DB and S3 boundaries are faked. Cases cover no-claim ordinary fallback, erased-linkage restart, stale/disposed response, ambiguity/unreadable/changed ownership, wrong full candidate before storage, vanished fence, empty-manifest real versioning check/completion/retry and versioned-bucket refusal. These prove worker boundary response handling, **not execution of the generated SQL authority**.
+- `node --test scripts/staging-campaign.test.mjs scripts/staging-control.test.mjs`: 54/54 pass. The campaign file was rerun after final SQL edits,11/11. Existing external SQL capture tests now also cover fence trigger presence, actual composite deletion key and fence-before-conversation order. They do not prove SQL compilation.
+- Both TypeScript compilers pass for API, worker and db: `pnpm --filter @auto-tm/<workspace> typecheck` and `pnpm --filter @auto-tm/<workspace> exec tsc6 --noEmit`.
+- Focused worker ESLint with zero warnings; `node --check scripts/staging-campaign.mjs`; `node scripts/check-agent-docs.mjs`; `node scripts/check-runtime-imports.cjs`; `git diff --check`: pass.
+- `/tmp/issue901-retention-decision-comparison.mjs`: v1/v2 fresh fixture, existing-fixture retry and reset SQL/receipts byte-identical to exact base232a66c3. V3 receipts unchanged. Captures `/tmp/issue901-retention-decision-v3-generated.sql` and `/tmp/issue901-retention-decision-v3-reset-generated.sql`. Offline trigger/authority parenthesis checks pass; PostgreSQL/PLpgSQL compilation is unproved.
+
+The CampaignFullV3 acceptance file is byte-identical to the exact base. Primary65/82→67/99→67/161 and foreign68/87→68/155 are unchanged predictions/assertions. Resolver/authority add no public graph writes. Existing purge adds two keys and17events; reset then mutates62remaining live keys once. Exact runtime accounting must be measured, never forced by weakening assertions.
+
+Docs: internal boundary only, no external dependency/API change. Owning worker/service overviews record the narrowed lifecycle scope. No local services/Docker/integration, CI dispatch/poll/wait, provider/Railway action, operational entry opening or schema/product policy change.
+
+## Remaining gates
+
+Root owns serial assembly and same-test hosted GREEN, including PostgreSQL function compilation, exact purge/reset counts and retained audit/fence identity. Wrong-candidate and corrupt/foreign journal **SQL** refusal, foreign due closed cases and already-selected reset/reopen races need hosted additive proof. The catalog classifier intentionally fails closed on any unreadable possible namespace, including before ordinary fallback; this is the selected safety behavior, not a global worker activation. Private bytes, attachments, History, push, account deletion/restoration,14-day awaiting closure, general lifecycle work and operational collection remain closed or unproved. No storage timeout was widened; a store call exceeding the existing transaction bound must remain a visible failure.

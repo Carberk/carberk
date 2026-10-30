@@ -33,7 +33,7 @@ export class RecoverAccount {
       return;
     }
 
-    await this.unitOfWork.run(async (writes) => {
+    await this.unitOfWork.run({ userId: input.userId }, async (writes) => {
       await writes.republishListingsArchivedByDeletion(input.userId);
       await writes.clearDeletionSchedule(input.userId);
     });

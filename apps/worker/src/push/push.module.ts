@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
+import { DIRECT_MESSAGE_DELIVERY_ELIGIBILITY } from "./domain/DirectMessageDeliveryEligibility";
+import { PrismaDirectMessageDeliveryEligibility } from "./infrastructure/PrismaDirectMessageDeliveryEligibility";
 import { ProcessDirectMessagePush } from "./application/ProcessDirectMessagePush";
 import { FcmApnsPushTransport } from "./adapters/FcmApnsPushTransport";
 import { TestPushTransport } from "./adapters/TestPushTransport";
@@ -54,6 +56,7 @@ export async function createPushPort(config: ConfigService): Promise<PushPort> {
 @Module({
   providers: [
     ProcessDirectMessagePush,
+    { provide: DIRECT_MESSAGE_DELIVERY_ELIGIBILITY, useClass: PrismaDirectMessageDeliveryEligibility },
     PrismaPushDeviceStore,
     {
       provide: PUSH_DEVICE_STORE,

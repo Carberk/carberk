@@ -5,6 +5,7 @@ import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { useListingCount } from "../../api/listings/useListingCount";
+import { HistoryEntry } from "../../services/HistoryEntry";
 import { BrandLogo } from "../../auth/BrandLogo";
 
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,8 @@ export function HomeHeader() {
           <Icon as={Search} className="size-5 text-foreground" strokeWidth={2.2} />
         </Button>
       </View>
+
+      <View className="mx-4"><HistoryEntry/></View>
 
       <PressableScale
         feedback="surface"

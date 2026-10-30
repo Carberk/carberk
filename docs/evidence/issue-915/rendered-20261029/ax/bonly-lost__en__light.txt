@@ -1,0 +1,20 @@
+heading2 "Exact reviewer handoff" {"level":2}
+heading3 "Interrupted operations in this current Session" {"level":3}
+button "Check operation status" {"invalid":"false"}
+alert "" {"live":"assertive","atomic":true}
+button "Retry exact unchanged operation" {"invalid":"false"}
+button "Edit decision" {"invalid":"false"}
+button "Restart handoff review" {"disabled":true,"invalid":"false"}
+button "Return to visit without linking" {"disabled":true,"invalid":"false"}
+heading3 "Exact reviewer handoff" {"level":3}
+button "Check current visit and handoff" {"disabled":true,"invalid":"false"}
+button "Usable handoff for this inspection 1" {"disabled":true,"invalid":"false","pressed":"true"}
+button "Usable handoff for this inspection 2" {"disabled":true,"invalid":"false","pressed":"false"}
+button "Usable handoff for this inspection 3" {"disabled":true,"invalid":"false","pressed":"false"}
+button "Load more handoffs" {"disabled":true,"invalid":"false"}
+textbox "Decision reason · Required" {"disabled":true,"invalid":"false","readonly":false,"required":true} desc="70/1000"
+region "Review linked report creation"
+heading3 "Review linked report creation" {"focused":true,"level":3}
+button "Start linked empty report for this physical visit" {"disabled":true,"invalid":"false"}
+button "Edit decision" {"disabled":true,"invalid":"false"}
+button "Return to visit without linking" {"disabled":true,"invalid":"false"}

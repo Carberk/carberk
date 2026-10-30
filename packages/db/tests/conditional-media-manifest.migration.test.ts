@@ -79,8 +79,8 @@ for (const populated of [true, false]) {
           FROM media_uploads WHERE id = 'old-retired'`);
         before = await snapshot();
       }
-      // The red checkpoint has no expansion migration: real inserts exercise the old check.
-      await apply(migrations.filter((name) => name >= MIGRATION));
+      // Later additive columns must not change this migration's row-preservation snapshot.
+      await apply(migrations.filter((name) => name === MIGRATION));
       if (!populated) {
         await db.query(`INSERT INTO users (id, "updatedAt") VALUES ('manifest-user', now())`);
       }

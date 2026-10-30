@@ -1,295 +1,107 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from "@nestjs/common";
-
-import type {
-  IdentityReadPort,
-  IdentityUserSummary,
-  ProfilePhotoPort,
-} from "../../identity/identity.public";
-import { ContentReport } from "../domain/ContentReport";
-import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRepository";
-import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
+import { describe, expect, it } from "vitest";
 import { RemoveUserPhoto } from "./RemoveUserPhoto";
+import { PrismaProfilePhotoLink } from "../../listings/infrastructure/PrismaProfilePhotoLink";
+import { PrismaUploadClaims } from "../../listings/infrastructure/PrismaUploadClaims";
+import { PrismaContentReportRepository } from "../infrastructure/PrismaContentReportRepository";
+import { PrismaAuditLogRepository } from "../infrastructure/PrismaAuditLogRepository";
+import { avatarDatabase, clock, NOW, identityPorts } from "../../listings/application/testing/AvatarContactDatabase";
+import type { ProfilePhotoPort } from "../../identity/identity.public";
 
-const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
-const TX = { name: "moderation transaction" };
-
-class FakeReports {
-  reports: ContentReport[] = [];
-  statusTransactions: unknown[] = [];
-
-  async findById(id: string): Promise<ContentReport | null> {
-    return this.reports.find((r) => r.id === id) ?? null;
-  }
-
-  async updateStatus(
-    id: string,
-    data: { status: string; reviewedById: string; reviewedAt: Date },
-    tx?: unknown,
-  ): Promise<ContentReport> {
-    this.statusTransactions.push(tx);
-    const index = this.reports.findIndex((r) => r.id === id);
-    const report = this.reports[index];
-    if (!report) throw new Error("Report not found");
-    const updated = ContentReport.reconstruct({
-      ...report,
-      status: data.status as ContentReport["status"],
-      reviewedById: data.reviewedById,
-      reviewedAt: data.reviewedAt,
-    });
-    this.reports[index] = updated;
-    return updated;
-  }
-
-  seed(id: string, targetType: "listing" | "user", targetId: string, status = "pending"): void {
-    this.reports.push(
-      ContentReport.reconstruct({
-        id,
-        reporterUserId: "reporter-1",
-        targetType,
-        targetId,
-        reason: "other",
-        details: "Offensive profile photo",
-        status: status as ContentReport["status"],
-        reviewedById: null,
-        reviewedAt: null,
-        createdAt: new Date("2026-01-01T00:00:00Z"),
-        messageContext: null,
-      }),
-    );
-  }
+const input = { userId: "seller", adminUserId: "admin", reason: "Offensive photo" };
+function setup(report = false) {
+  const db = avatarDatabase();
+  if (report) db.seed("content_reports", { id: "report", reporterUserId: "foreign", targetType: "user", targetId: "seller",
+    reason: "other", details: "Offensive photo", status: "pending", reviewedById: null, reviewedAt: null, createdAt: NOW, messageContext: null });
+  const link = new PrismaProfilePhotoLink(db.service, new PrismaUploadClaims(db.service, clock));
+  // The existing ProfilePhotoPort boundary forwards the actual release to the
+  // real link/claim adapters. Adoption's storage pipeline is not under test.
+  const photos: ProfilePhotoPort = { adopt: async () => { throw new Error("unused storage entry"); },
+    release: async (userId, tx) => ({ removedKey: await link.unbind(userId, tx) }) };
+  const useCase = new RemoveUserPhoto(db.service, identityPorts(db.service).read, photos,
+    new PrismaContentReportRepository(db.service), new PrismaAuditLogRepository(db.service), clock, () => "audit-id");
+  return { db, useCase };
 }
 
-class FakeAudit {
-  rows: AuditLogRow[] = [];
-  transactions: unknown[] = [];
-
-  async create(
-    data: {
-      actorId: string | null;
-      action: string;
-      targetType: string;
-      targetId: string;
-      details?: Record<string, unknown> | null;
-    },
-    tx?: unknown,
-  ): Promise<AuditLogRow> {
-    this.transactions.push(tx);
-    const row: AuditLogRow = {
-      id: `audit-${this.rows.length + 1}`,
-      actorId: data.actorId,
-      action: data.action,
-      targetType: data.targetType,
-      targetId: data.targetId,
-      details: data.details ?? null,
-      createdAt: new Date(),
-    };
-    this.rows.push(row);
-    return row;
-  }
-}
-
-/** Users with their photo keys, read through one port and released through the other. */
-class FakeIdentity {
-  users: Record<string, IdentityUserSummary> = {};
-  releases: Array<{ userId: string; tx: unknown }> = [];
-  /** The owner removes their own photo between the moderator's read and the release. */
-  removedMeanwhile = false;
-
-  readonly read = {
-    findUserById: async (id: string) => this.users[id] ?? null,
-  } as unknown as IdentityReadPort;
-
-  readonly photos: ProfilePhotoPort = {
-    adopt: async () => {
-      throw new Error("A moderator never sets a photo");
-    },
-    release: async (userId, tx) => {
-      this.releases.push({ userId, tx });
-      const user = this.users[userId];
-      const removedKey = this.removedMeanwhile ? null : (user?.avatarKey ?? null);
-      if (user) this.users[userId] = { ...user, avatarKey: null };
-      return { removedKey };
-    },
-  };
-
-  seed(id: string, data: Partial<IdentityUserSummary> = {}): void {
-    this.users[id] = {
-      id,
-      displayName: null,
-      nameNumber: 4821,
-      avatarIndex: 7,
-      avatarKey: KEY,
-      deleted: false,
-      role: "buyer",
-      suspendedAt: null,
-      suspendedById: null,
-      suspensionReason: null,
-      ...data,
-    };
-  }
-}
-
-describe("RemoveUserPhoto", () => {
-  let identity: FakeIdentity;
-  let reports: FakeReports;
-  let audit: FakeAudit;
-  let useCase: RemoveUserPhoto;
-
-  beforeEach(() => {
-    identity = new FakeIdentity();
-    reports = new FakeReports();
-    audit = new FakeAudit();
-    const prisma = { $transaction: <T>(fn: (tx: unknown) => Promise<T>) => fn(TX) };
-    useCase = new RemoveUserPhoto(
-      prisma as unknown as ConstructorParameters<typeof RemoveUserPhoto>[0],
-      identity.read,
-      identity.photos,
-      reports as unknown as ContentReportRepository,
-      audit as unknown as AuditLogRepository,
-    );
-    identity.seed("user-1");
+describe("RemoveUserPhoto complete production transaction at the database boundary", () => {
+  it.each([false, true])("removes the photo and atomically audits it, report=%s", async report => {
+    const { db, useCase } = setup(report);
+    const foreign = structuredClone(db.row("media_uploads", "foreign-upload"));
+    const result = await useCase.execute({ ...input, ...(report ? { reportId: "report" } : {}) });
+    expect(result).toMatchObject({ auditLogId: "audit-id", targetId: "seller", targetState: { avatarKey: null, avatarIndex: 7 }, ...(report ? { reportId: "report", reportStatus: "actioned" } : {}) });
+    expect(db.row("users", "seller")).toMatchObject({ avatarKey: null, avatarUploadId: null, avatarIndex: 7 });
+    expect(db.row("media_uploads", "old")).toMatchObject({ state: "RETIRED" });
+    expect(db.rows("media_upload_cleanups")).toHaveLength(1);
+    expect(db.rows("audit_logs")).toEqual([expect.objectContaining({ id: result.auditLogId, actorId: "admin", action: "USER_PHOTO_REMOVE",
+      targetId: "seller", details: { reason: "Offensive photo", avatarIndex: 7, ...(report ? { reportId: "report" } : {}),
+        before: { avatarKey: "old.webp", ...(report ? { reportStatus: "pending" } : {}) }, after: { avatarKey: null, ...(report ? { reportStatus: "actioned" } : {}) } } })]);
+    if (report) expect(db.row("content_reports", "report")).toMatchObject({ status: "actioned", reviewedById: "admin", reviewedAt: NOW });
+    expect(db.row("media_uploads", "foreign-upload")).toEqual(foreign);
   });
-
-  const input = { userId: "user-1", adminUserId: "admin-1", reason: "Offensive photo" };
-
-  it("removes the photo, keeps the Assigned Avatar index and writes the audit entry", async () => {
-    const result = await useCase.execute(input);
-
-    expect(result).toEqual({
-      targetId: "user-1",
-      targetState: { avatarKey: null, avatarIndex: 7 },
-      reportId: undefined,
-      reportStatus: undefined,
-      auditLogId: "audit-1",
-    });
-    expect(identity.users["user-1"]).toMatchObject({ avatarKey: null, avatarIndex: 7 });
-    expect(audit.rows).toEqual([
-      expect.objectContaining({
-        actorId: "admin-1",
-        action: "USER_PHOTO_REMOVE",
-        targetType: "user",
-        targetId: "user-1",
-        details: {
-          reason: "Offensive photo",
-          avatarIndex: 7,
-          before: { avatarKey: KEY },
-          after: { avatarKey: null },
-        },
-      }),
-    ]);
+  it("includes a distinct suspending staff User in the initial dependency union", async () => {
+    const { db, useCase } = setup();
+    Object.assign(db.requiredRow("users", "seller"), { suspendedAt: NOW, suspendedById: "foreign" });
+    db.requiredInitialUsers = ["seller", "admin", "foreign"];
+    await expect(useCase.execute(input)).resolves.toMatchObject({ targetId: "seller" });
   });
-
-  it("releases the photo and writes the audit entry in one transaction", async () => {
-    await useCase.execute(input);
-
-    expect(identity.releases).toEqual([{ userId: "user-1", tx: TX }]);
-    expect(audit.transactions).toEqual([TX]);
+  it("revalidates the recursive staff endpoint before release", async () => {
+    const { db, useCase } = setup();
+    db.requiredRow("users", "seller")["suspendedById"] = "foreign";
+    const before = structuredClone(db.tables);
+    db.afterPreparation = () => { db.requiredRow("users", "foreign")["suspendedAt"] = NOW; };
+    await expect(useCase.execute(input)).rejects.toThrow("avatar_contact_scope_changed");
+    expect(db.tables).toEqual(before);
   });
-
-  it("actions the pending report on that User in the same transaction", async () => {
-    reports.seed("report-1", "user", "user-1");
-
-    const result = await useCase.execute({ ...input, reportId: "report-1" });
-
-    expect(result).toMatchObject({ reportId: "report-1", reportStatus: "actioned" });
-    expect(reports.reports[0]).toMatchObject({ status: "actioned", reviewedById: "admin-1" });
-    expect(reports.statusTransactions).toEqual([TX]);
-    expect(audit.rows[0]?.details).toMatchObject({
-      reportId: "report-1",
-      before: { avatarKey: KEY, reportStatus: "pending" },
-      after: { avatarKey: null, reportStatus: "actioned" },
-    });
+  it("preserves unrelated error identity even with the same internal message", async () => {
+    const { db, useCase } = setup(); const error = new Error("avatar_contact_scope_changed");
+    db.afterPreparation = () => { throw error; };
+    await expect(useCase.execute(input)).rejects.toBe(error);
   });
-
-  it("removes a suspended User's photo too", async () => {
-    identity.seed("user-1", { suspendedAt: new Date("2026-06-01T00:00:00Z") });
-
-    await expect(useCase.execute(input)).resolves.toMatchObject({
-      targetState: { avatarKey: null },
-    });
+  it.each(["prepare", "retire", "cleanup", "users", "content_reports", "audit_logs", "finish"])("leaves no photo/report/audit/cleanup residue after %s refusal", async failAt => {
+    const { db, useCase } = setup(true); const before = structuredClone(db.tables); db.failAt = failAt;
+    await expect(useCase.execute({ ...input, reportId: "report" })).rejects.toThrow(`refused:${failAt}`);
+    expect(db.tables).toEqual(before);
   });
-
-  it("answers 404 for a User that does not exist", async () => {
-    await expect(useCase.execute({ ...input, userId: "gone" })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-    expect(audit.rows).toEqual([]);
+  it("removes a suspended User's photo", async () => {
+    const { db, useCase } = setup(); db.row("users", "seller")!["suspendedAt"] = NOW;
+    await expect(useCase.execute(input)).resolves.toMatchObject({ targetState: { avatarKey: null, avatarIndex: 7 } });
   });
-
-  it("refuses an admin target and the moderator's own photo", async () => {
-    identity.seed("admin-2", { role: "admin" });
-    identity.seed("admin-1", { role: "moderator" });
-
-    await expect(useCase.execute({ ...input, userId: "admin-2" })).rejects.toMatchObject({
-      response: { details: { reason: "ADMIN_TARGET_NOT_MODERATABLE" } },
-    });
-    await expect(useCase.execute({ ...input, userId: "admin-1" })).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
-    expect(identity.releases).toEqual([]);
-    expect(audit.rows).toEqual([]);
+  it.each([false, true])("preserves no-photo refusal, report=%s", async report => {
+    const { db, useCase } = setup(report); db.row("users", "seller")!["avatarKey"] = null;
+    const before = structuredClone(db.tables);
+    await expect(useCase.execute({ ...input, ...(report ? { reportId: "report" } : {}) })).rejects.toMatchObject({ response: { details: {
+      reason: report ? "REPORT_TARGET_NOT_ACTIONABLE" : "MODERATION_TARGET_STATE_CONFLICT",
+    } } });
+    expect(db.tables).toEqual(before);
   });
-
-  it("answers 409 for a User with no photo and writes nothing", async () => {
-    identity.seed("user-1", { avatarKey: null });
-
-    const error = await useCase.execute(input).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(ConflictException);
-    expect(error).toMatchObject({
-      response: { details: { reason: "MODERATION_TARGET_STATE_CONFLICT" } },
-    });
-    expect(identity.releases).toEqual([]);
-    expect(audit.rows).toEqual([]);
-  });
-
-  it("answers 409 and leaves the report pending when the reported User has no photo", async () => {
-    identity.seed("user-1", { avatarKey: null });
-    reports.seed("report-1", "user", "user-1");
-
-    await expect(useCase.execute({ ...input, reportId: "report-1" })).rejects.toMatchObject({
-      response: { details: { reason: "REPORT_TARGET_NOT_ACTIONABLE" } },
-    });
-    expect(reports.reports[0]?.status).toBe("pending");
-    expect(audit.rows).toEqual([]);
-  });
-
-  it("writes no audit entry when the owner removed the photo first", async () => {
-    identity.removedMeanwhile = true;
-    reports.seed("report-1", "user", "user-1");
-
-    const error = await useCase.execute({ ...input, reportId: "report-1" }).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(ConflictException);
-    expect(reports.reports[0]?.status).toBe("pending");
-    expect(audit.rows).toEqual([]);
-  });
-
   it.each([
-    ["a report on a Listing", () => reports.seed("report-1", "listing", "listing-1"), BadRequestException, "REPORT_TARGET_MISMATCH"],
-    ["a report on another User", () => reports.seed("report-1", "user", "user-2"), BadRequestException, "REPORT_TARGET_MISMATCH"],
-    ["a report already resolved", () => reports.seed("report-1", "user", "user-1", "dismissed"), ConflictException, "REPORT_ALREADY_RESOLVED"],
-  ])("refuses %s and keeps the photo", async (_name, seed, errorClass, reason) => {
-    seed();
-
-    const error = await useCase.execute({ ...input, reportId: "report-1" }).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(errorClass);
-    expect(error).toMatchObject({ response: { details: { reason } } });
-    expect(identity.users["user-1"]?.avatarKey).toBe(KEY);
-    expect(audit.rows).toEqual([]);
+    ["targetType", "listing", "REPORT_TARGET_MISMATCH"],
+    ["targetId", "foreign", "REPORT_TARGET_MISMATCH"],
+    ["status", "dismissed", "REPORT_ALREADY_RESOLVED"],
+  ])("preserves %s report refusal", async (field, value, reason) => {
+    const { db, useCase } = setup(true); db.row("content_reports", "report")![field] = value;
+    const before = structuredClone(db.tables);
+    await expect(useCase.execute({ ...input, reportId: "report" })).rejects.toMatchObject({ response: { details: { reason } } });
+    expect(db.tables).toEqual(before);
   });
-
-  it("answers 404 for a report that does not exist", async () => {
-    await expect(useCase.execute({ ...input, reportId: "missing" })).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-    expect(identity.users["user-1"]?.avatarKey).toBe(KEY);
+  it("preserves missing User and missing report 404", async () => {
+    const { db, useCase } = setup(); const before = structuredClone(db.tables);
+    await expect(useCase.execute({ ...input, userId: "missing" })).rejects.toMatchObject({ status: 404 });
+    await expect(useCase.execute({ ...input, reportId: "missing" })).rejects.toMatchObject({ status: 404 });
+    expect(db.tables).toEqual(before);
+  });
+  it("preserves admin target and self-moderation refusal", async () => {
+    const { db, useCase } = setup(); const before = structuredClone(db.tables);
+    await expect(useCase.execute({ ...input, userId: "admin" })).rejects.toMatchObject({ response: { details: { reason: "ADMIN_TARGET_NOT_MODERATABLE" } } });
+    await expect(useCase.execute({ ...input, adminUserId: "seller" })).rejects.toMatchObject({ response: { details: { reason: "SELF_MODERATION_NOT_ALLOWED" } } });
+    expect(db.tables).toEqual(before);
+  });
+  it.each([false, true])("preserves exact owner-removed conflict and rollback, report=%s", async report => {
+    const { db, useCase } = setup(report); const before = structuredClone(db.tables);
+    db.afterPreparation = () => { Object.assign(db.row("users", "seller")!, { avatarKey: null, avatarUploadId: null }); };
+    await expect(useCase.execute({ ...input, ...(report ? { reportId: "report" } : {}) })).rejects.toMatchObject({ status: 409, response: {
+      code: "CONFLICT", message: report ? "Report target is no longer actionable" : "User has no profile photo",
+      details: { reason: report ? "REPORT_TARGET_NOT_ACTIONABLE" : "MODERATION_TARGET_STATE_CONFLICT", targetState: { avatarKey: null } },
+    } });
+    expect(db.tables).toEqual(before);
   });
 });

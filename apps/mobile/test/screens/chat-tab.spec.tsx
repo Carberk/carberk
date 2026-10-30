@@ -215,10 +215,11 @@ describe("Messages tab", () => {
     expect(api.get).toHaveBeenCalledWith("/conversations?limit=20", expect.anything());
   });
 
-  it("has no Support row, help link or Help icon", async () => {
+  it("opens the personal Support service from one signed-in Messages row", async () => {
     const view = await renderScreen();
-    expect(view.queryByText(/support|help/i)).toBeNull();
-    expect(view.queryByRole("button", { name: /support|help/i })).toBeNull();
+    expect(view.getAllByRole("button", { name: "General Support" })).toHaveLength(1);
+    await fireEvent.press(view.getByRole("button", { name: "General Support" }));
+    expect(routerMock.push).toHaveBeenLastCalledWith({ pathname: "/service-requests", params: { purpose: "support" } });
   });
 });
 

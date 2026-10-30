@@ -1,0 +1,57 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-58ab493d/packages/db
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+Disposable PG lifecycle: role=sql-child ordinal=29 pid=3446 connectedAtMs=876488528 closedAtMs=876488575
+Disposable PG activity: ordinal=29 count=0 pids=none
+Disposable PG attribution: ordinal=29 rows=none
+Disposable reset DB boundary: child=29 settledAtMs=876488483 startedAtMs=876488484 exitedAtMs=876488577 lastFixtureClose=pid=3438 connectedAtMs=876488481 closedAtMs=876488482
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+Disposable PG lifecycle: role=sql-child ordinal=30 pid=3676 connectedAtMs=876489587 closedAtMs=876489651
+Disposable PG activity: ordinal=30 count=0 pids=none
+Disposable PG attribution: ordinal=30 rows=none
+Disposable reset DB boundary: child=30 settledAtMs=876489524 startedAtMs=876489529 exitedAtMs=876489654 lastFixtureClose=pid=3675 connectedAtMs=876489520 closedAtMs=876489522
+Disposable PG lifecycle: role=sql-child ordinal=31 pid=3683 connectedAtMs=876489704 closedAtMs=876489809
+Disposable reset DB boundary: child=31 settledAtMs=876489524 startedAtMs=876489656 exitedAtMs=876489811 lastFixtureClose=pid=3675 connectedAtMs=876489520 closedAtMs=876489522
+Private SQL envelope: Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=diagnostic_source_anchor_receipt routine=exec_stmt_raise stack=diagnostic_source_anchor_guard>staging_clean_reset_rows.dispose
+
+stderr | scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+Admitted reset A executor verdict {"code":1,"failure":"Clean reset refused: database operation failed","sqlDiagnostic":"Disposable database SQL diagnostic: SQLSTATE=P0001 refusal=diagnostic_source_anchor_receipt routine=exec_stmt_raise stack=diagnostic_source_anchor_guard>staging_clean_reset_rows.dispose"}
+
+ ❯ scripts/staging-clean-reset.e2e.spec.ts (7 tests | 1 failed) 21245ms
+   ❯ staging clean-reset remote operation on disposable application schema (7)
+     × admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion 1803ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  scripts/staging-clean-reset.e2e.spec.ts > staging clean-reset remote operation on disposable application schema > admitted DELETE disposes representative diagnostic, Session/device and User/Listing rows under enabled guards and binds completion
+AssertionError: expected [ 1, …(1) ] to deeply equal [ +0, '' ]
+
+- Expected
++ Received
+
+  [
+-   0,
+-   "",
++   1,
++   "Clean reset refused: database operation failed",
+  ]
+
+ ❯ scripts/staging-clean-reset.e2e.spec.ts:403:49
+    401|     console.error("Admitted reset A executor verdict", JSON.stringify(…
+    402|       sqlDiagnostic: completed.subprocesses?.at(-1)?.sqlDiagnostic }));
+    403|     expect([completed.code, completed.failure]).toEqual([0, ""]);
+       |                                                 ^
+    404|     expect(completed.receipt).toEqual({ ...bound, phase: "rows", state…
+    405|       digest: { schema: before.schema, retained: before.retained, disp…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  14:25:09
+   Duration  21.59s (tests 99%, import 1%)
+
+pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts  6.48s user 1.71s system 35% cpu 22.944 total

@@ -1,0 +1,41 @@
+[
+ {
+  "step": "hover/pressed contrast",
+  "secondary": {
+   "label": "Back to assigned work",
+   "rest": {
+    "fg": "#171717",
+    "bg": "#ffffff",
+    "ratio": 17.93
+   },
+   "hover": {
+    "fg": "#171717",
+    "bg": "#f4f4f2",
+    "ratio": 16.28
+   },
+   "pressed": {
+    "fg": "#171717",
+    "bg": "#f4f4f2",
+    "ratio": 16.28
+   }
+  },
+  "primary": {
+   "label": "Record complete evidence",
+   "rest": {
+    "fg": "#fafafa",
+    "bg": "#171717",
+    "ratio": 17.18
+   },
+   "hover": {
+    "fg": "#fafafa",
+    "bg": "#171717",
+    "ratio": 17.18
+   },
+   "pressed": {
+    "fg": "#fafafa",
+    "bg": "#171717",
+    "ratio": 17.18
+   }
+  }
+ }
+]

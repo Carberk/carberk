@@ -1,0 +1,123 @@
+{
+  "recordedAt": "2026-10-29T18:23:16.079547+00:00",
+  "status": "planned; no heavy command started",
+  "candidateSha": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "actualWorktreeHead": "6cf5c311d43b5ae0bca0f2543564f65b5d2e2a9e",
+  "actualWorktreeTree": "2bcd56b32c5a39fc73996d042a64d4569296d6ee",
+  "candidateTree": "f7bd4184367c5957df3109b2189de9ee0a67dfa6",
+  "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755",
+  "headOnlyChanges": [
+    "docs/evidence/issue-897/a-10-pr-reconciliation-20261030.md",
+    "docs/evidence/issue-897/a-wayfinder-ticket-map-20261030.md"
+  ],
+  "relevantSourceDiff": [],
+  "allRelevantTrackedFilesMatchCandidate": true,
+  "trackedFileCountCompared": 1619,
+  "sourceHashes": "source-pins.json",
+  "runtimeSnapshot": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "runtimeSnapshotSource": "git archive 52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "runDirectory": "/tmp/carberk-a02-worker-restricted-f6408755",
+  "composeProject": "auto_tm_ci_897_a02_f6408755",
+  "containers": [
+    "auto_tm_ci_897_a02_f6408755-postgres-1",
+    "auto_tm_ci_897_a02_f6408755-redis-1",
+    "auto_tm_ci_897_a02_f6408755-minio-1"
+  ],
+  "ports": {
+    "postgres": 61139,
+    "redis": 61138,
+    "minio": 61140
+  },
+  "portsCheckedAvailable": true,
+  "database": "a02_worker",
+  "dbHost": "127.0.0.1",
+  "dbOwner": "auto_tm_ci",
+  "workerRole": "per-scenario restricted r6c_diagnostic_worker_<random>, created by existing harness",
+  "redisNamespace": "dedicated Redis service, DB 0; preparation harness does not enqueue",
+  "objectNamespace": "dedicated MinIO service; diagnostic-test-private bucket; per-fixture UUID keys under diagnostic-evidence/ and diagnostic-pdf/",
+  "migrationCount": 102,
+  "migrationManifestSha256": "6db6fbf01a14c9a04cf4aa161b83133294647a777d7a39b62932990b44a019e8",
+  "commands": [
+    {
+      "phase": "snapshot",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755",
+      "command": "git archive 52d901c50af1dde97ea22bda8efb1fdf21f169b1 | tar -x -C /tmp/carberk-a02-worker-restricted-f6408755/source"
+    },
+    {
+      "phase": "dependencies",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "pnpm install --frozen-lockfile --ignore-scripts"
+    },
+    {
+      "phase": "provision",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "docker compose -p auto_tm_ci_897_a02_f6408755 -f infra/compose/docker-compose.ci.yml -f /tmp/carberk-a02-worker-restricted-f6408755/ports.yml up -d --wait --wait-timeout 180"
+    },
+    {
+      "phase": "contracts-build",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "pnpm --filter @auto-tm/contracts build"
+    },
+    {
+      "phase": "db-build",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "pnpm --filter @auto-tm/db build"
+    },
+    {
+      "phase": "migrate",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "pnpm --filter @auto-tm/db run migrate:deploy"
+    },
+    {
+      "phase": "restricted-preparation",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "pnpm --filter @auto-tm/worker test src/jobs/diagnostics/DiagnosticWorkerPreparation.e2e.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/restricted-preparation.vitest.json",
+      "environment": {
+        "AUTO_TM_TEST_DATABASES": "off",
+        "GITHUB_ACTIONS": "false",
+        "DATABASE_URL": "postgresql://auto_tm_ci:<disposable password>@127.0.0.1:61139/a02_worker",
+        "REDIS_URL": "redis://127.0.0.1:61138",
+        "MINIO_ENDPOINT": "http://127.0.0.1:61140",
+        "DIAGNOSTIC_WORKER_PREPARATION_ACCEPTANCE": "1",
+        "DIAGNOSTIC_WORKER_EVIDENCE_DIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/restricted-preparation"
+      }
+    },
+    {
+      "phase": "batch-prerequisite",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "pnpm --filter @auto-tm/worker test src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/ownership-batch.vitest.json",
+      "environment": {
+        "AUTO_TM_TEST_DATABASES": "off",
+        "GITHUB_ACTIONS": "false",
+        "DATABASE_URL": "postgresql://auto_tm_ci:<disposable password>@127.0.0.1:61139/a02_worker",
+        "REDIS_URL": "redis://127.0.0.1:61138",
+        "MINIO_ENDPOINT": "http://127.0.0.1:61140",
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE": "1",
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_MANIFEST": "unset unless valid separate ordinary fixtures located; missing prerequisites must fail setup",
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_EVIDENCE_DIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/ownership-batch"
+      }
+    },
+    {
+      "phase": "cleanup",
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "command": "docker compose -p auto_tm_ci_897_a02_f6408755 -f infra/compose/docker-compose.ci.yml -f /tmp/carberk-a02-worker-restricted-f6408755/ports.yml down -v"
+    }
+  ],
+  "batchCaseSelectors": [
+    "later-failure",
+    "shared-multiple",
+    "oldest-capacity",
+    "overlimit",
+    "worker-first-second-worker",
+    "second-worker-first-worker",
+    "worker-first-capture",
+    "capture-first-worker",
+    "worker-first-proof-use",
+    "proof-use-first-worker"
+  ],
+  "knownPrerequisiteGap": "No supplied ordinary per-case fixture manifest. Existing batch harness pins port 65379, which belongs to retained foreign task. No access to that service authorized.",
+  "ordinaryFull100WillRun": false,
+  "sourceOrTestChangesAuthorized": false,
+  "concurrency": "exclusive next CPU/timing slot; sequential steps only",
+  "earlierPortSelection": "65438 was occupied by T3; no connection or mutation attempted; selected available ports 61138/61139/61140 instead"
+}

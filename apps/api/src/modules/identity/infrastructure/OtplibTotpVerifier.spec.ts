@@ -35,6 +35,10 @@ describe("OtplibTotpVerifier", () => {
     expect(verifier.verify(secret, "000000")).toBe(false);
   });
 
+  it.each(["0123456789abcdef", "12345", "1234567", "abcdef", ""])("returns false for a non-TOTP token %j so backup-code handling can continue", (code) => {
+    expect(verifier.verify("JBSWY3DPEHPK3PXP", code)).toBe(false);
+  });
+
   it("accepts adjacent-step skew", () => {
     const secret = generateSecret();
     const now = Math.floor(Date.now() / 1000);

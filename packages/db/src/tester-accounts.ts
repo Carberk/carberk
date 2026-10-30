@@ -2,16 +2,17 @@ import { createHash } from "node:crypto";
 
 export interface TesterUser {
   id: string; phone: string | null; email: string | null; role: string;
-  phoneVerifiedAt: Date | null; emailVerifiedAt: Date | null; deletionScheduledAt: Date | null;
+  phoneVerifiedAt: Date | null; emailVerifiedAt: Date | null; deletionScheduledAt: Date | null; suspendedAt?: Date | null;
 }
 export interface TesterTransaction {
   findUsers(accounts: { id: string; phone: string; email: string }[]): Promise<TesterUser[]>;
   createUser(account: { id: string; phone: string; email: string }, now: Date): Promise<void>;
+  removePersonalAccounts(users: TesterUser[], now: Date): Promise<TesterResult>;
   scheduleDeletion(ids: string[], now: Date): Promise<number>;
   deleteSessions(ids: string[]): Promise<number>;
   archiveListings(ids: string[]): Promise<number>;
 }
-export interface TesterAccountStore { transaction<T>(run: (tx: TesterTransaction) => Promise<T>): Promise<T>; }
+export interface TesterAccountStore { transaction<T>(run: (tx: TesterTransaction) => Promise<T>, mode?: "seed" | "remove"): Promise<T>; }
 export interface TesterOptions { mode: "seed" | "remove"; testerAccountsJson: string; reviewerAccountsJson: string; now: Date; }
 
 interface TesterAccount { id: string; phone: string; email: string; }
@@ -73,6 +74,7 @@ export async function runTesterAccounts(store: TesterAccountStore, input: Tester
       if (!user || candidates.length !== 1 || user.id !== account.id || (user.role !== "buyer" && user.role !== "seller")) {
         throw new TesterAccountsRefused("unrelated or privileged User");
       }
+      if (user.suspendedAt != null) throw new TesterAccountsRefused("tester suspended");
       // Purge keeps the marker User but erases both methods. Removal remains retryable.
       if (input.mode === "remove" && user.phone === null && user.email === null && user.deletionScheduledAt === null) continue;
       if (user.phone !== account.phone || user.email !== account.email || user.phoneVerifiedAt === null || user.emailVerifiedAt === null) {
@@ -81,8 +83,8 @@ export async function runTesterAccounts(store: TesterAccountStore, input: Tester
       if (input.mode === "seed" && user.deletionScheduledAt !== null) throw new TesterAccountsRefused("tester deletion scheduled");
       matched.set(account.id, user);
     }
-    // Entire-list preflight above precedes every write. The store transaction also protects
-    // against concurrent role/method changes and rolls back on a uniqueness conflict.
+    // Entire-list preflight above precedes every write. Seed retains Serializable
+    // conflicts; removal uses prepared source revalidation at its database boundary.
     if (input.mode === "seed") {
       let created = 0;
       for (const account of accounts) {
@@ -91,10 +93,9 @@ export async function runTesterAccounts(store: TesterAccountStore, input: Tester
       }
       return { created, scheduled: 0, sessionsDeleted: 0, listingsArchived: 0 };
     }
-    const ids = [...matched.keys()];
-    const scheduled = await tx.scheduleDeletion(ids, input.now);
-    const sessionsDeleted = await tx.deleteSessions(ids);
-    const listingsArchived = await tx.archiveListings(ids);
-    return { created: 0, scheduled, sessionsDeleted, listingsArchived };
-  });
+    if (matched.size === 0) return { created: 0, scheduled: 0, sessionsDeleted: 0, listingsArchived: 0 };
+    // The database boundary discovers the whole effect graph, prepares once and
+    // revalidates this exact ownership before any schedule or archive DML.
+    return tx.removePersonalAccounts([...matched.values()], input.now);
+  }, input.mode);
 }

@@ -1,0 +1,3185 @@
+import "reflect-metadata";
+import { Worker as NodeWorker } from "node:worker_threads";
+import { Logger } from "@nestjs/common";
+import { HttpOtpSenderAdapter } from "../infrastructure/HttpOtpSenderAdapter";
+import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
+import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
+import { OtpCode } from "../domain/OtpCode";
+import { signInCodeDestination } from "../domain/SignInCodeDestination";
+import type { OtpSms } from "../domain/ports/OtpSenderPort";
+import { execFile, spawnSync } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
+import { runInNewContext } from "node:vm";
+import { promisify } from "node:util";
+import { PrismaService } from "@auto-tm/db";
+import { AuthSchemas, Enums } from "@auto-tm/contracts";
+import { getQueueToken } from "@nestjs/bullmq";
+import { ConfigModule } from "@nestjs/config";
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { Reflector } from "@nestjs/core";
+import { JwtModule, JwtService } from "@nestjs/jwt";
+import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { Test as NestTest } from "@nestjs/testing";
+import { Worker, type Queue } from "bullmq";
+import { generateSync } from "otplib";
+import supertest from "supertest";
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
+// eslint-disable-next-line no-restricted-imports -- HTTP integration composition needs the real contact controller and production providers.
+import { ListingsModule } from "../../listings/listings.module";
+import { ServiceMessagingModule } from "../../service-messaging/service-messaging.module";
+import { IdentityModule } from "../identity.module";
+import { BullMqEmailCodeSenderAdapter } from "../infrastructure/BullMqEmailCodeSenderAdapter";
+import { AdminController } from "../../admin/presentation/admin.controller";
+import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
+import { GlobalErrorFilter } from "../../../common/error.filter";
+import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
+import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import sharp from "sharp";
+// eslint-disable-next-line no-restricted-imports -- Integration composition observes only the real generator's external S3 transport.
+import { IMAGE_VARIANT_GENERATOR } from "../../listings/domain/ports/ImageVariantGenerator";
+
+const root = resolve(__dirname, "../../../../../..");
+const packageRoot = `${root}/packages/db`;
+const localRequire = createRequire(`${root}/apps/api/package.json`);
+const profile = "campaign897-full-v3";
+const candidate = "a".repeat(40);
+const aliases = ["buyer-a", "buyer-b", "owner", "sales-a", "sales-b", "coordinator", "support", "history-fulfiller", "payment-verifier", "reception-steward", "technician", "independent-reviewer", "private-reviewer", "aggregate-viewer", "investigator"];
+const source = readFileSync(`${root}/scripts/staging-campaign.mjs`, "utf8").replaceAll("export function ", "function ").replaceAll("export async function ", "async function ") +
+  readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace(/import \{[^}]+\} from '\.\/staging-campaign\.mjs';/, "").replace("export function remoteProgram", "function remoteProgram");
+type Actor = { alias: string; user_id: string; email: string };
+type Login = { accessToken: string; refreshToken: string; user: { id: string; role: string }; requestId: string };
+type RecordKey = { table_name: string; row_key: Record<string, string> };
+const tables = ["users", "sessions", "otp_requests", "totp_enrollments", "totp_backup_codes", "staff_grants", "audit_logs", "dealerships", "dealership_members", "dealership_invitations", "listings", "listing_drafts", "conversations", "conversation_participants", "messages", "business_enquiry_audits", "favorites", "verified_contact_phones", "owned_vehicles", "blocked_users", "notification_preferences", "content_reports"];
+
+// Failure-only diagnostics: inspect at most 8192 characters per field, emit only
+// fixed vocabulary (never raw messages/stderr), and retain no diagnostic buffers.
+// Read structured Prisma 7 driver metadata in the child before execFile wraps it.
+function cleanupFailure(error: unknown) {
+  const value = error as { name?: unknown; code?: unknown; message?: unknown; stderr?: unknown; meta?: { code?: unknown; message?: unknown; driverAdapterError?: { cause?: { originalCode?: unknown; kind?: unknown } } }; cause?: { originalCode?: unknown; kind?: unknown } } | null;
+  const driver = value?.meta?.driverAdapterError?.cause ?? value?.cause;
+  const bounded = (input: unknown) => typeof input === "string" ? input.slice(0, 8192) : "";
+  const text = [typeof value?.stderr === "string" ? value.stderr : value?.message, value?.meta?.message].map(bounded).join("\n");
+  const names = ["PrismaClientKnownRequestError", "PrismaClientUnknownRequestError", "PrismaClientInitializationError", "TypeError", "RangeError", "Error"];
+  const codes = ["P2010", "P2028", "P2034", "P1001", "P1002", "P1017", "P0001", "23503", "23505", "40001", "40P01", "55P03", "57014", "42601", "42703", "42702", "42P01", "22P02", "42883", "42501", "ETIMEDOUT", "ENOBUFS", "ENOENT", "ECONNREFUSED"];
+  const driverCategories = ["postgres", "ColumnNotFound", "TableDoesNotExist", "InvalidInputValue", "TransactionWriteConflict", "TransactionAlreadyClosed", "SocketTimeout", "ConnectionClosed", "DatabaseNotReachable", "TooManyConnections"];
+  const messages = [
+    "Service private cleanup unavailable", "Service cleanup authority invalid",
+    "Campaign Support ownership changed", "Campaign Support authority invalid",
+    "Campaign Support graph ambiguous", "Campaign Support ownership ambiguous",
+    "Campaign Support namespace invalid", "Campaign Support candidate invalid",
+    "Campaign lifecycle fenced", "Campaign lifecycle cleanup refused", "Campaign lifecycle contract changed",
+    "Campaign lifecycle locks required", "Campaign lifecycle candidate refused",
+    "Campaign lifecycle graph refused", "Campaign lifecycle state refused",
+    "Campaign lifecycle purge refused", "Campaign lifecycle phase refused",
+    "Campaign lifecycle binding changed", "Campaign service contract changed",
+    "Campaign service cleanup incomplete", "Unsupported campaign service",
+    "Campaign journal or schema changed", "Campaign journal changed",
+    "Untracked campaign mutation", "Foreign campaign reference",
+    "Foreign campaign graph reference", "Campaign binding changed",
+    "Campaign graph cleaning", "Campaign graph disposed", "Campaign graph limit",
+    "Campaign disposal incomplete", "Campaign terminal rows present",
+    "Campaign delivery sink retained", "Campaign media claim in flight",
+    "Transaction already closed", "Unable to start a transaction",
+    "deadlock detected", "canceling statement due to lock timeout",
+    "canceling statement due to statement timeout", "Disposable database query refused",
+  ];
+  return {
+    errorType: names.find(name => name === value?.name) ?? names.find(name => text.includes(name)) ?? "unclassified-error-type",
+    codes: codes.filter(code => code === value?.code || code === value?.meta?.code || code === driver?.originalCode || new RegExp(`\\b${code}\\b`).test(text)),
+    driverCategories: driverCategories.filter(category => category === driver?.kind || text.includes(JSON.stringify(category))),
+    classifications: messages.filter(message => text.includes(message)),
+  };
+}
+
+// Serialized into the existing reset transport worker too. Inputs are classified,
+// never retained or emitted. One bounded record per reset, including thrown exits.
+function resetPhaseTrace(scope: "support-reset" | "asynchronous-reset") {
+  const origin = process.hrtime.bigint(), maxEntries = 64;
+  const entries: { ordinal: number; sqlOrdinal: number | null; transport: string; phase: string; startMs: number; endMs: number; outcome: string; exitStatus: number | null; sqlState: string }[] = [];
+  let ordinal = 0, sqlOrdinal = 0, dropped = 0;
+  const now = () => Number(process.hrtime.bigint() - origin) / 1e6;
+  return {
+    call<T extends { status: number | null; error?: unknown; stderr?: string | null }>(binary: string, args: string[], input: string | undefined, run: () => T): T {
+      const child = binary === process.execPath;
+      const transport = child ? args[1]?.includes("function campaignObjectMain(") ? "object-child" : args[1]?.includes("function campaignQueueMain(") ? "queue-child" : "unknown-child" : "sql";
+      // Match statements emitted by businessMain, not SQL ordinals or a shared tag.
+      const phase = child ? transport === "unknown-child" ? "unknown" : args[1]?.includes("],true,{") ? "child-verification" : "child-disposal" : input?.includes("SET state='disposed'") ? "disposal"
+        : input?.includes("SET state='cleaning'") ? "cleaning"
+        : input?.includes("Campaign terminal rows present") ? "terminal-verification"
+        : input?.startsWith("BEGIN;") ? "initial-integrity" : "read";
+      const current = ++ordinal, currentSql = child ? null : ++sqlOrdinal, startMs = now();
+      let outcome = "threw", exitStatus: number | null = null, sqlState = "unavailable";
+      try {
+        const result = run();
+        exitStatus = result.status;
+        if (!child && result.status !== 0) {
+          const observed = result.stderr?.slice(0, 8192).match(/SQLSTATE=([A-Z0-9]{5})\b/)?.[1];
+          if (observed && ["P0001", "23503", "23505", "40001", "40P01", "55P03", "57014", "42601", "42703", "42P01", "42501"].includes(observed)) sqlState = observed;
+        }
+        outcome = result.error ? "transport-error" : result.status === 0 ? "ok" : result.status === null ? "no-status" : "nonzero";
+        return result;
+      } finally {
+        if (entries.length < maxEntries) entries.push({ ordinal: current, sqlOrdinal: currentSql, transport, phase, startMs, endMs: now(), outcome, exitStatus, sqlState });
+        else dropped += 1;
+      }
+    },
+    finish(code: number, state: unknown, threw: boolean) {
+      try { console.info(JSON.stringify({ diagnostic: "reset-transport-phases-v1", scope, maxEntries, entries, dropped,
+        outcome: threw ? "threw" : code === 0 ? "ok" : "nonzero", code, receiptState: ["identities", "cleaning", "disposed"].includes(String(state)) ? state : "unavailable" })); } catch { /* Diagnostics never replace the transport result/error. */ }
+    },
+  };
+}
+
+// No application provider overrides, JWT signing, auth inserts or elevated-session writes.
+// The remote process adapter changes only transport to the disposable worker SQL/Redis.
+describe("default-closed full-v3 ordinary authentication joins reservation-owned business disposal", () => {
+  let app: NestFastifyApplication;
+  let request: ReturnType<typeof supertest>;
+  let db: PrismaService;
+  let queue: Queue;
+  let priorTestMode: string | undefined;
+  let priorCommitSha: string | undefined;
+  let priorSmsDriver: string | undefined;
+
+  beforeAll(async () => {
+    priorTestMode = process.env["OTP_TEST_MODE"];
+    priorCommitSha = process.env["AUTOTM_COMMIT_SHA"];
+    priorSmsDriver = process.env["SMS_DRIVER"];
+    if (!inject("apiTestDatabases")) throw new Error("Requires configured migrated disposable API PostgreSQL and Redis lane");
+    delete process.env["OTP_TEST_MODE"];
+    // The real adapter validates its serving candidate before taking the
+    // namespace fence. Match the exact full-v3 fixture candidate and select
+    // its existing mock sink. This is test transport configuration only.
+    process.env["AUTOTM_COMMIT_SHA"] = candidate;
+    process.env["SMS_DRIVER"] = "mock";
+    const module = await NestTest.createTestingModule({ imports: [ConfigModule.forRoot({ isGlobal: true }), EventEmitterModule.forRoot(), bullTestRoot(), IdentityModule, ListingsModule, ServiceMessagingModule,
+      JwtModule.register({ global: true, secret: "synthetic-full-v3-http-contract-901" })],
+      controllers: [AdminController] }).compile();
+    app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+    db = app.get(PrismaService);
+    queue = app.get<Queue>(getQueueToken(AuthSchemas.EMAIL_CODE_QUEUE));
+    app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), app.get(JwtService)));
+    app.useGlobalFilters(new GlobalErrorFilter());
+    await app.listen(0, "127.0.0.1");
+    request = supertest(app.getHttpServer());
+  });
+  afterAll(async () => {
+    try { await app?.close(); } finally {
+      if (priorTestMode === undefined) delete process.env["OTP_TEST_MODE"];
+      else process.env["OTP_TEST_MODE"] = priorTestMode;
+      if (priorCommitSha === undefined) delete process.env["AUTOTM_COMMIT_SHA"];
+      else process.env["AUTOTM_COMMIT_SHA"] = priorCommitSha;
+      if (priorSmsDriver === undefined) delete process.env["SMS_DRIVER"];
+      else process.env["SMS_DRIVER"] = priorSmsDriver;
+    }
+  });
+
+  function execute(kind: "fixture" | "reset", id: string, options: { enabled?: string; candidate?: string; selectedProfile?: string; loseReceipt?: boolean } = {}) {
+    let code = 0;
+    let receipt: { profile: string; candidate: string; state: string; identities: number; fixtures: string; tombstone: boolean; queueJobs?: number; sinkRecords?: number } | undefined;
+    let sqlCalls = 0;
+    const selectedProfile = options.selectedProfile ?? profile;
+    const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
+      STAGING_CAMPAIGN_PROFILE_ENABLED: options.enabled ?? profile,
+      RAILWAY_PROJECT_ID: "v3-project", RAILWAY_ENVIRONMENT_ID: "v3-staging", RAILWAY_SERVICE_ID: "v3-api", RAILWAY_ENVIRONMENT_NAME: "staging",
+      APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: candidate,
+      DATABASE_URL: "postgresql://fixture:synthetic@postgres.railway.internal:5432/railway", REDIS_URL: "redis://fixture:synthetic@redis.railway.internal:6379/0",
+      MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example",
+    } };
+    const payload = { kind, id, namespace: `cf_${id}`, profile: selectedProfile, candidate: options.candidate ?? candidate, target: candidate,
+      redisOrigin: "redis://redis.railway.internal:6379/0", identity: { projectId: "v3-project", environmentId: "v3-staging", services: { api: "v3-api" },
+        origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" } } };
+    const observe = <T extends { status: number | null; error?: Error; stderr?: string | null }>(result: T, transport: "sql" | "disposal") => {
+      if (result.status !== 0 || result.error) console.error("[issue-901-cleanup]", JSON.stringify({ kind, transport, sqlCalls,
+        ...cleanupFailure(result.error ?? { stderr: result.stderr }) }));
+      return result;
+    };
+    // Existing bridge supports bounded SQLSTATE diagnostics behind this test-only flag.
+    const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
+    runInNewContext(program, { URL, process: remoteProcess, require: (name: string) => name === "node:child_process" ? {
+      spawnSync: (binary: string, args: string[], spawnOptions: { input: string }) => {
+        if (binary === process.execPath) return observe(spawnSync(binary, args, { ...spawnOptions, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`, env: { ...process.env,
+          // Disposable credentials from docker-compose.ci.yml, only in the existing local child bridge.
+          ...(process.env["APP_ENV"] === "test" && ["localhost", "127.0.0.1"].includes(new URL(process.env["MINIO_ENDPOINT"] ?? "http://invalid").hostname)
+            ? { MINIO_ACCESS_KEY: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", MINIO_SECRET_KEY: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } : {}) } }), "disposal");
+        sqlCalls += 1;
+        return observe(spawnSync(process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], {
+          input: spawnOptions.input, encoding: "utf8", timeout: 30000,
+          env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env["DATABASE_URL"], STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1" },
+        }), "sql");
+      },
+    } : localRequire(name), console: { log: (value: string) => { if (!options.loseReceipt) receipt = JSON.parse(value); }, error: () => { console.error("[issue-901-cleanup]", JSON.stringify({ kind, transport: "operator-refusal", sqlCalls })); code = 1; } } });
+    return { code: code || remoteProcess.exitCode, receipt, sqlCalls };
+  }
+  const email = (id: string, alias: string) => `${alias}.${id}.${candidate.slice(0, 12)}@campaign897.invalid`;
+  async function rows<T>(sql: string, ...values: unknown[]) { return db.$queryRawUnsafe<T[]>(sql, ...values); }
+  async function seed(id: string) {
+    // FIRST BEHAVIORAL BARRIER. On the supplied base this fails 1 vs 0 before SQL.
+    // No nested HTTP, ownership or disposal assertion has been reached at that point.
+    expect(execute("fixture", id).code, "full-v3 supported explicit profile required").toBe(0);
+    return rows<Actor>(`SELECT alias,user_id,email FROM "cf_${id}".campaign_entities ORDER BY alias`);
+  }
+  function actor(roster: Actor[], alias: string) {
+    const found = roster.find(row => row.alias === alias);
+    if (!found) throw new Error("Reserved actor missing");
+    return found;
+  }
+  function processEmail(requestId: string, lateDelivery?: object) {
+    return spawnSync(process.execPath, [`${root}/scripts/testing/process-campaign-email.cjs`], {
+      input: JSON.stringify({ requestId, ...(lateDelivery ? { lateDelivery } : {}) }), encoding: "utf8", timeout: 30000,
+      cwd: `${root}/apps/worker`, env: process.env,
+    }).status;
+  }
+  // Runs after the case's acceptance assertions, including failed ones, and removes only job IDs the case created or learned.
+  // A failed removal is recorded beside the original failure, never in its place. Queues are never enumerated or drained.
+  async function withKnownJobs(body: (known: Set<string>) => Promise<void>) {
+    const known = new Set<string>();
+    try {
+      await body(known);
+    } finally {
+      for (const jobId of known) {
+        const failure = await queue.getJob(jobId).then(job => job?.remove()).then(() => undefined, (error: unknown) => error);
+        expect.soft(failure, `exact known queue job cleanup ${jobId}`).toBeUndefined();
+      }
+    }
+  }
+  // Records a returned request ID before any response assertion, so cleanup knows an unexpected successful enqueue.
+  function learn(known: Set<string>, response: { body?: { requestId?: unknown } }) {
+    const requestId = response.body?.requestId;
+    if (typeof requestId === "string" && requestId.length > 0) known.add(requestId);
+  }
+  async function observeIssuance(kind: "sign-in" | "contact", issued: { status: number; body: { code?: unknown; details?: { reason?: unknown } } }, expected: number) {
+    if (issued.status === expected) return;
+    const codes = ["RATE_LIMITED", "BAD_REQUEST", "VALIDATION_ERROR", "HTTP_ERROR", "INTERNAL_SERVER_ERROR", "FORBIDDEN", "UNAUTHORIZED"];
+    const reasons = ["ip_limit", "destination_limit", "backoff", "USER_SUSPENDED"];
+    // These are the two possible loopback transports of this local HTTP harness.
+    const since = new Date(Date.now() - 3600000);
+    const budget = await Promise.all(["127.0.0.1", "::1"].map(ip => db.otpRequest.count({ where: { ip, createdAt: { gte: since } } })))
+      .then(counts => ({ loopbackHourlyRows: counts.reduce((sum, count) => sum + count, 0), loopbackHourlyMax: Math.max(...counts) }),
+        () => ({ counts: "unavailable" }));
+    console.error("[issue-901-issuance]", JSON.stringify({ kind, status: issued.status,
+      responseCode: codes.find(code => code === issued.body.code) ?? "unclassified-response-code",
+      detailsCategory: reasons.find(reason => reason === issued.body.details?.reason) ?? "absent-or-unclassified-details", ...budget }));
+  }
+  async function signIn(id: string, person: Actor, known: Set<string>): Promise<Login> {
+    const issued = await request.post("/api/v1/auth/otp/request").send({ email: person.email });
+    learn(known, issued);
+    await observeIssuance("sign-in", issued, 201);
+    expect(issued.status).toBe(201);
+    expect(issued.body.testCode).toBeUndefined();
+    const requestId = issued.body.requestId as string;
+    expect((await queue.getJob(requestId))?.data.to).toBe(person.email);
+    expect(processEmail(requestId), "production worker must persist ordinary generated OTP in protected mock sink").toBe(0);
+    const [sink] = await rows<{ message: { subject: string } }>(`SELECT message FROM "cf_${id}".campaign_delivery_sink WHERE request_id=$1 AND email=$2`, requestId, person.email);
+    const code = sink?.message.subject.match(/\b\d{6}\b/)?.[0];
+    expect(code).toBeDefined();
+    const verified = await request.post("/api/v1/auth/otp/verify").send({ email: person.email, code }).expect(201);
+    expect(verified.body.user.id).toBe(person.user_id);
+    expect(await db.session.count({ where: { userId: person.user_id } })).toBe(1);
+    return { ...verified.body, requestId } as Login;
+  }
+  const get = (path: string, login: Login) => request.get(path).set("authorization", `Bearer ${login.accessToken}`);
+  const post = (path: string, login: Login, body: object) => request.post(path).set("authorization", `Bearer ${login.accessToken}`).send(body);
+  async function elevate(login: Login) {
+    const enrollment = await post("/api/v1/auth/staff/totp/enroll", login, {}).expect(201);
+    // Authenticator derives a code ONLY from the secret returned by normal enrollment.
+    const verified = await post("/api/v1/auth/staff/totp/verify", login, {
+      code: generateSync({ secret: enrollment.body.secret, strategy: "totp", period: 30 }),
+    }).expect(201);
+    expect(verified.body.backupCodes).toHaveLength(10);
+    expect((await get("/api/v1/staff/capabilities", login).expect(200)).body.elevated).toBe(true);
+  }
+  const grant = (login: Login, targetUserId: string, capability: string, enabled = true) => post("/api/v1/staff/grants", login,
+    { targetUserId, capability, grant: enabled, reason: "Reservation-owned synthetic full-v3 acceptance" });
+  // Admission-slice setup: the coordinator grants support the named capabilities and both elevate normally.
+  async function elevatedStaff(id: string, roster: Actor[], known: Set<string>, capabilities: string[]) {
+    const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+    const staff = await signIn(id, actor(roster, "support"), known);
+    await elevate(coordinator);
+    for (const capability of capabilities) await grant(coordinator, actor(roster, "support").user_id, capability).expect(204);
+    await elevate(staff);
+    return { coordinator, staff };
+  }
+  const admissionFor = (id: string, ownerUserId: string, slug = `campaign897-${id}-${candidate.slice(0, 12)}-admitted`) => ({ name: "Synthetic v3 admitted business", slug, ownerUserId,
+    mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof" });
+  const recoveryFor = (ownerUserId: string) => ({ ownerUserId, evidence: "Synthetic foreign recovery probe", reason: "Disposable full-v3 adoption refusal proof" });
+  // Resets each named reservation after the case, including a failed one, so its sign-in codes stop counting
+  // against the shared loopback issuance budget. A refused reset is recorded beside the original failure.
+  async function resetAfter(ids: string[], body: () => Promise<void>) {
+    try { await body(); } finally { for (const id of ids) expect.soft(execute("reset", id).code, `exact reset ${id}`).toBe(0); }
+  }
+  async function businessState(businessId: string) {
+    return { business: await db.dealership.findUnique({ where: { id: businessId } }),
+      invitations: await db.dealershipInvitation.findMany({ where: { dealershipId: businessId }, orderBy: { id: "asc" } }),
+      members: await db.dealershipMember.findMany({ where: { dealershipId: businessId }, orderBy: { id: "asc" } }),
+      audits: await db.auditLog.findMany({ where: { targetType: "Dealership", targetId: businessId }, orderBy: { id: "asc" } }) };
+  }
+  async function digest(id: string) {
+    const [snapshot] = await rows<{ hash: string }>(`SELECT md5(jsonb_build_object('manifest',(SELECT jsonb_agg(to_jsonb(m)) FROM "cf_${id}".campaign_manifest m),'records',(SELECT jsonb_agg(to_jsonb(r) ORDER BY table_name,row_key::text) FROM "cf_${id}".campaign_records r),'events',(SELECT jsonb_agg(to_jsonb(e) ORDER BY sequence) FROM "cf_${id}".campaign_events e))::text) AS hash`);
+    return snapshot?.hash;
+  }
+  async function owned(id: string) {
+    return rows<RecordKey>(`SELECT table_name,row_key FROM "cf_${id}".campaign_records WHERE NOT deleted ORDER BY table_name,row_key::text`);
+  }
+  async function assertDisposed(id: string, before: RecordKey[]) {
+    expect((await rows<{ state: string }>(`SELECT state FROM "cf_${id}".campaign_manifest`))).toEqual([{ state: "disposed" }]);
+    const remaining = await owned(id);
+    expect(remaining.filter(row => row.table_name !== "audit_logs")).toEqual([]);
+    expect(remaining).toEqual(before.filter(row => row.table_name === "audit_logs"));
+    for (const record of before) {
+      expect(tables).toContain(record.table_name);
+      const values = await rows<{ value: { actorId: string | null; targetType: string; targetId: string; details: object } }>(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key));
+      if (record.table_name === "audit_logs") {
+        expect(values).toHaveLength(1);
+        expect(values[0]?.value).toMatchObject({ actorId: null, targetType: "SyntheticCampaign", targetId: id,
+          details: { profile, disposition: "redacted-synthetic-audit" } });
+        expect(values[0]?.value.details).toEqual({ profile, disposition: "redacted-synthetic-audit" });
+      } else expect(values, `exact owned ${record.table_name} row must be absent`).toEqual([]);
+    }
+    const deliveries = await rows<{ request_id: string }>(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`);
+    const redis = await queue.client;
+    for (const delivery of deliveries) {
+      expect(await queue.getJob(delivery.request_id)).toBeUndefined();
+      const key = queue.toKey(`de:campaign-cf_${id}-${delivery.request_id}`);
+      expect(await redis.get(key)).toBe(`disposed:cf_${id}:${candidate}:${delivery.request_id}`);
+      expect(await redis.pttl(key)).toBe(-1);
+    }
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_sink`)).toEqual([]);
+  }
+
+  it("supports the explicit v3 profile with a fixed roster and bounded bootstrap, without authenticating it", async () => {
+    const id = "a1".repeat(16), roster = await seed(id);
+    expect(roster.map(row => row.alias).sort()).toEqual([...aliases].sort());
+    expect(new Set(roster.map(row => row.user_id)).size).toBe(15);
+    expect(await rows(`SELECT reservation_id,candidate,profile,state,delivery_version FROM "cf_${id}".campaign_manifest`)).toEqual([
+      { reservation_id: id, candidate, profile, state: "identities", delivery_version: 3 },
+    ]);
+    const ids = roster.map(row => row.user_id);
+    expect(await db.session.count({ where: { userId: { in: ids } } })).toBe(0);
+    expect(await db.totpEnrollment.count({ where: { userId: { in: ids } } })).toBe(0);
+    expect(await db.staffGrant.findMany({ where: { userId: { in: ids } }, select: { userId: true, capability: true }, orderBy: { capability: "asc" } })).toEqual([
+      { userId: actor(roster, "coordinator").user_id, capability: "founder.control" },
+      { userId: actor(roster, "coordinator").user_id, capability: "staff.manage" },
+    ]);
+    const [counts] = await rows<{ records: number; events: number }>(`SELECT (SELECT count(*)::int FROM "cf_${id}".campaign_records) AS records,(SELECT count(*)::int FROM "cf_${id}".campaign_events) AS events`);
+    expect(counts?.records).toBeLessThanOrEqual(128);
+    expect(counts?.events).toBeLessThan(2048);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("refuses absent enablement and unknown versions before SQL without changing application rows", async () => {
+    const before = await db.user.count();
+    expect(execute("fixture", "a2".repeat(16), { enabled: "" })).toMatchObject({ code: 1, sqlCalls: 0, receipt: undefined });
+    expect(execute("fixture", "a3".repeat(16), { selectedProfile: "campaign897-full-v4" })).toMatchObject({ code: 1, sqlCalls: 0, receipt: undefined });
+    expect(await db.user.count()).toBe(before);
+  });
+
+  it("signs in normally, elevates distinct staff, admits and redeems ownership, edits content and exactly disposes with lost-response retry", () => withKnownJobs(async known => {
+    const id = "a4".repeat(16), roster = await seed(id);
+    const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+    const admissionStaff = await signIn(id, actor(roster, "support"), known);
+    const owner = await signIn(id, actor(roster, "buyer-a"), known);
+    const outsider = await signIn(id, actor(roster, "sales-b"), known);
+    const target = actor(roster, "support").user_id;
+    await grant(coordinator, target, "founder.admission").expect(403);
+    await elevate(coordinator);
+    await grant(coordinator, actor(roster, "coordinator").user_id, "founder.admission").expect(403);
+    await grant(coordinator, target, "founder.admission").expect(204);
+    const admission = { name: "Synthetic v3 admitted business", slug: `campaign897-${id}-${candidate.slice(0, 12)}-admitted`, ownerUserId: owner.user.id,
+      mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof" };
+    // Each refused step below must leave the whole reservation journal untouched.
+    let unchanged = await digest(id);
+    await post("/api/v1/business/admission", admissionStaff, admission).expect(403);
+    expect(await digest(id), "pre-elevation admission refusal writes nothing").toBe(unchanged);
+    await elevate(admissionStaff);
+    const admitted = (await post("/api/v1/business/admission", admissionStaff, admission).expect(201)).body as { businessId: string; invitationId: string; token: string };
+    expect(await db.dealership.findUnique({ where: { id: admitted.businessId }, select: { status: true, admissionMode: true } })).toEqual({ status: "recovery", admissionMode: "synthetic" });
+    expect(await owned(id)).toEqual(expect.arrayContaining([{ table_name: "dealerships", row_key: { id: admitted.businessId } },
+      { table_name: "dealership_invitations", row_key: { id: admitted.invitationId } }]));
+    unchanged = await digest(id);
+    await post(`/api/v1/business/${admitted.businessId}/settings`, owner, { name: "Before redemption refused" }).expect(403);
+    await post("/api/v1/business/invitations/redeem", outsider, { token: admitted.token }).expect(409);
+    expect(await digest(id), "pre-redemption settings and outsider redemption refusals write nothing").toBe(unchanged);
+    await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+    const member = await db.dealershipMember.findFirstOrThrow({ where: { dealershipId: admitted.businessId, userId: owner.user.id }, select: { id: true, role: true, status: true } });
+    expect(member).toMatchObject({ role: "owner", status: "active" });
+    unchanged = await digest(id);
+    await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(409);
+    expect(await digest(id), "repeated redemption refusal writes nothing").toBe(unchanged);
+    await post(`/api/v1/business/${admitted.businessId}/settings`, owner, { name: "Ordinary owner saved synthetic content" }).expect(201);
+    expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({ business: { id: admitted.businessId, status: "active", admissionMode: "synthetic", name: "Ordinary owner saved synthetic content" }, membership: { role: "owner" } });
+    unchanged = await digest(id);
+    await post(`/api/v1/business/${admitted.businessId}/settings`, outsider, { name: "Foreign edit refused" }).expect(403);
+    expect(await digest(id), "foreign settings refusal writes nothing").toBe(unchanged);
+    await grant(coordinator, target, "founder.admission", false).expect(204);
+    unchanged = await digest(id);
+    await post("/api/v1/business/admission", admissionStaff, { ...admission, slug: `${admission.slug}-revoked` }).expect(403);
+    expect(await digest(id), "revoked admission refusal writes nothing").toBe(unchanged);
+    const audit = await db.auditLog.findFirstOrThrow({ where: { targetId: admitted.businessId, action: "BUSINESS_ADMITTED" } });
+    expect(audit.actorId).toBe(target);
+    expect(audit.details).toMatchObject({ mode: "synthetic", verifiedScope: "Synthetic fixture; no real business verified" });
+    expect(JSON.stringify(audit.details).includes(admitted.token)).toBe(false);
+    const businessAudits = await db.auditLog.findMany({ where: { targetType: "Dealership", targetId: admitted.businessId }, orderBy: { createdAt: "asc" }, select: { id: true, actorId: true, action: true, details: true } });
+    expect(businessAudits.map(({ actorId, action, details }) => ({ actorId, action, details }))).toEqual([
+      { actorId: target, action: "BUSINESS_ADMITTED", details: { mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof", verifiedScope: "Synthetic fixture; no real business verified" } },
+      { actorId: owner.user.id, action: "BUSINESS_INVITATION_REDEEMED", details: { invitationId: admitted.invitationId, role: "owner" } },
+      { actorId: owner.user.id, action: "BUSINESS_SETTINGS_CHANGED", details: { fields: ["name"] } },
+    ]);
+    const before = await owned(id);
+    for (const table of ["users", "sessions", "otp_requests", "totp_enrollments", "totp_backup_codes", "staff_grants", "dealerships", "dealership_members", "dealership_invitations", "audit_logs"]) expect(before.some(row => row.table_name === table), table).toBe(true);
+    for (const row of [{ table_name: "dealerships", row_key: { id: admitted.businessId } }, { table_name: "dealership_invitations", row_key: { id: admitted.invitationId } },
+      { table_name: "dealership_members", row_key: { id: member.id } }, ...businessAudits.map(row => ({ table_name: "audit_logs", row_key: { id: row.id } }))]) expect(before, `owned ${row.table_name}`).toContainEqual(row);
+    expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+    await assertDisposed(id, before);
+    expect(await db.dealership.findUnique({ where: { id: admitted.businessId } })).toBeNull();
+    expect(await db.dealershipInvitation.findUnique({ where: { id: admitted.invitationId } })).toBeNull();
+    expect(await db.dealershipMember.findUnique({ where: { id: member.id } })).toBeNull();
+    // Retained business audits keep no evidence, reason, token or settings text.
+    expect(await db.auditLog.findMany({ where: { id: { in: businessAudits.map(row => row.id) } }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual(
+      businessAudits.map(() => ({ actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } })));
+    const terminal = await digest(id);
+    expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+    expect(await digest(id)).toBe(terminal);
+    await assertDisposed(id, before);
+    await get("/api/v1/business/current", owner).expect(403);
+    await request.post("/api/v1/auth/refresh").send({ refreshToken: owner.refreshToken }).expect(401);
+    expect(execute("fixture", id).code).toBe(1);
+  }));
+
+  it("refuses foreign alias collision atomically and preserves the foreign identity", async () => {
+    const id = "a5".repeat(16), controlId = "b5".repeat(16), foreignId = randomUUID();
+    await seed(controlId);
+    // Collision fixture only. This is never used as admission or authentication proof.
+    const foreign = await db.user.create({ data: { id: foreignId, email: email(id, "buyer-a"), emailVerifiedAt: new Date(), displayName: "Foreign collision must survive" } });
+    expect(execute("fixture", id).code).toBe(1);
+    expect(await db.user.findUnique({ where: { id: foreignId } })).toEqual(foreign);
+    expect(await rows(`SELECT schema_name FROM information_schema.schemata WHERE schema_name=$1`, `cf_${id}`)).toEqual([]);
+    await db.user.delete({ where: { id: foreignId } });
+    expect(execute("reset", controlId).code).toBe(0);
+  });
+
+  it("preserves another reservation and exact foreign queue content while blocking late enqueue and mock delivery", () => withKnownJobs(async known => {
+    const id = "a6".repeat(16), otherId = "a7".repeat(16);
+    const roster = await seed(id);
+    await seed(otherId);
+    const other = await digest(otherId);
+    const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email });
+    learn(known, issued);
+    expect(issued.status).toBe(201);
+    const requestId = issued.body.requestId as string;
+    const pending = await queue.getJob(requestId);
+    expect(pending).toBeDefined();
+    const data = pending!.data as { to: string; code: string; locale: "ru"; purpose: "sign-in" };
+    const foreignId = randomUUID();
+    const foreignData = { to: "foreign@example.invalid", code: "654321", locale: "en", purpose: "sign-in" };
+    known.add(foreignId);
+    await queue.add(AuthSchemas.EMAIL_CODE_JOB_NAME, foreignData, { jobId: foreignId });
+    const before = await owned(id);
+    expect(execute("reset", id).code).toBe(0);
+    await assertDisposed(id, before);
+    expect(await digest(otherId)).toBe(other);
+    expect((await queue.getJob(foreignId))?.data).toEqual(foreignData);
+    await expect(app.get(BullMqEmailCodeSenderAdapter).enqueue({ requestId, email: data.to, code: data.code, locale: data.locale, purpose: data.purpose })).rejects.toThrow();
+    expect(processEmail(requestId, { ...data, to: data.to })).toBe(1);
+    const lateRequest = await request.post("/api/v1/auth/otp/request").send({ email: data.to });
+    learn(known, lateRequest);
+    expect(lateRequest.status).toBe(500);
+    await request.post("/api/v1/auth/otp/verify").send({ email: data.to, code: data.code }).expect(400);
+    expect(await db.session.count({ where: { userId: actor(roster, "sales-b").user_id } })).toBe(0);
+    await assertDisposed(id, before);
+    expect(await digest(otherId)).toBe(other);
+    await (await queue.getJob(foreignId))?.remove();
+    expect(execute("reset", otherId).code).toBe(0);
+  }));
+
+  it("rolls back row and event budget overflow while retaining room for exact cleanup", async () => {
+    const id = "a9".repeat(16), roster = await seed(id);
+    const original = await digest(id);
+    const business = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
+    // Storage-boundary fault probes, separate from the ordinary HTTP content proof.
+    // A single failed transaction must leave the entire tracked inventory unchanged.
+    await expect(db.$transaction(Array.from({ length: 129 }, () => db.listingDraft.create({ data: {
+      userId: actor(roster, "owner").user_id, businessId: business.id, payload: { description: "Synthetic row budget probe", media: [] },
+    } })))).rejects.toThrow(/Campaign.*limit/);
+    expect(await digest(id)).toBe(original);
+    // No authority/active-status write. Repeat a permitted storage content edit.
+    await expect(db.$executeRawUnsafe(`DO $probe$ BEGIN FOR i IN 1..2049 LOOP UPDATE public.dealerships SET name='Synthetic event budget probe' WHERE id='${business.id}'; END LOOP; END $probe$`)).rejects.toThrow(/Campaign.*(limit|budget)/);
+    expect(await digest(id)).toBe(original);
+    const before = await owned(id);
+    expect(execute("reset", id).code).toBe(0);
+    await assertDisposed(id, before);
+  });
+
+  it("keeps cleaning ownership after an active exact delivery, then resumes the same reset", () => withKnownJobs(async known => {
+    const id = "aa".repeat(16), roster = await seed(id);
+    const issued = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "buyer-a").email });
+    learn(known, issued);
+    expect(issued.status).toBe(201);
+    const requestId = issued.body.requestId as string;
+    const before = await owned(id);
+    // A real BullMQ lock provides an explicit barrier. Never enumerate queue jobs.
+    const worker = new Worker(AuthSchemas.EMAIL_CODE_QUEUE, async () => {}, {
+      connection: { url: process.env["REDIS_URL"]! }, autorun: false,
+    });
+    const token = randomUUID();
+    let job: Awaited<ReturnType<typeof worker.getNextJob>> | undefined;
+    try {
+      // Acquisition sits inside the lifecycle so Worker.close runs even when the claim attempt throws.
+      job = await worker.getNextJob(token, { block: false });
+      expect(job?.id, "exact disposable delivery claim required before reset proof").toBe(requestId);
+      expect(await job!.getState()).toBe("active");
+      expect(execute("reset", id).code).toBe(1);
+      expect(await rows(`SELECT state FROM "cf_${id}".campaign_manifest`)).toEqual([{ state: "cleaning" }]);
+      expect((await queue.getJob(requestId))?.data.to).toBe(actor(roster, "buyer-a").email);
+      const refused = await request.post("/api/v1/auth/otp/request").send({ email: actor(roster, "sales-b").email });
+      learn(known, refused);
+      expect(refused.status).toBe(500);
+    } finally {
+      // Releases whichever job this token claimed, own or not, before exact known-ID removal; unknown jobs are never removed.
+      try { await job?.moveToWait(token); } finally { await worker.close(); }
+    }
+    expect(execute("reset", id).code).toBe(0);
+    await assertDisposed(id, before);
+    expect(execute("reset", id).code).toBe(0);
+    await assertDisposed(id, before);
+  }));
+
+  it("refuses a changed candidate without altering live ownership or ordinary sessions", () => withKnownJobs(async known => {
+    const id = "a8".repeat(16), roster = await seed(id);
+    const login = await signIn(id, actor(roster, "buyer-a"), known);
+    const before = await digest(id);
+    expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
+    expect(await digest(id)).toBe(before);
+    await get("/api/v1/business/current", login).expect(200);
+    expect(execute("reset", id).code).toBe(0);
+  }));
+
+  // Elevation expiry is not exercised: identity composes the concrete SystemClockAdapter with no
+  // configuration seam, and this spec forbids provider overrides and Session writes. See the #901 handoff.
+  it("re-elevates a granted staff alias, consumes one backup code once, refuses a revoked grant on the next request and disposes exactly", () => withKnownJobs(async known => {
+    const id = "ab".repeat(16), roster = await seed(id);
+    const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+    let staff = await signIn(id, actor(roster, "support"), known);
+    const staffId = actor(roster, "support").user_id;
+    // Authorized recovery of an absent business is refused after the authority check, before any write.
+    const recover = (login: Login) => post(`/api/v1/business/${randomUUID()}/recovery`, login,
+      { ownerUserId: actor(roster, "owner").user_id, evidence: "Synthetic lifecycle probe only", reason: "Disposable full-v3 grant lifecycle proof" });
+    const capabilities = async (login: Login) => (await get("/api/v1/staff/capabilities", login).expect(200)).body as { capabilities: string[]; elevated: boolean; adminTotpExpiresAt?: string };
+    const verify = (code: string) => post("/api/v1/auth/staff/totp/verify", staff, { code });
+
+    expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    await elevate(coordinator);
+    await grant(coordinator, staffId, "founder.recovery").expect(204);
+    const enrollment = await post("/api/v1/auth/staff/totp/enroll", staff, {}).expect(201);
+    const first = (await verify(generateSync({ secret: enrollment.body.secret, strategy: "totp", period: 30 })).expect(201)).body as { adminTotpExpiresAt: string; backupCodes: string[] };
+    expect(first.backupCodes).toHaveLength(10);
+    expect((await recover(staff).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+
+    // Ordinary refresh keeps the deadline; a later TOTP code re-elevates the same Session to a later one.
+    const refreshed = await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(201);
+    staff = { ...staff, accessToken: refreshed.body.accessToken, refreshToken: refreshed.body.refreshToken };
+    expect(await capabilities(staff)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: first.adminTotpExpiresAt });
+    const reElevated = (await verify(generateSync({ secret: enrollment.body.secret, strategy: "totp", period: 30 })).expect(201)).body as { adminTotpExpiresAt: string };
+    expect(Object.keys(reElevated)).toEqual(["adminTotpExpiresAt"]);
+    expect(Date.parse(reElevated.adminTotpExpiresAt)).toBeGreaterThan(Date.parse(first.adminTotpExpiresAt));
+    expect((await capabilities(staff)).adminTotpExpiresAt).toBe(reElevated.adminTotpExpiresAt);
+
+    const backupCode = first.backupCodes[0]!;
+    const byBackup = (await verify(backupCode).expect(201)).body as { adminTotpExpiresAt: string };
+    expect(Object.keys(byBackup)).toEqual(["adminTotpExpiresAt"]);
+    expect(Date.parse(byBackup.adminTotpExpiresAt)).toBeGreaterThan(Date.parse(reElevated.adminTotpExpiresAt));
+    expect((await verify(backupCode).expect(400)).body.code).toBe("INVALID_TOTP");
+    expect((await capabilities(staff)).adminTotpExpiresAt).toBe(byBackup.adminTotpExpiresAt);
+    // No route reports remaining backup codes, so exact single consumption is read from storage.
+    expect(await db.totpBackupCode.count({ where: { totpEnrollment: { userId: staffId }, usedAt: { not: null } } })).toBe(1);
+    expect(await db.totpBackupCode.count({ where: { totpEnrollment: { userId: staffId }, usedAt: null } })).toBe(9);
+
+    await grant(coordinator, staffId, "founder.recovery", false).expect(204);
+    expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    expect((await verify(generateSync({ secret: enrollment.body.secret, strategy: "totp", period: 30 })).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+    expect(await db.session.count({ where: { userId: staffId } })).toBe(1);
+    await grant(coordinator, staffId, "founder.recovery").expect(204);
+    expect(await capabilities(staff)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: byBackup.adminTotpExpiresAt });
+    expect((await recover(staff).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+    expect(await db.auditLog.findMany({ where: { targetType: "User", targetId: staffId }, orderBy: { createdAt: "asc" }, select: { actorId: true, action: true, details: true } })).toEqual([
+      { actorId: coordinator.user.id, action: "STAFF_CAPABILITY_GRANTED", details: { capability: "founder.recovery", reason: "Reservation-owned synthetic full-v3 acceptance", previouslyActive: false } },
+      { actorId: coordinator.user.id, action: "STAFF_CAPABILITY_REVOKED", details: { capability: "founder.recovery", reason: "Reservation-owned synthetic full-v3 acceptance", previouslyActive: true } },
+      { actorId: coordinator.user.id, action: "STAFF_CAPABILITY_GRANTED", details: { capability: "founder.recovery", reason: "Reservation-owned synthetic full-v3 acceptance", previouslyActive: false } },
+    ]);
+
+    const before = await owned(id);
+    const perTable: Record<string, number> = {};
+    for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+    expect(perTable).toEqual({ users: 15, sessions: 2, otp_requests: 2, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 5, dealerships: 1, dealership_members: 1 });
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+      [coordinator.requestId, staff.requestId].sort().map(request_id => ({ request_id })));
+    expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+    await assertDisposed(id, before);
+    const terminal = await digest(id);
+    expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+    expect(await digest(id)).toBe(terminal);
+    await assertDisposed(id, before);
+    expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+    await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(401);
+    await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
+    expect(execute("fixture", id).code).toBe(1);
+  }));
+
+  it("refuses an admission slug owned by a foreign or root Dealership and leaves both unchanged", () => withKnownJobs(known => {
+    const id = "ac".repeat(16), foreignId = randomUUID();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      // Collision fixture only: a pre-existing Dealership outside every reservation, never adopted or authenticated.
+      const slug = `campaign897-${id}-${candidate.slice(0, 12)}-admitted`;
+      await db.dealership.create({ data: { id: foreignId, slug, name: "Foreign collision Dealership must survive" } });
+      try {
+        const foreign = await businessState(foreignId);
+        const root = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
+        const rootState = await businessState(root.id);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const unchanged = await digest(id);
+        expect((await post("/api/v1/business/admission", staff, admissionFor(id, actor(roster, "buyer-a").user_id, slug)).expect(409)).body.code).toBe("CONFLICT");
+        expect((await post("/api/v1/business/admission", staff, admissionFor(id, actor(roster, "buyer-a").user_id, root.slug)).expect(409)).body.code).toBe("CONFLICT");
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect(await businessState(root.id)).toEqual(rootState);
+        expect(await db.auditLog.count({ where: { action: "BUSINESS_ADMITTED", actorId: actor(roster, "support").user_id } })).toBe(0);
+        expect(await digest(id)).toBe(unchanged);
+        const before = await owned(id);
+        expect(before.filter(row => row.table_name === "dealerships")).toEqual([{ table_name: "dealerships", row_key: { id: root.id } }]);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await businessState(foreignId)).toEqual(foreign);
+      } finally {
+        await db.dealership.delete({ where: { id: foreignId } });
+      }
+    });
+  }));
+
+  it("refuses to adopt a pre-existing foreign Dealership through owner recovery and rolls back every write", () => withKnownJobs(known => {
+    const id = "ad".repeat(16), foreignId = randomUUID();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      // Ownerless foreign Dealership in recovery: ordinary recovery would invite a roster User into it.
+      await db.dealership.create({ data: { id: foreignId, slug: `foreign-adoption-${foreignId}`, name: "Foreign recovery Dealership must survive" } });
+      try {
+        const foreign = await businessState(foreignId);
+        const measurement = await db.measurementState.findMany({ orderBy: { key: "asc" } });
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.recovery"]);
+        const unchanged = await digest(id);
+        const refused = await post(`/api/v1/business/${foreignId}/recovery`, staff, recoveryFor(actor(roster, "buyer-b").user_id));
+        expect(refused.status, "foreign Dealership adoption must refuse").toBeGreaterThanOrEqual(400);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect(await db.dealershipInvitation.count({ where: { recipientUserId: actor(roster, "buyer-b").user_id } })).toBe(0);
+        expect(await db.measurementState.findMany({ orderBy: { key: "asc" } })).toEqual(measurement);
+        expect(await digest(id)).toBe(unchanged);
+        const before = await owned(id);
+        expect(before.some(row => row.row_key["id"] === foreignId)).toBe(false);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await businessState(foreignId)).toEqual(foreign);
+      } finally {
+        await db.dealership.delete({ where: { id: foreignId } });
+      }
+    });
+  }));
+
+  it("keeps a second reservation's admitted Dealership out of the first and preserves it through the first reset", () => withKnownJobs(known => {
+    const id = "ae".repeat(16), otherId = "af".repeat(16);
+    return resetAfter([id, otherId], async () => {
+      const roster = await seed(id), otherRoster = await seed(otherId);
+      const other = await elevatedStaff(otherId, otherRoster, known, ["founder.admission"]);
+      const admitted = (await post("/api/v1/business/admission", other.staff, admissionFor(otherId, actor(otherRoster, "buyer-a").user_id)).expect(201)).body as { businessId: string; invitationId: string };
+      const otherBefore = await owned(otherId);
+      expect(otherBefore).toEqual(expect.arrayContaining([{ table_name: "dealerships", row_key: { id: admitted.businessId } },
+        { table_name: "dealership_invitations", row_key: { id: admitted.invitationId } }]));
+      const otherDigest = await digest(otherId), otherState = await businessState(admitted.businessId);
+      const { staff } = await elevatedStaff(id, roster, known, ["founder.recovery"]);
+      const unchanged = await digest(id);
+      const refused = await post(`/api/v1/business/${admitted.businessId}/recovery`, staff, recoveryFor(actor(roster, "buyer-b").user_id));
+      expect(refused.status, "another reservation's Dealership must not be adopted").toBeGreaterThanOrEqual(400);
+      expect(await businessState(admitted.businessId)).toEqual(otherState);
+      expect(await digest(id)).toBe(unchanged);
+      expect(await digest(otherId)).toBe(otherDigest);
+      const before = await owned(id);
+      expect(before.some(row => row.row_key["id"] === admitted.businessId)).toBe(false);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      expect(await digest(otherId)).toBe(otherDigest);
+      expect(await businessState(admitted.businessId)).toEqual(otherState);
+      expect(execute("reset", otherId).code).toBe(0);
+      await assertDisposed(otherId, otherBefore);
+      expect(await db.dealership.findUnique({ where: { id: admitted.businessId } })).toBeNull();
+    });
+  }));
+
+  it("refuses a stale candidate at the operator boundary without altering an admitted Dealership", () => withKnownJobs(known => {
+    const id = "b0".repeat(16), stale = "b".repeat(40);
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+      const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, actor(roster, "buyer-a").user_id)).expect(201)).body as { businessId: string };
+      const unchanged = await digest(id), state = await businessState(admitted.businessId);
+      // The runtime admission path has no candidate input; the supported binding is the operator fixture/reset command.
+      expect(execute("reset", id, { candidate: stale })).toMatchObject({ code: 1, receipt: undefined });
+      expect(execute("fixture", id, { candidate: stale })).toMatchObject({ code: 1, sqlCalls: 0, receipt: undefined });
+      expect(await digest(id)).toBe(unchanged);
+      expect(await businessState(admitted.businessId)).toEqual(state);
+      const before = await owned(id);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      expect(await db.dealership.findUnique({ where: { id: admitted.businessId } })).toBeNull();
+    });
+  }));
+
+  it("atomically refuses reserved redemption that would delete a pre-existing inventory baseline, then succeeds without one", () => withKnownJobs(known => {
+    const id = "b1".repeat(16), epoch = randomUUID(), baselineKey = `inventory_baseline:${epoch}`, unrelatedKey = `inventory_baseline:${randomUUID()}`;
+    const baselineValue = "2026-10-01T00:00:00.000Z", created: string[] = [], unrelatedEmail = `unrelated.${randomUUID()}@example.invalid`;
+    let unrelatedUserId: string | undefined;
+    // Known-request lifetime, like known jobs: the racing redemption is settled before any cleanup, on every path.
+    let racing: Promise<{ status: number } | { error: unknown }> | undefined;
+    return resetAfter([id], async () => {
+      // Global rows are created only when absent and removed in finally by exact key; a foreign collector stops the case.
+      expect(await db.measurementState.findMany({ where: { key: { in: ["collector", baselineKey, unrelatedKey] } } })).toEqual([]);
+      try {
+        await db.measurementState.create({ data: { key: "collector", epoch } }); created.push("collector");
+        await db.measurementState.create({ data: { key: unrelatedKey, epoch: baselineValue } }); created.push(unrelatedKey);
+        await db.measurementState.create({ data: { key: baselineKey, epoch: baselineValue } }); created.push(baselineKey);
+        const roster = await seed(id);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; invitationId: string; token: string };
+        const redeem = () => post("/api/v1/business/invitations/redeem", owner, { token: admitted.token });
+        const measurement = () => db.measurementState.findMany({ orderBy: { key: "asc" } });
+        const withBaseline = await measurement(), state = await businessState(admitted.businessId), unchanged = await digest(id);
+        // Proposed contract: refused like other fixture storage refusals (500), with the whole transaction rolled back.
+        const assertRefusedAtomically = async (status: number) => {
+          expect(status, "reserved redemption must refuse rather than delete a shared baseline").toBe(500);
+          expect(await businessState(admitted.businessId)).toEqual(state);
+          expect(await digest(id)).toBe(unchanged);
+          expect(await measurement()).toEqual(withBaseline);
+        };
+        await assertRefusedAtomically((await redeem()).status);
+
+        // Race at the legitimate row-lock boundary: the baseline commits while redemption waits on the collector lock.
+        await db.measurementState.delete({ where: { key: baselineKey } });
+        await db.$transaction(async tx => {
+          await tx.$queryRaw`SELECT "key" FROM "measurement_state" WHERE "key" = 'collector' FOR UPDATE`;
+          await tx.measurementState.create({ data: { key: baselineKey, epoch: baselineValue } });
+          // Rejection is observed at creation, so it cannot surface unhandled while this transaction waits.
+          racing = redeem().then(response => ({ status: response.status }), (error: unknown) => ({ error }));
+          for (let attempt = 0; ; attempt += 1) {
+            const [waiting] = await db.$queryRaw<{ count: number }[]>`SELECT count(*)::int AS count FROM pg_stat_activity
+              WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%measurement_state%'`;
+            if (waiting?.count === 1) break;
+            if (attempt >= 100) throw new Error("Reserved redemption never waited on the collector row lock");
+            await new Promise(done => setTimeout(done, 50));
+          }
+        }, { timeout: 15_000 });
+        const raced = await racing!;
+        if ("error" in raced) throw raced.error;
+        await assertRefusedAtomically(raced.status);
+
+        // With no baseline for the current epoch, ordinary redemption succeeds and leaves other global rows untouched.
+        await db.measurementState.delete({ where: { key: baselineKey } }); created.pop();
+        const withoutBaseline = await measurement();
+        await redeem().expect(201);
+        expect(await measurement()).toEqual(withoutBaseline);
+        expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({ business: { id: admitted.businessId, status: "active" }, membership: { role: "owner" } });
+
+        // A non-reserved ordinary deletion of the same baseline stays normal while this namespace is live.
+        await db.measurementState.create({ data: { key: baselineKey, epoch: baselineValue } }); created.push(baselineKey);
+        const reserved = await digest(id);
+        const issued = await request.post("/api/v1/auth/otp/request").send({ email: unrelatedEmail });
+        learn(known, issued);
+        expect(issued.status).toBe(201);
+        const code = (await queue.getJob(issued.body.requestId as string))?.data.code as string;
+        const unrelated = await request.post("/api/v1/auth/otp/verify").send({ email: unrelatedEmail, code }).expect(201);
+        unrelatedUserId = unrelated.body.user.id as string;
+        await request.delete("/api/v1/me").set("authorization", `Bearer ${unrelated.body.accessToken}`).expect(204);
+        expect(await measurement()).toEqual(withoutBaseline);
+        expect(await digest(id)).toBe(reserved);
+        const before = await owned(id);
+        expect(before.some(row => row.row_key["id"] === unrelatedUserId)).toBe(false);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await measurement()).toEqual(withoutBaseline);
+      } finally {
+        // Never rejects; awaited after the row-lock transaction has unwound, so the original failure stays primary.
+        await racing;
+        await db.measurementState.deleteMany({ where: { key: { in: created } } });
+        // Exact removal of the unrelated ordinary User this case created, and its own sign-in code.
+        await db.otpRequest.deleteMany({ where: { destination: unrelatedEmail } });
+        if (unrelatedUserId) await db.user.delete({ where: { id: unrelatedUserId } });
+      }
+    });
+  }));
+
+  // Time is the controlled boundary: only this process's Date moves back 12 h + 2 min for support's ordinary
+  // sign-in and first elevation. PostgreSQL, Redis, timers and the worker child keep real time; no Session is seeded or edited directly.
+  it("refuses an elevation that expired by the API clock, keeps it through refresh, and re-elevates the same and a fresh Session", () => withKnownJobs(known => {
+    const id = "b2".repeat(16), shift = 12 * 60 * 60 * 1000 + 2 * 60 * 1000;
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      const staffId = actor(roster, "support").user_id;
+      const coordinator = await signIn(id, actor(roster, "coordinator"), known);
+      await elevate(coordinator);
+      await grant(coordinator, staffId, "founder.recovery").expect(204);
+      const recover = (login: Login) => post(`/api/v1/business/${randomUUID()}/recovery`, login, recoveryFor(actor(roster, "owner").user_id));
+      const capabilities = async (login: Login) => (await get("/api/v1/staff/capabilities", login).expect(200)).body as { capabilities: string[]; elevated: boolean; adminTotpExpiresAt?: string };
+      const verify = (login: Login, code: string) => post("/api/v1/auth/staff/totp/verify", login, { code });
+
+      let staff: Login, secret: string, first: { adminTotpExpiresAt: string; backupCodes: string[] };
+      try {
+        vi.useFakeTimers({ toFake: ["Date"], now: Date.now() - shift });
+        staff = await signIn(id, actor(roster, "support"), known);
+        secret = (await post("/api/v1/auth/staff/totp/enroll", staff, {}).expect(201)).body.secret as string;
+        // The authenticator derives the code from the enrolled secret at the window's own time.
+        first = (await verify(staff, generateSync({ secret, strategy: "totp", period: 30 })).expect(201)).body;
+        expect(first.backupCodes).toHaveLength(10);
+        expect(await capabilities(staff), "elevation is valid inside the window").toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: first.adminTotpExpiresAt });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      // At real time the server-issued deadline is an ordinary 12-hour deadline that has already passed.
+      const deadline = Date.parse(first.adminTotpExpiresAt);
+      expect(deadline).toBeLessThan(Date.now());
+      expect(deadline).toBeGreaterThan(Date.now() - 10 * 60 * 1000);
+      expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "ELEVATION_REQUIRED" });
+      const stale = { capabilities: ["founder.recovery"], elevated: false, adminTotpExpiresAt: first.adminTotpExpiresAt };
+      expect(await capabilities(staff)).toEqual(stale);
+      const refreshed = await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(201);
+      staff = { ...staff, accessToken: refreshed.body.accessToken, refreshToken: refreshed.body.refreshToken };
+      expect(await capabilities(staff), "refresh neither extends nor restores elevation").toEqual(stale);
+      expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "ELEVATION_REQUIRED" });
+
+      const same = (await verify(staff, generateSync({ secret, strategy: "totp", period: 30 })).expect(201)).body as { adminTotpExpiresAt: string };
+      expect(Object.keys(same)).toEqual(["adminTotpExpiresAt"]);
+      expect(Date.parse(same.adminTotpExpiresAt)).toBeGreaterThan(Date.now());
+      expect(await capabilities(staff)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: same.adminTotpExpiresAt });
+      expect((await recover(staff).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+
+      await request.post("/api/v1/auth/logout").send({ refreshToken: staff.refreshToken }).expect(204);
+      expect((await get("/api/v1/staff/capabilities", staff).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+      expect((await recover(staff).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: staff.refreshToken }).expect(401);
+      // The window's request is 12 h old, so the ordinary 60 s resend backoff no longer applies.
+      const fresh = await signIn(id, actor(roster, "support"), known);
+      expect(fresh.requestId).not.toBe(staff.requestId);
+      expect(await capabilities(fresh), "a fresh Session inherits no elevation").toEqual({ capabilities: ["founder.recovery"], elevated: false });
+      expect((await recover(fresh).expect(403)).body.details).toEqual({ reason: "ELEVATION_REQUIRED" });
+      const backupCode = first.backupCodes[0]!;
+      const byBackup = (await verify(fresh, backupCode).expect(201)).body as { adminTotpExpiresAt: string };
+      expect(Object.keys(byBackup)).toEqual(["adminTotpExpiresAt"]);
+      expect(Date.parse(byBackup.adminTotpExpiresAt)).toBeGreaterThan(Date.now());
+      expect((await verify(fresh, backupCode).expect(400)).body.code).toBe("INVALID_TOTP");
+      expect(await capabilities(fresh)).toEqual({ capabilities: ["founder.recovery"], elevated: true, adminTotpExpiresAt: byBackup.adminTotpExpiresAt });
+      expect((await recover(fresh).expect(409)).body.details).toEqual({ reason: "RECOVERY_REQUIRED" });
+
+      const before = await owned(id);
+      const perTable: Record<string, number> = {};
+      for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+      expect(perTable).toEqual({ users: 15, sessions: 2, otp_requests: 3, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 3, dealerships: 1, dealership_members: 1 });
+      expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+        [coordinator.requestId, staff.requestId, fresh.requestId].sort().map(request_id => ({ request_id })));
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await assertDisposed(id, before);
+      const terminal = await digest(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      expect((await get("/api/v1/staff/capabilities", fresh).expect(403)).body.details).toEqual({ reason: "SESSION_REQUIRED" });
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: fresh.refreshToken }).expect(401);
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
+    });
+  }));
+
+  // B1/B2 membership on the admitted business. Setup (admission, owner redemption, settings) must pass before any
+  // membership assertion counts. On 794ac50a the expected reached failure is owner redemption: `admissionClosed`
+  // first refuses the admitted Dealership's invitation UPDATE ('Unsupported campaign business'), before the member INSERT.
+  // Invitation expiry (48 h) is not exercised; see the #901 business membership handoff.
+  it("invites, replaces, revokes, redeems and suspends sales membership on the admitted business with exact audits and disposal", () => withKnownJobs(known => {
+    const id = "b3".repeat(16), foreignUserId = randomUUID();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      const { coordinator, staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+      const owner = await signIn(id, actor(roster, "buyer-a"), known);
+      const salesA = await signIn(id, actor(roster, "sales-a"), known);
+      const salesB = await signIn(id, actor(roster, "sales-b"), known);
+      const rootBusiness = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
+      const rootState = await businessState(rootBusiness.id);
+      // Foreign recipient fixture only: an ordinary User outside every reservation, never signed in or adopted.
+      const foreignUser = await db.user.create({ data: { id: foreignUserId, email: `foreign.${foreignUserId}@example.invalid`, emailVerifiedAt: new Date(), displayName: "Foreign recipient must survive" } });
+      try {
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; invitationId: string; token: string };
+        const businessId = admitted.businessId;
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        await post(`/api/v1/business/${businessId}/settings`, owner, { name: "Synthetic membership business" }).expect(201);
+        const ownerMember = await db.dealershipMember.findUniqueOrThrow({ where: { userId: owner.user.id } });
+        expect(ownerMember).toMatchObject({ dealershipId: businessId, role: "owner", status: "active" });
+
+        const invite = async (recipient: string) => {
+          const body = (await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: recipient }).expect(201)).body as { businessId: string; invitationId: string; token: string; expiresAt: string };
+          expect(body).toMatchObject({ businessId });
+          expect(body.token).toMatch(/^[a-f0-9]{64}$/);
+          expect(await db.dealershipInvitation.findUniqueOrThrow({ where: { id: body.invitationId } })).toMatchObject({ dealershipId: businessId, recipientUserId: recipient, role: "sales", redeemedAt: null, revokedAt: null, expiresAt: new Date(body.expiresAt) });
+          expect(await owned(id)).toContainEqual({ table_name: "dealership_invitations", row_key: { id: body.invitationId } });
+          return body;
+        };
+        const redeem = (login: Login, token: string) => post("/api/v1/business/invitations/redeem", login, { token });
+        const reason = (response: { body: { details?: unknown } }) => response.body.details;
+        let unchanged: string | undefined;
+        const refusedWithoutWrites = async (label: string, attempt: () => Promise<unknown>) => {
+          unchanged = await digest(id);
+          const state = await businessState(businessId);
+          await attempt();
+          expect(await digest(id), `${label} writes nothing`).toBe(unchanged);
+          expect(await businessState(businessId), `${label} leaves the business unchanged`).toEqual(state);
+        };
+        const salesAId = actor(roster, "sales-a").user_id, salesBId = actor(roster, "sales-b").user_id;
+
+        // Invite, wrong-account redemption and duplicate replacement.
+        const first = await invite(salesAId);
+        await refusedWithoutWrites("wrong-account redemption", async () => expect(reason(await redeem(salesB, first.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+        const second = await invite(salesAId);
+        expect((await db.dealershipInvitation.findUniqueOrThrow({ where: { id: first.invitationId } })).revokedAt).not.toBeNull();
+        await refusedWithoutWrites("replaced-token redemption", async () => expect(reason(await redeem(salesA, first.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+
+        // Revoke, revoked-token refusal and a no-op repeated revoke without an audit.
+        const third = await invite(salesBId);
+        expect((await post(`/api/v1/business/${businessId}/invitations/revoke`, owner, { invitationId: third.invitationId }).expect(201)).body).toEqual({ ok: true });
+        await refusedWithoutWrites("revoked-token redemption", async () => expect(reason(await redeem(salesB, third.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+        await refusedWithoutWrites("repeated revoke", async () => expect((await post(`/api/v1/business/${businessId}/invitations/revoke`, owner, { invitationId: third.invitationId }).expect(201)).body).toEqual({ ok: true }));
+
+        // Sales redemption has no shared inventory-baseline path; global measurement rows are only observed.
+        const measurement = await db.measurementState.findMany({ orderBy: { key: "asc" } });
+        expect((await redeem(salesA, second.token).expect(201)).body).toEqual({ businessId });
+        expect(await db.measurementState.findMany({ orderBy: { key: "asc" } })).toEqual(measurement);
+        const salesMember = await db.dealershipMember.findUniqueOrThrow({ where: { userId: salesAId } });
+        expect(salesMember).toMatchObject({ dealershipId: businessId, role: "sales", status: "active" });
+        expect((await get("/api/v1/business/current", salesA).expect(200)).body.workspace).toMatchObject({ business: { id: businessId, status: "active" }, membership: { role: "sales", status: "active" }, members: [], invitations: [] });
+        await refusedWithoutWrites("repeated redemption", async () => expect(reason(await redeem(salesA, second.token).expect(409))).toEqual({ reason: "INVITATION_INVALID" }));
+        await refusedWithoutWrites("sales owner actions", async () => {
+          expect(reason(await post(`/api/v1/business/${businessId}/invitations`, salesA, { recipientUserId: salesBId }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+          expect(reason(await post(`/api/v1/business/${businessId}/invitations/revoke`, salesA, { invitationId: third.invitationId }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+          expect(reason(await post(`/api/v1/business/${businessId}/settings`, salesA, { name: "Sales edit refused" }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+          expect(reason(await post(`/api/v1/business/${businessId}/members`, salesA, { targetUserId: owner.user.id, action: "suspend" }).expect(403))).toEqual({ reason: "OWNER_REQUIRED" });
+        });
+
+        // Suspend and restore; the sole owner and a non-member are refused.
+        expect((await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: salesAId, action: "suspend" }).expect(201)).body).toEqual({ ok: true });
+        expect(reason(await get("/api/v1/business/current", salesA).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        expect((await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: salesAId, action: "restore" }).expect(201)).body).toEqual({ ok: true });
+        expect((await get("/api/v1/business/current", salesA).expect(200)).body.workspace).toMatchObject({ membership: { role: "sales", status: "active" } });
+        await refusedWithoutWrites("sole-owner removal and non-member change", async () => {
+          expect(reason(await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: owner.user.id, action: "remove" }).expect(409))).toEqual({ reason: "SOLE_OWNER" });
+          expect(reason(await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: salesBId, action: "suspend" }).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        });
+
+        // An owned invitation naming a foreign recipient is a foreign roster reference: whole-transaction refusal.
+        await refusedWithoutWrites("foreign-recipient invitation", async () => {
+          expect((await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: foreignUserId })).status, "fixture refusal").toBe(500);
+        });
+        expect(await db.dealershipInvitation.count({ where: { recipientUserId: foreignUserId } })).toBe(0);
+        expect(await db.user.findUnique({ where: { id: foreignUserId } })).toEqual(foreignUser);
+
+        // Exact per-operation audits, none carrying a raw invitation token.
+        const audits = await db.auditLog.findMany({ where: { targetType: "Dealership", targetId: businessId }, orderBy: { createdAt: "asc" }, select: { id: true, actorId: true, action: true, details: true } });
+        expect(audits.map(({ actorId, action, details }) => ({ actorId, action, details }))).toEqual([
+          { actorId: staff.user.id, action: "BUSINESS_ADMITTED", details: { mode: "synthetic", evidence: "Fictional reservation-owned business only", reason: "Disposable full-v3 ordinary HTTP proof", verifiedScope: "Synthetic fixture; no real business verified" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_REDEEMED", details: { invitationId: admitted.invitationId, role: "owner" } },
+          { actorId: owner.user.id, action: "BUSINESS_SETTINGS_CHANGED", details: { fields: ["name"] } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_CREATED", details: { invitationId: first.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_CREATED", details: { invitationId: second.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_CREATED", details: { invitationId: third.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_INVITATION_REVOKED", details: { invitationId: third.invitationId } },
+          { actorId: salesAId, action: "BUSINESS_INVITATION_REDEEMED", details: { invitationId: second.invitationId, role: "sales" } },
+          { actorId: owner.user.id, action: "BUSINESS_MEMBERSHIP_CHANGED", details: { targetUserId: salesAId, action: "suspend" } },
+          { actorId: owner.user.id, action: "BUSINESS_MEMBERSHIP_CHANGED", details: { targetUserId: salesAId, action: "restore" } },
+        ]);
+        for (const token of [admitted.token, first.token, second.token, third.token]) expect(JSON.stringify(audits).includes(token)).toBe(false);
+
+        // Changed candidate at the operator boundary (the runtime path has no candidate input) changes nothing.
+        await refusedWithoutWrites("changed-candidate reset", async () => expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined }));
+
+        // The bootstrap owner and root Dealership are untouched by the admitted business's membership.
+        expect(await businessState(rootBusiness.id)).toEqual(rootState);
+
+        // Exact ownership: nothing was deleted, so every record ever written is live.
+        const before = await owned(id);
+        const perTable: Record<string, number> = {};
+        for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+        expect(perTable).toEqual({ users: 15, sessions: 5, otp_requests: 5, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 13, dealerships: 2, dealership_members: 3, dealership_invitations: 4 });
+        expect((await rows<{ count: number }>(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_records`))[0]?.count).toBe(72);
+        for (const row of [{ table_name: "dealerships", row_key: { id: businessId } }, { table_name: "dealership_members", row_key: { id: ownerMember.id } }, { table_name: "dealership_members", row_key: { id: salesMember.id } },
+          ...[admitted, first, second, third].map(i => ({ table_name: "dealership_invitations", row_key: { id: i.invitationId } })), ...audits.map(a => ({ table_name: "audit_logs", row_key: { id: a.id } }))]) expect(before, `owned ${row.table_name}`).toContainEqual(row);
+        expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+          [coordinator.requestId, staff.requestId, owner.requestId, salesA.requestId, salesB.requestId].sort().map(request_id => ({ request_id })));
+
+        // Exact disposal with a lost receipt, redacted audit retention and an identical retry.
+        expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await assertDisposed(id, before);
+        expect(await businessState(businessId)).toEqual({ business: null, invitations: [], members: [], audits: [] });
+        expect(await db.auditLog.findMany({ where: { id: { in: audits.map(a => a.id) } }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual(
+          audits.map(() => ({ actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } })));
+        const terminal = await digest(id);
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+        expect(await digest(id)).toBe(terminal);
+        await assertDisposed(id, before);
+        expect(reason(await get("/api/v1/business/current", salesA).expect(403))).toEqual({ reason: "SESSION_REQUIRED" });
+        await request.post("/api/v1/auth/refresh").send({ refreshToken: owner.refreshToken }).expect(401);
+        expect(await db.user.findUnique({ where: { id: foreignUserId } })).toEqual(foreignUser);
+      } finally {
+        await db.user.deleteMany({ where: { id: foreignUserId } });
+      }
+    });
+  }));
+
+  // A foreign active business (legitimate setup outside every reservation) inviting a roster User must refuse
+  // atomically. Reachable on 794ac50a: no admission or redemption precedes it.
+  it("refuses a foreign business invitation naming a roster User and preserves the foreign business exactly", () => withKnownJobs(known => {
+    const id = "b4".repeat(16), foreignBusinessId = randomUUID(), foreignEmail = `foreign-owner.${randomUUID()}@example.invalid`;
+    let foreignOwnerId: string | undefined;
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      try {
+        // Ordinary sign-in of a non-reserved User; its code is read from its own ordinary job, as in the baseline case.
+        const issued = await request.post("/api/v1/auth/otp/request").send({ email: foreignEmail });
+        learn(known, issued);
+        expect(issued.status).toBe(201);
+        const code = (await queue.getJob(issued.body.requestId as string))?.data.code as string;
+        const signedIn = await request.post("/api/v1/auth/otp/verify").send({ email: foreignEmail, code }).expect(201);
+        foreignOwnerId = signedIn.body.user.id as string;
+        await db.dealership.create({ data: { id: foreignBusinessId, slug: `foreign-membership-${foreignBusinessId}`, name: "Foreign membership business must survive", status: "active" } });
+        await db.dealershipMember.create({ data: { dealershipId: foreignBusinessId, userId: foreignOwnerId, role: "owner", status: "active" } });
+        const foreign = await businessState(foreignBusinessId), unchanged = await digest(id);
+        const salesB = actor(roster, "sales-b").user_id;
+        const refused = await request.post(`/api/v1/business/${foreignBusinessId}/invitations`).set("authorization", `Bearer ${signedIn.body.accessToken}`).send({ recipientUserId: salesB });
+        expect(refused.status, "foreign invitation of a roster User is a fixture refusal").toBe(500);
+        expect(await businessState(foreignBusinessId)).toEqual(foreign);
+        expect(await db.dealershipInvitation.count({ where: { recipientUserId: salesB } })).toBe(0);
+        expect(await digest(id)).toBe(unchanged);
+        const before = await owned(id);
+        expect(before.some(row => [foreignBusinessId, foreignOwnerId].includes(row.row_key["id"]!))).toBe(false);
+        expect(execute("reset", id).code).toBe(0);
+        await assertDisposed(id, before);
+        expect(await businessState(foreignBusinessId)).toEqual(foreign);
+      } finally {
+        // Exact removal of only the foreign rows this case created.
+        await db.dealershipMember.deleteMany({ where: { dealershipId: foreignBusinessId } });
+        await db.dealership.deleteMany({ where: { id: foreignBusinessId } });
+        await db.otpRequest.deleteMany({ where: { destination: foreignEmail } });
+        if (foreignOwnerId) await db.user.delete({ where: { id: foreignOwnerId } });
+      }
+    });
+  }));
+  // This is the checked-in operator command, in its own Node/tsx process and transaction.
+  // One Node process avoids an unowned tsx CLI descendant. execFile's callback settles
+  // after exit, including its bounded SIGKILL timeout; no child survives an assertion.
+  async function promote(person: Actor, options: { runtimeCandidate?: string; dryRun?: boolean; loseResponse?: boolean } = {}) {
+    const run = promisify(execFile);
+    const args = ["--import", "tsx", "scripts/promote-admin.ts", "--email", person.email,
+      "--reason", "  Reservation-owned coordinator moderation proof  "];
+    if (options.dryRun) args.push("--dry-run");
+    try {
+      const result = await run(process.execPath, args, { cwd: packageRoot, timeout: 30000, killSignal: "SIGKILL",
+        env: { ...process.env, AUTOTM_COMMIT_SHA: options.runtimeCandidate ?? candidate } });
+      return { code: 0, output: options.loseResponse ? undefined : `${result.stdout}${result.stderr}` };
+    } catch (error) {
+      const failed = error as { code?: unknown; stdout?: string; stderr?: string };
+      // Spawn/timeout signal errors throw. Each refusal case first proves command
+      // loading and database lookup with a successful write-free dry-run.
+      if (typeof failed.code !== "number") throw error;
+      return { code: failed.code, output: `${failed.stdout ?? ""}${failed.stderr ?? ""}` };
+    }
+  }
+  async function promotionState(roster: Actor[]) {
+    const ids = roster.map(person => person.user_id);
+    return {
+      users: await db.user.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" } }),
+      grants: await db.staffGrant.findMany({ where: { userId: { in: ids } }, orderBy: [{ userId: "asc" }, { capability: "asc" }] }),
+      sessions: await db.session.findMany({ where: { userId: { in: ids } }, orderBy: { id: "asc" } }),
+      enrollments: await db.totpEnrollment.findMany({ where: { userId: { in: ids } }, orderBy: { id: "asc" } }),
+      codes: await db.totpBackupCode.findMany({ where: { totpEnrollment: { userId: { in: ids } } }, orderBy: { id: "asc" } }),
+      otps: await db.otpRequest.findMany({ where: { destination: { in: roster.map(person => person.email) } }, orderBy: { id: "asc" } }),
+      audits: await db.auditLog.findMany({ where: { targetId: { in: ids } }, orderBy: { id: "asc" } }),
+    };
+  }
+  async function promotionAccounting(id: string, requestIds: string[], promoted: boolean, elevated: boolean, disposed = false) {
+    const expected = { users: 15, dealerships: 1, dealership_members: 1, staff_grants: 2,
+      audit_logs: promoted ? 3 : 2,
+      ...(requestIds.length ? { otp_requests: requestIds.length, sessions: requestIds.length } : {}),
+      ...(elevated ? { totp_enrollments: 1, totp_backup_codes: 10 } : {}) };
+    expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+      Object.entries(expected).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+    const [budget] = await rows<{ records: number; events: number }>(`SELECT
+      (SELECT count(*)::int FROM "cf_${id}".campaign_records) AS records,
+      (SELECT count(*)::int FROM "cf_${id}".campaign_events) AS events`);
+    expect(budget?.records).toBe(21 + requestIds.length * 2 + (promoted ? 1 : 0) + (elevated ? 11 : 0));
+    expect(budget!.records).toBeLessThanOrEqual(128);
+    // Source-derived exact write count: OTP INSERT + two UPDATEs + Session INSERT;
+    // first TOTP adds enrollment INSERT/UPDATE, ten code INSERTs and Session UPDATE.
+    expect(budget?.events).toBe(21 + requestIds.length * 4 + (promoted ? 2 : 0) + (elevated ? 13 : 0) +
+      (disposed ? 21 + requestIds.length * 2 + (promoted ? 1 : 0) + (elevated ? 11 : 0) : 0));
+    expect(budget!.events).toBeLessThan(2048);
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+      [...requestIds].sort().map(request_id => ({ request_id })));
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_sink ORDER BY request_id`)).toEqual(
+      (disposed ? [] : [...requestIds].sort().map(request_id => ({ request_id }))));
+  }
+
+  it("keeps an ordinarily signed-in and elevated buyer coordinator outside the marketplace admin role", () => withKnownJobs(known => {
+    const id = "c5".repeat(16);
+    return resetAfter([id], async () => {
+      const roster = await seed(id), coordinator = await signIn(id, actor(roster, "coordinator"), known);
+      expect(coordinator.user.role).toBe("buyer");
+      const denied = async () => expect((await get("/api/v1/admin/authority", coordinator).expect(403)).body).toMatchObject({ code: "FORBIDDEN", message: "Admin role required" });
+      let unchanged = await digest(id);
+      await denied();
+      expect(await digest(id)).toBe(unchanged);
+      await elevate(coordinator);
+      unchanged = await digest(id);
+      await denied();
+      expect(await digest(id)).toBe(unchanged);
+      expect(await db.auditLog.count({ where: { targetId: coordinator.user.id, action: "ADMIN_BOOTSTRAP_PROMOTE" } })).toBe(0);
+      await promotionAccounting(id, [coordinator.requestId], false, true);
+      const before = await owned(id);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      await promotionAccounting(id, [coordinator.requestId], false, true, true);
+    });
+  }));
+
+  it("promotes only the coordinator through the real command, requires ordinary TOTP, and redacts the exact audit on retryable reset", () => withKnownJobs(known => {
+    const id = "b6".repeat(16);
+    return resetAfter([id], async () => {
+      const roster = await seed(id), person = actor(roster, "coordinator");
+      const coordinator = await signIn(id, person, known);
+      const initial = await promotionState(roster), unchanged = await digest(id);
+      expect(initial.users.every(user => user.role === "buyer")).toBe(true);
+      expect(await promote(person, { dryRun: true })).toMatchObject({ code: 0 });
+      expect(await promotionState(roster)).toEqual(initial);
+      expect(await digest(id)).toBe(unchanged);
+      // First intended new RED: current track_business refuses users.role='admin'
+      // with "Synthetic identity changed", before the command's audit INSERT.
+      // A fixture, OTP or import failure above is setup failure, not this RED.
+      expect(await promote(person, { loseResponse: true }), "actual coordinator command must commit despite lost response").toEqual({ code: 0, output: undefined });
+      const promoted = await promotionState(roster);
+      expect(promoted.users).toEqual(initial.users.map(user => user.id === person.user_id ? { ...user, role: "admin", updatedAt: expect.any(Date) } : user));
+      for (const key of ["grants", "sessions", "enrollments", "codes", "otps"] as const) expect(promoted[key], key).toEqual(initial[key]);
+      const audits = promoted.audits.filter(audit => audit.action === "ADMIN_BOOTSTRAP_PROMOTE");
+      expect(audits).toHaveLength(1);
+      expect(audits[0]).toMatchObject({ actorId: null, targetType: "user", targetId: person.user_id,
+        details: { reason: "Reservation-owned coordinator moderation proof", before: { role: "buyer" }, after: { role: "admin" } } });
+      expect(audits[0]!.details).toEqual({ reason: "Reservation-owned coordinator moderation proof", before: { role: "buyer" }, after: { role: "admin" } });
+      expect(promoted.audits.filter(audit => audit.action !== "ADMIN_BOOTSTRAP_PROMOTE")).toEqual(initial.audits);
+      const committed = await digest(id);
+      const retry = await promote(person);
+      expect(retry).toMatchObject({ code: 0 });
+      expect(retry.output).toContain(person.user_id);
+      expect(retry.output).not.toContain(person.email);
+      expect(await promotionState(roster)).toEqual(promoted);
+      expect(await digest(id)).toBe(committed);
+      // The existing JWT still says buyer. AdminGuard checks the current database role,
+      // then finds the live Session with no elevation deadline: elevation-expired.
+      expect((await get("/api/v1/admin/authority", coordinator).expect(403)).body).toMatchObject({ code: "FORBIDDEN", message: "Admin TOTP elevation expired" });
+      expect(await digest(id)).toBe(committed);
+      await elevate(coordinator);
+      const elevated = await digest(id);
+      expect((await get("/api/v1/admin/authority", coordinator).expect(200)).body).toEqual({ marketplaceAdmin: true });
+      expect((await post("/api/v1/business/admission", coordinator, admissionFor(id, actor(roster, "buyer-a").user_id)).expect(403)).body.details).toEqual({ reason: "CAPABILITY_REQUIRED" });
+      expect(await digest(id)).toBe(elevated);
+      await promotionAccounting(id, [coordinator.requestId], true, true);
+      const before = await owned(id);
+      expect(before).toContainEqual({ table_name: "audit_logs", row_key: { id: audits[0]!.id } });
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await assertDisposed(id, before);
+      expect(await db.auditLog.findUnique({ where: { id: audits[0]!.id }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual({
+        actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } });
+      const terminal = await digest(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", candidate, profile, fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+      expect(await digest(id)).toBe(terminal);
+      expect(await promote(person)).toEqual({ code: 1, output: "No user found for the selected contact\n" });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      await promotionAccounting(id, [coordinator.requestId], true, true, true);
+      await request.post("/api/v1/auth/refresh").send({ refreshToken: coordinator.refreshToken }).expect(401);
+    });
+  }));
+
+  it("refuses real command promotion for every other alias and for a stale runtime candidate without writes", async () => {
+    const id = "b7".repeat(16), foreignId = "b8".repeat(16);
+    await resetAfter([id, foreignId], async () => {
+      const roster = await seed(id), foreignRoster = await seed(foreignId);
+      const initial = await promotionState(roster), foreign = await promotionState(foreignRoster);
+      const unchanged = await digest(id), foreignDigest = await digest(foreignId);
+      expect(await promote(actor(roster, "coordinator"), { dryRun: true })).toMatchObject({ code: 0 });
+      for (const person of roster.filter(person => person.alias !== "coordinator")) {
+        const refused = await promote(person);
+        expect(refused, `other alias ${person.alias}`).toMatchObject({ code: 1 });
+        expect(await promotionState(roster)).toEqual(initial);
+        expect(await digest(id)).toBe(unchanged);
+      }
+      expect(await promote(actor(roster, "coordinator"), { runtimeCandidate: "b".repeat(40) })).toMatchObject({ code: 1 });
+      expect(await promotionState(roster)).toEqual(initial);
+      expect(await digest(id)).toBe(unchanged);
+      expect(await promotionState(foreignRoster)).toEqual(foreign);
+      expect(await digest(foreignId)).toBe(foreignDigest);
+      await promotionAccounting(id, [], false, false);
+      await promotionAccounting(foreignId, [], false, false);
+    });
+  });
+
+  it("refuses the real coordinator command during cleaning and after disposal without recreating identities", async () => {
+    const id = "b9".repeat(16);
+    await resetAfter([id], async () => {
+      const roster = await seed(id), person = actor(roster, "coordinator");
+      expect(await promote(person, { dryRun: true })).toMatchObject({ code: 0 });
+      expect(await rows(`SELECT object_key,upload_id,bucket,absent FROM "cf_${id}".campaign_object_ledger`)).toEqual([]);
+      expect(await rows(`SELECT table_name,row_key FROM "cf_${id}".campaign_records WHERE table_name IN ('media_uploads','listing_media')`)).toEqual([]);
+      // Fixture lifecycle metadata only. The empty protected object intent must accompany cleaning.
+      // No auth, role, receipt, application row or journal is seeded.
+      await db.$executeRawUnsafe(`UPDATE "cf_${id}".campaign_manifest SET state='cleaning',object_hash='d751713988987e9331980363e24189ce'`);
+      const initial = await promotionState(roster), unchanged = await digest(id);
+      expect(await promote(person)).toMatchObject({ code: 1 });
+      expect(await promotionState(roster)).toEqual(initial);
+      expect(await digest(id)).toBe(unchanged);
+      await promotionAccounting(id, [], false, false);
+      const before = await owned(id);
+      expect(execute("reset", id).code).toBe(0);
+      await assertDisposed(id, before);
+      const terminal = await digest(id);
+      expect(await promote(person)).toEqual({ code: 1, output: "No user found for the selected contact\n" });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      await promotionAccounting(id, [], false, false, true);
+    });
+  });
+
+
+  it("confirms only the admitted Owner's generated contact code and disposes its exact protected SMS evidence", () => withKnownJobs(known => {
+    const id = "e1".repeat(16), foreignId = randomUUID(), reuseId = randomUUID();
+    const phone = "+99367752052";
+    // Literal design vector, independently checked against the selected derivation.
+    expect(`+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${id}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`).toBe(phone);
+    const smsIds = new Set<string>();
+    return resetAfter([id], async () => {
+      const roster = await seed(id);
+      await db.dealership.create({ data: { id: foreignId, slug: `contact-control-${foreignId}`, name: "Foreign contact control" } });
+      try {
+        const foreign = await businessState(foreignId);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({
+          business: { id: admitted.businessId, status: "active" }, membership: { role: "owner" },
+        });
+        const contact = (action: "request" | "verify", login: Login, body: object, businessId = admitted.businessId) =>
+          post(`/api/v1/me/contact-phones/${action}`, login, body).set("x-business-id", businessId);
+        const measurement = () => db.measurementState.findMany({ orderBy: { key: "asc" } });
+        const unchanged = async () => ({
+          users: await db.user.findMany({ where: { id: { in: roster.map(person => person.user_id) } }, orderBy: { id: "asc" } }),
+          sessions: await db.session.findMany({ where: { userId: { in: roster.map(person => person.user_id) } }, orderBy: { id: "asc" } }),
+          proofs: await db.verifiedContactPhone.findMany({ orderBy: { id: "asc" } }),
+          audits: await db.auditLog.findMany({ orderBy: { id: "asc" } }), global: await measurement(),
+        });
+        const initial = await unchanged(), business = await businessState(admitted.businessId);
+        const before = await owned(id), journal = await digest(id);
+        const [eventsBefore] = await rows<{ count: number }>(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_events`);
+        // On d397c8b7 this real route reaches track_business's Unsupported campaign OTP.
+        // A 404, failed admission/redemption or an auth failure is setup failure, never that behavioral RED.
+        const issued = await contact("request", owner, { phone });
+        if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+        await observeIssuance("contact", issued, 200);
+        if (issued.status >= 400) {
+          expect(await digest(id)).toBe(journal);
+          expect(await unchanged()).toEqual(initial);
+          expect(await db.otpRequest.count({ where: { destination: phone } })).toBe(0);
+        }
+        expect(issued.status, "ordinary contact request must pass Unsupported campaign OTP barrier").toBe(200);
+        expect(issued.body).toMatchObject({ status: "code_sent", requestId: expect.any(String), resendInSeconds: expect.any(Number) });
+        expect(issued.body.testCode).toBeUndefined();
+        const requestId = issued.body.requestId as string;
+        expect(requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+        expect(issued.body.resendInSeconds).toBeGreaterThan(0);
+        const smsLedger = () => rows<{ value: Record<string, unknown> }>(`SELECT to_jsonb(l) AS value FROM "cf_${id}".campaign_sms_ledger l WHERE request_id=$1`, requestId);
+        const binding = () => rows<{ value: Record<string, unknown> }>(`SELECT to_jsonb(b) AS value FROM "cf_${id}".campaign_sms_binding b`);
+        const sink = () => rows<{ message: string }>(`SELECT message FROM "cf_${id}".campaign_sms_sink WHERE request_id=$1`, requestId);
+        const retainedBinding = await binding(), retainedLedger = await smsLedger();
+        expect(retainedBinding).toHaveLength(1);
+        expect(retainedBinding[0]?.value).toMatchObject({ reservation_id: id, candidate, destination: phone });
+        expect(retainedLedger).toHaveLength(1);
+        for (const entry of [...retainedBinding, ...retainedLedger]) {
+          expect(entry.value).not.toHaveProperty("message");
+          expect(entry.value).not.toHaveProperty("code");
+        }
+        const pending = await db.otpRequest.findUniqueOrThrow({ where: { id: requestId } });
+        expect(pending).toMatchObject({ purpose: "listing_contact_phone", channel: "phone", destination: phone, phone, userId: owner.user.id, businessId: admitted.businessId, verifiedAt: null, attempts: 0 });
+        expect(retainedLedger[0]?.value).toMatchObject({ request_id: requestId, destination: phone, code_hash: pending.codeHash, issue_row_hash: expect.stringMatching(/^[0-9a-f]+$/) });
+        const delivered = await sink();
+        expect(delivered).toHaveLength(1);
+        // The sole code read is the exact namespace/full-request protected SMS sink.
+        const code = delivered[0]?.message.match(/\b\d{6}\b/)?.[0];
+        expect(code).toBeDefined();
+        expect(createHash("sha256").update(code!).digest("hex")).toBe(pending.codeHash);
+        expect(await queue.getJob(requestId)).toBeUndefined();
+        expect(await unchanged()).toEqual(initial);
+        expect(await businessState(admitted.businessId)).toEqual(business);
+        const sent = await digest(id);
+        expect(sent).not.toBe(journal);
+        await contact("request", staff, { phone }).expect(403);
+        await contact("verify", owner, { phone, code }, foreignId).expect(403);
+        expect(await digest(id)).toBe(sent);
+        const wrong = `${code![0] === "0" ? "1" : "0"}${code!.slice(1)}`;
+        expect((await contact("verify", owner, { phone, code: wrong }).expect(400)).body).toMatchObject({ code: "INVALID_OTP", details: { attemptsLeft: 4 } });
+        expect(await db.otpRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ attempts: 1, verifiedAt: null });
+        const verified = await contact("verify", owner, { phone, code }).expect(200);
+        expect(verified.body.contactPhone).toMatchObject({ phone, source: "confirmed" });
+        const { confirmedAt, reusableUntil } = verified.body.contactPhone as { confirmedAt: string; reusableUntil: string };
+        expect(Date.parse(reusableUntil) - Date.parse(confirmedAt)).toBe(7 * 24 * 60 * 60 * 1000);
+        expect(await db.otpRequest.findUniqueOrThrow({ where: { id: requestId } })).toMatchObject({ attempts: 1, verifiedAt: expect.any(Date) });
+        const confirmed = await businessState(admitted.businessId);
+        expect(confirmed).toEqual({ ...business, business: { ...business.business, contactPhone: phone, contactConfirmedAt: new Date(confirmedAt), updatedAt: expect.any(Date) } });
+        const confirmedDigest = await digest(id);
+        // Foreign scalar use must refuse without adoption or a change to the control.
+        await expect(db.dealership.update({ where: { id: foreignId }, data: { contactPhone: phone } })).rejects.toThrow();
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect((await contact("verify", owner, { phone, code }).expect(400)).body.code).toBe("OTP_ALREADY_USED");
+        expect((await contact("request", owner, { phone }).expect(200)).body).toEqual({ status: "confirmed", contactPhone: verified.body.contactPhone });
+        expect(await digest(id)).toBe(confirmedDigest);
+        expect(await smsLedger()).toEqual(retainedLedger);
+        expect(await sink()).toEqual(delivered);
+        expect(await unchanged()).toEqual(initial);
+        expect((await owned(id)).length).toBe(before.length + 1);
+        const [eventsAfter] = await rows<{ count: number }>(`SELECT count(*)::int AS count FROM "cf_${id}".campaign_events`);
+        expect(eventsAfter?.count).toBe(eventsBefore!.count + 4); // INSERT, wrong attempt, consume, Dealership UPDATE.
+        const disposable = await owned(id);
+        expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await assertDisposed(id, disposable);
+        expect(await sink()).toEqual([]);
+        expect(await smsLedger()).toEqual(retainedLedger);
+        expect(await binding()).toEqual(retainedBinding);
+        expect(await db.otpRequest.findUnique({ where: { id: requestId } })).toBeNull();
+        expect(await measurement()).toEqual(initial.global);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        const terminal = await digest(id);
+        // Fresh unrelated graph IDs may reuse the phone after disposal. No auth or proof is seeded.
+        const reused = await db.dealership.create({ data: { id: reuseId, slug: `terminal-reuse-${reuseId}`, name: "Unrelated later phone reuse", contactPhone: phone } });
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        expect(await digest(id)).toBe(terminal);
+        expect(await db.dealership.findUnique({ where: { id: reuseId } })).toEqual(reused);
+        expect(await smsLedger()).toEqual(retainedLedger);
+        expect(await binding()).toEqual(retainedBinding);
+        expect(await sink()).toEqual([]);
+        expect(await businessState(foreignId)).toEqual(foreign);
+      } finally {
+        // Recover exact authority even if the HTTP response was lost after reserve committed.
+        const [contract] = await rows<{ present: boolean }>(`SELECT to_regclass('"cf_${id}".campaign_sms_ledger') IS NOT NULL AS present`);
+        if (contract?.present) {
+          for (const entry of await rows<{ request_id: string }>(`SELECT request_id FROM "cf_${id}".campaign_sms_ledger`)) smsIds.add(entry.request_id);
+        }
+        for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "synchronous SMS has no email job").toBeUndefined();
+        await db.dealership.deleteMany({ where: { id: reuseId } });
+        await db.dealership.delete({ where: { id: foreignId } });
+      }
+    });
+  }));
+
+  // Literal pre-edit budget and reset arithmetic live in full-v3-support-text-test-handoff-20261020.md.
+  // No runtime gate override: the first open requires campaign-aware synthetic admission from source.
+  const serviceTables = ["support_cases", "service_conversations", "service_messages", "service_outbox", "service_read_states", "service_audits"];
+  async function supportJournal(id: string, expectedRecords: number, expectedEvents: number) {
+    const records = await rows<RecordKey & { row_hash: string; version: bigint; deleted: boolean }>(`SELECT * FROM "cf_${id}".campaign_records ORDER BY table_name,row_key::text`);
+    const events = await rows<{ table_name: string; row_key: Record<string, string>; mutation: string; row_hash: string }>(`SELECT table_name,row_key,mutation,row_hash FROM "cf_${id}".campaign_events ORDER BY sequence`);
+    expect(records).toHaveLength(expectedRecords);
+    expect(events).toHaveLength(expectedEvents);
+    expect(expectedRecords).toBeLessThanOrEqual(128);
+    expect(expectedEvents).toBeLessThanOrEqual(2048);
+    for (const record of records) {
+      expect([...tables, ...serviceTables]).toContain(record.table_name);
+      const history = events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key));
+      expect(Number(record.version)).toBe(history.length);
+      expect(history[0]?.mutation).toBe("INSERT");
+      expect(history.slice(1).map(event => event.mutation)).toEqual(Array.from({ length: history.length - 1 }, (_, index) => record.deleted && index === history.length - 2 ? "DELETE" : "UPDATE"));
+      expect(history.at(-1)?.row_hash).toBe(record.row_hash);
+      const actual = await rows<{ hash: string }>(`SELECT md5(to_jsonb(t)::text) AS hash FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key));
+      expect(actual).toEqual(record.deleted ? [] : [{ hash: record.row_hash }]);
+    }
+    expect(events.every(event => records.some(record => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key)))).toBe(true);
+    return { records, events };
+  }
+  async function supportSnapshot(id: string) {
+    const records = await owned(id);
+    const content = [];
+    for (const record of records) {
+      expect([...tables, ...serviceTables]).toContain(record.table_name);
+      content.push({ ...record, rows: await rows(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key)) });
+    }
+    return { journal: await digest(id), content };
+  }
+  async function supportDisposed(id: string, before: RecordKey[], auditRows: Awaited<ReturnType<typeof db.serviceAudit.findMany>>, requestIds: string[]) {
+    expect(await rows(`SELECT state FROM "cf_${id}".campaign_manifest`)).toEqual([{ state: "disposed" }]);
+    expect(await owned(id)).toEqual(before.filter(row => row.table_name === "audit_logs" || row.table_name === "service_audits"));
+    for (const record of before) {
+      expect([...tables, ...serviceTables]).toContain(record.table_name);
+      const actual = await rows<{ value: Record<string, unknown> }>(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key));
+      if (record.table_name === "audit_logs") {
+        expect(actual).toHaveLength(1);
+        expect(actual[0]?.value).toMatchObject({ actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } });
+        expect(actual[0]?.value["details"]).toEqual({ profile, disposition: "redacted-synthetic-audit" });
+      } else if (record.table_name === "service_audits") {
+        const original = auditRows.find(audit => audit.id === record.row_key["id"]);
+        expect(original).toBeDefined();
+        // Non-null scalar resourceId cannot be nulled. Keep exact ID, action, purpose, version and timestamp.
+        expect(actual).toHaveLength(1);
+        expect(await db.serviceAudit.findUnique({ where: { id: original!.id } })).toEqual({ ...original, actorId: null, reason: null, targetStaffId: null, resourceId: "redacted-synthetic-service" });
+      } else expect(actual, `owned ${record.table_name} ${JSON.stringify(record.row_key)} disposed`).toEqual([]);
+    }
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual([...requestIds].sort().map(request_id => ({ request_id })));
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_sink`)).toEqual([]);
+    const redis = await queue.client;
+    for (const requestId of requestIds) {
+      expect(await queue.getJob(requestId)).toBeUndefined();
+      const key = queue.toKey(`de:campaign-cf_${id}-${requestId}`);
+      expect(await redis.get(key)).toBe(`disposed:cf_${id}:${candidate}:${requestId}`);
+      expect(await redis.pttl(key)).toBe(-1);
+    }
+  }
+
+  it("keeps Support text, private notes and read state in one reservation, retains redacted audit IDs and preserves foreign cases on repeatable reset", () => withKnownJobs(known => {
+    const id = "f1".repeat(16), foreignId = "f2".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const roster = await seed(id);
+      const { staff } = await elevatedStaff(id, roster, known, ["support.operations"]);
+      const buyerA = await signIn(id, actor(roster, "buyer-a"), known);
+      const buyerB = await signIn(id, actor(roster, "buyer-b"), known);
+      const requestIds = [...known];
+      await supportJournal(id, 53, 65);
+      // FIRST NEW BEHAVIORAL BARRIER: source runtime currently returns COLLECTION_DISABLED/503.
+      const opened = await post("/api/v1/services/conversations", buyerA, { purpose: "support", synthetic: true }).expect(201);
+      const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+      expect(conversationId).toMatch(/^[a-f0-9-]{36}$/);
+      expect(resourceId).toMatch(/^[a-f0-9-]{36}$/);
+      const path = `/api/v1/services/conversations/${conversationId}`;
+      expect((await owned(id)).filter(row => serviceTables.includes(row.table_name))).toEqual([
+        { table_name: "service_conversations", row_key: { id: conversationId } }, { table_name: "support_cases", row_key: { id: resourceId } },
+      ]);
+      await supportJournal(id, 55, 67);
+      let unchanged = await supportSnapshot(id);
+      expect((await post("/api/v1/services/conversations", buyerA, { purpose: "support", synthetic: true }).expect(201)).body).toEqual(opened.body);
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+      const customerMessage = { clientMessageId: randomUUID(), body: "Synthetic buyer A Support request", visibility: "customer" };
+      const customerSent = await post(`${path}/messages`, buyerA, customerMessage).expect(201);
+      expect(customerSent.body).toMatchObject({ clientMessageId: customerMessage.clientMessageId, sequence: 1, sender: "customer", visibility: "customer", body: customerMessage.body, attachment: null });
+      const debt = (await get(path, buyerA).expect(200)).body.support.unansweredSince;
+      expect(debt).not.toBeNull();
+      await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+      const note = { clientMessageId: randomUUID(), body: "Synthetic private Support note", visibility: "staff" };
+      const noteSent = await post(`${path}/messages`, staff, note).expect(201);
+      expect(noteSent.body).toMatchObject({ sequence: 3, sender: "carberk", visibility: "staff", body: note.body });
+      expect((await get(path, buyerA).expect(200)).body.support.unansweredSince).toBe(debt);
+      const notice = { clientMessageId: randomUUID(), body: "Synthetic Support notice", visibility: "customer", supportKind: "notice", reason: "Synthetic customer-specific notice reason to erase" };
+      const noticeSent = await post(`${path}/messages`, staff, notice).expect(201);
+      expect(noticeSent.body).toMatchObject({ sequence: 4, sender: "carberk", visibility: "customer", body: notice.body });
+      expect((await get(path, buyerA).expect(200)).body.support.unansweredSince).toBe(debt);
+      const reply = { clientMessageId: randomUUID(), body: "Synthetic customer-visible Support reply", visibility: "customer", supportKind: "reply" };
+      const replySent = await post(`${path}/messages`, staff, reply).expect(201);
+      expect(replySent.body).toMatchObject({ sequence: 5, sender: "carberk", visibility: "customer", body: reply.body });
+      const staffRead = await get(path, staff).expect(200);
+      expect(staffRead.body.messages.map((message: { id: string }) => message.id)).toEqual([customerSent.body.id, noteSent.body.id, noticeSent.body.id, replySent.body.id]);
+      expect(staffRead.body).toMatchObject({ assignmentVersion: 1, assigned: true, lastSequence: 5, support: { unansweredSince: null } });
+      const customerRead = await get(path, buyerA).expect(200);
+      expect(customerRead.headers["cache-control"]).toBe("no-store, private");
+      expect(customerRead.body.messages.map((message: { id: string }) => message.id)).toEqual([customerSent.body.id, noticeSent.body.id, replySent.body.id]);
+      expect(customerRead.body.messages.every((message: { operatorName: unknown }) => message.operatorName === null)).toBe(true);
+      expect(customerRead.body).toMatchObject({ lastSequence: 5, readThrough: 0, unread: 2, operatorName: null });
+      await post(`${path}/read`, buyerA, { throughSequence: 5 }).expect(201);
+      expect((await get(path, buyerA).expect(200)).body).toMatchObject({ readThrough: 5, unread: 0 });
+      expect(await db.serviceReadState.findMany({ where: { conversationId }, select: { conversationId: true, userId: true, lastSequence: true } })).toEqual([{ conversationId, userId: buyerA.user.id, lastSequence: 5 }]);
+      unchanged = await supportSnapshot(id);
+      expect((await post(`${path}/messages`, buyerA, customerMessage).expect(201)).body).toEqual(customerSent.body);
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+      // Staff exact retry still creates the ordinary locked SERVICE_SEND access audit, but no content/outbox/sequence write.
+      expect((await post(`${path}/messages`, staff, reply).expect(201)).body).toEqual(replySent.body);
+      const other = await post("/api/v1/services/conversations", buyerB, { purpose: "support", synthetic: true }).expect(201);
+      expect(other.body.id).not.toBe(conversationId);
+      expect((await get("/api/v1/services/conversations", buyerB).expect(200)).body).toEqual([{ id: other.body.id, purpose: "support", createdAt: expect.any(String) }]);
+      expect((await get("/api/v1/services/conversations", buyerA).expect(200)).body).toEqual([{ id: conversationId, purpose: "support", createdAt: expect.any(String) }]);
+      unchanged = await supportSnapshot(id);
+      expect((await get(path, buyerB).expect(403)).body.code).toBe("NO_ACCESS");
+      expect((await post(`${path}/messages`, buyerB, { clientMessageId: randomUUID(), visibility: "customer", body: "Synthetic cross-account refusal" }).expect(403)).body.code).toBe("NO_ACCESS");
+      expect((await post(`${path}/read`, buyerB, { throughSequence: 5 }).expect(403)).body.code).toBe("NO_ACCESS");
+      expect((await post(`${path}/messages`, buyerA, { ...customerMessage, body: "Changed idempotency payload" }).expect(409)).body.code).toBe("IDEMPOTENCY_CONFLICT");
+      // Runtime HTTP has no client candidate field. Exercise the actual operator binding, not an invented HTTP header.
+      expect(execute("fixture", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, sqlCalls: 0, receipt: undefined });
+      expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+
+      cleanupIds.push(foreignId);
+      const foreignRoster = await seed(foreignId), foreignBuyer = await signIn(foreignId, actor(foreignRoster, "buyer-a"), known);
+      const foreign = await post("/api/v1/services/conversations", foreignBuyer, { purpose: "support", synthetic: true }).expect(201);
+      const foreignBefore = await supportSnapshot(foreignId);
+      // A valid current support grant cannot adopt a case from another reservation through assignment.
+      await post(`/api/v1/services/conversations/${foreign.body.id}/assignment`, staff, { expectedVersion: 0 }).expect(403);
+      expect(await supportSnapshot(id)).toEqual(unchanged);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      await supportJournal(foreignId, 25, 27);
+
+      const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+      expect(audits.map(({ action }) => action).sort()).toEqual(["SERVICE_ASSIGN", "SERVICE_HANDOVER", "SERVICE_NOTE", "SERVICE_READ", "SERVICE_SEND", "SERVICE_SEND", "SERVICE_SEND", "SUPPORT_CUSTOMER_MESSAGE", "SUPPORT_NOTICE", "SUPPORT_PRIVATE_NOTE", "SUPPORT_REPLY"]);
+      for (const audit of audits) expect(audit).toMatchObject({ purpose: "support", resourceId, actorId: audit.action === "SUPPORT_CUSTOMER_MESSAGE" ? buyerA.user.id : staff.user.id,
+        assignmentVersion: audit.action === "SERVICE_ASSIGN" || audit.action === "SUPPORT_CUSTOMER_MESSAGE" ? 0 : 1, reason: audit.action === "SUPPORT_NOTICE" ? notice.reason : null, targetStaffId: audit.action === "SERVICE_HANDOVER" ? staff.user.id : null });
+      const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      expect(outbox.map(({ eventType, sequence, visibility, lifecycleEpoch }) => ({ eventType, sequence, visibility, lifecycleEpoch }))).toEqual([
+        { eventType: "message", sequence: 1, visibility: "customer", lifecycleEpoch: 0 }, { eventType: "handover", sequence: 2, visibility: "customer", lifecycleEpoch: 0 },
+        { eventType: "message", sequence: 3, visibility: "staff", lifecycleEpoch: 0 }, { eventType: "message", sequence: 4, visibility: "customer", lifecycleEpoch: 0 },
+        { eventType: "message", sequence: 5, visibility: "customer", lifecycleEpoch: 0 },
+      ]);
+      const before = await owned(id);
+      const expectedServiceKeys = [
+        { table_name: "support_cases", row_key: { id: resourceId } }, { table_name: "support_cases", row_key: { id: other.body.resourceId } },
+        { table_name: "service_conversations", row_key: { id: conversationId } }, { table_name: "service_conversations", row_key: { id: other.body.id } },
+        ...[customerSent.body.id, noteSent.body.id, noticeSent.body.id, replySent.body.id].map(id => ({ table_name: "service_messages", row_key: { id } })),
+        ...outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })),
+        ...audits.map(({ id }) => ({ table_name: "service_audits", row_key: { id } })),
+        { table_name: "service_read_states", row_key: { conversationId, userId: buyerA.user.id } },
+      ];
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toHaveLength(25);
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toEqual(expect.arrayContaining(expectedServiceKeys));
+      const live = await supportJournal(id, 78, 100);
+      expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+        Object.entries({ audit_logs: 3, dealership_members: 1, dealerships: 1, otp_requests: 4, service_audits: 11, service_conversations: 2, service_messages: 4, service_outbox: 5, service_read_states: 1, sessions: 4, staff_grants: 3, support_cases: 2, totp_backup_codes: 20, totp_enrollments: 2, users: 15 }).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+      expect(await rows(`SELECT table_name,mutation,count(*)::int AS count FROM "cf_${id}".campaign_events WHERE mutation<>'INSERT' GROUP BY table_name,mutation ORDER BY table_name`)).toEqual([
+        { table_name: "otp_requests", mutation: "UPDATE", count: 8 }, { table_name: "service_conversations", mutation: "UPDATE", count: 5 },
+        { table_name: "sessions", mutation: "UPDATE", count: 2 }, { table_name: "support_cases", mutation: "UPDATE", count: 5 }, { table_name: "totp_enrollments", mutation: "UPDATE", count: 2 },
+      ]);
+      const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await supportDisposed(id, before, audits, requestIds);
+      const terminal = await supportJournal(id, 78, 178);
+      expect(terminal.events.slice(0, 100)).toEqual(live.events);
+      for (const record of terminal.records) {
+        const prior = live.records.find(row => row.table_name === record.table_name && JSON.stringify(row.row_key) === JSON.stringify(record.row_key));
+        expect(Number(record.version)).toBe(Number(prior!.version) + 1);
+        expect(terminal.events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key)).at(-1)?.mutation).toBe(["audit_logs", "service_audits"].includes(record.table_name) ? "UPDATE" : "DELETE");
+      }
+      const terminalSnapshot = await supportSnapshot(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await supportSnapshot(id)).toEqual(terminalSnapshot);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      const foreignKeys = await owned(foreignId);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      await supportDisposed(foreignId, foreignKeys, [], [foreignBuyer.requestId]);
+      await supportJournal(foreignId, 25, 52);
+    });
+  }));
+
+  // Literal write ledger: full-v3-support-close-reopen-test-20261021.md.
+  // No clock mutation: successful 14-day awaiting closure and 90-day purge remain deferred.
+  it("closes and reopens owned Support with current assignment, response debt and repeatable exact reset", () => withKnownJobs(known => {
+    const id = "f3".repeat(16), foreignId = "f4".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const roster = await seed(id);
+      const { coordinator, staff } = await elevatedStaff(id, roster, known, ["support.operations"]);
+      const customer = await signIn(id, actor(roster, "buyer-a"), known);
+      const outsider = await signIn(id, actor(roster, "buyer-b"), known);
+      const next = await signIn(id, actor(roster, "history-fulfiller"), known);
+      await grant(coordinator, next.user.id, "support.operations").expect(204);
+      await elevate(next);
+      const requestIds = [...known];
+      await supportJournal(id, 68, 84);
+      const opened = await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201);
+      const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+      const path = `/api/v1/services/conversations/${conversationId}`;
+      const send = (login: Login, body: string, extra: object = {}) => post(`${path}/messages`, login,
+        { clientMessageId: randomUUID(), body, visibility: "customer", ...extra });
+      const customerSent = await send(customer, "Synthetic lifecycle request").expect(201);
+      await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+      const debt = (await get(path, customer).expect(200)).body.support.unansweredSince;
+      expect(debt).toEqual(expect.any(String));
+      const beforeCommand = await supportSnapshot(id);
+      await supportJournal(id, 76, 96);
+      // FIRST NEW RED: text=false leaves actor() without campaign admission before debt validation.
+      // Setup/admission/auth failures above are not this behavioral refusal.
+      const owed = await post(`${path}/support`, staff, { kind: "close_resolved" });
+      expect(await supportSnapshot(id)).toEqual(beforeCommand);
+      expect(owed.status, "ordinary response-debt refusal must pass the campaign command gate").toBe(400);
+      expect(owed.body.code).toBe("INVALID_MESSAGE");
+
+      // All refusals roll back even the locked staff access audit.
+      for (const login of [customer, outsider, next]) {
+        await post(`${path}/support`, login, { kind: "close_resolved" }).expect(403);
+        await post(`${path}/support`, login, { kind: "reopen" }).expect(403);
+      }
+      expect(await supportSnapshot(id)).toEqual(beforeCommand);
+      const information = await send(staff, "Synthetic request for information", { supportKind: "request_information" }).expect(201);
+      const waiting = await get(path, customer).expect(200);
+      expect(waiting.body.support).toMatchObject({ unansweredSince: null, awaitingCustomerSince: expect.any(String) });
+      const awaitingClosure = { kind: "close_awaiting", reason: "Synthetic awaiting closure reason", body: "Synthetic closure notice. Reply to reopen.", clientMessageId: randomUUID() };
+      const beforeAwaiting = await supportSnapshot(id);
+      await post(`${path}/support`, staff, awaitingClosure).expect(400);
+      expect(await supportSnapshot(id)).toEqual(beforeAwaiting);
+      expect(await db.serviceMessage.findMany({ where: { conversationId, clientMessageId: awaitingClosure.clientMessageId } })).toEqual([]);
+      // Too-early closure must not emit its customer notice or consume a sequence.
+      expect((await get(path, customer).expect(200)).body.lastSequence).toBe(3);
+      const reply = await send(staff, "Synthetic resolved reply", { supportKind: "reply" }).expect(201);
+      const notice = { clientMessageId: randomUUID(), body: "Synthetic resolution notice. Reply to reopen.", visibility: "customer", supportKind: "notice", reason: "Synthetic customer-specific resolution reason" };
+      const noticeSent = await post(`${path}/messages`, staff, notice).expect(201);
+      expect(noticeSent.body).toMatchObject({ sender: "carberk", visibility: "customer", sequence: 5, body: notice.body });
+      const noticeBefore = await db.serviceMessage.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      const outboxBefore = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      expect((await post(`${path}/messages`, staff, notice).expect(201)).body).toEqual(noticeSent.body);
+      expect(await db.serviceMessage.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(noticeBefore);
+      expect(await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(outboxBefore);
+      await supportJournal(id, 89, 115); // Retry adds exactly one SERVICE_SEND access audit.
+      expect((await get(path, customer).expect(200)).body.support).toMatchObject({ unansweredSince: null, awaitingCustomerSince: null });
+      await post(`${path}/support`, staff, { kind: "close_resolved" }).expect(201);
+      const closed = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+      expect(closed).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null });
+      // Resolved closure has no implicit message/notice or outbox under the ordinary contract.
+      expect(await db.serviceMessage.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(noticeBefore);
+      expect(await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } })).toEqual(outboxBefore);
+      expect((await get(path, customer).expect(200)).body).toMatchObject({ status: "closed", lastSequence: 5 });
+      const reopenedMessage = await send(customer, "Synthetic reply reopens retained case").expect(201);
+      const reopened = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+      expect(reopened).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date), awaitingCustomerSince: null });
+      const extraMessage = await send(customer, "Synthetic extra request preserves oldest debt").expect(201);
+      expect((await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).unansweredSince).toEqual(reopened.unansweredSince);
+      expect((await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201)).body).toEqual(opened.body);
+      await post(`${path}/assignment`, staff, { expectedVersion: 1, targetUserId: next.user.id }).expect(201);
+      const handedOver = await supportSnapshot(id);
+      for (const kind of ["close_resolved", "reopen"]) await post(`${path}/support`, staff, { kind }).expect(403);
+      expect(await supportSnapshot(id)).toEqual(handedOver);
+      await post(`${path}/support`, next, { kind: "reopen" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).toMatchObject({ assigneeId: next.user.id, assignmentVersion: 2, status: "open", closedAt: null, unansweredSince: reopened.unansweredSince });
+      const stillOwed = await supportSnapshot(id);
+      await post(`${path}/support`, next, { kind: "close_resolved" }).expect(400);
+      expect(await supportSnapshot(id)).toEqual(stillOwed);
+      const nextReply = await send(next, "Synthetic current owner resolves request", { supportKind: "reply" }).expect(201);
+      await post(`${path}/support`, next, { kind: "close_resolved" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null });
+      await post(`${path}/support`, next, { kind: "reopen" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } })).toMatchObject({ status: "open", closedAt: null, unansweredSince: null, awaitingCustomerSince: null });
+
+      cleanupIds.push(foreignId);
+      const foreignRoster = await seed(foreignId);
+      const foreignCustomer = await signIn(foreignId, actor(foreignRoster, "buyer-a"), known);
+      const foreignOpened = await post("/api/v1/services/conversations", foreignCustomer, { purpose: "support", synthetic: true }).expect(201);
+      const foreignBefore = await supportSnapshot(foreignId), ownBefore = await supportSnapshot(id);
+      for (const kind of ["close_resolved", "reopen"]) {
+        await post(`${path}/support`, foreignCustomer, { kind }).expect(403);
+        await post(`/api/v1/services/conversations/${foreignOpened.body.id}/support`, next, { kind }).expect(403);
+      }
+      expect(await supportSnapshot(id)).toEqual(ownBefore);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      await supportJournal(foreignId, 25, 27);
+      const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+      expect(audits.map(({ action }) => action).sort()).toEqual([
+        ...Array<string>(2).fill("SERVICE_ASSIGN"), ...Array<string>(2).fill("SERVICE_HANDOVER"),
+        ...Array<string>(4).fill("SERVICE_NOTE"), ...Array<string>(5).fill("SERVICE_SEND"),
+        ...Array<string>(3).fill("SUPPORT_CUSTOMER_MESSAGE"), ...Array<string>(2).fill("SUPPORT_REPLY"),
+        "SUPPORT_REQUEST_INFORMATION", "SUPPORT_NOTICE", ...Array<string>(2).fill("SUPPORT_CLOSE_RESOLVED"), ...Array<string>(2).fill("SUPPORT_REOPEN"),
+      ].sort());
+      expect(audits.filter(audit => audit.action === "SUPPORT_CLOSE_RESOLVED").map(audit => ({ actorId: audit.actorId, assignmentVersion: audit.assignmentVersion })).sort((a, b) => Number(a.assignmentVersion) - Number(b.assignmentVersion))).toEqual([
+        { actorId: staff.user.id, assignmentVersion: 1 }, { actorId: next.user.id, assignmentVersion: 2 },
+      ]);
+      expect(audits.filter(audit => audit.action === "SUPPORT_REOPEN")).toEqual([
+        expect.objectContaining({ actorId: next.user.id, assignmentVersion: 2 }), expect.objectContaining({ actorId: next.user.id, assignmentVersion: 2 }),
+      ]);
+      expect(audits.find(audit => audit.action === "SUPPORT_NOTICE")).toMatchObject({ actorId: staff.user.id, reason: notice.reason, assignmentVersion: 1 });
+      const messages = [customerSent, information, reply, noticeSent, reopenedMessage, extraMessage, nextReply];
+      const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+      expect(outbox.map(({ eventType, sequence, visibility, lifecycleEpoch }) => ({ eventType, sequence, visibility, lifecycleEpoch }))).toEqual(
+        Array.from({ length: 9 }, (_, index) => ({ eventType: index === 1 || index === 7 ? "handover" : "message", sequence: index + 1, visibility: "customer", lifecycleEpoch: 0 })));
+      const customerRead = await get(path, customer).expect(200);
+      expect(customerRead.body.messages.map((message: { id: string }) => message.id)).toEqual(messages.map(message => message.body.id));
+      expect(customerRead.body.messages.every((message: { sender: string; operatorName: string | null }) => message.sender === "customer" || message.sender === "carberk" && message.operatorName === null)).toBe(true);
+      const before = await owned(id);
+      const keys = [
+        { table_name: "support_cases", row_key: { id: resourceId } }, { table_name: "service_conversations", row_key: { id: conversationId } },
+        ...messages.map(message => ({ table_name: "service_messages", row_key: { id: message.body.id } })),
+        ...outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })), ...audits.map(({ id }) => ({ table_name: "service_audits", row_key: { id } })),
+      ];
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toHaveLength(42);
+      expect(before.filter(row => serviceTables.includes(row.table_name))).toEqual(expect.arrayContaining(keys));
+      const live = await supportJournal(id, 110, 148);
+      expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+        Object.entries({ audit_logs: 4, dealership_members: 1, dealerships: 1, otp_requests: 5, service_audits: 24, service_conversations: 1, service_messages: 7, service_outbox: 9, sessions: 5, staff_grants: 4, support_cases: 1, totp_backup_codes: 30, totp_enrollments: 3, users: 15 }).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+      expect(await rows(`SELECT table_name,mutation,count(*)::int AS count FROM "cf_${id}".campaign_events WHERE mutation<>'INSERT' GROUP BY table_name,mutation ORDER BY table_name`)).toEqual([
+        { table_name: "otp_requests", mutation: "UPDATE", count: 10 }, { table_name: "service_conversations", mutation: "UPDATE", count: 9 },
+        { table_name: "sessions", mutation: "UPDATE", count: 3 }, { table_name: "support_cases", mutation: "UPDATE", count: 13 }, { table_name: "totp_enrollments", mutation: "UPDATE", count: 3 },
+      ]);
+      const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await supportDisposed(id, before, audits, requestIds);
+      const terminal = await supportJournal(id, 110, 258);
+      expect(terminal.events.slice(0, 148)).toEqual(live.events);
+      for (const record of terminal.records) {
+        const prior = live.records.find(row => row.table_name === record.table_name && JSON.stringify(row.row_key) === JSON.stringify(record.row_key));
+        expect(Number(record.version)).toBe(Number(prior!.version) + 1);
+        expect(terminal.events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key)).at(-1)?.mutation).toBe(["audit_logs", "service_audits"].includes(record.table_name) ? "UPDATE" : "DELETE");
+      }
+      const terminalSnapshot = await supportSnapshot(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await supportSnapshot(id)).toEqual(terminalSnapshot);
+      expect(await supportSnapshot(foreignId)).toEqual(foreignBefore);
+      const foreignKeys = await owned(foreignId);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      await supportDisposed(foreignId, foreignKeys, [], [foreignCustomer.requestId]);
+      await supportJournal(foreignId, 25, 52);
+    });
+  }));
+
+  // Worker-only elapsed time; literal ledger in full-v3-support-retention-test-20261021.md.
+  it("purges closed Support at its inclusive stored deadline while preserving a reopened foreign case and exact reset proof", () => withKnownJobs(known => {
+    const id = "f5".repeat(16), foreignId = "f6".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const allowed = [...tables, ...serviceTables, "service_erasure_fences"];
+      const snapshot = async (reservation: string) => {
+        const content = [];
+        for (const record of await owned(reservation)) {
+          expect(allowed).toContain(record.table_name);
+          content.push({ ...record, rows: await rows(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key)) });
+        }
+        return { journal: await digest(reservation), content };
+      };
+      const journal = async (reservation: string, recordCount: number, eventCount: number) => {
+        const records = await rows<RecordKey & { version: bigint; deleted: boolean; row_hash: string }>(`SELECT * FROM "cf_${reservation}".campaign_records ORDER BY table_name,row_key::text`);
+        const events = await rows<{ table_name: string; row_key: Record<string, string>; mutation: string; row_hash: string }>(`SELECT table_name,row_key,mutation,row_hash FROM "cf_${reservation}".campaign_events ORDER BY sequence`);
+        expect(records).toHaveLength(recordCount);
+        expect(events).toHaveLength(eventCount);
+        expect(recordCount).toBeLessThanOrEqual(128);
+        expect(eventCount).toBeLessThanOrEqual(2048);
+        for (const record of records) {
+          expect(allowed).toContain(record.table_name);
+          const history = events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key));
+          expect(Number(record.version)).toBe(history.length);
+          expect(history.map(event => event.mutation)).toEqual(["INSERT", ...Array<string>(history.length - 1 - Number(record.deleted)).fill("UPDATE"), ...(record.deleted ? ["DELETE"] : [])]);
+          expect(history.at(-1)?.row_hash).toBe(record.row_hash);
+          expect(await rows(`SELECT md5(to_jsonb(t)::text) AS hash FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key))).toEqual(record.deleted ? [] : [{ hash: record.row_hash }]);
+        }
+        expect(events.every(event => records.some(record => record.table_name === event.table_name && JSON.stringify(record.row_key) === JSON.stringify(event.row_key)))).toBe(true);
+        return { records, events };
+      };
+      const worker = async (now: Date) => {
+        const result = await promisify(execFile)(process.execPath, ["-e", `
+          require('reflect-metadata'); require('tsx/cjs');
+          const { PrismaService } = require('@auto-tm/db');
+          const { S3Client, CreateBucketCommand } = require('@aws-sdk/client-s3');
+          const { ExpireServiceContent } = require('./src/jobs/ExpireServiceContent.ts');
+          const { S3RetiredObjectStore } = require('./src/jobs/S3RetiredObjectStore.ts');
+          (async () => {
+            const db = new PrismaService();
+            const s3 = new S3Client({ endpoint: process.env.MINIO_ENDPOINT, region: process.env.MINIO_REGION ?? 'us-east-1', forcePathStyle: true,
+              credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
+            try {
+              // Match ServiceLifecycle's real disposable service bucket setup, including empty-manifest version checks.
+              try { await s3.send(new CreateBucketCommand({ Bucket: 'service-private' })); }
+              catch (error) { if (!['BucketAlreadyExists', 'BucketAlreadyOwnedByYou'].includes(error.name)) throw error; }
+              console.log(JSON.stringify(await new ExpireServiceContent(db, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
+            finally { s3.destroy(); await db.onModuleDestroy(); }
+          })().catch(error => { console.error('[issue-901-cleanup]', JSON.stringify((${cleanupFailure.toString()})(error))); console.error('Deadline Support worker refused'); process.exitCode = 1; });
+        `, now.toISOString()], {
+          timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` },
+        });
+        return JSON.parse(result.stdout.trim()) as { supportPurged: number; attachmentsRetired: number; cleanupsCompleted: number };
+      };
+      const closeCase = async (reservation: string) => {
+        const beforeJobs = new Set(known);
+        const roster = await seed(reservation);
+        const { staff } = await elevatedStaff(reservation, roster, known, ["support.operations"]);
+        const customer = await signIn(reservation, actor(roster, "buyer-a"), known);
+        await journal(reservation, 51, 61);
+        const opened = await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201);
+        const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+        const path = `/api/v1/services/conversations/${conversationId}`;
+        const sent = await post(`${path}/messages`, customer, { clientMessageId: randomUUID(), body: "Synthetic retained request", visibility: "customer" }).expect(201);
+        await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+        const replied = await post(`${path}/messages`, staff, { clientMessageId: randomUUID(), body: "Synthetic retained resolution", visibility: "customer", supportKind: "reply" }).expect(201);
+        await post(`${path}/support`, staff, { kind: "close_resolved" }).expect(201);
+        const closed = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+        expect(closed).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null, assignmentVersion: 1 });
+        const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+        expect(audits.map(audit => audit.action).sort()).toEqual(["SERVICE_ASSIGN", "SERVICE_HANDOVER", "SERVICE_NOTE", "SERVICE_SEND", "SUPPORT_CLOSE_RESOLVED", "SUPPORT_CUSTOMER_MESSAGE", "SUPPORT_REPLY"]);
+        const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+        expect(outbox.map(row => ({ sequence: row.sequence, eventType: row.eventType, lifecycleEpoch: row.lifecycleEpoch }))).toEqual([
+          { sequence: 1, eventType: "message", lifecycleEpoch: 0 }, { sequence: 2, eventType: "handover", lifecycleEpoch: 0 }, { sequence: 3, eventType: "message", lifecycleEpoch: 0 },
+        ]);
+        await journal(reservation, 65, 82);
+        return { customer, path, conversationId, resourceId, closedAt: closed.closedAt!, closed, audits, outbox, messageIds: [sent.body.id as string, replied.body.id as string], requestIds: [...known].filter(requestId => !beforeJobs.has(requestId)) };
+      };
+      const primary = await closeCase(id);
+      cleanupIds.push(foreignId);
+      const foreign = await closeCase(foreignId);
+      await post(`${foreign.path}/messages`, foreign.customer, { clientMessageId: randomUUID(), body: "Synthetic foreign reply reopens retained case", visibility: "customer" }).expect(201);
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: foreign.resourceId } })).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date) });
+      await journal(foreignId, 68, 87);
+      const foreignBefore = await snapshot(foreignId), primaryBefore = await snapshot(id);
+      const deadline = new Date(primary.closedAt.getTime() + 90 * 86400000);
+      const noWork = { supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 };
+      expect(await worker(new Date(deadline.getTime() - 1))).toEqual(noWork);
+      expect(await snapshot(id)).toEqual(primaryBefore);
+      expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      // FIRST NEW RED: existing campaign guard refuses erasedAt/epoch UPDATE atomically.
+      // Preserve the raw worker error and prove rollback; do not label setup/transport failures as this RED.
+      const purge = await worker(deadline).then(result => ({ result, error: undefined }), (error: unknown) => ({ result: undefined, error }));
+      if (purge.error) {
+        console.error("[issue-901-cleanup]", JSON.stringify({ phase: "deadline-worker", ...cleanupFailure(purge.error) }));
+        expect(await snapshot(id)).toEqual(primaryBefore);
+        expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      }
+      expect(purge.error, "deadline worker must pass Unsupported campaign service on erasedAt/epoch UPDATE").toBeUndefined();
+      expect(purge.result).toEqual({ supportPurged: 1, attachmentsRetired: 0, cleanupsCompleted: 1 });
+      expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: primary.conversationId } })).toMatchObject({ erasedAt: deadline, lifecycleEpoch: 1, lastSequence: 3 });
+      expect(await db.supportCase.findUniqueOrThrow({ where: { id: primary.resourceId } })).toEqual({ ...primary.closed, customerId: null, assigneeId: null, sourceListingId: null, assignmentVersion: 2, updatedAt: expect.any(Date) });
+      expect(await db.serviceMessage.findMany({ where: { conversationId: primary.conversationId } })).toEqual([]);
+      expect(await db.serviceOutbox.findMany({ where: { conversationId: primary.conversationId } })).toEqual([]);
+      const fence = await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: primary.conversationId } });
+      expect(fence).toEqual({ conversationId: primary.conversationId, epoch: 1, objectKeys: [], erasedAt: deadline, cleanupCompletedAt: deadline });
+      const audits = await db.serviceAudit.findMany({ where: { resourceId: primary.resourceId }, orderBy: { id: "asc" } });
+      expect(audits).toHaveLength(8);
+      for (const audit of primary.audits) expect(audits.find(row => row.id === audit.id)).toEqual({ ...audit, reason: null });
+      const purgeAudit = audits.find(audit => audit.action === "SERVICE_CONTENT_PURGED");
+      expect(purgeAudit).toMatchObject({ id: expect.any(String), purpose: "support", resourceId: primary.resourceId, actorId: null, reason: null, targetStaffId: null, assignmentVersion: 1 });
+      expect(audits.filter(audit => !primary.audits.some(original => original.id === audit.id))).toEqual([purgeAudit]);
+      const purged = await journal(id, 67, 99);
+      expect(await rows(`SELECT table_name,count(*)::int AS count FROM "cf_${id}".campaign_records GROUP BY table_name ORDER BY table_name`)).toEqual(
+        Object.entries({ audit_logs: 3, dealership_members: 1, dealerships: 1, otp_requests: 3, service_audits: 8, service_conversations: 1, service_erasure_fences: 1, service_messages: 2, service_outbox: 3, sessions: 3, staff_grants: 3, support_cases: 1, totp_backup_codes: 20, totp_enrollments: 2, users: 15 }).sort(([a], [b]) => a.localeCompare(b)).map(([table_name, count]) => ({ table_name, count })));
+      expect(await rows(`SELECT table_name,mutation,count(*)::int AS count FROM "cf_${id}".campaign_events WHERE mutation<>'INSERT' GROUP BY table_name,mutation ORDER BY table_name,mutation`)).toEqual([
+        { table_name: "otp_requests", mutation: "UPDATE", count: 6 }, { table_name: "service_audits", mutation: "UPDATE", count: 7 },
+        { table_name: "service_conversations", mutation: "UPDATE", count: 4 }, { table_name: "service_erasure_fences", mutation: "UPDATE", count: 1 },
+        { table_name: "service_messages", mutation: "DELETE", count: 2 }, { table_name: "service_outbox", mutation: "DELETE", count: 3 },
+        { table_name: "sessions", mutation: "UPDATE", count: 2 }, { table_name: "support_cases", mutation: "UPDATE", count: 5 }, { table_name: "totp_enrollments", mutation: "UPDATE", count: 2 },
+      ]);
+      expect(purged.records.filter(record => record.deleted).map(({ table_name, row_key }) => ({ table_name, row_key }))).toEqual(expect.arrayContaining([
+        ...primary.messageIds.map(id => ({ table_name: "service_messages", row_key: { id } })), ...primary.outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })),
+      ]));
+      expect(purged.records.filter(record => record.deleted)).toHaveLength(5);
+      expect(purged.records.find(record => record.table_name === "service_erasure_fences")).toMatchObject({ row_key: { conversationId: primary.conversationId }, version: 2n, deleted: false });
+      const purgedSnapshot = await snapshot(id);
+      expect(await worker(deadline)).toEqual(noWork);
+      expect(await snapshot(id)).toEqual(purgedSnapshot);
+      expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      const before = await owned(id);
+      expect(before).toHaveLength(62);
+      const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await supportDisposed(id, before.filter(record => record.table_name !== "service_erasure_fences"), audits, primary.requestIds);
+      expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+      expect(await db.serviceConversation.findUnique({ where: { id: primary.conversationId } })).toBeNull();
+      const terminal = await journal(id, 67, 161);
+      expect(terminal.events.slice(0, 99)).toEqual(purged.events);
+      for (const record of terminal.records) {
+        const prior = purged.records.find(row => row.table_name === record.table_name && JSON.stringify(row.row_key) === JSON.stringify(record.row_key))!;
+        expect(Number(record.version)).toBe(Number(prior.version) + Number(!prior.deleted));
+        if (prior.deleted) expect(record).toEqual(prior);
+      }
+      const fenceDelete = terminal.events.findIndex(event => event.table_name === "service_erasure_fences" && event.mutation === "DELETE");
+      const conversationDelete = terminal.events.findIndex(event => event.table_name === "service_conversations" && event.mutation === "DELETE");
+      expect(fenceDelete).toBeGreaterThanOrEqual(99);
+      expect(conversationDelete).toBeGreaterThan(fenceDelete);
+      const terminalSnapshot = await snapshot(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await snapshot(id)).toEqual(terminalSnapshot);
+      expect(await worker(deadline)).toEqual(noWork);
+      expect(await snapshot(id)).toEqual(terminalSnapshot);
+      expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+      expect(await snapshot(foreignId)).toEqual(foreignBefore);
+      const foreignKeys = await owned(foreignId);
+      const foreignAudits = await db.serviceAudit.findMany({ where: { resourceId: foreign.resourceId }, orderBy: { id: "asc" } });
+      expect(foreignAudits).toHaveLength(8);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      await supportDisposed(foreignId, foreignKeys, foreignAudits, foreign.requestIds);
+      await journal(foreignId, 68, 155);
+      const foreignTerminal = await snapshot(foreignId);
+      expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+      expect(await snapshot(foreignId)).toEqual(foreignTerminal);
+    });
+  }));
+
+  // Additive owned-resource proofs. Literal accounting: full-v3-support-owned-worker-race-tests-20261021.md.
+  type SupportRaceSql = { connect(): Promise<void>; end(): Promise<void>; query<T>(sql: string, values?: unknown[]): Promise<{ rows: T[] }> };
+  async function supportRaceSql() {
+    const { Client } = createRequire(`${packageRoot}/package.json`)("pg") as { Client: new (options: { connectionString: string | undefined }) => SupportRaceSql };
+    const client = new Client({ connectionString: process.env["DATABASE_URL"] });
+    await client.connect();
+    return client;
+  }
+  async function supportRaceSnapshot(id: string) {
+    const content = [];
+    for (const record of await owned(id)) {
+      expect([...tables, ...serviceTables, "service_erasure_fences"]).toContain(record.table_name);
+      content.push({ ...record, rows: await rows(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key)) });
+    }
+    return { journal: await digest(id), content };
+  }
+  async function supportRaceJournal(id: string, recordCount: number, eventCount: number) {
+    const records = await rows<RecordKey & { version: bigint; deleted: boolean; row_hash: string }>(`SELECT * FROM "cf_${id}".campaign_records ORDER BY table_name,row_key::text`);
+    const events = await rows<{ table_name: string; row_key: Record<string, string>; mutation: string; row_hash: string }>(`SELECT table_name,row_key,mutation,row_hash FROM "cf_${id}".campaign_events ORDER BY sequence`);
+    expect(records).toHaveLength(recordCount);
+    expect(events).toHaveLength(eventCount);
+    expect(recordCount).toBeLessThanOrEqual(128);
+    expect(eventCount).toBeLessThanOrEqual(2048);
+    for (const record of records) {
+      expect([...tables, ...serviceTables, "service_erasure_fences"]).toContain(record.table_name);
+      const history = events.filter(event => event.table_name === record.table_name && JSON.stringify(event.row_key) === JSON.stringify(record.row_key));
+      expect(Number(record.version)).toBe(history.length);
+      expect(history.map(event => event.mutation)).toEqual(["INSERT", ...Array<string>(history.length - 1 - Number(record.deleted)).fill("UPDATE"), ...(record.deleted ? ["DELETE"] : [])]);
+      expect(history.at(-1)?.row_hash).toBe(record.row_hash);
+      expect(await rows(`SELECT md5(to_jsonb(t)::text) AS hash FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key))).toEqual(record.deleted ? [] : [{ hash: record.row_hash }]);
+    }
+    expect(events.every(event => records.some(record => record.table_name === event.table_name && JSON.stringify(record.row_key) === JSON.stringify(event.row_key)))).toBe(true);
+    return { records, events };
+  }
+  async function supportRaceGraph(id: string, known: Set<string>) {
+    const prior = new Set(known), roster = await seed(id);
+    const { staff } = await elevatedStaff(id, roster, known, ["support.operations"]);
+    const customer = await signIn(id, actor(roster, "buyer-a"), known);
+    await supportRaceJournal(id, 51, 61);
+    const opened = await post("/api/v1/services/conversations", customer, { purpose: "support", synthetic: true }).expect(201);
+    const conversationId = opened.body.id as string, resourceId = opened.body.resourceId as string;
+    const path = `/api/v1/services/conversations/${conversationId}`;
+    const first = await post(`${path}/messages`, customer, { clientMessageId: randomUUID(), body: "Synthetic owned worker request", visibility: "customer" }).expect(201);
+    await post(`${path}/assignment`, staff, { expectedVersion: 0 }).expect(201);
+    const reply = await post(`${path}/messages`, staff, { clientMessageId: randomUUID(), body: "Synthetic owned worker resolution", visibility: "customer", supportKind: "reply" }).expect(201);
+    await post(`${path}/support`, staff, { kind: "close_resolved" }).expect(201);
+    const closed = await db.supportCase.findUniqueOrThrow({ where: { id: resourceId } });
+    expect(closed).toMatchObject({ status: "closed", closedAt: expect.any(Date), unansweredSince: null, assignmentVersion: 1 });
+    const audits = await db.serviceAudit.findMany({ where: { resourceId }, orderBy: { id: "asc" } });
+    expect(audits.map(audit => audit.action).sort()).toEqual(["SERVICE_ASSIGN", "SERVICE_HANDOVER", "SERVICE_NOTE", "SERVICE_SEND", "SUPPORT_CLOSE_RESOLVED", "SUPPORT_CUSTOMER_MESSAGE", "SUPPORT_REPLY"]);
+    const outbox = await db.serviceOutbox.findMany({ where: { conversationId }, orderBy: { sequence: "asc" } });
+    expect(outbox.map(row => ({ eventType: row.eventType, sequence: row.sequence, lifecycleEpoch: row.lifecycleEpoch }))).toEqual([
+      { eventType: "message", sequence: 1, lifecycleEpoch: 0 }, { eventType: "handover", sequence: 2, lifecycleEpoch: 0 }, { eventType: "message", sequence: 3, lifecycleEpoch: 0 },
+    ]);
+    await supportRaceJournal(id, 65, 82);
+    return { id, customer, path, conversationId, resourceId, closed, audits, outbox, messageIds: [first.body.id as string, reply.body.id as string], requestIds: [...known].filter(requestId => !prior.has(requestId)) };
+  }
+  type SupportRaceGraph = Awaited<ReturnType<typeof supportRaceGraph>>;
+  const supportRaceEmpty = { supportPurged: 0, attachmentsRetired: 0, cleanupsCompleted: 0 };
+  const supportRaceReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+  async function supportRaceReopen(graph: SupportRaceGraph) {
+    const sent = await post(`${graph.path}/messages`, graph.customer, { clientMessageId: randomUUID(), body: "Synthetic owned worker reopening", visibility: "customer" }).expect(201);
+    expect(await db.supportCase.findUniqueOrThrow({ where: { id: graph.resourceId } })).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date), assignmentVersion: 1 });
+    await supportRaceJournal(graph.id, 68, 87);
+    return sent;
+  }
+  async function supportRaceStorage() {
+    const http = localRequire("node:http") as typeof import("node:http");
+    const endpoint = new URL(process.env["MINIO_ENDPOINT"]!);
+    expect(endpoint.protocol).toBe("http:");
+    const { CreateBucketCommand } = localRequire("@aws-sdk/client-s3") as typeof import("@aws-sdk/client-s3");
+    const s3 = new S3Client({ endpoint: endpoint.origin, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true,
+      credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+    try { await s3.send(new CreateBucketCommand({ Bucket: "service-private" })); }
+    catch (error) { if (!(error instanceof Error) || !["BucketAlreadyExists", "BucketAlreadyOwnedByYou"].includes(error.name)) throw error; }
+    finally { s3.destroy(); }
+    let requests = 0, forwardingFailures = 0;
+    const server = http.createServer((incoming, outgoing) => {
+      requests++;
+      // Forward original request headers and streaming bytes; retain only sanitized counters.
+      const upstream = http.request({ hostname: endpoint.hostname, port: endpoint.port, method: incoming.method, path: incoming.url, headers: incoming.rawHeaders }, response => {
+        outgoing.writeHead(response.statusCode!, response.rawHeaders);
+        response.pipe(outgoing);
+      });
+      upstream.on("error", () => { forwardingFailures++; outgoing.destroy(); });
+      incoming.on("error", () => upstream.destroy());
+      incoming.pipe(upstream);
+    });
+    await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Worker storage recorder unavailable");
+    return { endpoint: `http://127.0.0.1:${address.port}`, counts: () => ({ requests, forwardingFailures }), close: async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    } };
+  }
+  function supportRaceWorker(now: Date, endpoint: string, selectedCaseId?: string) {
+    const tag = `support-race-${randomUUID()}`;
+    const database = new URL(process.env["DATABASE_URL"]!);
+    database.searchParams.set("application_name", tag);
+    let child: ReturnType<typeof execFile>, selected!: () => void;
+    const selection = new Promise<void>(resolve => { selected = resolve; });
+    const result = new Promise<{ supportPurged: number; attachmentsRetired: number; cleanupsCompleted: number }>((resolve, reject) => {
+      child = execFile(process.execPath, ["-e", `
+        require('reflect-metadata'); require('tsx/cjs');
+        const { PrismaService } = require('@auto-tm/db');
+        const { S3Client } = require('@aws-sdk/client-s3');
+        const { ExpireServiceContent } = require('./src/jobs/ExpireServiceContent.ts');
+        const { S3RetiredObjectStore } = require('./src/jobs/S3RetiredObjectStore.ts');
+        (async () => {
+          const db = new PrismaService();
+          const s3 = new S3Client({ endpoint: process.env.MINIO_ENDPOINT, region: process.env.MINIO_REGION ?? 'us-east-1', forcePathStyle: true,
+            credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
+          // Transparent scheduling gate. Selection and all SQL authority/purge work remain real.
+          const selectedCaseId = process.argv[2];
+          const released = selectedCaseId ? new Promise(resolve => process.stdin.once('data', resolve)) : Promise.resolve();
+          const supportCase = new Proxy(db.supportCase, { get: (target, key) => key === 'findMany' ? async args => {
+            const rows = await target.findMany(args);
+            if (rows.some(row => row.id === selectedCaseId)) {
+              process.stderr.write('SUPPORT_SELECTED\\n');
+              await released;
+            }
+            return rows;
+          } : Reflect.get(target, key) });
+          const gated = new Proxy(db, { get: (target, key) => {
+            if (key === 'supportCase') return supportCase;
+            const value = Reflect.get(target, key);
+            return typeof value === 'function' ? value.bind(target) : value;
+          } });
+          try { console.log(JSON.stringify(await new ExpireServiceContent(gated, new S3RetiredObjectStore(s3, 'service-private')).execute(new Date(process.argv[1])))); }
+          finally { s3.destroy(); await db.onModuleDestroy(); }
+        })().catch(error => { console.error('[issue-901-cleanup]', JSON.stringify((${cleanupFailure.toString()})(error))); console.error('Owned Support worker refused'); process.exitCode = 1; });
+      `, now.toISOString(), selectedCaseId ?? ""], { timeout: 30000, cwd: `${root}/apps/worker`, env: { ...process.env, DATABASE_URL: database.toString(), MINIO_ENDPOINT: endpoint, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` } }, (error, stdout, stderr) => {
+        if (error) console.error("[issue-901-cleanup]", JSON.stringify({ phase: "owned-support-worker", ...cleanupFailure({ name: error.name, code: error.code, stderr }) }));
+        if (error) reject(new Error("Owned Support worker failed before result"));
+        else { try { resolve(JSON.parse(stdout.trim())); } catch { reject(new Error("Owned Support worker result invalid")); } }
+      });
+    });
+    let selectionOutput = "";
+    child!.stderr?.on("data", (chunk: Buffer) => {
+      selectionOutput = (selectionOutput + chunk.toString()).slice(-1024);
+      if (selectionOutput.includes("SUPPORT_SELECTED\n")) selected();
+    });
+    // Attach immediately so a failed barrier never leaves an unhandled child rejection.
+    const settled = result.then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
+    return { tag, result, selected: selectedCaseId ? Promise.race([selection, settled.then(() => { throw new Error("Worker finished before selecting the requested Support case"); })]) : Promise.resolve(), resume: () => child!.stdin?.end("resume\n"), settle: async () => {
+      if (child!.exitCode === null) child!.kill("SIGTERM");
+      return settled;
+    } };
+  }
+  async function supportRaceWait(client: SupportRaceSql, until: number, sql: string, values: unknown[], participants?: { worker: string; reset: string; gate: number }) {
+    const remainingAtEntryMs = until - Date.now();
+    while (Date.now() < until) {
+      const { rows: matches } = await client.query<{ pid: number }>(sql, values);
+      if (matches.length > 1) throw new Error("Support barrier waiter identity ambiguous");
+      if (matches[0]) return matches[0].pid;
+    }
+    if (participants) {
+      const remainingAtFailureMs = until - Date.now();
+      try {
+        const { rows: locks } = await client.query<{ participant: string; locktype: string; mode: string; granted: boolean; total: string }>(`
+          SELECT CASE WHEN a.application_name=$1 THEN 'worker' WHEN a.application_name=$2 THEN 'reset' ELSE 'gate' END AS participant,
+            l.locktype, l.mode, l.granted, count(*) OVER()::text AS total
+          FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid
+          WHERE a.application_name IN ($1,$2) OR a.pid=$3 ORDER BY 1,l.locktype,l.mode,l.granted LIMIT 24`, [participants.worker, participants.reset, participants.gate]);
+        const kinds = ["relation", "advisory", "transactionid", "virtualxid", "tuple", "object", "extend", "page", "spectoken"];
+        const modes = ["AccessShareLock", "RowShareLock", "RowExclusiveLock", "ShareUpdateExclusiveLock", "ShareLock", "ShareRowExclusiveLock", "ExclusiveLock", "AccessExclusiveLock", "SIReadLock"];
+        console.info(JSON.stringify({ diagnostic: "support-barrier-budget-v1", remainingAtEntryMs, remainingAtFailureMs, maxEntries: 24,
+          dropped: Math.max(0, Number(locks[0]?.total ?? 0) - locks.length), locks: locks.map(lock => ({
+            participant: ["worker", "reset", "gate"].includes(lock.participant) ? lock.participant : "unknown",
+            kind: kinds.includes(lock.locktype) ? lock.locktype : "unknown", mode: modes.includes(lock.mode) ? lock.mode : "unknown", granted: lock.granted === true,
+          })) }));
+      } catch { console.info(JSON.stringify({ diagnostic: "support-barrier-budget-v1", remainingAtEntryMs, remainingAtFailureMs, outcome: "observation-unavailable" })); }
+    }
+    throw new Error("Support barrier not observed within existing lock budget; no ordering evidence");
+  }
+  async function supportRacePurged(graph: SupportRaceGraph, now: Date) {
+    expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: graph.conversationId } })).toMatchObject({ erasedAt: now, lifecycleEpoch: 1, lastSequence: 3 });
+    expect(await db.supportCase.findUniqueOrThrow({ where: { id: graph.resourceId } })).toMatchObject({ status: "closed", closedAt: graph.closed.closedAt, customerId: null, assigneeId: null, assignmentVersion: 2 });
+    expect(await db.serviceMessage.findMany({ where: { conversationId: graph.conversationId } })).toEqual([]);
+    expect(await db.serviceOutbox.findMany({ where: { conversationId: graph.conversationId } })).toEqual([]);
+    expect(await db.serviceErasureFence.findUniqueOrThrow({ where: { conversationId: graph.conversationId } })).toEqual({ conversationId: graph.conversationId, epoch: 1, objectKeys: [], erasedAt: now, cleanupCompletedAt: now });
+    const audits = await db.serviceAudit.findMany({ where: { resourceId: graph.resourceId }, orderBy: { id: "asc" } });
+    expect(audits).toHaveLength(8);
+    for (const audit of graph.audits) expect(audits.find(row => row.id === audit.id)).toEqual({ ...audit, reason: null });
+    expect(audits.filter(audit => !graph.audits.some(original => original.id === audit.id))).toEqual([
+      expect.objectContaining({ id: expect.any(String), action: "SERVICE_CONTENT_PURGED", purpose: "support", resourceId: graph.resourceId, actorId: null, targetStaffId: null, reason: null, assignmentVersion: 1 }),
+    ]);
+    const journal = await supportRaceJournal(graph.id, 67, 99);
+    expect(journal.records.filter(row => row.deleted).map(({ table_name, row_key }) => ({ table_name, row_key }))).toEqual(expect.arrayContaining([
+      ...graph.messageIds.map(id => ({ table_name: "service_messages", row_key: { id } })), ...graph.outbox.map(({ id }) => ({ table_name: "service_outbox", row_key: { id } })),
+    ]));
+    expect(journal.records.filter(row => row.deleted)).toHaveLength(5);
+    expect(journal.records.find(row => row.table_name === "service_erasure_fences")).toMatchObject({ row_key: { conversationId: graph.conversationId }, version: 2n, deleted: false });
+    return audits;
+  }
+  async function supportRaceDisposed(graph: SupportRaceGraph, before: RecordKey[], audits: Awaited<ReturnType<typeof db.serviceAudit.findMany>>, records: number, events: number) {
+    await supportDisposed(graph.id, before.filter(row => row.table_name !== "service_erasure_fences"), audits, graph.requestIds);
+    expect(await db.serviceErasureFence.findUnique({ where: { conversationId: graph.conversationId } })).toBeNull();
+    expect(await db.serviceConversation.findUnique({ where: { id: graph.conversationId } })).toBeNull();
+    const terminal = await supportRaceJournal(graph.id, records, events);
+    const snapshot = await supportRaceSnapshot(graph.id);
+    expect(execute("reset", graph.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+    expect(await supportRaceSnapshot(graph.id)).toEqual(snapshot);
+    return terminal;
+  }
+
+  it("purges two due current-candidate Support namespaces under their own exact authority and preserves foreign disposal proof", () => withKnownJobs(known => {
+    const ids = ["f7".repeat(16)], foreignId = "f8".repeat(16);
+    return resetAfter(ids, async () => {
+      const first = await supportRaceGraph(ids[0]!, known);
+      ids.push(foreignId);
+      const foreign = await supportRaceGraph(foreignId, known);
+      const now = new Date(Math.max(first.closed.closedAt!.getTime(), foreign.closed.closedAt!.getTime()) + 90 * 86400000);
+      const storage = await supportRaceStorage();
+      const children: ReturnType<typeof supportRaceWorker>[] = [];
+      try {
+        const run = supportRaceWorker(now, storage.endpoint); children.push(run);
+        expect(await run.result).toEqual({ supportPurged: 2, attachmentsRetired: 0, cleanupsCompleted: 2 });
+        expect(storage.counts()).toEqual({ requests: 2, forwardingFailures: 0 });
+        const firstAudits = await supportRacePurged(first, now), foreignAudits = await supportRacePurged(foreign, now);
+        const firstLive = await supportRaceJournal(first.id, 67, 99), foreignLive = await supportRaceJournal(foreign.id, 67, 99);
+        expect(firstLive.records.some(row => foreignLive.records.some(other => row.table_name === other.table_name && JSON.stringify(row.row_key) === JSON.stringify(other.row_key)))).toBe(false);
+        const firstBefore = await owned(first.id), foreignBefore = await owned(foreign.id), foreignSnapshot = await supportRaceSnapshot(foreign.id);
+        expect(execute("reset", first.id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        const firstTerminal = await supportRaceDisposed(first, firstBefore, firstAudits, 67, 161);
+        expect(firstTerminal.events.slice(0, 99)).toEqual(firstLive.events);
+        const fenceDelete = firstTerminal.events.findIndex(event => event.table_name === "service_erasure_fences" && event.mutation === "DELETE");
+        expect(fenceDelete).toBeGreaterThanOrEqual(99);
+        expect(firstTerminal.events.findIndex(event => event.table_name === "service_conversations" && event.mutation === "DELETE")).toBeGreaterThan(fenceDelete);
+        expect(await supportRaceSnapshot(foreign.id)).toEqual(foreignSnapshot);
+        const terminalSnapshot = await supportRaceSnapshot(first.id);
+        const late = supportRaceWorker(now, storage.endpoint); children.push(late);
+        expect(await late.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 2, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(first.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(foreign.id)).toEqual(foreignSnapshot);
+        expect(execute("reset", foreign.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+        const foreignTerminal = await supportRaceDisposed(foreign, foreignBefore, foreignAudits, 67, 161);
+        expect(foreignTerminal.events.slice(0, 99)).toEqual(foreignLive.events);
+      } finally { for (const child of children) await child.settle(); await storage.close(); }
+    });
+  }));
+
+  it("rereads an ordinary reopened Support case after a selected worker waits behind the exact HTTP transaction", () => withKnownJobs(known => {
+    const ids = ["f9".repeat(16)], foreignId = "fa".repeat(16);
+    return resetAfter(ids, async () => {
+      const primary = await supportRaceGraph(ids[0]!, known);
+      ids.push(foreignId);
+      const foreign = await supportRaceGraph(foreignId, known);
+      await supportRaceReopen(foreign);
+      const foreignBefore = await supportRaceSnapshot(foreignId), storage = await supportRaceStorage();
+      const holder = await supportRaceSql(), observer = await supportRaceSql();
+      const children: ReturnType<typeof supportRaceWorker>[] = [];
+      let reopen: Promise<{ value: { status: number } | undefined; error: unknown }> | undefined;
+      try {
+        await holder.query("BEGIN");
+        const { rows: held } = await holder.query<{ pid: number }>("SELECT pg_backend_pid() AS pid,pg_advisory_xact_lock(hashtextextended($1,0))", [`cf_${primary.id}`]);
+        const until = Date.now() + 3500;
+        reopen = post(`${primary.path}/messages`, primary.customer, { clientMessageId: randomUUID(), body: "Synthetic selected-worker reopening", visibility: "customer" }).then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
+        const httpPid = await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE $1::int=ANY(pg_blocking_pids(a.pid))
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.locktype='advisory' AND NOT l.granted)
+          AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='RowExclusiveLock' AND l.granted)`, [held[0]!.pid]);
+        const now = new Date(primary.closed.closedAt!.getTime() + 90 * 86400000);
+        const run = supportRaceWorker(now, storage.endpoint); children.push(run);
+        await supportRaceWait(observer, until, `SELECT a.pid FROM pg_stat_activity a WHERE a.application_name=$1 AND $2::int=ANY(pg_blocking_pids(a.pid))
+          AND a.query LIKE 'LOCK TABLE public.service_audits,%' AND EXISTS(SELECT 1 FROM pg_locks l WHERE l.pid=a.pid AND l.relation='public.service_audits'::regclass AND l.mode='ShareRowExclusiveLock' AND NOT l.granted)`, [run.tag, httpPid]);
+        await holder.query("COMMIT");
+        const response = await reopen!;
+        expect(response.error).toBeUndefined(); expect(response.value?.status).toBe(201);
+        expect(await run.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        const open = await db.supportCase.findUniqueOrThrow({ where: { id: primary.resourceId } });
+        expect(open).toMatchObject({ status: "open", closedAt: null, unansweredSince: expect.any(Date), assigneeId: primary.closed.assigneeId, assignmentVersion: 1 });
+        expect(await db.serviceConversation.findUniqueOrThrow({ where: { id: primary.conversationId } })).toMatchObject({ erasedAt: null, lifecycleEpoch: 0, lastSequence: 4 });
+        expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+        const audits = await db.serviceAudit.findMany({ where: { resourceId: primary.resourceId }, orderBy: { id: "asc" } });
+        expect(audits).toHaveLength(8);
+        for (const audit of primary.audits) expect(audits.find(row => row.id === audit.id)).toEqual(audit);
+        expect(audits.filter(audit => !primary.audits.some(original => original.id === audit.id))).toEqual([expect.objectContaining({ action: "SUPPORT_CUSTOMER_MESSAGE", actorId: primary.customer.user.id, assignmentVersion: 1 })]);
+        expect((await get(primary.path, primary.customer).expect(200)).body.messages.map((message: { id: string }) => message.id)).toEqual([...primary.messageIds, expect.any(String)]);
+        expect(await db.serviceOutbox.count({ where: { conversationId: primary.conversationId } })).toBe(4);
+        await supportRaceJournal(primary.id, 68, 87);
+        const openSnapshot = await supportRaceSnapshot(primary.id);
+        const late = supportRaceWorker(now, storage.endpoint); children.push(late);
+        expect(await late.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(openSnapshot);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        const keys = await owned(primary.id);
+        expect(execute("reset", primary.id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await supportRaceDisposed(primary, keys, audits, 68, 155);
+        const terminalSnapshot = await supportRaceSnapshot(primary.id);
+        const disposedWorker = supportRaceWorker(now, storage.endpoint); children.push(disposedWorker);
+        expect(await disposedWorker.result).toEqual(supportRaceEmpty);
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(terminalSnapshot);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        const foreignKeys = await owned(foreignId), foreignAudits = await db.serviceAudit.findMany({ where: { resourceId: foreign.resourceId }, orderBy: { id: "asc" } });
+        expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+        await supportRaceDisposed(foreign, foreignKeys, foreignAudits, 68, 155);
+      } finally {
+        try { await holder.query("ROLLBACK"); } finally {
+          await reopen;
+          try { for (const child of children) await child.settle(); }
+          finally { await Promise.all([holder.end(), observer.end(), storage.close()]); }
+        }
+      }
+    });
+  }));
+
+  it.each(["present", "absent"] as const)("fences a selected Support worker under disposed SQL authority with its target %s", targetState => withKnownJobs(known => {
+    const ids = ["fb".repeat(16)], foreignId = "fc".repeat(16);
+    return resetAfter(ids, async () => {
+      const primary = await supportRaceGraph(ids[0]!, known);
+      ids.push(foreignId);
+      const foreign = await supportRaceGraph(foreignId, known);
+      await supportRaceReopen(foreign);
+      const foreignBefore = await supportRaceSnapshot(foreignId);
+      const now = new Date(primary.closed.closedAt!.getTime() + 90 * 86400000);
+      const storage = await supportRaceStorage();
+      const run = supportRaceWorker(now, storage.endpoint, primary.resourceId);
+      try {
+        await run.selected;
+        if (targetState === "present") {
+          // Negative authority fixture: terminal state with the real graph/journal intact.
+          // The terminal manifest must carry the generated empty object-ledger hash because
+          // integrity/preflight validates it before authority can return false. No trigger,
+          // SQL predicate, permission or product callback is replaced.
+          expect(await rows(`SELECT object_key FROM "cf_${primary.id}".campaign_object_ledger`)).toEqual([]);
+          expect(await rows(`SELECT state,object_hash FROM "cf_${primary.id}".campaign_manifest`)).toEqual([{ state: "identities", object_hash: null }]);
+          await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='disposed', object_hash=(SELECT md5(coalesce(jsonb_agg(jsonb_build_object('object_key',l.object_key,'upload_id',l.upload_id,'bucket',l.bucket) ORDER BY l.object_key),'[]'::jsonb)::text) FROM "cf_${primary.id}".campaign_object_ledger l)`);
+        } else {
+          expect(execute("reset", primary.id)).toMatchObject({ code: 0, receipt: supportRaceReceipt });
+          expect(await db.supportCase.findUnique({ where: { id: primary.resourceId } })).toBeNull();
+          expect(await db.serviceConversation.findUnique({ where: { id: primary.conversationId } })).toBeNull();
+        }
+        const before = await supportRaceSnapshot(primary.id);
+        run.resume();
+        expect(await run.result).toEqual(supportRaceEmpty);
+        expect(await supportRaceSnapshot(primary.id)).toEqual(before);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        const late = supportRaceWorker(now, storage.endpoint);
+        try { expect(await late.result).toEqual(supportRaceEmpty); }
+        finally { await late.settle(); }
+        expect(storage.counts()).toEqual({ requests: 0, forwardingFailures: 0 });
+        expect(await supportRaceSnapshot(primary.id)).toEqual(before);
+        expect(await supportRaceSnapshot(foreignId)).toEqual(foreignBefore);
+        expect(await db.serviceErasureFence.findUnique({ where: { conversationId: primary.conversationId } })).toBeNull();
+        if (targetState === "absent") {
+          expect(await db.serviceMessage.count({ where: { conversationId: primary.conversationId } })).toBe(0);
+          expect(await db.serviceOutbox.count({ where: { conversationId: primary.conversationId } })).toBe(0);
+          expect(await db.serviceReadState.count({ where: { conversationId: primary.conversationId } })).toBe(0);
+        }
+      } finally {
+        await run.settle();
+        if (targetState === "present") await db.$executeRawUnsafe(`UPDATE "cf_${primary.id}".campaign_manifest SET state='identities', object_hash=NULL`);
+        await storage.close();
+      }
+    });
+  }));
+
+  // B2 text-only contexts. Per reservation, count BEFORE writing: primary 68 records / 91 events
+  // before reset, 159 events after reset; foreign control 24 / 26, then 50 events after its reset.
+  // Fixed guards remain 128 records / 2048 events. No catalog, contact, media or publish setup.
+  // First predicted RED at abfd51f9: personal INSERT -> `Campaign business required` (null businessId).
+  // After context admission, PATCH also needs the real generated validatedSteps: [] payload allowed.
+  it("keeps personal and admitted-business drafts separate, preserves suspended sales work and disposes only its reservation on retry", () => withKnownJobs(known => {
+    const id = "d1".repeat(16), foreignId = "d2".repeat(16);
+    const cleanupIds = [id];
+    return resetAfter(cleanupIds, async () => {
+      const roster = await seed(id);
+      const { coordinator, staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+      const owner = await signIn(id, actor(roster, "buyer-a"), known);
+      const sales = await signIn(id, actor(roster, "sales-a"), known);
+      const outsider = await signIn(id, actor(roster, "buyer-b"), known);
+      const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+      const businessId = admitted.businessId;
+      await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+      const invitation = (await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: sales.user.id }).expect(201)).body as { token: string };
+      await post("/api/v1/business/invitations/redeem", sales, { token: invitation.token }).expect(201);
+      const rootBusiness = await db.dealership.findUniqueOrThrow({ where: { slug: `campaign897-${id}-${candidate.slice(0, 12)}` } });
+      const rootState = await businessState(rootBusiness.id);
+      const draftsPath = "/api/v1/listings/drafts";
+      const inventoryPath = `/api/v1/businesses/${businessId}/inventory`;
+      const patch = (draftId: string, login: Login, description: string, context?: string) => {
+        const attempt = request.patch(`${draftsPath}/${draftId}`).set("authorization", `Bearer ${login.accessToken}`);
+        if (context) attempt.set("x-business-id", context);
+        return attempt.send({ description });
+      };
+      const personal = (await post(draftsPath, owner, { initialPayload: { description: "Synthetic personal draft before workspace switch" } }).expect(201)).body as { id: string };
+      const business = (await post(draftsPath, sales, { businessId, initialPayload: { description: "Synthetic business draft by sales" } }).expect(201)).body as { id: string };
+      const savedDrafts = () => db.listingDraft.findMany({ where: { id: { in: [personal.id, business.id] } }, orderBy: { id: "asc" } });
+      const assertContexts = async (personalDescription: string, businessDescription: string, updated: boolean) => {
+        expect((await get("/api/v1/me/drafts", owner).expect(200)).body.items).toEqual([
+          expect.objectContaining({ id: personal.id, userId: owner.user.id, payload: { description: personalDescription, ...(updated ? { validatedSteps: [] } : {}) } }),
+        ]);
+        expect((await get("/api/v1/me/drafts", sales).expect(200)).body.items).toEqual([]);
+        for (const login of [owner, sales]) {
+          const inventory = (await get(inventoryPath, login).expect(200)).body;
+          expect(inventory).toMatchObject({ businessId, listings: [], counts: { drafts: 1, active: 0 } });
+          expect(inventory.drafts).toEqual([expect.objectContaining({ id: business.id, userId: sales.user.id, businessId,
+            payload: { description: businessDescription, ...(updated ? { validatedSteps: [] } : {}) } })]);
+        }
+        expect(await db.listingDraft.findUniqueOrThrow({ where: { id: personal.id } })).toMatchObject({ userId: owner.user.id, businessId: null,
+          payload: { description: personalDescription, ...(updated ? { validatedSteps: [] } : {}) } });
+        expect(await db.listingDraft.findUniqueOrThrow({ where: { id: business.id } })).toMatchObject({ userId: sales.user.id, businessId,
+          payload: { description: businessDescription, ...(updated ? { validatedSteps: [] } : {}) } });
+      };
+      await assertContexts("Synthetic personal draft before workspace switch", "Synthetic business draft by sales", false);
+      expect((await patch(personal.id, owner, "Synthetic personal draft resumed").expect(200)).body).not.toHaveProperty("businessId");
+      expect((await patch(business.id, sales, "Synthetic business draft resumed by sales", businessId).expect(200)).body).toMatchObject({ id: business.id, userId: sales.user.id, businessId,
+        payload: { description: "Synthetic business draft resumed by sales", validatedSteps: [] } });
+      await assertContexts("Synthetic personal draft resumed", "Synthetic business draft resumed by sales", true);
+
+      cleanupIds.push(foreignId);
+      const foreignRoster = await seed(foreignId);
+      const foreignBuyer = await signIn(foreignId, actor(foreignRoster, "buyer-b"), known);
+      const foreignDraft = (await post(draftsPath, foreignBuyer, { initialPayload: { description: "Foreign reservation personal draft must survive" } }).expect(201)).body as { id: string };
+      const foreignState = await db.listingDraft.findUniqueOrThrow({ where: { id: foreignDraft.id } });
+      const foreignDigest = await digest(foreignId);
+      const refused = async (attempt: () => Promise<unknown>) => {
+        const unchanged = await digest(id), drafts = await savedDrafts();
+        await attempt();
+        expect(await digest(id), "draft refusal writes no graph or event").toBe(unchanged);
+        expect(await savedDrafts()).toEqual(drafts);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        expect(await db.listingDraft.findUniqueOrThrow({ where: { id: foreignDraft.id } })).toEqual(foreignState);
+      };
+      await refused(async () => {
+        expect((await patch(business.id, owner, "Missing explicit context").expect(403)).body.details).toEqual({ reason: "BUSINESS_CONTEXT_CHANGED" });
+        expect((await patch(personal.id, owner, "Do not transfer personal work", businessId).expect(403)).body.details).toEqual({ reason: "OWNER_REQUIRED" });
+        expect((await post(draftsPath, owner, { businessId, initialPayload: { description: "Mismatched context" } }).set("x-business-id", rootBusiness.id).expect(400)).body.details).toEqual({ reason: "BUSINESS_CONTEXT_CHANGED" });
+        for (const login of [outsider, foreignBuyer]) {
+          expect((await get(inventoryPath, login).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect((await patch(business.id, login, "Cannot adopt business work", businessId).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          await patch(personal.id, login, "Cannot adopt personal work").expect(404);
+          expect((await post(draftsPath, login, { businessId, initialPayload: { description: "Cannot create business work" } }).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        }
+        await patch(foreignDraft.id, owner, "Cannot adopt another reservation's work").expect(404);
+        expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
+      });
+
+      await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: sales.user.id, action: "suspend" }).expect(201);
+      await refused(async () => {
+        expect((await get(inventoryPath, sales).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        expect((await patch(business.id, sales, "Suspended sales must not overwrite saved work", businessId).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        expect((await post(draftsPath, sales, { businessId, initialPayload: { description: "Suspended sales must not create" } }).expect(403)).body.details).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+      });
+      expect((await get(inventoryPath, owner).expect(200)).body.drafts).toEqual([expect.objectContaining({ id: business.id, userId: sales.user.id, businessId,
+        payload: { description: "Synthetic business draft resumed by sales", validatedSteps: [] } })]);
+      expect((await get("/api/v1/me/drafts", owner).expect(200)).body.items).toEqual([expect.objectContaining({ id: personal.id,
+        payload: { description: "Synthetic personal draft resumed", validatedSteps: [] } })]);
+      expect((await patch(business.id, owner, "Synthetic business work preserved by owner", businessId).expect(200)).body).toMatchObject({ id: business.id, userId: sales.user.id, businessId,
+        payload: { description: "Synthetic business work preserved by owner", validatedSteps: [] } });
+      await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: sales.user.id, action: "restore" }).expect(201);
+      expect((await get(inventoryPath, sales).expect(200)).body.drafts).toEqual([expect.objectContaining({ id: business.id,
+        payload: { description: "Synthetic business work preserved by owner", validatedSteps: [] } })]);
+      await patch(business.id, sales, "Synthetic business work resumed after restoration", businessId).expect(200);
+      await assertContexts("Synthetic personal draft resumed", "Synthetic business work resumed after restoration", true);
+      expect(await businessState(rootBusiness.id)).toEqual(rootState);
+      expect(await digest(foreignId)).toBe(foreignDigest);
+
+      // Literal accounting includes bootstrap, ordinary sign-ins, TOTP, admission and membership.
+      const journal = async (reservation: string, records: number, events: number) => {
+        expect(await rows(`SELECT (SELECT count(*)::int FROM "cf_${reservation}".campaign_records) AS records,(SELECT count(*)::int FROM "cf_${reservation}".campaign_events) AS events`)).toEqual([{ records, events }]);
+      };
+      const before = await owned(id), foreignBefore = await owned(foreignId);
+      const perTable: Record<string, number> = {};
+      for (const row of before) perTable[row.table_name] = (perTable[row.table_name] ?? 0) + 1;
+      expect(perTable).toEqual({ users: 15, sessions: 5, otp_requests: 5, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3,
+        audit_logs: 9, dealerships: 2, dealership_members: 3, dealership_invitations: 2, listing_drafts: 2 });
+      for (const draftId of [personal.id, business.id]) expect(before).toContainEqual({ table_name: "listing_drafts", row_key: { id: draftId } });
+      expect(before).not.toContainEqual({ table_name: "listing_drafts", row_key: { id: foreignDraft.id } });
+      await journal(id, 68, 91);
+      await journal(foreignId, 24, 26);
+      expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual(
+        [coordinator.requestId, staff.requestId, owner.requestId, sales.requestId, outsider.requestId].sort().map(request_id => ({ request_id })));
+      // Publish is deferred to valid contact/media proof. Suspension here is not D3 creator removal.
+      expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+      await assertDisposed(id, before);
+      await journal(id, 68, 159);
+      const terminal = await digest(id);
+      expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 } });
+      expect(await digest(id)).toBe(terminal);
+      await assertDisposed(id, before);
+      expect(await savedDrafts()).toEqual([]);
+      expect(await digest(foreignId)).toBe(foreignDigest);
+      expect(await db.listingDraft.findUniqueOrThrow({ where: { id: foreignDraft.id } })).toEqual(foreignState);
+      expect((await get("/api/v1/me/drafts", foreignBuyer).expect(200)).body.items).toEqual([expect.objectContaining({ id: foreignDraft.id, userId: foreignBuyer.user.id,
+        payload: { description: "Foreign reservation personal draft must survive" } })]);
+      expect(execute("reset", foreignId).code).toBe(0);
+      await assertDisposed(foreignId, foreignBefore);
+      await journal(foreignId, 24, 50);
+    });
+  }));
+
+  // Literal accounting was derived before editing: each reservation is 56/68
+  // after ordinary Owner setup, 57/69 after unused contact reserve, 57/126 terminal.
+  // No confirmation, wrong attempt, resend, extra grant or Session is performed.
+  function asynchronousReset(id: string) {
+    // Run the identical existing operator/transport harness away from this event loop.
+    // Every SQL/Redis child retains execute's existing 30s bound. Do not terminate
+    // this worker before its synchronous children settle; wait for its natural exit.
+    const worker = new NodeWorker(`
+      const { parentPort, workerData } = require('node:worker_threads');
+      const { spawnSync } = require('node:child_process');
+      const { createRequire } = require('node:module');
+      const { runInNewContext } = require('node:vm');
+      const { root, packageRoot, profile, candidate, source, id } = workerData;
+      const localRequire = createRequire(root + '/apps/api/package.json');
+      const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
+        STAGING_CAMPAIGN_PROFILE_ENABLED: profile,
+        RAILWAY_PROJECT_ID: 'v3-project', RAILWAY_ENVIRONMENT_ID: 'v3-staging', RAILWAY_SERVICE_ID: 'v3-api', RAILWAY_ENVIRONMENT_NAME: 'staging',
+        APP_ENV: 'staging', SMS_DRIVER: 'mock', AUTOTM_COMMIT_SHA: candidate,
+        DATABASE_URL: 'postgresql://fixture:synthetic@postgres.railway.internal:5432/railway', REDIS_URL: 'redis://fixture:synthetic@redis.railway.internal:6379/0',
+        MINIO_ENDPOINT: 'http://minio.railway.internal:9000', MINIO_PUBLIC_URL: 'https://media.example',
+      } };
+      const payload = { kind: 'reset', id, namespace: 'cf_' + id, profile, candidate, target: candidate,
+        redisOrigin: 'redis://redis.railway.internal:6379/0', identity: { projectId: 'v3-project', environmentId: 'v3-staging', services: { api: 'v3-api' },
+          origins: { database: 'postgresql://postgres.railway.internal:5432/railway', media: 'http://minio.railway.internal:9000', publicMedia: 'https://media.example' } } };
+      let code = 0, receipt, sqlCalls = 0;
+      const phases = (${resetPhaseTrace.toString()})("asynchronous-reset");
+      let transportThrew = true;
+      try {
+        const program = runInNewContext(source + '; remoteProgram(payload)', { payload });
+        runInNewContext(program, { URL, process: remoteProcess, require: name => name === 'node:child_process' ? {
+          spawnSync: (binary, args, spawnOptions) => phases.call(binary, args, spawnOptions.input, () => {
+            if (binary === process.execPath) return spawnSync(binary, args, { ...spawnOptions, encoding: 'utf8', timeout: 30000, cwd: root + '/apps/api', env: { ...process.env,
+              ...(process.env.APP_ENV === 'test' && ['localhost', '127.0.0.1'].includes(new URL(process.env.MINIO_ENDPOINT ?? 'http://invalid').hostname)
+                ? { MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } : {}) } });
+            sqlCalls += 1;
+            return spawnSync(process.execPath, [root + '/scripts/testing/query-disposable-postgres.cjs'], {
+              input: spawnOptions.input, encoding: 'utf8', timeout: 30000,
+              env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: process.env.DATABASE_URL, STAGING_TEST_DB_PACKAGE: packageRoot + '/package.json', STAGING_TEST_SQL_DIAGNOSTICS: '1' },
+            });
+          }),
+        } : localRequire(name), console: { log: value => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+      transportThrew = false;
+      } finally { phases.finish(code || remoteProcess.exitCode, receipt?.state, transportThrew); }
+      parentPort.postMessage({ code: code || remoteProcess.exitCode, receipt, sqlCalls });
+    `, { eval: true, workerData: { root, packageRoot, profile, candidate, source, id } });
+    return new Promise<ReturnType<typeof execute>>((resolve, reject) => {
+      let result: ReturnType<typeof execute> | undefined, failure: Error | undefined;
+      worker.on("message", (value: ReturnType<typeof execute>) => { result = value; });
+      worker.on("error", (error: Error) => { failure = error; });
+      worker.on("exit", code => {
+        if (failure) reject(failure);
+        else if (code !== 0 || !result) reject(new Error("Reset transport worker failed before receipt"));
+        else resolve(result);
+      });
+    });
+  }
+
+  async function contactOrdering(id: string, phone: string, senderFirst: boolean, known: Set<string>) {
+    const foreignId = randomUUID(), reuseId = randomUUID();
+    type SqlClient = {
+      connect(): Promise<void>; end(): Promise<void>;
+      query<T>(sql: string, values?: unknown[]): Promise<{ rows: T[] }>;
+    };
+    const { Client } = createRequire(`${packageRoot}/package.json`)("pg") as {
+      Client: new (options: { connectionString: string | undefined }) => SqlClient;
+    };
+    let barrier: SqlClient | undefined;
+    let send: Promise<{ error?: unknown }> | undefined;
+    let resetting: Promise<{ result?: ReturnType<typeof execute>; error?: unknown }> | undefined;
+    let requestId: string | undefined;
+    let log: ReturnType<typeof vi.spyOn> | undefined;
+    await resetAfter([id], async () => {
+      try {
+        const roster = await seed(id);
+        await db.dealership.create({ data: { id: foreignId, slug: `sender-control-${foreignId}`, name: "Unrelated sender/reset control" } });
+        const foreign = await businessState(foreignId);
+        const { staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        expect((await get("/api/v1/business/current", owner).expect(200)).body.workspace).toMatchObject({
+          business: { id: admitted.businessId, status: "active" }, membership: { role: "owner", status: "active" },
+        });
+        const accounting = () => rows(`SELECT (SELECT count(*)::int FROM "cf_${id}".campaign_records) AS records,
+          (SELECT count(*)::int FROM "cf_${id}".campaign_events) AS events`);
+        expect(await accounting()).toEqual([{ records: 56, events: 68 }]);
+        const measurement = await db.measurementState.findMany({ orderBy: { key: "asc" } });
+        expect(`+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${id}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`).toBe(phone);
+        const code = OtpCode.generate();
+        const reserved = await new PrismaOtpRequestRepository(db).reserve({
+          purpose: Enums.SignInCodePurpose.ListingContactPhone, destination: signInCodeDestination({ phone }),
+          codeHash: createHash("sha256").update(code.value).digest("hex"), userId: owner.user.id,
+          businessId: admitted.businessId, ip: "127.0.0.1",
+        }, new SystemClockAdapter());
+        requestId = reserved.record.id;
+        expect(reserved.smsDelivery).toEqual({ kind: "campaign", reservationId: id, candidate, namespace: `cf_${id}`, requestId });
+        const sms: OtpSms = { phone, code: code.value, purpose: Enums.SignInCodePurpose.ListingContactPhone,
+          locale: "ru", requestId, smsDelivery: reserved.smsDelivery };
+        const sender = app.get(HttpOtpSenderAdapter);
+        // Missing serving attestation is a setup gap. Never enable an operational gate here.
+        expect(process.env["AUTOTM_COMMIT_SHA"], "serving candidate attestation prerequisite, not race RED").toBe(candidate);
+        expect(await accounting()).toEqual([{ records: 57, events: 69 }]);
+        const before = await owned(id);
+        const authority = () => rows(`SELECT to_jsonb(b) AS binding,
+          (SELECT to_jsonb(l) FROM "cf_${id}".campaign_sms_ledger l WHERE request_id=$1) AS ledger,
+          m.sms_hash,m.sms_schema_hash,m.sms_contract_hash,m.tracking_hash,m.schema_hash
+          FROM "cf_${id}".campaign_sms_binding b CROSS JOIN "cf_${id}".campaign_manifest m`, requestId);
+        const retained = await authority();
+        expect(retained).toMatchObject([{ binding: { reservation_id: id, candidate, destination: phone,
+          business_id: admitted.businessId, owner_id: owner.user.id }, ledger: { request_id: requestId,
+          reservation_id: id, candidate, destination: phone, business_id: admitted.businessId, owner_id: owner.user.id,
+          purpose: "listing_contact_phone", code_hash: createHash("sha256").update(code.value).digest("hex"),
+          issue_row_hash: expect.stringMatching(/^[a-f0-9]{32}$/) } }]);
+        const sink = () => rows<{ message: string }>(`SELECT message FROM "cf_${id}".campaign_sms_sink WHERE request_id=$1`, requestId);
+        expect(await sink()).toEqual([]);
+        log = vi.spyOn(Logger.prototype, "log").mockImplementation(() => {});
+        if (senderFirst) {
+          barrier = new Client({ connectionString: process.env["DATABASE_URL"] });
+          await barrier.connect();
+          await barrier.query("BEGIN");
+          const holder = (await barrier.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
+          // Only the exact private table is locked. The sender's public authority
+          // reads remain MVCC and reset can take its existing public graph locks.
+          await barrier.query(`LOCK TABLE "cf_${id}".campaign_sms_sink IN SHARE MODE`);
+          send = sender.send(sms).then(() => ({}), (error: unknown) => ({ error }));
+          const deadline = performance.now() + 2500;
+          let senderPid: number | undefined;
+          while (performance.now() < deadline) {
+            const waiting = await rows<{ pid: number }>(`SELECT a.pid FROM pg_stat_activity a
+              JOIN pg_locks sink ON sink.pid=a.pid AND sink.locktype='relation' AND NOT sink.granted
+                AND sink.relation='"cf_${id}".campaign_sms_sink'::regclass AND sink.mode='RowExclusiveLock'
+              JOIN pg_locks fence ON fence.pid=a.pid AND fence.locktype='advisory' AND fence.granted AND fence.objsubid=1
+                AND fence.classid=((hashtextextended($1,0)>>32)&4294967295)::oid
+                AND fence.objid=(hashtextextended($1,0)&4294967295)::oid
+              WHERE a.datname=current_database() AND $2::int=ANY(pg_blocking_pids(a.pid))`, `cf_${id}`, holder);
+            if (waiting.length === 1) { senderPid = waiting[0]!.pid; break; }
+          }
+          expect(senderPid, "BARRIER SETUP FAILURE: real sender must hold exact namespace fence at sink INSERT").toBeDefined();
+          resetting = asynchronousReset(id).then(result => ({ result }), (error: unknown) => ({ error }));
+          const resetDeadline = performance.now() + 2500;
+          let resetWaiting = false;
+          while (performance.now() < resetDeadline) {
+            const waiting = await rows(`SELECT a.pid FROM pg_stat_activity a JOIN pg_locks fence ON fence.pid=a.pid
+              WHERE a.datname=current_database() AND a.wait_event_type='Lock'
+                AND fence.locktype='advisory' AND NOT fence.granted AND fence.objsubid=1
+                AND fence.classid=((hashtextextended($1,0)>>32)&4294967295)::oid
+                AND fence.objid=(hashtextextended($1,0)&4294967295)::oid
+                AND $2::int=ANY(pg_blocking_pids(a.pid))`, `cf_${id}`, senderPid);
+            if (waiting.length === 1) { resetWaiting = true; break; }
+          }
+          expect(resetWaiting, "BARRIER SETUP FAILURE: reset must wait on sender's exact namespace fence").toBe(true);
+          await barrier.query("ROLLBACK");
+          const sent = await send;
+          if (sent.error) throw sent.error;
+          const reset = await resetting;
+          if (reset.error) throw reset.error;
+          expect(reset.result).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        } else {
+          expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        }
+        await assertDisposed(id, before);
+        expect(await accounting()).toEqual([{ records: 57, events: 126 }]);
+        expect(await db.otpRequest.findUnique({ where: { id: requestId } })).toBeNull();
+        expect(await db.user.findUnique({ where: { id: owner.user.id } })).toBeNull();
+        expect(await sink()).toEqual([]);
+        expect(await authority()).toEqual(retained);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        const terminal = await digest(id);
+        const reused = await db.dealership.create({ data: { id: reuseId, slug: `sender-reuse-${reuseId}`,
+          name: "Unrelated terminal scalar reuse", contactPhone: phone } });
+        // Reset-first invokes this exact generated reserve result for the first
+        // time only after disposal. Sender-first also checks its delayed retry.
+        await expect(sender.send(sms)).rejects.toThrow("Campaign SMS delivery refused");
+        expect(log.mock.calls.length, "campaign send must never reach code/provider logging").toBe(0);
+        expect(await sink()).toEqual([]);
+        expect(await queue.getJob(requestId)).toBeUndefined();
+        expect(await authority()).toEqual(retained);
+        expect(await digest(id)).toBe(terminal);
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: { state: "disposed", queueJobs: 0, sinkRecords: 0 } });
+        expect(await digest(id)).toBe(terminal);
+        expect(await authority()).toEqual(retained);
+        expect(await sink()).toEqual([]);
+        await assertDisposed(id, before);
+        expect(await db.dealership.findUnique({ where: { id: reuseId } })).toEqual(reused);
+        expect(await businessState(foreignId)).toEqual(foreign);
+        expect(await db.measurementState.findMany({ orderBy: { key: "asc" } })).toEqual(measurement);
+      } finally {
+        // Release storage before awaiting either contender. Sender rollback or
+        // commit releases its transaction advisory lock. The reset worker exits
+        // only after every existing bounded SQL/Redis child has settled.
+        try { if (barrier) await barrier.query("ROLLBACK"); } finally {
+          try { await Promise.allSettled([send, resetting]); } finally {
+            try { if (barrier) await barrier.end(); } finally {
+              log?.mockRestore();
+              try { if (requestId) expect.soft(await queue.getJob(requestId)).toBeUndefined(); } finally {
+                await db.dealership.deleteMany({ where: { id: { in: [reuseId, foreignId] } } });
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  it("finishes a fenced generated contact send before reset disposes its sink and owned graph", () => withKnownJobs(known =>
+    contactOrdering("e2".repeat(16), "+99369944528", true, known)));
+
+  it("refuses the exact delayed contact carrier after reset while unrelated fresh phone reuse survives retry", () => withKnownJobs(known =>
+    contactOrdering("e3".repeat(16), "+99366905843", false, known)));
+
+  // B3 joined media case under the root D1-D5 disposition in
+  // docs/evidence/issue-897/support-assembly-and-media-disposition-20261021.md. Literal accounting was derived
+  // before editing (full-v3-media-publication-test-20261021.md): primary 76/103 before reset, 76/177 terminal;
+  // foreign stock control 66/87, then 66/152. Guards stay 128 records / 2048 events.
+  // FIRST NEW BEHAVIORAL BARRIER: the first ordinary conditional presign commits an unjournaled media_uploads row,
+  // so its upload-ownership assertion fails. Catalog, MinIO, auth, admission or contact failures are setup failures.
+  const mediaTables = ["media_uploads", "listing_media"];
+  const mediaSuite = defineE2eSuite("campaign897-full-v3-media-901");
+  async function mediaDisposed(id: string, before: RecordKey[], requestIds: string[]) {
+    expect(await rows(`SELECT state FROM "cf_${id}".campaign_manifest`)).toEqual([{ state: "disposed" }]);
+    expect(await owned(id)).toEqual(before.filter(row => row.table_name === "audit_logs"));
+    for (const record of before) {
+      expect([...tables, ...mediaTables]).toContain(record.table_name);
+      const actual = await rows<{ value: { actorId: string | null; targetType: string; targetId: string; details: object } }>(`SELECT to_jsonb(t) AS value FROM public.${record.table_name} t WHERE to_jsonb(t) @> $1::jsonb`, JSON.stringify(record.row_key));
+      if (record.table_name === "audit_logs") {
+        expect(actual).toHaveLength(1);
+        expect(actual[0]?.value).toMatchObject({ actorId: null, targetType: "SyntheticCampaign", targetId: id });
+        expect(actual[0]?.value.details).toEqual({ profile, disposition: "redacted-synthetic-audit" });
+      } else expect(actual, `owned ${record.table_name} ${JSON.stringify(record.row_key)} disposed`).toEqual([]);
+    }
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual([...requestIds].sort().map(request_id => ({ request_id })));
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_sink`)).toEqual([]);
+    expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_sms_sink`)).toEqual([]);
+    const redis = await queue.client;
+    for (const requestId of requestIds) {
+      expect(await queue.getJob(requestId)).toBeUndefined();
+      const key = queue.toKey(`de:campaign-cf_${id}-${requestId}`);
+      expect(await redis.get(key)).toBe(`disposed:cf_${id}:${candidate}:${requestId}`);
+      expect(await redis.pttl(key)).toBe(-1);
+    }
+  }
+
+  it("publishes ordinary conditional business media, keeps it through Sales removal, refuses foreign keys and resets to exact object absence", () => withKnownJobs(async known => {
+    const id = "c1".repeat(16), foreignId = "c2".repeat(16);
+    const phone = "+99363382801", foreignPhone = "+99363259840";
+    for (const [reservation, number] of [[id, phone], [foreignId, foreignPhone]] as const) {
+      expect(`+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${reservation}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`).toBe(number);
+    }
+    const cleanupIds = [id];
+    // Exact object keys learned from each presign response, per reservation. Buckets and prefixes are never listed.
+    const objectKeys = new Map<string, string[]>([[id, []], [foreignId, []]]);
+    const smsIds = new Set<string>();
+    const catalog = mediaSuite.catalog;
+    const endpoint = process.env["MINIO_ENDPOINT"] ?? "", publicUrl = (process.env["MINIO_PUBLIC_URL"] ?? "").replace(/\/$/, "");
+    const loopback = (value: string) => { try { return ["localhost", "127.0.0.1"].includes(new URL(value).hostname); } catch { return false; } };
+    let s3: S3Client | undefined, catalogOwned = false;
+    const head = (Key: string) => s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => 200,
+      (error: { $metadata?: { httpStatusCode?: number } }) => error.$metadata?.httpStatusCode ?? error);
+    const variants = (key: string) => ["original", "thumbnail", "list", "detail", "fullscreen"].map(name => key.replace(/original\.webp$/, `${name}.webp`));
+    const catalogRows = async () => ({
+      brands: await db.brand.findMany({ where: { OR: [{ id: catalog.brandId }, { slug: catalog.brandSlug }] } }),
+      models: await db.model.findMany({ where: { OR: [{ id: catalog.modelId }, { slug: catalog.modelSlug }] } }),
+      regions: await db.region.findMany({ where: { OR: [{ id: catalog.regionId }, { slug: catalog.regionSlug }] } }),
+      cities: await db.city.findMany({ where: { OR: [{ id: catalog.cityId }, { slug: catalog.citySlug }] } }),
+    });
+    const catalogReferences = async () =>
+      await db.listing.count({ where: { OR: [{ brandId: catalog.brandId }, { modelId: catalog.modelId }, { regionId: catalog.regionId }, { cityId: catalog.cityId }] } }) +
+      await db.dealership.count({ where: { cityId: catalog.cityId } }) + await db.generation.count({ where: { modelId: catalog.modelId } }) +
+      await db.model.count({ where: { brandId: catalog.brandId, id: { not: catalog.modelId } } }) + await db.city.count({ where: { regionId: catalog.regionId, id: { not: catalog.cityId } } });
+    try {
+      expect(loopback(endpoint) && loopback(publicUrl), "SETUP: lane-local disposable MinIO required, not behavioral RED").toBe(true);
+      s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED",
+        credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+      // D1: exact-ID test-owned catalog outside every reservation. An existing row is a foreign collision: stop untouched.
+      expect(await catalogRows(), "SETUP: test-owned catalog IDs and slugs must be unused").toEqual({ brands: [], models: [], regions: [], cities: [] });
+      catalogOwned = true;
+      await seedSuiteCatalog(db, mediaSuite);
+      const image = await sharp({ create: { width: 80, height: 60, channels: 3, background: "#377080" } }).webp().toBuffer();
+      await resetAfter(cleanupIds, async () => {
+        const draftsPath = "/api/v1/listings/drafts";
+        const business = (attempt: ReturnType<typeof post>, businessId: string) => attempt.set("x-business-id", businessId);
+        const journal = async (reservation: string, records: number, events: number) => {
+          expect(await rows(`SELECT (SELECT count(*)::int FROM "cf_${reservation}".campaign_records) AS records,(SELECT count(*)::int FROM "cf_${reservation}".campaign_events) AS events`)).toEqual([{ records, events }]);
+          expect(records).toBeLessThanOrEqual(128);
+          expect(events).toBeLessThan(2048);
+        };
+        const confirmContact = async (reservation: string, login: Login, businessId: string, number: string) => {
+          const contact = (action: "request" | "verify", body: object) => business(post(`/api/v1/me/contact-phones/${action}`, login, body), businessId);
+          const issued = await contact("request", { phone: number });
+          if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+          await observeIssuance("contact", issued, 200);
+          expect(issued.status, "SETUP: proven ordinary contact request").toBe(200);
+          const [delivered] = await rows<{ message: string }>(`SELECT message FROM "cf_${reservation}".campaign_sms_sink WHERE request_id=$1`, issued.body.requestId);
+          const code = delivered?.message.match(/\b\d{6}\b/)?.[0];
+          expect(code, "SETUP: protected SMS sink code").toBeDefined();
+          expect((await contact("verify", { phone: number, code }).expect(200)).body.contactPhone).toMatchObject({ phone: number, source: "confirmed" });
+        };
+        // Ordinary conditional presign, then the client PUT through the returned if-match authority.
+        const upload = async (reservation: string, login: Login, businessId: string) => {
+          const signed = await business(post("/api/v1/uploads/presign", login, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId);
+          const key = signed.body?.key as string;
+          if (typeof key === "string" && /original\.webp$/.test(key)) objectKeys.get(reservation)!.push(...variants(key));
+          expect(signed.status, "ordinary conditional business presign").toBe(201);
+          const row = await db.mediaUpload.findUniqueOrThrow({ where: { key } });
+          expect(await owned(reservation), "presigned media_uploads row must be journal-owned by its reservation").toContainEqual({ table_name: "media_uploads", row_key: { id: row.id } });
+          expect(row).toMatchObject({ userId: login.user.id, businessId, kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1", state: "AVAILABLE", objectKeys: variants(key) });
+          for (const objectKey of variants(key)) expect(await head(objectKey), `initialized ${objectKey}`).toBe(200);
+          expect(signed.body.headers).toMatchObject({ "if-match": expect.any(String), "content-type": "image/webp" });
+          const put = await fetch(signed.body.uploadUrl as string, { method: "PUT", headers: signed.body.headers as Record<string, string>, body: new Uint8Array(image) });
+          expect(put.ok, "client PUT through returned if-match").toBe(true);
+          return { key, id: row.id };
+        };
+        const payload = (photos: { key: string }[], contactPhone: string) => ({ brandId: catalog.brandId, modelId: catalog.modelId, year: 2020, cityId: catalog.cityId, regionId: catalog.regionId,
+          priceAmount: 100000, priceCurrency: "TMT", condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: false }, description: "Synthetic full-v3 business stock",
+          contactPhone, allowCalls: true, allowChat: true, photos: photos.map(({ key }, sortOrder) => ({ photoId: randomUUID(), key, sortOrder })) });
+        const mediaState = async (businessId: string) => ({
+          uploads: await db.mediaUpload.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+          listings: await db.listing.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+          media: await db.listingMedia.findMany({ where: { listing: { businessId } }, orderBy: { id: "asc" } }),
+          drafts: await db.listingDraft.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+          business: await businessState(businessId),
+        });
+
+        // Proven setup: ordinary sign-in, staff TOTP and grant, admission, Owner redemption, contact, Sales membership.
+        const roster = await seed(id);
+        const { coordinator, staff } = await elevatedStaff(id, roster, known, ["founder.admission"]);
+        const owner = await signIn(id, actor(roster, "buyer-a"), known);
+        const sales = await signIn(id, actor(roster, "sales-a"), known);
+        const admitted = (await post("/api/v1/business/admission", staff, admissionFor(id, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        const businessId = admitted.businessId, inventoryPath = `/api/v1/businesses/${businessId}/inventory`;
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        await confirmContact(id, owner, businessId, phone);
+        const invitation = (await post(`/api/v1/business/${businessId}/invitations`, owner, { recipientUserId: sales.user.id }).expect(201)).body as { token: string };
+        await post("/api/v1/business/invitations/redeem", sales, { token: invitation.token }).expect(201);
+        const ownerDraft = (await post(draftsPath, owner, { businessId, initialPayload: { description: "Synthetic Owner business draft kept through Sales removal" } }).expect(201)).body as { id: string };
+        await journal(id, 64, 81);
+
+        // Three Sales uploads, each journal-owned as soon as presign commits.
+        const photos: { key: string; id: string }[] = [];
+        for (let index = 0; index < 3; index += 1) photos.push(await upload(id, sales, businessId));
+        const salesPayload = payload(photos, phone);
+        const salesDraft = (await post(draftsPath, sales, { businessId, initialPayload: salesPayload }).expect(201)).body as { id: string };
+        expect(await owned(id)).toContainEqual({ table_name: "listing_drafts", row_key: { id: salesDraft.id } });
+        const published = (await business(post(`${draftsPath}/${salesDraft.id}/publish`, sales, {}), businessId).expect(201)).body as { id: string; sellerId: string; status: string };
+        const listingId = published.id;
+        expect(published).toMatchObject({ sellerId: sales.user.id, status: "active" });
+        const listing = await db.listing.findUniqueOrThrow({ where: { id: listingId } });
+        expect(listing).toMatchObject({ businessId, sellerId: sales.user.id, lastEditedById: sales.user.id, status: "active", contactPhone: phone,
+          brandId: catalog.brandId, modelId: catalog.modelId, cityId: catalog.cityId, regionId: catalog.regionId });
+        const media = await db.listingMedia.findMany({ where: { listingId }, orderBy: { sortOrder: "asc" } });
+        expect(media.map(({ id: mediaId, key, sortOrder, uploadId, kind }) => ({ id: mediaId, key, sortOrder, uploadId, kind }))).toEqual(
+          salesPayload.photos.map((photo, index) => ({ id: photo.photoId, key: photo.key, sortOrder: photo.sortOrder, uploadId: photos[index]!.id, kind: "image" })));
+        for (const row of media) expect(row.thumbHash).toEqual(expect.any(String));
+        const adopted = (ids: string[]) => db.mediaUpload.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" }, select: { id: true, state: true, claimTargetType: true, claimTargetId: true, claimToken: true } });
+        expect(await adopted(photos.map(photo => photo.id))).toEqual(photos.map(photo => photo.id).sort().map(uploadId => ({ id: uploadId, state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null })));
+        expect(await db.listingDraft.findUnique({ where: { id: salesDraft.id } })).toBeNull();
+        const publishedAudit = await db.auditLog.findFirstOrThrow({ where: { action: "listing.published", targetType: "Listing", targetId: listingId } });
+        expect(publishedAudit).toMatchObject({ actorId: sales.user.id, details: { brandId: catalog.brandId, modelId: catalog.modelId, cityId: catalog.cityId, priceAmount: 100000, priceCurrency: "TMT" } });
+        const ownedPublished = await owned(id);
+        for (const row of [{ table_name: "listings", row_key: { id: listingId } }, { table_name: "audit_logs", row_key: { id: publishedAudit.id } },
+          ...media.map(({ id: mediaId }) => ({ table_name: "listing_media", row_key: { id: mediaId } }))]) expect(ownedPublished, `owned ${row.table_name}`).toContainEqual(row);
+        expect(ownedPublished).not.toContainEqual({ table_name: "listing_drafts", row_key: { id: salesDraft.id } });
+        expect((await get(inventoryPath, owner).expect(200)).body).toMatchObject({ businessId, counts: { active: 1, drafts: 1 } });
+        const detail = (await request.get(`/api/v1/listings/${listingId}`).expect(200)).body as { media: { id: string; key: string; variants: Record<string, string> }[] };
+        expect(detail).toMatchObject({ id: listingId, businessId, sellerId: sales.user.id, status: "active", contactPhone: phone });
+        expect(detail.media.map(item => item.id)).toEqual(media.map(row => row.id));
+        for (const item of detail.media) for (const size of ["thumbnail", "list", "detail", "fullscreen"]) {
+          const url = new URL(item.variants[size]!);
+          expect(`${url.origin}${url.pathname}`).toBe(`${publicUrl}/listing-photos/${item.key.replace(/original\.webp$/, `${size}.webp`)}`);
+        }
+        for (const key of objectKeys.get(id)!) expect(await head(key), `published ${key}`).toBe(200);
+        await journal(id, 73, 97);
+
+        // Foreign stock control: a second reservation's ordinary admitted business publishes its own uploads.
+        cleanupIds.push(foreignId);
+        const foreignRoster = await seed(foreignId);
+        const foreignStaff = await elevatedStaff(foreignId, foreignRoster, known, ["founder.admission"]);
+        const foreignOwner = await signIn(foreignId, actor(foreignRoster, "buyer-a"), known);
+        const foreignAdmitted = (await post("/api/v1/business/admission", foreignStaff.staff, admissionFor(foreignId, foreignOwner.user.id)).expect(201)).body as { businessId: string; token: string };
+        const foreignBusinessId = foreignAdmitted.businessId;
+        await post("/api/v1/business/invitations/redeem", foreignOwner, { token: foreignAdmitted.token }).expect(201);
+        await confirmContact(foreignId, foreignOwner, foreignBusinessId, foreignPhone);
+        const foreignPhotos: { key: string; id: string }[] = [];
+        for (let index = 0; index < 3; index += 1) foreignPhotos.push(await upload(foreignId, foreignOwner, foreignBusinessId));
+        const foreignDraft = (await post(draftsPath, foreignOwner, { businessId: foreignBusinessId, initialPayload: payload(foreignPhotos, foreignPhone) }).expect(201)).body as { id: string };
+        const foreignListing = (await business(post(`${draftsPath}/${foreignDraft.id}/publish`, foreignOwner, {}), foreignBusinessId).expect(201)).body as { id: string };
+        await journal(foreignId, 66, 87);
+        const fourth = await upload(id, sales, businessId);
+
+        const reason = (response: { body: { details?: unknown } }) => response.body.details;
+        const refused = async (label: string, attempt: () => Promise<unknown>) => {
+          const before = { journal: await digest(id), foreign: await digest(foreignId), state: await mediaState(businessId), foreignState: await mediaState(foreignBusinessId) };
+          await attempt();
+          expect({ journal: await digest(id), foreign: await digest(foreignId), state: await mediaState(businessId), foreignState: await mediaState(foreignBusinessId) }, `${label} writes nothing`).toEqual(before);
+        };
+        const attach = (login: Login, target: string, key: string, context: string) => business(post(`/api/v1/listings/${target}/media/attach`, login, { key, kind: "image", sortOrder: 3 }), context);
+        await refused("foreign-key and non-member refusals", async () => {
+          expect((await attach(foreignOwner, foreignListing.id, fourth.key, foreignBusinessId).expect(400)).body.code).toBe("UPLOAD_NOT_AVAILABLE");
+          expect((await attach(sales, listingId, foreignPhotos[0]!.key, businessId).expect(400)).body.code).toBe("UPLOAD_NOT_AVAILABLE");
+          expect(reason(await attach(foreignOwner, listingId, fourth.key, businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post(`${draftsPath}/${ownerDraft.id}/publish`, foreignOwner, {}), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await get(inventoryPath, foreignOwner).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post("/api/v1/uploads/presign", foreignOwner, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(execute("reset", id, { candidate: "b".repeat(40) })).toMatchObject({ code: 1, receipt: undefined });
+        });
+
+        // Fourth photo, then ordinary Sales removal with its exact audit.
+        const attached = (await attach(sales, listingId, fourth.key, businessId).expect(201)).body as { id: string; sortOrder: number };
+        expect(attached.sortOrder).toBe(3);
+        expect(await owned(id)).toContainEqual({ table_name: "listing_media", row_key: { id: attached.id } });
+        expect(await adopted([fourth.id])).toEqual([{ id: fourth.id, state: "ADOPTED", claimTargetType: "listing", claimTargetId: listingId, claimToken: null }]);
+        expect((await post(`/api/v1/business/${businessId}/members`, owner, { targetUserId: sales.user.id, action: "remove" }).expect(201)).body).toEqual({ ok: true });
+        expect(await db.dealershipMember.findUnique({ where: { userId: sales.user.id } })).toBeNull();
+        const removal = await db.auditLog.findFirstOrThrow({ where: { targetType: "Dealership", targetId: businessId, action: "BUSINESS_MEMBERSHIP_CHANGED" } });
+        expect(removal).toMatchObject({ actorId: owner.user.id, details: { targetUserId: sales.user.id, action: "remove" } });
+        expect(removal.details).toEqual({ targetUserId: sales.user.id, action: "remove" });
+        await refused("removed Sales", async () => {
+          expect(reason(await get(inventoryPath, sales).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await attach(sales, listingId, fourth.key, businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post(`${draftsPath}/${ownerDraft.id}/publish`, sales, {}), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+          expect(reason(await business(post("/api/v1/uploads/presign", sales, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId).expect(403))).toEqual({ reason: "MEMBERSHIP_REQUIRED" });
+        });
+        // Owner keeps the stock: original seller, publication time, contact and all four photos. No silent transfer.
+        expect(await db.listing.findUniqueOrThrow({ where: { id: listingId } })).toEqual(listing);
+        const kept = (await business(get(`/api/v1/listings/${listingId}`, owner), businessId).expect(200)).body as { media: { id: string }[] };
+        expect(kept).toMatchObject({ sellerId: sales.user.id, contactPhone: phone, publishedAt: listing.publishedAt!.toISOString(), status: "active" });
+        expect(kept.media.map(item => item.id)).toEqual([...media.map(row => row.id), attached.id]);
+        const stock = (await get(inventoryPath, owner).expect(200)).body;
+        expect(stock).toMatchObject({ counts: { active: 1, drafts: 1 } });
+        expect(stock.drafts).toEqual([expect.objectContaining({ id: ownerDraft.id, userId: owner.user.id, businessId, payload: { description: "Synthetic Owner business draft kept through Sales removal" } })]);
+
+        // Literal accounting before reset: 76 records (draft and Sales member deleted) / 103 events.
+        const before = await owned(id), foreignBefore = await owned(foreignId);
+        const perTable = (keys: RecordKey[]) => keys.reduce<Record<string, number>>((counts, row) => ({ ...counts, [row.table_name]: (counts[row.table_name] ?? 0) + 1 }), {});
+        expect(perTable(before)).toEqual({ users: 15, sessions: 4, otp_requests: 5, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 9,
+          dealerships: 2, dealership_members: 2, dealership_invitations: 2, listing_drafts: 1, media_uploads: 4, listings: 1, listing_media: 4 });
+        expect(perTable(foreignBefore)).toEqual({ users: 15, sessions: 3, otp_requests: 4, totp_enrollments: 2, totp_backup_codes: 20, staff_grants: 3, audit_logs: 6,
+          dealerships: 2, dealership_members: 2, dealership_invitations: 1, media_uploads: 3, listings: 1, listing_media: 3 });
+        for (const upload of [...photos, fourth]) expect(before).toContainEqual({ table_name: "media_uploads", row_key: { id: upload.id } });
+        for (const upload of foreignPhotos) expect(foreignBefore).toContainEqual({ table_name: "media_uploads", row_key: { id: upload.id } });
+        expect(before.filter(row => mediaTables.includes(row.table_name) && foreignBefore.some(other => JSON.stringify(other) === JSON.stringify(row)))).toEqual([]);
+        await journal(id, 76, 103);
+        await journal(foreignId, 66, 87);
+        const requestIds = [coordinator.requestId, staff.requestId, owner.requestId, sales.requestId];
+        const foreignRequestIds = [foreignStaff.coordinator.requestId, foreignStaff.staff.requestId, foreignOwner.requestId];
+        expect(await rows(`SELECT request_id FROM "cf_${id}".campaign_delivery_ledger ORDER BY request_id`)).toEqual([...requestIds].sort().map(request_id => ({ request_id })));
+        expect(objectKeys.get(id)).toHaveLength(20);
+        expect(objectKeys.get(foreignId)).toHaveLength(15);
+        for (const key of [...objectKeys.get(id)!, ...objectKeys.get(foreignId)!]) expect(await head(key), `live ${key}`).toBe(200);
+        const foreignState = await mediaState(foreignBusinessId), foreignDigest = await digest(foreignId);
+
+        // D2: the existing reset disposes the journal-owned rows and establishes exact object absence, lost-response retry stable.
+        const terminalReceipt = { profile, candidate, state: "disposed", fixtures: "absent", identities: 0, tombstone: true, queueJobs: 0, sinkRecords: 0 };
+        expect(execute("reset", id, { loseReceipt: true })).toMatchObject({ code: 0, receipt: undefined });
+        await mediaDisposed(id, before, requestIds);
+        await journal(id, 76, 177);
+        expect(await db.auditLog.findUnique({ where: { id: publishedAudit.id }, select: { actorId: true, targetType: true, targetId: true, details: true } })).toEqual(
+          { actorId: null, targetType: "SyntheticCampaign", targetId: id, details: { profile, disposition: "redacted-synthetic-audit" } });
+        for (const key of objectKeys.get(id)!) expect(await head(key), `journal-owned object ${key} absent after reset`).toBe(404);
+        for (const key of objectKeys.get(foreignId)!) expect(await head(key), `foreign object ${key} preserved`).toBe(200);
+        expect(await mediaState(foreignBusinessId)).toEqual(foreignState);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        const terminal = await digest(id);
+        expect(execute("reset", id)).toMatchObject({ code: 0, receipt: terminalReceipt });
+        expect(await digest(id)).toBe(terminal);
+        await mediaDisposed(id, before, requestIds);
+        for (const key of objectKeys.get(id)!) expect(await head(key), `retry keeps ${key} absent`).toBe(404);
+        expect(reason(await get(inventoryPath, owner).expect(403))).toEqual({ reason: "SESSION_REQUIRED" });
+        await request.post("/api/v1/auth/refresh").send({ refreshToken: sales.refreshToken }).expect(401);
+        expect(await mediaState(foreignBusinessId)).toEqual(foreignState);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        expect((await request.get(`/api/v1/listings/${foreignListing.id}`).expect(200)).body).toMatchObject({ businessId: foreignBusinessId, contactPhone: foreignPhone });
+
+        // The control then disposes only its own graph and objects.
+        expect(execute("reset", foreignId)).toMatchObject({ code: 0, receipt: terminalReceipt });
+        await mediaDisposed(foreignId, foreignBefore, foreignRequestIds);
+        await journal(foreignId, 66, 152);
+        for (const key of objectKeys.get(foreignId)!) expect(await head(key), `control object ${key} absent after its reset`).toBe(404);
+      });
+    } finally {
+      // After both soft-asserted resets: exact known objects, SMS evidence, then the exact catalog rows once unreferenced.
+      for (const reservation of [id, foreignId]) {
+        const [contract] = await rows<{ present: boolean }>(`SELECT to_regclass('"cf_${reservation}".campaign_sms_ledger') IS NOT NULL AS present`);
+        if (contract?.present) for (const entry of await rows<{ request_id: string }>(`SELECT request_id FROM "cf_${reservation}".campaign_sms_ledger`)) smsIds.add(entry.request_id);
+      }
+      for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "synchronous SMS has no email job").toBeUndefined();
+      if (s3) for (const key of [...objectKeys.values()].flat()) {
+        const status = await head(key);
+        const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
+        expect.soft(failure, `exact known object cleanup ${key}`).toBeUndefined();
+      }
+      if (catalogOwned) {
+        const references = await catalogReferences();
+        expect.soft(references, "test-owned catalog retained: a reference survives cleanup").toBe(0);
+        if (references === 0) {
+          const failure = await (async () => {
+            await db.city.deleteMany({ where: { id: catalog.cityId } });
+            await db.region.deleteMany({ where: { id: catalog.regionId } });
+            await db.model.deleteMany({ where: { id: catalog.modelId } });
+            await db.brand.deleteMany({ where: { id: catalog.brandId } });
+          })().then(() => undefined, (error: unknown) => error);
+          expect.soft(failure, "exact test-owned catalog cleanup").toBeUndefined();
+        }
+      }
+      s3?.destroy();
+    }
+  }));
+
+  // Additive boundary tests. The original 28 cases and their helpers stay byte-for-byte unchanged.
+  it.each(["publish", "attach"] as const)("refuses HTTP %s finalization after claim recovery and preserves foreign business stock", mode => withKnownJobs(async known => {
+    const id = (mode === "publish" ? "c3" : "c7").repeat(16);
+    const foreignId = (mode === "publish" ? "c4" : "c6").repeat(16);
+    const suite = defineE2eSuite(`campaign897-full-v3-media-races-${mode}-901`);
+    const catalog = suite.catalog;
+    const keys = new Map<string, string[]>([[id, []], [foreignId, []]]);
+    const cleanupIds: string[] = [], smsIds = new Set<string>();
+    let s3: S3Client | undefined, catalogOwned = false;
+    let resume = () => {};
+    let pending: Promise<{ status: number }> | undefined;
+    let generator: { s3: unknown } | undefined, originalTransport: unknown;
+    const journal = async (reservation: string, records: number, events: number) => {
+      expect(await rows(`SELECT (SELECT count(*)::int FROM "cf_${reservation}".campaign_records) AS records,(SELECT count(*)::int FROM "cf_${reservation}".campaign_events) AS events`)).toEqual([{ records, events }]);
+      expect(records).toBeLessThanOrEqual(128);
+      expect(events).toBeLessThan(2048);
+    };
+    // Same tsx/process boundary as processEmail: execute worker production source in its own workspace.
+    const workerCleanup = async (action: "recover" | "clean" | "outage", now: Date, limit: number) => {
+      const result = await promisify(execFile)(process.execPath, ["-e", `
+        require('reflect-metadata');
+        require('tsx/cjs');
+        const { PrismaService } = require('@auto-tm/db');
+        const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+        const { PrismaRetiredUploadLedger } = require('./src/jobs/PrismaRetiredUploadLedger.ts');
+        const { CleanRetiredUploads } = require('./src/jobs/CleanRetiredUploads.ts');
+        const { S3RetiredObjectStore } = require('./src/jobs/S3RetiredObjectStore.ts');
+        (async () => {
+          const [action, timestamp, limit] = process.argv.slice(1);
+          const db = new PrismaService();
+          const s3 = new S3Client({ endpoint: process.env.MINIO_ENDPOINT, region: process.env.MINIO_REGION ?? 'us-east-1',
+            forcePathStyle: true, requestChecksumCalculation: 'WHEN_REQUIRED', credentials: {
+              accessKeyId: process.env.MINIO_ACCESS_KEY ?? 'minioadmin', secretAccessKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin' } });
+          try {
+            const ledger = new PrismaRetiredUploadLedger(db);
+            const boundary = action === 'outage' ? { send: (command, options) => {
+              if (command instanceof DeleteObjectCommand) throw new Error('controlled disposable S3 outage');
+              return s3.send(command, options);
+            } } : s3;
+            const result = action === 'recover'
+              ? await ledger.retireExpiredPreparations(new Date(timestamp), Number(limit))
+              : await new CleanRetiredUploads(ledger, new S3RetiredObjectStore(boundary)).execute({ now: new Date(timestamp), limit: Number(limit) });
+            console.log(JSON.stringify(result));
+          } finally { s3.destroy(); await db.onModuleDestroy(); }
+        })().catch(() => { process.exitCode = 1; });
+      `, action, now.toISOString(), String(limit)], {
+        timeout: 30000, cwd: `${root}/apps/worker`,
+        env: { ...process.env, TSX_TSCONFIG_PATH: `${root}/apps/worker/tsconfig.json` },
+      });
+      return JSON.parse(result.stdout.trim()) as number | { cancelledPreparations: number; deleted: number; waiting: number };
+    };
+    const head = (Key: string) => s3!.send(new HeadObjectCommand({ Bucket: "listing-photos", Key })).then(() => 200,
+      (error: { $metadata?: { httpStatusCode?: number } }) => error.$metadata?.httpStatusCode ?? error);
+    const manifest = (key: string) => ["original", "thumbnail", "list", "detail", "fullscreen"].map(name => key.replace(/original\.webp$/, `${name}.webp`));
+    const business = (attempt: ReturnType<typeof post>, businessId: string) => attempt.set("x-business-id", businessId);
+    const state = async (businessId: string) => ({
+      business: await businessState(businessId),
+      uploads: await db.mediaUpload.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+      listings: await db.listing.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+      media: await db.listingMedia.findMany({ where: { listing: { businessId } }, orderBy: { id: "asc" } }),
+      drafts: await db.listingDraft.findMany({ where: { businessId }, orderBy: { id: "asc" } }),
+    });
+    const catalogReferences = async () =>
+      await db.listing.count({ where: { OR: [{ brandId: catalog.brandId }, { modelId: catalog.modelId }, { regionId: catalog.regionId }, { cityId: catalog.cityId }] } }) +
+      await db.dealership.count({ where: { cityId: catalog.cityId } }) + await db.generation.count({ where: { modelId: catalog.modelId } }) +
+      await db.model.count({ where: { brandId: catalog.brandId, id: { not: catalog.modelId } } }) + await db.city.count({ where: { regionId: catalog.regionId, id: { not: catalog.cityId } } });
+    try {
+      const endpoint = process.env["MINIO_ENDPOINT"] ?? "", publicUrl = process.env["MINIO_PUBLIC_URL"] ?? "";
+      const loopback = (value: string) => { try { return ["localhost", "127.0.0.1"].includes(new URL(value).hostname); } catch { return false; } };
+      expect(process.env["GITHUB_ACTIONS"], "SETUP: hosted disposable services only").toBe("true");
+      expect(loopback(endpoint) && loopback(publicUrl), "SETUP: lane-local disposable MinIO required").toBe(true);
+      s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED",
+        credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+      expect(await db.brand.findMany({ where: { OR: [{ id: catalog.brandId }, { slug: catalog.brandSlug }] } })).toEqual([]);
+      expect(await db.model.findMany({ where: { OR: [{ id: catalog.modelId }, { slug: catalog.modelSlug }] } })).toEqual([]);
+      expect(await db.region.findMany({ where: { OR: [{ id: catalog.regionId }, { slug: catalog.regionSlug }] } })).toEqual([]);
+      expect(await db.city.findMany({ where: { OR: [{ id: catalog.cityId }, { slug: catalog.citySlug }] } })).toEqual([]);
+      catalogOwned = true;
+      await seedSuiteCatalog(db, suite);
+      const image = await sharp({ create: { width: 80, height: 60, channels: 3, background: "#377080" } }).webp().toBuffer();
+      const payload = (photos: { key: string }[], phone: string) => ({ brandId: catalog.brandId, modelId: catalog.modelId, year: 2020, cityId: catalog.cityId, regionId: catalog.regionId,
+        priceAmount: 100000, priceCurrency: "TMT", condition: "used", mileageKm: 1000, conditionDisclosure: { damaged: false }, description: "Synthetic full-v3 business stock",
+        contactPhone: phone, allowCalls: true, allowChat: true, photos: photos.map(({ key }, sortOrder) => ({ photoId: randomUUID(), key, sortOrder })) });
+      const upload = async (reservation: string, owner: Login, businessId: string) => {
+        const signed = await business(post("/api/v1/uploads/presign", owner, { kind: "image", contentType: "image/webp", sizeBytes: image.length, writeProtocol: "conditional-v1" }), businessId);
+        const key = signed.body?.key as string;
+        if (typeof key === "string" && /original\.webp$/.test(key)) keys.get(reservation)!.push(...manifest(key));
+        expect(signed.status, "ordinary recorded conditional presign").toBe(201);
+        const row = await db.mediaUpload.findUniqueOrThrow({ where: { key } });
+        expect(await owned(reservation)).toContainEqual({ table_name: "media_uploads", row_key: { id: row.id } });
+        expect(row).toMatchObject({ userId: owner.user.id, businessId, state: "AVAILABLE", writeProtocol: "conditional-v1", objectKeys: manifest(key) });
+        expect(signed.body.headers).toMatchObject({ "if-match": expect.any(String), "content-type": "image/webp" });
+        for (const member of manifest(key)) expect(await head(member)).toBe(200);
+        expect((await fetch(signed.body.uploadUrl as string, { method: "PUT", headers: signed.body.headers as Record<string, string>, body: new Uint8Array(image) })).status).toBe(200);
+        return { id: row.id, key };
+      };
+      const prepareBusiness = async (reservation: string, publish: boolean) => {
+        expect(await rows(`SELECT to_regclass('"cf_${reservation}".campaign_manifest')::text AS present`)).toEqual([{ present: null }]);
+        cleanupIds.push(reservation);
+        const roster = await seed(reservation);
+        await journal(reservation, 21, 21);
+        const staff = await elevatedStaff(reservation, roster, known, ["founder.admission"]);
+        await journal(reservation, 49, 57);
+        const owner = await signIn(reservation, actor(roster, "buyer-a"), known);
+        await journal(reservation, 51, 61);
+        const admitted = (await post("/api/v1/business/admission", staff.staff, admissionFor(reservation, owner.user.id)).expect(201)).body as { businessId: string; token: string };
+        const businessId = admitted.businessId;
+        await journal(reservation, 54, 64);
+        await post("/api/v1/business/invitations/redeem", owner, { token: admitted.token }).expect(201);
+        await journal(reservation, 56, 68);
+        const phone = `+9936${(BigInt(`0x${createHash("sha256").update(`campaign897-contact-phone-v1:${reservation}:${candidate}`, "ascii").digest("hex")}`) % 10000000n).toString().padStart(7, "0")}`;
+        const issued = await business(post("/api/v1/me/contact-phones/request", owner, { phone }), businessId);
+        if (typeof issued.body.requestId === "string") smsIds.add(issued.body.requestId);
+        await observeIssuance("contact", issued, 200);
+        expect(issued.status, "SETUP: ordinary contact request").toBe(200);
+        await journal(reservation, 57, 69);
+        const [delivered] = await rows<{ message: string }>(`SELECT message FROM "cf_${reservation}".campaign_sms_sink WHERE request_id=$1`, issued.body.requestId);
+        const code = delivered?.message.match(/\b\d{6}\b/)?.[0];
+        expect(code, "SETUP: protected contact sink").toBeDefined();
+        await business(post("/api/v1/me/contact-phones/verify", owner, { phone, code }), businessId).expect(200);
+        await journal(reservation, 57, 71);
+        let listingId: string | undefined;
+        if (publish) {
+          const photos: { id: string; key: string }[] = [];
+          await journal(reservation, 57, 71);
+          photos.push(await upload(reservation, owner, businessId));
+          await journal(reservation, 58, 72);
+          photos.push(await upload(reservation, owner, businessId));
+          await journal(reservation, 59, 73);
+          photos.push(await upload(reservation, owner, businessId));
+          await journal(reservation, 60, 74);
+          const draft = (await post("/api/v1/listings/drafts", owner, { businessId, initialPayload: payload(photos, phone) }).expect(201)).body as { id: string };
+          await journal(reservation, 61, 75);
+          listingId = ((await business(post(`/api/v1/listings/drafts/${draft.id}/publish`, owner, {}), businessId).expect(201)).body as { id: string }).id;
+          await journal(reservation, 66, 87);
+        }
+        return { owner, businessId, phone, listingId, requestIds: [staff.coordinator.requestId, staff.staff.requestId, owner.requestId] };
+      };
+      const primary = await prepareBusiness(id, mode === "attach");
+      const foreign = await prepareBusiness(foreignId, true);
+      const foreignState = await state(foreign.businessId), foreignDigest = await digest(foreignId);
+      const bytesHash = async (Key: string) => {
+        const object = await s3!.send(new GetObjectCommand({ Bucket: "listing-photos", Key }));
+        expect(object.Body, `foreign body ${Key}`).toBeDefined();
+        return createHash("sha256").update(await object.Body!.transformToByteArray()).digest("hex");
+      };
+      const foreignBytes = new Map<string, string>();
+      for (const key of keys.get(foreignId)!) foreignBytes.set(key, await bytesHash(key));
+      const foreignUnchanged = async () => {
+        await journal(foreignId, 66, 87);
+        expect(await state(foreign.businessId)).toEqual(foreignState);
+        expect(await digest(foreignId)).toBe(foreignDigest);
+        for (const key of keys.get(foreignId)!) expect(await bytesHash(key), `foreign bytes unchanged ${key}`).toBe(foreignBytes.get(key));
+        expect((await request.get(`/api/v1/listings/${foreign.listingId}`).expect(200)).body).toMatchObject({ businessId: foreign.businessId, contactPhone: foreign.phone });
+      };
+      const photos: { id: string; key: string }[] = [];
+      if (mode === "publish") {
+        await journal(id, 57, 71);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 58, 72);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 59, 73);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 60, 74);
+      } else {
+        await journal(id, 66, 87);
+        photos.push(await upload(id, primary.owner, primary.businessId));
+        await journal(id, 67, 88);
+      }
+      let draftId: string | undefined;
+      if (mode === "publish") {
+        draftId = ((await post("/api/v1/listings/drafts", primary.owner, { businessId: primary.businessId, initialPayload: payload(photos, primary.phone) }).expect(201)).body as { id: string }).id;
+        await journal(id, 61, 75);
+      }
+      // Only external S3 transport changes. The HTTP caller, claim, generator and recovery stay real.
+      generator = app.get<{ s3: unknown }>(IMAGE_VARIANT_GENERATOR);
+      originalTransport = generator.s3;
+      const held = new Set<string>();
+      let allStarted!: () => void;
+      const started = new Promise<void>(resolve => { allStarted = resolve; });
+      const release = new Promise<void>(resolve => { resume = resolve; });
+      generator.s3 = { send: async (command: unknown, options?: { abortSignal?: AbortSignal }) => {
+        if (command instanceof PutObjectCommand && photos.some(photo => manifest(photo.key).includes(command.input.Key ?? "")) && !held.has(command.input.Key!)) {
+          expect(command.input.IfMatch).toEqual(expect.any(String));
+          expect(command.input.CacheControl).toBe("no-store");
+          expect(Buffer.isBuffer(command.input.Body)).toBe(true);
+          held.add(command.input.Key!);
+          if (held.size === photos.length) allStarted();
+          // Hold before transport submission, only through claim recovery. NP-4 owns
+          // real in-flight PUT/cleanup ordering and late conditional-byte refusal.
+          await release;
+          expect(options?.abortSignal?.aborted, "Claim recovery must finish inside the unchanged request budget").toBe(false);
+        }
+        return s3!.send(command as PutObjectCommand, options);
+      } };
+      // New ordinary mutation. PREPARING is produced by publish/attach, never inserted by the test.
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 75 : 88);
+      const attempt = mode === "publish"
+        ? business(post(`/api/v1/listings/drafts/${draftId}/publish`, primary.owner, {}), primary.businessId)
+        : business(post(`/api/v1/listings/${primary.listingId}/media/attach`, primary.owner, { key: photos[0]!.key, kind: "image", sortOrder: 3 }), primary.businessId);
+      pending = attempt.then(response => ({ status: response.status }));
+      await Promise.race([started, pending.then(() => { throw new Error("Request finished before the generator transport gate"); })]);
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 78 : 89);
+      const preparing = await db.mediaUpload.findMany({ where: { id: { in: photos.map(photo => photo.id) } }, orderBy: { id: "asc" } });
+      expect(preparing).toHaveLength(mode === "publish" ? 3 : 1);
+      for (const upload of preparing) expect(upload).toMatchObject({ state: "PREPARING", claimTargetType: "listing", claimToken: expect.any(String), claimDeadline: expect.any(Date) });
+      const targetId = preparing[0]!.claimTargetId!;
+      for (const upload of preparing) expect(upload).toMatchObject({ claimTargetId: targetId, claimToken: preparing[0]!.claimToken });
+      if (mode === "publish") expect(await db.listing.findUnique({ where: { id: targetId } })).toBeNull();
+      else expect(targetId).toBe(primary.listingId);
+      // Existing production recovery time input. No fake global clock or database timestamp edits.
+      const now = new Date(Math.max(...preparing.map(upload => upload.claimDeadline!.getTime())) + 1);
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 78 : 89);
+      expect(await workerCleanup("recover", now, 3)).toBe(mode === "publish" ? 3 : 1);
+      await journal(id, mode === "publish" ? 61 : 67, mode === "publish" ? 81 : 90);
+      for (const photo of photos) {
+        expect(await db.mediaUpload.findUniqueOrThrow({ where: { id: photo.id } })).toMatchObject({
+          state: mode === "publish" ? "AVAILABLE" : "RETIRED", claimToken: null, claimDeadline: null,
+          claimTargetType: mode === "publish" ? null : "listing", claimTargetId: mode === "publish" ? null : primary.listingId, retiredAt: mode === "publish" ? null : now,
+        });
+        if (mode === "publish") expect(await db.mediaUploadCleanup.findUnique({ where: { uploadId: photo.id } })).toBeNull();
+        else expect(await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photo.id } })).toMatchObject({ status: "PENDING", attempts: 0, objectKeys: manifest(photo.key), nextAttemptAt: preparing[0]!.claimDeadline });
+      }
+      await foreignUnchanged();
+      resume();
+      expect((await pending).status).toBeGreaterThanOrEqual(400);
+      if (mode === "publish") {
+        expect(await db.listing.findUnique({ where: { id: targetId } })).toBeNull();
+        expect(await db.listingDraft.findUnique({ where: { id: draftId! } })).not.toBeNull();
+      } else {
+        expect(await db.listingMedia.count({ where: { listingId: primary.listingId!, uploadId: photos[0]!.id } })).toBe(0);
+      }
+      await foreignUnchanged();
+      if (mode === "attach") {
+        // Preserve exact recovery/backoff/retry assertions without any campaign reset.
+        expect(await workerCleanup("outage", now, 1)).toEqual({ cancelledPreparations: 0, deleted: 0, waiting: 1 });
+        const work = await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photos[0]!.id } });
+        expect(work).toMatchObject({ status: "PENDING", attempts: 1, lastError: "controlled disposable S3 outage" });
+        expect(work.nextAttemptAt.getTime()).toBe(now.getTime() + 60_000);
+        expect(await workerCleanup("clean", new Date(work.nextAttemptAt.getTime() + 1), 1)).toEqual({ cancelledPreparations: 0, deleted: 1, waiting: 0 });
+        expect(await db.mediaUploadCleanup.findUniqueOrThrow({ where: { uploadId: photos[0]!.id } })).toMatchObject({ status: "DONE", attempts: 2, lastError: null });
+        for (const photo of photos) for (const key of manifest(photo.key)) expect(await head(key)).toBe(404);
+        await foreignUnchanged();
+      }
+    } finally {
+      resume();
+      try { await pending; } finally {
+        if (generator) generator.s3 = originalTransport;
+        try {
+          for (const reservation of cleanupIds) expect.soft(execute("reset", reservation).code, `exact reset ${reservation}`).toBe(0);
+          for (const requestId of smsIds) expect.soft(await queue.getJob(requestId), "SMS has no email job").toBeUndefined();
+          if (s3) for (const key of [...keys.values()].flat()) {
+            const status = await head(key);
+            const failure = status === 200 ? await s3.send(new DeleteObjectCommand({ Bucket: "listing-photos", Key: key })).then(() => undefined, (error: unknown) => error) : status === 404 ? undefined : status;
+            expect.soft(failure, `exact known key cleanup ${key}`).toBeUndefined();
+          }
+          if (catalogOwned) {
+            const references = await catalogReferences();
+            expect.soft(references, "catalog retained while referenced").toBe(0);
+            if (references === 0) {
+              await db.city.deleteMany({ where: { id: catalog.cityId } });
+              await db.region.deleteMany({ where: { id: catalog.regionId } });
+              await db.model.deleteMany({ where: { id: catalog.modelId } });
+              await db.brand.deleteMany({ where: { id: catalog.brandId } });
+            }
+          }
+        } finally { s3?.destroy(); }
+      }
+    }
+  }));
+
+});

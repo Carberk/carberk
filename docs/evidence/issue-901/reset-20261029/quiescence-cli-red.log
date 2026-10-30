@@ -1,0 +1,70 @@
+✖ an exact CLI-session target reaches read-only observations without claiming closure (2.361334ms)
+✖ quiescence credential modes cannot masquerade or automatically fall back (0.164292ms)
+✔ CLI-session quiescence refuses a cross-target scope before any platform read (0.233417ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 57.062041
+
+✖ failing tests:
+
+test at scripts/staging-quiescence.test.mjs:6:1
+✖ an exact CLI-session target reaches read-only observations without claiming closure (2.361334ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + Comparison {}
+  - Comparison {
+  -   code: 'QUIESCENCE_EVIDENCE_GAP'
+  - }
+
+      at async TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.test.mjs:28:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Quiescence refused: exact scoped staging identity required
+        at fail (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.mjs:8:33)
+        at validateRequest (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.mjs:19:71)
+        at observeQuiescence (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.mjs:155:3)
+        at RailwayPlatform.observeQuiescence (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-railway.mjs:133:12)
+        at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.test.mjs:28:33)
+        at Test.runInAsyncScope (node:async_hooks:214:14)
+        at Test.run (node:internal/test_runner/test:1106:25)
+        at Test.start (node:internal/test_runner/test:1003:17)
+        at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17),
+    expected: { code: 'QUIESCENCE_EVIDENCE_GAP' },
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/staging-quiescence.test.mjs:35:1
+✖ quiescence credential modes cannot masquerade or automatically fall back (0.164292ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /credential mode mismatch/. Input:
+
+  'Error: Quiescence refused: exact scoped staging identity required'
+
+      at async TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.test.mjs:41:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Quiescence refused: exact scoped staging identity required
+        at fail (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.mjs:8:33)
+        at validateRequest (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.mjs:19:71)
+        at observeQuiescence (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.mjs:155:3)
+        at RailwayPlatform.observeQuiescence (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-railway.mjs:133:12)
+        at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-ccafc35f/scripts/staging-quiescence.test.mjs:41:35)
+        at Test.runInAsyncScope (node:async_hooks:214:14)
+        at Test.run (node:internal/test_runner/test:1106:25)
+        at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+        at Test.postRun (node:internal/test_runner/test:1235:19)
+        at Test.run (node:internal/test_runner/test:1163:12),
+    expected: /credential mode mismatch/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

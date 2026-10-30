@@ -1,0 +1,18 @@
+{
+  "base": "4538ae99bfdfa2504f81a2e090eec2b6af496384",
+  "sourceCandidate": "0dd9ed599f96c5e9f556dd79eb471173e7380a96",
+  "originalTestFiles": 916,
+  "unchangedByBlob": 915,
+  "changedOriginalTests": [
+    "apps/api/src/modules/diagnostics/presentation/DiagnosticAutomaticVinProof.e2e.spec.ts"
+  ],
+  "newTestFiles": [
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+    "apps/api/src/modules/measurement/infrastructure/MeasurementUnavailableDiagnostics.spec.ts",
+    "apps/worker/src/jobs/diagnostics/SafeReplacementScheduling.spec.ts"
+  ],
+  "originalE2eRestoredExactlyAfterRemovingOneAddedJourney": true,
+  "addedJourneyBytes": 2341,
+  "oldE2eBlob": "9bc2674dee0d5698d82c8b259c35a3a8019fb4f9",
+  "newE2eBlob": "a5fb14f6e418af036fc7f41a2e12162a67d65e71"
+}

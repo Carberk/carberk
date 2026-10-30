@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockState = vi.hoisted(() => ({
@@ -180,7 +180,9 @@ describe("ReportDetailPage profile photo", () => {
     fireEvent.click(screen.getByRole("button", { name: "Подтвердить удаление" }));
     await waitFor(() => expect(mockState.refresh).toHaveBeenCalled());
     mockDetail(userReport({ status: "actioned", target: { ...userReport().target, avatarKey: null } }));
-    view.rerender(await ReportDetailPage({ params: Promise.resolve({ id: "r1" }) }));
+    await act(async () => {
+      view.rerender(await ReportDetailPage({ params: Promise.resolve({ id: "r1" }) }));
+    });
     expect(screen.getByText("Обработана")).toBeDefined();
     expect(screen.getByRole("img", { name: "Назначенный аватар" }).getAttribute("src")).toBe("/assigned-avatars/3.svg");
     expect(screen.queryByRole("img", { name: "Фото профиля" })).toBeNull();
@@ -268,7 +270,7 @@ describe("Reported Message detail", () => {
     expect(document.querySelector("script")).toBeNull();
     expect(screen.getByText("Есть вложение")).toBeDefined();
     expect(screen.getByText("Тип:").parentElement?.textContent).toBe("Тип: Сообщение");
-    expect(screen.getByText("Отправлено:").parentElement?.textContent).toBe("Отправлено: 01.01.2026, 12:00");
+    expect(screen.getByText("Отправлено:").parentElement?.textContent).toBe("Отправлено: 1 янв. 2026 г., 12:00 UTC");
     vi.unstubAllEnvs();
     expect(screen.getByRole("link", { name: "Борис" }).getAttribute("href")).toBe("/users/sender-1");
     expect(document.querySelector('a[href="/users/m1"]')).toBeNull();

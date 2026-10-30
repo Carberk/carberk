@@ -1,0 +1,391 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/apps/worker
+
+ ❯ src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts (13 tests | 6 failed | 7 skipped) 156ms
+   × prints the immutable vehicle and center identity in tk customer copies 49ms
+   × prints the immutable vehicle and center identity in ru customer copies 28ms
+   × prints the immutable vehicle and center identity in en customer copies 22ms
+   × prints human-readable manual vehicle identification in tk without restricted workshop notes 19ms
+   × prints human-readable manual vehicle identification in ru without restricted workshop notes 19ms
+   × prints human-readable manual vehicle identification in en without restricted workshop notes 18ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts > prints the immutable vehicle and center identity in tk customer copies
+AssertionError: expected 'Carberk\n11111111-1111-4111-8111-0000…' to contain 'Aşgabat synag merkezi'
+
+- Expected
++ Received
+
+- Aşgabat synag merkezi
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / TK
++ SYNAG NUSGASY. Hakyky barlag däl.
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Barlag hasabaty
++ Barlag wagty: 2026-10-17T00:00:00.000Z
++ Ýazylan aralyk: 123456 km
++ Şablon wersiýasy: 11111111-1111-4111-8111-000000000003
++ Barlag hasabaty: 11111111-1111-4111-8111-000000000001
++ Barlagyň çägi
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Bu hasabat barlag wagtyndaky synlamalary görkezýär. Kepillik ýa-da umumy howpsuzlyk tassyknamasy däl.
++ Netijeler
++ 1. Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin [brakes]
++ Kadaly / 11111111-1111-4111-8111-000000000010
++ Düşündiriş: Observation 1: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Ölçeg: 2.5 mm; Caliper; Näbellilik: ±0.1 mm
++ Surat ýok
++ 2. Bölek 1 [panel_1]
++ Kadaly / 11111111-1111-4111-8111-000000000011
++ Düşündiriş: Observation 2: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Bölek 1 [panel_1] / Öň / 0.35, 0.44999999999999996
++ Surat ýok
++ 1 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / TK
++ SYNAG NUSGASY. Hakyky barlag däl.
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Kuzowyň çyzgysy
++ Umumy çyzgy. Bölekleriň atlaryna we doly netijelere serediň.
++ Öň
++ 2
++ Yz
++ Çep
++ Sag
++ 2 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / TK
++ SYNAG NUSGASY. Hakyky barlag däl.
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Ýokardan
++ Häzirki ýazgy
++ /diagnostics/reports/record
++ Göçürilen nusgalar soňraky üýtgeşmeleri görkezmez. Häzirki ýazgyny barlaň.
++ 3 / 3
+
+ ❯ src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts:34:18
+     32|     const bytes = await renderDiagnosticPdf({ snapshot: current, local…
+     33|     const text = await readDiagnosticPdfText(bytes);
+     34|     expect(text).toContain(centerNames[locale]);
+       |                  ^
+     35|     expect(text).toContain("Toyota Camry 2018");
+     36|     expect(text).toContain("*************1234");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts > prints the immutable vehicle and center identity in ru customer copies
+AssertionError: expected 'Carberk\n11111111-1111-4111-8111-0000…' to contain 'Тестовый центр Ашхабада'
+
+- Expected
++ Received
+
+- Тестовый центр Ашхабада
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / RU
++ ДЕМОНСТРАЦИОННЫЙ ОБРАЗЕЦ. Это не реальный осмотр.
++ Синтетический образец
++ Отчёт осмотра
++ Дата осмотра: 2026-10-17T00:00:00.000Z
++ Зафиксированный пробег: 123456 km
++ Версия шаблона: 11111111-1111-4111-8111-000000000003
++ Отчёт осмотра: 11111111-1111-4111-8111-000000000001
++ Объём осмотра
++ Синтетический образец
++ Синтетический образец
++ Отчёт фиксирует наблюдения на момент осмотра. Это не гарантия и не сертификат общей
++ безопасности.
++ Результаты
++ 1. Синтетический образец [brakes]
++ Норма / 11111111-1111-4111-8111-000000000010
++ Пояснение: Observation 1: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Измерение: 2.5 mm; Caliper; Неопределённость: ±0.1 mm
++ Нет фотографий
++ 2. Панель 1 [panel_1]
++ Норма / 11111111-1111-4111-8111-000000000011
++ Пояснение: Observation 2: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Панель 1 [panel_1] / Спереди / 0.35, 0.44999999999999996
++ Нет фотографий
++ 1 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / RU
++ ДЕМОНСТРАЦИОННЫЙ ОБРАЗЕЦ. Это не реальный осмотр.
++ Синтетический образец
++ Схема кузова
++ Условная схема. См. названия панелей и полную таблицу результатов.
++ Спереди
++ 2
++ Сзади
++ Слева
++ Справа
++ 2 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / RU
++ ДЕМОНСТРАЦИОННЫЙ ОБРАЗЕЦ. Это не реальный осмотр.
++ Синтетический образец
++ Сверху
++ Текущая запись
++ /diagnostics/reports/record
++ Скачанные копии не отражают последующие изменения. Проверяйте текущую запись.
++ 3 / 3
+
+ ❯ src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts:34:18
+     32|     const bytes = await renderDiagnosticPdf({ snapshot: current, local…
+     33|     const text = await readDiagnosticPdfText(bytes);
+     34|     expect(text).toContain(centerNames[locale]);
+       |                  ^
+     35|     expect(text).toContain("Toyota Camry 2018");
+     36|     expect(text).toContain("*************1234");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts > prints the immutable vehicle and center identity in en customer copies
+AssertionError: expected 'Carberk\n11111111-1111-4111-8111-0000…' to contain 'Ashgabat test center'
+
+- Expected
++ Received
+
+- Ashgabat test center
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / EN
++ SYNTHETIC SAMPLE. This is not a real inspection.
++ Synthetic sample
++ Inspection report
++ Observation date: 2026-10-17T00:00:00.000Z
++ Recorded mileage: 123456 km
++ Template version: 11111111-1111-4111-8111-000000000003
++ Inspection report: 11111111-1111-4111-8111-000000000001
++ Inspection scope
++ Synthetic sample
++ Synthetic sample
++ This report records observations at the inspection time. It is not a warranty or a general safety certificate.
++ Results
++ 1. Synthetic sample [brakes]
++ Normal / 11111111-1111-4111-8111-000000000010
++ Explanation: Observation 1: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Measurement: 2.5 mm; Caliper; Uncertainty: ±0.1 mm
++ No photographs
++ 2. Panel 1 [panel_1]
++ Normal / 11111111-1111-4111-8111-000000000011
++ Explanation: Observation 2: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Panel 1 [panel_1] / Front / 0.35, 0.44999999999999996
++ No photographs
++ 1 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / EN
++ SYNTHETIC SAMPLE. This is not a real inspection.
++ Synthetic sample
++ Body diagram
++ Generic diagram. See panel labels and the complete results table.
++ Front
++ 2
++ Rear
++ Left
++ Right
++ 2 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / EN
++ SYNTHETIC SAMPLE. This is not a real inspection.
++ Synthetic sample
++ Top
++ Current record
++ /diagnostics/reports/record
++ Downloaded copies do not reflect later changes. Check the current record.
++ 3 / 3
+
+ ❯ src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts:34:18
+     32|     const bytes = await renderDiagnosticPdf({ snapshot: current, local…
+     33|     const text = await readDiagnosticPdfText(bytes);
+     34|     expect(text).toContain(centerNames[locale]);
+       |                  ^
+     35|     expect(text).toContain("Toyota Camry 2018");
+     36|     expect(text).toContain("*************1234");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts > prints human-readable manual vehicle identification in tk without restricted workshop notes
+AssertionError: expected 'Carberk\n11111111-1111-4111-8111-0000…' to contain 'Aşgabat synag merkezi'
+
+- Expected
++ Received
+
+- Aşgabat synag merkezi
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / TK
++ SYNAG NUSGASY. Hakyky barlag däl.
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Barlag hasabaty
++ Barlag wagty: 2026-10-17T00:00:00.000Z
++ Ýazylan aralyk: 123456 km
++ Şablon wersiýasy: 11111111-1111-4111-8111-000000000003
++ Barlag hasabaty: 11111111-1111-4111-8111-000000000001
++ Barlagyň çägi
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Bu hasabat barlag wagtyndaky synlamalary görkezýär. Kepillik ýa-da umumy howpsuzlyk tassyknamasy däl.
++ Netijeler
++ 1. Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin [brakes]
++ Kadaly / 11111111-1111-4111-8111-000000000010
++ Düşündiriş: Observation 1: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Ölçeg: 2.5 mm; Caliper; Näbellilik: ±0.1 mm
++ Surat ýok
++ 1 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / TK
++ SYNAG NUSGASY. Hakyky barlag däl.
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Kuzowyň çyzgysy
++ Umumy çyzgy. Bölekleriň atlaryna we doly netijelere serediň.
++ Öň
++ Yz
++ Çep
++ Sag
++ 2 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / TK
++ SYNAG NUSGASY. Hakyky barlag däl.
++ Synag äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Ýokardan
++ Häzirki ýazgy
++ /private/diagnostics/record
++ Göçürilen nusgalar soňraky üýtgeşmeleri görkezmez. Häzirki ýazgyny barlaň.
++ 3 / 3
+
+ ❯ src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts:50:16
+     48|   const bytes = await renderDiagnosticPdf({ snapshot: current, locale,…
+     49|   const text = await readDiagnosticPdfText(bytes);
+     50|   expect(text).toContain(centerNames[locale]);
+       |                ^
+     51|   expect(text).toContain("Toyota Camry 2018");
+     52|   expect(text).toContain(locale === "tk" ? "El bilen şahsyýet kesgitle…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts > prints human-readable manual vehicle identification in ru without restricted workshop notes
+AssertionError: expected 'Carberk\n11111111-1111-4111-8111-0000…' to contain 'Тестовый центр Ашхабада'
+
+- Expected
++ Received
+
+- Тестовый центр Ашхабада
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / RU
++ ДЕМОНСТРАЦИОННЫЙ ОБРАЗЕЦ. Это не реальный осмотр.
++ Синтетический образец
++ Отчёт осмотра
++ Дата осмотра: 2026-10-17T00:00:00.000Z
++ Зафиксированный пробег: 123456 km
++ Версия шаблона: 11111111-1111-4111-8111-000000000003
++ Отчёт осмотра: 11111111-1111-4111-8111-000000000001
++ Объём осмотра
++ Синтетический образец
++ Синтетический образец
++ Отчёт фиксирует наблюдения на момент осмотра. Это не гарантия и не сертификат общей
++ безопасности.
++ Результаты
++ 1. Синтетический образец [brakes]
++ Норма / 11111111-1111-4111-8111-000000000010
++ Пояснение: Observation 1: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Измерение: 2.5 mm; Caliper; Неопределённость: ±0.1 mm
++ Нет фотографий
++ 1 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / RU
++ ДЕМОНСТРАЦИОННЫЙ ОБРАЗЕЦ. Это не реальный осмотр.
++ Синтетический образец
++ Схема кузова
++ Условная схема. См. названия панелей и полную таблицу результатов.
++ Спереди
++ Сзади
++ Слева
++ Справа
++ 2 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / RU
++ ДЕМОНСТРАЦИОННЫЙ ОБРАЗЕЦ. Это не реальный осмотр.
++ Синтетический образец
++ Сверху
++ Текущая запись
++ /private/diagnostics/record
++ Скачанные копии не отражают последующие изменения. Проверяйте текущую запись.
++ 3 / 3
+
+ ❯ src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts:50:16
+     48|   const bytes = await renderDiagnosticPdf({ snapshot: current, locale,…
+     49|   const text = await readDiagnosticPdfText(bytes);
+     50|   expect(text).toContain(centerNames[locale]);
+       |                ^
+     51|   expect(text).toContain("Toyota Camry 2018");
+     52|   expect(text).toContain(locale === "tk" ? "El bilen şahsyýet kesgitle…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts > prints human-readable manual vehicle identification in en without restricted workshop notes
+AssertionError: expected 'Carberk\n11111111-1111-4111-8111-0000…' to contain 'Ashgabat test center'
+
+- Expected
++ Received
+
+- Ashgabat test center
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / EN
++ SYNTHETIC SAMPLE. This is not a real inspection.
++ Synthetic sample
++ Inspection report
++ Observation date: 2026-10-17T00:00:00.000Z
++ Recorded mileage: 123456 km
++ Template version: 11111111-1111-4111-8111-000000000003
++ Inspection report: 11111111-1111-4111-8111-000000000001
++ Inspection scope
++ Synthetic sample
++ Synthetic sample
++ This report records observations at the inspection time. It is not a warranty or a general safety certificate.
++ Results
++ 1. Synthetic sample [brakes]
++ Normal / 11111111-1111-4111-8111-000000000010
++ Explanation: Observation 1: äçňöşüýž ÄÇŇÖŞÜÝŽ Кириллица Latin
++ Measurement: 2.5 mm; Caliper; Uncertainty: ±0.1 mm
++ No photographs
++ 1 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / EN
++ SYNTHETIC SAMPLE. This is not a real inspection.
++ Synthetic sample
++ Body diagram
++ Generic diagram. See panel labels and the complete results table.
++ Front
++ Rear
++ Left
++ Right
++ 2 / 3
++ Carberk
++ 11111111-1111-4111-8111-000000000001 / EN
++ SYNTHETIC SAMPLE. This is not a real inspection.
++ Synthetic sample
++ Top
++ Current record
++ /private/diagnostics/record
++ Downloaded copies do not reflect later changes. Check the current record.
++ 3 / 3
+
+ ❯ src/jobs/diagnostics/DiagnosticPdfRenderer.spec.ts:50:16
+     48|   const bytes = await renderDiagnosticPdf({ snapshot: current, locale,…
+     49|   const text = await readDiagnosticPdfText(bytes);
+     50|   expect(text).toContain(centerNames[locale]);
+       |                ^
+     51|   expect(text).toContain("Toyota Camry 2018");
+     52|   expect(text).toContain(locale === "tk" ? "El bilen şahsyýet kesgitle…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 7 skipped (13)
+   Start at  01:31:51
+   Duration  810ms (import 74%, tests 21%, transform 5%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ dde97944/apps/worker

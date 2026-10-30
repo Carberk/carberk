@@ -49,11 +49,12 @@ describe("Help", () => {
     expect(copies.filter((copy) => copy.props.selectable)).toHaveLength(1);
   });
 
-  it("offers nothing but Back, Email us and Call us", async () => {
+  it("offers signed-out Support sign-in alongside Back and existing contacts", async () => {
     const screen = await renderMobile(<HelpScreen />);
 
     expect(screen.getAllByRole("button").map((b) => b.props.accessibilityLabel)).toEqual([
       "Back",
+      "Sign in to continue",
       `Email us, ${email}`,
       `Call us, ${shownPhone}`,
     ]);

@@ -134,28 +134,36 @@ class FakeAccountDeletionUnitOfWork implements AccountDeletionUnitOfWork {
 
   constructor(private readonly store: InMemoryAccountStore) {}
 
-  async run<T>(work: (writes: AccountDeletionWrites) => Promise<T>): Promise<T> {
+  async run<T>(command: { readonly userId: string; readonly deletionScheduledAt: Date }, work: (writes: AccountDeletionWrites) => Promise<T>): Promise<T> {
     this.runs += 1;
     const before = this.store.snapshot();
+    let scheduled = false;
+    let archived = false;
     try {
-      return await work({
+      const result = await work({
         scheduleDeletion: async (userId, deletionScheduledAt) => {
+          if (userId !== command.userId || deletionScheduledAt.getTime() !== command.deletionScheduledAt.getTime() || scheduled || archived) throw new Error("account_deletion_target");
           const user = this.store.users.get(userId);
           if (user) {
             this.store.users.set(userId, { ...user, deletionScheduledAt });
           }
+          scheduled = true;
           this.failIfAsked("scheduleDeletion");
         },
         archiveActiveListings: async (sellerId) => {
+          if (sellerId !== command.userId || !scheduled || archived) throw new Error("account_deletion_target");
           for (const listing of this.store.listings) {
             if (listing.sellerId === sellerId && listing.status === "active") {
               listing.status = "archived";
               listing.archivedByDeletion = true;
             }
           }
+          archived = true;
           this.failIfAsked("archiveActiveListings");
         },
       });
+      if (!scheduled || !archived) throw new Error("account_deletion_incomplete");
+      return result;
     } catch (error) {
       // Session rows are not part of this transaction, so they keep whatever
       // happened to them before the work ran.

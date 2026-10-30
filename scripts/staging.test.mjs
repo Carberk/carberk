@@ -1,0 +1,144 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { runStagingCommand } from './staging.mjs';
+test('operators can discover the bounded command contract without credentials', async()=>{
+  const value=await runStagingCommand(['help']);assert.match(value.usage,/identity/);assert.match(value.usage,/restore/);
+});
+test('arbitrary command names are refused before reading credentials or creating a ledger',async()=>{
+  await assert.rejects(runStagingCommand(['shell']),/Unsupported/);
+});
+
+test('campaign operation help names the exact supported profile; unknown profiles and state payloads fail before credentials', async () => {
+  assert.match((await runStagingCommand(['help'])).usage, /campaign897-identities-v1/);
+  for (const args of [
+    ['operate', 'policy', 'claim', 'fixture', 'campaign897-full'],
+    ['operate', 'policy', 'claim', 'reset', 'campaign897-identities-v1'],
+    ['operate', 'policy', 'claim', 'fixture', 'campaign897-identities-v1', 'historical-cohort'],
+  ]) await assert.rejects(runStagingCommand(args), /Unsupported command or arguments/);
+});
+
+test('business storage profile remains closed at the operator CLI pending its disposal receipt controller', async () => {
+  await assert.rejects(runStagingCommand(['operate', 'policy', 'claim', 'fixture', 'campaign897-business-v2']), /Unsupported command or arguments/);
+});
+
+
+// Exercise the executable CLI with a real isolated Git coordination remote.
+// Only GitHub actor discovery is faked; no Railway credential is supplied.
+async function operatorLease(t, profile, auditCleanup = false) {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { execFileSync, execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const { GitLedger } = await import('./staging-ledger.mjs');
+  const directory = await mkdtemp(join(tmpdir(), 'staging-cli-lease-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const remote = join(directory, 'shared.git');
+  execFileSync('git', ['init', '--bare', remote], { stdio: 'ignore' });
+  const ledger = new GitLedger({ directory: join(directory, 'objects'), remote });
+  const policy = { projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2', environmentName: 'staging',
+    services: { api: '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0', worker: '24aa02e0-25a9-4e80-9cc2-c1795ef82091' },
+    origins: { database: 'postgresql://postgres.railway.internal:5432/railway', media: 'http://minio.railway.internal:9000', publicMedia: 'https://media.example', api: 'https://api.example' } };
+  policy.credentialScope = `project:${policy.projectId}:${policy.environmentId}`;
+  const claim = { id: '1'.repeat(32), candidate: 'a'.repeat(40) };
+  const state = { version: 1, queue: [], history: [], reservation: { ...claim, owner: 'alice', namespace: `cf_${claim.id}`, identity: policy, fixtureProfile: profile, evidence: [], operation: null } };
+  assert.equal(await ledger.compareAndSwap(null, state), true);
+  const before = await ledger.read();
+  await writeFile(join(directory, 'policy.json'), JSON.stringify(policy));
+  await writeFile(join(directory, 'claim.json'), JSON.stringify(claim));
+  await writeFile(join(directory, 'gh'), `#!${process.execPath}
+process.stdout.write(${JSON.stringify('alice\n')});
+`, { mode: 0o755 });
+  // Observe the real filesystem boundary without replacing the ledger or Git.
+  // mkdir completes asynchronously, so an early finally is observed even if
+  // Git initialization later recreates the directory and masks the race.
+  const observer = join(directory, 'observe-cleanup.mjs');
+  await writeFile(observer, `
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const mkdir = fs.promises.mkdir;
+const rm = fs.promises.rm;
+const cleaning = new Set();
+fs.promises.mkdir = async function (path, ...args) {
+  const result = await mkdir.call(this, path, ...args);
+  if (cleaning.has(path)) console.error('Scratch cleanup started before ledger directory creation completed');
+  return result;
+};
+fs.promises.rm = async function (path, ...args) {
+  cleaning.add(path);
+  const result = await rm.call(this, path, ...args);
+  if (!fs.existsSync(path)) console.error('Scratch cleanup completed');
+  return result;
+};
+syncBuiltinESMExports();
+`);
+  const run = promisify(execFile);
+  const invoke = async (command, ...args) => {
+    try {
+      return { code: 0, ...(await run(process.execPath, [...(auditCleanup ? ['--import', observer] : []), 'scripts/staging.mjs', command,
+        ...(command === 'inspect' ? [] : [join(directory, 'policy.json'), join(directory, 'claim.json')]), ...args], {
+        env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, STAGING_RAILWAY_PROJECT_TOKEN: '', STAGING_MUTATIONS_AUTHORIZATION: '',
+          GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `url.${remote}.insteadOf`, GIT_CONFIG_VALUE_0: 'https://github.com/bagtyyarkovusov/auto.tm-rewrite.git' },
+      })) };
+    } catch (error) { return { code: error.code, stdout: error.stdout, stderr: error.stderr }; }
+  };
+  return { invoke, ledger, before };
+}
+
+for (const [command, ...args] of [['operate', 'fixture'], ['operate', 'reset'], ['operate', 'deploy'], ['recover'], ['restore'], ['release'], ['operate', 'fixture', 'campaign897-identities-v1']]) {
+  test(`operator CLI refuses durable business v2 lease for ${command} ${args.join(' ')} without an explicit v2 profile`, async t => {
+    const { invoke, ledger, before } = await operatorLease(t, 'campaign897-business-v2');
+    const result = await invoke(command, ...args);
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /Business storage profile remains closed at the operator CLI/);
+    assert.deepEqual(await ledger.read(), before, 'CLI refusal preserves the durable lease');
+  });
+}
+
+test('operator CLI can inspect a durable business v2 lease without credentials', async t => {
+  const { invoke, ledger, before } = await operatorLease(t, 'campaign897-business-v2');
+  const result = await invoke('inspect');
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).reservation.fixtureProfile, 'campaign897-business-v2');
+  assert.deepEqual(await ledger.read(), before);
+});
+for (const profile of ['listing-v1', 'campaign897-identities-v1']) {
+  test(`operator CLI keeps ${profile} scratch alive until recovery refuses and then cleans it`, async t => {
+    const { invoke, ledger, before } = await operatorLease(t, profile, true);
+    const result = await invoke('recover');
+    assert.doesNotMatch(result.stderr, /Scratch cleanup started before ledger directory creation completed/);
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /Known durable operation required for recovery/);
+    assert.match(result.stderr, /Scratch cleanup completed/);
+    assert.doesNotMatch(result.stderr, /ENOTEMPTY|Coordination Git operation failed/);
+    assert.deepEqual(await ledger.read(), before, 'Recovery refusal preserves the durable lease');
+  });
+  test(`operator CLI preserves existing ${profile} admission and recovery guards`, async t => {
+    const { invoke, ledger, before } = await operatorLease(t, profile);
+    const result = await invoke('recover');
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /Known durable operation required for recovery/);
+    assert.deepEqual(await ledger.read(), before);
+  });
+}
+
+test('clean-reset is default closed: exact staging policy and claim reach only the unimplemented executor', async t => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const directory = await mkdtemp(join(tmpdir(), 'staging-clean-reset-cli-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const policy = { target: 'staging', projectId: '176ddec0-dd65-4087-b82c-798599fc2ebe', environmentId: '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2',
+    services: { api: '6db6f1b1-5c7a-4033-88d0-53f5f315bfc0', worker: '24aa02e0-25a9-4e80-9cc2-c1795ef82091' } };
+  const claim = { id: '1'.repeat(32), candidate: 'a'.repeat(40) };
+  const file = async (name, value) => { const path = join(directory, name); await writeFile(path, JSON.stringify(value)); return path; };
+  const [policyFile, claimFile] = [await file('policy.json', policy), await file('claim.json', claim)];
+  assert.match((await runStagingCommand(['help'])).usage, /clean-reset POLICY\.json CLAIM\.json/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile, claimFile]), /Clean reset executor not implemented/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile]), /Unsupported command or arguments/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile, claimFile, 'rows']), /Unsupported command or arguments/);
+  await assert.rejects(runStagingCommand(['clean-reset', await file('extra.json', { ...policy, workersStopped: true }), claimFile]), /Exact clean-reset policy/);
+  await assert.rejects(runStagingCommand(['clean-reset', policyFile, await file('claim-extra.json', { ...claim, publicLaunch: false })]), /Exact clean-reset claim/);
+  await assert.rejects(runStagingCommand(['clean-reset', await file('wrong.json', { ...policy, environmentId: 'c628b9bf-08ef-45f6-976f-3d646e0ebfbd' }), claimFile]), /Wrong AutoTM staging/);
+  await assert.rejects(runStagingCommand(['clean-reset', await file('prod.json', { ...policy, target: 'production' }), claimFile]), /Production clean reset disabled/);
+});

@@ -44,6 +44,8 @@ function makeUser(input: {
 }
 
 class FakeOtpRepo implements OtpRequestRepository {
+  async reserve(): ReturnType<OtpRequestRepository["reserve"]> { throw new Error("unused"); }
+
   request: OtpRequest;
 
   constructor(

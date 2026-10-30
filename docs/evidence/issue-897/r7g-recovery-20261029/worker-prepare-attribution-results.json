@@ -1,0 +1,39 @@
+{
+  "status": "attribution-only",
+  "resource": {
+    "project": "candidatea-r7g-attribution",
+    "container": "candidatea-r7g-attribution-postgres",
+    "port": 62778,
+    "database": "candidatea_r7g_attribution_before",
+    "role": "r6c_ownership_worker_0997c81081f6"
+  },
+  "inputSha256": "0cc55f9db0bbe795fb2a1c14e4d8b7bef3cb0b0a58ea3299facd1e4ee8990e22",
+  "phases": [
+    {"name":"prepare100","verdict":"P0001 diagnostic_source_scope_limit","elapsedMs":5099.010},
+    {"name":"prepare10","verdict":"PASS","elapsedMs":2982.307},
+    {"name":"parse10","verdict":"PASS","elapsedMs":80.986},
+    {"name":"scope10","verdict":"PASS","elapsedMs":1057.917,"entries":240},
+    {"name":"keys10","verdict":"PASS","elapsedMs":41.178,"keys":370},
+    {"name":"effects10","verdict":"PASS","elapsedMs":76.891,"effects":30}
+  ],
+  "prepare100ErrorContext": "diagnostic_source_scope_before_purge line 44 at RAISE -> diagnostic_source_scope_before_intake -> diagnostic_source_scope_before_finite_fk -> diagnostic_source_scope_before_complete_moderation -> diagnostic_source_scope_before_composition -> diagnostic_source_scope_before_listing_publication -> SQL function diagnostic_source_scope -> diagnostic_source_insert_receipt line 15 at assignment -> INSERT diagnostic_source_commands -> diagnostic_prepare_source line 4",
+  "prepare100Counters": {
+    "diagnostic_source_registry": {"calls":12596,"selfMs":3097.641},
+    "diagnostic_source_meta": {"calls":21956,"totalMs":3715.862,"selfMs":620.138},
+    "diagnostic_source_add": {"calls":11881,"totalMs":3235.414,"selfMs":612.722},
+    "diagnostic_source_disposal_effects": {"totalMs":659.843,"selfMs":147.241},
+    "diagnostic_ownership_disposal_scope": {"calls":200,"selfMs":77.470},
+    "diagnostic_source_key": {"calls":10885,"totalMs":3259.506,"selfMs":52.982}
+  },
+  "diagnosis": "Repeated registry, metadata, scope and source-read work dominates the failing path; prepare100 still refuses the unchanged semantic closure limit before receipt insertion.",
+  "nextHypothesis": "Immutable exact registry-map and metadata reuse, conditional on all77-entry, unknown/null/duplicate and OLD/NEW scope/keys/effects equivalence.",
+  "repairApplied": false,
+  "acceptance": "UNKNOWN",
+  "artifacts": {
+    "measurement.json": {"path":"/tmp/897-r7g-worker-attribution-20261029/measurement.json","sha256":"27fbd41462a17cfcb438c90b18113266520f50286b9af8894bad93ac188c6410"},
+    "measurement-normalized.json": {"path":"/tmp/897-r7g-worker-attribution-20261029/measurement-normalized.json","sha256":"96a457dc81ec9678364498cec70698695d96362b12cd8149179ca2289e331b02"},
+    "drain.json": {"path":"/tmp/897-r7g-worker-attribution-20261029/drain.json","sha256":"f34e75fb01157944a4912903ca2eb240db2d9354fcf58cfe59fab76d779b95f9"},
+    "stop.log": {"path":"/tmp/897-r7g-worker-attribution-20261029/stop.log","sha256":"a76efff297231486276aa748c71654c649a65d5d1155446f5d35187fb7f3c6a9"}
+  },
+  "cleanup": {"sourceReceipts":0,"campaignReceipts":0,"remainingClients":0,"cloneStopped":true}
+}

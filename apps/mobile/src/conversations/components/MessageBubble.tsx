@@ -8,6 +8,7 @@ import type { ConversationsSchemas } from "@auto-tm/contracts";
 import { buildChatImageUrl } from "../upload/buildChatImageUrl";
 import { formatMessageTime } from "../messageTime";
 
+import { BusinessChatImage } from "./BusinessChatImage";
 import { PostRefCard } from "./PostRefCard";
 
 import { Text } from "@/components/ui/text";
@@ -171,6 +172,8 @@ function BubbleContent({
       </View>
     );
   }
+
+  if (isImage && metadata && "key" in metadata && metadata.key.startsWith("business-chat-private/")) return <BusinessChatImage objectKey={metadata.key} />;
 
   if (isImage && imageUri) {
     const imageMeta =

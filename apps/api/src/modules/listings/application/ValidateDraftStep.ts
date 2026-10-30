@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Optional , Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ListingOwnership, assertListingOwnership } from "./ListingOwnership";
 
 import {
   WizardSchemas,
@@ -13,6 +14,8 @@ import {
 export interface ValidateDraftStepInput {
   draftId: string;
   userId: string;
+  sessionId?: string | undefined;
+  businessId?: string | undefined;
   step: WizardSchemas.WizardStep;
   payload: ListingsSchemas.ListingDraftPayload;
 }
@@ -28,13 +31,16 @@ export class ValidateDraftStep {
   constructor(
     @Inject(LISTING_DRAFT_REPOSITORY)
     private readonly drafts: ListingDraftRepository,
+    @Optional() @Inject(ListingOwnership) private readonly ownership?: ListingOwnership,
   ) {}
 
   async execute(input: ValidateDraftStepInput): Promise<ValidateDraftStepResult> {
     const existing = await this.drafts.findById(input.draftId);
-    if (!existing || existing.userId !== input.userId) {
+    if (!existing) {
       throw new NotFoundException("Draft not found");
     }
+    if (!existing.businessId && existing.userId !== input.userId) throw new NotFoundException("Resource not found");
+    await assertListingOwnership(this.ownership, input, existing);
 
     const validation = WizardSchemas.validateStep(input.step, input.payload);
 

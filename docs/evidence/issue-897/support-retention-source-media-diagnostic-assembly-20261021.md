@@ -1,0 +1,21 @@
+# Support retention source and media diagnostic assembly, 2026-10-21
+
+Root assembled from published `232a66c38a253980fadc523ba924f77d9c444127`. Its [hosted receipt](checkpoint-232a66c3-20261021.md) reached the intended retention guard refusal, publish's pre-release producer settlement and attach's test namespace collision. Reinspection remained 404. Those results certify only that earlier SHA.
+
+| Writer checkpoint | Root incorporation | Scope |
+|---|---|---|
+| `af1605bf3bb383902fb313f89c2dfce8a23bcd26` | `3d7442d6` | Attach primary reservation c5 to unused c7; all other spec bytes preserved |
+| `f67802eff40819787003a768ca4dcd1d99f5432d` | `0921f579` | Bounded held-PUT/reset timing observations; assertions, deadlines, signals and ordering preserved |
+| `ac86f2d679e4d29eac47ea889f78d11c692a34f1` | `291a8537` | Exact journal-owned text Support retention, restarted empty-fence cleanup and disposal |
+
+Both writers are terminal with no pending child runs. Root independently verified their remote checkpoints, inspected the complete diffs and incorporated them serially with `-x`. Origin main remains `9fde309c3da17f2661fe9c266504e6e56a1b97c9`, already included. Held receipts, decisions and acceptance-matrix corrections are included in this batch. Root corrected one stale source comment to include the newly tracked empty erasure fences; no executable behavior changed in that correction.
+
+The [source checkpoint](../issue-901/full-v3-support-retention-source-green-20261021.md) implements the [selected resolver](../issue-901/full-v3-support-worker-resolver-selection-20261021.md). It uses existing namespace-local durable journal claims, including deleted claims, and revalidates them after reset-compatible table/namespace locks. Only due closed owned text Support cases and exact pending empty fences receive lifecycle authority. Cleanup calls the unchanged real private-object store, including its versioning check, before exact conditional completion. Reset requires completed-empty proof and deletes the fence before its Restrict-FK conversation.
+
+Root accepts the additional `lifecycle_contract_hash` field in the existing reservation manifest as internal contract verification required by that selected boundary. It adds no application schema/migration, namespace, global ownership directory, caller-selected authority, product policy or operational entry. The worker/storage transaction retains its existing bound. Any failure to finish within it must remain visible. This implementation disposition is not independent review or runtime GREEN.
+
+Combined offline checks at assembled `291a8537` passed: API and worker TypeScript 7, focused lint with zero warnings, 4 worker files/19 tests, 11 staging-campaign tests, emitted and embedded-worker syntax, documentation links/headings/routes, script syntax and diff checks. The preservation check retains all 773 direct assertion chains and existing storage/reset/recovery/release operations. V1/v2 fresh/retry/reset SQL and receipts are byte-identical to 232a66c3; v3 receipt shapes are unchanged. Writers separately passed TypeScript 6 and broader relevant checks. Root did not repeat unchanged control/DB compiler checks. Logs are under `/tmp/carberk-next-release-20261021/291a8537-*`; tool results also preserve the worker test and SQL comparison output.
+
+The unchanged retention case remains the same-test hosted target: primary65/82 to67/99 to67/161; foreign68/87 to68/155; caps128/2048 unchanged. Generated PL/pgSQL compilation, runtime authority/refusals, exact counts, storage completion and disposal remain UNKNOWN until hosted execution. The new media trace is diagnostic only; internal reset DELETE/HEAD timing, provider admission and stronger late-producer ordering remain unproved.
+
+Root publishes one combined batch without a manual CI rerun. Final pushed SHA/tree and readback are recorded in #897, #901's execution comment and #904. Hosted results start UNKNOWN/PENDING. No whole-campaign acceptance, independent review, staging authority/restoration, signing/disclosures, protected merge, production or store approval follows from this checkpoint. The [release acceptance matrix](release-acceptance-matrix-20261020.md) retains the full scope and remaining gates.

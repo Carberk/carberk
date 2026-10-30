@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 
 import type {
   ListingsReadPort,
@@ -11,12 +11,14 @@ import {
 } from "../../identity/identity.public";
 import type { Message } from "../domain/Message";
 import type { Conversation } from "../domain/Conversation";
+import { BUSINESS_ENQUIRY_REPOSITORY, type BusinessEnquiryRepository } from "../domain/ports/BusinessEnquiryRepository";
 import {
   CONVERSATION_REPOSITORY,
   type ConversationRepository,
 } from "../domain/ports/ConversationRepository";
 import {
   missingPeer,
+  toBusinessPeer,
   peerIdOf,
   readConversationPeers,
   type ConversationPeer,
@@ -52,6 +54,7 @@ export class ListMyConversations {
     private readonly listings: ListingsReadPort,
     @Inject(IDENTITY_READ_PORT)
     private readonly identityRead: IdentityReadPort,
+    @Inject(BUSINESS_ENQUIRY_REPOSITORY) @Optional() private readonly businesses?: BusinessEnquiryRepository,
   ) {}
 
   async execute(
@@ -82,6 +85,8 @@ export class ListMyConversations {
       items.map((item) => item.conversation),
     );
 
+    const businessIds = [...new Set(items.map(item => item.conversation.businessId).filter((id): id is string => !!id))];
+    const businessNames = new Map(await Promise.all(businessIds.map(async id => [id, await this.businesses?.businessName(id)] as const)));
     const enriched = await Promise.all(
       items.map(async (item) => {
         const unreadCount = await this.conversations.countUnreadMessages(
@@ -97,6 +102,9 @@ export class ListMyConversations {
         );
         const peerId = peerIdOf(item.conversation, input.userId);
         const peerView = peers.get(peerId);
+        const businessId = item.conversation.businessId;
+        const businessName = businessId ? businessNames.get(businessId) : null;
+        const businessPeer = businessId && businessName && item.conversation.buyerId === input.userId ? toBusinessPeer(businessId, businessName) : null;
         return {
           conversation: item.conversation,
           listing: listingMap.get(item.conversation.listingId) ?? null,
@@ -105,8 +113,8 @@ export class ListMyConversations {
           peerLastReadAt: peerState?.lastReadAt ?? null,
           peerLastDeliveredAt: peerState?.lastDeliveredAt ?? null,
           mutedAt: ownState?.mutedAt ?? null,
-          peer: peerView?.peer ?? missingPeer(peerId),
-          blockedByMe: peerView?.blockedByMe ?? false,
+          peer: businessPeer ?? peerView?.peer ?? missingPeer(peerId),
+          blockedByMe: businessPeer ? false : peerView?.blockedByMe ?? false,
         };
       }),
     );

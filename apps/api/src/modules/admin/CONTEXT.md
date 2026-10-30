@@ -12,6 +12,8 @@ A Message report detail releases only its reported Message through Conversations
 
 Audit and report history intentionally survives account deletion with nullable actor/reporter relationships. Reviewer-auth audit records omit credential values. A table without an update restriction does not enforce append-only history by itself; inspect the application write paths.
 
+Admin also owns bounded marketplace Listing/User read projections behind the unchanged current-role and current-session TOTP `AdminGuard`. The projections select public/profile and moderation state explicitly and never release sign-in/contact data, private Conversations, payment evidence, staff grants or report bodies. Complaint context is a target-only count and a link to the existing separately guarded review flow. Photo URLs use released variants. Tester-gated video processing and protected grants are implemented with flags closed by default; complete buyer playback, native acceptance and rollout activation remain pending. No raw storage URL belongs in a marketplace projection.
+
 ## Start here
 
 - [Module composition](admin.module.ts)
@@ -21,3 +23,5 @@ Audit and report history intentionally survives account deletion with nullable a
 - [Admin browser boundary](../../../../admin/CONTEXT.md)
 - [Inspection demand](../reports/CONTEXT.md)
 - [Schema](../../../../../packages/db/prisma/schema.prisma)
+
+The marketplace audit feed restricts its query and count to released `AdminAuditAction` actions. Purpose-private staff grant/revoke/bootstrap audit remains durable in the same table and requires a future explicitly scoped reader; marketplace role alone does not expose it or extend the legacy closed-enum response contract.

@@ -104,9 +104,42 @@ export interface ReviewerScenarioUser {
   phone: string | null;
   email: string | null;
   role: string;
+  displayName: string | null;
+  phoneVerifiedAt: Date | null;
+  emailVerifiedAt: Date | null;
+  deletionScheduledAt: Date | null;
+  suspendedAt?: Date | null;
+}
+
+/** Only the exact successful revoke output is eligible for repeat cleanup. */
+export function isRevokedReviewerUser(user: ReviewerScenarioUser): boolean {
+  return ACCOUNT_SLOTS.some(slot => slot.id === user.id && slot.role === user.role) &&
+    user.phone === `revoked:${user.id}` && user.email === null && user.emailVerifiedAt === null &&
+    user.displayName === `Revoked ${user.id}` && user.phoneVerifiedAt !== null &&
+    user.suspendedAt === null && user.deletionScheduledAt === null;
+}
+
+export interface ReviewerScenarioCatalog {
+  brandId: string;
+  brandSlug: string;
+  modelId: string;
+  modelSlug: string;
+  regionId: string;
+  regionSlug: string;
+  cityId: string;
+  citySlug: string;
+}
+
+export interface ReviewerCredentialChange {
+  mode: "rotate" | "revoke";
+  accounts: readonly { id: string; phone: string; email: string | null; role: ReviewerRole; displayName: string }[];
+  expected: readonly ReviewerScenarioUser[];
+  now: Date;
+  associations: { catalog: ReviewerScenarioCatalog; listings: { id: string; sellerId: string }[] };
 }
 
 export interface ReviewerScenarioSeedStore {
+  changeCredentials(input: ReviewerCredentialChange): Promise<string[]>;
   findUserById(id: string): Promise<ReviewerScenarioUser | null>;
   findUserByPhone(phone: string): Promise<ReviewerScenarioUser | null>;
   findUserByEmail(email: string): Promise<ReviewerScenarioUser | null>;
@@ -124,16 +157,8 @@ export interface ReviewerScenarioSeedStore {
   }): Promise<void>;
   deleteSessionsByUserIds(userIds: string[]): Promise<number>;
   invalidatePushDevicesByUserIds(userIds: string[], invalidatedAt: Date): Promise<number>;
-  upsertCatalog(input: {
-    brandId: string;
-    brandSlug: string;
-    modelId: string;
-    modelSlug: string;
-    regionId: string;
-    regionSlug: string;
-    cityId: string;
-    citySlug: string;
-  }): Promise<void>;
+  preflightSeed(input: { catalog: ReviewerScenarioCatalog; listings: { id: string; sellerId: string }[] }): Promise<string | null>;
+  upsertCatalog(input: ReviewerScenarioCatalog): Promise<void>;
   upsertListing(input: {
     contactPhone: string;
     id: string;
@@ -378,67 +403,64 @@ export async function runReviewerScenarioSeed(
     return safeFailure(error instanceof Error ? error.message : String(error));
   }
 
+  const associations = { catalog: CATALOG,
+    listings: [PRIMARY_LISTING_ID, REPORTABLE_LISTING_ID].map(id => ({ id, sellerId: SCENARIO_UUIDS.seller1 })),
+  };
   if (options.mode === "revoke") {
-    const revokedUserIds: string[] = [];
-    for (const id of REVIEWER_USER_IDS) {
-      const existing = await store.findUserById(id);
+    const expected: ReviewerScenarioUser[] = [];
+    for (const slot of ACCOUNT_SLOTS) {
+      const existing = await store.findUserById(slot.id);
       if (!existing) continue;
-      if (existing.role !== "buyer" && existing.role !== "seller") {
-        return safeFailure(
-          `Reviewer scenario revocation refused: configured user slot ${id} is privileged`,
-        );
+      if (!isRevokedReviewerUser(existing) && (existing.role !== slot.role || existing.deletionScheduledAt !== null || existing.suspendedAt != null ||
+          !/^\+993[0-9]{8}$/.test(existing.phone ?? "") || !existing.email ||
+          !existing.phoneVerifiedAt || !existing.emailVerifiedAt)) {
+        return safeFailure("Reviewer scenario revocation refused: privileged or unsupported reviewer source");
       }
-      await store.revokeUser({
-        id,
-        revokedPhone: `revoked:${id}`,
-        displayName: `Revoked ${id}`,
-      });
-      revokedUserIds.push(id);
+      expected.push(existing);
     }
-
-    await store.deleteSessionsByUserIds(revokedUserIds);
-    await store.invalidatePushDevicesByUserIds(revokedUserIds, options.now);
-    await store.createAuditLog({
-      action: "REVIEWER_SCENARIO_REVOKE",
-      targetType: "reviewer_scenario",
-      targetId: "store-review",
-      details: {
-        mode: "revoke",
-        accountCount: revokedUserIds.length,
-        revokedUserIds,
-        occurredAt: options.now.toISOString(),
-      },
+    const associationFailure = await store.preflightSeed(associations);
+    if (associationFailure) return safeFailure(`Reviewer scenario revocation refused: ${associationFailure}`);
+    const revokedUserIds = expected.length === 0 ? [] : await store.changeCredentials({
+      mode: "revoke", expected, now: options.now, associations,
+      accounts: ACCOUNT_SLOTS.map(slot => ({ ...slot, phone: `revoked:${slot.id}`, email: null, displayName: `Revoked ${slot.id}` })),
     });
-
-    return {
-      exitCode: 0,
-      message: `Reviewer scenario revoked ${revokedUserIds.length} accounts`,
-      seededUserIds: [],
-      rotatedUserIds: [],
-      revokedUserIds,
-    };
+    return { exitCode: 0, message: `Reviewer scenario revoked ${revokedUserIds.length} accounts`,
+      seededUserIds: [], rotatedUserIds: [], revokedUserIds };
   }
 
   const accountFailure = await assertNoPrivilegedOrHijackedAccounts(store, accounts);
   if (accountFailure) return accountFailure;
 
-  const rotatedUserIds: string[] = [];
-  const seededUserIds: string[] = [];
+  // Discover the whole account plan before catalog, account, media, audit or storage effects.
+  const existingUsers = new Map<string, ReviewerScenarioUser>();
   for (const account of accounts) {
     const existing = await store.findUserById(account.id);
-    if (
-      existing &&
-      (existing.phone !== account.phone || existing.email !== account.email)
-    ) {
-      rotatedUserIds.push(account.id);
+    if (!existing) continue;
+    if (existing.role !== account.role || existing.suspendedAt != null ||
+        !existing.phone || !existing.email || !existing.phoneVerifiedAt || !existing.emailVerifiedAt || existing.deletionScheduledAt !== null) {
+      return safeFailure("Reviewer scenario seed refused: unsupported existing-source eligibility or verification");
     }
-    const user = await store.upsertUser(account);
-    seededUserIds.push(user.id);
+    existingUsers.set(account.id, existing);
   }
-
-  if (rotatedUserIds.length > 0) {
-    await store.deleteSessionsByUserIds(rotatedUserIds);
-    await store.invalidatePushDevicesByUserIds(rotatedUserIds, options.now);
+  const sellerAccount = accounts.find(account => account.role === "seller");
+  if (!sellerAccount) return safeFailure("Reviewer scenario seed requires a seller account");
+  const associationFailure = await store.preflightSeed({ catalog: CATALOG,
+    listings: [PRIMARY_LISTING_ID, REPORTABLE_LISTING_ID].map(id => ({ id, sellerId: sellerAccount.id })),
+  });
+  if (associationFailure) return safeFailure(`Reviewer scenario seed refused: ${associationFailure}`);
+  const changedIds = accounts.filter(account => {
+    const existing = existingUsers.get(account.id);
+    return existing && (existing.phone !== account.phone || existing.email !== account.email);
+  }).map(account => account.id);
+  const rotatedUserIds = changedIds.length === 0 ? [] : await store.changeCredentials({
+    mode: "rotate", accounts, expected: [...existingUsers.values()], now: options.now, associations,
+  });
+  const seededUserIds: string[] = [];
+  for (const account of accounts) {
+    // Equal source converges without refreshing verification timestamps or User.updatedAt.
+    const existing = existingUsers.get(account.id);
+    const user = existing?.displayName === account.displayName ? existing : await store.upsertUser(account);
+    seededUserIds.push(user.id);
   }
 
   const buyer = accounts.find((account) => account.role === "buyer");
@@ -548,7 +570,7 @@ export async function runReviewerScenarioSeed(
       "Store review scenario report. Deterministic demo data only; not a real moderation case.",
   });
 
-  await store.createAuditLog({
+  if (rotatedUserIds.length === 0) await store.createAuditLog({
     action:
       rotatedUserIds.length > 0
         ? "REVIEWER_SCENARIO_ROTATE"

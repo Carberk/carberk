@@ -1,0 +1,70 @@
+{
+  "status": "READY; functional GREEN reproduced; measured six-phase profile NOT STARTED (explicit parent START required)",
+  "recovery": {
+    "reason": "Previous worker-kernel owner t3-630f4e85 terminal/cancelled after Codex429; no live owner process; old worktree read-only and untouched",
+    "sourceCommits": {
+      "9d9caf3a8bab10b4c1b2c2b8344b469a86d9b37c": "6d3f3dec (test(db): expose repeated registry work through real scope discovery)",
+      "82a5974a8295580613f3b322af0d6fa349d74429": "70112dcd (fix(db): reuse immutable diagnostic registry metadata)"
+    },
+    "parent": "690bda56",
+    "ownedBlobsIdenticalToSource": true,
+    "migrationSha256": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7",
+    "testSha256": "27b6db26ff805bce557bc398f69efdc668a4b1f7fa4c484b4dae0d0050e2d704"
+  },
+  "resource": {
+    "project": "candidatea-r7g-attribution",
+    "container": "candidatea-r7g-attribution-postgres",
+    "image": "postgres:16-alpine (16.15, track_functions=all)",
+    "database": "candidatea_r7g_attribution_before",
+    "port": 55168,
+    "previousPorts": [62778, 49356],
+    "transfer": "Stopped exit0 by previous owner (registry163-stop.log), restarted by this owner on a new dynamic loopback port; same anonymous volume; resource.private.json port updated",
+    "retainedResourcesTouched": false,
+    "retainedOwnership7": "PARTIAL; never accessed or reused as pristine"
+  },
+  "driver": {
+    "pg": "8.20.0 from this worktree",
+    "profile": "/tmp/897-r7g-worker-kernel-owner2-20261029/profile163-owner2.cjs",
+    "profileSha256": "9e5584bbc9ef5d975a045c28346f5e864f4690e8faaaaa4deebdb953f9985697",
+    "derivedFrom": "/tmp/897-r7g-worker-attribution-20261029/profile163.cjs sha256 3cbd32dced456a970146135a1ab5e00ab3d3305f9ee5bcc3449db723f2bc97d9",
+    "derivation": "Only the pg require path, the 163 migration path (both repointed from t3-630f4e85 to this worktree) and the pinned port (49356 -> 55168) changed; phases, inputs, limits and outputs identical",
+    "phases": ["prepare100", "prepare10", "parse10", "scope10", "keys10", "effects10"],
+    "limits": { "invocations": 6, "statementMs": 15000, "clientMs": 20000, "lockMs": 250 },
+    "startGuardRefusesWithoutStart": true
+  },
+  "baseline": {
+    "verifier": "/tmp/897-r7g-worker-kernel-owner2-20261029/verify-baseline.cjs sha256 715889414259fd031bdda223306d564caacaad70afea636028d21c2304ef403e (reuses finalize-ready/drain/registry163-drain algorithms)",
+    "verdict": "PASS before and after the functional rerun",
+    "migrations": { "count": 98, "hash": "ae0f239366f3134887e329f64724ebf5dc916536f0b91613e0481a5459fbde62", "notInClone": ["20261026016200_diagnostic_maintenance_compatibility", "20261026016300_diagnostic_registry_metadata_lookup (installed by SQL, not recorded)"] },
+    "functionSurface163": { "count": 174, "hash": "4f69996d0afd78d664de20c956a4be479abd896f691d9114bc6bad3e354512ec", "otherFunctionsUnchanged": true },
+    "meta163": "immutable, invoker, search_path=pg_catalog, public; uses registry_map; map deep-equals 77-entry registry md5 af2112af42595e4b6d5045a4e7886303",
+    "guards": { "count": 354, "hash": "74f8917631d0ccdc8f7821aec6dfa0f4f9c70ecc9ee1e112b33f3ba4e5113c93" },
+    "wholeCloneData": "1db785614db30bef2edd3f023fd4cacc83e3b32718ef62df93d6778fe40a32cb",
+    "eightSavedClasses": "grants/components/orders/raw/reports/anchors/proofs/requests equal drain.json fixtures",
+    "receipts": { "source": 0, "campaign": 0 },
+    "worker": "role attributes and table privileges equal ready.json; function privileges equal ready.json except added EXECUTE on diagnostic_source_registry_map()",
+    "fullInputSha256": "0cc55f9db0bbe795fb2a1c14e4d8b7bef3cb0b0a58ea3299facd1e4ee8990e22",
+    "otherClients": 0
+  },
+  "functionalRerun": {
+    "command": "R7G_REGISTRY_EVIDENCE=/tmp/897-r7g-worker-kernel-owner2-20261029/functional node packages/db/tests/diagnostic-registry-metadata.functional.cjs new",
+    "verdict": "PASS",
+    "registryNewSha256": "cfca3d753e99193a11c73d25fbdf2a81fe0691f1435e657e22e096e5149a5881 (byte-identical to previous owner's receipt)",
+    "scopeRegistryCalls": { "old": 2185, "new": 1 },
+    "outputs": "same 240 scope / 370 keys / 30 effects hashes",
+    "full100": "P0001 diagnostic_source_scope_limit, same context, rolled back, receipts 0/0"
+  },
+  "checks": { "TS7": "PASS", "TS6": "PASS", "affectedLint": "PASS" },
+  "observation": "The attribution clone is the historical 98 baseline plus 163 and lacks 16200, which wraps parse/scope/lock_keys. 16200 does not redefine registry or meta, so the 163 drift guard is unaffected; attribution remains comparable to the earlier 98-based measurements, not to the current full chain.",
+  "nextProof": {
+    "command": "R7G_ATTRIBUTION_MEASURE_START=1 node /tmp/897-r7g-worker-kernel-owner2-20261029/profile163-owner2.cjs --measure",
+    "status": "READY, explicit parent START required",
+    "outputs": "/tmp/897-r7g-worker-attribution-20261029/registry163-measurement.json and registry163-measurement-progress.private.json",
+    "compareWith": "measurement-normalized.json (pre-163): prepare100 5099ms P0001 scope_limit, registry 12596 calls 3097.6ms self; prepare10 2982ms, registry 4784 calls 1177.8ms self; scope10 1058ms, registry 2185 calls 542.6ms self",
+    "remaining": [
+      "Attribution only; does not establish native 5s acceptance",
+      "Fresh ordinary full100 fixture and original unchanged native test (RED at aa5eed1d, exactly 10 committed)",
+      "Full100 semantic scope-limit refusal unresolved; no cap/graph/scope change proposed"
+    ]
+  }
+}

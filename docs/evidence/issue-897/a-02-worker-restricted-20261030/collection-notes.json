@@ -1,0 +1,10 @@
+{
+  "evidenceCollectorOnlyCorrections": [
+    "Initial executor call named a runtime cwd before it existed; no process started.",
+    "System Python 3.9 lacks tarfile extractall filter; archive members were checked explicitly before snapshot extraction.",
+    "Read-only observer initially returned Prisma P2010 UnsupportedNativeDataType for pg_trigger.tgenabled native char; the evidence-only observer now casts it to text. No test or candidate query was edited."
+  ],
+  "testsRerun": false,
+  "hostGuardRefusals": [],
+  "batchFixtureSearch": "No manifest was supplied in dispatch or environment. Tracked diagnostics testing has bootstrapOwnershipExpiryFixture.mjs and produceOwnershipExpiryFixture.mjs for the accepted full100 fixture, not a ten-case batch producer. Inspected /tmp/897-r6c-recovery-20261029 artifact names yielded the retained ownership-7/fixture.json, not an admissible per-case manifest. Retained foreign DBs were not queried."
+}

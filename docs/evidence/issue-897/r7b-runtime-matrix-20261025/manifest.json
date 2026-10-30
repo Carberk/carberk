@@ -1,0 +1,199 @@
+{
+  "status": "SCOPED_OWNER_RUNTIME_EVIDENCE_PARENT_ACCEPTANCE_PENDING",
+  "continuationBase": "12ab1c0249bdbbb497bf7a364e79ca67d0f40460",
+  "publicationCheckpoint": "daac99234eeb781433e02ce417be45a6f874c9eb",
+  "sourceHead": "e0d56a491e6e54121bc491508ae674676fc947c5",
+  "sourceTree": "8abe3e03b2503264edbfe65d678cb98b4b723a80",
+  "changedPaths": {
+    "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts": "795ef6f49232a58caed2202b28e0f9edc153ab013307ed441d052e0d2f7a0307",
+    "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts": "e55647026fd9f31172ea53dfaae7162ddc2ced5402cfddc0c5705802ff37c1f4",
+    "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.ts": "0fa1af7745b4febc64f3ea045ccbae0873e93ca09192b81496fee62c1c62bf20",
+    "apps/api/src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts": "6148a8f6ef1f963ed7500a17dd4de1b746a58a519c48be564aa654f07ad21c1b",
+    "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts": "7da45d4ebd2c2ce93607a6de90a31781879a4b0f7b16d0e4d027351ef8ea8524",
+    "apps/worker/src/jobs/PurgeExpiredAccounts.ts": "40049f67159f309662c80d18e476940f95f8219741021d30d02af84d13b78581",
+    "apps/worker/src/jobs/diagnosticAccountErasure.ts": "f54c5f55171694f030ff105bc9114319e16fd7b50ca6acfffb620fa1651779cf",
+    "apps/worker/src/jobs/serviceAccountErasure.ts": "61eaa717162555a1249cc1a2bc6b51adfe1fbd170632601b5dc95d4d4af14570",
+    "apps/worker/src/jobs/video/videoAccountErasure.ts": "54149d179d55b98959b78dfc97ba22688920c1830e6ab6589265e43c901551d8"
+  },
+  "command": "DATABASE_URL=postgresql://postgres:r7b-disposable@127.0.0.1:50486/r7b_seventeenth AUTO_TM_TEST_DATABASES=off R7B_DISPOSABLE_DATABASE=round1-8c41fd9a pnpm --filter @auto-tm/api exec vitest run src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts --maxWorkers=1 --reporter=verbose",
+  "environment": {
+    "container": "carberk897-r7b-r1-8c41fd9a",
+    "database": "r7b_seventeenth",
+    "postgres": "17.11",
+    "role": "postgres",
+    "superuser": true,
+    "timezone": "UTC",
+    "matchedGuards": 284,
+    "migrations": 90,
+    "sharedResourcesUsed": false,
+    "parentDiagnosticDuplicated": false
+  },
+  "finalCounts": {
+    "selected": 25,
+    "passed": 25,
+    "failed": 0,
+    "deselected": 0,
+    "draft": 2,
+    "video": 2,
+    "collector": 4,
+    "deletion": 4,
+    "baseline": 13
+  },
+  "runHistory": [
+    {
+      "path": "/tmp/897-r7b-round1-evidence/draft-r7a-pin.log",
+      "sha256": "8260513754bccb2559f226e00e06e4bfc797aabbdffd69d2a7408a31d498e678",
+      "selected": 0,
+      "passed": 0,
+      "failed": 0,
+      "deselected": 15,
+      "note": "Seed/catalog unique collision on reused seventh database; no test behavior reached."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/draft-r7a-pin-eighth.log",
+      "sha256": "467b7f238641406b1f898fbb5ab71bb3a855c1b70e4191d558026f6da0de9257",
+      "selected": 2,
+      "passed": 0,
+      "failed": 2,
+      "deselected": 13,
+      "note": "R7a018 unsupported void; separate premature-pool-close fixture failure."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/draft-r7a4662-ninth.log",
+      "sha256": "de4cc437ef166742fad58cd3fe8f90c0b736cffdf7cc7ec0cd44aac0fb57565c",
+      "selected": 2,
+      "passed": 2,
+      "failed": 0,
+      "deselected": 13,
+      "note": "Exact4662 and corrected teardown; prior instrumentation omitted supplied transaction options, superseded by final native-bound run."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-tenth.log",
+      "sha256": "fd2fa6e8f43029f49c97216442a3b1af5f471ae08c40a361435f8dbde8e652e5",
+      "selected": 6,
+      "passed": 1,
+      "failed": 5,
+      "deselected": 15,
+      "note": "Video994 void2; fixture error-shape/expected-refusal3; duplicate-pool-close suite failure. Collector publication-first1pass. Options omission superseded."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-eleventh.log",
+      "sha256": "bfa2391a05ffbb322d63007a182061ff878648ab6d4681f8698fb130620c23f7",
+      "selected": 4,
+      "passed": 4,
+      "failed": 0,
+      "deselected": 17,
+      "note": "Schedule2/rotation2 pass; options omission superseded."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-twelfth.log",
+      "sha256": "2fa7602b4b6193aa15a3394e85158e3fdb9c4ea3935e319fbdb1a3403d19ebd2",
+      "selected": 8,
+      "passed": 8,
+      "failed": 0,
+      "deselected": 15,
+      "note": "Draft2/schedule2/bootstrap2/rotation2 pass; options omission superseded."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-thirteenth.log",
+      "sha256": "96022a6206e5739ae9bd1154462e7635d30a9645924e67f524f666f51188d6e9",
+      "selected": 10,
+      "passed": 7,
+      "failed": 3,
+      "deselected": 15,
+      "note": "Native options retained. Draft first barrier timeout amid concurrent local compilers; purge2 import resolution failures before caller reachability. No timeout increased."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-fourteenth.log",
+      "sha256": "fd434db5c868df8859e00694feb5e92dc08e302516803d3b2b547671e0924556",
+      "selected": 10,
+      "passed": 10,
+      "failed": 0,
+      "deselected": 15,
+      "note": "Native options, isolated runtime. Purge shared due-user inventory later isolated with future schedule deadlines and exact purgedCount1."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/video-b7ac-fifteenth.log",
+      "sha256": "d9eec8cb1a08b40d7eefca49023e98f31a03f148cccc1a8d86fde230da49b692",
+      "selected": 2,
+      "passed": 1,
+      "failed": 1,
+      "deselected": 23,
+      "note": "Exactb7ac. Reverse test waited at separate photo reservation and lawfully used fresh cancelled video; not outer stale-graph proof."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/video-b7ac-sixteenth.log",
+      "sha256": "0de543a80fe849a1a5a0bb2f8cfd3e01d957a5a184d21d218f292b08f95f77e5",
+      "selected": 2,
+      "passed": 1,
+      "failed": 1,
+      "deselected": 23,
+      "note": "Outer transaction now reached. Existing specific SQL refusal listing_publication_video_binding differs from fixture generic expected message; exact assertion corrected without production edit."
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-full-seventeenth.log",
+      "sha256": "c474ec4bda7479047b05d5e13e16622a67d8e86a8dd6011890d4f9b331a9c090",
+      "selected": 25,
+      "passed": 25,
+      "failed": 0,
+      "deselected": 0,
+      "note": "Final exact source, full suite, original transaction options and barriers, purge target isolation, no concurrent compilers; all assertions reached."
+    }
+  ],
+  "offlineChecks": [
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-draft-offline.log",
+      "command": "pnpm --filter @auto-tm/api exec vitest run src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts --exclude '**/*.e2e.spec.ts' --maxWorkers=1",
+      "exitCode": 0,
+      "testsPassed": 22,
+      "sha256": "0dccb39e310643a08cdcb52b3f210d098a00cc3faac40e80cf77a4dbf101e3ef"
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/final-ts7.log",
+      "command": "pnpm --filter @auto-tm/api exec tsc --noEmit",
+      "exitCode": 0,
+      "testsPassed": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/final-ts6.log",
+      "command": "pnpm --filter @auto-tm/api exec tsc6 --noEmit",
+      "exitCode": 0,
+      "testsPassed": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/final-lint.log",
+      "command": "pnpm --filter @auto-tm/api exec eslint src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts",
+      "exitCode": 0,
+      "testsPassed": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/897-r7b-round1-evidence/matrix-worker-build.log",
+      "command": "pnpm --filter @auto-tm/worker build",
+      "exitCode": 0,
+      "testsPassed": null,
+      "sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538"
+    }
+  ],
+  "remaining": [
+    "Parent decides source/runtime/G1 matrix acceptance.",
+    "Restricted-role and combined B1-B5/G0-G4 integration evidence are outside this owner continuation.",
+    "No separate completion/revision video-writer permutations claimed; selected video opposition is cancellation in both orders."
+  ],
+  "artifactHashes": {
+    "pinned-source-hashes.json": "4ef1dd795520de329f2a02fb9b6998a4174bfc58a36a4c2d95888eb8cc6d73b2",
+    "full25.txt": "c474ec4bda7479047b05d5e13e16622a67d8e86a8dd6011890d4f9b331a9c090",
+    "post-database.json": "e689211df5a204740347aed2cbcbd0d2ba7fd0e0826da8b6328d9d75ab925a85"
+  },
+  "serviceCleanup": {
+    "container": "carberk897-r7b-r1-8c41fd9a",
+    "running": false,
+    "status": "exited",
+    "stateReceipt": "/tmp/897-r7b-round1-evidence/matrix-service-state.json",
+    "stateSha256": "f2fd30c1c8afd958566225f85e874496152145cbf93a43cb814ccad9c58ded0d",
+    "dataRetained": true,
+    "otherServicesTouched": false
+  }
+}

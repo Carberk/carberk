@@ -324,3 +324,20 @@ describe("photo conversion maintenance setting", () => {
     expect(EnvSchema.safeParse({ ...baseEnv, PHOTO_CONVERSION_MAINTENANCE: "yes" }).success).toBe(false);
   });
 });
+
+describe("worker private video activation", () => {
+  it("keeps processing and cleanup closed without explicit activation", () => {
+    expect(EnvSchema.parse(baseEnv)).toMatchObject({ VIDEO_PROCESSING_ENABLED: false, VIDEO_CLEANUP_ENABLED: false, VIDEO_ROLLOUT_ENABLED: false, VIDEO_TESTER_USER_IDS: [], VIDEO_PRIVATE_BUCKET: "listing-video-private" });
+  });
+  it("rejects public photo buckets and malformed tester identities", () => {
+    expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_PRIVATE_BUCKET: "listing-photos" }).success).toBe(false);
+    expect(EnvSchema.safeParse({ ...baseEnv, VIDEO_TESTER_USER_IDS: "someone" }).success).toBe(false);
+  });
+});
+
+describe("worker measurement source capture", () => {
+  it("stays disabled unless collector authority is provisioned", () => {
+    expect(EnvSchema.parse(baseEnv)).toMatchObject({ MEASUREMENT_ENABLED: false });
+    expect(EnvSchema.safeParse({ ...baseEnv, MEASUREMENT_ENABLED: "true" }).success).toBe(false);
+  });
+});

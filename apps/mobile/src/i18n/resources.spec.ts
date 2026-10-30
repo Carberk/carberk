@@ -17,6 +17,21 @@ function flattenKeys(value: unknown, prefix = ""): string[] {
   });
 }
 
+const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
+
+describe("Plural keys", () => {
+  it.each(["ru", "tk", "en"])("in %s define every plural category the locale's rules use", (locale) => {
+    const categories = new Intl.PluralRules(locale).resolvedOptions().pluralCategories;
+    const keys = flattenKeys(resources[locale]);
+    const pluralBases = new Set(keys.filter((key) => PLURAL_SUFFIX.test(key)).map((key) => key.replace(PLURAL_SUFFIX, "")));
+    const missing = [...pluralBases].flatMap((base) =>
+      categories.map((category) => `${base}_${category}`).filter((key) => !keys.includes(key)),
+    );
+    expect(pluralBases.size).toBeGreaterThan(0);
+    expect(missing).toEqual([]);
+  });
+});
+
 describe("English broad-surface translations", () => {
   it.each([
     ["favorites", "Favorites"],

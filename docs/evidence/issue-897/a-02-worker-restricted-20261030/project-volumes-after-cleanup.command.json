@@ -1,0 +1,21 @@
+{
+  "name": "project-volumes-after-cleanup",
+  "program": "docker",
+  "arguments": [
+    "volume",
+    "ls",
+    "--filter",
+    "label=com.docker.compose.project=auto_tm_ci_897_a02_f6408755",
+    "--format",
+    "{{json .}}"
+  ],
+  "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "startedAt": "2026-10-29T18:27:18.345Z",
+  "finishedAt": "2026-10-29T18:27:18.366Z",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "log": "project-volumes-after-cleanup.log",
+  "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "environmentNames": []
+}

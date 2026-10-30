@@ -1,0 +1,103 @@
+[
+  {
+    "receipt": "functional-base-red.txt",
+    "rawPath": "/tmp/t3-58ab493d/logs/functional-base-red.log",
+    "rawSha256": "ca5efeabae3f78c55f2ec323545e15541ac1bbababf11e3b30872925dddc49c5",
+    "receiptSha256": "ca5efeabae3f78c55f2ec323545e15541ac1bbababf11e3b30872925dddc49c5",
+    "source": "1976863f8+7a172ea74 (rebased checkpoint), before the anchor branch",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts"
+  },
+  {
+    "receipt": "focused-anchor-red.txt",
+    "rawPath": "/tmp/t3-58ab493d/logs/focused-anchor-red-verbose.log",
+    "rawSha256": "d8a12ab5fcdb3847e067bcd25ff6fed8d28b4c149308035415beebe87fb0ab1e",
+    "receiptSha256": "d8a12ab5fcdb3847e067bcd25ff6fed8d28b4c149308035415beebe87fb0ab1e",
+    "source": "focused tests added, migration unchanged",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "focused-anchor-green.txt",
+    "rawPath": "/tmp/t3-58ab493d/logs/focused-anchor-green-verbose.log",
+    "rawSha256": "9f9faa3ff7fe4d7defbe99b1113c0c6308ed0b9108e34a3109ec7a7dcabcfdcb",
+    "receiptSha256": "9f9faa3ff7fe4d7defbe99b1113c0c6308ed0b9108e34a3109ec7a7dcabcfdcb",
+    "source": "anchor branch added (content of e8987ce02)",
+    "command": "pnpm exec vitest run tests/operational-reset-rows.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "functional-next-refusal.txt",
+    "rawPath": "/tmp/t3-58ab493d/logs/functional-anchor-next.log",
+    "rawSha256": "244b8c85d5bba394a27f6fecdc840fe1cab8ec58ef93a3080205d24fed3b5bd0",
+    "receiptSha256": "244b8c85d5bba394a27f6fecdc840fe1cab8ec58ef93a3080205d24fed3b5bd0",
+    "source": "anchor branch added (content of e8987ce02)",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "redis-admitted-path.txt",
+    "rawPath": "/tmp/t3-58ab493d/logs/redis-admitted-path.log",
+    "rawSha256": "53ba54b8896021d7d08140a6a2355bbb1b408454714d7c5f0f8b5964bfcf64d8",
+    "receiptSha256": "5395c04588a13f5fc8e7e4452515f3039881ddc776968b5598e268e294043b5a",
+    "source": "e8987ce02; receipt keeps result and summary lines only",
+    "command": "pnpm exec vitest run scripts/staging-clean-reset-redis-recovery.e2e.spec.ts scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts --reporter=verbose"
+  },
+  {
+    "receipt": "node-reset-units.txt",
+    "rawPath": "/tmp/t3-58ab493d/logs/node-reset-units.log",
+    "rawSha256": "9ed19ae7ac009fcdc950116eb0b5ebddd6a545c24914e1d163e0517ca32635c0",
+    "receiptSha256": "9ed19ae7ac009fcdc950116eb0b5ebddd6a545c24914e1d163e0517ca32635c0",
+    "source": "e8987ce02",
+    "command": "node --test scripts/staging-clean-reset.test.mjs scripts/staging-clean-reset-remote.test.mjs scripts/testing/query-disposable-postgres.test.cjs"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/source-kernel-base-25f80afcc.log",
+    "rawSha256": "efcf3d580bb2b41972370ed5e9f831d5d4e57b8d2a7369c2594e5f6ec54b3a84",
+    "summarizedIn": "source-kernel-comparison.json, parent run"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/source-kernel-base-7a172ea74.log",
+    "rawSha256": "f0dfe5aca9730dfcb562480688b1f162122ab6b15cfd9cdcf54f51e6992b4c73",
+    "summarizedIn": "source-kernel-comparison.json, checkpoint run"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/source-kernel-preservation.log",
+    "rawSha256": "4468dbf24c1c3228b4e27a531026fa0f94a642b143aa71ec961c00b6dea481d4",
+    "summarizedIn": "source-kernel-comparison.json, this checkpoint run"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/eslint-focused.log",
+    "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "summarizedIn": "pnpm exec eslint tests/operational-reset-rows.e2e.spec.ts --max-warnings=0"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/db-typecheck.log",
+    "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+    "summarizedIn": "pnpm typecheck (packages/db)"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/setup-contracts-build.log",
+    "rawSha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+    "summarizedIn": "SETUP pnpm --filter @auto-tm/contracts build"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/setup-db-generate.log",
+    "rawSha256": "70a8920d70980ccd40816ac917ac499bdc7c50ad131f8c65f229cfa75a9ad2d8",
+    "summarizedIn": "SETUP prisma generate (inert DATABASE_URL)"
+  },
+  {
+    "receipt": null,
+    "rawPath": "/tmp/t3-58ab493d/logs/setup-db-build.log",
+    "rawSha256": "7e50eb2fa56946cea195a587c36f1fce1ff042e5a41fe5aa200a10cfd9a8bde6",
+    "summarizedIn": "SETUP pnpm --filter @auto-tm/db build (inert DATABASE_URL)"
+  },
+  {
+    "receipt": "source-kernel-comparison.json",
+    "receiptSha256": "45de8ec3907261c6ed15329ad1bf537d318355fe9e79b8adaf9b6b64d785321e",
+    "generatedFrom": "the three source-kernel raw logs above"
+  }
+]

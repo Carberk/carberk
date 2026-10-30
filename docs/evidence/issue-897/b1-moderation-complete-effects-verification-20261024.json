@@ -1,0 +1,179 @@
+{
+  "sourceCheckpoint": "3f50dd2d",
+  "checks": [
+    {
+      "command": "pnpm --filter @auto-tm/contracts build",
+      "exitCode": 0,
+      "seconds": 4.76,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-0.log",
+      "sha256": "8955456238486fb15239e3447baa9428bd8347cfab2db3045460d0cf94eb89b3"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db build",
+      "exitCode": 0,
+      "seconds": 2.95,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-1.log",
+      "sha256": "d6f83aef1f9b591833d0bcf56baeba6763282d83469c2139e84e9d1f99ab36f2"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "exitCode": 1,
+      "seconds": 1.2,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-2.log",
+      "sha256": "27e85b9960c18b70a0e0409e215545f09795f1cde7caea0e1cef324d8cbdb98b"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+      "exitCode": 1,
+      "seconds": 5.48,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-3.log",
+      "sha256": "37c4a683f335b066bff18dd830de18ee22bf7acb06d762ab9dccf960c6a8c105"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api build",
+      "exitCode": 0,
+      "seconds": 7.42,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-4.log",
+      "sha256": "4a05c6427b19891d26ef0948d363c6e68007e7f53128823e462c6d66c9137bfe"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api typecheck",
+      "exitCode": 1,
+      "seconds": 2.07,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-5.log",
+      "sha256": "5e5c9402ad90506f15ec60c2d2f47539974e851041272dcb0965f423ee112c62"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api exec tsc6 --noEmit",
+      "exitCode": 1,
+      "seconds": 6.92,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-6.log",
+      "sha256": "ec5759778546e5125522e13898ac24fc70c18c26c75c01cf63e9589ff3c3e669"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db lint",
+      "exitCode": 0,
+      "seconds": 2.79,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-7.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api lint",
+      "exitCode": 0,
+      "seconds": 5.07,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-8.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db exec prisma validate",
+      "exitCode": 0,
+      "seconds": 0.56,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-9.log",
+      "sha256": "f42be55724289534e6fab7707bf97c906b59b2a65578449f3fbabc739f5b0606"
+    },
+    {
+      "command": "node --test 'scripts/diagnostic*schema.test.mjs' scripts/campaign-preparation-schema.test.mjs",
+      "exitCode": 0,
+      "seconds": 0.14,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-10.log",
+      "sha256": "8e50987dd2d821bcacecdd79b459084f12533555608b01f285e047efb42dffc6"
+    },
+    {
+      "command": "python3 /tmp/897-b1-moderation-complete-effects-grammar.py",
+      "exitCode": 0,
+      "seconds": 0.06,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-11.log",
+      "sha256": "07616ddbb84ab11431e631f62960bf466f41018b8c4d3fc5f8d3d0b98d904f0b"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api exec vitest run src/modules/admin/application/SuspendUser.spec.ts src/modules/admin/application/UnsuspendUser.spec.ts src/modules/identity/infrastructure/PrismaIdentityAdminRepository.spec.ts src/modules/diagnostics/domain/ContinuityPublicOwnership.spec.ts src/modules/diagnostics/infrastructure/DiagnosticOwnershipGrant.application.spec.ts",
+      "exitCode": 0,
+      "seconds": 1.79,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-12.log",
+      "sha256": "7aff3f59b8f98e98cf48982d741108661093af7a9f777d2ad74733ac14f1420a"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db test:offline",
+      "exitCode": 0,
+      "seconds": 0.84,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-13.log",
+      "sha256": "58941f1793475743a3da1036d5fac10486b9649bbe50be3c509c9a9108209eea"
+    },
+    {
+      "command": "pnpm check:runtime-imports",
+      "exitCode": 0,
+      "seconds": 0.18,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-14.log",
+      "sha256": "2920e5c9967fdaf4eb831dfb48e054ff0bd4262a1ef314658ceca54821fa5d97"
+    },
+    {
+      "command": "pnpm check:agent-docs",
+      "exitCode": 0,
+      "seconds": 0.14,
+      "log": "/tmp/897-b1-moderation-complete-effects-check-15.log",
+      "sha256": "8f5507ea6fcde992f7d6733d113abc538ae4957b777bc97cadd580f651c93b20"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db typecheck",
+      "exitCode": 0,
+      "seconds": 1.52,
+      "log": "/tmp/897-b1-moderation-complete-effects-affected-check-0.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db exec tsc6 --noEmit",
+      "exitCode": 0,
+      "seconds": 3.91,
+      "log": "/tmp/897-b1-moderation-complete-effects-affected-check-1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api typecheck",
+      "exitCode": 0,
+      "seconds": 1.92,
+      "log": "/tmp/897-b1-moderation-complete-effects-affected-check-2.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api exec tsc6 --noEmit",
+      "exitCode": 0,
+      "seconds": 7.22,
+      "log": "/tmp/897-b1-moderation-complete-effects-affected-check-3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/db lint",
+      "exitCode": 0,
+      "seconds": 2.16,
+      "log": "/tmp/897-b1-moderation-complete-effects-affected-check-4.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/api lint",
+      "exitCode": 0,
+      "seconds": 4.64,
+      "log": "/tmp/897-b1-moderation-complete-effects-affected-check-5.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+    },
+    {
+      "command": "node --test scripts/diagnostic-moderation-complete-effects-schema.test.mjs",
+      "exitCode": 1,
+      "log": "/tmp/897-b1-moderation-complete-effects-static-red.log",
+      "sha256": "3b41dabca840c6888c1edc56248e08a021f31c8b9f2125c67bb3a4be69f3ee86",
+      "note": "Missing forward migration/inventory. Static setup failure only, not observed SQL behavior red."
+    },
+    {
+      "command": "node --test scripts/diagnostic-moderation-complete-effects-schema.test.mjs",
+      "exitCode": 0,
+      "log": "/tmp/897-b1-moderation-complete-effects-static-green.log",
+      "sha256": "1a0ce2fae1d0c4be9f3e30f90b0ae7bd424d3a5dced30cfe2284c899b0ccada9",
+      "note": "Exact additive schema inventory and mirror proof only."
+    }
+  ],
+  "finalAffectedChecksPassed": true,
+  "initialTypecheckFailures": "Ignored worker dependencies absent; new fixture value import, UUID inference and misplaced local readback additions. Corrected once; original failure logs retained. Worker dependencies populated through configured pnpm --filter @auto-tm/worker exec node --version; zero services/E2E imports.",
+  "sqlExecuted": 0,
+  "httpExecuted": 0,
+  "e2eModulesImported": 0,
+  "newSourceBlocker": "Campaign synthetic User/audit policy rejects complete moderation; writer static finding, not independently reviewed or runtime-observed."
+}

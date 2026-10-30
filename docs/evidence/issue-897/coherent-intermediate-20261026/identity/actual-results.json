@@ -1,0 +1,140 @@
+{
+  "numTotalTests": 22,
+  "numPassedTests": 22,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "cases": [
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition refresh CAS has one winner and false loser, left begins first",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 777.1812909999999
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition refresh CAS has one winner and false loser, right begins first",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 728.2162919999996
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition first verification is atomic and the loser retains its pending error, left first",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 785.91075
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition first verification is atomic and the loser retains its pending error, right first",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 802.306458
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition backup reuse cannot burn or elevate twice, left first",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 753.4153329999999
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition backup reuse cannot burn or elevate twice, right first",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 901.5046670000002
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition backup elevation opposes staff revocation in both orders, left",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 891.459041000001
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition backup elevation opposes staff revocation in both orders, right",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 853.8626250000016
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition logout and Session creation never delete the incoming Session, left",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 333.5090830000008
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition logout and Session creation never delete the incoming Session, right",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 351.9833750000016
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition User INSERT and verified replacement fence the same destination, left",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 390.2827079999988
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition User INSERT and verified replacement fence the same destination, right",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 352.1242089999996
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition OTP reservation prepares before destination/IP locks, left",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 36.15462500000103
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition OTP reservation prepares before destination/IP locks, right",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 26.547875000000204
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition actual logout and enrollment deletion complete their exact FK cascades",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 955.5332080000007
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition real staff no-ops emit no audit, while revoke and regrant each audit once",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1947.087958
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition expired pruning rechecks the selector and retains new and foreign live Sessions",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 665.8451249999998
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition rollback after successful real caller work leaves no grant, audit, code burn or elevation",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 911.2029160000002
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition refused missing Session does not verify enrollment or create backup codes",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 488.9496249999993
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition refused foreign Session does not verify enrollment or create backup codes",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 877.5779999999995
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition refused expired Session does not verify enrollment or create backup codes",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1182.2283749999988
+    },
+    {
+      "name": "Identity caller-owned preparation under PostgreSQL opposition refused inactive Session does not verify enrollment or create backup codes",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 745.8477079999975
+    }
+  ]
+}

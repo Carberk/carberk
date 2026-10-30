@@ -1,0 +1,13 @@
+[
+ {
+  "step": "tab to replacement button",
+  "found": true,
+  "n": 12
+ },
+ {
+  "step": "Enter on replacement: focus lands on",
+  "f": {
+   "el": "body"
+  }
+ }
+]

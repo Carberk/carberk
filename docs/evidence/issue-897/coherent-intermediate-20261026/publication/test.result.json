@@ -1,0 +1,25 @@
+{
+  "name": "test",
+  "command": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts",
+    "--maxWorkers=1",
+    "--no-file-parallelism",
+    "--retry=0",
+    "--passWithNoTests=false",
+    "--reporter=default",
+    "--reporter=json",
+    "--reporter=junit",
+    "--outputFile.json=/tmp/897-coherent-intermediate-assembly-20261025/publication/vitest.json",
+    "--outputFile.junit=/tmp/897-coherent-intermediate-assembly-20261025/publication/junit.xml"
+  ],
+  "exitCode": 0,
+  "log": "/tmp/897-coherent-intermediate-assembly-20261025/publication/test.log",
+  "sha256": "57a0780ff466ed5112ca979075662ffedaee81efe3c826ac962419297df1a5b0",
+  "durationSeconds": 38.86
+}

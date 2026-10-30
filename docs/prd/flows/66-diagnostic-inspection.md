@@ -96,10 +96,14 @@ An untouched panel is unassessed. The worker must not interpret an empty drawing
 | Reviewer returns report | Show reason and resume the same pinned-template draft |
 | PDF generation fails | Show accurate artifact state and retry; finalized report data remains unchanged |
 | Seller dislikes a finding | No per-finding deletion or favorable-only public copy; use correction/dispute route |
-| Later correction or reinspection | Link new snapshot and show current status; never label old measurements as new |
+| Later correction or reinspection | Preserve original snapshots/audiences; a new visit starts with fresh observations and no reused findings/evidence. Reinspection consumes the exact pair-bound proof under ADR-0108; never label old measurements as new |
 | Unauthorized user guesses private report/media URL | Deny access without leaking private contents or public metadata |
 
-Feature 50 and ADR-0104 now govern accepted correction/withdrawal, reviewer, association and classified data policies. Real center payment/refund methods and consent wording remain activation inputs.
+Feature 50 and ADR-0104 govern accepted correction/withdrawal, reviewer, association and classified data policies. [ADR-0108](../../adr/0108-pair-bound-diagnostic-reinspection-continuity-proof.md) adds the approved continuity flow. Capture immutable identity evidence for predecessor report A and new physical visit B. Equal normalized VIN permits automatic proof only for unchanged, consistent identity/ownership. For manual/manual, either manual/VIN direction, supported identity correction or changed public Listing/seller/commissioner, a qualified reviewer independently assigned to both orders and distinct from B's linking technician compares retained A material with B's physical observation. Record original/corrected values and provenance. Unresolved mismatch, different vehicle or insufficient material cannot link.
+
+Private continuity requires the same nonnull commissioner even without a common Listing; different private commissioners and mixed audiences refuse. Public B requires current publisher authority, fresh consent and revalidated association. Bind proof to exact versions, hashes, audiences, commissioner references and applicable public identity/ownership digests. Recheck current technician and issuer/session authority, reviewer qualification/assignments where applicable, candidate state, erasure and uniqueness under locks; any intervening identity, ownership, observation, authorization, assignment or candidate change invalidates unused proof. Atomically consume once with B creation and audit; exact retries create no duplicate audit. Later A changes or erasure cannot retroactively break valid surviving B. A link grants no old findings, evidence, private report access or inherited consent. Restricted identity/proof provenance follows ADR-0104 purpose/rights/holds/erasure rules without new rights or retention duration, backfill, old snapshot rewrite or blanket TTL; hashes are not anonymous.
+
+This software policy keeps real-service activation closed. Real center payment/refund methods and consent wording remain activation inputs.
 
 ## Evidence expected before launch
 

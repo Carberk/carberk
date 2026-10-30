@@ -4,34 +4,51 @@ import "dotenv/config";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { PrismaClient, type Prisma } from "../generated/prisma/client/client";
-import type { UserRole } from "../generated/prisma/client/enums";
+import { PrismaClient } from "../generated/prisma/client/client";
 import { runPromoteAdmin } from "../src/promote-admin";
+import { PrismaAdminPromotionStore } from "../src/PrismaAdminPromotionStore";
 
 function parseArgs(argv: string[]) {
   let phone: string | undefined;
+  let email: string | undefined;
   let reason: string | undefined;
   let dryRun = false;
 
   for (let i = 2; i < argv.length; i++) {
-    if (argv[i] === "--phone" && i + 1 < argv.length) {
-      phone = argv[++i];
-    } else if (argv[i] === "--reason" && i + 1 < argv.length) {
-      reason = argv[++i];
-    } else if (argv[i] === "--dry-run") {
+    const flag = argv[i];
+    if (flag === "--") continue; // pnpm's optional argument separator
+    if (flag === "--dry-run") {
       dryRun = true;
+      continue;
+    }
+    if (flag !== "--phone" && flag !== "--email" && flag !== "--reason") {
+      throw new Error(`Unknown argument: ${flag}`);
+    }
+    const value = argv[++i];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`Missing value for ${flag}`);
+    }
+    if (flag === "--phone") {
+      if (phone !== undefined) throw new Error("Duplicate --phone");
+      phone = value;
+    } else if (flag === "--email") {
+      if (email !== undefined) throw new Error("Duplicate --email");
+      email = value;
+    } else {
+      if (reason !== undefined) throw new Error("Duplicate --reason");
+      reason = value;
     }
   }
 
-  return { phone, reason, dryRun };
+  return { phone, email, reason, dryRun };
 }
 
 async function main(): Promise<number> {
   const args = parseArgs(process.argv);
 
-  if (!args.phone || !args.reason) {
+  if ((args.phone !== undefined) === (args.email !== undefined) || !args.reason) {
     console.error(
-      "Usage: tsx scripts/promote-admin.ts --phone <phone> --reason <reason> [--dry-run]",
+      "Usage: tsx scripts/promote-admin.ts (--phone <phone> | --email <email>) --reason <reason> [--dry-run]",
     );
     return 1;
   }
@@ -41,26 +58,8 @@ async function main(): Promise<number> {
 
   try {
     const result = await runPromoteAdmin(
-      {
-        findUserByPhone: (phone) =>
-          prisma.user.findUnique({ where: { phone } }).then((u) => u ?? null),
-        updateUserRole: async (userId, role) => {
-          // runPromoteAdmin only passes its ADMIN_ROLE constant.
-          await prisma.user.update({ where: { id: userId }, data: { role: role as UserRole } });
-        },
-        createAuditLog: async (data) => {
-          await prisma.auditLog.create({
-            data: {
-              actorId: data.actorId,
-              action: data.action,
-              targetType: data.targetType,
-              targetId: data.targetId,
-              details: data.details as Prisma.InputJsonValue,
-            },
-          });
-        },
-      },
-      { phone: args.phone, reason: args.reason, dryRun: args.dryRun },
+      new PrismaAdminPromotionStore(prisma, process.env["AUTOTM_COMMIT_SHA"] ?? ""),
+      { phone: args.phone, email: args.email, reason: args.reason, dryRun: args.dryRun },
     );
 
     console.log(result.message);

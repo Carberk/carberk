@@ -1,9 +1,15 @@
+import { randomUUID } from "node:crypto";
+import { AVATAR_CONTACT_UUID_FACTORY } from "../../common/avatar-contact-preparation";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { Module } from "@nestjs/common";
 
 import { ListingsModule } from "../listings/listings.module";
 import { IdentityModule } from "../identity/identity.module";
 import { ConversationsModule } from "../conversations/conversations.module";
+
+import { AdminContextController } from "./presentation/AdminContextController";
+import { PrismaAdminContextReader } from "./infrastructure/PrismaAdminContextReader";
+import { ADMIN_CONTEXT_READ_PORT } from "./domain/ports/AdminContextReadPort";
 
 import { AdminController } from "./presentation/admin.controller";
 import { ReportsController } from "./presentation/ReportsController";
@@ -29,8 +35,10 @@ import { AUDIT_LOG_REPOSITORY } from "./domain/ports/AuditLogRepository";
 
 @Module({
   imports: [EventEmitterModule, ListingsModule, IdentityModule, ConversationsModule],
-  controllers: [AdminController, ReportsController, AuditController, AdminModerationController, ConfigController],
+  controllers: [AdminContextController, AdminController, ReportsController, AuditController, AdminModerationController, ConfigController],
   providers: [
+    { provide: AVATAR_CONTACT_UUID_FACTORY, useValue: randomUUID },
+    { provide: ADMIN_CONTEXT_READ_PORT, useClass: PrismaAdminContextReader },
     PrismaContentReportRepository,
     {
       provide: CONTENT_REPORT_REPOSITORY,

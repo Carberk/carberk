@@ -1,0 +1,27 @@
+{
+  "name": "services-up",
+  "program": "docker",
+  "arguments": [
+    "compose",
+    "-p",
+    "auto_tm_ci_897_a02_f6408755",
+    "-f",
+    "/tmp/carberk-a02-worker-restricted-f6408755/source/infra/compose/docker-compose.ci.yml",
+    "-f",
+    "/tmp/carberk-a02-worker-restricted-f6408755/ports.yml",
+    "up",
+    "-d",
+    "--wait",
+    "--wait-timeout",
+    "180"
+  ],
+  "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "startedAt": "2026-10-29T18:24:38.738Z",
+  "finishedAt": "2026-10-29T18:24:44.975Z",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "log": "services-up.log",
+  "logSha256": "dd392d6e02fe5021446e3989768297129a99e2ba8af2845f58d4906f58f98352",
+  "environmentNames": []
+}

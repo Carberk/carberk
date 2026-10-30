@@ -9,12 +9,13 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
 
   async findMany(params: {
     action?: string;
+    allowedActions?: readonly string[];
     targetType?: string;
     targetId?: string;
     page: number;
     pageSize: number;
   }): Promise<{ items: AuditLogRow[]; total: number }> {
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = params.allowedActions ? { AND: [{ action: { in: [...params.allowedActions] } }] } : {};
     if (params.action) {
       where["action"] = params.action;
     }
@@ -51,6 +52,7 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
 
   async create(
     data: {
+      id?: string;
       actorId: string | null;
       action: string;
       targetType: string;
@@ -62,6 +64,7 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
     const client = (tx as PrismaService | undefined) ?? this.prisma;
     const row = await client.auditLog.create({
       data: {
+        ...(data.id ? { id: data.id } : {}),
         actorId: data.actorId,
         action: data.action,
         targetType: data.targetType,

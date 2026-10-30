@@ -1,0 +1,75 @@
+{
+  "commit": "4ed39fc229ff1714fdb2416ab43085b6e56a98e2",
+  "tree": "02108d2a04d31c8c087884a438dc2e630b08b9b9",
+  "parent": "fc77bc55cd83fdaa502aba236697d4b3c5260659",
+  "changedByThisCheckpoint": {
+    "packages/db/prisma/migrations/20261029190000_operational_reset_row_admission/migration.sql": {
+      "sha256": "b94b86d699143bb36b769d8015cf9f7448ee5545456fcce65e326f66b9aac232",
+      "gitBlob": "0ba8b25b31488aaa2942c59d861ae2a8cfc56614"
+    },
+    "packages/db/tests/operational-reset-rows.e2e.spec.ts": {
+      "sha256": "171dc66eb424f14d498c9372dc8f522c900bafe4aa4f079b0546ce5503193a66",
+      "gitBlob": "85f9306e1c94bd94e865d3ef475f1bb24a54b99c"
+    }
+  },
+  "carriedUnchangedFromParent": {
+    "packages/db/scripts/staging-clean-reset.e2e.spec.ts": {
+      "sha256": "5730f98f59e3e99fe5cc473a80c901bd6b6ab980117740ed1a545900677473c3",
+      "gitBlob": "48551e4fb146d10d9716e45539d8ed67c9f28137"
+    },
+    "packages/db/scripts/staging-clean-reset-redis-recovery.e2e.spec.ts": {
+      "sha256": "7c09759ec3ab089c044aeaacc7a466a044c2433eb4e63716f3cd5b1179847f43",
+      "gitBlob": "a8c7695e5a685ffcf7aa47ccfe752f6064ae1067"
+    },
+    "packages/db/scripts/staging-clean-reset-redis-interrupted.e2e.spec.ts": {
+      "sha256": "7ef4f73693a00e348efa3565feb3f69b815c113f21f6bfc52aa43848796f2049",
+      "gitBlob": "f7b2340d3aaa3dfbefb9e72e809e2f7485be4bbb"
+    },
+    "scripts/staging-clean-reset-remote.mjs": {
+      "sha256": "6cf54abdd87eac6d4cbc2a2baca0cd10e4486cc98033f22fcb97de80f13bba72",
+      "gitBlob": "6cd476640a53ba3128c1512c58e463c733154280"
+    },
+    "scripts/staging-clean-reset.mjs": {
+      "sha256": "6666430cbbfab6e0b29da7b736c3d5f0d1eda2ce5a6409b7c63d75c3fb179a6c",
+      "gitBlob": "bf57fafc36ea2125eb6826330e11f05e46969b16"
+    },
+    "scripts/staging-clean-reset.tables.json": {
+      "sha256": "2a086045263f8b525d0a9fcd4d72ef09f2c6963f63f370d34ea84fd5245c4017",
+      "gitBlob": "ed14bac303219070b8a5de9c37eaef2b60ab7968"
+    },
+    "scripts/staging-clean-reset.test.mjs": {
+      "sha256": "83e217082980e9578abf4e735fa3ac8d9628b07fbea7455cb436d4e9c436f356",
+      "gitBlob": "333c7675aaba5b143e3573f3df4c94fd50d63133"
+    },
+    "scripts/staging-clean-reset-remote.test.mjs": {
+      "sha256": "23282dd318f63ddf7fd4ca23b568bc375f125ce9fff52d8448f8e8b54f296fb1",
+      "gitBlob": "ca3a76c33c6f549beaa4d9551f2a2cdff75989fa"
+    },
+    "scripts/testing/query-disposable-postgres.cjs": {
+      "sha256": "7a6eceab9649e68a52803e76c8d366bf05c6154bd6fe49332271955dc6f019ae",
+      "gitBlob": "644f25ced9c2b3d23393ab37251f33c1e2472444"
+    },
+    "scripts/testing/query-disposable-postgres.test.cjs": {
+      "sha256": "dfde4940e2b73bf007eeb9c815343a61887fa1ccc842b4c0ea79bf3a0e28e63e",
+      "gitBlob": "254ca0f7874e5d0b71bb8dd296cdc79fe5ee2d19"
+    }
+  },
+  "historicalMigrationsUnchanged": {
+    "packages/db/prisma/migrations/20261021130000_diagnostic_identity_evidence/migration.sql": {
+      "sha256": "5351553647b355dc59eadf25a02e84aa7916e1b33da2117b00e40f47d49ecb82",
+      "gitBlob": "72c89aa2c9c42f66b30d1499be87a545a29641b8"
+    },
+    "packages/db/prisma/migrations/20261023090000_diagnostic_ownership_components/migration.sql": {
+      "sha256": "f43b2c04ef6ed9f447acfc0e5ebf326a577b3cd1d96539439c43f05f537cad01",
+      "gitBlob": "c61015ad6bfa8d6f33f5011a45a4bc9b755843e6"
+    },
+    "packages/db/prisma/migrations/20261023120000_diagnostic_ownership_grants/migration.sql": {
+      "sha256": "3696e93cfc56f13a95d8e38fd72e3e985d43105ce17ffdf7d5f7ce273efac3df",
+      "gitBlob": "30bab0755c67dd0d2b6de39b493278af5f632515"
+    },
+    "packages/db/prisma/migrations/20261024050000_diagnostic_kernel_invariants/migration.sql": {
+      "sha256": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8",
+      "gitBlob": "79d853619018da04f5f1d37fd5167ef6ed3ca5be"
+    }
+  }
+}

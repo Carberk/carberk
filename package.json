@@ -13,12 +13,12 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "test": "pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:native-session && pnpm test:worktree-gc && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
+    "test": "node --test 'infra/minio/*.test.mjs' && pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:native-session && pnpm test:worktree-gc && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
     "test:unit": "pnpm test:agent-github && pnpm test:native-session && turbo run test:unit",
-    "test:api": "turbo run test --filter=@auto-tm/api --filter=@auto-tm/worker",
+    "test:api": "turbo run test --continue=dependencies-successful --filter=@auto-tm/api --filter=@auto-tm/worker",
     "test:db": "turbo run test --filter=@auto-tm/db",
     "test:frontend": "turbo run test --filter=@auto-tm/mobile --filter=@auto-tm/web --filter=@auto-tm/admin --filter=@auto-tm/contracts --filter=@auto-tm/sms-gateway",
-    "test:root": "pnpm check:agent-docs && node --test 'scripts/*.test.mjs'",
+    "test:root": "pnpm check:agent-docs && node --test 'scripts/*.test.mjs' 'infra/minio/*.test.mjs'",
     "typecheck": "turbo run typecheck",
     "check:glossary": "node scripts/check-domain-glossary.mjs",
     "test:glossary": "node --test scripts/check-domain-glossary.test.mjs",
@@ -46,7 +46,9 @@
     "test:worktree-gc": "node --test scripts/worktree-gc.test.mjs",
     "agent:github": "node scripts/agent-github.mjs",
     "test:agent-github": "node --test scripts/agent-github.test.mjs",
-    "test:native-session": "node --test scripts/native-session*.test.mjs"
+    "test:native-session": "node --test scripts/native-session*.test.mjs",
+    "staging:control": "node scripts/staging.mjs",
+    "test:staging-control": "node --test scripts/staging-clean-reset.test.mjs scripts/staging.test.mjs scripts/staging-control.test.mjs scripts/staging-ledger.test.mjs scripts/staging-railway.test.mjs"
   },
   "devDependencies": {
     "@typescript/native": "catalog:",

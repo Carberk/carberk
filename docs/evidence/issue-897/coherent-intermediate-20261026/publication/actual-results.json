@@ -1,0 +1,158 @@
+{
+  "numTotalTests": 25,
+  "numPassedTests": 25,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "cases": [
+    {
+      "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 1",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1369.813666
+    },
+    {
+      "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 2",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1764.712958
+    },
+    {
+      "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 3",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1715.1689170000004
+    },
+    {
+      "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 4",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1462.605375
+    },
+    {
+      "name": "R7b real publication finite transaction closure publishes exact photos/audit/capture with absent, READY, pending or invalid video graph 5",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1483.2597500000002
+    },
+    {
+      "name": "R7b real publication finite transaction closure commits publication when optional capture is disabled after planning",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1086.6198750000003
+    },
+    {
+      "name": "R7b real publication finite transaction closure preserves optional absence when capture activation changes after the source receipt",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1426.6275409999998
+    },
+    {
+      "name": "R7b real publication finite transaction closure commits core publication after the actual capture savepoint rolls an outbox failure back",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1278.859625000001
+    },
+    {
+      "name": "R7b real publication finite transaction closure retains ordinary nonpublication listing_create and listing_change",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 476.80975000000035
+    },
+    {
+      "name": "R7b real publication finite transaction closure rolls back publication on the omit-audit source completion attack",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1332.0837090000005
+    },
+    {
+      "name": "R7b real publication finite transaction closure rolls back publication on the corrupt-photo source completion attack",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1295.1327500000007
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes the real publish and draft update in publication-first=true order",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 2876.1825839999983
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes the real publish and draft update in publication-first=false order",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1188.7773749999978
+    },
+    {
+      "name": "R7b real publication finite transaction closure permits only one real publication adopter in original-draft-first=true order",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1478.479833999998
+    },
+    {
+      "name": "R7b real publication finite transaction closure permits only one real publication adopter in original-draft-first=false order",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1465.7842920000003
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes actual video cancellation with publication-first=true",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 2085.2137909999983
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes actual video cancellation with publication-first=false",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1483.0296659999985
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes account scheduling with publication-first=true",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 2528.350333999999
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes account scheduling with publication-first=false",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 613.580915999999
+    },
+    {
+      "name": "R7b real publication finite transaction closure commits optional capture around actual principal bootstrap publication-first=true",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1124.3707090000025
+    },
+    {
+      "name": "R7b real publication finite transaction closure commits optional capture around actual principal bootstrap publication-first=false",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1378.6153750000012
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes actual due account purge with publication-first=true",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 2965.3715840000004
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes actual due account purge with publication-first=false",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1228.551333000003
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes collector epoch rotation with publication-first=true",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 1343.986791999996
+    },
+    {
+      "name": "R7b real publication finite transaction closure serializes collector epoch rotation with publication-first=false",
+      "status": "passed",
+      "failureMessages": [],
+      "duration": 888.7648749999935
+    }
+  ]
+}

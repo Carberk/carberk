@@ -1,0 +1,49 @@
+{
+  "verdict": "READY for fixture/setup; one parent-owned product/type defect reported separately (API build exit 1)",
+  "parent": "fc77bc55cd83fdaa502aba236697d4b3c5260659",
+  "migrations": {
+    "count": 102,
+    "manifestSha256": "dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc",
+    "newest": {
+      "migration_name": "20261029190000_operational_reset_row_admission",
+      "checksum": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd"
+    },
+    "added": {
+      "20261026016200_diagnostic_maintenance_compatibility": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379",
+      "20261026016300_diagnostic_registry_metadata_lookup": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7",
+      "20261026016400_diagnostic_source_key_predicate": "fe7358f92acaeae0b57a442cf8e7b4aa28b56ee03aa6177fd7fb271a93bafdb6",
+      "20261029190000_operational_reset_row_admission": "4c709daa44670a550876f06cdf7226fb43c6eb7b306146a80c802f25856946ce"
+    },
+    "firstOneHundredOneEqualPrior": "worker-width-decision-20261029/migration-manifest.json (sha256 62c0801e82b2...) is a byte-equal prefix by name and checksum"
+  },
+  "fixtureScripts": {
+    "apps/worker/src/jobs/diagnostics/testing/bootstrapOwnershipExpiryFixture.mjs": "bfaa1e665e02d47b5569b5ee556428fef722e7f070d80afab292226f39a7bf87",
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipExpiryFixture.mjs": "8ada8f016b7ddd2921c14048c26c3a615d84124450e137d0bd29b20596515cf0"
+  },
+  "specs": {
+    "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts": "1a2d9b3a8747ff75dad4c32f43136a5759c0589f4a5976b80260eb6f69163953",
+    "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipExpiry.e2e.spec.ts": "4fc9ad84645fcf268c35f970bf4eb1786dad46f113f34ae536150061a105e60e"
+  },
+  "workerConfig": {
+    "apps/worker/test/globalSetup.ts": "7de5c330970065fec201bb002b97ea9ef0b19aafebb986d1499785aba08d9c16",
+    "apps/worker/test/setup-env.ts": "c66465382dac6299f8507e057825b45093c4e78f010a8526d892809ee88301c0",
+    "apps/worker/vitest.config.mts": "3a2a5df706d50b5d4c8be9853448577778458cedd68f23e9a4dbba1eaed6d6f8"
+  },
+  "callerSourceAndCompiled": {
+    "apps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipGrants.ts": "4f6182655a48667b75cc486e977aa07238ea71a46e0398eb856d3954b11f8339",
+    "apps/api/dist/src/modules/diagnostics/infrastructure/DiagnosticOwnershipGrants.js": "e191292bd02944c1bf65b22026b3adc11f9cd681ce88e87320e8250bceb4001d",
+    "apps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipCapture.ts": "4cd86de03dff827c6c343f0c15a5c59920ebeb7fd9af335023496ac5ab75d17e",
+    "apps/api/dist/src/modules/diagnostics/infrastructure/DiagnosticOwnershipCapture.js": "5265a5087a765067d0efb67b4ae7e1e872fdd5204d9a9d8670feb85d05af991d",
+    "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.ts": "8f1c69574b491932c1db68c3c3b59c279887b2e14b6e69d5bccfe9325dd42bb0",
+    "apps/api/dist/src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.js": "7278b8fe01a4024226cc999fbc1b13a7c054acf35f5759863e44e945029ae8ae",
+    "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts": "6514d0d8ee47ca2d9cac1537e591beace4195bd2c2c3c395a793d6b46a8612d8",
+    "apps/api/dist/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.js": "1f6622949b1442d2f3bcba8573846522e00de5ea97933bfbd719557383a45b05"
+  },
+  "compose": {
+    "infra/compose/docker-compose.ci.yml": "bff8f1a841757a691930c10da79d2e98197fe5aa59c30a86b94bcd162bf39b37"
+  },
+  "lockfile": {
+    "pnpm-lock.yaml": "175aeafe3cb3dd0bb906cca75991c60ce81f333f4cb2463d6ad5773f876c16c9"
+  },
+  "workerFilesPinned": 24
+}

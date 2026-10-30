@@ -1,0 +1,136 @@
+[
+ {
+  "step": "tab-order to submit (capture form, includes earlier controls)",
+  "found": true,
+  "stops": 39,
+  "order": [
+   "select \"Язык\"  r=17.93",
+   "button \"К назначенным осмотрам\"  r=17.93",
+   "button \"Загрузить текущую версию\"  r=17.93",
+   "button \"Осмотр и идентификация\"  r=17.93",
+   "button \"Связать предыдущий осмотр\"  r=17.93",
+   "button \"Отчёты и редакции\"  r=17.93",
+   "button \"Прочитать историю идентификации\"  r=17.93",
+   "summary \"Текущий сотрудник\"  r=1.55",
+   "textarea#r_0_-image-purpose \"Цель · Обязательно\"  r=17.93",
+   "textarea#_r_0_-image-basis \"Основание полномочий · Обязательно\"  r=17.93",
+   "textarea#_-image-provenance \"Происхождение источника · Обязательно\"  r=17.93",
+   "textarea#age-scheduleReason \"Основание срока хранения · Обязательно\"  r=17.93",
+   "select#ge-identifiability \"Идентифицируемость · Обязательно\"  r=17.93",
+   "input#_r_0_-image-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_0_-image-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_0_-image-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_0_-image-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_0_-image-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_0_-image-until \"Разрешённый срок, UTC · Обязательно\" [!fv]  r=1.55",
+   "textarea#image-restrictions \"Ограничения поставщика, необязательно\"  r=17.93",
+   "button \"Записать классификацию и загрузить\"  r=17.93",
+   "select#_r_1_-kind-0 \"Вид идентификатора · Обязательно\"  r=17.93",
+   "input#_r_1_-location-0 \"Расположение · Обязательно\"  r=17.93",
+   "input#_r_1_-value-0 \"Наблюдаемое значение · Обязательно\"  r=17.93",
+   "button \"Удалить неотправленный идентификатор\"  r=17.93",
+   "button \"Добавить идентификатор, не более 20\"  r=17.93",
+   "textarea#_1_-record-purpose \"Цель · Обязательно\"  r=17.93",
+   "textarea#_r_1_-record-basis \"Основание полномочий · Обязательно\"  r=17.93",
+   "textarea#-record-provenance \"Происхождение источника · Обязательно\"  r=17.93",
+   "textarea#ord-scheduleReason \"Основание срока хранения · Обязательно\"  r=17.93",
+   "select#rd-identifiability \"Идентифицируемость · Обязательно\"  r=17.93",
+   "input#_r_1_-record-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_1_-record-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_1_-record-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_1_-record-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_1_-record-until \"Разрешённый срок, UTC · Обязательно\"  r=17.93",
+   "input#_r_1_-record-until \"Разрешённый срок, UTC · Обязательно\" [!fv]  r=1.55",
+   "textarea#ecord-restrictions \"Ограничения поставщика, необязательно\"  r=17.93",
+   "button \"Записать полное доказательство\"  r=17.93"
+  ]
+ },
+ {
+  "step": "focus-ring failures on tab path",
+  "count": 1,
+  "ringBad": [
+   "summary \"Текущий сотрудник\""
+  ]
+ },
+ {
+  "step": "Enter on submit (blank form): focus lands on",
+  "f": {
+   "el": "textarea#_1_-record-purpose \"Цель · Обязательно\"",
+   "focusVisible": true,
+   "outline": "solid 2px offset 2px #171717",
+   "outlineW": 2,
+   "outlineVsPage": 17.93,
+   "outlineVsControl": 17.93,
+   "pageBg": "#ffffff",
+   "controlBg": "#ffffff",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "310x66",
+   "tabindex": null,
+   "disabled": false,
+   "ariaDisabled": null,
+   "invalid": "true",
+   "describedby": "0/300 | Ошибка: укажите полное значение в пределах указанного ограни"
+  },
+  "summary": "Проверьте обязательные поля и уникальность расположений идентификаторов.Права на эту запись идентификации: Цель: Ошибка: укажите полное значение в пределах указанного ограничения.Права на эту запись и"
+ },
+ {
+  "step": "shift-tab back to Add identifier",
+  "found": true,
+  "n": 1
+ },
+ {
+  "step": "Enter on Add identifier: focus",
+  "f": {
+   "el": "h4 \"Физический идентификатор 2\"",
+   "focusVisible": true,
+   "outline": "auto 1px offset 0px #d0d0d0",
+   "outlineW": 1,
+   "outlineVsPage": 1.55,
+   "outlineVsControl": 1.55,
+   "pageBg": "#ffffff",
+   "controlBg": "#ffffff",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "276x24",
+   "tabindex": "-1",
+   "disabled": null,
+   "ariaDisabled": null,
+   "invalid": null,
+   "describedby": ""
+  }
+ },
+ {
+  "step": "Tab after new identifier heading",
+  "f": "select#_r_1_-kind-1 \"Вид идентификатора · Обязательно\""
+ },
+ {
+  "step": "Enter on submit with appended identifier",
+  "f": "textarea#_1_-record-purpose \"Цель · Обязательно\"",
+  "summaryItems": [
+   "Физический идентификатор 2: Вид идентификатора: Ошибка: укажите полное значение ",
+   "Физический идентификатор 2: Расположение: Ошибка: укажите полное значение в пред",
+   "Физический идентификатор 2: Наблюдаемое значение: Ошибка: укажите полное значени",
+   "Физический идентификатор 2: Выберите проверенные материалы: Ошибка: укажите полн"
+  ]
+ },
+ {
+  "step": "shift-tab to summary link",
+  "found": true,
+  "link": "a \"Физический идентификатор 2: Выберите проверенные материалы: Ошибка: ук\""
+ },
+ {
+  "step": "Enter on summary link moves focus to",
+  "f": "fieldset#_r_1_-support-1 \"Выберите проверенные материалы · 0/20 · ОбязательноОшибка: укажите пол\"",
+  "invalid": "true",
+  "describedby": " | Ошибка: укажите полное значение в пределах указанного ограни"
+ },
+ {
+  "step": "tab to Remove identifier 2",
+  "found": true
+ },
+ {
+  "step": "Enter on Remove: focus",
+  "f": "h4 \"Физический идентификатор 1\""
+ }
+]

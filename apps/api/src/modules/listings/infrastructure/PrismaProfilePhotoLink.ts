@@ -1,12 +1,14 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { AdminSchemas } from "@auto-tm/contracts";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, type Prisma } from "@auto-tm/db";
+
+import { withAvatarPreparation, assertAvatarReleasePreparation } from "../../../common/avatar-contact-preparation";
 
 import { accountDeletionPendingException } from "../../identity/identity.public";
 import type { ProfilePhotoLinkPort } from "../domain/ports/ProfilePhotoLinkPort";
 import { UPLOAD_CLAIM_PORT, type UploadClaimPort } from "../domain/ports/UploadClaimPort";
 
-type Tx = Pick<PrismaService, "$queryRaw" | "user">;
+type Tx = Prisma.TransactionClient;
 
 interface LockedUser {
   id: string;
@@ -23,7 +25,8 @@ interface LockedUser {
  * another's table so both changes commit together; no other User column is
  * touched here.
  *
- * Lock order: the User row first, then upload rows through the claim.
+ * The outer ordinary preparation covers old/new uploads and adopter/cleanup
+ * slots before User and claim locks. Supplied transactions reuse that union.
  */
 @Injectable()
 export class PrismaProfilePhotoLink implements ProfilePhotoLinkPort {
@@ -33,7 +36,8 @@ export class PrismaProfilePhotoLink implements ProfilePhotoLinkPort {
   ) {}
 
   async bind(input: { userId: string; uploadId: string; key: string; token: string }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => withAvatarPreparation(tx, input.userId, input, undefined, async (present) => {
+      if (!present) throw new NotFoundException({ code: "USER_NOT_FOUND", message: "User not found." });
       const user = await this.lockUser(tx, input.userId);
       // The request checked these before the bytes were prepared. They are
       // checked again under the lock, because preparation takes time.
@@ -65,7 +69,7 @@ export class PrismaProfilePhotoLink implements ProfilePhotoLinkPort {
         where: { id: input.userId },
         data: { avatarUploadId: input.uploadId, avatarKey: input.key },
       });
-    });
+    }));
   }
 
   async unbind(userId: string, tx?: unknown): Promise<string | null> {
@@ -79,7 +83,11 @@ export class PrismaProfilePhotoLink implements ProfilePhotoLinkPort {
       });
       return user.avatarKey;
     };
-    return tx ? release(tx as Tx) : this.prisma.$transaction((own) => release(own));
+    if (tx) {
+      await assertAvatarReleasePreparation(tx as Tx, userId);
+      return release(tx as Tx);
+    }
+    return this.prisma.$transaction(own => withAvatarPreparation(own, userId, undefined, undefined, present => present ? release(own) : Promise.resolve(null)));
   }
 
   private async lockUser(db: Tx, userId: string): Promise<LockedUser | undefined> {

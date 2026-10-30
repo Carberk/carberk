@@ -3,6 +3,7 @@ import { memo } from "react";
 import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { BusinessIdentityLink } from "../../business/BusinessIdentityLink";
 import type { AuthHref } from "../../auth/intentStore";
 import { useListingFavorite } from "../useListingFavorite";
 
@@ -111,6 +112,7 @@ export const ListingGridCard = memo(function ListingGridCard({
           </View>
         </Pressable>
 
+        {listing.business ? <View className="px-1"><BusinessIdentityLink business={listing.business} compact /></View> : null}
         <PhotoFavoriteButton
           favorited={favorited}
           onPress={toggle}

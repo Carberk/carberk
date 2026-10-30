@@ -27,7 +27,7 @@ export function validateReturnTo(
   if (!/^\/[a-zA-Z0-9_\-/.?&=%]*$/.test(url)) return null;
 
   const path = url.split("?")[0] ?? "";
-  const allowedPrefixes = ["/reports", "/audit", "/listings", "/users", "/catalog"];
+  const allowedPrefixes = ["/reports", "/audit", "/listings", "/users", "/catalog", "/workspace", "/business-admission", "/services", "/diagnostics", "/improvement", "/operations"];
   const isAdminPath = path === "/" || allowedPrefixes.some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`),
   );

@@ -1,0 +1,67 @@
+[
+ {
+  "step": "tab to first handoff row",
+  "found": true,
+  "n": 9,
+  "order": [
+   "select \"Language\"  r=17.93",
+   "button \"Back to assigned work\"  r=17.93",
+   "button \"Load current version\"  r=17.93",
+   "button \"Visit and identity\"  r=17.93",
+   "button \"Link a previous inspection\"  r=17.93",
+   "button \"Reports and revisions\"  r=17.93",
+   "button \"Check operation status\"  r=17.93",
+   "button \"Check current visit and handoff\"  r=17.93",
+   "button \"Usable handoff for this inspection 1\"  r=17.93"
+  ]
+ },
+ {
+  "step": "Enter in textarea: newline, no submit",
+  "value": "line one\nline two",
+  "writes": 0
+ },
+ {
+  "step": "tab to Review",
+  "found": true,
+  "f": "button \"Review linked report creation\""
+ },
+ {
+  "step": "Enter on Review: focus",
+  "f": "h3 \"Review linked report creation\""
+ },
+ {
+  "step": "Enter on consume with lost reply: focus + alert",
+  "f": "body",
+  "alerts": [
+   "This action is unavailable. Refresh and review before continuing.",
+   "Result not confirmed. Check status before any retry. Do not reload to restore input."
+  ],
+  "writes": [
+   "continuity-requests",
+   "execute"
+  ]
+ },
+ {
+  "step": "Check operation status: focus + buttons",
+  "f": "button \"Check operation status\"",
+  "btns": [
+   "Check operation status",
+   "Retry exact unchanged operation",
+   "Edit decision"
+  ]
+ },
+ {
+  "step": "Retry exact reachable",
+  "found": true
+ },
+ {
+  "step": "Enter on Retry exact: focus + writes",
+  "f": "body",
+  "writes": [
+   "continuity-requests",
+   "execute",
+   "execute"
+  ],
+  "result": true
+ }
+]

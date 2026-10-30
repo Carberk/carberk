@@ -11,6 +11,7 @@ Every delivery follows [coding workflow](docs/agents/coding-workflow.md). It own
 | Domain logic, ownership or documentation | [Domain guidance](docs/agents/domain.md) |
 | New or changed modules, behavior or tests; Standards review | [Coding standards](docs/agents/coding-standards.md) |
 | External dependency or service | [Documentation lookups](docs/agents/documentation-lookups.md) |
+| Railway or EAS access, builds or signing | [Existing CLI authentication](docs/agents/cli-access.md) |
 | Mobile dependencies, native sessions or runtime | [Mobile/Expo checks](docs/agents/mobile-expo.md) |
 | Mobile styling/components or API/cache | [NativeWind](docs/agents/nativewind-v4.md) or [data fetching](docs/agents/mobile-data-fetching.md) |
 | Mobile screens/navigation/discovery | [UI readiness](.claude/skills/run-issue/UI-MODE.md) and the affected approved design |

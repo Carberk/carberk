@@ -1,0 +1,7 @@
+const L=require('./lib.cjs');const {Client,OUT,read,write}=L;
+(async()=>{const r=read(OUT+'/resource.private.json'),b=read(OUT+'/fingerprints-101.private.json').hashes;const c=new Client({connectionString:r.ownerUrl,application_name:'r7g-decision-drain'});await c.connect();
+const fp=await L.fingerprints(c,r.workerRole);const clients=(await c.query('SELECT pid,application_name,state FROM pg_stat_activity WHERE datname=$1 AND pid<>pg_backend_pid()',[r.database])).rows;
+const out={hashes:fp.hashes,equalToPreMeasurement:Object.fromEntries(Object.keys(b).map(k=>[k,b[k]===fp.hashes[k]])),receipts:fp.receipts,clients,eightClassCounts:Object.fromEntries(Object.entries(L.MAP).map(([k,t])=>[k,fp.inventory[t].count])),
+ states:(await c.query("SELECT (SELECT count(*) FILTER (WHERE state='available')::int FROM diagnostic_ownership_grants) grantsAvailable,(SELECT count(*) FILTER (WHERE state='erased')::int FROM diagnostic_ownership_grants) grantsErased,(SELECT count(*) FILTER (WHERE state='available')::int FROM diagnostic_ownership_components) componentsAvailable,(SELECT count(*) FILTER (WHERE state='erased')::int FROM diagnostic_ownership_components) componentsErased")).rows[0]};
+out.allEqual=Object.values(out.equalToPreMeasurement).every(Boolean)&&!out.receipts.source&&!out.receipts.campaign&&!clients.length;
+await c.end();write('drain-decision.json',out);console.log(JSON.stringify(out));if(!out.allEqual)process.exitCode=1})().catch(e=>{console.error(e.stack);process.exit(1)});

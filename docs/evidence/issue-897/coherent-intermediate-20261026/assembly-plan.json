@@ -1,0 +1,770 @@
+{
+  "base": "ad463b742820dea7f9d7ecf7b4efc105f5856a96",
+  "groups": {
+    "r7a": {
+      "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+      "paths": [
+        "apps/api/src/modules/listings/application/PublishListing.spec.ts",
+        "apps/api/src/modules/listings/application/PublishListing.ts",
+        "apps/api/src/modules/listings/domain/ports/ListingsAdminPort.ts",
+        "apps/api/src/modules/listings/infrastructure/ListingVisibilityMeasurement.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.e2e.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingRepository.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingsAdminRepository.ts",
+        "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts"
+      ]
+    },
+    "video": {
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "paths": [
+        "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.preparation.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.preparation.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.ts",
+        "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts",
+        "apps/api/src/modules/listings/infrastructure/testing/VideoAuthority.ts",
+        "apps/api/src/modules/listings/infrastructure/testing/VideoDatabase.ts",
+        "apps/worker/src/jobs/video/PrismaVideoCleanupLedger.ts",
+        "apps/worker/src/jobs/video/PrismaVideoLedgers.preparation.spec.ts",
+        "apps/worker/src/jobs/video/PrismaVideoProcessingLedger.ts",
+        "apps/worker/src/jobs/video/ProcessPreparedVideo.ts",
+        "apps/worker/src/jobs/video/VideoTransactionPreparation.ts",
+        "apps/worker/src/jobs/video/testing/VideoDatabase.ts"
+      ]
+    },
+    "videoTransport": {
+      "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+      "paths": [
+        "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts",
+        "apps/api/src/modules/listings/infrastructure/testing/VideoDatabase.ts",
+        "apps/worker/src/jobs/video/VideoTransactionPreparation.ts",
+        "apps/worker/src/jobs/video/testing/VideoDatabase.ts"
+      ]
+    },
+    "claims": {
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "paths": [
+        "apps/api/src/modules/listings/application/testing/UploadClaimsDatabase.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.ts",
+        "apps/api/src/modules/listings/infrastructure/testing/upload-claims-r7c-20261025.sql",
+        "docs/evidence/issue-897/b1-r7c-upload-claims-20261025.md"
+      ]
+    },
+    "publication": {
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "paths": [
+        "apps/api/src/modules/listings/application/PublishListing.capture-plan.spec.ts",
+        "apps/api/src/modules/listings/application/PublishListing.spec.ts",
+        "apps/api/src/modules/listings/application/PublishListing.ts",
+        "apps/api/src/modules/listings/infrastructure/DiagnosticRuntimeTransport.r7b.e2e.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.r7b.e2e.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts",
+        "apps/api/src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts",
+        "apps/api/src/modules/listings/infrastructure/testing/media-callers-r7b-20261025.sql",
+        "apps/api/src/modules/measurement/application/testing/FakeMeasurementCommit.ts",
+        "apps/api/src/modules/measurement/measurement.public.ts",
+        "packages/db/src/listing-source-command.ts",
+        "packages/db/src/measurement-capture.ts",
+        "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql",
+        "scripts/testing/retained-schema/20261025020000_diagnostic_listing_publication_effects.sql",
+        "scripts/diagnostic-listing-publication-effects-schema.test.mjs",
+        "docs/evidence/issue-897/b1-r7b-media-publication-20261025.md",
+        "docs/evidence/issue-897/r7b-round1-fix-handoff-20261025.md",
+        "docs/evidence/issue-897/r7b-round1-verification-20261025.json",
+        "docs/evidence/issue-897/r7b-runtime-matrix-20261025/full25.txt",
+        "docs/evidence/issue-897/r7b-runtime-matrix-20261025/manifest.json",
+        "docs/evidence/issue-897/r7b-runtime-matrix-20261025/pinned-source-hashes.json",
+        "docs/evidence/issue-897/r7b-runtime-matrix-20261025/post-database.json",
+        "docs/evidence/issue-897/r7b-runtime-matrix-handoff-20261025.md"
+      ]
+    },
+    "retention": {
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "paths": [
+        "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts",
+        "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts",
+        "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.spec.ts",
+        "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.ts",
+        "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts",
+        "apps/worker/src/jobs/PurgeExpiredAccounts.ts",
+        "apps/worker/src/jobs/application/testing/MeasurementRetentionDatabase.ts",
+        "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts",
+        "apps/worker/src/jobs/diagnosticAccountErasure.ts",
+        "apps/worker/src/jobs/serviceAccountErasure.ts",
+        "apps/worker/src/jobs/video/videoAccountErasure.ts",
+        "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.json",
+        "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.md",
+        "docs/evidence/issue-897/measurement-retention-effects-20261025.json",
+        "docs/evidence/issue-897/measurement-retention-ordering-20261025.json",
+        "docs/evidence/issue-897/measurement-retention-ordering-20261025.md"
+      ]
+    },
+    "observer": {
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "paths": [
+        "apps/worker/test/b5-observation-plugin.d.mts",
+        "apps/worker/test/b5-observation-plugin.mjs",
+        "apps/worker/test/b5-observation-runtime.mjs",
+        "apps/worker/test/b5-observation.check.mjs",
+        "apps/worker/vitest.config.mts",
+        "docs/evidence/issue-897/b5-observer-preparation-20261023.md",
+        "docs/evidence/issue-897/b5-timing-diagnosis-20261025.json",
+        "docs/evidence/issue-897/b5-timing-diagnosis-20261025.md"
+      ]
+    }
+  },
+  "finalAssignments": {
+    "apps/api/src/modules/listings/application/PublishListing.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "530f352e118f7f1246bfc4c16036522d9361cd80c8c8c154fa762e5e6e3edff4",
+      "blob": "a1bc4c38edf31f4f6a65523a22b63ac2571abdf1",
+      "priorBlob": "102eb2aa3b57b624a26b4200f0c7c058f358c66f"
+    },
+    "apps/api/src/modules/listings/application/PublishListing.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "f79abf27f896688ab8070435f429fd0e1f98eedeb140e67e33d6994ca238bea6",
+      "blob": "d2edfd692d757d7b1df96abe641cedbd8395c13f",
+      "priorBlob": "bb351663e735766fb72bde3224a6417a7eca26e4"
+    },
+    "apps/api/src/modules/listings/domain/ports/ListingsAdminPort.ts": {
+      "group": "r7a",
+      "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+      "sha256": "41b09e18fedbac14dd4e9318a2969220861b8789f24893fd578b997ac4718c40",
+      "blob": "2ce42e939d2ab61338e6cfc71659bf4f838693d7",
+      "priorBlob": "2ce42e939d2ab61338e6cfc71659bf4f838693d7"
+    },
+    "apps/api/src/modules/listings/infrastructure/ListingVisibilityMeasurement.spec.ts": {
+      "group": "r7a",
+      "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+      "sha256": "45e3df4456242576e78d512e6e4751c5a82e1d149c739c358ee9977bff51a964",
+      "blob": "6781d6b53f03955306e836aa9f174ca37743fbb6",
+      "priorBlob": "6781d6b53f03955306e836aa9f174ca37743fbb6"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.e2e.spec.ts": {
+      "group": "r7a",
+      "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+      "sha256": "936299508640de3be7a662de1444550b090e6c325367f27f01ded5cc74020ab4",
+      "blob": "22bed91d9e16a91a84aca9b8558b64786053dc65",
+      "priorBlob": "22bed91d9e16a91a84aca9b8558b64786053dc65"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.preparation.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "795ef6f49232a58caed2202b28e0f9edc153ab013307ed441d052e0d2f7a0307",
+      "blob": "7785658b1ba83d707180c2c04901b06c359f2452",
+      "priorBlob": "1a06a7399f407ee3254ecdb0db0e0e391ac435d2"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingDraftRepository.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "e55647026fd9f31172ea53dfaae7162ddc2ced5402cfddc0c5705802ff37c1f4",
+      "blob": "4411dac782bdf946ae32ecf823f06de4c2238bd4",
+      "priorBlob": "a11218bcdd9184a26027fc32f53a77ad730d2fb1"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingRepository.ts": {
+      "group": "r7a",
+      "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+      "sha256": "1b9c31aaa7b556bfd3f56a2598e4fca7c9d1f159ba0f7d6c53f7db419983529c",
+      "blob": "eaa40db0d1a58e47b175b69b45fa9d581b80791c",
+      "priorBlob": "eaa40db0d1a58e47b175b69b45fa9d581b80791c"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingsAdminRepository.ts": {
+      "group": "r7a",
+      "pin": "466297461712a4f3759d1cf2699590fd933fa9a9",
+      "sha256": "f2f7368166165d47c67a999efababcd1d2962388c47a1863f4905265bc56f0f4",
+      "blob": "1bedd88d5fce65e802653f75f9c6a81cf055a2d1",
+      "priorBlob": "1bedd88d5fce65e802653f75f9c6a81cf055a2d1"
+    },
+    "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "5e9a1462b7c464ba2e4cab7c96a291d1a0feca8845e895b450d0ca410dcad57a",
+      "blob": "09111a52d6238ff14c4663ef6d19c6a53cef17fd",
+      "priorBlob": "7178d1006d010d0db96194dc6f5f12ed744030b2"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.preparation.spec.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "b43e6e4f369634860377e9fca78c4be7be29bc8589610fea1ff0eb6dd89b8b28",
+      "blob": "119774f534589423cbfb6951270293ccf7c82f9d",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaOwnedVideoSessionLedger.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "0fa1af7745b4febc64f3ea045ccbae0873e93ca09192b81496fee62c1c62bf20",
+      "blob": "db9ec5a9386b2f2eb496e7e5191a111b097f512b",
+      "priorBlob": "506274d5a5c26392105b9bfe0fbe5832299e215d"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.preparation.spec.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "a890b062a90c4176aa4e20c13d79ae4306bbc2b4e2f8b726c860c98e5b57736b",
+      "blob": "3eea9bbc7cc39f2999916b6cd30439df4e507da9",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.spec.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "7dc42eed9c1177ffffeccffdcccb813d706d1d531b50ac7880b9856f02a84ddc",
+      "blob": "d15e475ea2fac9e9f9f32e580e70ce99c8e949f1",
+      "priorBlob": "415965aa883787b838fc746658bd8b971f41e6bf"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaVideoPlayback.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "ee53e912aaf986b2a24a88cabf9c9c16cb0489216d8e1477b1717d8f86c6a39d",
+      "blob": "bb0ff35b7736b2b0be486b79291ad77ddaba2c0b",
+      "priorBlob": "0f6b97c010cbd2b125f80b0e1175aadb21a8dd7f"
+    },
+    "apps/api/src/modules/listings/infrastructure/VideoTransactionPreparation.ts": {
+      "group": "videoTransport",
+      "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+      "sha256": "7da45d4ebd2c2ce93607a6de90a31781879a4b0f7b16d0e4d027351ef8ea8524",
+      "blob": "52275d5acee28bddbe07b881bf8f15f52f9318df",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/testing/VideoAuthority.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "e08a888f83735562ceef6f0d9f039888838ba935313ba95b268fa830937a46de",
+      "blob": "1c7ffe2921e7514ff67b34287441dc996f4c6294",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/testing/VideoDatabase.ts": {
+      "group": "videoTransport",
+      "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+      "sha256": "4654526718d339d462fcfd4bf45f50257c2b4d54570168d3f919aae23653762a",
+      "blob": "ed098e06e86f1a14657fffa74c9c817a93309ff7",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/video/PrismaVideoCleanupLedger.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "131eef5b5ff80fdd3ab051a755e2b1215c18a27c17740ad62f9c3bb62b64a8f6",
+      "blob": "13a5e59ddcefc00fe47436b9848dc5afab8e1afa",
+      "priorBlob": "bbe103d03a3655687b9e4957a95295dca56582f3"
+    },
+    "apps/worker/src/jobs/video/PrismaVideoLedgers.preparation.spec.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "a4aabd0c0cc0a62c215dada2aa4899435b6b6852f5d683f9bc48e26e44901d07",
+      "blob": "77a50f8af7acd1302d14e53e06f7e2e56f5d1869",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/video/PrismaVideoProcessingLedger.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "a5890b66eb58115b8b33aa4fd4a07ad2e741c2e773046771b8706a969ceffd99",
+      "blob": "f8de0d407080e425e9ef54fe3c9c135ddd3a66ad",
+      "priorBlob": "30d9dd9051f7a31f91edde78b8af9cd76a5bcc95"
+    },
+    "apps/worker/src/jobs/video/ProcessPreparedVideo.ts": {
+      "group": "video",
+      "pin": "994e2cb59115349a3f6c186269f5e00fc693d467",
+      "sha256": "cd8dcb136b9c33be7c24785a9bdf5d750df7d740ca2ff9b90ec1337d501092b9",
+      "blob": "0b24b45dace6b1f306590358e3eaf0caa444fa24",
+      "priorBlob": "d52a9b3eb4308ffa1aab347b320b7417a841c299"
+    },
+    "apps/worker/src/jobs/video/VideoTransactionPreparation.ts": {
+      "group": "videoTransport",
+      "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+      "sha256": "ffcd595ea23910f51ee6dca6aab4f200f67914766a33a4c12de44853a4f563c7",
+      "blob": "b9ddc7dca9332bdbe1b0e4bcd2c1b218007a2769",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/video/testing/VideoDatabase.ts": {
+      "group": "videoTransport",
+      "pin": "b7ac70a2caca6bee462cb2da3facc8e4236191d9",
+      "sha256": "e60f994314a092aeb066dbb92f8497c6e4890d4a5a75298098a2a6d164301409",
+      "blob": "216c2c78fc937460104051ff8158bf4f1da3ccb8",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/application/testing/UploadClaimsDatabase.ts": {
+      "group": "claims",
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "sha256": "2cc56345b07dfca86d44f9afef1d9e797103b0663653ff13f9710aeab2daff8c",
+      "blob": "87f2e4725faf94a1a2e375468c02ff01228c8fa6",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts": {
+      "group": "claims",
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "sha256": "25d951cb66782403e4e6198dffba66117a3eedfb29ecae41ac19f1ddcfcd9970",
+      "blob": "5c76c8baced1392dba6a1c38f72b5022c683e5eb",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.preparation.spec.ts": {
+      "group": "claims",
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "sha256": "758238337f5189ec6e98fa1f493668b98e1c211d4e11772098e9745bcccb8e55",
+      "blob": "daea821795c2f9cdd634e8cb9aead626307d69e0",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.spec.ts": {
+      "group": "claims",
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "sha256": "80ecfb79eb7845d5261f689e1b70c27243b8fbd638b3d1fc7f5219d168f6e5fa",
+      "blob": "d8a5ec1af1f13ad68d5475a52c97fd5d8d0821f1",
+      "priorBlob": "eab3baf14d4cb067577c1d84622f9f52974845f9"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaUploadClaims.ts": {
+      "group": "claims",
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "sha256": "f30f6716d884227291df1a404dea4da5eb07f5557d30fe1d467dbc09e14e59c2",
+      "blob": "dd0fae1a04af9ade0d75f0c72a01b17f37e964be",
+      "priorBlob": "b0a86b544af0b2c570ae046280e0575b4364834b"
+    },
+    "apps/api/src/modules/listings/infrastructure/testing/upload-claims-r7c-20261025.sql": {
+      "group": "claims",
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "sha256": "0fa52e164d13a982f317dbabdb7d7f3f927a20f35664e80f9cc07eb6df0fd390",
+      "blob": "0c4daadbb1edeaa7531fc0755330aacba88cc6c6",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/b1-r7c-upload-claims-20261025.md": {
+      "group": "claims",
+      "pin": "5b34982c0b7e9075227a394157d24561c286103a",
+      "sha256": "dbbc8cdc641c59103a52abc5b189a98721901d77f7fdf13dd893ba51b510a138",
+      "blob": "93324c338be5733090638812953eca6867af1d90",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/application/PublishListing.capture-plan.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "6d831c587e8a268986f6d5066ae5fa1f4219a897d24229c9600157d848e3f6da",
+      "blob": "a1d38b76a917580930b1807322243d2f5cf1d46b",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/DiagnosticRuntimeTransport.r7b.e2e.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "0f20a9fb821863ad24cb92a71158b075d2adad349c9a4845a90f959769566afa",
+      "blob": "2392105c55dd28ddd69094c940ecc98a6e610344",
+      "priorBlob": "2392105c55dd28ddd69094c940ecc98a6e610344"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.preparation.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "5cf144098bdd8f7c1c23e52cb33237d7a490dbb1b7d5f1c36704d21d8c024437",
+      "blob": "a23e34321b14353ae7e1f95896aa4a2696ec916c",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.r7b.e2e.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "490ab767d4b1b899a52e6523603ae3bb2276196b9a4edaba1623a1c97f8febf6",
+      "blob": "4cba2162494b9c8caa1986f74089f498edcf29cf",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaListingMediaRepository.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "a6b039b19cea28f38777707ba9aaa7b765c9c140e4fffb3cd90dbc04bbcbb032",
+      "blob": "ae46cd4b2aa006eafa324de3d38667053d032ffa",
+      "priorBlob": "7d29071562e818365ca973a0caab51a9b1192a76"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.preparation.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "2b9b1bd3b02d1189af1ef14060989395f225a86ccf8b85b55d239edd26a66624",
+      "blob": "cd8b4ff01fa22cb1e85756b464a38b40d0b8742d",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaMediaUploadRepository.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "80e600bf664e9033eb2d00eeae7a02915cdea672ae24b5caccef20ab249930c6",
+      "blob": "0314fe44e3be395387c7d84442fc49d5ae24e23c",
+      "priorBlob": "e224887f3526f27cb7aa60cc7aa0a7d675aa1a3b"
+    },
+    "apps/api/src/modules/listings/infrastructure/PublishListing.r7b.e2e.spec.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "6148a8f6ef1f963ed7500a17dd4de1b746a58a519c48be564aa654f07ad21c1b",
+      "blob": "7b96e6245aa69279e1107376c3b2841b00e9083c",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/listings/infrastructure/testing/media-callers-r7b-20261025.sql": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "3ec2bb76b45a21137b84c3158f728db51e340575cb016bf32127a57b346cd601",
+      "blob": "cc870c5c43f050654528dc5cb1dcfe755c3253c2",
+      "priorBlob": null
+    },
+    "apps/api/src/modules/measurement/application/testing/FakeMeasurementCommit.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "eb55bef6395f7707a4cade41c481d21d8c184778d337f8d3c37662ba35d8497e",
+      "blob": "fa3e7db6b78203d410856bac5d4df6bf50d53133",
+      "priorBlob": "c9b4c6a54625e53ed17b0b642d1916daad8b49f7"
+    },
+    "apps/api/src/modules/measurement/measurement.public.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "51e51cf31ce8abbb9cd39ac049a88386b9176a7cf50fed8f1e7f73be4181fa77",
+      "blob": "effa61acceccf83c5338048ae35fb0f24f4a1994",
+      "priorBlob": "a13edbe803154f5575a1f6adc04dd2a5c396c098"
+    },
+    "packages/db/src/listing-source-command.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "e7f55f86100c077f666453725e047eee84c37664f82dd9b47ed87cf271820882",
+      "blob": "1fb4d0de2a4995b99e0d9e1e400fab3a1e917cda",
+      "priorBlob": "dbbb870da08715fa3970ee4569f741c3b63079c0"
+    },
+    "packages/db/src/measurement-capture.ts": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "3faa22308227f79103050d19ed5debfef4ea729b94c58cafb990571224497659",
+      "blob": "dad35f98914b56cb2add21109a7d9080526ec0eb",
+      "priorBlob": "4af03a3f5b2a889e2c4a7e347e9bc1e20997b9d5"
+    },
+    "packages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39",
+      "blob": "80fc7a5178edc25e04f41a64b765e9d4ca93bd2d",
+      "priorBlob": null
+    },
+    "scripts/testing/retained-schema/20261025020000_diagnostic_listing_publication_effects.sql": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39",
+      "blob": "80fc7a5178edc25e04f41a64b765e9d4ca93bd2d",
+      "priorBlob": null
+    },
+    "scripts/diagnostic-listing-publication-effects-schema.test.mjs": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "3559f1154cba7b2ea8b46b769f714e1687f10622edec9abe68df7b13c17926aa",
+      "blob": "27925aca2ae3c71a763a5ac74b4e34097b4fcb0e",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/b1-r7b-media-publication-20261025.md": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "b4604224f6cc4fde1bc5a7925623b6f2867d8e43edad0582cfe0c0f09577f389",
+      "blob": "551a4abdbec07bcc72809dd1e55bf0f37df1fe2b",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/r7b-round1-fix-handoff-20261025.md": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "ba412bcf7475bcd015922c59ca26f3490cbe24fe638cd7834fa47861c0fe74c5",
+      "blob": "e0ecfcc719ef533965a0d65b68772232ed7575f0",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/r7b-round1-verification-20261025.json": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "9419fd02eff1b0741304a2d827d4121095ae0659433f5e980635c0c405b7ad71",
+      "blob": "5e79bf1f189062d9c1258b8ef1fe8625b6af2d6c",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/full25.txt": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "c474ec4bda7479047b05d5e13e16622a67d8e86a8dd6011890d4f9b331a9c090",
+      "blob": "4d7972247b835a145feb08ee4f7db7d6beebf8ca",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/manifest.json": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "866431f1d4cfb4b8d29a3990e95846a8ea5a034647dfd52cdd2f90fd1ae30e61",
+      "blob": "8f2390856f8e2d1e877a8f231a3cabe6b3c1db5b",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/pinned-source-hashes.json": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "4ef1dd795520de329f2a02fb9b6998a4174bfc58a36a4c2d95888eb8cc6d73b2",
+      "blob": "bc2e108abf410575e16fe05889b8928ed1161ec1",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/r7b-runtime-matrix-20261025/post-database.json": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "e689211df5a204740347aed2cbcbd0d2ba7fd0e0826da8b6328d9d75ab925a85",
+      "blob": "02e0af1a5bb8de73bd0ebc86eaeb89305a729d6e",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/r7b-runtime-matrix-handoff-20261025.md": {
+      "group": "publication",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "a5f93dfbf9a8b92c0a3ea694ccdfdb1fc85d9d850b2bda448cd1d1630e9adaae",
+      "blob": "8a580d87f01cfc9cc1ee3c6a060d63b8ed830a28",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/MeasurementRetentionOrdering.e2e.spec.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "00b2a69cb60399025ba81ccc9f1a31f5ec9ea816c98bfe8a7ba6e2f8d22fe871",
+      "blob": "7b8bf85ab0d4d5f160982e69663c2417505bc981",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.e2e.spec.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "ae3a7bd1d570edcd4f64947fd38bd7a7b9219b8d876073c6f0c0cef4c95e928f",
+      "blob": "4de5f2ea20775af5f15eebef78c9162d408af9fe",
+      "priorBlob": "0c4a7ada48ae9a2e44058a16ffafd7e0c42d03c8"
+    },
+    "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.spec.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "53c57dd6a005fea4167ee5744363303e928b4ec695947fd381bd512c69f2b794",
+      "blob": "6c7b3ca349a32fe7b6c6f3c74e5dde55cdb52a30",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/PrismaMeasurementRetentionLedger.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "8d1b872dc72f3ad238d0232cbfd62af692a60bf0eaefcdb94f48e100bf8f7bc3",
+      "blob": "4647660bad3a721e45794c3d17e0f52e34f72a1a",
+      "priorBlob": "5797ec5d9c3d04bddbd12a57d5a86cbef069cb44"
+    },
+    "apps/worker/src/jobs/PurgeExpiredAccounts.spec.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "ddc9a2faec05e93d97cb20366dd4768e91f2893587f7518b8e2771ab58cfd354",
+      "blob": "640aa67c88dd4b6fec3d6b994dd03ddb8ca94aa3",
+      "priorBlob": "b0d3a121d3ede446b9241263e7f3a6f2cbb38f64"
+    },
+    "apps/worker/src/jobs/PurgeExpiredAccounts.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "40049f67159f309662c80d18e476940f95f8219741021d30d02af84d13b78581",
+      "blob": "8588e524ebbd948ecffe71704f95b51ee2ea4c4a",
+      "priorBlob": "37b8e7ed5453cb3e50631ccf2e21dda8dd07d913"
+    },
+    "apps/worker/src/jobs/application/testing/MeasurementRetentionDatabase.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "faed8c142c49c6250f9549cb6f977df9bc351a5e9e5447a1d64426441c93978d",
+      "blob": "b5e721a0e8bd0f4e6a9a728421e5465f9c97105a",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/application/testing/MeasurementRetentionPostgresFixture.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "a8830ef918e69289eb4a8c59c4cd1d0796dd9762f3bccbe1e2b355406274ed4a",
+      "blob": "ebc77369e20b8696ad0d2a5c43a5aaf9d8042493",
+      "priorBlob": null
+    },
+    "apps/worker/src/jobs/diagnosticAccountErasure.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "f54c5f55171694f030ff105bc9114319e16fd7b50ca6acfffb620fa1651779cf",
+      "blob": "3d7ccadc481bf59edfdd217e421d0b7114f0b3fe",
+      "priorBlob": "8eb9da7645534fc5c5497346649eec0735c78b89"
+    },
+    "apps/worker/src/jobs/serviceAccountErasure.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "61eaa717162555a1249cc1a2bc6b51adfe1fbd170632601b5dc95d4d4af14570",
+      "blob": "f5676704b516a06078a18c25cb07e3965860f8ef",
+      "priorBlob": "e166bfc854a6f571e687f481e8b1aaf7eac0710e"
+    },
+    "apps/worker/src/jobs/video/videoAccountErasure.ts": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "54149d179d55b98959b78dfc97ba22688920c1830e6ab6589265e43c901551d8",
+      "blob": "7507862b1e46f2c47de2da61b73dd66117ee7265",
+      "priorBlob": "ae48f836c3956abcc154b38eee4165ea507efc3b"
+    },
+    "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.json": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "cf9be620a53cd05111c8490f0c34f7af02491a1d7cefb3cb760ac0102c3e2c54",
+      "blob": "3af0ce38e2182f1ccb6ca35b346f5deb2edac569",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/measurement-retention-core175-runtime-20261025.md": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "cb5b80860a64229b42d287dca6a69a49c81f100497f0a3686a821464e92e5014",
+      "blob": "789c99c92c19240f2a56e4c9d109c3e722538eed",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/measurement-retention-effects-20261025.json": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "981341e99d3f5e67cfe6298dd791c5e7ad4e756ce67d1f92b84c4fe2273cd415",
+      "blob": "f2ab62c8f6b149d347136c394b07dcbf73c2ca4a",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/measurement-retention-ordering-20261025.json": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "1bbb20e57672c85a851f52b33d0e40c32ae4b67e68c82bd7cc161749a7e4a7a7",
+      "blob": "425c7b23a3f5d449d3a5d803d8222c7166256eaf",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/measurement-retention-ordering-20261025.md": {
+      "group": "retention",
+      "pin": "0aa1a18de7010039baf3f8b78a5abf500a6a2a62",
+      "sha256": "872761558d0070e9969904c367af794bd464e6899dcec99cd8d18cfc60823379",
+      "blob": "667d3b16082e0fd3d50215253e35138aceadaa96",
+      "priorBlob": null
+    },
+    "apps/worker/test/b5-observation-plugin.d.mts": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "1c64f0494420ef61d1bbb1f3838429b39fae7fab358f94987354d2f5c2ae0d2f",
+      "blob": "6d2ba38430e66c97a3b7ce688239d8696c713a70",
+      "priorBlob": null
+    },
+    "apps/worker/test/b5-observation-plugin.mjs": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "bb4bbe4421edb7e8a62a32035fe28574832cbea0881ac79774a6396905e2be15",
+      "blob": "8ff91f7103a07238e6062e5bc4efb222fad93c5f",
+      "priorBlob": null
+    },
+    "apps/worker/test/b5-observation-runtime.mjs": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "ac77a1f2b89098d3870053d41a4375832b7504ee0e07d26f038f4e31db2e4a9e",
+      "blob": "0f1e87d4840dca5c6686aff3605326ce8fac2f74",
+      "priorBlob": null
+    },
+    "apps/worker/test/b5-observation.check.mjs": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "21172a5c972e0a61c16e8453ed40ac906cde5c9681702968fbcd7ae28307fa35",
+      "blob": "7a54f21846f6450a23de8a0865c4ef4de680cd07",
+      "priorBlob": null
+    },
+    "apps/worker/vitest.config.mts": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "e6d84e0ab7668e2ca3c23f82fd12c538f01006c145dec896f965bbc0d182a1f7",
+      "blob": "35b3698ce4d13ace22739939b0501e92ab5adf3c",
+      "priorBlob": "cfd2cdafc35bf26989d4ed3628b59d0d667bd32f"
+    },
+    "docs/evidence/issue-897/b5-observer-preparation-20261023.md": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "906c087ad60fc87ebdf1976ce2fbc2aaa4c1de3566ca2729891f12b61ce252ee",
+      "blob": "7a852bc84be5a5bfe6a7db28df8f823978382cd0",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/b5-timing-diagnosis-20261025.json": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "ca9a17e70693d1086f6bd9de93e7e85cfeb5d4eacc991c131dbecb8de250b522",
+      "blob": "ceea4775054953ebd76d3ef8405dade64007db8d",
+      "priorBlob": null
+    },
+    "docs/evidence/issue-897/b5-timing-diagnosis-20261025.md": {
+      "group": "observer",
+      "pin": "c8d01014404d6f796b5feec7ba6abd2b9cace531",
+      "sha256": "1e56eee757f16fa399faf724776f440b3fb081de02f4d98f74b77d8b974bafb2",
+      "blob": "5cb39da415a1e38f58a8d6e5a6c13f0e5baac82c",
+      "priorBlob": null
+    },
+    "packages/db/src/diagnostic-source-command.ts": {
+      "group": "publicationIntentDependency",
+      "pin": "34ede11e2f9c4c8ab15f7cf413d66bf6216fd932",
+      "sha256": "37522b517684e4feafd06d0f69a38f6774feae6367ea9794a84a5e16d6171a92",
+      "blob": "87880e98db9b41bb28bfb0fd3c6b56caa172697c"
+    },
+    "apps/api/src/common/avatar-contact-preparation.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "6684215e38cb74623681213bf424b4b60f9cc49eab897f72ca77f4ff28953066",
+      "blob": "f51e633964e388ff5ca3a776a0c699cd9e4812d8"
+    },
+    "apps/api/src/modules/admin/admin.module.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "5c0e33c9cab6f93991f9b0350badc2946ebf1a6e5e82eff2a585bb8fda6e6757",
+      "blob": "987576952a1535da2d79eeb57b45bb8e95fb9e96"
+    },
+    "apps/api/src/modules/admin/application/RemoveUserPhoto.spec.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "fb942fcfafb6934587987a8b4ee46d992f7fc2ae93f7a6f8266bd3be8a63e7e7",
+      "blob": "096a13a197487bc5ff29408cee6323d129fd9ceb"
+    },
+    "apps/api/src/modules/admin/application/RemoveUserPhoto.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "e186dc625a885f2d8480cea73aeed9b7abf98e052e672725c77324bcfbe44122",
+      "blob": "8c8763b857f17f33f078960df10744f2d4c2f9d4"
+    },
+    "apps/api/src/modules/listings/application/testing/AvatarContactDatabase.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "e9cbf8a5cb21af0c6e2880656115f0ccbd2eb67b5bb3006821e6b9f422efdb55",
+      "blob": "94a3dd344bbfa4de88c04616fc0f7bdc78934256"
+    },
+    "apps/api/src/modules/listings/infrastructure/AvatarContactPreparation.e2e.spec.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "52abe6ccd8a21dfa243b8b9468549043a5abeff50d992d801a7d12e033c0111e",
+      "blob": "33beb7721a71b7d39c86ee9260a1c4b37d1614b1"
+    },
+    "apps/api/src/modules/listings/infrastructure/AvatarContactPreparation.spec.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "8bad0f93333743e38285a18bd535eee773da2c8a88e2a71059faf69d2ec40ea3",
+      "blob": "fbeeec4d8af422cf2eb2899b595bf1a6b0d9ec18"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaBusinessContactPhoneRepository.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "295e139db353a9d9676b852829d3d99ecc310269b60ad2d3c3fe968108047920",
+      "blob": "edf2efc899e3ef56d2cac8ecefeb9dfb01215257"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaProfilePhotoLink.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "03de95817ebd3994b57b63148da143829e5e7fee8d16b63d62a986a1afae830d",
+      "blob": "6a3a82f247e7f1340b72348bc6db8fed4173a242"
+    },
+    "apps/api/src/modules/listings/infrastructure/PrismaVerifiedContactPhoneRepository.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "cf7b24c5f18a9db9460c6090ec89e1583535f3a20e567e63a16abd91a3675bcc",
+      "blob": "251f7c77928a15c288e7712ec6d9080dfc1c7b48"
+    },
+    "apps/api/src/modules/listings/infrastructure/testing/avatar-contact-r7d-20261025.sql": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "e9035c2129490d2492808cd54000f2079d654e0378b15f72970702dff0815369",
+      "blob": "60c0753a712c95fae8fff68a6d3f1d6241ca1b10"
+    },
+    "apps/api/src/modules/listings/listings.module.ts": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "6a88862f50b264f98e18f410b27e20324662cef4c2ad7c5eaf8f5972c8c06088",
+      "blob": "e555e8c805530623f834c29dcd6688f1757a2526"
+    },
+    "docs/evidence/issue-897/b1-r7d-avatar-contact-20261025.md": {
+      "group": "r7d",
+      "pin": "677ea4e79a907f497f9e0a342e5262f51712c127",
+      "sha256": "2e9d7cfa62c8d2dd82d6914061ffb880c050682d0def304e7b991c223de015e6",
+      "blob": "0cd1c69d34bc5897aedb22e02fefe37f63da7790"
+    }
+  },
+  "compatibilityEdits": {
+    "apps/api/src/modules/listings/infrastructure/R1ListingCallerRecovery897.e2e.spec.ts": "Exact publication suite plus R7d required randomUUID constructor argument only; retains newer claimDeadline/video expectation."
+  }
+}

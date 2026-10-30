@@ -134,7 +134,7 @@ async function fill(s3: S3Client, pool: Pool, candidate: Candidate): Promise<boo
       [hash, candidate.id, candidate.key],
     )
     : await pool.query(
-      `UPDATE "messages" SET "metadata" = jsonb_set("metadata", '{thumbHash}', to_jsonb($1::text)) WHERE "id" = $2 AND "metadata"->>'key' = $3 AND NOT ("metadata" ? 'thumbHash')`,
+      `UPDATE "messages" SET "metadata" = jsonb_set("metadata", '{thumbHash}', to_jsonb($1::text)) WHERE "id" = $2 AND "deletedAt" IS NULL AND "metadata"->>'key' = $3 AND NOT ("metadata" ? 'thumbHash')`,
       [hash, candidate.id, candidate.key],
     );
   return (result.rowCount ?? 0) > 0;
@@ -197,7 +197,7 @@ export async function main(args = process.argv.slice(2)) {
     for (const cover of coverCandidates(await readState(pool))) {
       if (cover.thumbHash === null) continue; // its photo failed above and is listed there
       const result = await pool.query(
-        `UPDATE "messages" SET "metadata" = jsonb_set("metadata", '{coverThumbHash}', to_jsonb($1::text)) WHERE "id" = $2 AND "metadata"->>'coverMediaKey' = $3 AND NOT ("metadata" ? 'coverThumbHash')`,
+        `UPDATE "messages" SET "metadata" = jsonb_set("metadata", '{coverThumbHash}', to_jsonb($1::text)) WHERE "id" = $2 AND "deletedAt" IS NULL AND "metadata"->>'coverMediaKey' = $3 AND NOT ("metadata" ? 'coverThumbHash')`,
         [cover.thumbHash, cover.id, cover.coverMediaKey],
       );
       if ((result.rowCount ?? 0) > 0) covers += 1;

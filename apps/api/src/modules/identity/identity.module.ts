@@ -1,3 +1,31 @@
+import { PUBLISHER_BINDING_PORT } from "./domain/ports/PublisherBindingPort";
+import { PrismaPublisherBindings } from "./infrastructure/PrismaPublisherBindings";
+import { STAFF_BINDING_PORT } from "./domain/ports/StaffBindingPort";
+import { PrismaStaffBindings } from "./infrastructure/PrismaStaffBindings";
+import { MeasurementModule } from "../measurement/measurement.module";
+import { AdmitBusiness } from "./application/AdmitBusiness";
+import { InviteBusinessMember } from "./application/InviteBusinessMember";
+import { RedeemBusinessInvitation } from "./application/RedeemBusinessInvitation";
+import { RevokeBusinessInvitation } from "./application/RevokeBusinessInvitation";
+import { ChangeBusinessMembership } from "./application/ChangeBusinessMembership";
+import { UpdateBusinessSettings } from "./application/UpdateBusinessSettings";
+import { RecoverBusinessOwner } from "./application/RecoverBusinessOwner";
+import { BusinessController } from "./presentation/BusinessController";
+import { PrismaBusinessRepository } from "./infrastructure/PrismaBusinessRepository";
+import { NodeBusinessInvitationTokens } from "./infrastructure/NodeBusinessInvitationTokens";
+import { BUSINESS_REPOSITORY, BUSINESS_INVITATION_TOKENS } from "./domain/ports/BusinessRepository";
+import { CheckBusinessAuthority } from "./application/CheckBusinessAuthority";
+import { PrismaBusinessAuthority } from "./infrastructure/PrismaBusinessAuthority";
+import { BUSINESS_AUTHORITY_PORT } from "./domain/ports/BusinessAuthorityPort";
+import { BUSINESS_AUTHORITY_REPOSITORY } from "./domain/ports/BusinessAuthorityRepository";
+import { CheckStaffAuthority } from "./application/CheckStaffAuthority";
+import { ChangeStaffGrant } from "./application/ChangeStaffGrant";
+import { StaffController } from "./presentation/StaffController";
+import { PrismaStaffAuthority } from "./infrastructure/PrismaStaffAuthority";
+import { STAFF_AUTHORITY_PORT } from "./domain/ports/StaffAuthorityPort";
+import { STAFF_AUTHORITY_REPOSITORY } from "./domain/ports/StaffAuthorityRepository";
+import { CheckAdminSessionElevation } from "./application/CheckAdminSessionElevation";
+import { ADMIN_SESSION_ELEVATION_PORT } from "./domain/ports/AdminSessionElevationPort";
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import { EventEmitterModule } from "@nestjs/event-emitter";
@@ -71,11 +99,12 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
 
 @Module({
   imports: [
+    MeasurementModule,
     EventEmitterModule,
     PrismaModule,
     BullModule.registerQueue({ name: AuthSchemas.EMAIL_CODE_QUEUE }),
   ],
-  controllers: [
+  controllers: [BusinessController, StaffController,
     IdentityController,
     AuthController,
     MeController,
@@ -83,6 +112,19 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     AccountDeletionController,
   ],
   providers: [
+    { provide: PUBLISHER_BINDING_PORT, useClass: PrismaPublisherBindings },
+    { provide: STAFF_BINDING_PORT, useClass: PrismaStaffBindings },
+    CheckAdminSessionElevation,
+    { provide: ADMIN_SESSION_ELEVATION_PORT, useExisting: CheckAdminSessionElevation },
+    AdmitBusiness, InviteBusinessMember, RedeemBusinessInvitation, RevokeBusinessInvitation, ChangeBusinessMembership, UpdateBusinessSettings, RecoverBusinessOwner,
+    { provide: BUSINESS_REPOSITORY, useClass: PrismaBusinessRepository },
+    { provide: BUSINESS_INVITATION_TOKENS, useClass: NodeBusinessInvitationTokens },
+    CheckBusinessAuthority,
+    { provide: BUSINESS_AUTHORITY_PORT, useExisting: CheckBusinessAuthority },
+    { provide: BUSINESS_AUTHORITY_REPOSITORY, useClass: PrismaBusinessAuthority },
+    CheckStaffAuthority, ChangeStaffGrant,
+    { provide: STAFF_AUTHORITY_PORT, useExisting: CheckStaffAuthority },
+    { provide: STAFF_AUTHORITY_REPOSITORY, useClass: PrismaStaffAuthority },
     PrismaOtpRequestRepository,
     PrismaUserRepository,
     PrismaSessionRepository,
@@ -237,11 +279,15 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
   ],
   exports: [
+    PUBLISHER_BINDING_PORT,
+    STAFF_BINDING_PORT,
+    BUSINESS_AUTHORITY_PORT,
+    STAFF_AUTHORITY_PORT,
     SELLER_PROFILE_READ_PORT,
     IDENTITY_TOKENS.IdentityCheckPort,
     IDENTITY_TOKENS.ContactPhoneCodePort,
     IDENTITY_READ_PORT,
-    IDENTITY_TOKENS.SessionRepository,
+    ADMIN_SESSION_ELEVATION_PORT,
     IDENTITY_TOKENS.ClockPort,
     IDENTITY_ADMIN_PORT,
     // For ProfilePhotoModule, identity's own composition above Listings. Other

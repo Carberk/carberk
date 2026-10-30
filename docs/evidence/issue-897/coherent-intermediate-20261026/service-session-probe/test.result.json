@@ -1,0 +1,11 @@
+{
+  "name": "test",
+  "command": [
+    "node",
+    "/tmp/897-service-session-probe.cjs"
+  ],
+  "exitCode": 0,
+  "log": "/tmp/897-coherent-intermediate-assembly-20261025/service-session-probe/test.log",
+  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "durationSeconds": 10.23
+}

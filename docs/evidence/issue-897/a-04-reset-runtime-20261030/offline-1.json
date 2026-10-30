@@ -1,0 +1,18 @@
+{
+  "command": "node",
+  "args": [
+    "--test",
+    "scripts/staging-clean-reset.test.mjs",
+    "scripts/staging-clean-reset-remote.test.mjs",
+    "scripts/staging-clean-reset-storage.test.mjs",
+    "scripts/staging-quiescence.test.mjs",
+    "scripts/staging-campaign.test.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-c04d2138",
+  "startedAt": "2026-10-29T18:21:00.011Z",
+  "endedAt": "2026-10-29T18:21:00.390Z",
+  "code": 0,
+  "signal": null,
+  "log": "offline-1.log",
+  "sha256": "111345362e390f8980a1adb8ef3f321bcb9cd25cb5f08afe52cb5ca0c5b63502"
+}

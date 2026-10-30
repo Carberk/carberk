@@ -1,9 +1,18 @@
-/* global module, process */
+/* global module, process, URL */
 
 // The store release updates the Play app that already exists, whose package
 // can never change (#697). Only the EAS `production` profile sets this;
 // every other build keeps tm.auto.app, with its own Firebase app.
 const ANDROID_PACKAGE = process.env.ANDROID_APPLICATION_ID || "tm.auto.app";
+
+// The native entitlement is build-time; the web association files supply the
+// deployed signing identities. Sharing stays behind separate deployed acceptance.
+let PUBLIC_LINK_HOST;
+try {
+  const origin = new URL(process.env.EXPO_PUBLIC_WEB_URL || "");
+  if (origin.protocol === "https:" && !origin.username && !origin.password && origin.pathname === "/") PUBLIC_LINK_HOST = origin.host;
+} catch { /* Local builds without a public origin keep custom-scheme routing. */ }
+const PUBLIC_LINK_PATHS = ["tk", "ru", "en"].flatMap(locale => [`/${locale}/listings/`, `/${locale}/showrooms/`]);
 
 const PHOTO_PERMISSIONS = {
   en: {
@@ -35,6 +44,7 @@ const config = {
     ios: {
       bundleIdentifier: "tm.auto.app",
       supportsTablet: false,
+      ...(PUBLIC_LINK_HOST ? { associatedDomains: [`applinks:${PUBLIC_LINK_HOST}`] } : {}),
       ...(process.env.GOOGLE_SERVICES_INFO_PLIST
         ? { googleServicesFile: process.env.GOOGLE_SERVICES_INFO_PLIST }
         : {}),
@@ -45,6 +55,7 @@ const config = {
     },
     android: {
       package: ANDROID_PACKAGE,
+      ...(PUBLIC_LINK_HOST ? { intentFilters: [{ action: "VIEW", autoVerify: true, category: ["BROWSABLE", "DEFAULT"], data: PUBLIC_LINK_PATHS.map(pathPrefix => ({ scheme: "https", host: PUBLIC_LINK_HOST, pathPrefix })) }] } : {}),
       // No Android backup: the session lives in SecureStore, whose keys do not
       // survive a restore onto another device.
       allowBackup: false,

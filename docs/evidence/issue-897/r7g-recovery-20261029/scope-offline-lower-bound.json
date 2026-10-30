@@ -1,0 +1,60 @@
+{
+  "status": "offline-lower-bound-not-runtime-per-pass",
+  "onlyRetainedTables": [
+    "diagnostic_ownership_grants",
+    "diagnostic_ownership_components",
+    "inspection_orders",
+    "diagnostic_identity_records",
+    "diagnostic_reports",
+    "diagnostic_source_anchors",
+    "diagnostic_continuity_proofs",
+    "diagnostic_continuity_requests"
+  ],
+  "rootsAfterDisposal": 301,
+  "passes": [
+    {
+      "step": 1,
+      "startKeys": 401,
+      "endKeys": 1101,
+      "perTable": {
+        "diagnostic_centers": 99,
+        "diagnostic_continuity_proofs": 1,
+        "diagnostic_continuity_requests": 1,
+        "diagnostic_identity_evidence": 1,
+        "diagnostic_identity_records": 100,
+        "diagnostic_ownership_components": 100,
+        "diagnostic_ownership_grants": 100,
+        "diagnostic_reports": 1,
+        "diagnostic_source_anchors": 100,
+        "diagnostic_template_versions": 99,
+        "inspection_orders": 100,
+        "listings": 100,
+        "sessions": 100,
+        "users": 199
+      }
+    },
+    {
+      "step": 2,
+      "startKeys": 1101,
+      "endKeys": 1101,
+      "perTable": {
+        "diagnostic_centers": 99,
+        "diagnostic_continuity_proofs": 1,
+        "diagnostic_continuity_requests": 1,
+        "diagnostic_identity_evidence": 1,
+        "diagnostic_identity_records": 100,
+        "diagnostic_ownership_components": 100,
+        "diagnostic_ownership_grants": 100,
+        "diagnostic_reports": 1,
+        "diagnostic_source_anchors": 100,
+        "diagnostic_template_versions": 99,
+        "inspection_orders": 100,
+        "listings": 100,
+        "sessions": 100,
+        "users": 199
+      }
+    }
+  ],
+  "knownEndpointKeys": 1101,
+  "unknown": "Does not scan actual User/Session/center/template/Listing/staff/assignment/audit rows; not full scope trace or exact guard branch."
+}

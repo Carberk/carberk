@@ -1,0 +1,26 @@
+{
+  "red": {
+    "code": "P2010",
+    "meta": {
+      "driverAdapterError": {
+        "name": "DriverAdapterError",
+        "cause": {
+          "originalCode": "42P18",
+          "originalMessage": "could not determine data type of parameter $1",
+          "kind": "postgres",
+          "code": "42P18",
+          "severity": "ERROR",
+          "message": "could not determine data type of parameter $1"
+        }
+      }
+    },
+    "message": "\nInvalid `prisma.$queryRaw()` invocation:\n\n\nRaw query failed. Code: `42P18`. Message: `could not determine data type of parameter $1`"
+  },
+  "green": [
+    {
+      "value": {
+        "id": "same-session-input"
+      }
+    }
+  ]
+}

@@ -1,14 +1,16 @@
 import { z } from "zod";
 
+import { Currency, ListingCondition, ListingStatus } from "../enums";
+
+import { PhoneTm } from "./auth";
+import { PublicIdentitySchema } from "./identity";
+import { PublicBusinessSchema } from "./public-marketplace";
+
 /** Publication floor, guidance target and hard cap shared by API and clients. */
 export const MIN_LISTING_PHOTOS = 3;
 export const RECOMMENDED_LISTING_PHOTOS = 8;
 export const MAX_LISTING_PHOTOS = 20;
 
-import { Currency, ListingCondition, ListingStatus } from "../enums";
-
-import { PhoneTm } from "./auth";
-import { PublicIdentitySchema } from "./identity";
 
 // ── Shared enums as Zod schemas ──
 
@@ -110,6 +112,8 @@ function checkParallel(
 export const ListingSummaryBaseSchema = z.object({
   id: z.string().uuid(),
   sellerId: z.string().uuid(),
+  businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
   status: ListingStatusSchema,
   brandId: z.string().uuid(),
   modelId: z.string().uuid(),
@@ -243,6 +247,8 @@ export const ListingDetailSchema = z.object({
   id: z.string().uuid(),
   publicNumber: z.number().int().positive(),
   sellerId: z.string().uuid(),
+  businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
   seller: PublicIdentitySchema.extend({
     memberSince: z.string().datetime(),
   }),
@@ -273,7 +279,9 @@ export const ListingDetailSchema = z.object({
   acceptsExchange: z.boolean(),
   installmentAvailable: z.boolean(),
   media: z.array(ListingMediaSchema),
+  // Required for released clients; closed non-owner detail sends zero.
   viewCount: z.number().int().nonnegative(),
+  viewsToday: z.number().int().nonnegative().optional(),
   favoriteCount: z.number().int().nonnegative(),
   isFavorited: z.boolean().optional(),
   conditionDisclosure: ConditionDisclosureSchema.optional(),
@@ -330,6 +338,8 @@ export type ListingDraftPayload = z.infer<typeof ListingDraftPayloadSchema>;
 // ── ListingDraft entity ──
 
 export const ListingDraftSchema = z.object({
+  businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
   id: z.string().uuid(),
   userId: z.string().uuid(),
   payload: ListingDraftPayloadSchema,
@@ -342,6 +352,8 @@ export type ListingDraft = z.infer<typeof ListingDraftSchema>;
 
 export const CreateDraftRequestSchema = z
   .object({
+    businessId: z.string().uuid().optional(),
+  business: PublicBusinessSchema.omit({ contactPhone: true }).optional(),
     initialPayload: ListingDraftPayloadSchema.optional(),
   })
   .optional();
@@ -521,6 +533,7 @@ const ModelIdsFilterSchema = z.preprocess(
 // ── Feed filters ──
 
 export const ListingFilterFieldsSchema = z.object({
+  sellerType: z.enum(["personal", "business"]).optional(),
   brandId: z.string().uuid().optional(),
   modelId: z.string().uuid().optional(),
   modelIds: ModelIdsFilterSchema,
@@ -807,3 +820,16 @@ export const ListingsErrorCode = {
 } as const;
 export type ListingsErrorCode =
   (typeof ListingsErrorCode)[keyof typeof ListingsErrorCode];
+
+/** Dedicated app-only view signal header. No raw identifier in URLs, bodies or events. */
+export const ListingViewInstallIdSchema = z.string().uuid().toLowerCase();
+
+/** Business stock is separate from its creator's personal listings and drafts. */
+export const BusinessInventoryResponseSchema = z.object({
+  businessId: z.string().uuid(),
+  status: z.enum(["active", "suspended", "recovery"]),
+  listings: z.array(z.object({ id: z.string().uuid(), status: z.string(), brandId: z.string(), modelId: z.string(), year: z.number().nullable(), publishedAt: z.string().nullable(), availabilityConfirmedAt: z.string().nullable(), reviewDue: z.boolean() })),
+  drafts: z.array(ListingDraftSchema),
+  counts: z.object({ active: z.number().int().nonnegative(), sold: z.number().int().nonnegative(), archived: z.number().int().nonnegative(), banned: z.number().int().nonnegative(), drafts: z.number().int().nonnegative(), reviewDue: z.number().int().nonnegative() }),
+});
+export type BusinessInventoryResponse = z.infer<typeof BusinessInventoryResponseSchema>;

@@ -1,0 +1,69 @@
+heading2 "Structured identity history" {"level":2}
+button "Read identity history" {"invalid":"false"}
+heading3 "Recorded physical identity · 7" {"level":3}
+group ""
+DisclosureTriangle "Current staff member" {"expanded":false}
+form ""
+heading3 "Record complete evidence" {"level":3}
+region "Review the required fields and distinct identifier locations."
+link "Rights for this identity record: Purpose: Error: provide a complete value within the stated limit."
+link "Rights for this identity record: Authority basis: Error: provide a complete value within the stated limit."
+link "Rights for this identity record: Source provenance: Error: provide a complete value within the stated limit."
+link "Rights for this identity record: Retention reason: Error: provide a complete value within the stated limit."
+link "Rights for this identity record: Identifiability: Error: provide a complete value within the stated limit."
+link "Rights for this identity record: Authorized end, UTC: Error: provide a complete value within the stated limit."
+link "Physical identifier 1: Identifier kind: Error: provide a complete value within the stated limit."
+link "Physical identifier 1: Location: Error: provide a complete value within the stated limit."
+link "Physical identifier 1: Observed value: Error: provide a complete value within the stated limit."
+link "Physical identifier 1: Select verified support: Error: provide a complete value within the stated limit."
+link "Physical identifier 2: Identifier kind: Error: provide a complete value within the stated limit."
+link "Physical identifier 2: Location: Error: provide a complete value within the stated limit."
+link "Physical identifier 2: Observed value: Error: provide a complete value within the stated limit."
+link "Physical identifier 2: Select verified support: Error: provide a complete value within the stated limit."
+link "Physical identifier 3: Identifier kind: Error: provide a complete value within the stated limit."
+link "Physical identifier 3: Location: Error: provide a complete value within the stated limit."
+link "Physical identifier 3: Observed value: Error: provide a complete value within the stated limit."
+link "Physical identifier 3: Select verified support: Error: provide a complete value within the stated limit."
+heading4 "Recorded physical identity" {"level":4}
+group "Rights for this supporting image" {"invalid":"false"}
+textbox "Purpose · Required" {"invalid":"false","readonly":false,"required":true} desc="0/300"
+textbox "Authority basis · Required" {"invalid":"false","readonly":false,"required":true} desc="0/500"
+textbox "Source provenance · Required" {"invalid":"false","readonly":false,"required":true} desc="0/1000"
+textbox "Retention reason · Required" {"invalid":"false","readonly":false,"required":true} desc="0/500"
+combobox "Identifiability · Required" {"invalid":"true","expanded":false}
+textbox "Supplier restrictions, optional" {"invalid":"false","readonly":false,"required":false} desc="0/1000"
+button "Select JPEG, PNG or WebP, up to 10 MiB · Optional" {"disabled":true,"invalid":"false"} desc="Complete the image rights before choosing an image."
+button "Stage classification and upload" {"disabled":true,"invalid":"false"}
+group "Physical identifier · 3/20" {"invalid":"false"}
+group "Physical identifier 1" {"invalid":"false"}
+heading4 "Physical identifier 1" {"level":4}
+combobox "Identifier kind · Required" {"invalid":"true","expanded":false} desc="Error: provide a complete value within the stated limit."
+textbox "Location · Required" {"invalid":"true","readonly":false,"required":true} desc="0/300 Error: provide a complete value within the stated limit."
+textbox "Observed value · Required" {"invalid":"true","readonly":false,"required":true} desc="0/500 Error: provide a complete value within the stated limit."
+group "Select verified support · 0/20 · Required" {"invalid":"true"} desc="Error: provide a complete value within the stated limit."
+button "Remove unsent identifier" {"invalid":"false"}
+group "Physical identifier 2" {"invalid":"false"}
+heading4 "Physical identifier 2" {"level":4}
+combobox "Identifier kind · Required" {"invalid":"true","expanded":false} desc="Error: provide a complete value within the stated limit."
+textbox "Location · Required" {"invalid":"true","readonly":false,"required":true} desc="0/300 Error: provide a complete value within the stated limit."
+textbox "Observed value · Required" {"invalid":"true","readonly":false,"required":true} desc="0/500 Error: provide a complete value within the stated limit."
+group "Select verified support · 0/20 · Required" {"invalid":"true"} desc="Error: provide a complete value within the stated limit."
+button "Remove unsent identifier" {"invalid":"false"}
+group "Physical identifier 3" {"invalid":"false"}
+heading4 "Physical identifier 3" {"level":4}
+combobox "Identifier kind · Required" {"invalid":"true","expanded":false} desc="Error: provide a complete value within the stated limit."
+textbox "Location · Required" {"invalid":"true","readonly":false,"required":true} desc="0/300 Error: provide a complete value within the stated limit."
+textbox "Observed value · Required" {"invalid":"true","readonly":false,"required":true} desc="0/500 Error: provide a complete value within the stated limit."
+group "Select verified support · 0/20 · Required" {"invalid":"true"} desc="Error: provide a complete value within the stated limit."
+button "Remove unsent identifier" {"invalid":"false"}
+button "Add identifier, maximum 20" {"invalid":"false"}
+group "Rights for this identity record" {"invalid":"false"}
+textbox "Purpose · Required" {"invalid":"true","focused":true,"readonly":false,"required":true} desc="0/300 Error: provide a complete value within the stated limit."
+textbox "Authority basis · Required" {"invalid":"true","readonly":false,"required":true} desc="0/500 Error: provide a complete value within the stated limit."
+textbox "Source provenance · Required" {"invalid":"true","readonly":false,"required":true} desc="0/1000 Error: provide a complete value within the stated limit."
+textbox "Retention reason · Required" {"invalid":"true","readonly":false,"required":true} desc="0/500 Error: provide a complete value within the stated limit."
+combobox "Identifiability · Required" {"invalid":"true","expanded":false} desc="Error: provide a complete value within the stated limit."
+textbox "Supplier restrictions, optional" {"invalid":"false","readonly":false,"required":false} desc="0/1000"
+button "Record complete evidence" {"disabled":true,"invalid":"false"}
+group ""
+DisclosureTriangle "Intake and assignment" {"expanded":false}

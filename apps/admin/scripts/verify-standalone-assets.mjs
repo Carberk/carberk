@@ -26,9 +26,11 @@ for (const copy of runtime.matchAll(/^COPY --from=build (\/app\/\S+) (\/app\S*)$
 // A fixture API lets the built server component render a real report request.
 const api = createServer((request, response) => {
   response.setHeader("content-type", "application/json");
-  const body = request.url === "/api/v1/auth/admin/totp/status"
+  const body = ["/api/v1/auth/admin/totp/status", "/api/v1/auth/staff/totp/status"].includes(request.url)
     ? { elevated: true, enrolled: true }
-    : request.url === "/api/v1/config"
+    : request.url === "/api/v1/staff/capabilities"
+      ? { elevated: true, capabilities: [] }
+    : ["/api/v1/config", "/api/v1/admin/config"].includes(request.url)
       ? { adminModerationActionsEnabled: true }
       : {
           id: "r1", status: "pending", reason: "other", createdAt: "2026-10-07T12:00:00Z",

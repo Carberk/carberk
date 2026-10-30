@@ -119,6 +119,8 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0105](0105-listing-views-once-per-ashgabat-day.md) | Listing views count each viewer once per Ashgabat day, using an anonymous install id | Accepted | 2026-10-14 |
 | [0106](0106-service-owned-support-and-vehicle-history.md) | Service-owned Support and Vehicle History preserve separate policies | Accepted | 2026-10-14 |
 | [0107](0107-durable-permitted-vehicle-market-knowledge.md) | Durable permitted vehicle and market knowledge | Accepted | 2026-10-14 |
+| [0108](0108-pair-bound-diagnostic-reinspection-continuity-proof.md) | Pair-bound diagnostic reinspection continuity proof (complements ADR-0104) | Accepted | 2026-10-21 |
+| [0109](0109-authenticated-ownership-grants-for-automatic-diagnostic-continuity.md) | Authenticated ownership grants for automatic diagnostic continuity (complements ADR-0108) | Accepted | 2026-10-23 |
 
 ## Per-app ADRs
 

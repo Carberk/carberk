@@ -1,3 +1,4 @@
+import { StaffAuthorityDenied } from "../domain/ports/StaffAuthorityPort";
 import { Inject, Injectable } from "@nestjs/common";
 import { randomBytes, createHash } from "node:crypto";
 import type { TotpEnrollmentRepository } from "../domain/ports/TotpEnrollmentRepository";
@@ -59,6 +60,9 @@ export class VerifyAdminTotp {
   ) {}
 
   async execute(input: VerifyAdminTotpInput): Promise<VerifyAdminTotpResult> {
+    const currentSession = await this.sessionRepo.findById(input.sessionId);
+    const checkedAt = this.clock.now();
+    if (!currentSession || currentSession.userId !== input.userId || currentSession.expiresAt <= checkedAt) throw new StaffAuthorityDenied("SESSION_REQUIRED");
     const failureCount = await this.throttle.recordFailure(input.userId, input.sessionId);
     if (failureCount > MAX_FAILURES) {
       const err = new Error("TOTP_RATE_LIMITED");
@@ -109,7 +113,7 @@ export class VerifyAdminTotp {
     }
 
     if (validTotp) {
-      await this.sessionRepo.updateAdminTotpExpiresAt(input.sessionId, adminTotpExpiresAt);
+      await this.sessionRepo.updateAdminTotpExpiresAt(input.sessionId, adminTotpExpiresAt, { userId: input.userId, now });
       await this.throttle.reset(input.userId, input.sessionId);
       return result;
     }

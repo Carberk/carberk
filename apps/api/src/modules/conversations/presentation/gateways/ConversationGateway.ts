@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 import {
   ConnectedSocket,
@@ -31,6 +31,8 @@ import { DeleteMessage } from "../../application/DeleteMessage";
 import type { Message } from "../../domain/Message";
 import type { MessageSentEvent } from "../../domain/ports/MessageEventPublisher";
 import type { Conversation } from "../../domain/Conversation";
+import { BUSINESS_ENQUIRY_REPOSITORY, type BusinessEnquiryRepository, type ConversationActor } from "../../domain/ports/BusinessEnquiryRepository";
+import { CONVERSATION_REPOSITORY, type ConversationRepository } from "../../domain/ports/ConversationRepository";
 
 type JoinPayload = {
   conversationId: string;
@@ -140,6 +142,8 @@ export class ConversationGateway implements OnGatewayDisconnect {
     private readonly deleteMessage: DeleteMessage,
     @Inject(PRESENCE_PORT)
     private readonly presence: PresencePort,
+    @Optional() @Inject(BUSINESS_ENQUIRY_REPOSITORY) private readonly businessEnquiries?: BusinessEnquiryRepository,
+    @Optional() @Inject(CONVERSATION_REPOSITORY) private readonly conversations?: ConversationRepository,
   ) {}
 
   @SubscribeMessage("conversation:join")
@@ -172,12 +176,16 @@ export class ConversationGateway implements OnGatewayDisconnect {
       conversation = await this.validateAccess.execute({
         userId: user.sub,
         conversationId: payload.conversationId,
+        ...(this.socketActor(client) ? { actor: this.socketActor(client) } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
     }
 
     const room = conversationRoom(payload.conversationId);
+    // Business delivery resolves current recipients and sessions for every event.
+    // Joining a persistent room would retain access after membership revocation.
+    if (conversation.businessId) return { ok: true, conversationId: payload.conversationId, room };
     await client.join(room);
     this.trackSocketRoom(client.id, room);
 
@@ -309,10 +317,12 @@ export class ConversationGateway implements OnGatewayDisconnect {
       };
     }
 
+    let conversation: Conversation;
     try {
-      await this.validateAccess.execute({
+      conversation = await this.validateAccess.execute({
         userId: user.sub,
         conversationId: payload.conversationId,
+        ...(this.socketActor(client) ? { actor: this.socketActor(client) } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
@@ -326,7 +336,10 @@ export class ConversationGateway implements OnGatewayDisconnect {
     };
 
     // Fan out to other participants in the room, not back to the sender.
-    client.to(room).emit("typing:peer", event);
+    if (conversation.businessId) {
+      const recipients = await this.businessEnquiries?.recipients(conversation.id, user.sub) ?? [];
+      await this.deliverBusiness(conversation, recipients, "typing:peer", event);
+    } else client.to(room).emit("typing:peer", event);
 
     return { ok: true, conversationId: payload.conversationId };
   }
@@ -413,6 +426,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
       await this.validateAccess.execute({
         userId: user.sub,
         conversationId: payload.conversationId,
+        ...(this.socketActor(client) ? { actor: this.socketActor(client) } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
@@ -436,9 +450,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
         event.lastDeliveredAt = result.lastDeliveredAt.toISOString();
       }
 
-      this.server
-        .to(conversationRoom(payload.conversationId))
-        .emit("watermark", event);
+      await this.deliverConversationEvent(payload.conversationId, user.sub, "watermark", event);
 
       return { ok: true, conversationId: payload.conversationId };
     } catch (err) {
@@ -465,11 +477,13 @@ export class ConversationGateway implements OnGatewayDisconnect {
       };
     }
 
+    const actor = this.socketActor(client);
     let result: SendRealtimeMessageResult;
     try {
       result = await this.sendMessage.execute({
         senderId: user.sub,
         ...payload,
+        ...(actor ? { actor } : {}),
       });
     } catch (err) {
       return this.toSocketError(err);
@@ -484,7 +498,8 @@ export class ConversationGateway implements OnGatewayDisconnect {
   }
 
   @OnEvent("MessageSent")
-  handleMessageSent(event: MessageSentEvent): void {
+  handleMessageSent(event: MessageSentEvent): void | Promise<void> {
+    if (event.businessId) return this.deliverBusinessMessage(event);
     // The conversation room reaches sockets that joined it; the recipient's
     // user room (joined on every authenticated connect) reaches the recipient
     // wherever they are in the app. Socket.IO dedupes a socket in both rooms.
@@ -492,6 +507,42 @@ export class ConversationGateway implements OnGatewayDisconnect {
       .to(conversationRoom(event.conversationId))
       .to(userRoom(event.recipientId))
       .emit("message:new", { message: this.toBroadcastSummary(event) });
+  }
+
+  private async deliverBusinessMessage(event: MessageSentEvent): Promise<void> {
+    const conversation = await this.conversations?.findById(event.conversationId);
+    if (!conversation || conversation.businessId !== event.businessId || !this.businessEnquiries) return;
+    const current = await this.businessEnquiries.recipients(conversation.id, event.senderId);
+    const recipients = current.includes(event.recipientId) ? [event.recipientId] : [];
+    if (event.echoSender) recipients.push(event.senderId);
+    await this.deliverBusiness(conversation, recipients, "message:new", { message: this.toBroadcastSummary(event) });
+  }
+
+  private async deliverConversationEvent(conversationId: string, senderId: string, name: string, payload: unknown): Promise<void> {
+    const conversation = await this.conversations?.findById(conversationId);
+    if (conversation?.businessId) {
+      const recipients = await this.businessEnquiries?.recipients(conversationId, senderId) ?? [];
+      await this.deliverBusiness(conversation, [...recipients, senderId], name, payload);
+      return;
+    }
+    this.server.to(conversationRoom(conversationId)).emit(name, payload);
+  }
+
+  private async deliverBusiness(conversation: Conversation, recipients: string[], name: string, payload: unknown): Promise<void> {
+    for (const userId of new Set(recipients)) {
+      const sockets = await this.server.in(userRoom(userId)).fetchSockets();
+      for (const socket of sockets) {
+        const user = socket.data.user as AuthenticatedSocketUser | undefined;
+        if (!user?.sid || user.sub !== userId) continue;
+        try {
+          await this.validateAccess.execute({
+            userId, conversationId: conversation.id,
+            actor: { userId, sessionId: user.sid, ...(userId !== conversation.buyerId && conversation.businessId ? { businessId: conversation.businessId } : {}) },
+          });
+        } catch { continue; }
+        socket.emit(name, payload);
+      }
+    }
   }
 
   @SubscribeMessage("message:delete")
@@ -524,8 +575,7 @@ export class ConversationGateway implements OnGatewayDisconnect {
       return this.toSocketError(err);
     }
 
-    const room = conversationRoom(payload.conversationId);
-    this.server.to(room).emit("message:deleted", {
+    await this.deliverConversationEvent(payload.conversationId, user.sub, "message:deleted", {
       messageId: result.messageId,
       conversationId: payload.conversationId,
       deletedAt: result.deletedAt.toISOString(),
@@ -537,6 +587,14 @@ export class ConversationGateway implements OnGatewayDisconnect {
       conversationId: payload.conversationId,
       deletedAt: result.deletedAt.toISOString(),
     };
+  }
+
+  private socketActor(client: Socket): ConversationActor | undefined {
+    const user = this.authenticatedUser(client);
+    if (!user) return undefined;
+    const raw = client.handshake?.headers?.["x-business-id"];
+    const businessId = Array.isArray(raw) ? raw[0] : raw;
+    return { userId: user.sub, sessionId: user.sid, ...(businessId ? { businessId } : {}) };
   }
 
   private authenticatedUser(client: Socket): AuthenticatedSocketUser | null {

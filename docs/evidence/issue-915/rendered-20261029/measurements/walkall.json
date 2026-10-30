@@ -1,0 +1,521 @@
+[
+ {
+  "name": "capture-ready",
+  "theme": "light",
+  "w": 1280,
+  "locale": "en",
+  "stops": 43,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#age-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#_1_-record-purpose \"Purpose · Required\" | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "capture-ready",
+  "theme": "light",
+  "w": 1280,
+  "locale": "ru",
+  "stops": 43,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#age-scheduleReason \"Основание срока хранения · Обяз | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW",
+   "input \"Проверенное сохранённое изображение 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#_1_-record-purpose \"Цель · Обязательно\" | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "capture-ready",
+  "theme": "light",
+  "w": 384,
+  "locale": "en",
+  "stops": 43,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#age-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#ord-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "capture-ready",
+  "theme": "light",
+  "w": 384,
+  "locale": "ru",
+  "stops": 43,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Проверенное сохранённое изображение 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "capture-ready",
+  "theme": "dark",
+  "w": 1280,
+  "locale": "en",
+  "stops": 43,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "textarea#age-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #f4f4f2 | r=17.98 | fv=true OFFVIEW",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "textarea#_1_-record-purpose \"Purpose · Required\" | solid 2px offset 2px #f4f4f2 | r=17.98 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "capture-ready",
+  "theme": "dark",
+  "w": 384,
+  "locale": "en",
+  "stops": 43,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "textarea#age-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #f4f4f2 | r=17.98 | fv=true OFFVIEW",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "textarea#ord-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #f4f4f2 | r=17.98 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "capture-ready",
+  "theme": "dark",
+  "w": 384,
+  "locale": "ru",
+  "stops": 43,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input \"Проверенное сохранённое изображение 1\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "correct-form",
+  "theme": "light",
+  "w": 1280,
+  "locale": "en",
+  "stops": 51,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Original evidence\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Verified retained image 2\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Verified retained image 3\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#ord-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "correct-form",
+  "theme": "light",
+  "w": 1280,
+  "locale": "ru",
+  "stops": 51,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Исходное доказательство\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Проверенное сохранённое изображение 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Проверенное сохранённое изображение 2\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Проверенное сохранённое изображение 3\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#ord-scheduleReason \"Основание срока хранения · Обяз | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "correct-form",
+  "theme": "light",
+  "w": 384,
+  "locale": "en",
+  "stops": 51,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Original evidence\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "textarea#age-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #171717 | r=17.93 | fv=true OFFVIEW",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Verified retained image 2\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Verified retained image 3\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "correct-form",
+  "theme": "light",
+  "w": 384,
+  "locale": "ru",
+  "stops": 51,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Исходное доказательство\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Проверенное сохранённое изображение 1\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Проверенное сохранённое изображение 2\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Проверенное сохранённое изображение 3\" | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "correct-form",
+  "theme": "dark",
+  "w": 1280,
+  "locale": "en",
+  "stops": 51,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Original evidence\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input \"Verified retained image 2\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input \"Verified retained image 3\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "textarea#ord-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #f4f4f2 | r=17.98 | fv=true OFFVIEW"
+  ]
+ },
+ {
+  "name": "correct-form",
+  "theme": "dark",
+  "w": 384,
+  "locale": "en",
+  "stops": 51,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Original evidence\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "textarea#age-scheduleReason \"Retention reason · Required\" | solid 2px offset 2px #f4f4f2 | r=17.98 | fv=true OFFVIEW",
+   "input \"Verified retained image 1\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input \"Verified retained image 2\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input \"Verified retained image 3\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "correct-form",
+  "theme": "dark",
+  "w": 384,
+  "locale": "ru",
+  "stops": 51,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Исходное доказательство\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input \"Проверенное сохранённое изображение 1\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input \"Проверенное сохранённое изображение 2\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input \"Проверенное сохранённое изображение 3\" | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-decision",
+  "theme": "light",
+  "w": 1280,
+  "locale": "en",
+  "stops": 42,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"I reviewed this image and its record context · Requir | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-decision",
+  "theme": "light",
+  "w": 1280,
+  "locale": "ru",
+  "stops": 42,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Ссылки на защищённые записи\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Я проверил изображение и контекст записи · Обязательн | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"Я заключаю, что наблюдения относятся к одн | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-decision",
+  "theme": "light",
+  "w": 384,
+  "locale": "en",
+  "stops": 42,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"I reviewed this image and its record context · Requir | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-decision",
+  "theme": "light",
+  "w": 384,
+  "locale": "ru",
+  "stops": 42,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Ссылки на защищённые записи\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input \"Я проверил изображение и контекст записи · Обязательн | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"Я заключаю, что наблюдения относятся к одн | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-decision",
+  "theme": "dark",
+  "w": 1280,
+  "locale": "en",
+  "stops": 42,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input \"I reviewed this image and its record context · Requir | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-decision",
+  "theme": "dark",
+  "w": 384,
+  "locale": "en",
+  "stops": 42,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input \"I reviewed this image and its record context · Requir | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-decision",
+  "theme": "dark",
+  "w": 384,
+  "locale": "ru",
+  "stops": 42,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Ссылки на защищённые записи\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input \"Я проверил изображение и контекст записи · Обязательн | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true",
+   "input#_r_4_-same \"Я заключаю, что наблюдения относятся к одн | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-imgfail",
+  "theme": "light",
+  "w": 1280,
+  "locale": "en",
+  "stops": 36,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-imgfail",
+  "theme": "light",
+  "w": 1280,
+  "locale": "ru",
+  "stops": 36,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Ссылки на защищённые записи\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"Я заключаю, что наблюдения относятся к одн | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-imgfail",
+  "theme": "light",
+  "w": 384,
+  "locale": "en",
+  "stops": 36,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-imgfail",
+  "theme": "light",
+  "w": 384,
+  "locale": "ru",
+  "stops": 36,
+  "minRatio": 1.55,
+  "weak": [
+   "summary \"Ссылки на защищённые записи\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #d0d0d0 | r=1.55 | fv=true",
+   "input#_r_4_-same \"Я заключаю, что наблюдения относятся к одн | auto 1px offset 2px #d0d0d0 | r=1.55 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-imgfail",
+  "theme": "dark",
+  "w": 1280,
+  "locale": "en",
+  "stops": 36,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-imgfail",
+  "theme": "dark",
+  "w": 384,
+  "locale": "en",
+  "stops": 36,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Restricted record references\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Current staff member\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input#_r_4_-same \"I conclude these observations concern the  | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "pair-imgfail",
+  "theme": "dark",
+  "w": 384,
+  "locale": "ru",
+  "stops": 36,
+  "minRatio": 1.89,
+  "weak": [
+   "summary \"Ссылки на защищённые записи\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "summary \"Текущий сотрудник\" | auto 1px offset 0px #3f3f3f | r=1.89 | fv=true",
+   "input#_r_4_-same \"Я заключаю, что наблюдения относятся к одн | auto 1px offset 2px #3f3f3f | r=1.89 | fv=true"
+  ]
+ },
+ {
+  "name": "bonly-review",
+  "theme": "light",
+  "w": 1280,
+  "locale": "en",
+  "stops": 16,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-review",
+  "theme": "light",
+  "w": 1280,
+  "locale": "ru",
+  "stops": 16,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-review",
+  "theme": "light",
+  "w": 384,
+  "locale": "en",
+  "stops": 16,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-review",
+  "theme": "light",
+  "w": 384,
+  "locale": "ru",
+  "stops": 16,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-review",
+  "theme": "dark",
+  "w": 1280,
+  "locale": "en",
+  "stops": 16,
+  "minRatio": 17.98,
+  "weak": []
+ },
+ {
+  "name": "bonly-review",
+  "theme": "dark",
+  "w": 384,
+  "locale": "en",
+  "stops": 16,
+  "minRatio": 17.98,
+  "weak": []
+ },
+ {
+  "name": "bonly-review",
+  "theme": "dark",
+  "w": 384,
+  "locale": "ru",
+  "stops": 16,
+  "minRatio": 17.98,
+  "weak": []
+ },
+ {
+  "name": "bonly-lost",
+  "theme": "light",
+  "w": 1280,
+  "locale": "en",
+  "stops": 4,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-lost",
+  "theme": "light",
+  "w": 1280,
+  "locale": "ru",
+  "stops": 4,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-lost",
+  "theme": "light",
+  "w": 384,
+  "locale": "en",
+  "stops": 4,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-lost",
+  "theme": "light",
+  "w": 384,
+  "locale": "ru",
+  "stops": 4,
+  "minRatio": 17.93,
+  "weak": []
+ },
+ {
+  "name": "bonly-lost",
+  "theme": "dark",
+  "w": 1280,
+  "locale": "en",
+  "stops": 4,
+  "minRatio": 17.98,
+  "weak": []
+ },
+ {
+  "name": "bonly-lost",
+  "theme": "dark",
+  "w": 384,
+  "locale": "en",
+  "stops": 4,
+  "minRatio": 17.98,
+  "weak": []
+ },
+ {
+  "name": "bonly-lost",
+  "theme": "dark",
+  "w": 384,
+  "locale": "ru",
+  "stops": 4,
+  "minRatio": 17.98,
+  "weak": []
+ }
+]

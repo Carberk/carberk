@@ -1,0 +1,10 @@
+heading2 "Exact reviewer handoff" {"focused":true,"level":2}
+heading3 "Interrupted operations in this current Session" {"level":3}
+button "Check operation status" {"invalid":"false"}
+heading3 "Exact reviewer handoff" {"level":3}
+button "Check current visit and handoff" {"invalid":"false"}
+button "Usable handoff for this inspection 1" {"invalid":"false","pressed":"false"}
+button "Usable handoff for this inspection 2" {"invalid":"false","pressed":"false"}
+button "Usable handoff for this inspection 3" {"invalid":"false","pressed":"false"}
+button "Load more handoffs" {"invalid":"false"}
+button "Return to visit without linking" {"invalid":"false"}

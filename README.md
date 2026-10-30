@@ -34,6 +34,8 @@ Run `pnpm lint`, `pnpm typecheck`, and `pnpm test`. Migration and some integrati
 
 Use the [deployment runbook](docs/prd/ops/80-deployment-runbook.md) and the effective hosting decision. The API pre-deploy command owns deployed schema migrations. Do not infer current hosting from the original air-gap charter.
 
+Railway and EAS work uses the host's [existing CLI logins](docs/agents/cli-access.md), including managed EAS build credentials. Check those sessions before requesting new access.
+
 Use the [portable coding workflow](docs/agents/coding-workflow.md) for bounded integration delivery and recovery.
 
 ## License

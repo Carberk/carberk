@@ -1,0 +1,482 @@
+[
+ {
+  "key": "boundary-contrast|light|select \"Language\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 126,
+  "ratio": 1.26
+ },
+ {
+  "key": "boundary-contrast|light|button \"Back to assigned work\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 126,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Load current version\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 126,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Visit and identity\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 122,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Link a previous inspection\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 122,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Reports and revisions\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 122,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Actual inspection time, UTC · Required\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Recorded mileage, km · Required\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|select \"Vehicle matching method · Required\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Manual decision reference · Required\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Record observed vehicle\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|select \"Select report\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Assessment\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|textarea \"Decision reason\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Submit for review\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__en__light__1280",
+  "n": 4,
+  "ratio": 2.43
+ },
+ {
+  "key": "text-contrast|dark|p \"Synthetic inspections only. Live center booki",
+  "kind": "text-contrast",
+  "theme": "dark",
+  "first": "intake__en__dark__1280",
+  "n": 126,
+  "ratio": 2.53
+ },
+ {
+  "key": "field-text-contrast|dark|input \"Actual inspection time, UTC · Required\"",
+  "kind": "field-text-contrast",
+  "theme": "dark",
+  "first": "intake__en__dark__1280",
+  "n": 4,
+  "ratio": 1.04
+ },
+ {
+  "key": "field-text-contrast|dark|input \"Recorded mileage, km · Required\"",
+  "kind": "field-text-contrast",
+  "theme": "dark",
+  "first": "intake__en__dark__1280",
+  "n": 4,
+  "ratio": 1.04
+ },
+ {
+  "key": "field-text-contrast|dark|select \"Vehicle matching method · Required\"",
+  "kind": "field-text-contrast",
+  "theme": "dark",
+  "first": "intake__en__dark__1280",
+  "n": 4,
+  "ratio": 1.04
+ },
+ {
+  "key": "field-text-contrast|dark|input \"Manual decision reference · Required\"",
+  "kind": "field-text-contrast",
+  "theme": "dark",
+  "first": "intake__en__dark__1280",
+  "n": 4,
+  "ratio": 1.04
+ },
+ {
+  "key": "boundary-contrast|dark|select \"Language\"",
+  "kind": "boundary-contrast",
+  "theme": "dark",
+  "first": "intake__en__dark__1280",
+  "n": 126,
+  "ratio": 1.24
+ },
+ {
+  "key": "text-contrast|dark|p \"No assessment has been recorded. No result de",
+  "kind": "text-contrast",
+  "theme": "dark",
+  "first": "bonly-done__en__dark__1280",
+  "n": 4,
+  "ratio": 2.53
+ },
+ {
+  "key": "text-contrast|dark|p \"Editorial correction preserves the original p",
+  "kind": "text-contrast",
+  "theme": "dark",
+  "first": "bonly-done__en__dark__1280",
+  "n": 4,
+  "ratio": 2.53
+ },
+ {
+  "key": "text-contrast|dark|p \"New physical inspection starts empty under cu",
+  "kind": "text-contrast",
+  "theme": "dark",
+  "first": "bonly-done__en__dark__1280",
+  "n": 4,
+  "ratio": 2.53
+ },
+ {
+  "key": "field-text-contrast|dark|select \"Select report\"",
+  "kind": "field-text-contrast",
+  "theme": "dark",
+  "first": "bonly-done__en__dark__1280",
+  "n": 4,
+  "ratio": 1.04
+ },
+ {
+  "key": "field-text-contrast|dark|textarea \"Decision reason\"",
+  "kind": "field-text-contrast",
+  "theme": "dark",
+  "first": "bonly-done__en__dark__1280",
+  "n": 4,
+  "ratio": 1.04
+ },
+ {
+  "key": "boundary-contrast|light|select \"Язык\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 90,
+  "ratio": 1.26
+ },
+ {
+  "key": "boundary-contrast|light|button \"К назначенным осмотрам\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 90,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Загрузить текущую версию\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 90,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Осмотр и идентификация\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 87,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Связать предыдущий осмотр\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 87,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Отчёты и редакции\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 87,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Фактическое время осмотра, UTC · Обязател",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Пробег при осмотре, км · Обязательно\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|select \"Способ сопоставления автомобиля · Обязат",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Основание ручного решения · Обязательно\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Записать данные автомобиля\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|select \"Выбрать отчёт\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Оценка\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|textarea \"Причина решения\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Отправить на проверку\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__ru__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|select \"Dil\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 90,
+  "ratio": 1.26
+ },
+ {
+  "key": "boundary-contrast|light|button \"Bellenen işlere dolan\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 90,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Häzirki wersiýany ýükle\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 90,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Barlag we şahsyýet\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 87,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Öňki barlagy bagla\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 87,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Hasabatlar we wersiýalar\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 87,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Hakyky barlag wagty, UTC · Hökmany\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"Barlagdaky ýol, km · Hökmany\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|select \"Awtoulagy gabat getiriş usuly · Hökmany\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|input \"El bilen çözgüdiň salgysy · Hökmany\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Gözegçilik maglumatlaryny ýaz\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "intake__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|select \"Hasabaty saýla\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Baha\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|textarea \"Çözgüdiň sebäbi\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "boundary-contrast|light|button \"Barlaga iber\"",
+  "kind": "boundary-contrast",
+  "theme": "light",
+  "first": "bonly-done__tk__light__1280",
+  "n": 3,
+  "ratio": 2.43
+ },
+ {
+  "key": "text-contrast|dark|p \"Только синтетические осмотры. Запись в реальн",
+  "kind": "text-contrast",
+  "theme": "dark",
+  "first": "capture-errors__ru__dark__1280",
+  "n": 16,
+  "ratio": 2.53
+ },
+ {
+  "key": "boundary-contrast|dark|select \"Язык\"",
+  "kind": "boundary-contrast",
+  "theme": "dark",
+  "first": "capture-errors__ru__dark__1280",
+  "n": 16,
+  "ratio": 1.24
+ },
+ {
+  "key": "text-contrast|dark|p \"Diňe emeli barlaglar. Hakyky merkeze ýazylmak",
+  "kind": "text-contrast",
+  "theme": "dark",
+  "first": "capture-errors__tk__dark__1280",
+  "n": 16,
+  "ratio": 2.53
+ },
+ {
+  "key": "boundary-contrast|dark|select \"Dil\"",
+  "kind": "boundary-contrast",
+  "theme": "dark",
+  "first": "capture-errors__tk__dark__1280",
+  "n": 16,
+  "ratio": 1.24
+ }
+]

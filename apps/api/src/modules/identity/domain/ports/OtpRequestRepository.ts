@@ -1,19 +1,39 @@
+import type { SmsDelivery } from "./OtpSenderPort";
+import type { ClockPort } from "./ClockPort";
+import type { SignInCodeDestination } from "../SignInCodeDestination";
 import type {
   OtpRequest,
   SignInCodeChannel,
   SignInCodePurpose,
 } from "../OtpRequest";
 
+export interface CreateOtpRequest {
+  purpose: SignInCodePurpose;
+  channel: SignInCodeChannel;
+  destination: string;
+  codeHash: string;
+  expiresAt: Date;
+  userId: string | null;
+  businessId?: string | undefined;
+  ip: string;
+}
+
 export interface OtpRequestRepository {
-  create(input: {
-    purpose: SignInCodePurpose;
-    channel: SignInCodeChannel;
-    destination: string;
-    codeHash: string;
-    expiresAt: Date;
-    userId: string | null;
-    ip: string;
-  }): Promise<OtpRequest>;
+  /**
+   * Atomically checks all-purpose rolling budgets/cooldown and persists a code.
+   * destination must be normalized. Sample clock only after admission locks are
+   * held; use that time for windows, createdAt and destination.expiresAt.
+   * Throws SignInCodeRateLimitedError on policy refusal. Storage/timeout errors
+   * propagate unchanged. A resolved promise means committed: deliver afterward.
+   */
+  reserve(
+    input: Omit<CreateOtpRequest, "channel" | "destination" | "expiresAt"> & {
+      destination: SignInCodeDestination;
+    },
+    clock: ClockPort,
+  ): Promise<{ record: OtpRequest; resendInSeconds: number; smsDelivery: SmsDelivery }>;
+
+  create(input: CreateOtpRequest): Promise<OtpRequest>;
 
   findById(id: string): Promise<OtpRequest | null>;
 
@@ -32,6 +52,7 @@ export interface OtpRequestRepository {
     channel: SignInCodeChannel;
     destination: string;
     userId?: string;
+    businessId?: string | undefined;
   }): Promise<OtpRequest | null>;
 
   /** Counts codes of every purpose: the per-destination limit is shared. */

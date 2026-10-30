@@ -1,0 +1,62 @@
+{
+  "status": "Functional RED/GREEN complete; no measured/native call; separate READY and explicit START required before attribution",
+  "parent": "b8d44968",
+  "migration": {
+    "path": "packages/db/prisma/migrations/20261026016400_diagnostic_source_key_predicate/migration.sql",
+    "sha256": "fe7358f92acaeae0b57a442cf8e7b4aa28b56ee03aa6177fd7fb271a93bafdb6",
+    "position": "Immediately after 20261026016300; unused on every local and remote ref; before the reset writer's 20261029190000",
+    "historicalMigrationsEdited": false,
+    "helper": "public.diagnostic_source_key_predicate(text,jsonb) RETURNS text, SQL IMMUTABLE invoker, search_path=pg_catalog, public. Returns typed text equality on the registry pk (s.\"col\"=$1->>'col', AND-joined in C order) only when the key is a JSON object whose field set equals the registry pk and every value is a JSON string. Otherwise, including NULL, unknown table, non-object, extra/missing field and non-string values, it returns 'to_jsonb(s) @> $1'. Ordered CASE branches keep object-only functions away from other shapes.",
+    "sites": {
+      "diagnostic_source_read(text,jsonb)": "per-key read",
+      "diagnostic_source_insert_receipt()": "per-key FOR UPDATE inside the lock loop; the after-wait VOLATILE rediscovery and graph comparison are byte-unchanged",
+      "campaign_preparation_scope(jsonb)": "old_row read; the fresh post-wait campaign rescan is unchanged"
+    },
+    "replacement": "Each body is reissued from pg_get_functiondef with exactly one statement-text occurrence replaced; owner, ACL, volatility and search_path are preserved",
+    "installRefusals": {
+      "diagnostic_source_key_collation": "any registry pk column with a nondeterministic collation",
+      "diagnostic_source_key_predicate_drift": "registry pk not a non-empty string array; pk column missing, nullable or not text; no exact non-partial non-expression unique index on the pk; any of the three body md5s changed; replaced text not found exactly once"
+    }
+  },
+  "oracle": {
+    "path": "packages/db/tests/diagnostic-source-key-predicate.e2e.spec.ts",
+    "sha256": "6529917ccb8ce923a6bc8ac6dff78c9fdbf247195da0fa24ae41d67915ce6b4b",
+    "fixture": "Fresh postgres:17-alpine testcontainer: pre (all historical migrations applied raw, excluding 164) and post (prisma migrate deploy of the full tree)",
+    "red": "Before the migration existed: 14 failed / 1 passed. The passing test pins the pre-seam surface to the registry163 harness (functions a6c66ee7, guards b2be78df, registry 6d7b15db). Failures: helper missing; no surface change; real diagnostic_source_read and campaign_preparation_scope statements on 'Seq Scan on users s'; migration file absent. Final-spec RED log sha256 25f2417791389e9880a7703199b7ce23b0516a17fefee69e4beff4195adbcfc8",
+    "green": "15/15 passed (log sha256 96dddf0db9ca23aa83c6c0c5b269bc26134ae68b532eb3b8b02507f068bb301b)",
+    "tests": [
+      "pre-seam chain equals the recorded registry163 full-chain surface",
+      "surface diff: only the helper is added; only the three bodies change, each equal to the pre body with its one statement text replaced; owner/ACL/volatility/secdef/search_path, guards, registry and map unchanged",
+      "typed text for the exact pk on all 77 tables; containment for extra field (string or null), missing field, null, number, boolean, nested object, array value, non-pk field, {}, array, string, JSON null, SQL NULL key, NULL table and unknown table",
+      "all 77 tables: on same-column copies with case, padding, numeric text, NFC/NFD and no-break-space rows, every key shape returns identical row sets for plain SELECT and FOR UPDATE (more than 7,700 comparisons)",
+      "READ COMMITTED FOR UPDATE recheck under a concurrent writer: a key change returns no row and a non-key change returns the row, identically for typed and containment",
+      "EXPLAIN only (enable_seqscan=off): every table's exact key uses its unique pk index; containment stays a Seq Scan",
+      "EXPLAIN only (auto_explain, no analyze): the real source read and campaign old-row statements move from Seq Scan to Index Scan using users_pkey",
+      "installation refuses a nondeterministic pk collation, a non-text pk, a missing pk unique index and a drifted body for each site, all before the helper exists; the positive control matches the deployed surface"
+    ]
+  },
+  "cloneProof": {
+    "path": "docs/evidence/issue-897/r7g-recovery-20261029/key-predicate164-clone-proof.cjs",
+    "sha256": "b1743219d45efe3902e7727b2a5ead1aa3c7f88201aa7c3b26dd89abbe4f98cb",
+    "receiptSha256": "94a7f8dd477d511be0da1c870a3ed7947f167851f96245e6cdbc2f28fc15432a",
+    "resource": "Owned 98+163 attribution clone, worker role via SET LOCAL ROLE, every transaction rolled back",
+    "verdict": "PASS",
+    "results": [
+      "prepare10 receipt command/scope/lock_keys/campaigns/effects and campaign preparation identical without and with 164 (hash 583e250c5fe1ba11fe8c63453df47e2f829a600a210edac0be9da1a5b773b81e; 240 scope, 370 keys)",
+      "auto_explain EXPLAIN-only: without 164, 1460 reads and 240 FOR UPDATE all containment Seq Scan; with 164, all typed with the same counts. 1280 reads and 210 locks use pk Index Scan. 180 reads and 30 locks on diagnostic_centers (3 pages), diagnostic_identity_records (5) and listings (4) are cost-chosen Seq Scans filtering on the plain key column with no to_jsonb; forced EXPLAIN shows each pk index",
+      "scope/keys/effects hashes equal the registry163 receipt (ce8ca056 / 0a9ccdb8 / a27fff81); full100 P0001 diagnostic_source_scope_limit with identical context",
+      "drain before and after: migrations ae0f2393, functions 4f69996d, guards 74f89176, data 1db78561, eight classes, receipts 0/0, no clients; clone stopped exit 0"
+    ]
+  },
+  "existingSuites": {
+    "with164": "104 failed / 157 passed / 34 skipped (log sha256 a65a93c6e266dbd05e1a174e5db093e9b559d1d79135f16bdea7c5962af94a06)",
+    "attribution": "No 164-caused failure. Every 164-only failure is the kernel spec's timestamp formatting flake: JS toISOString expectations ('…08.030') against to_jsonb timestamps without trailing zeros ('…08.03'). All 24 grant-row mismatches differ only in declaredAt/rightsUntil trailing zeros or an erasedAt 'Z'. A targeted rerun passed 6 of 9 matching tests and failed a different 3 with the same diff (sha256 d33279fb489537c99b82fd9f9ea5e8193743c7d8ecb84869df45b75cb464d45f). Non-timestamp failures are the same pre-existing ones as on the 99 and 163 chains."
+  },
+  "checks": { "TS7": "PASS", "TS6": "PASS", "lint": "PASS (new spec)" },
+  "knownRed": "maintenance-finite.r7g.e2e.spec.ts still pins exactly 99 migrations and now sees 101; route to its owner as previously reported",
+  "notEstablished": [
+    "No timing; attribution needs a separate READY and explicit START",
+    "Native 5s, fresh ordinary full100 baseline and the original unchanged test remain required",
+    "Full100 single-command scope-limit refusal preserved, not relaxed"
+  ]
+}

@@ -1,3 +1,5 @@
+import type { DiagnosticSourceCommand } from "@auto-tm/db";
+import { FakeMeasurementCommit } from "../../measurement/application/testing/FakeMeasurementCommit";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   NotFoundException,
@@ -18,6 +20,8 @@ import { PublishListing } from "./PublishListing";
 import { UploadAdoptionGuard } from "./UploadAdoptionGuard";
 import { InMemoryContactPhones } from "./testing/InMemoryContactPhones";
 import { InMemoryMediaWorld } from "./testing/InMemoryMediaWorld";
+
+type ListingPublicationIntent = Extract<NonNullable<DiagnosticSourceCommand["intent"]>, { publication: unknown }>["publication"];
 
 /** The media world the next `makeUseCase()` reads uploads and storage from. */
 let world = new InMemoryMediaWorld();
@@ -144,11 +148,49 @@ class FakePrisma {
     this.auditLogs = [];
   }
 
+  publication: ListingPublicationIntent | undefined;
+  omitMedia = false;
+  private prepared = false;
+  beforePrepared: (() => void) | undefined;
+  failAudit = false;
+  $queryRaw = async (parts: TemplateStringsArray, ...values: unknown[]) => {
+    const sql = parts.join("?");
+    if (sql.includes("WITH target AS")) return [{ source: null, next: JSON.parse(String(values.at(-1))) }];
+    if (sql.includes("diagnostic_prepare_source")) {
+      const command = JSON.parse(String(values[0])) as { operation: string; rows: { table: string; next: Record<string, unknown> }[]; intent: { publication: ListingPublicationIntent } };
+      const plan = command.intent.publication;
+      if (command.operation !== "listing_create" || command.rows.length !== 1 || command.rows[0]?.table !== "listings") throw new Error("publication_command_shape");
+      const draft = this.draftRows.find(row => row.id === plan.draftId);
+      if (!draft || draft.userId !== command.rows[0].next["sellerId"]) throw new Error("publication_draft_owner");
+      const photos = (draft.payload as { photos: { photoId: string; key: string; sortOrder: number }[] }).photos.filter(photo => photo.key);
+      expect(plan.photos.map(({ photoId, key, sortOrder }) => ({ photoId, key, sortOrder }))).toEqual(photos);
+      expect(new Set(plan.photos.map(photo => photo.uploadId)).size).toBe(photos.length);
+      this.publication = plan;
+      this.beforePrepared?.(); this.prepared = true;
+      return [{ receipt: "00000000-0000-4000-8000-000000000001" }];
+    }
+    if (sql.includes("diagnostic_assert_source")) { if (!this.prepared) throw new Error("receipt_required"); return []; }
+    if (sql.includes("diagnostic_finish_source")) {
+      const plan = this.publication;
+      if (!plan || this.createdListings.length !== 1 || this.createdMedia.length !== plan.photos.length || this.auditLogs.length !== 1 || !this.deletedDrafts.includes(plan.draftId)) throw new Error("publication_final_effect");
+      for (const photo of plan.photos) {
+        const actual = this.createdMedia.find(row => row["id"] === photo.photoId);
+        expect(actual).toMatchObject({ listingId: this.createdListings[0]?.["id"], key: photo.key, sortOrder: photo.sortOrder, uploadId: photo.uploadId, thumbHash: photo.thumbHash, createdAt: new Date(plan.at) });
+      }
+      expect(this.auditLogs[0]).toMatchObject({ id: plan.auditId, targetId: this.createdListings[0]?.["id"], createdAt: new Date(plan.at) });
+      this.prepared = false; return [];
+    }
+    if (sql.includes("FOR UPDATE") && !this.prepared) throw new Error("lock_before_preparation");
+    return [{ id: "locked-fixture", deletionScheduledAt: null }];
+  };
+  videoUploadSession = { findFirst: async () => null };
+
   $transaction = async <T>(work: Promise<T>[] | ((tx: FakePrisma) => Promise<T>)): Promise<T | T[]> => {
     if (typeof work === "function") {
       try {
         // An interactive transaction is atomic, so a failure adopts nothing:
         // the in-memory claim is not reached rather than undone.
+        this.prepared = false;
         if (this.failTransaction) throw this.failTransaction();
         return await work(this);
       } catch (err) {
@@ -207,12 +249,14 @@ class FakePrisma {
 
   listingMedia = {
     create: async ({ data }: { data: Record<string, unknown> }) => {
-      this.createdMedia.push(data);
+      if (!this.omitMedia) this.createdMedia.push(data);
       return data;
     },
   };
 
+  draftRows: ListingDraft[] = [];
   listingDraft = {
+    findUnique: async ({ where }: { where: { id: string } }) => this.draftRows.find(row => row.id === where.id) ?? null,
     delete: async ({ where }: { where: { id: string } }) => {
       this.deletedDrafts.push(where.id);
     },
@@ -220,6 +264,7 @@ class FakePrisma {
 
   auditLog = {
     create: async ({ data }: { data: unknown }) => {
+      if (this.failAudit) throw new Error("audit_failed");
       this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
     },
   };
@@ -231,10 +276,14 @@ function makeUseCase(
   exchangeRates?: FakeExchangeRatePort,
   events?: FakeEventPublisher,
   variantGenerator?: FakeImageVariantGenerator,
+  measurement?: FakeMeasurementCommit,
 ) {
+  const drafts = draftRepo ?? new FakeListingDraftRepository();
+  const database = prisma ?? new FakePrisma();
+  database.draftRows = drafts.drafts;
   return new PublishListing(
-    draftRepo ?? new FakeListingDraftRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof PublishListing>[1],
+    drafts,
+    database as unknown as ConstructorParameters<typeof PublishListing>[1],
     exchangeRates ?? new FakeExchangeRatePort(),
     events ?? new FakeEventPublisher(),
     variantGenerator ?? new FakeImageVariantGenerator(),
@@ -242,6 +291,8 @@ function makeUseCase(
     contactPhones.policy,
     clock,
     world.claims,
+    undefined,
+    measurement,
   );
 }
 
@@ -491,6 +542,28 @@ describe("PublishListing", () => {
       ["photo2.webp", "2yMBBYCIh4iHiHeAiId4dXh3f4f4"],
       ["photo3.webp", "1fsDBYCIiIiHiIdweIeHh4d4cIgH"],
     ]);
+  });
+
+  it("commits a minimal authoritative publication fact and keeps publication usable during collection refusal", async () => {
+    seedDraft(draftRepo, validPayload);
+    const measurement = new FakeMeasurementCommit();
+    const result = await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" });
+    expect(measurement.facts).toHaveLength(2);
+    expect(measurement.facts[0]?.event).toMatchObject({ eventName: "listing_published", context: { platform: "server" }, payload: { listingId: result.listing.id, cityId: validPayload.cityId, draftId: "draft-1" } });
+    expect(measurement.facts[1]?.event).toMatchObject({eventName:"listing_visibility_changed",payload:{listingId:result.listing.id,visibility:"public",reason:"published"}});
+    expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.description);
+    expect(JSON.stringify(measurement.facts)).not.toContain(validPayload.contactPhone);
+  });
+  it("keeps publication usable when measurement capture is unavailable", async () => {
+    seedDraft(draftRepo, validPayload);
+    const measurement = new FakeMeasurementCommit(); measurement.unavailable = true;
+    expect((await makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator, measurement).execute({ draftId: "draft-1", userId: "user-1" })).listing.status).toBe("active");
+  });
+  it("refuses a missing mandatory media effect at finish and rolls back the caller writes", async () => {
+    seedDraft(draftRepo, validPayload); prisma.omitMedia = true;
+    await expect(makeUseCase(draftRepo, prisma, exchangeRates, events, variantGenerator).execute({ draftId: "draft-1", userId: "user-1" })).rejects.toThrow("publication_final_effect");
+    expect(prisma.createdListings).toEqual([]); expect(prisma.createdMedia).toEqual([]);
+    expect(prisma.deletedDrafts).toEqual([]); expect(prisma.auditLogs).toEqual([]); expect(events.events).toEqual([]);
   });
 
   it("publishes a valid draft", async () => {

@@ -1,0 +1,67 @@
+[
+ {
+  "step": "tab to first handoff row",
+  "found": true,
+  "n": 9,
+  "order": [
+   "select \"Dil\"  r=17.93",
+   "button \"Bellenen işlere dolan\"  r=17.93",
+   "button \"Häzirki wersiýany ýükle\"  r=17.93",
+   "button \"Barlag we şahsyýet\"  r=17.93",
+   "button \"Öňki barlagy bagla\"  r=17.93",
+   "button \"Hasabatlar we wersiýalar\"  r=17.93",
+   "button \"Amalyň ýagdaýyny barla\"  r=17.93",
+   "button \"Häzirki barlagy we geçirişi barla\"  r=17.93",
+   "button \"Şu barlag üçin ulanyp bolýan rugsat 1\"  r=17.93"
+  ]
+ },
+ {
+  "step": "Enter in textarea: newline, no submit",
+  "value": "line one\nline two",
+  "writes": 0
+ },
+ {
+  "step": "tab to Review",
+  "found": true,
+  "f": "button \"Bagly hasabatyň döredilişini gözden geçir\""
+ },
+ {
+  "step": "Enter on Review: focus",
+  "f": "h3 \"Bagly hasabatyň döredilişini gözden geçir\""
+ },
+ {
+  "step": "Enter on consume with lost reply: focus + alert",
+  "f": "body",
+  "alerts": [
+   "Amal elýeterli däl. Täzeläp gözden geçiriň.",
+   "Netije tassyklanmady. Gaýtalamazdan öň ýagdaýyny barlaň. Täzeden ýüklemek girizilenleri di"
+  ],
+  "writes": [
+   "continuity-requests",
+   "execute"
+  ]
+ },
+ {
+  "step": "Check operation status: focus + buttons",
+  "f": "button \"Amalyň ýagdaýyny barla\"",
+  "btns": [
+   "Amalyň ýagdaýyny barla",
+   "Takyk üýtgemedik amaly gaýtala",
+   "Karary üýtget"
+  ]
+ },
+ {
+  "step": "Retry exact reachable",
+  "found": true
+ },
+ {
+  "step": "Enter on Retry exact: focus + writes",
+  "f": "body",
+  "writes": [
+   "continuity-requests",
+   "execute",
+   "execute"
+  ],
+  "result": true
+ }
+]

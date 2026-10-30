@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 
-import type { ListingSummary } from "../../listings/domain/ports/ListingsReadPort";
+import type { ListingSummary, ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
+import { LISTINGS_READ_PORT } from "../../listings/domain/ports/ListingsReadPort";
 import type { Message } from "../domain/Message";
 import { ConversationDomainError } from "../domain/types";
 import {
@@ -12,12 +13,16 @@ import {
 
 import { ConversationMessageCommitter } from "./ConversationMessageCommitter";
 import { ConversationSendPolicy } from "./ConversationSendPolicy";
+import { BusinessEnquiryAccess } from "./BusinessEnquiryAccess";
+import type { ConversationActor } from "../domain/ports/BusinessEnquiryRepository";
 
 export interface SendConversationMessageInput {
   senderId: string;
   conversationId: string;
   clientMessageId?: string | undefined;
+  actor?: ConversationActor;
   createMessage: (data: {
+    businessId?: string | undefined;
     id: string;
     conversationId: string;
     senderId: string;
@@ -40,15 +45,27 @@ export class SendConversationMessage {
     private readonly sendPolicy: ConversationSendPolicy,
     @Inject(ConversationMessageCommitter)
     private readonly committer: ConversationMessageCommitter,
+    @Inject(BusinessEnquiryAccess) @Optional() private readonly businessAccess?: BusinessEnquiryAccess,
+    @Inject(LISTINGS_READ_PORT) @Optional() private readonly listings?: ListingsReadPort,
   ) {}
 
   async execute(
     input: SendConversationMessageInput,
   ): Promise<SendConversationMessageResult> {
-    const authorized = await this.sendPolicy.authorize(
-      input.conversationId,
-      input.senderId,
-    );
+    if (input.actor && input.actor.userId !== input.senderId) throw new ForbiddenException({ code: "FORBIDDEN", details: { reason: "ACTOR_MISMATCH" } });
+    const conversation = await this.conversations.findById(input.conversationId);
+    if (!conversation) throw new NotFoundException("Conversation not found");
+    if (conversation.businessId) {
+      if (!this.businessAccess || !this.listings || !input.actor) throw new BadRequestException("Business context required");
+      const recipientId = await this.businessAccess.authorize(conversation, input.actor, { send: true });
+      const authorized = await this.sendPolicy.authorizeBusiness(conversation, input.senderId, recipientId);
+      return this.executeAuthorized(input, authorized, conversation.businessId ?? undefined);
+    }
+    const authorized = await this.sendPolicy.authorize(input.conversationId, input.senderId);
+    return this.executeAuthorized(input, authorized, conversation.businessId ?? undefined);
+  }
+
+  private async executeAuthorized(input: SendConversationMessageInput, authorized: { recipientId: string; listing: ListingSummary }, businessId?: string) {
     if (input.clientMessageId) {
       const existing = await this.conversations.findMessageByClientMessageId(
         input.conversationId,
@@ -60,17 +77,19 @@ export class SendConversationMessage {
       }
     }
 
-    const message = await this.createMessage(input);
+    const message = await this.createMessage(input, businessId);
     const committed = await this.committer.commit(
       message,
       authorized.recipientId,
+      input.actor,
     );
     return { ...committed, listing: authorized.listing };
   }
 
-  private async createMessage(input: SendConversationMessageInput) {
+  private async createMessage(input: SendConversationMessageInput, businessId?: string) {
     try {
       return await input.createMessage({
+        businessId,
         id: randomUUID(),
         conversationId: input.conversationId,
         senderId: input.senderId,

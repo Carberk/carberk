@@ -1,0 +1,14 @@
+heading2 "Structured identity history" {"level":2}
+button "Read identity history" {"invalid":"false"}
+heading3 "Recorded physical identity · 7" {"level":3}
+group ""
+DisclosureTriangle "Current staff member" {"expanded":false}
+heading3 "Original evidence" {"level":3}
+group ""
+DisclosureTriangle "Original evidence" {"expanded":false}
+heading3 "Complete replacement for this record" {"focused":true,"level":3}
+group ""
+DisclosureTriangle "Complete replacement for this record" {"expanded":false}
+button "Complete replacement for this record" {"invalid":"false"}
+group ""
+DisclosureTriangle "Intake and assignment" {"expanded":false}

@@ -47,9 +47,13 @@ const api = createServer(async (req, res) => {
   bearerCalls.push(req.headers.authorization);
   const authorized = [...sessions.values()].some(({ pair, used }) => used && req.headers.authorization === `Bearer ${pair.accessToken}`);
   if (!authorized) { res.writeHead(401); res.end(JSON.stringify({ code: "UNAUTHORIZED" })); return; }
-  if (req.url === "/api/v1/auth/admin/totp/status") {
+  if (["/api/v1/auth/admin/totp/status", "/api/v1/auth/staff/totp/status"].includes(req.url)) {
     if (statusUnavailable) { res.writeHead(503); res.end("{}"); return; }
     res.end(JSON.stringify({ enrolled: true, elevated: true }));
+  } else if (req.url === "/api/v1/staff/capabilities") {
+    res.end(JSON.stringify({ capabilities: [], elevated: true }));
+  } else if (req.url === "/api/v1/admin/authority") {
+    res.end(JSON.stringify({ marketplaceAdmin: true }));
   } else if (req.url === "/api/v1/admin/reports/r1/dismiss" && req.method === "POST") {
     assert(JSON.parse(body).reason === "Runtime renewal proof", "original action arguments must reach mutation");
     mutations++;
@@ -113,8 +117,8 @@ try {
   assert(healthy, "standalone must become healthy");
   const rootSession = session();
   const rootGet = await fetch(`${origin}/`, { redirect: "manual", headers: { cookie: cookie(rootSession.old) } });
-  assert.equal(rootGet.status, 307, "root must renew then use its reports redirect");
-  assert(rootGet.headers.get("location")?.endsWith("/reports"));
+  assert.equal(rootGet.status, 307, "root must renew then use its workspace redirect");
+  assert(rootGet.headers.get("location")?.endsWith("/workspace"));
   rotatedCookies(rootGet, rootSession.pair);
   console.log("PASS root GET: sole root page redirects after renewal; both cookies persisted");
 
@@ -153,9 +157,9 @@ try {
   const renewable = session();
   const expiryLink = await fetch(`${origin}/login?reason=session-expired`, { redirect: "manual", headers: { cookie: cookie(renewable.old) } });
   assert.equal(expiryLink.status, 303);
-  assert(expiryLink.headers.get("location")?.endsWith("/reports"));
+  assert(expiryLink.headers.get("location")?.endsWith("/workspace"));
   rotatedCookies(expiryLink, renewable.pair);
-  console.log("PASS expiry links: current TOTP cookies survive; renewable session rotates before reports");
+  console.log("PASS expiry links: current TOTP cookies survive; renewable session rotates before workspace");
 
   statusUnavailable = true;
   const layoutOutage = await fetch(`${origin}/reports`, { redirect: "manual", headers: { cookie: currentCookie } });

@@ -1,3 +1,4 @@
+import { ImprovementModule } from "./modules/measurement/improvement.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD } from "@nestjs/core";
@@ -23,10 +24,16 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { ReportsModule } from "./modules/reports/reports.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
+import { MeasurementModule } from "./modules/measurement/measurement.module";
+import { ServiceMessagingModule } from "./modules/service-messaging/service-messaging.module";
 import { requestLoggingOptions } from "./common/requestLogging";
+import { DiagnosticsModule } from "./modules/diagnostics/diagnostics.module";
+import { OperationsModule } from "./modules/operations/operations.module";
+import { TelemetryDiagnosticsModule } from "./modules/telemetry-diagnostics/telemetry-diagnostics.module";
 
 @Module({
   imports: [
+    ImprovementModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validate: parseEnv,
@@ -59,6 +66,11 @@ import { requestLoggingOptions } from "./common/requestLogging";
     ReportsModule,
     AdminModule,
     RealtimeModule,
+    MeasurementModule,
+    ServiceMessagingModule,
+    DiagnosticsModule,
+    OperationsModule,
+    TelemetryDiagnosticsModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -1,0 +1,98 @@
+[
+ {
+  "name": "summary",
+  "theme": "light",
+  "computed": "auto 1px offset 0px #d0d0d0",
+  "computedRatio": 1.55,
+  "renderedMaxRingContrast": 1.54,
+  "ringPixels": 880
+ },
+ {
+  "name": "checkbox",
+  "theme": "light",
+  "computed": "auto 1px offset 2px #d0d0d0",
+  "computedRatio": 1.55,
+  "renderedMaxRingContrast": 1.56,
+  "ringPixels": 128
+ },
+ {
+  "name": "textarea",
+  "theme": "light",
+  "computed": "solid 2px offset 2px #171717",
+  "computedRatio": 17.93,
+  "renderedMaxRingContrast": 17.93,
+  "ringPixels": 1822
+ },
+ {
+  "name": "primary-button",
+  "theme": "light",
+  "computed": "solid 2px offset 2px #171717",
+  "computedRatio": 17.93,
+  "renderedMaxRingContrast": 17.93,
+  "ringPixels": 1060
+ },
+ {
+  "name": "secondary-button-legacy",
+  "theme": "light",
+  "computed": "solid 2px offset 2px #171717",
+  "computedRatio": 17.93,
+  "renderedMaxRingContrast": 17.93,
+  "ringPixels": 904
+ },
+ {
+  "name": "language-select",
+  "theme": "light",
+  "computed": "solid 2px offset 2px #171717",
+  "computedRatio": 17.93,
+  "renderedMaxRingContrast": 17.93,
+  "ringPixels": 883
+ },
+ {
+  "name": "summary",
+  "theme": "dark",
+  "computed": "auto 1px offset 0px #3f3f3f",
+  "computedRatio": 1.89,
+  "renderedMaxRingContrast": 19.8,
+  "ringPixels": 1754
+ },
+ {
+  "name": "checkbox",
+  "theme": "dark",
+  "computed": "auto 1px offset 2px #3f3f3f",
+  "computedRatio": 1.89,
+  "renderedMaxRingContrast": 19.8,
+  "ringPixels": 216
+ },
+ {
+  "name": "textarea",
+  "theme": "dark",
+  "computed": "solid 2px offset 2px #f4f4f2",
+  "computedRatio": 17.98,
+  "renderedMaxRingContrast": 17.98,
+  "ringPixels": 1822
+ },
+ {
+  "name": "primary-button",
+  "theme": "dark",
+  "computed": "solid 2px offset 2px #f4f4f2",
+  "computedRatio": 17.98,
+  "renderedMaxRingContrast": 17.98,
+  "ringPixels": 1060
+ },
+ {
+  "name": "secondary-button-legacy",
+  "theme": "dark",
+  "computed": "solid 2px offset 2px #f4f4f2",
+  "computedRatio": 17.98,
+  "renderedMaxRingContrast": 17.98,
+  "ringPixels": 904
+ },
+ {
+  "name": "language-select",
+  "theme": "dark",
+  "computed": "solid 2px offset 2px #f4f4f2",
+  "computedRatio": 17.98,
+  "renderedMaxRingContrast": 17.98,
+  "ringPixels": 977
+ }
+]

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   Inject,
   Injectable,
@@ -5,7 +6,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, userEligibilitySourceCommand, withDiagnosticSourceCommand } from "@auto-tm/db";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import {
@@ -93,14 +94,24 @@ export class UnsuspendUser {
     }
 
     // 4. Execute mutation + audit in one transaction
+    const auditId = randomUUID();
     const result = await this.prisma.$transaction(async (tx) => {
+      const command = await userEligibilitySourceCommand(tx, { userId: input.userId, actorUserId: input.adminUserId,
+        suspendedAt: null, reason: input.reason,
+        intent: { auditId, reason: input.reason } });
+      return withDiagnosticSourceCommand(tx, command, async receipt => {
+        const locked = await tx.user.findUnique({ where: { id: input.userId } });
+        if (!locked || locked.role !== user.role || locked.suspendedAt?.getTime() !== user.suspendedAt?.getTime()
+          || locked.suspendedById !== user.suspendedById || locked.suspensionReason !== user.suspensionReason) throw new Error("diagnostic_source_graph_changed");
       const unsuspendResult = await this.identityAdmin.unsuspendUser(
         input.userId,
         tx,
+        receipt,
       );
 
       const auditRow = await this.auditRepo.create(
         {
+          id: auditId,
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.UserUnsuspend,
           targetType: "user",
@@ -131,6 +142,7 @@ export class UnsuspendUser {
         },
         auditLogId: auditRow.id,
       };
+      });
     });
 
     return result;

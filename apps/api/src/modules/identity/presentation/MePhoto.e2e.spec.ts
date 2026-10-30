@@ -247,18 +247,16 @@ describe("PUT and DELETE /api/v1/me/photo e2e (#642)", () => {
 
   it("refuses a made-up key, another User's key and a video key with one indistinguishable error", async () => {
     const othersKey = await upload("other");
-    const video = await request
-      .post("/api/v1/uploads/presign")
-      .set("Authorization", `Bearer ${tokens.owner}`)
-      .send({ kind: "video", contentType: "video/mp4", sizeBytes: 2048 })
-      .expect(201);
-    ownedKeys.add(video.body.key);
+    // Legacy records predate private video preparation and remain unadoptable.
+    const videoKey = `pending/${suite.id("legacy-video")}/original.mp4`;
+    await prisma.mediaUpload.create({ data: { id: suite.id("legacy-video-upload"), userId: OWNER, key: videoKey, kind: "video", contentType: "video/mp4", sizeBytes: 2048 } });
+    ownedKeys.add(videoKey);
     await s3.send(new PutObjectCommand({
-      Bucket: BUCKET, Key: video.body.key, Body: Buffer.alloc(2048, 1), ContentType: "video/mp4",
+      Bucket: BUCKET, Key: videoKey, Body: Buffer.alloc(2048, 1), ContentType: "video/mp4",
     }));
 
     const bodies = [];
-    for (const key of ["pending/11111111-1111-4111-8111-111111111111/original.webp", othersKey, video.body.key]) {
+    for (const key of ["pending/11111111-1111-4111-8111-111111111111/original.webp", othersKey, videoKey]) {
       const res = await setPhoto("owner", key).expect(400);
       // Everything the caller can tell apart; the timestamp differs per request.
       const { timestamp: _timestamp, ...answer } = res.body as Record<string, unknown>;

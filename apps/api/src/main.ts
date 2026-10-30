@@ -2,27 +2,25 @@ import "reflect-metadata";
 
 import { randomUUID } from "node:crypto";
 
-import { NestFactory } from "@nestjs/core";
-import {
-  FastifyAdapter,
-  type NestFastifyApplication,
-} from "@nestjs/platform-fastify";
-import { ConfigService } from "@nestjs/config";
-import { Logger } from "nestjs-pino";
+import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 
 import { createMediaConversionMaintenanceServer } from "./common/media-conversion-maintenance";
-import { AppModule } from "./app.module";
-import { registerAcceptLanguageHook } from "./common/accept-language";
-import { RealtimeIoAdapter } from "./modules/realtime/infrastructure/RealtimeIoAdapter";
 
 async function bootstrap() {
-  if (process.env["PHOTO_CONVERSION_MAINTENANCE"] === "true") {
+  if (process.env["PHOTO_CONVERSION_MAINTENANCE"] === "true" || process.env["STAGING_CLEAN_RESET_EXECUTOR"] !== undefined) {
     const server = createMediaConversionMaintenanceServer();
     await server.listen({ port: Number(process.env["PORT"] ?? 3006), host: "0.0.0.0" });
     const stop = () => { void server.close().then(() => process.exit(0)); };
     process.once("SIGTERM", stop); process.once("SIGINT", stop);
     return;
   }
+  // Business imports can execute module registration code. They must not run
+  // in the admitted reset executor, including after its automatic restart.
+  const [{ NestFactory }, { FastifyAdapter }, { ConfigService }, { Logger }, { AppModule },
+    { registerAcceptLanguageHook }, { RealtimeIoAdapter }] = await Promise.all([
+    import("@nestjs/core"), import("@nestjs/platform-fastify"), import("@nestjs/config"), import("nestjs-pino"),
+    import("./app.module"), import("./common/accept-language"), import("./modules/realtime/infrastructure/RealtimeIoAdapter"),
+  ]);
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),

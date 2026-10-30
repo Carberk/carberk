@@ -30,3 +30,5 @@ The staff report-detail reader uses `MessageModerationReadPort`, implemented ins
 - [Persistence](infrastructure)
 - [Product requirements](../../../../../docs/prd/features/34-conversations.md)
 - [Schema](../../../../../packages/db/prisma/schema.prisma)
+
+Canonical Improvement cohorts use nullable `firstBuyerMessageId` and `firstSellerReplyId` scalar references set under the Conversation write lock in the same Message/source-outbox transaction. Timestamp and UUID ordering cannot redefine already accepted first outcomes. Existing unmarked history is not backfilled into a new cohort. These references contain no Message body and follow the Conversation lifecycle. Collection outages may omit facts but must never manufacture a later first cohort. Hosted rollback, retry and same-time ordering fixtures live in [ConversationMeasurement.e2e.spec.ts](infrastructure/ConversationMeasurement.e2e.spec.ts).

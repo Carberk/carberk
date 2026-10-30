@@ -4,6 +4,7 @@ import { Phone, MessageCircle } from "lucide-react-native";
 import { Enums } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { emitMeasurement } from "../../measurement/nativeMeasurement";
 import { openSellerDialer } from "../openSellerDialer";
 import { useAuth } from "../../auth/useAuth";
 import {
@@ -77,6 +78,7 @@ export function ContactCtaBar({
 
   const handleCall = async () => {
     if (!canCall || !contactPhone) return;
+    emitMeasurement({ eventName: "call_intent", purpose: "product_improvement", payload: { listingId } });
     await openSellerDialer(contactPhone, t);
   };
 

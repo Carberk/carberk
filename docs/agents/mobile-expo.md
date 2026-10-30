@@ -4,6 +4,8 @@ Use this checklist for any `mobile` issue, Expo SDK package change, Metro failur
 
 For component behavior tests, use the [mobile testing guide](mobile-testing.md).
 
+For EAS builds and signing, use the host's [existing CLI session and managed credentials](cli-access.md) before requesting access or a keystore.
+
 ## First rule
 
 Do not patch `node_modules`, Codegen, Metro resolution, or native-package entrypoints until Expo's dependency check has run. Expo Go ships native modules at SDK-specific versions; mismatched JavaScript packages can compile and still crash at runtime.
@@ -32,7 +34,7 @@ CI=1 pnpm --filter @auto-tm/mobile exec expo install --check
 
 ## Android Worklets prefab patches
 
-The workspace carries two native build patches for Expo Modules Core 55.0.26 and Reanimated 4.2.1. They backport [Expo #43863](https://github.com/expo/expo/pull/43863) and [Reanimated #8685](https://github.com/software-mansion/react-native-reanimated/pull/8685), linking Worklets through its published prefab target. The original consumers hardcode an obsolete AGP output path and fail on clean Debug and Release builds. Worklets 0.7.4 already includes the required prefab cache fix.
+The workspace carries two native build patches for Expo Modules Core 55.0.27 and Reanimated 4.2.1. They backport [Expo #43863](https://github.com/expo/expo/pull/43863) and [Reanimated #8685](https://github.com/software-mansion/react-native-reanimated/pull/8685), linking Worklets through its published prefab target. The original consumers hardcode an obsolete AGP output path and fail on clean Debug and Release builds. Worklets 0.7.4 already includes the required prefab cache fix. The Expo 55.0.32 alignment moves Modules Core to 55.0.27; its published CMake source still needs the identical backport, so the patch is retargeted without changing its contents.
 
 Install through pnpm so the committed patches and lockfile apply consistently. Do not copy shared libraries into the old output directory. Remove each patch when its installed package includes the upstream fix, then repeat the clean native build gate.
 
@@ -78,7 +80,7 @@ pnpm --filter @auto-tm/mobile native:metro -- --env pr-842 --port 8842
 pnpm --filter @auto-tm/mobile native:ios -- --udid <SIMULATOR_UUID> --port 8842
 ```
 
-`--env staging` selects staging. The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
+`--env staging` selects staging. The Railway CLI must support `variables --project`; resolve the current authenticated binary under [CLI access](cli-access.md) and set `RAILWAY_CLI` when another binary precedes it on PATH. Historical host paths and versions are not current access evidence. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
 
 Run `native:ios` from the same worktree after Metro reports its guarded bundle is ready. It verifies the selected bundle against the public-origin receipt in gitignored `.expo/` before any native build. Select a simulator that this session owns; an install and launch replace the app on that selected simulator. Preserve other device and Metro sessions.
 
@@ -198,6 +200,8 @@ Stop owned Metro/device sessions before restoration, retain exact deployment/dev
 ## Android package per build profile
 
 The EAS `production` profile builds Android package `com.auto_tm.ynamly`, the Play app that already exists ([#697](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/697)); it sets `ANDROID_APPLICATION_ID` in `eas.json`, which `app.config.js` reads. `staging`, `production-smoke`, development clients and local builds stay `tm.auto.app`. Each package needs its own Android app in its Firebase project, so the production `GOOGLE_SERVICES_JSON` must be the file for `com.auto_tm.ynamly`. The iOS bundle identifier is `tm.auto.app` everywhere. `simctl` and `adb` commands in this guide use `tm.auto.app` because they drive development builds.
+
+When recovering Android release metadata, use the existing production EAS project before requesting credentials. Follow the [read-only lookup and current receipt](../evidence/issue-897/play-signing-metadata-recovery-20261021.md#fresh-eas-recovery-2026-10-23-utc). Select `production` and filter builds by `com.auto_tm.ynamly`; other profiles are a different app. An EAS build code is not the all-track Play upload maximum, and the EAS upload certificate is not Google's app-signing certificate. Read the credentials summary only; metadata recovery does not require a key export or signing change.
 
 ## Documentation duty
 

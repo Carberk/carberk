@@ -1,5 +1,7 @@
 import {
   Controller,
+  Res,
+  Optional,
   Get,
   Post,
   Delete,
@@ -10,7 +12,7 @@ import {
   BadRequestException,
   Inject,
 } from "@nestjs/common";
-import type { FastifyRequest } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import type { z } from "zod";
 import { ConversationsSchemas } from "@auto-tm/contracts";
 
@@ -29,16 +31,18 @@ import { ListMessages } from "../application/ListMessages";
 import { SendTextMessage } from "../application/SendTextMessage";
 import { SendMessage } from "../application/SendMessage";
 import { SendPostRefMessage } from "../application/SendPostRefMessage";
+import { BusinessChatFiles } from "../application/BusinessChatFiles";
 import { PresignChatAttachmentUpload } from "../application/PresignChatAttachmentUpload";
 import { UpdateWatermark } from "../application/UpdateWatermark";
 import { MuteConversation } from "../application/MuteConversation";
 import { DeleteMessage } from "../application/DeleteMessage";
 import type { Conversation } from "../domain/Conversation";
+import { BUSINESS_ENQUIRY_REPOSITORY, type BusinessEnquiryRepository } from "../domain/ports/BusinessEnquiryRepository";
 import type { Message } from "../domain/Message";
 import type { PostRefMessageMetadata } from "../domain/types";
 import { availabilityMapForListingSummaries } from "../infrastructure/PostRefSnapshotMapper";
 
-type AuthenticatedRequest = FastifyRequest & { user?: { sub?: string } };
+type AuthenticatedRequest = FastifyRequest & { user?: { sub?: string; sid?: string } };
 
 @Controller("api/v1/conversations")
 export class ConversationsController {
@@ -69,6 +73,10 @@ export class ConversationsController {
     private readonly listings: ListingsReadPort,
     @Inject(CountMyUnreadMessages)
     private readonly countMyUnreadMessagesUC: CountMyUnreadMessages,
+    @Inject(BUSINESS_ENQUIRY_REPOSITORY)
+    @Optional()
+    private readonly businessEnquiries?: BusinessEnquiryRepository,
+    @Inject(BusinessChatFiles) @Optional() private readonly businessFiles?: BusinessChatFiles,
   ) {}
 
   @Public()
@@ -91,6 +99,7 @@ export class ConversationsController {
     const result = await this.openConversationUC.execute({
       buyerId: userId,
       listingId: parsed.listingId,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return this.toConversationSummaryResponse(
@@ -143,6 +152,23 @@ export class ConversationsController {
     };
   }
 
+  @Get("business/:businessId")
+  async listBusinessEnquiries(@Param("businessId") businessId: string, @Query("cursor") cursor: string | undefined, @Req() req: FastifyRequest) {
+    const actor = { ...this.actor(req), businessId };
+    if (!this.businessEnquiries) throw new BadRequestException("Business enquiries unavailable");
+    const result = await this.businessEnquiries.list(actor, cursor);
+    return { businessId, unanswered: result.unanswered, nextCursor: result.nextCursor, items: result.items.map(enquiry => ({ id: enquiry.id, listingId: enquiry.listingId, buyerId: enquiry.buyerId, createdBy: enquiry.sellerId, assigneeId: enquiry.assigneeId, status: enquiry.enquiryState, version: enquiry.version, updatedAt: enquiry.updatedAt.toISOString() })) };
+  }
+
+  @Post("business/:businessId/:id/:action")
+  async changeBusinessEnquiry(@Param("businessId") businessId: string, @Param("id") conversationId: string, @Param("action") action: "claim" | "reassign" | "close" | "reopen", @Body() body: unknown, @Req() req: FastifyRequest) {
+    const parsed = typeof body === "object" && body !== null ? body as { expectedVersion?: number; assigneeId?: string | null } : {};
+    if (!Number.isInteger(parsed.expectedVersion)) throw new BadRequestException({ code: "VALIDATION_FAILED", message: "expectedVersion is required" });
+    if (!this.businessEnquiries) throw new BadRequestException("Business enquiries unavailable");
+    const result = await this.businessEnquiries.change({ actor: { ...this.actor(req), businessId }, conversationId, expectedVersion: parsed.expectedVersion as number, action, ...(parsed.assigneeId !== undefined ? { assigneeId: parsed.assigneeId } : {}) });
+    return { id: result.id, assigneeId: result.assigneeId, status: result.enquiryState, version: result.version };
+  }
+
   @Get("unread-count")
   async unreadCount(
     @Req() req: FastifyRequest,
@@ -165,6 +191,7 @@ export class ConversationsController {
     const result = await this.getConversationUC.execute({
       userId,
       conversationId: id,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     const availabilityMap = await this.buildPostRefAvailabilityMap(
@@ -208,6 +235,7 @@ export class ConversationsController {
     const result = await this.listMessagesUC.execute({
       userId,
       conversationId,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
       ...(parsed.cursor ? { cursor: parsed.cursor } : {}),
       limit: parsed.limit,
     });
@@ -236,6 +264,7 @@ export class ConversationsController {
       senderId: userId,
       conversationId,
       text: parsed.text,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return this.toMessageSummary(result.message);
@@ -257,6 +286,7 @@ export class ConversationsController {
       senderId: userId,
       conversationId,
       ...parsed,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return this.toMessageSummary(result.message);
@@ -279,6 +309,7 @@ export class ConversationsController {
       conversationId,
       metadata: parsed.metadata,
       clientMessageId: parsed.clientMessageId,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     const availabilityMap = await this.buildPostRefAvailabilityMap([
@@ -286,6 +317,20 @@ export class ConversationsController {
     ]);
 
     return this.toMessageSummary(result.message, availabilityMap);
+  }
+
+  @Post(":id/attachments/:attachmentId/bytes")
+  uploadBusinessAttachment(@Param("id") id: string, @Param("attachmentId") attachmentId: string, @Body() body: unknown, @Req() req: FastifyRequest) {
+    if (!this.businessFiles) throw new BadRequestException();
+    return this.businessFiles.upload(this.actor(req), id, attachmentId, body);
+  }
+
+  @Get(":id/attachments/:attachmentId")
+  async downloadBusinessAttachment(@Param("id") id: string, @Param("attachmentId") attachmentId: string, @Req() req: FastifyRequest, @Res() reply: FastifyReply) {
+    if (!this.businessFiles) throw new BadRequestException();
+    const bytes = await this.businessFiles.download(this.actor(req), id, attachmentId);
+    reply.header("Cache-Control", "no-store, private").header("Content-Type", "image/webp").header("X-Content-Type-Options", "nosniff");
+    return reply.send(Buffer.from(bytes));
   }
 
   @Post(":id/attachments/presign")
@@ -305,6 +350,7 @@ export class ConversationsController {
       conversationId,
       contentType: parsed.contentType,
       sizeBytes: parsed.sizeBytes,
+      ...(this.actor(req).sessionId || this.actor(req).businessId ? { actor: this.actor(req) } : {}),
     });
 
     return {
@@ -389,6 +435,12 @@ export class ConversationsController {
 
   private userId(req: FastifyRequest): string {
     return (req as AuthenticatedRequest).user?.sub as string;
+  }
+
+  private actor(req: FastifyRequest) {
+    const auth = req as AuthenticatedRequest;
+    const businessId = req.headers?.["x-business-id"];
+    return { userId: auth.user?.sub as string, sessionId: auth.user?.sid, ...(typeof businessId === "string" ? { businessId } : {}) };
   }
 
   private parseOrThrow<T>(

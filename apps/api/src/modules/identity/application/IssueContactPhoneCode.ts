@@ -3,13 +3,8 @@ import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { Enums } from "@auto-tm/contracts";
 
-import {
-  OtpAttemptLedger,
-  SIGN_IN_CODE_RATE_POLICY,
-} from "../domain/OtpAttemptLedger";
 import { OtpCode } from "../domain/OtpCode";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
-import { SignInCodeRateLimitedError } from "../domain/SignInCodeRateLimitedError";
 import type { ContactPhoneCodeSent } from "../domain/ports/ContactPhoneCodePort";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
@@ -19,6 +14,7 @@ import { HttpOtpSenderAdapter } from "../infrastructure/HttpOtpSenderAdapter";
 
 export interface IssueContactPhoneCodeInput {
   userId: string;
+  businessId?: string | undefined;
   phone: string;
   ip: string;
   locale: "ru" | "tk" | "en";
@@ -33,12 +29,6 @@ export interface IssueContactPhoneCodeInput {
  */
 @Injectable()
 export class IssueContactPhoneCode {
-  private readonly ledger = new OtpAttemptLedger(
-    SIGN_IN_CODE_RATE_POLICY.destinationLimit,
-    SIGN_IN_CODE_RATE_POLICY.ipLimit,
-    SIGN_IN_CODE_RATE_POLICY.baseBackoffSeconds,
-  );
-
   constructor(
     @Inject(IDENTITY_TOKENS.OtpRequestRepository)
     private readonly otpRequestRepo: OtpRequestRepository,
@@ -52,49 +42,18 @@ export class IssueContactPhoneCode {
 
   async execute(input: IssueContactPhoneCodeInput): Promise<ContactPhoneCodeSent> {
     const destination = signInCodeDestination({ phone: input.phone });
-    const now = this.clock.now();
-    const dayAgo = new Date(
-      now.getTime() - SIGN_IN_CODE_RATE_POLICY.destinationWindowMs,
-    );
-    const hourAgo = new Date(
-      now.getTime() - SIGN_IN_CODE_RATE_POLICY.ipWindowMs,
-    );
-
-    const [destinationCount24h, ipCount1h, latest] = await Promise.all([
-      this.otpRequestRepo.countByDestinationSince(
-        destination.channel,
-        destination.value,
-        dayAgo,
-      ),
-      this.otpRequestRepo.countByIpSince(input.ip, hourAgo),
-      this.otpRequestRepo.findLatestByDestination(
-        destination.channel,
-        destination.value,
-      ),
-    ]);
-
-    const rateCheck = this.ledger.check({
-      destinationCount24h,
-      ipCount1h,
-      lastAttemptAt: latest?.createdAt ?? null,
-      now,
-    });
-    if (!rateCheck.allowed) {
-      throw new SignInCodeRateLimitedError(rateCheck);
-    }
-
     const code = OtpCode.generate();
-    const record = await this.otpRequestRepo.create({
+    const { record, resendInSeconds, smsDelivery } = await this.otpRequestRepo.reserve({
       purpose: Enums.SignInCodePurpose.ListingContactPhone,
-      channel: destination.channel,
-      destination: destination.value,
+      destination,
       codeHash: createHash("sha256").update(code.value).digest("hex"),
-      expiresAt: destination.expiresAt(now),
       userId: input.userId,
+      ...(input.businessId ? { businessId: input.businessId } : {}),
       ip: input.ip,
-    });
+    }, this.clock);
 
     await this.otpSender.send({
+      smsDelivery,
       phone: destination.value,
       code: code.value,
       purpose: Enums.SignInCodePurpose.ListingContactPhone,
@@ -104,8 +63,8 @@ export class IssueContactPhoneCode {
 
     return {
       requestId: record.id,
-      resendInSeconds: rateCheck.resendInSeconds,
-      ...(this.testMode ? { testCode: code.value } : {}),
+      resendInSeconds,
+      ...(this.testMode && smsDelivery.kind === "ordinary" ? { testCode: code.value } : {}),
     };
   }
 }

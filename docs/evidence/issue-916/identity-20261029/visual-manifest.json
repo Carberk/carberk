@@ -1,0 +1,506 @@
+[
+  {
+    "file": "buyer_private-manual-en.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "buyer_private-manual-en.snapshot.json",
+    "snapshotHash": "52dfe6c6e91d1b15d48f1543892309956d5c72cdebcbee94f88f0f40a2ddfff1",
+    "snapshotFileHash": "a2459e9cc46eb1ec0f0fb30e80b9f101f21d4eed3bb438d7c0e851e16777cfc8",
+    "artifactSha256": "f4a88328225c97d82df0e4dd8ccb9fa09816feb06cb4c0c300188f4a69c9c091",
+    "sizeBytes": 21534,
+    "pages": 3,
+    "locale": "en",
+    "audience": "buyer_private",
+    "method": "manual",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "buyer_private-manual-en-1.png",
+      "buyer_private-manual-en-2.png",
+      "buyer_private-manual-en-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "buyer_private-manual-en-1.png": "fc771d175eba4dbfcd71bce54eb0ee8f37d3b9f6924473520c3643e64f7185b4",
+      "buyer_private-manual-en-2.png": "85a3932b529348afbca8a307447bfeca168b877e91a747996c629d3c7572d799",
+      "buyer_private-manual-en-3.png": "0d030f2b4cbad1e19063c11063747f87a63a4af609eaf820185a28c72b59530f"
+    }
+  },
+  {
+    "file": "buyer_private-manual-ru.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "buyer_private-manual-ru.snapshot.json",
+    "snapshotHash": "52dfe6c6e91d1b15d48f1543892309956d5c72cdebcbee94f88f0f40a2ddfff1",
+    "snapshotFileHash": "a2459e9cc46eb1ec0f0fb30e80b9f101f21d4eed3bb438d7c0e851e16777cfc8",
+    "artifactSha256": "a2b2863efb0af60cf44ab3edb68bf241bdcedfc829270d539b855f96874237f0",
+    "sizeBytes": 25089,
+    "pages": 3,
+    "locale": "ru",
+    "audience": "buyer_private",
+    "method": "manual",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "buyer_private-manual-ru-1.png",
+      "buyer_private-manual-ru-2.png",
+      "buyer_private-manual-ru-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "buyer_private-manual-ru-1.png": "784613c3dd43019f17c7470c822defe44d675ddf4f22d9435607221a3d15933f",
+      "buyer_private-manual-ru-2.png": "696214471dcfa4269ca6fd954cffd30964dd4bfdf64f3a6a0d9184130a235477",
+      "buyer_private-manual-ru-3.png": "88f00d5629c2c32f60e49db1e03ad8bdc10d317a068cb4bce46da7bf948b539e"
+    }
+  },
+  {
+    "file": "buyer_private-manual-tk.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "buyer_private-manual-tk.snapshot.json",
+    "snapshotHash": "52dfe6c6e91d1b15d48f1543892309956d5c72cdebcbee94f88f0f40a2ddfff1",
+    "snapshotFileHash": "a2459e9cc46eb1ec0f0fb30e80b9f101f21d4eed3bb438d7c0e851e16777cfc8",
+    "artifactSha256": "423298ccdc2c4a6d6c0d594899044b23e18ad7b2d5b9c186cf48f6de08337f97",
+    "sizeBytes": 22499,
+    "pages": 3,
+    "locale": "tk",
+    "audience": "buyer_private",
+    "method": "manual",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "buyer_private-manual-tk-1.png",
+      "buyer_private-manual-tk-2.png",
+      "buyer_private-manual-tk-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "buyer_private-manual-tk-1.png": "f26f4f50454fea9a5924563c73794eb5e33b6878d1bbcb01c2f6db35190cc795",
+      "buyer_private-manual-tk-2.png": "ab3a12214c9d3f759f07bbfb19fb79d4cb9fc76e94c68682b96e69913f5915a8",
+      "buyer_private-manual-tk-3.png": "95b316aae0d9bffb758477b24833d9f64323e6d74adbd86260012d8830f33c1d"
+    }
+  },
+  {
+    "file": "buyer_private-vin-en.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "buyer_private-vin-en.snapshot.json",
+    "snapshotHash": "9a0ecb5cf09d0a29a2355eed7c78feb06bd4a77a7266633521143e84a11ecf47",
+    "snapshotFileHash": "cc10f433c933ab84e89325eedfef853c53460902da7ed099d073e3f612e137a3",
+    "artifactSha256": "00eb956b7572d3911c70a1e1fd82ca85237ba43801d3ec9fc2400e81c73f54dd",
+    "sizeBytes": 21624,
+    "pages": 3,
+    "locale": "en",
+    "audience": "buyer_private",
+    "method": "vin",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "buyer_private-vin-en-1.png",
+      "buyer_private-vin-en-2.png",
+      "buyer_private-vin-en-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "buyer_private-vin-en-1.png": "d40277e5b33b04bbf922a5680d4f4aa62efdcc6e8354546c12e26618f465995e",
+      "buyer_private-vin-en-2.png": "85a3932b529348afbca8a307447bfeca168b877e91a747996c629d3c7572d799",
+      "buyer_private-vin-en-3.png": "0d030f2b4cbad1e19063c11063747f87a63a4af609eaf820185a28c72b59530f"
+    }
+  },
+  {
+    "file": "buyer_private-vin-ru.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "buyer_private-vin-ru.snapshot.json",
+    "snapshotHash": "9a0ecb5cf09d0a29a2355eed7c78feb06bd4a77a7266633521143e84a11ecf47",
+    "snapshotFileHash": "cc10f433c933ab84e89325eedfef853c53460902da7ed099d073e3f612e137a3",
+    "artifactSha256": "97738fcec974ddce4a74f14b0ff59c026de53c6b0332b995c0660ffc5ab29c52",
+    "sizeBytes": 25238,
+    "pages": 3,
+    "locale": "ru",
+    "audience": "buyer_private",
+    "method": "vin",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "buyer_private-vin-ru-1.png",
+      "buyer_private-vin-ru-2.png",
+      "buyer_private-vin-ru-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "buyer_private-vin-ru-1.png": "777a5884ccf497af6d4abc39a71fe56cf97e8ee435e11a6d769c74c4c3b5e51a",
+      "buyer_private-vin-ru-2.png": "696214471dcfa4269ca6fd954cffd30964dd4bfdf64f3a6a0d9184130a235477",
+      "buyer_private-vin-ru-3.png": "88f00d5629c2c32f60e49db1e03ad8bdc10d317a068cb4bce46da7bf948b539e"
+    }
+  },
+  {
+    "file": "buyer_private-vin-tk.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "buyer_private-vin-tk.snapshot.json",
+    "snapshotHash": "9a0ecb5cf09d0a29a2355eed7c78feb06bd4a77a7266633521143e84a11ecf47",
+    "snapshotFileHash": "cc10f433c933ab84e89325eedfef853c53460902da7ed099d073e3f612e137a3",
+    "artifactSha256": "7c87047adfb5ee5f8c8facfd42899b35b3a082de42df7f3d506e6169f26a36f5",
+    "sizeBytes": 22649,
+    "pages": 3,
+    "locale": "tk",
+    "audience": "buyer_private",
+    "method": "vin",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "buyer_private-vin-tk-1.png",
+      "buyer_private-vin-tk-2.png",
+      "buyer_private-vin-tk-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "buyer_private-vin-tk-1.png": "d6cf94d64d21e7a5e15b84250b08024ec5881d7e49afc59e5f4d55bfea82d6d5",
+      "buyer_private-vin-tk-2.png": "ab3a12214c9d3f759f07bbfb19fb79d4cb9fc76e94c68682b96e69913f5915a8",
+      "buyer_private-vin-tk-3.png": "95b316aae0d9bffb758477b24833d9f64323e6d74adbd86260012d8830f33c1d"
+    }
+  },
+  {
+    "file": "listing_public-manual-en.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "listing_public-manual-en.snapshot.json",
+    "snapshotHash": "807e2b113be622c75a98e421c0916959525c92c676fadb86861db0600a38e8ae",
+    "snapshotFileHash": "3925a0e789cb7f98748c98303171c5a39e28a66d91877a9e932496e8468782dd",
+    "artifactSha256": "f4a88328225c97d82df0e4dd8ccb9fa09816feb06cb4c0c300188f4a69c9c091",
+    "sizeBytes": 21534,
+    "pages": 3,
+    "locale": "en",
+    "audience": "listing_public",
+    "method": "manual",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "listing_public-manual-en-1.png",
+      "listing_public-manual-en-2.png",
+      "listing_public-manual-en-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "listing_public-manual-en-1.png": "fc771d175eba4dbfcd71bce54eb0ee8f37d3b9f6924473520c3643e64f7185b4",
+      "listing_public-manual-en-2.png": "85a3932b529348afbca8a307447bfeca168b877e91a747996c629d3c7572d799",
+      "listing_public-manual-en-3.png": "0d030f2b4cbad1e19063c11063747f87a63a4af609eaf820185a28c72b59530f"
+    }
+  },
+  {
+    "file": "listing_public-manual-ru.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "listing_public-manual-ru.snapshot.json",
+    "snapshotHash": "807e2b113be622c75a98e421c0916959525c92c676fadb86861db0600a38e8ae",
+    "snapshotFileHash": "3925a0e789cb7f98748c98303171c5a39e28a66d91877a9e932496e8468782dd",
+    "artifactSha256": "a2b2863efb0af60cf44ab3edb68bf241bdcedfc829270d539b855f96874237f0",
+    "sizeBytes": 25089,
+    "pages": 3,
+    "locale": "ru",
+    "audience": "listing_public",
+    "method": "manual",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "listing_public-manual-ru-1.png",
+      "listing_public-manual-ru-2.png",
+      "listing_public-manual-ru-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "listing_public-manual-ru-1.png": "784613c3dd43019f17c7470c822defe44d675ddf4f22d9435607221a3d15933f",
+      "listing_public-manual-ru-2.png": "696214471dcfa4269ca6fd954cffd30964dd4bfdf64f3a6a0d9184130a235477",
+      "listing_public-manual-ru-3.png": "88f00d5629c2c32f60e49db1e03ad8bdc10d317a068cb4bce46da7bf948b539e"
+    }
+  },
+  {
+    "file": "listing_public-manual-tk.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "listing_public-manual-tk.snapshot.json",
+    "snapshotHash": "807e2b113be622c75a98e421c0916959525c92c676fadb86861db0600a38e8ae",
+    "snapshotFileHash": "3925a0e789cb7f98748c98303171c5a39e28a66d91877a9e932496e8468782dd",
+    "artifactSha256": "423298ccdc2c4a6d6c0d594899044b23e18ad7b2d5b9c186cf48f6de08337f97",
+    "sizeBytes": 22499,
+    "pages": 3,
+    "locale": "tk",
+    "audience": "listing_public",
+    "method": "manual",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "listing_public-manual-tk-1.png",
+      "listing_public-manual-tk-2.png",
+      "listing_public-manual-tk-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "listing_public-manual-tk-1.png": "f26f4f50454fea9a5924563c73794eb5e33b6878d1bbcb01c2f6db35190cc795",
+      "listing_public-manual-tk-2.png": "ab3a12214c9d3f759f07bbfb19fb79d4cb9fc76e94c68682b96e69913f5915a8",
+      "listing_public-manual-tk-3.png": "95b316aae0d9bffb758477b24833d9f64323e6d74adbd86260012d8830f33c1d"
+    }
+  },
+  {
+    "file": "listing_public-vin-en.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "listing_public-vin-en.snapshot.json",
+    "snapshotHash": "6ff2ead09c2ac1c90ccff7292720c19117bc454def9447d92f1da9c85a1561b2",
+    "snapshotFileHash": "0f357145db4fa4c2238bd13537cca4c2ff6b762e5425baa772290324b9ce2450",
+    "artifactSha256": "00eb956b7572d3911c70a1e1fd82ca85237ba43801d3ec9fc2400e81c73f54dd",
+    "sizeBytes": 21624,
+    "pages": 3,
+    "locale": "en",
+    "audience": "listing_public",
+    "method": "vin",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "listing_public-vin-en-1.png",
+      "listing_public-vin-en-2.png",
+      "listing_public-vin-en-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "listing_public-vin-en-1.png": "d40277e5b33b04bbf922a5680d4f4aa62efdcc6e8354546c12e26618f465995e",
+      "listing_public-vin-en-2.png": "85a3932b529348afbca8a307447bfeca168b877e91a747996c629d3c7572d799",
+      "listing_public-vin-en-3.png": "0d030f2b4cbad1e19063c11063747f87a63a4af609eaf820185a28c72b59530f"
+    }
+  },
+  {
+    "file": "listing_public-vin-ru.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "listing_public-vin-ru.snapshot.json",
+    "snapshotHash": "6ff2ead09c2ac1c90ccff7292720c19117bc454def9447d92f1da9c85a1561b2",
+    "snapshotFileHash": "0f357145db4fa4c2238bd13537cca4c2ff6b762e5425baa772290324b9ce2450",
+    "artifactSha256": "97738fcec974ddce4a74f14b0ff59c026de53c6b0332b995c0660ffc5ab29c52",
+    "sizeBytes": 25238,
+    "pages": 3,
+    "locale": "ru",
+    "audience": "listing_public",
+    "method": "vin",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "listing_public-vin-ru-1.png",
+      "listing_public-vin-ru-2.png",
+      "listing_public-vin-ru-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "listing_public-vin-ru-1.png": "777a5884ccf497af6d4abc39a71fe56cf97e8ee435e11a6d769c74c4c3b5e51a",
+      "listing_public-vin-ru-2.png": "696214471dcfa4269ca6fd954cffd30964dd4bfdf64f3a6a0d9184130a235477",
+      "listing_public-vin-ru-3.png": "88f00d5629c2c32f60e49db1e03ad8bdc10d317a068cb4bce46da7bf948b539e"
+    }
+  },
+  {
+    "file": "listing_public-vin-tk.pdf",
+    "sourceSha": "c35cfd4e19aca112b247611426857e69304102ed",
+    "snapshotFile": "listing_public-vin-tk.snapshot.json",
+    "snapshotHash": "6ff2ead09c2ac1c90ccff7292720c19117bc454def9447d92f1da9c85a1561b2",
+    "snapshotFileHash": "0f357145db4fa4c2238bd13537cca4c2ff6b762e5425baa772290324b9ce2450",
+    "artifactSha256": "7c87047adfb5ee5f8c8facfd42899b35b3a082de42df7f3d506e6169f26a36f5",
+    "sizeBytes": 22649,
+    "pages": 3,
+    "locale": "tk",
+    "audience": "listing_public",
+    "method": "vin",
+    "rendererVersion": "v1",
+    "generatedAt": "2026-10-18T00:00:00.000Z",
+    "pageImages": [
+      "listing_public-vin-tk-1.png",
+      "listing_public-vin-tk-2.png",
+      "listing_public-vin-tk-3.png"
+    ],
+    "visualInspection": {
+      "result": "pass",
+      "dpi": 110,
+      "dimensionsPixels": [
+        910,
+        1287
+      ],
+      "allPagesIndividuallyInspected": true,
+      "checks": [
+        "localized identity and center labels",
+        "Latin/Turkmen/Cyrillic glyphs",
+        "13-character VIN mask or localized manual label",
+        "findings and all five body-map views",
+        "page numbers and synthetic notices",
+        "no clipping or overlap"
+      ]
+    },
+    "pageImageSha256": {
+      "listing_public-vin-tk-1.png": "d6cf94d64d21e7a5e15b84250b08024ec5881d7e49afc59e5f4d55bfea82d6d5",
+      "listing_public-vin-tk-2.png": "ab3a12214c9d3f759f07bbfb19fb79d4cb9fc76e94c68682b96e69913f5915a8",
+      "listing_public-vin-tk-3.png": "95b316aae0d9bffb758477b24833d9f64323e6d74adbd86260012d8830f33c1d"
+    }
+  }
+]

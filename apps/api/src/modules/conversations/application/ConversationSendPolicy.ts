@@ -81,6 +81,32 @@ export class ConversationSendPolicy {
     return { conversation, listing, recipientId };
   }
 
+  async authorizeBusiness(conversation: Conversation, senderId: string, recipientId: string): Promise<AuthorizedConversationSend> {
+    await this.accessPolicy.assertAccountNotPendingDeletion(senderId);
+    await this.accessPolicy.assertAccountNotPendingDeletion(conversation.buyerId);
+    const listing = await this.loadContactableListing(conversation.listingId);
+    // An unassigned buyer enquiry has no staff peer yet. The departed creator
+    // never supplies participant safety for a business-owned thread.
+    const otherParticipantId = senderId === conversation.buyerId
+      ? conversation.assigneeId ?? senderId
+      : conversation.buyerId;
+    await this.accessPolicy.assertAccountNotPendingDeletion(otherParticipantId);
+    await this.accessPolicy.assertParticipantSafety({ userId: senderId, otherParticipantId, otherParticipantSuspendedMessage: "User is suspended" });
+    return { conversation, listing, recipientId };
+  }
+
+  async businessRestrictionFor(conversation: Conversation, viewerId: string, listing: ListingSummary | null): Promise<SendRestriction | null> {
+    const otherId = viewerId === conversation.buyerId ? conversation.assigneeId ?? viewerId : conversation.buyerId;
+    const safety = await this.accessPolicy.readParticipantSafety(viewerId, otherId);
+    if (safety.blockedByViewer) return "blocked_by_me";
+    const check = checkListing(listing);
+    if (!check.contactable) return check.restriction;
+    if (safety.viewerSuspended || safety.otherSuspended || safety.blockedByOther) return "participant_unavailable";
+    try { await this.accessPolicy.assertAccountNotPendingDeletion(conversation.buyerId); }
+    catch (error) { if (error instanceof ForbiddenException) return "participant_unavailable"; throw error; }
+    return null;
+  }
+
   /**
    * Whether the viewer's next Message would be refused, without throwing.
    * It applies the same Listing rule and reads the same participant-safety

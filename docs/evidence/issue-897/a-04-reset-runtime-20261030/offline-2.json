@@ -1,0 +1,15 @@
+{
+  "command": "node",
+  "args": [
+    "--test",
+    "scripts/staging-control.test.mjs",
+    "scripts/staging-ledger.test.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-c04d2138",
+  "startedAt": "2026-10-29T18:21:00.390Z",
+  "endedAt": "2026-10-29T18:22:05.916Z",
+  "code": 1,
+  "signal": null,
+  "log": "offline-2.log",
+  "sha256": "013ba0789772b8554715f687799c0cbbae7399e17bd5bd5f1467435c4f32c0da"
+}

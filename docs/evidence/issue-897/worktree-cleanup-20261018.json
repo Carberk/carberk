@@ -1,0 +1,1270 @@
+{
+  "capturedDate": "2026-10-18",
+  "source": "/tmp/carberk-campaign-delivery-20261014/worktree-gc-applied.json",
+  "sha256": "d49b08df91224e32d6b9bb663f241e7f97c7e3a1e693eb52b82fb5dc580cc4e5",
+  "terminalExit": 0,
+  "applied": {
+    "done": [
+      "remove worktree /private/tmp/carberk-pr898-docs-fix-dealer-20261014",
+      "remove worktree /Users/bagtyyar/.codex/queue-worktrees/carberk-866-integration-20261014",
+      "remove worktree /Users/bagtyyar/.codex/queue-worktrees/carberk-868-final-integration-20261014",
+      "remove worktree /Users/bagtyyar/.codex/queue-worktrees/carberk-869-transition-20261014",
+      "remove worktree /Users/bagtyyar/.codex/queue-worktrees/carberk-875-finalize-20261014",
+      "remove worktree /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a0ec53b7a000e0c14",
+      "remove worktree /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a7be6005d2ecfe9f4",
+      "remove worktree /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-abc8881b570daecaf",
+      "remove worktree /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-823-ci-fix",
+      "remove worktree /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-ci-resume-20261012",
+      "remove worktree /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-motion-20261013",
+      "remove worktree /Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-staging-build-20261012",
+      "delete branch agent/issue-869 at d49cdea28",
+      "delete branch agent/issue-871 at a5c86237a",
+      "delete branch agent/issue-872 at ba3cd30af",
+      "delete branch agent/issue-870 at 98a8314b9",
+      "delete branch agent/issue-553 at 14f950391",
+      "delete branch agent/issue-642 at 6538be0f4",
+      "delete branch agent/issue-864 at 963933b6f",
+      "delete branch agent/issue-867 at e3e4aa474",
+      "delete branch worktree-agent-a0ec53b7a000e0c14 at bb30e348c",
+      "delete branch worktree-agent-a10f63ade7a876f8d at bb30e348c",
+      "delete branch worktree-agent-a7be6005d2ecfe9f4 at bb30e348c",
+      "delete branch worktree-agent-abc8881b570daecaf at bb30e348c",
+      "prune worktree metadata"
+    ],
+    "failed": null,
+    "skipped": []
+  },
+  "scans": {
+    "processes": {
+      "status": "includes-current-process",
+      "count": 503,
+      "includesCurrentProcess": true
+    },
+    "claude": {
+      "status": "ok",
+      "sessions": 0,
+      "withoutCwd": 0
+    }
+  },
+  "worktreeDecisions": [
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite",
+      "head": "7b7c5d7a564d06c65f72de97e898938c95d49d8d",
+      "branch": "main",
+      "verdict": "keep",
+      "reason": "the main checkout"
+    },
+    {
+      "path": "/private/tmp/carberk-204-ios-upload-source-378727bd",
+      "head": "b7c7de05c429a4ad811ce5ffe65d1f2c737242cc",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "directory is missing (prunable); git worktree prune clears the entry"
+    },
+    {
+      "path": "/private/tmp/carberk-204-production-bb30",
+      "head": "bb30e348ca5d6a986e7e095b161ce5750d3d8731",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "directory is missing (prunable); git worktree prune clears the entry"
+    },
+    {
+      "path": "/private/tmp/carberk-852-native-eb5469ae",
+      "head": "9244b1715466767d42c0dac0d3d854a1a20fe641",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "directory is missing (prunable); git worktree prune clears the entry"
+    },
+    {
+      "path": "/private/tmp/carberk-874-api-20261014",
+      "head": "542c74bbfdd3d9e31a8118acd42e4e40a4828e8e",
+      "branch": "agent/issue-874",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/private/tmp/carberk-900-staff-20261014",
+      "head": "ab6b47256bcbba317c7d84e42161fa63a45b0bb1",
+      "branch": "agent/issue-900",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/private/tmp/carberk-902-business-20261014",
+      "head": "23e1cc7d04ebf08a70dc00030d6ef5cb3084b9f5",
+      "branch": "agent/issue-902",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/private/tmp/carberk-903-services-20261015",
+      "head": "68327524d990b9ba66b86758ce690a68248d7a26",
+      "branch": "agent/issue-903",
+      "verdict": "keep",
+      "reason": "dirty tree (7 changed paths)"
+    },
+    {
+      "path": "/private/tmp/carberk-907-intake-20261015",
+      "head": "dadbb8d6c4ed52b787250bdf4de8f671ded6319c",
+      "branch": "agent/issue-907",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/private/tmp/carberk-908-inventory-20261015",
+      "head": "4e2a25eb801195156c7aa10ad8602787efaa5082",
+      "branch": "agent/issue-908",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/private/tmp/carberk-909-enquiries-20261015",
+      "head": "561661225466fc54cf69f811bce3d515ac3ff464",
+      "branch": "agent/issue-917",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/private/tmp/carberk-pr898-docs-fix-dealer-20261014",
+      "head": "205a9f75dfbe6bc785c4adc2b9b7ec7474ad704c",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #898 merged; HEAD is the PR head"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-368-fix-0930a",
+      "head": "763af228b702366010a20e0ab09d780a95f06522",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-536-storage-20261002-sol",
+      "head": "e2e81d76e81025236442b870dc670197bbb52a89",
+      "branch": "evidence/issue-536-storage",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-537-native-20261002-sol",
+      "head": "96e0238369ecc6cdddcedfad78ead2608152346f",
+      "branch": "evidence/issue-537-screenshots",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-progress622-20261003-d5b6",
+      "head": "631495535435bd807cabc5884e5a220e31080c88",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-prototype-353-20261002-sol",
+      "head": "43d4e79023eb6fb6868a6cf7c851970cdb92dbcc",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-prototype-353-identityfix-20261002-sol",
+      "head": "a051fafb719b68d6e0b68fca2548c7c61be517a2",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-prototype-500-images-20261002-sol",
+      "head": "e5497796146a75c4b0d85e98495a8d3192a18422",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-ui717-20261007",
+      "head": "917b0e405aafcafb8a7a721e8ef2f85e2c0646c0",
+      "branch": "agent/issue-717",
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/autotm-ui718-20261007",
+      "head": "d3ea31ec7eb6650df20fe75ae6b55ce68a845871",
+      "branch": "agent/issue-718",
+      "verdict": "keep",
+      "reason": "locked: Active issue 718 implementer"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-866-integration-20261014",
+      "head": "180eca51bb71df4867784202de52553651a5471e",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #868 merged; HEAD is an ancestor of PR #868 head"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-866-native-20261014",
+      "head": "b33aaa18d1b5269c261c556321f36252f9965d9f",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (4 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-868-final-integration-20261014",
+      "head": "e94bfdc6c3e55defa2dde5c4239345b8f581743e",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #868 merged; HEAD is the PR head"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-869-transition-20261014",
+      "head": "d49cdea28744d24e97a4160230939a46195eb3e8",
+      "branch": "agent/issue-869",
+      "verdict": "remove",
+      "reason": "PR #868 merged; HEAD is an ancestor of PR #868 head"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-874-views-20261014",
+      "head": "bb30e348ca5d6a986e7e095b161ce5750d3d8731",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-875-finalize-20261014",
+      "head": "ba3cd30afc519477289bc67ac94b9d4e059a5d0b",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #875 merged; HEAD is the PR head"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-897-service-prototype-20261014",
+      "head": "7d48f7c6629531cfdad3a0ecb49e93467d37e9b0",
+      "branch": "prototype/campaign-services-897",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-901-staging-controls-20261015",
+      "head": "ecda454941861d05fbb5d90b4c6da61a9a5f5dcc",
+      "branch": "agent/issue-901",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-906-admin-shell-20261015",
+      "head": "ae490b4a23ef11fce71badf1534e2f639c92b3d8",
+      "branch": "agent/issue-906",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-founder-ios-20261014",
+      "head": "2e1bcb97fff0b7582490b7d5566f067a03f31608",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/queue-worktrees/carberk-workflow-docs-20261014-writer-731",
+      "head": "2e1bcb97fff0b7582490b7d5566f067a03f31608",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (44 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/worktrees/45df/auto.tm-rewrite",
+      "head": "87b9631f79928d895b2fc21263704b8b0107d0cb",
+      "branch": "codex/prototype-decisions-2026-10-04",
+      "verdict": "keep",
+      "reason": "Codex app-managed worktree (~/.codex/worktrees)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/worktrees/4f71/auto.tm-rewrite",
+      "head": "7f5bb8b8b8f2e55b8dbfdb50568b7d1276a8b924",
+      "branch": "research/observability-managed-options-2026-10-03",
+      "verdict": "keep",
+      "reason": "Codex app-managed worktree (~/.codex/worktrees)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/worktrees/7f01/auto.tm-rewrite",
+      "head": "ad25c4c4d0cdde1f73017aada97e8153b022ca9b",
+      "branch": "codex/reviewer-native-integration-20261003",
+      "verdict": "keep",
+      "reason": "Codex app-managed worktree (~/.codex/worktrees)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/worktrees/82eb/auto.tm-rewrite",
+      "head": "a64e60a0757ad11b15ab4f9b7116c58ae25dbecc",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "Codex app-managed worktree (~/.codex/worktrees)"
+    },
+    {
+      "path": "/Users/bagtyyar/.codex/worktrees/release-wayfinder-handoff/auto.tm-rewrite",
+      "head": "f704c8475440b2dd5d7199ac6603233445cb0f6c",
+      "branch": "agent/issue-535",
+      "verdict": "keep",
+      "reason": "Codex app-managed worktree (~/.codex/worktrees)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/issue-874-mobile-legal",
+      "head": "b86cb1e15642012580d3e7f180e80721838969f1",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/issue-888-native-proof",
+      "head": "87dea6e8793fc17f6e6b639a6e8c8103e7860c0e",
+      "branch": "agent/issue-888",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/issue-889-video-protocol",
+      "head": "b8dca6391424b6af86dd638cb2a04bde48c3688b",
+      "branch": "agent/issue-889",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/issue-899-fingerprint-retention",
+      "head": "c5119ae0eeea9d792b4a6bc00f86c6974a620542",
+      "branch": "agent/issue-899",
+      "verdict": "keep",
+      "reason": "PR #904 is open"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/issue-905-measurement",
+      "head": "00a38875ac83bd783172f6ebd7b218fa89fe4384",
+      "branch": "agent/issue-905",
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3-0cd5dc58",
+      "head": "4d194ff6df6896e5276bf104dc7e83a243e8e299",
+      "branch": "t3/issue-897-dealer-measurement-fixes",
+      "verdict": "keep",
+      "reason": "running agent: pid 68433 (kimi-cu) works in it"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3-579db4f4",
+      "head": "7a1aa5110e59674c944d4a920ac6c17641f21a84",
+      "branch": "t3/video-seller-processing-resume",
+      "verdict": "keep",
+      "reason": "running agent: pid 67454 (kimi-cu) works in it"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3-87148a59",
+      "head": "ef403fa58908a3d4c0542f2dc420921811627652",
+      "branch": "t3/resume-897-diagnostics-readiness",
+      "verdict": "keep",
+      "reason": "running agent: pid 69668 (kimi-cu) works in it"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3-a26830a7",
+      "head": "ef85f17f308a36cf7a7c8e8c45717d45b534f864",
+      "branch": "t3/pr904-campaign-standards-review",
+      "verdict": "keep",
+      "reason": "running agent: pid 85113 (kimi-cu) works in it"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3-bcd87cbd",
+      "head": "ef85f17f308a36cf7a7c8e8c45717d45b534f864",
+      "branch": "t3/campaign-pr904-spec-acceptance-review",
+      "verdict": "keep",
+      "reason": "running agent: pid 85140 (node) works in it"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3-d4ed9082",
+      "head": "300152807e8db9df0f028834fb47f40d5e030fc7",
+      "branch": "t3/campaign897-acceptance-fixtures",
+      "verdict": "keep",
+      "reason": "running agent: pid 99061 (kimi-cu) works in it"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3-dfaeebe4",
+      "head": "a63f537fd83b7c968c165d348693a50bc32c615f",
+      "branch": "t3/smtp-error-monitoring-alerts",
+      "verdict": "keep",
+      "reason": "running agent: pid 90157 (kimi-cu) works in it"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-24fd1ea9",
+      "head": "a64e60a0757ad11b15ab4f9b7116c58ae25dbecc",
+      "branch": "t3code/24fd1ea9",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-258ff3ff",
+      "head": "2e1bcb97fff0b7582490b7d5566f067a03f31608",
+      "branch": "t3code/258ff3ff",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-277d9782",
+      "head": "f3d6ea3fe1563d48b486bcfc6463d5809052e951",
+      "branch": "t3code/277d9782",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-2a904ff7",
+      "head": "bb30e348ca5d6a986e7e095b161ce5750d3d8731",
+      "branch": "t3code/2a904ff7",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-374de406",
+      "head": "2e1bcb97fff0b7582490b7d5566f067a03f31608",
+      "branch": "t3code/374de406",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-38c3bd4c",
+      "head": "f3d6ea3fe1563d48b486bcfc6463d5809052e951",
+      "branch": "t3code/38c3bd4c",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-5366f6a7",
+      "head": "faf1c253d1276cd814cc26edde62160749f9065a",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (2 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-6496a0fd",
+      "head": "2e1bcb97fff0b7582490b7d5566f067a03f31608",
+      "branch": "t3code/6496a0fd",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-6b58c36e",
+      "head": "f3d6ea3fe1563d48b486bcfc6463d5809052e951",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-6e9fa951",
+      "head": "cf452fd3881ee46b6fcea4b59d87ba1be8f1e512",
+      "branch": "shape/dealer-showroom-diagnostics",
+      "verdict": "keep",
+      "reason": "dirty tree (57 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-92f034a0",
+      "head": "a64e60a0757ad11b15ab4f9b7116c58ae25dbecc",
+      "branch": "t3code/92f034a0",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-9ed87b09",
+      "head": "cf452fd3881ee46b6fcea4b59d87ba1be8f1e512",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-b723497c",
+      "head": "a64e60a0757ad11b15ab4f9b7116c58ae25dbecc",
+      "branch": "t3code/continue-integration-branch-work",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-dddcdf69",
+      "head": "83d8acf38d1837be0c4f860193903af365569d55",
+      "branch": "agent/spec-897-campaign",
+      "verdict": "keep",
+      "reason": "the current session's own worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/.t3/worktrees/auto.tm-rewrite/t3code-de29c8f3",
+      "head": "af2ec40403c9aa4963bd8501ca301aaf2a7e5fde",
+      "branch": "t3code/de29c8f3",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is already on main and belongs to no PR)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a0d1782972e7aa0a2",
+      "head": "26b7d291705beea8d1a9f7553527b4c6adf28923",
+      "branch": "ci/hosted-runner-trial",
+      "verdict": "keep",
+      "reason": "PR #473 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a0ec53b7a000e0c14",
+      "head": "a5c86237a5c3b7a8b67884328b279bddcd1fc202",
+      "branch": "agent/issue-871",
+      "verdict": "remove",
+      "reason": "PR #876 merged; HEAD is the PR head"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a10f63ade7a876f8d",
+      "head": "d47c5a039a91e1822f812399abdd57405a6a976e",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (2 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a12b19beb7148b9f1",
+      "head": "13e0429d7b6fe8bdc41c29901a2f15df23571c1c",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (2 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a1829478bf7e0af54",
+      "head": "23b9e892e8f21d87631ae0f48697016849b1983e",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a1aa664763dd2fa24",
+      "head": "b1cbd61419155a696ad3972aa93b9c2bd63af183",
+      "branch": "proto/favorites-support-entry",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a1dba7895a7a21db4",
+      "head": "0a0fd35ea50a6876019b3945745dd8e431c917af",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a239ef1cb823a258f",
+      "head": "3309977d8f7941b3da41a766672c070a909d5e0b",
+      "branch": "agent/issue-504",
+      "verdict": "keep",
+      "reason": "dirty tree (3 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a33f771402ce22cf7",
+      "head": "2aa2f39e1242d4fa2eedc5fd7784f41692a86fb6",
+      "branch": "prototype/sell-wizard-evidence",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a33f7c7ef4d1843a6",
+      "head": "18229b8a6ed5ace0ebde576293250432e1c63c0d",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a36a2e1ecebadbb3b",
+      "head": "8402d60cdf83fcec207f4c0177501a4aa168629e",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a3f90da72ad559709",
+      "head": "b9449a7db99e5aa1413f73270525af3c3f53bc9a",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a400bf8442d3193f3",
+      "head": "d7a80a59b3784608cf7fe6a6bb14baab4d291ab3",
+      "branch": "chore/mobile-glass-material",
+      "verdict": "keep",
+      "reason": "PR #769 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a41ff0a63a7bbf0be",
+      "head": "7382e77ff79c1d0804cdec4866166ad23b27ac2b",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a43a91b8096e8c216",
+      "head": "4f3dd3366beb8a8a7b64cd5544a6b6ba87ffa24c",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a4448f370b799346e",
+      "head": "8009b3c50a262ff5ea1f2d4c9e097b16d35d013a",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (8 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a45088562b8cc9a5e",
+      "head": "92b867b7db27bcf5deceee8cefa29777f9afffb8",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a4b52a8a71e34261f",
+      "head": "143947fa34b33712375f282656d45479e1d46b6b",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (18 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a558338d297a15128",
+      "head": "ca80979a7f9f2cda9a969bbe9b77f8cbeaa2a97a",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (10 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a582adab835d77627",
+      "head": "4ebac6943f9b8063b2e4b0ca67fad8454508e856",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (5 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a5a9309ed457c457e",
+      "head": "9c2f1f5b21c3168dfa6a770dabd77c17a303d3d1",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (5 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a5dd9bcf564dd6eb2",
+      "head": "e58f42188aee1aa18f9155d53b36576afe998509",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a62ec5e8ba14f8867",
+      "head": "e2e81d76e81025236442b870dc670197bbb52a89",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a6f7e9c7c3af920ea",
+      "head": "8402d60cdf83fcec207f4c0177501a4aa168629e",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a7698a472271f4ccf",
+      "head": "214bc9c6c3c97a005a095591721789a55abc068f",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a7be6005d2ecfe9f4",
+      "head": "ba3cd30afc519477289bc67ac94b9d4e059a5d0b",
+      "branch": "agent/issue-872",
+      "verdict": "remove",
+      "reason": "PR #875 merged; HEAD is the PR head"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a7d0e5586d2a9e141",
+      "head": "4b6e064ca780bb2972e0b3548658bc6d4677d4bc",
+      "branch": "agent/issue-455",
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a831d044cea1cfd25",
+      "head": "c79c1a409410c2a034cc83517982732687510094",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a8ff37191e1b8ffe8",
+      "head": "3309977d8f7941b3da41a766672c070a909d5e0b",
+      "branch": "agent/issue-502",
+      "verdict": "keep",
+      "reason": "dirty tree (4 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a9112f6e7536563c6",
+      "head": "8f5203843b369a389647ba4891081cd0fa7f0f8b",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a913f09f863ee6106",
+      "head": "36d28919007fb372d12a9082ccf2a4fef709b64c",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (3 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a941d995408205b92",
+      "head": "59be524f89b95a3a6bd2f2177a9245706751c98e",
+      "branch": "prototype/support-conversations",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a9785b735ec2403a4",
+      "head": "4bcb57d6225d21dca8ea6c009939d92c88cd96b7",
+      "branch": "agent/issue-506",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is not the PR head or its ancestor, so it may hold commits the PR lacks)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-a9dfdf04cb60b3667",
+      "head": "93ee62bb7f7c9ecd52431dfc08e2338d57374ade",
+      "branch": "proto-topfix",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-aa76e77e778f2919b",
+      "head": "d5fbb6888ae3011d78acc4ce730e19dd7f65f318",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-aab5f77fbf1b65d71",
+      "head": "eaa1b20bd3f4f951e6cd9524d8583b2517a52eed",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-aab70ef4df79fab79",
+      "head": "23b9e892e8f21d87631ae0f48697016849b1983e",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-aaf69a196ac239658",
+      "head": "7ca1df34e0957f96c886f6824f41cc9bd37e6cf2",
+      "branch": "prototype/favorites-conversations",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-abc8881b570daecaf",
+      "head": "98a8314b9c59cb5ac4ea47be10d98c82f7c99bca",
+      "branch": "agent/issue-870",
+      "verdict": "remove",
+      "reason": "PR #868 merged; HEAD is an ancestor of PR #868 head"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-abcd768684f28d271",
+      "head": "e729eae390b871fa71ad408450e3e1431f4fa0a8",
+      "branch": "agent/issue-695",
+      "verdict": "keep",
+      "reason": "dirty tree (33 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-abef30b15bd65c126",
+      "head": "31574b58de07395ec846a600354c9e6394bbff35",
+      "branch": "agent/issue-518",
+      "verdict": "keep",
+      "reason": "dirty tree (9 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-ac64aef5e96fdb822",
+      "head": "22784d98cd9c52018e66f539430da7ceb56d4316",
+      "branch": "agent/issue-503",
+      "verdict": "keep",
+      "reason": "dirty tree (2 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-ad133d2f57101188c",
+      "head": "17486ab6a9a5c9e597355a0681a976ea5b7ad98f",
+      "branch": "proto-update",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-ad35db867fa3af082",
+      "head": "516175cb9477d82cff93714eafe15efd11998c3b",
+      "branch": "agent/issue-536",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is not the PR head or its ancestor, so it may hold commits the PR lacks)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-ad76e300b01b6c000",
+      "head": "e58f42188aee1aa18f9155d53b36576afe998509",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (6 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-ad8cacb1ee4281a24",
+      "head": "97155e6d1e44b44877568b3c1e71f1817293245e",
+      "branch": "agent/issue-472",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is not the PR head or its ancestor, so it may hold commits the PR lacks)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-adaec2c342b76c4b5",
+      "head": "ccdf7c2f00e0649689d9d43d69e48ef4caef0c31",
+      "branch": "prototype/cabinet-profile",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-ae216f000e1f05805",
+      "head": "93ee62bb7f7c9ecd52431dfc08e2338d57374ade",
+      "branch": "reconcile-353",
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-ae663f8cdd9d261af",
+      "head": "afa339d3cb31077a9fdb46daf96ea8d8ab82454d",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-aead8f604468d2bab",
+      "head": "7815a3f3e0371f51a9dc7555d6280c9c2cb58668",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-aec119267477df1e2",
+      "head": "2aa2f39e1242d4fa2eedc5fd7784f41692a86fb6",
+      "branch": "d12-sell-wizard",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-af4002918b20dde44",
+      "head": "42021e28c44b377c59355b3859154b49cbe4f666",
+      "branch": "agent/issue-640",
+      "verdict": "keep",
+      "reason": "dirty tree (8 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-af71f31ef7a5331cc",
+      "head": "0a0fd35ea50a6876019b3945745dd8e431c917af",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-af97872a70f909094",
+      "head": "c8417beec5b659b2bb0050ab2e3aba4129a09319",
+      "branch": "agent/issue-368",
+      "verdict": "keep",
+      "reason": "dirty tree (3 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-afafe0831fec67ea3",
+      "head": "3309977d8f7941b3da41a766672c070a909d5e0b",
+      "branch": "prototype/sell-wizard",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-afcac7fbc05f5f657",
+      "head": "40181221819c3a84c17b7f4fe318c8c2d62b26b2",
+      "branch": "agent/issue-377",
+      "verdict": "keep",
+      "reason": "dirty tree (2 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-afdcd5694cbbbf455",
+      "head": "1d79c7b9ba6ff272723c60fd0fd08f7cc4f1912b",
+      "branch": "agent/issue-471",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is not the PR head or its ancestor, so it may hold commits the PR lacks)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/agent-afef912e27d7c2099",
+      "head": "e321e365159647e8383e4ac253bd5e9af4667b9b",
+      "branch": "d10-update",
+      "verdict": "keep",
+      "reason": "no PR match (no PR head equals HEAD or descends from it)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-823-ci-fix",
+      "head": "c56ac5ae1e8eae9f047c07d7845953373688ed09",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #848 merged; HEAD is an ancestor of PR #848 head"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-823-fix",
+      "head": "99963c763199d234a5e6cdf66b47fd2739f6d493",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "PR #835 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-824-thumbhash",
+      "head": "705a14418bea39f9521c123d94d086645d44ec40",
+      "branch": "agent/issue-824",
+      "verdict": "keep",
+      "reason": "PR #846 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-833-docs",
+      "head": "f666cf4fd52d3c72b81cf3c1b9d1226287dd8a21",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "PR #834 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-837-contracts",
+      "head": "85da4c42943231d9790067621933e6f37d54cef0",
+      "branch": "agent/issue-837",
+      "verdict": "keep",
+      "reason": "PR #845 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-841-docs",
+      "head": "8aa68c1294bebe9464b8fef2bca929b83b1eec0a",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "PR #842 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/claude-843-keyboard",
+      "head": "343688176c38f44898938e54a2d5ef8f88f13817",
+      "branch": "agent/issue-843",
+      "verdict": "keep",
+      "reason": "PR #844 closed without merging"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-ci-resume-20261012",
+      "head": "bf3f7534bc623afaf701f7c179bcddabd92634cf",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #848 merged; HEAD is an ancestor of PR #848 head"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-compact-login-20261013",
+      "head": "d03c8811b2fd1e8929510b8bdeabafcd8a13d77c",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-final-20261013",
+      "head": "10d3f1b56cd23f6c9d628f6664e353b940993df3",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "locked: PR848 final release writer preserved until root merge gate"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-motion-20261013",
+      "head": "d16e70f4a4afb5b92bcfbec3a9a7c9d5e380715e",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #848 merged; HEAD is an ancestor of PR #848 head"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-848-staging-build-20261012",
+      "head": "bf3f7534bc623afaf701f7c179bcddabd92634cf",
+      "branch": null,
+      "verdict": "remove",
+      "reason": "PR #848 merged; HEAD is an ancestor of PR #848 head"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-850-resume-20261013",
+      "head": "add8e17bfccdbda571fa3275d9ed2226a05790cc",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "locked: Active Codex #850 integration implementer"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-issue-758",
+      "head": "e5124c0f4ca7d3a25bb892a1c11682d8400b59f1",
+      "branch": "agent/issue-758",
+      "verdict": "keep",
+      "reason": "locked: Cleanup gate blocked: issue 758 remains OPEN despite merged PR 761; preserve 20261013"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-launch-polish",
+      "head": "07178be9dc70948f4bfc69e49549314164899d02",
+      "branch": "agent/issue-833",
+      "verdict": "keep",
+      "reason": "dirty tree (4 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-native-prefab-20261013",
+      "head": "839ead289f0e3de1221c277fed9086be26efe72e",
+      "branch": "agent/issue-858",
+      "verdict": "keep",
+      "reason": "locked: Active native prefab repair implementer"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-native-session-helper",
+      "head": "de56c7155a0ec9057ad17b0a2632004ad1204a11",
+      "branch": "agent/issue-841",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is not the PR head or its ancestor, so it may hold commits the PR lacks)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/codex-webp-media",
+      "head": "3ca4ed8d18ba3d0f343c91796703c35213d9cb7d",
+      "branch": "agent/issue-823",
+      "verdict": "keep",
+      "reason": "dirty tree (4 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/docs-play-pack",
+      "head": "f43be9f29ca170f4f932013d346cc77eb23d20af",
+      "branch": "docs/play-store-screenshots",
+      "verdict": "keep",
+      "reason": "locked: Preserve release assets checkout per root coordinator 20261013"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/evidence-572",
+      "head": "ed436a2effe158f94b624905417cd37c10e22334",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/favorites-screenshots-pr-556-a949e0",
+      "head": "83d1b6094571f2497acd45ca0d3303602fcea746",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "locked: Preserve ignored screenshot evidence tmp; release disk recovery 20261013"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/fix-chat-separator-vin",
+      "head": "3c67a6ebc634d411d447798087a2e39022df973d",
+      "branch": "fix/chat-date-separator-vin-clear",
+      "verdict": "keep",
+      "reason": "no PR match (HEAD is not the PR head or its ancestor, so it may hold commits the PR lacks)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/issue-363",
+      "head": "0000000000000000000000000000000000000000",
+      "branch": "agent/issue-363",
+      "verdict": "keep",
+      "reason": "unborn branch"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/issue-712",
+      "head": "36aebd0add0c0426a04c6d984d1900db06860f06",
+      "branch": "agent/issue-712",
+      "verdict": "keep",
+      "reason": "dirty tree (3 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/kimi-cli-session-continue-5829cb",
+      "head": "7bda970da0c34c7f3018a7ca71926b004ee18dc1",
+      "branch": "agent/batch-5-sell-photos",
+      "verdict": "keep",
+      "reason": "locked: Preserve ignored scratch and handoff tmp; release disk recovery 20261013"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/kimi-issue-542",
+      "head": "ba9ed9c5152248a247140ce5c7dbe8649f538abb",
+      "branch": "agent/issue-542",
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/kimi-issue-593",
+      "head": "ce26bd25cf35792e5718d4e8eea1dd094b71d664",
+      "branch": "agent/issue-593",
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/kimi-pr660-spec",
+      "head": "3d80370ad70219cd2bf46c18ef6032ddb9ad6c17",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (3 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/orchestration-handoff-7ce258",
+      "head": "5264344b2395eee701996b458efc03e8b8b1fe49",
+      "branch": "claude/orchestration-handoff-7ce258",
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/orchestration-handoff-prototypes-7daa9e",
+      "head": "664cfc3ce2cec897c7807e78f425aa11aff7f79d",
+      "branch": "claude/review-session-d8a31d",
+      "verdict": "keep",
+      "reason": "dirty tree (41 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/pr-558-screenshots-027f3b",
+      "head": "012993e7384f45314f598daf0a3cc132e5aae778",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (6 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/pr555-cabinet-screenshots-2086c0",
+      "head": "4a844e10c419668e4eee5d6c0709465a73a62b52",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "locked: holds orchestration handoff tmp/ (gitignored); keep until handoff moved"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/pr555-screens",
+      "head": "b6e9f00ce6fd65563ecd2f63080f3b0c183a80d8",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/prototype-sell-wizard-d12",
+      "head": "21a3ae2ee74a132b3506edaddf3ee1c74e0ed83e",
+      "branch": "prototype-sell-wizard-d12",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/release-emulator-pass",
+      "head": "c447b7f823f3993b596f8d0a5fc287b561856b9a",
+      "branch": "evidence/release-emulator-pass-2",
+      "verdict": "keep",
+      "reason": "evidence, prototype or research worktree"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/root-823-proof",
+      "head": "c56ac5ae1e8eae9f047c07d7845953373688ed09",
+      "branch": null,
+      "verdict": "keep",
+      "reason": "dirty tree (1 changed paths)"
+    },
+    {
+      "path": "/Users/bagtyyar/Projects/auto.tm-rewrite/.claude/worktrees/root-rc-204",
+      "head": "96f088fae64d2fe90e052d4c9749327fa7df1477",
+      "branch": "release/2.0.4-rc",
+      "verdict": "keep",
+      "reason": "dirty tree (5 changed paths)"
+    }
+  ],
+  "staleBranches": [
+    {
+      "name": "agent/issue-553",
+      "sha": "14f950391d1b1df560a1aecf90812a79c02132be",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "agent/issue-553",
+        "headRefOid": "8e2023ed42520ed184a628aa9fb38fb34660ca29",
+        "number": 650,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/650"
+      },
+      "onMain": true
+    },
+    {
+      "name": "agent/issue-642",
+      "sha": "6538be0f4b599f421b4d73e63585de7191ad77d7",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "agent/issue-642",
+        "headRefOid": "de8ba50c22bbb04afe10e8fcbaefc7b9fba86a6b",
+        "number": 737,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/737"
+      },
+      "onMain": true
+    },
+    {
+      "name": "agent/issue-864",
+      "sha": "963933b6f0bef280ed21e24eff8531d4c8dcfcdb",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "agent/spec-866-detail-loading",
+        "headRefOid": "e94bfdc6c3e55defa2dde5c4239345b8f581743e",
+        "number": 868,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/868"
+      },
+      "onMain": false
+    },
+    {
+      "name": "agent/issue-867",
+      "sha": "e3e4aa474a9fa0f6b9ea141a4a8f5d305c7ac3dd",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "agent/spec-866-detail-loading",
+        "headRefOid": "e94bfdc6c3e55defa2dde5c4239345b8f581743e",
+        "number": 868,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/868"
+      },
+      "onMain": false
+    },
+    {
+      "name": "worktree-agent-a0ec53b7a000e0c14",
+      "sha": "bb30e348ca5d6a986e7e095b161ce5750d3d8731",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "shape/campaign-20261014",
+        "headRefOid": "205a9f75dfbe6bc785c4adc2b9b7ec7474ad704c",
+        "number": 898,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/898"
+      },
+      "onMain": true
+    },
+    {
+      "name": "worktree-agent-a10f63ade7a876f8d",
+      "sha": "bb30e348ca5d6a986e7e095b161ce5750d3d8731",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "shape/campaign-20261014",
+        "headRefOid": "205a9f75dfbe6bc785c4adc2b9b7ec7474ad704c",
+        "number": 898,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/898"
+      },
+      "onMain": true
+    },
+    {
+      "name": "worktree-agent-a7be6005d2ecfe9f4",
+      "sha": "bb30e348ca5d6a986e7e095b161ce5750d3d8731",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "shape/campaign-20261014",
+        "headRefOid": "205a9f75dfbe6bc785c4adc2b9b7ec7474ad704c",
+        "number": 898,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/898"
+      },
+      "onMain": true
+    },
+    {
+      "name": "worktree-agent-abc8881b570daecaf",
+      "sha": "bb30e348ca5d6a986e7e095b161ce5750d3d8731",
+      "pr": {
+        "baseRefName": "main",
+        "headRefName": "shape/campaign-20261014",
+        "headRefOid": "205a9f75dfbe6bc785c4adc2b9b7ec7474ad704c",
+        "number": 898,
+        "state": "MERGED",
+        "url": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/898"
+      },
+      "onMain": true
+    }
+  ]
+}

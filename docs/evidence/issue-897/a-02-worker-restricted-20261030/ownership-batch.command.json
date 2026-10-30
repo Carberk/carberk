@@ -1,0 +1,26 @@
+{
+  "name": "ownership-batch",
+  "program": "pnpm",
+  "arguments": [
+    "--filter",
+    "@auto-tm/worker",
+    "test",
+    "src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts",
+    "--maxWorkers=1",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/ownership-batch.vitest.json"
+  ],
+  "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "startedAt": "2026-10-29T18:26:18.740Z",
+  "finishedAt": "2026-10-29T18:26:19.724Z",
+  "exitCode": 1,
+  "signal": null,
+  "error": null,
+  "log": "ownership-batch.log",
+  "logSha256": "2ea398126395d4ad55792b48f5d2053727ef12990a0d571f1002a3f69b76e8ef",
+  "environmentNames": [
+    "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE",
+    "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_EVIDENCE_DIR"
+  ]
+}

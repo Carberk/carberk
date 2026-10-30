@@ -1,0 +1,136 @@
+[
+ {
+  "step": "tab-order to submit (capture form, includes earlier controls)",
+  "found": true,
+  "stops": 39,
+  "order": [
+   "select \"Language\"  r=17.93",
+   "button \"Back to assigned work\"  r=17.93",
+   "button \"Load current version\"  r=17.93",
+   "button \"Visit and identity\"  r=17.93",
+   "button \"Link a previous inspection\"  r=17.93",
+   "button \"Reports and revisions\"  r=17.93",
+   "button \"Read identity history\"  r=17.93",
+   "summary \"Current staff member\"  r=1.55",
+   "textarea#r_0_-image-purpose \"Purpose · Required\"  r=17.93",
+   "textarea#_r_0_-image-basis \"Authority basis · Required\"  r=17.93",
+   "textarea#_-image-provenance \"Source provenance · Required\"  r=17.93",
+   "textarea#age-scheduleReason \"Retention reason · Required\"  r=17.93",
+   "select#ge-identifiability \"Identifiability · Required\"  r=17.93",
+   "input#_r_0_-image-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_0_-image-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_0_-image-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_0_-image-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_0_-image-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_0_-image-until \"Authorized end, UTC · Required\" [!fv]  r=1.55",
+   "textarea#image-restrictions \"Supplier restrictions, optional\"  r=17.93",
+   "button \"Stage classification and upload\"  r=17.93",
+   "select#_r_1_-kind-0 \"Identifier kind · Required\"  r=17.93",
+   "input#_r_1_-location-0 \"Location · Required\"  r=17.93",
+   "input#_r_1_-value-0 \"Observed value · Required\"  r=17.93",
+   "button \"Remove unsent identifier\"  r=17.93",
+   "button \"Add identifier, maximum 20\"  r=17.93",
+   "textarea#_1_-record-purpose \"Purpose · Required\"  r=17.93",
+   "textarea#_r_1_-record-basis \"Authority basis · Required\"  r=17.93",
+   "textarea#-record-provenance \"Source provenance · Required\"  r=17.93",
+   "textarea#ord-scheduleReason \"Retention reason · Required\"  r=17.93",
+   "select#rd-identifiability \"Identifiability · Required\"  r=17.93",
+   "input#_r_1_-record-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_1_-record-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_1_-record-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_1_-record-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_1_-record-until \"Authorized end, UTC · Required\"  r=17.93",
+   "input#_r_1_-record-until \"Authorized end, UTC · Required\" [!fv]  r=1.55",
+   "textarea#ecord-restrictions \"Supplier restrictions, optional\"  r=17.93",
+   "button \"Record complete evidence\"  r=17.93"
+  ]
+ },
+ {
+  "step": "focus-ring failures on tab path",
+  "count": 1,
+  "ringBad": [
+   "summary \"Current staff member\""
+  ]
+ },
+ {
+  "step": "Enter on submit (blank form): focus lands on",
+  "f": {
+   "el": "textarea#_1_-record-purpose \"Purpose · Required\"",
+   "focusVisible": true,
+   "outline": "solid 2px offset 2px #171717",
+   "outlineW": 2,
+   "outlineVsPage": 17.93,
+   "outlineVsControl": 17.93,
+   "pageBg": "#ffffff",
+   "controlBg": "#ffffff",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "654x66",
+   "tabindex": null,
+   "disabled": false,
+   "ariaDisabled": null,
+   "invalid": "true",
+   "describedby": "0/300 | Error: provide a complete value within the stated limit."
+  },
+  "summary": "Review the required fields and distinct identifier locations.Rights for this identity record: Purpose: Error: provide a complete value within the stated limit.Rights for this identity record: Authorit"
+ },
+ {
+  "step": "shift-tab back to Add identifier",
+  "found": true,
+  "n": 1
+ },
+ {
+  "step": "Enter on Add identifier: focus",
+  "f": {
+   "el": "h4 \"Physical identifier 2\"",
+   "focusVisible": true,
+   "outline": "auto 1px offset 0px #d0d0d0",
+   "outlineW": 1,
+   "outlineVsPage": 1.55,
+   "outlineVsControl": 1.55,
+   "pageBg": "#ffffff",
+   "controlBg": "#ffffff",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "620x24",
+   "tabindex": "-1",
+   "disabled": null,
+   "ariaDisabled": null,
+   "invalid": null,
+   "describedby": ""
+  }
+ },
+ {
+  "step": "Tab after new identifier heading",
+  "f": "select#_r_1_-kind-1 \"Identifier kind · Required\""
+ },
+ {
+  "step": "Enter on submit with appended identifier",
+  "f": "textarea#_1_-record-purpose \"Purpose · Required\"",
+  "summaryItems": [
+   "Physical identifier 2: Identifier kind: Error: provide a complete value within t",
+   "Physical identifier 2: Location: Error: provide a complete value within the stat",
+   "Physical identifier 2: Observed value: Error: provide a complete value within th",
+   "Physical identifier 2: Select verified support: Error: provide a complete value "
+  ]
+ },
+ {
+  "step": "shift-tab to summary link",
+  "found": true,
+  "link": "a \"Physical identifier 2: Select verified support: Error: provide a compl\""
+ },
+ {
+  "step": "Enter on summary link moves focus to",
+  "f": "fieldset#_r_1_-support-1 \"Select verified support · 0/20 · RequiredError: provide a complete val\"",
+  "invalid": "true",
+  "describedby": " | Error: provide a complete value within the stated limit."
+ },
+ {
+  "step": "tab to Remove identifier 2",
+  "found": true
+ },
+ {
+  "step": "Enter on Remove: focus",
+  "f": "h4 \"Physical identifier 1\""
+ }
+]

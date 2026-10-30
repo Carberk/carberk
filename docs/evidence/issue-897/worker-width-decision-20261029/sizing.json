@@ -1,0 +1,263 @@
+[
+  {
+    "range": [
+      0,
+      10
+    ],
+    "width": 10,
+    "commandSha256": "6731f3337886e05b484e9bc153ea9a6ad01ccbeaa2abc30ad0f4ec2feef3ec4f",
+    "untimedMs": 341.3995,
+    "verdict": "PASS",
+    "entries": 240,
+    "scopeHash": "ce8ca056ae0fd41de05091651a8bec465e5469106672ad02cfd64d0503ac4690",
+    "perTable": {
+      "diagnostic_audits": 80,
+      "diagnostic_centers": 10,
+      "diagnostic_identity_records": 10,
+      "diagnostic_order_assignments": 30,
+      "diagnostic_ownership_components": 10,
+      "diagnostic_ownership_grants": 10,
+      "diagnostic_source_anchors": 10,
+      "diagnostic_template_versions": 10,
+      "inspection_orders": 10,
+      "listings": 10,
+      "sessions": 10,
+      "users": 40
+    },
+    "lockKeys": 370
+  },
+  {
+    "range": [
+      10,
+      20
+    ],
+    "width": 10,
+    "commandSha256": "ced3dd93b85c33569c2aba3f5c3497e3eb500ba627cfcb42fe1e95487629eb67",
+    "untimedMs": 556.598458,
+    "verdict": "PASS",
+    "entries": 275,
+    "scopeHash": "55d7debf40f548febb1417d9a8ce127cd29a11866adaf48456a51d8a89372379",
+    "perTable": {
+      "diagnostic_audits": 95,
+      "diagnostic_centers": 10,
+      "diagnostic_continuity_proofs": 1,
+      "diagnostic_continuity_requests": 1,
+      "diagnostic_identity_evidence": 2,
+      "diagnostic_identity_provenance": 2,
+      "diagnostic_identity_records": 11,
+      "diagnostic_order_assignments": 33,
+      "diagnostic_ownership_components": 11,
+      "diagnostic_ownership_grants": 11,
+      "diagnostic_pdf_artifacts": 3,
+      "diagnostic_reports": 1,
+      "diagnostic_source_anchors": 11,
+      "diagnostic_template_versions": 10,
+      "inspection_orders": 11,
+      "listings": 11,
+      "sessions": 11,
+      "users": 40
+    },
+    "lockKeys": 423
+  },
+  {
+    "range": [
+      0,
+      20
+    ],
+    "width": 20,
+    "commandSha256": "d8a852efcb724ca808205d85cfa855e421444f6c739a97d8af1972788302fc7d",
+    "untimedMs": 1075.329417,
+    "verdict": "PASS",
+    "entries": 515,
+    "scopeHash": "26a0b35c8170dfa56e85e4acdb279e4745379969b2d0cbb3f4172d767fa99120",
+    "perTable": {
+      "diagnostic_audits": 175,
+      "diagnostic_centers": 20,
+      "diagnostic_continuity_proofs": 1,
+      "diagnostic_continuity_requests": 1,
+      "diagnostic_identity_evidence": 2,
+      "diagnostic_identity_provenance": 2,
+      "diagnostic_identity_records": 21,
+      "diagnostic_order_assignments": 63,
+      "diagnostic_ownership_components": 21,
+      "diagnostic_ownership_grants": 21,
+      "diagnostic_pdf_artifacts": 3,
+      "diagnostic_reports": 1,
+      "diagnostic_source_anchors": 21,
+      "diagnostic_template_versions": 20,
+      "inspection_orders": 21,
+      "listings": 21,
+      "sessions": 21,
+      "users": 80
+    },
+    "lockKeys": 793
+  },
+  {
+    "range": [
+      0,
+      40
+    ],
+    "width": 40,
+    "commandSha256": "4f77b430ed9712dbfc22e5db7699e1946a197a48f9cc28389aa913fe64fa65e3",
+    "untimedMs": 2166.298625,
+    "verdict": "PASS",
+    "entries": 995,
+    "scopeHash": "1ac37dd570887bf46f0d5ea29206ed04d544a71021bfac461c10b5500d15ee21",
+    "perTable": {
+      "diagnostic_audits": 335,
+      "diagnostic_centers": 40,
+      "diagnostic_continuity_proofs": 1,
+      "diagnostic_continuity_requests": 1,
+      "diagnostic_identity_evidence": 2,
+      "diagnostic_identity_provenance": 2,
+      "diagnostic_identity_records": 41,
+      "diagnostic_order_assignments": 123,
+      "diagnostic_ownership_components": 41,
+      "diagnostic_ownership_grants": 41,
+      "diagnostic_pdf_artifacts": 3,
+      "diagnostic_reports": 1,
+      "diagnostic_source_anchors": 41,
+      "diagnostic_template_versions": 40,
+      "inspection_orders": 41,
+      "listings": 41,
+      "sessions": 41,
+      "users": 160
+    },
+    "lockKeys": 1533
+  },
+  {
+    "range": [
+      0,
+      35
+    ],
+    "width": 35,
+    "commandSha256": "d8d60729a26b71f42488d14d6c2ee6ea667ee02cddcc6146eeca7c76c64b9e92",
+    "untimedMs": 1652.74875,
+    "verdict": "PASS",
+    "entries": 875,
+    "scopeHash": "42e364b8ece352f7aa101b32058405e6b4e37c3d058b3676f0dd265c9aa7753a",
+    "perTable": {
+      "diagnostic_audits": 295,
+      "diagnostic_centers": 35,
+      "diagnostic_continuity_proofs": 1,
+      "diagnostic_continuity_requests": 1,
+      "diagnostic_identity_evidence": 2,
+      "diagnostic_identity_provenance": 2,
+      "diagnostic_identity_records": 36,
+      "diagnostic_order_assignments": 108,
+      "diagnostic_ownership_components": 36,
+      "diagnostic_ownership_grants": 36,
+      "diagnostic_pdf_artifacts": 3,
+      "diagnostic_reports": 1,
+      "diagnostic_source_anchors": 36,
+      "diagnostic_template_versions": 35,
+      "inspection_orders": 36,
+      "listings": 36,
+      "sessions": 36,
+      "users": 140
+    },
+    "lockKeys": 1348
+  },
+  {
+    "range": [
+      0,
+      41
+    ],
+    "width": 41,
+    "commandSha256": "bd3da3c93081e8b338852033c42ad83d2b9c4a2a0c837eef177182952b5d4b6d",
+    "untimedMs": 485.558625,
+    "verdict": "ERROR",
+    "error": {
+      "sqlstate": "P0001",
+      "message": "diagnostic_source_scope_limit",
+      "where": "PL/pgSQL function diagnostic_source_scope_before_purge(jsonb) line 44 at RAISE\nPL/pgSQL function diagnostic_source_scope_before_intake(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_finite_fk(jsonb) line 4 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_complete_moderation(jsonb) line 33 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_composition(jsonb) line 13 at RETURN\nPL/pgSQL function diagnostic_source_scope_before_listing_publication(jsonb) line 4 at RETURN\nSQL function \"diagnostic_source_scope_before_maintenance\" statement 1\nPL/pgSQL function diagnostic_source_scope(jsonb) line 20 at RETURN"
+    }
+  },
+  {
+    "range": [
+      40,
+      80
+    ],
+    "width": 40,
+    "commandSha256": "e5d3269feb9f1d7f9d665134e48c9e432ff8dce54104692cacb0bbf34aac948b",
+    "untimedMs": 2079.749792,
+    "verdict": "PASS",
+    "entries": 995,
+    "scopeHash": "57994c40c89920aa67c6350ae437e7e241388298c5c3f2f4d6a3c77e903b8e29",
+    "perTable": {
+      "diagnostic_audits": 335,
+      "diagnostic_centers": 40,
+      "diagnostic_continuity_proofs": 1,
+      "diagnostic_continuity_requests": 1,
+      "diagnostic_identity_evidence": 2,
+      "diagnostic_identity_provenance": 2,
+      "diagnostic_identity_records": 41,
+      "diagnostic_order_assignments": 123,
+      "diagnostic_ownership_components": 41,
+      "diagnostic_ownership_grants": 41,
+      "diagnostic_pdf_artifacts": 3,
+      "diagnostic_reports": 1,
+      "diagnostic_source_anchors": 41,
+      "diagnostic_template_versions": 40,
+      "inspection_orders": 41,
+      "listings": 41,
+      "sessions": 41,
+      "users": 160
+    },
+    "lockKeys": 1533
+  },
+  {
+    "range": [
+      80,
+      100
+    ],
+    "width": 20,
+    "commandSha256": "873bc7d40aca456b0b312a912c078e139ea3cc256be0c44437f00605f703ef42",
+    "untimedMs": 608.095875,
+    "verdict": "PASS",
+    "entries": 480,
+    "scopeHash": "9ad54220b1dccab0d77cd283be551d60a7f157ed72c3f8f711aa3cfaff275075",
+    "perTable": {
+      "diagnostic_audits": 160,
+      "diagnostic_centers": 20,
+      "diagnostic_identity_records": 20,
+      "diagnostic_order_assignments": 60,
+      "diagnostic_ownership_components": 20,
+      "diagnostic_ownership_grants": 20,
+      "diagnostic_source_anchors": 20,
+      "diagnostic_template_versions": 20,
+      "inspection_orders": 20,
+      "listings": 20,
+      "sessions": 20,
+      "users": 80
+    },
+    "lockKeys": 740
+  },
+  {
+    "range": [
+      20,
+      40
+    ],
+    "width": 20,
+    "commandSha256": "c4eaa10780d0942d2ce3c215577d0fcccf223a3d58ebb5ba5faa24b1ae98407d",
+    "untimedMs": 608.211875,
+    "verdict": "PASS",
+    "entries": 480,
+    "scopeHash": "ef1a780926f4e64b84d67147e0d9408e393a67c5692b613239b17c7ab13f9f90",
+    "perTable": {
+      "diagnostic_audits": 160,
+      "diagnostic_centers": 20,
+      "diagnostic_identity_records": 20,
+      "diagnostic_order_assignments": 60,
+      "diagnostic_ownership_components": 20,
+      "diagnostic_ownership_grants": 20,
+      "diagnostic_source_anchors": 20,
+      "diagnostic_template_versions": 20,
+      "inspection_orders": 20,
+      "listings": 20,
+      "sessions": 20,
+      "users": 80
+    },
+    "lockKeys": 740
+  }
+]

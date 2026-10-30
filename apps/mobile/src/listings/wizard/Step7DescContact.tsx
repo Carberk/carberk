@@ -27,6 +27,7 @@ interface Step7DescContactProps {
   onConfirmExpired?: (phone: string) => void;
   selectionError?: string | null;
   publishPhoneError?: boolean;
+  canChangeNumber?: boolean | undefined;
 }
 
 function useReviewSummary(payload: WizardSchemas.WizardDraftPayload) {
@@ -139,6 +140,7 @@ function ContactMethods({
 }
 
 export default function Step7DescContact({
+  canChangeNumber,
   payload,
   onChange,
   disabled = false,
@@ -164,6 +166,7 @@ export default function Step7DescContact({
       <ReviewSummary payload={payload} />
       {wrapDisabled(
         <ContactPhonePicker
+          canChangeNumber={canChangeNumber}
           selectedPhone={payload.contactPhone}
           onSelect={(phone) => onChange({ contactPhone: phone })}
           accountPhone={accountPhone}

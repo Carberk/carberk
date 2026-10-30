@@ -8,7 +8,7 @@ import {
   isConversationPath,
 } from "../conversations/conversationRoutes";
 
-import { parseDirectMessageConversationId } from "./deepLinks";
+import { parseDirectMessageConversationId, parseServiceConversationId } from "./deepLinks";
 
 function routeFromResponse(
   response: Notifications.NotificationResponse,
@@ -17,6 +17,15 @@ function routeFromResponse(
   rootRouteName: { current: string | undefined },
 ): void {
   if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+    return;
+  }
+
+  const serviceId = parseServiceConversationId(response.notification.request.content.data);
+  if (serviceId) {
+    const identifier = response.notification.request.identifier;
+    if (lastHandledIdentifier.current === identifier) return;
+    lastHandledIdentifier.current = identifier;
+    router.push({ pathname: "/service-requests", params: { conversationId: serviceId } });
     return;
   }
 

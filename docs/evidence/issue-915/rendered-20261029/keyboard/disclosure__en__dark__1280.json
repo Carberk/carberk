@@ -1,0 +1,32 @@
+[
+ {
+  "step": "summary focus",
+  "found": true,
+  "f": {
+   "el": "summary \"Current staff member\"",
+   "focusVisible": true,
+   "outline": "auto 1px offset 0px #3f3f3f",
+   "outlineW": 1,
+   "outlineVsPage": 1.89,
+   "outlineVsControl": 1.89,
+   "pageBg": "#0a0a0a",
+   "controlBg": "#0a0a0a",
+   "inViewport": true,
+   "coveredBy": null,
+   "box": "1166x44",
+   "tabindex": null,
+   "disabled": null,
+   "ariaDisabled": null,
+   "invalid": null,
+   "describedby": ""
+  }
+ },
+ {
+  "step": "Enter toggles details",
+  "open": true
+ },
+ {
+  "step": "Space toggles details",
+  "open": false
+ }
+]

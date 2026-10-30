@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { Prisma, PrismaService, withCampaignPreparation, type CampaignMutation } from "@auto-tm/db";
 
 import type { CleanupWork, RetiredUploadLedger } from "./retiredUploadCleanup";
 
@@ -20,62 +20,94 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
     // Publish reserves a new Listing id; that Listing appears only when it
     // commits with adoption. Attach reserves an existing Listing, and Profile
     // Photo uses a profile target. Recovery and finalization take the same lock.
-    const [result] = await this.prisma.$queryRaw<{ recovered: bigint }[]>`
-      WITH stranded AS (
-        SELECT upload.id, upload."claimDeadline" AS deadline,
-          (upload."claimTargetType" = 'listing' AND NOT EXISTS (
-            SELECT 1 FROM listings WHERE id = upload."claimTargetId"
-          )) AS publish
-        FROM media_uploads AS upload
-        WHERE upload."state" = 'PREPARING' AND upload."claimDeadline" < ${now}
-          AND NOT EXISTS (
-            SELECT 1 FROM listing_media WHERE "uploadId" = upload.id
-              OR starts_with("key", regexp_replace(upload."key", '[^/]+$', ''))
-              OR starts_with("posterKey", regexp_replace(upload."key", '[^/]+$', ''))
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM users WHERE "avatarUploadId" = upload.id
-              OR starts_with("avatarKey", regexp_replace(upload."key", '[^/]+$', ''))
-          )
-        ORDER BY upload."claimDeadline", upload.id LIMIT ${limit}::int
-        FOR UPDATE OF upload SKIP LOCKED
-      ), recovered AS (
-        UPDATE media_uploads SET "state" = CASE WHEN stranded.publish THEN 'AVAILABLE' ELSE 'RETIRED' END,
-          "retiredAt" = CASE WHEN stranded.publish THEN media_uploads."retiredAt" ELSE ${now} END,
-          "claimToken" = NULL, "claimDeadline" = NULL,
-          "claimTargetType" = CASE WHEN stranded.publish THEN NULL ELSE media_uploads."claimTargetType" END,
-          "claimTargetId" = CASE WHEN stranded.publish THEN NULL ELSE media_uploads."claimTargetId" END
-        FROM stranded WHERE media_uploads.id = stranded.id
-        RETURNING media_uploads.id, media_uploads."key", media_uploads."objectKeys",
-          media_uploads."writeProtocol", media_uploads."state", stranded.deadline
-      ), cleanup AS (
-        INSERT INTO media_upload_cleanups ("uploadId", "key", "objectKeys", "writeProtocol", "status", "nextAttemptAt")
-        SELECT id, "key", "objectKeys", "writeProtocol",
-          CASE WHEN "writeProtocol" = 'conditional-v1' THEN 'PENDING' ELSE 'LEGACY_PENDING' END, deadline
-        FROM recovered WHERE "state" = 'RETIRED'
-        ON CONFLICT ("uploadId") DO NOTHING
-      )
-      SELECT count(*) AS recovered FROM recovered`;
-    return Number(result?.recovered ?? 0);
+    return this.prisma.$transaction(tx => this.prepared(tx, { kind: "recover", now, limit }, 0, async plan => {
+      const [result] = await tx.$queryRaw<{ recovered: bigint }[]>`
+        WITH stranded AS (
+          SELECT upload.id, upload."claimDeadline" AS deadline,
+            (upload."claimTargetType" = 'listing' AND NOT EXISTS (
+              SELECT 1 FROM listings WHERE id = upload."claimTargetId"
+            )) AS publish
+          FROM media_uploads AS upload
+          WHERE upload.id = ANY(${plan.ids}::text[])
+            AND upload."state" = 'PREPARING' AND upload."claimDeadline" < ${now}
+            AND upload."writeProtocol" <> 'video-v1'
+            AND NOT EXISTS (
+              SELECT 1 FROM listing_media WHERE "uploadId" = upload.id
+                OR starts_with("key", regexp_replace(upload."key", '[^/]+$', ''))
+                OR starts_with("posterKey", regexp_replace(upload."key", '[^/]+$', ''))
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM users WHERE "avatarUploadId" = upload.id
+                OR starts_with("avatarKey", regexp_replace(upload."key", '[^/]+$', ''))
+            )
+          ORDER BY upload."claimDeadline", upload.id LIMIT ${limit}::int
+          FOR UPDATE OF upload SKIP LOCKED
+        ), recovered AS (
+          UPDATE media_uploads SET "state" = CASE WHEN stranded.publish THEN 'AVAILABLE' ELSE 'RETIRED' END,
+            "retiredAt" = CASE WHEN stranded.publish THEN media_uploads."retiredAt" ELSE ${now} END,
+            "claimToken" = NULL, "claimDeadline" = NULL,
+            "claimTargetType" = CASE WHEN stranded.publish THEN NULL ELSE media_uploads."claimTargetType" END,
+            "claimTargetId" = CASE WHEN stranded.publish THEN NULL ELSE media_uploads."claimTargetId" END
+          FROM stranded WHERE media_uploads.id = stranded.id
+          RETURNING media_uploads.id, media_uploads."key", media_uploads."objectKeys",
+            media_uploads."writeProtocol", media_uploads."state", stranded.deadline
+        ), cleanup AS (
+          INSERT INTO media_upload_cleanups ("uploadId", "key", "objectKeys", "writeProtocol", "status", "nextAttemptAt")
+          SELECT id, "key", "objectKeys", "writeProtocol",
+            CASE WHEN "writeProtocol" = 'conditional-v1' THEN 'PENDING' ELSE 'LEGACY_PENDING' END, deadline
+          FROM recovered WHERE "state" = 'RETIRED'
+          ON CONFLICT ("uploadId") DO NOTHING
+        )
+        SELECT count(*) AS recovered FROM recovered`;
+      return Number(result?.recovered ?? 0);
+    }));
   }
 
   async lease(now: Date, limit: number): Promise<CleanupWork[]> {
-    // Taking work and scheduling its next attempt are one statement, so the
+    // Taking work and scheduling its next attempt are one transaction, so the
     // backoff is saved before any deletion starts. SKIP LOCKED keeps two
     // overlapping sweeps from taking the same work.
-    return this.prisma.$queryRaw<CleanupWork[]>`
-      UPDATE media_upload_cleanups AS work
-      SET "attempts" = work."attempts" + 1,
-        "nextAttemptAt" = ${now}::timestamp + LEAST(
-          ${BACKOFF_BASE_SECONDS}::float8 * power(2::float8, LEAST(work."attempts", 30)),
-          ${BACKOFF_CAP_SECONDS}::float8) * interval '1 second'
-      FROM (
-        SELECT "uploadId" FROM media_upload_cleanups
-        WHERE "status" = 'PENDING' AND "nextAttemptAt" <= ${now}
-        ORDER BY "nextAttemptAt", "uploadId" LIMIT ${limit}::int FOR UPDATE SKIP LOCKED
-      ) AS due
-      WHERE work."uploadId" = due."uploadId"
-      RETURNING work."uploadId", work."key", work."objectKeys", work."writeProtocol", work."attempts"`;
+    return this.prisma.$transaction(async tx => {
+      // This ordinary scalar update has no physical FK/source/unique effects.
+      // Fix the entire bounded pool before preparation; never lock its owners
+      // or monopolize candidates with advisory locks. Terminal paths retain
+      // their full reference graph and storage protection.
+      const candidates = await tx.$queryRaw<{ row: Row }[]>`
+        SELECT to_jsonb(work) AS row FROM media_upload_cleanups work
+        WHERE status='PENDING' AND "nextAttemptAt" <= ${now}
+        ORDER BY "nextAttemptAt","uploadId" LIMIT ${Math.min(2 * limit, 1000)}::int`;
+      if (!candidates.length) return [];
+      const ids = candidates.map(({ row }) => String(row["uploadId"]));
+      const mutations: CampaignMutation[] = candidates.map(({ row }) => ({
+        table: "media_upload_cleanups", key: { uploadId: String(row["uploadId"]) }, verb: "update", next: {
+          attempts: Number(row["attempts"]) + 1,
+          nextAttemptAt: new Date(now.getTime() + Math.min(BACKOFF_BASE_SECONDS * 2 ** Math.min(Number(row["attempts"]), 30), BACKOFF_CAP_SECONDS) * 1000).toISOString(),
+        },
+      }));
+      return withCampaignPreparation(tx, mutations, async () => {
+        const selected = await tx.$queryRaw<{ selected: string }[]>`
+          SELECT "uploadId" AS selected FROM media_upload_cleanups
+          WHERE "uploadId" = ANY(${ids}::text[]) AND status='PENDING' AND "nextAttemptAt" <= ${now}
+          ORDER BY "nextAttemptAt","uploadId" LIMIT ${limit}::int FOR UPDATE SKIP LOCKED`;
+        if (!selected.length) return [];
+        const lockedIds = selected.map(row => row.selected);
+        // A separate READ COMMITTED statement checks complete selected rows.
+        // Skipped candidates may change; they can never add IDs to this pool.
+        const fresh = await tx.$queryRaw<{ row: Row }[]>`
+          SELECT to_jsonb(work) AS row FROM media_upload_cleanups work WHERE "uploadId" = ANY(${lockedIds}::text[])`;
+        if (fresh.length !== lockedIds.length || fresh.some(({ row }) => !same(row, candidates.find(c => c.row["uploadId"] === row["uploadId"])?.row))) {
+          throw new Error("retired_upload_scope_changed");
+        }
+        return tx.$queryRaw<CleanupWork[]>`
+          UPDATE media_upload_cleanups AS work
+          SET "attempts" = work."attempts" + 1,
+            "nextAttemptAt" = ${now}::timestamp + LEAST(
+              ${BACKOFF_BASE_SECONDS}::float8 * power(2::float8, LEAST(work."attempts", 30)),
+              ${BACKOFF_CAP_SECONDS}::float8) * interval '1 second'
+          WHERE "uploadId" = ANY(${lockedIds}::text[])
+          RETURNING work."uploadId", work."key", work."objectKeys", work."writeProtocol", work."attempts"`;
+      });
+    });
   }
 
   async blockingReference(work: CleanupWork, directory: string): Promise<string | null> {
@@ -96,19 +128,216 @@ export class PrismaRetiredUploadLedger implements RetiredUploadLedger {
   }
 
   async complete(uploadId: string, now: Date): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.mediaUploadCleanup.update({
-        where: { uploadId },
-        data: { status: "DONE", completedAt: now, lastError: null },
-      }),
-      this.prisma.mediaUpload.updateMany({
-        where: { id: uploadId, state: "RETIRED" },
-        data: { state: "DELETED" },
-      }),
-    ]);
+    await this.prisma.$transaction(tx => this.prepared(tx, { kind: "complete", uploadId, now }, undefined, async plan => {
+      const upload = plan.slots.find(s => s.table === "media_uploads" && s.key["id"] === uploadId)?.row;
+      if ((upload && upload["state"] !== "RETIRED" && upload["state"] !== "DELETED") || plan.references.length) {
+        throw new Error("retired_upload_live_reference");
+      }
+      await tx.mediaUploadCleanup.update({
+        where: { uploadId }, data: { status: "DONE", completedAt: now, lastError: null },
+      });
+      if (upload?.["state"] === "RETIRED") await tx.mediaUpload.updateMany({ where: { id: uploadId, state: "RETIRED" }, data: { state: "DELETED" } });
+    }));
   }
 
   async recordFailure(uploadId: string, reason: string): Promise<void> {
-    await this.prisma.mediaUploadCleanup.update({ where: { uploadId }, data: { lastError: reason } });
+    await this.prisma.$transaction(tx => this.prepared(tx, { kind: "failure", uploadId, reason }, undefined, async () => {
+      await tx.mediaUploadCleanup.update({ where: { uploadId }, data: { lastError: reason } });
+    }));
+  }
+
+  /** One unlocked bounded selection, then the whole OLD/NEW/absent dependency
+   * union. No storage operation or source command runs in this transaction. */
+  private async discover(tx: Prisma.TransactionClient, selection: Selection): Promise<Plan> {
+    let ids: string[];
+    if (selection.kind === "recover") {
+      const rows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT upload.id FROM media_uploads upload
+        WHERE upload."state"='PREPARING' AND upload."claimDeadline" < ${selection.now}
+          AND upload."writeProtocol" <> 'video-v1'
+          AND NOT EXISTS (SELECT 1 FROM listing_media WHERE "uploadId"=upload.id
+            OR starts_with(key,regexp_replace(upload.key,'[^/]+$',''))
+            OR starts_with("posterKey",regexp_replace(upload.key,'[^/]+$','')))
+          AND NOT EXISTS (SELECT 1 FROM users WHERE "avatarUploadId"=upload.id
+            OR starts_with("avatarKey",regexp_replace(upload.key,'[^/]+$','')))
+        ORDER BY upload."claimDeadline",upload.id LIMIT ${selection.limit}::int`;
+      ids = rows.map(r => r.id);
+    } else if (selection.kind === "lease") {
+      const rows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "uploadId" AS id FROM media_upload_cleanups
+        WHERE status='PENDING' AND "nextAttemptAt" <= ${selection.now}
+        ORDER BY "nextAttemptAt","uploadId" LIMIT ${selection.limit}::int`;
+      ids = rows.map(r => r.id);
+    } else ids = [selection.uploadId];
+    const slots: Slot[] = [];
+    const references: { table: string; id: string }[] = [];
+    const edges = new Map<string, Set<string>>();
+    const reverse = new Map<string, string[]>();
+    const add = async (table: string, id: unknown): Promise<string | undefined> => {
+      if (typeof id !== "string") return;
+      if (!TABLES.includes(table)) throw new Error("retired_upload_reference_table");
+      const key = table === "media_upload_cleanups" ? { uploadId: id } : { id };
+      const identity = slotIdentity({ table, key });
+      if (slots.some(s => s.table === table && same(s.key, key))) return identity;
+      if (slots.length >= 1000) throw new Error("retired_upload_scope_limit");
+      const [found] = await tx.$queryRaw<{ row: Row }[]>(Prisma.sql`
+        SELECT to_jsonb(s) AS row FROM public.${Prisma.raw(table)} s WHERE to_jsonb(s) @> ${JSON.stringify(key)}::jsonb`);
+      slots.push({ table, key, row: found?.row ?? null });
+      return identity;
+    };
+    for (const id of ids) { await add("media_uploads", id); await add("media_upload_cleanups", id); }
+    // Both reverse UNIQUE keys are needed even when there is no adopter yet.
+    // Legacy references have no upload FK; retain their full rows and parents.
+    for (const id of ids) {
+      const upload = slots.find(s => s.table === "media_uploads" && s.key["id"] === id)?.row;
+      const cleanup = slots.find(s => s.table === "media_upload_cleanups" && s.key["uploadId"] === id)?.row;
+      const key = upload?.["key"] ?? cleanup?.["key"];
+      if (typeof key !== "string") continue;
+      const directory = key.replace(/[^/]+$/, "");
+      const found = await tx.$queryRaw<{ table: string; id: string }[]>`
+        SELECT 'users' AS table,id FROM users WHERE "avatarUploadId"=${id}
+          OR starts_with("avatarKey",${directory})
+        UNION ALL SELECT 'listing_media',id FROM listing_media WHERE "uploadId"=${id}
+          OR starts_with(key,${directory}) OR starts_with("posterKey",${directory}) ORDER BY 1,2 LIMIT 1001`;
+      references.push(...found);
+      for (const ref of found) {
+        const identity = await add(ref.table, ref.id);
+        if (identity) reverse.set(id, [...(reverse.get(id) ?? []), identity]);
+      }
+    }
+    // Follow the metadata's actual stored FK endpoints recursively. The cleanup
+    // registry edge is a lock dependency only: its table deliberately has no FK.
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      if (!slot?.row) continue;
+      const [meta] = await tx.$queryRaw<Meta[]>`SELECT (public.diagnostic_source_meta(${slot.table})->>'namespace')::int AS namespace,
+        public.diagnostic_source_meta(${slot.table})->'refs' AS refs`;
+      if (!meta) throw new Error("retired_upload_metadata");
+      const targets = new Set<string>();
+      const link = async (table: string, id: unknown) => { const identity = await add(table, id); if (identity) targets.add(identity); };
+      for (const ref of meta.refs) {
+        if (ref.columns.length !== 1 || ref.target.length !== 1 || ref.target[0] !== "id") throw new Error("retired_upload_reference_key");
+        await link(ref.table, slot.row[ref.columns[0] ?? ""]);
+      }
+      if (slot.table === "media_uploads") {
+        const type = slot.row["claimTargetType"], target = slot.row["claimTargetId"];
+        if (type === "listing") await link("listings", target);
+        if (type === "profile") await link("users", target);
+        if (type === "video_session") await link("video_upload_sessions", target);
+      }
+      edges.set(slotIdentity(slot), targets);
+    }
+    const mutations: CampaignMutation[] = [];
+    for (const id of ids) {
+      const upload = slots.find(s => s.table === "media_uploads" && s.key["id"] === id)?.row;
+      const cleanup = slots.find(s => s.table === "media_upload_cleanups" && s.key["uploadId"] === id)?.row;
+      if (selection.kind === "recover" && upload) {
+        const publish = upload["claimTargetType"] === "listing" && !slots.find(s => s.table === "listings" && s.key["id"] === upload["claimTargetId"])?.row;
+        mutations.push({ table: "media_uploads", key: { id }, verb: "update", next: {
+          state: publish ? "AVAILABLE" : "RETIRED", retiredAt: publish ? upload["retiredAt"] ?? null : selection.now.toISOString(),
+          claimToken: null, claimDeadline: null,
+          claimTargetType: publish ? null : upload["claimTargetType"] ?? null,
+          claimTargetId: publish ? null : upload["claimTargetId"] ?? null,
+        } });
+        if (!publish && !cleanup) mutations.push({ table: "media_upload_cleanups", key: { uploadId: id }, verb: "insert", next: {
+          uploadId: id, key: upload["key"] ?? null, objectKeys: upload["objectKeys"] ?? null, writeProtocol: upload["writeProtocol"] ?? null,
+          status: upload["writeProtocol"] === "conditional-v1" ? "PENDING" : "LEGACY_PENDING", nextAttemptAt: upload["claimDeadline"] ?? null,
+        } });
+      }
+      if (selection.kind === "lease" && cleanup) mutations.push({ table: "media_upload_cleanups", key: { uploadId: id }, verb: "update", next: {
+        attempts: Number(cleanup["attempts"]) + 1,
+        nextAttemptAt: new Date(selection.now.getTime() + Math.min(BACKOFF_BASE_SECONDS * 2 ** Math.min(Number(cleanup["attempts"]), 30), BACKOFF_CAP_SECONDS) * 1000).toISOString(),
+      } });
+      if (selection.kind === "complete") {
+        mutations.push({ table: "media_upload_cleanups", key: { uploadId: id }, verb: "update", next: { status: "DONE", completedAt: selection.now.toISOString(), lastError: null } });
+        if (upload?.["state"] === "RETIRED") mutations.push({ table: "media_uploads", key: { id }, verb: "update", next: { state: "DELETED" } });
+      }
+      if (selection.kind === "failure") mutations.push({ table: "media_upload_cleanups", key: { uploadId: id }, verb: "update", next: { lastError: selection.reason } });
+    }
+    const rootSlots: Record<string, string[]> = {};
+    for (const id of ids) {
+      const reached = new Set([
+        slotIdentity({ table: "media_uploads", key: { id } }),
+        slotIdentity({ table: "media_upload_cleanups", key: { uploadId: id } }),
+        ...(reverse.get(id) ?? []),
+      ]);
+      for (const identity of reached) for (const target of edges.get(identity) ?? []) reached.add(target);
+      rootSlots[id] = [...reached].sort();
+    }
+    return { ids, slots, references, mutations, rootSlots };
+  }
+
+  private async prepared<T>(tx: Prisma.TransactionClient, selection: Selection, skipped: T, work: (plan: Plan) => Promise<T>): Promise<T> {
+    const before = await this.discover(tx, selection);
+    if (!before.ids.length) return skipped;
+    const coverage = [...before.mutations];
+    for (const slot of before.slots) if (slot.row && !coverage.some(m => m.table === slot.table && same(m.key, slot.key))) {
+      coverage.push({ table: slot.table, key: slot.key, verb: "update", next: {} });
+    }
+    return withCampaignPreparation(tx, coverage, async () => {
+      const ownedKeys = new Map<string, { namespace: number; key: number; roots: Set<string> }>();
+      for (const id of before.ids) {
+        const unique = [
+          { table: "users", row: { avatarUploadId: id } }, { table: "listing_media", row: { uploadId: id } },
+        ];
+        const [derived] = await tx.$queryRaw<{ keys: { namespace: number; key: number }[] }[]>`
+          SELECT public.diagnostic_source_lock_keys_before_intake(${JSON.stringify(before.slots.filter(slot => before.rootSlots[id]?.includes(slotIdentity(slot))))}::jsonb,
+            ${JSON.stringify({ rows: before.mutations.filter(m => m.key["id"] === id || m.key["uploadId"] === id) })}::jsonb) || coalesce((
+            SELECT jsonb_agg(DISTINCT jsonb_build_object('namespace',(public.diagnostic_source_meta(s->>'table')->>'namespace')::int,
+              'key',hashtext(jsonb_build_array('unique',fields,public.diagnostic_source_project(s->'row',fields))::text)))
+            FROM jsonb_array_elements(${JSON.stringify(unique)}::jsonb) s
+            CROSS JOIN LATERAL jsonb_array_elements(public.diagnostic_source_meta(s->>'table')->'unique') fields
+            WHERE NOT EXISTS (SELECT 1 FROM jsonb_each(public.diagnostic_source_project(s->'row',fields)) e WHERE e.value='null')
+          ),'[]'::jsonb) AS keys`;
+        if (!derived) throw new Error("retired_upload_lock_keys");
+        for (const key of derived.keys) {
+          const identity = `${key.namespace}:${key.key}`;
+          const existing = ownedKeys.get(identity);
+          if (existing) existing.roots.add(id);
+          else ownedKeys.set(identity, { ...key, roots: new Set([id]) });
+        }
+      }
+      const keys = [...ownedKeys.values()].sort((a,b) => a.namespace-b.namespace || a.key-b.key);
+      const batch = selection.kind === "recover" || selection.kind === "lease";
+      const blocked = new Set<string>();
+      for (const namespace of [...new Set(keys.map(k => k.namespace))]) {
+        for (const key of keys.filter(k => k.namespace === namespace)) {
+          if (batch) {
+            const [locked] = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(${namespace}::int,${key.key}::int) AS locked`;
+            if (!locked?.locked) for (const id of key.roots) blocked.add(id);
+          } else await tx.$queryRaw`SELECT pg_advisory_xact_lock(${namespace}::int,${key.key}::int)::text AS locked`;
+        }
+        for (const slot of before.slots.filter(s => s.row).sort((a,b) => canonical(a.key).localeCompare(canonical(b.key)))) {
+          const [meta] = await tx.$queryRaw<Meta[]>`SELECT (public.diagnostic_source_meta(${slot.table})->>'namespace')::int AS namespace`;
+          if (meta?.namespace !== namespace) continue;
+          const rows = await tx.$queryRaw<{ locked: number }[]>(Prisma.sql`
+            SELECT 1 AS locked FROM public.${Prisma.raw(slot.table)} s WHERE to_jsonb(s) @> ${JSON.stringify(slot.key)}::jsonb
+            FOR UPDATE ${Prisma.raw(batch ? "SKIP LOCKED" : "")}`);
+          if (batch && !rows.length) for (const id of before.ids) if (before.rootSlots[id]?.includes(slotIdentity(slot))) blocked.add(id);
+        }
+      }
+      const active = before.ids.filter(id => !blocked.has(id));
+      if (!active.length) return skipped;
+      if (!same(before, await this.discover(tx, selection))) throw new Error("retired_upload_scope_changed");
+      return work({ ...before, ids: active });
+    });
   }
 }
+
+const TABLES: readonly string[] = ["users", "dealerships", "dealership_members", "listings", "listing_drafts", "media_uploads", "media_upload_cleanups", "listing_media", "video_upload_sessions", "video_generations"];
+type Row = Record<string, Prisma.InputJsonValue | null>;
+interface Slot { table: string; key: Record<string, string>; row: Row | null }
+interface Meta { namespace: number; refs: { table: string; columns: string[]; target: string[] }[] }
+interface Plan { rootSlots: Record<string, string[]>; ids: string[]; slots: Slot[]; references: { table: string; id: string }[]; mutations: CampaignMutation[] }
+type Selection = { kind: "recover"; now: Date; limit: number }
+  | { kind: "lease"; now: Date; limit: number }
+  | { kind: "complete"; uploadId: string; now: Date }
+  | { kind: "failure"; uploadId: string; reason: string };
+const canonical = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value).sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+  return JSON.stringify(value);
+};
+const same = (a: unknown, b: unknown) => canonical(a) === canonical(b);
+
+const slotIdentity = (slot: Pick<Slot, "table" | "key">) => canonical([slot.table, slot.key]);

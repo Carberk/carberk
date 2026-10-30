@@ -346,3 +346,18 @@ describe("Signing out and signing in as someone else", () => {
 // Profile loads these native modules; only this spec supplies its stand-ins.
 vi.mock("expo-file-system/legacy", async () => (await import("../profile-photo-device")).fileSystemFake);
 vi.mock("expo-image-manipulator", async () => (await import("../profile-photo-device")).imageManipulatorFake);
+
+it("keeps private service history and business invitation access in signed-in Account", async () => {
+ serve("service-entry", meOf());
+ await signIn("service-entry");
+ const view = await renderMobile(<CabinetScreen/>);
+ await fireEvent.press(await view.findByRole("button", { name: "Your services" }));
+ expect(routerMock.push).toHaveBeenCalledWith("/service-requests");
+ await fireEvent.press(view.getByRole("button", { name: "Your inspection reports" }));
+ expect(routerMock.push).toHaveBeenCalledWith("/diagnostics");
+ await fireEvent.press(view.getByRole("button", { name: "Business workspace" }));
+ expect(routerMock.push).toHaveBeenCalledWith("/business");
+ await act(async () => { await clearAuthSession(); });
+ expect(view.queryByRole("button", { name: "Your services" })).toBeNull();
+ expect(view.queryByRole("button", { name: "Business workspace" })).toBeNull();
+});

@@ -1,0 +1,536 @@
+// Storage/cleanup contract only. No authentication, admission, Session or token proof.
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
+
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+import { GenericContainer, type StartedTestContainer } from "testcontainers";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { PrismaClient } from "../generated/prisma/client/client";
+
+const root = fileURLToPath(new URL("../../..", import.meta.url));
+const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const localRequire = createRequire(import.meta.url);
+const profile = "campaign897-business-v2";
+const candidate = "a".repeat(40);
+const aliases = ["buyer-a", "buyer-b", "owner", "sales-a", "sales-b", "coordinator", "support", "history-fulfiller", "payment-verifier", "reception-steward", "technician", "independent-reviewer", "private-reviewer", "aggregate-viewer", "investigator"];
+const source = readFileSync(`${root}/scripts/staging-campaign.mjs`, "utf8").replaceAll("export function ", "function ").replaceAll("export async function ", "async function ") +
+  readFileSync(`${root}/scripts/staging-remote.mjs`, "utf8").replace(/import \{[^}]+\} from '\.\/staging-campaign\.mjs';/, "").replace("export function remoteProgram", "function remoteProgram");
+const slug = (id: string) => `campaign897-${id}-${candidate.slice(0, 12)}`;
+const contact = (id: string) => `+999${(BigInt(`0x${createHash("sha256").update(`${id}:${candidate}:business-contact`).digest("hex").slice(0, 12)}`) % 1000000000000n).toString().padStart(12, "0")}`;
+
+describe("reservation-owned synthetic business v2 storage graph, without admission or authentication", () => {
+  let postgres: StartedPostgreSqlContainer;
+  let redis: StartedTestContainer;
+  let databaseUrl: string;
+  let redisUrl: string;
+  let db: PrismaClient;
+  let pool: Pool;
+  beforeAll(async () => {
+    postgres = await new PostgreSqlContainer("postgres:16-alpine").start();
+    databaseUrl = postgres.getConnectionUri();
+    redis = await new GenericContainer("redis:7-alpine").withExposedPorts(6379).start();
+    redisUrl = `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`;
+    execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: packageRoot, env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
+    pool = new Pool({ connectionString: databaseUrl });
+    db = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+    await pool.query(`INSERT INTO brands(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES('graph-brand','graph-brand','Test','Test','Test',now());
+      INSERT INTO models(id,"brandId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES('graph-model','graph-brand','graph-model','Test','Test','Test',now());
+      INSERT INTO regions(id,slug,"nameRu","nameTk","nameEn","updatedAt") VALUES('graph-region','graph-region','Test','Test','Test',now());
+      INSERT INTO cities(id,"regionId",slug,"nameRu","nameTk","nameEn","updatedAt") VALUES('graph-city','graph-region','graph-city','Test','Test','Test',now());`);
+    await db.user.create({ data: { id: "graph-foreign-user", displayName: "Unrelated user" } });
+    await db.dealership.create({ data: { id: "graph-foreign-business", slug: "graph-foreign-business", name: "Unrelated business" } });
+    await db.listing.create({ data: listing("graph-foreign-listing", "graph-foreign-user", "graph-foreign-business") });
+  }, 120000);
+  afterAll(async () => { await db?.$disconnect(); await pool?.end(); await redis?.stop(); await postgres?.stop(); });
+
+  const expectedMigrations = readdirSync(`${packageRoot}/prisma/migrations`).filter(name => /^\d+_[a-zA-Z0-9_]+$/.test(name)).sort()
+    .map(name => ({ name, checksum: createHash("sha256").update(readFileSync(`${packageRoot}/prisma/migrations/${name}/migration.sql`)).digest("hex") }));
+  type ProbeOptions = { target?: string; expectedMigrations?: { name: string; checksum: string }[]; schemaDisposition?: string };
+  function execute(kind: "fixture" | "reset" | "probe", id: string, selectedProfile = profile, selectedCandidate = candidate, beforeQuery?: (query: string) => void, probe: ProbeOptions = {}) {
+    let code = 0;
+    let sqlDiagnostic: string | undefined;
+    let receipt: { profile: string; state: string; identities: number; fixtures: string; tombstone: boolean;
+      sha?: string; candidate?: string; namespace?: string; reservationId?: string; schema?: string; migrations?: { name: string; checksum: string }[];
+      storageDisposal?: { version: number; scope: string; state: string; rows: string; retainedAudits: number; auditDisposition: string; tombstone: string } } | undefined;
+    const remoteProcess = { execPath: process.execPath, exitCode: 0, env: {
+      STAGING_CAMPAIGN_PROFILE_ENABLED: selectedProfile, RAILWAY_PROJECT_ID: "graph-project", RAILWAY_ENVIRONMENT_ID: "graph-staging", RAILWAY_SERVICE_ID: "graph-api", RAILWAY_ENVIRONMENT_NAME: "staging",
+      APP_ENV: "staging", SMS_DRIVER: "mock", AUTOTM_COMMIT_SHA: probe.target ?? candidate, DATABASE_URL: "postgresql://fixture:synthetic@postgres.railway.internal:5432/railway",
+      REDIS_URL: "redis://fixture:synthetic@redis.railway.internal:6379/0", MINIO_ENDPOINT: "http://minio.railway.internal:9000", MINIO_PUBLIC_URL: "https://media.example",
+    } };
+    const payload = { kind, id, namespace: `cf_${id}`, profile: selectedProfile, candidate: selectedCandidate, target: probe.target ?? candidate, expectedMigrations: probe.expectedMigrations ?? expectedMigrations, schemaDisposition: probe.schemaDisposition ?? "retained-additive", redisOrigin: "redis://redis.railway.internal:6379/0", identity: {
+      projectId: "graph-project", environmentId: "graph-staging", services: { api: "graph-api" }, origins: { database: "postgresql://postgres.railway.internal:5432/railway", media: "http://minio.railway.internal:9000", publicMedia: "https://media.example" },
+    } };
+    const program = runInNewContext(`${source}; remoteProgram(payload)`, { payload });
+    runInNewContext(program, { URL, process: remoteProcess, require: (name: string) => name === "node:child_process" ? {
+      spawnSync: (command: string, args: string[], options: { input: string }) => {
+        if (command === process.execPath) return spawnSync(command, args, { ...options, encoding: "utf8", timeout: 30000, cwd: `${root}/apps/api`, env: { ...process.env, REDIS_URL: redisUrl } });
+        beforeQuery?.(options.input);
+        const result = spawnSync(process.execPath, [`${root}/scripts/testing/query-disposable-postgres.cjs`], { input: options.input, encoding: "utf8", timeout: 30000,
+          env: { ...process.env, STAGING_CONTROL_TEST_DATABASE_URL: databaseUrl, STAGING_TEST_DB_PACKAGE: `${packageRoot}/package.json`, STAGING_TEST_SQL_DIAGNOSTICS: "1" } });
+        if (result.status !== 0) {
+          // Independently admit only the helper's bounded format, never arbitrary child stderr.
+          sqlDiagnostic = result.stderr?.split(/\r?\n/).find(line => /^Disposable database SQL diagnostic: SQLSTATE=[A-Z0-9]{5}(?: position=[0-9]{1,10})?(?: internalPosition=[0-9]{1,10})?$/.test(line));
+        }
+        return result;
+      },
+    } : localRequire(name), console: { log: (value: string) => { receipt = JSON.parse(value); }, error: () => { code = 1; } } });
+    return { code: code || remoteProcess.exitCode, receipt, sqlDiagnostic };
+  }
+
+  function listing(id: string, sellerId: string, businessId: string) {
+    return { id, sellerId, businessId, status: "draft" as const, brandId: "graph-brand", modelId: "graph-model", cityId: "graph-city", description: "Synthetic media-free inventory", priceAmount: 100, damaged: false };
+  }
+  async function seed(id: string) {
+    // Intentional first behavioral RED on current source: fixed v2 profile is absent.
+    const result = execute("fixture", id);
+    expect(result.code, result.sqlDiagnostic).toBe(0);
+    const rows = (await pool.query(`SELECT alias,user_id,email FROM "cf_${id}".campaign_entities ORDER BY alias`)).rows as { alias: string; user_id: string; email: string }[];
+    const actor = (alias: string) => {
+      const row = rows.find(row => row.alias === alias);
+      if (!row) throw new Error("fixed roster alias missing");
+      return row.user_id;
+    };
+    const business = await db.dealership.findUniqueOrThrow({ where: { slug: slug(id) } });
+    return { rows, actor, business };
+  }
+  async function graph(id: string) {
+    const seeded = await seed(id);
+    const { actor, business } = seeded;
+    const car = await db.listing.create({ data: listing(randomUUID(), actor("owner"), business.id) });
+    const draft = await db.listingDraft.create({ data: { userId: actor("owner"), businessId: business.id, payload: { description: "Unpublished synthetic draft", media: [] } } });
+    const conversation = await db.conversation.create({ data: { businessId: business.id, listingId: car.id, buyerId: actor("buyer-a"), sellerId: actor("owner"), enquiryState: "closed", version: 1 } });
+    await db.conversationParticipant.createMany({ data: ["buyer-a", "owner"].map(alias => ({ conversationId: conversation.id, userId: actor(alias) })) });
+    const message = await db.message.create({ data: { conversationId: conversation.id, senderId: actor("buyer-a"), kind: "text", body: "Synthetic enquiry" } });
+    await db.conversation.update({ where: { id: conversation.id }, data: { lastMessageId: message.id, firstBuyerMessageId: message.id } });
+    await db.businessEnquiryAudit.create({ data: { conversationId: conversation.id, version: 1, actorId: actor("owner"), action: "closed", enquiryState: "closed" } });
+    await db.favorite.create({ data: { userId: actor("buyer-b"), listingId: car.id } });
+    // Storage-only invitation hash, never issued/redeemed as a credential.
+    const invitation = await db.dealershipInvitation.create({ data: { dealershipId: business.id, recipientUserId: actor("sales-a"), tokenHash: randomUUID(), expiresAt: new Date("2099-01-01T00:00:00Z") } });
+    await db.dealershipInvitation.update({ where: { id: invitation.id }, data: { revokedAt: new Date() } });
+    await db.ownedVehicle.create({ data: { userId: actor("owner"), dealershipId: business.id, brand: "Synthetic", model: "No real car" } });
+    await db.blockedUser.create({ data: { blockerId: actor("buyer-b"), blockedId: actor("sales-b") } });
+    await db.notificationPreference.create({ data: { userId: actor("buyer-a"), optOuts: { marketing: true } } });
+    await db.verifiedContactPhone.create({ data: { sellerId: actor("owner"), phone: contact(id), confirmedAt: new Date() } });
+    await db.contentReport.create({ data: { reporterUserId: actor("buyer-b"), targetType: "listing", targetId: car.id, reason: "synthetic-storage-fixture" } });
+    return { ...seeded, car, draft, conversation, message };
+  }
+  async function liveRecords(id: string) {
+    return (await pool.query(`SELECT table_name,row_key,row_hash FROM "cf_${id}".campaign_records WHERE NOT deleted ORDER BY table_name,row_key::text`)).rows;
+  }
+
+  it("provides a fixed distinct roster and only a nonoperational synthetic owner root, without new staff authority", async () => {
+    const id = "11".repeat(16), otherId = "12".repeat(16);
+    const first = await seed(id), second = await seed(otherId);
+    expect(first.rows.map(row => row.alias)).toEqual([...aliases].sort());
+    expect(new Set([...first.rows, ...second.rows].map(row => row.user_id)).size).toBe(30);
+    expect(new Set([...first.rows, ...second.rows].map(row => row.email)).size).toBe(30);
+    expect(first.business.id).not.toBe(second.business.id);
+    expect(first.business).toMatchObject({ slug: slug(id), status: "recovery", admissionMode: "synthetic", admittedAt: null, checkedEvidence: null, contactPhone: contact(id), contactConfirmedAt: null, logoUrl: null });
+    expect(await db.dealershipMember.findMany({ where: { dealershipId: first.business.id }, select: { userId: true, role: true } })).toEqual([{ userId: first.actor("owner"), role: "owner" }]);
+    expect(await db.staffGrant.findMany({ where: { userId: { in: first.rows.map(row => row.user_id) } }, select: { userId: true, capability: true }, orderBy: { capability: "asc" } })).toEqual([
+      { userId: first.actor("coordinator"), capability: "founder.control" }, { userId: first.actor("coordinator"), capability: "staff.manage" },
+    ]);
+    expect(await db.session.count()).toBe(0);
+    const original = await liveRecords(id);
+    expect(execute("fixture", id).code).toBe(0);
+    expect(await liveRecords(id)).toEqual(original);
+    expect(execute("reset", id).code).toBe(0);
+    expect(execute("reset", otherId).code).toBe(0);
+  });
+
+  it("journals ordinary media-free Prisma edits and disposes only exact owned rows while retaining terminal proof", async () => {
+    const id = "21".repeat(16), owned = await graph(id);
+    const unrelated = await db.listing.findUniqueOrThrow({ where: { id: "graph-foreign-listing" } });
+    await db.dealership.update({ where: { id: owned.business.id }, data: { name: "Edited synthetic business", description: "Mutable, not an original snapshot" } });
+    await db.listing.update({ where: { id: owned.car.id }, data: { description: "Owner saved a normal edit", priceAmount: 100 } });
+    await db.listingDraft.update({ where: { id: owned.draft.id }, data: { payload: { description: "Recoverable edited draft", media: [] } } });
+    await db.message.update({ where: { id: owned.message.id }, data: { body: "Edited synthetic message" } });
+    expect(execute("fixture", id).code).toBe(0);
+    const before = await liveRecords(id);
+    for (const table of ["dealerships", "dealership_members", "dealership_invitations", "listings", "listing_drafts", "conversations", "conversation_participants", "messages", "business_enquiry_audits", "favorites", "verified_contact_phones", "owned_vehicles", "blocked_users", "content_reports", "notification_preferences"])
+      expect(before.some(row => row.table_name === table), table).toBe(true);
+    expect(execute("reset", id).code).toBe(0);
+    expect(await db.dealership.findUnique({ where: { id: owned.business.id } })).toBeNull();
+    expect(await db.listing.findUnique({ where: { id: owned.car.id } })).toBeNull();
+    expect(await db.message.findUnique({ where: { id: owned.message.id } })).toBeNull();
+    expect((await liveRecords(id)).filter(row => row.table_name !== "audit_logs")).toEqual([]);
+    expect(await db.listing.findUnique({ where: { id: unrelated.id } })).toEqual(unrelated);
+    expect((await pool.query(`SELECT state FROM "cf_${id}".campaign_manifest`)).rows).toEqual([{ state: "disposed" }]);
+    expect(execute("reset", id).code).toBe(0);
+    await expect(db.listingDraft.create({ data: { userId: owned.actor("owner"), businessId: owned.business.id, payload: {} } })).rejects.toThrow();
+  });
+
+  it("refuses existing slug, contact and alias collisions without adopting or damaging them", async () => {
+    for (const [index, collision] of ["slug", "contact", "email"].entries()) {
+      const id = `${31 + index}`.repeat(16);
+      const foreign = collision === "email" ? await db.user.create({ data: { email: `buyer-b.${id}.${candidate.slice(0, 12)}@campaign897.invalid`, emailVerifiedAt: new Date() } }) :
+        await db.dealership.create({ data: { slug: collision === "slug" ? slug(id) : `contact-collision-${id}`, name: "Foreign preexisting root", contactPhone: collision === "contact" ? contact(id) : null } });
+      expect(execute("fixture", id).code).toBe(1);
+      expect((await pool.query("SELECT count(*)::int AS count FROM pg_namespace WHERE nspname=$1", [`cf_${id}`])).rows).toEqual([{ count: 0 }]);
+      if (collision === "email") expect(await db.user.findUnique({ where: { id: foreign.id } })).toEqual(foreign);
+      else expect(await db.dealership.findUnique({ where: { id: foreign.id } })).toEqual(foreign);
+    }
+  });
+
+  it("refuses mixed foreign child creation and parent or key transfers without changing either graph", async () => {
+    const id = "41".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    const membership = await db.dealershipMember.findUniqueOrThrow({ where: { userId: owned.actor("owner") } });
+    const participant = await db.conversationParticipant.findFirstOrThrow({ where: { conversationId: owned.conversation.id } });
+    await expect(db.dealership.update({ where: { id: owned.business.id }, data: { slug: "transferred-synthetic-root" } })).rejects.toThrow();
+    await expect(db.dealership.update({ where: { id: owned.business.id }, data: { contactPhone: "+999000000000000" } })).rejects.toThrow();
+    await expect(db.dealershipMember.update({ where: { id: membership.id }, data: { dealershipId: "graph-foreign-business" } })).rejects.toThrow();
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { businessId: "graph-foreign-business" } })).rejects.toThrow();
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { sellerId: "graph-foreign-user" } })).rejects.toThrow();
+    await expect(db.conversationParticipant.update({ where: { id: participant.id }, data: { userId: "graph-foreign-user" } })).rejects.toThrow();
+    await expect(db.message.update({ where: { id: owned.message.id }, data: { senderId: "graph-foreign-user" } })).rejects.toThrow();
+    await expect(db.favorite.create({ data: { userId: owned.actor("buyer-a"), listingId: "graph-foreign-listing" } })).rejects.toThrow();
+    await expect(db.dealershipInvitation.create({ data: { dealershipId: owned.business.id, recipientUserId: "graph-foreign-user", tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 60000) } })).rejects.toThrow();
+    expect(await liveRecords(id)).toEqual(before);
+    expect(await db.dealership.findUnique({ where: { id: owned.business.id } })).toEqual(owned.business);
+    expect(await db.dealershipMember.findUnique({ where: { id: membership.id } })).toEqual(membership);
+    expect(await db.conversationParticipant.findUnique({ where: { id: participant.id } })).toEqual(participant);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("refuses foreign incoming FK and scalar targets before any owned deletion, then safely retries", async () => {
+    const id = "51".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    // An unknown incoming FK with a composite descendant must never cascade.
+    // These external tables are outside the profile and cleanup allowlist.
+    await pool.query(`CREATE TABLE public.graph_unexpected_parent (business_id text, user_id text, PRIMARY KEY(business_id,user_id));
+      INSERT INTO public.graph_unexpected_parent VALUES('${owned.business.id}','${owned.actor("owner")}');
+      CREATE TABLE public.graph_unexpected_child (id text PRIMARY KEY, business_id text, user_id text,
+      FOREIGN KEY(business_id,user_id) REFERENCES public.graph_unexpected_parent(business_id,user_id));
+      INSERT INTO public.graph_unexpected_child VALUES('preserve-composite','${owned.business.id}','${owned.actor("owner")}');
+      ALTER TABLE public.graph_unexpected_parent ADD FOREIGN KEY(business_id) REFERENCES dealerships(id);`);
+    try {
+      expect(execute("reset", id).code).toBe(1);
+      expect(await liveRecords(id)).toEqual(before);
+      expect((await pool.query("SELECT id FROM graph_unexpected_child")).rows).toEqual([{ id: "preserve-composite" }]);
+    } finally { await pool.query("DROP TABLE public.graph_unexpected_child; DROP TABLE public.graph_unexpected_parent;"); }
+    // A polymorphic target has no FK; guard inventory must still see it.
+    const report = await db.contentReport.create({ data: { reporterUserId: "graph-foreign-user", targetType: "listing", targetId: owned.car.id, reason: "foreign-target-preservation" } });
+    expect(execute("reset", id).code).toBe(1);
+    expect(await db.contentReport.findUnique({ where: { id: report.id } })).toEqual(report);
+    expect(await liveRecords(id)).toEqual(before);
+    await db.contentReport.delete({ where: { id: report.id } });
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("rejects candidate/profile changes, active v1 migration and missing tracking without deleting owned data", async () => {
+    const id = "61".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    expect(execute("reset", id, profile, "b".repeat(40)).code).toBe(1);
+    expect(execute("fixture", id, "campaign897-identities-v1").code).toBe(1);
+    expect(await liveRecords(id)).toEqual(before);
+    const trigger = (await pool.query(`SELECT tgname FROM pg_trigger WHERE tgrelid='public.listings'::regclass AND NOT tgisinternal AND tgname LIKE $1`, [`cf_${id}%`])).rows[0]?.tgname as string | undefined;
+    expect(trigger).toBeDefined();
+    if (!trigger || !/^cf_[a-f0-9]{32}_[a-z_]+$/.test(trigger)) throw new Error("profile listing tracking missing");
+    await pool.query(`ALTER TABLE public.listings DISABLE TRIGGER "${trigger}"`);
+    try { expect(execute("reset", id).code).toBe(1); expect(await db.listing.findUnique({ where: { id: owned.car.id } })).toEqual(owned.car); }
+    finally { await pool.query(`ALTER TABLE public.listings ENABLE TRIGGER "${trigger}"`); }
+    expect(execute("reset", id).code).toBe(0);
+    const v1 = "62".repeat(16);
+    expect(execute("fixture", v1, "campaign897-identities-v1").code).toBe(0);
+    expect(execute("fixture", v1).code).toBe(1);
+    expect(execute("reset", v1, "campaign897-identities-v1").code).toBe(0);
+  });
+
+  it("resumes from committed cleaning after interruption and never treats a missing response as completed cleanup", async () => {
+    const id = "71".repeat(16), owned = await graph(id);
+    let interrupted = false;
+    const reset = execute("reset", id, profile, candidate, query => {
+      if (!query.includes("DELETE FROM public.")) return;
+      interrupted = true; throw new Error("synthetic interruption before graph disposal transaction");
+    });
+    expect(interrupted).toBe(true); expect(reset.code).toBe(1);
+    expect((await pool.query(`SELECT state FROM "cf_${id}".campaign_manifest`)).rows).toEqual([{ state: "cleaning" }]);
+    expect(await db.listing.findUnique({ where: { id: owned.car.id } })).toEqual(owned.car);
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { description: "late graph write" } })).rejects.toThrow();
+    expect(execute("reset", id).code).toBe(0);
+    expect(await db.dealership.findUnique({ where: { id: owned.business.id } })).toBeNull();
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("leaves unrelated writes unowned before and after disposal and permits a future reservation", async () => {
+    const id = "81".repeat(16), owned = await graph(id);
+    const original = await liveRecords(id);
+    await db.user.update({ where: { id: "graph-foreign-user" }, data: { displayName: "Foreign update while active" } });
+    await db.listing.update({ where: { id: "graph-foreign-listing" }, data: { description: "Foreign active edit" } });
+    expect(await liveRecords(id)).toEqual(original);
+    expect(execute("reset", id).code).toBe(0);
+    await db.user.update({ where: { id: "graph-foreign-user" }, data: { displayName: "Foreign update after disposal" } });
+    await db.listing.update({ where: { id: "graph-foreign-listing" }, data: { description: "Foreign terminal edit" } });
+    expect(await db.user.findUnique({ where: { id: "graph-foreign-user" } })).toMatchObject({ displayName: "Foreign update after disposal" });
+    expect(execute("fixture", id).code).toBe(1);
+    expect(execute("reset", id, profile, "b".repeat(40)).code).toBe(1);
+    expect(execute("fixture", "82".repeat(16)).code).toBe(0);
+    expect(execute("reset", "82".repeat(16)).code).toBe(0);
+    const buyer = owned.rows.find(row => row.alias === "buyer-a");
+    if (!buyer) throw new Error("fixed buyer missing");
+    await expect(db.user.create({ data: { id: buyer.user_id, email: buyer.email, emailVerifiedAt: new Date() } })).rejects.toThrow();
+    await pool.query(`ALTER TABLE public.users DISABLE TRIGGER "cf_${id}_business"`);
+    try { await db.user.create({ data: { id: buyer.user_id, email: buyer.email, emailVerifiedAt: new Date() } }); }
+    finally { await pool.query(`ALTER TABLE public.users ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`ALTER TABLE public.users DISABLE TRIGGER "cf_${id}_business"`);
+    try { await db.user.delete({ where: { id: buyer.user_id } }); }
+    finally { await pool.query(`ALTER TABLE public.users ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(execute("reset", id).code).toBe(0);
+    expect(execute("reset", "83".repeat(16)).code).toBe(1);
+  });
+
+  it("tracks composite grants and retains only redacted bootstrap audits after verified disposal", async () => {
+    const id = "84".repeat(16), owned = await seed(id);
+    const grants = (await pool.query(`SELECT row_key FROM "cf_${id}".campaign_records WHERE table_name='staff_grants' ORDER BY row_key::text`)).rows;
+    expect(grants).toHaveLength(2);
+    expect(grants.map(row => row.row_key)).toEqual(expect.arrayContaining([
+      { userId: owned.actor("coordinator"), capability: "staff.manage" },
+      { userId: owned.actor("coordinator"), capability: "founder.control" },
+    ]));
+    expect(await db.auditLog.count({ where: { targetId: owned.actor("coordinator") } })).toBe(2);
+    expect(execute("reset", id).code).toBe(0);
+    expect(await db.staffGrant.count({ where: { userId: owned.actor("coordinator") } })).toBe(0);
+    const retained = await db.auditLog.findMany({ where: { targetType: "SyntheticCampaign", targetId: id } });
+    expect(retained).toHaveLength(2);
+    for (const row of retained) expect(row).toMatchObject({ actorId: null, details: { profile, disposition: "redacted-synthetic-audit" } });
+    expect((await liveRecords(id)).map(row => row.table_name)).toEqual(["audit_logs", "audit_logs"]);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("refuses nullable parent removal, identity transfers, foreign assignees, pointers and media payloads", async () => {
+    const id = "85".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { businessId: null } })).rejects.toThrow();
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { id: randomUUID() } })).rejects.toThrow();
+    await expect(db.user.update({ where: { id: owned.actor("buyer-a") }, data: { email: "transferred@campaign897.invalid" } })).rejects.toThrow();
+    await expect(db.businessEnquiryAudit.updateMany({ where: { conversationId: owned.conversation.id }, data: { previousAssigneeId: "graph-foreign-user" } })).rejects.toThrow();
+    await expect(db.conversation.update({ where: { id: owned.conversation.id }, data: { lastMessageId: randomUUID() } })).rejects.toThrow();
+    await expect(db.message.update({ where: { id: owned.message.id }, data: { metadata: { uploadId: randomUUID() } } })).rejects.toThrow();
+    await expect(db.listingDraft.update({ where: { id: owned.draft.id }, data: { payload: { media: [randomUUID()] } } })).rejects.toThrow();
+    await expect(db.staffGrant.update({ where: { userId_capability: { userId: owned.actor("coordinator"), capability: "staff.manage" } }, data: { capability: "marketplace.moderate" } })).rejects.toThrow();
+    expect(await liveRecords(id)).toEqual(before);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("detects journal hashes, explicit keys, event and missing-trigger tampering before any deletion", async () => {
+    const id = "86".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    const records = (await pool.query(`SELECT * FROM "cf_${id}".campaign_records ORDER BY table_name,row_key::text`)).rows;
+    const listingRecord = records.find(row => row.table_name === "listings");
+    if (!listingRecord) throw new Error("listing ownership missing");
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_hash='changed' WHERE table_name='listings'`);
+    expect(execute("reset", id).code).toBe(1);
+    expect(await db.listing.findUnique({ where: { id: owned.car.id } })).toEqual(owned.car);
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_hash=$1 WHERE table_name='listings'`, [listingRecord.row_hash]);
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_key=jsonb_build_object('id',NULL) WHERE table_name='listings'`);
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`UPDATE "cf_${id}".campaign_records SET row_key=$1 WHERE table_name='listings'`, [listingRecord.row_key]);
+    const event = (await pool.query(`SELECT * FROM "cf_${id}".campaign_events ORDER BY sequence LIMIT 1`)).rows[0];
+    if (!event) throw new Error("bootstrap event missing");
+    await pool.query(`UPDATE "cf_${id}".campaign_events SET row_hash='changed' WHERE sequence=$1`, [event.sequence]);
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`UPDATE "cf_${id}".campaign_events SET row_hash=$1 WHERE sequence=$2`, [event.row_hash, event.sequence]);
+    await pool.query(`DROP TRIGGER "cf_${id}_business" ON public.listings`);
+    expect(execute("reset", id).code).toBe(1);
+    await pool.query(`CREATE TRIGGER "cf_${id}_business" AFTER INSERT OR UPDATE OR DELETE ON public.listings FOR EACH ROW EXECUTE FUNCTION "cf_${id}".track_business()`);
+    await pool.query(`ALTER TABLE public.listings DISABLE TRIGGER "cf_${id}_business"`);
+    try { await pool.query('UPDATE public.listings SET description=$1 WHERE id=$2', ["Untracked bypassed mutation", owned.car.id]); }
+    finally { await pool.query(`ALTER TABLE public.listings ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(execute("reset", id).code).toBe(1);
+    await expect(db.listing.update({ where: { id: owned.car.id }, data: { description: "Must not launder tamper" } })).rejects.toThrow();
+    await pool.query(`ALTER TABLE public.listings DISABLE TRIGGER "cf_${id}_business"`);
+    try { await pool.query('UPDATE public.listings SET description=$1 WHERE id=$2', [owned.car.description, owned.car.id]); }
+    finally { await pool.query(`ALTER TABLE public.listings ENABLE TRIGGER "cf_${id}_business"`); }
+    expect(await liveRecords(id)).toEqual(before);
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("refuses unsupported FK and JSON descendants without adopting or unlinking them", async () => {
+    const id = "87".repeat(16), owned = await graph(id), before = await liveRecords(id);
+    const search = await db.savedSearch.create({ data: { userId: owned.actor("buyer-a"), filters: {} } });
+    expect(execute("reset", id).code).toBe(1);
+    expect(await liveRecords(id)).toEqual(before);
+    expect(await db.savedSearch.findUnique({ where: { id: search.id } })).toEqual(search);
+    await db.savedSearch.delete({ where: { id: search.id } });
+    const media = await db.listingMedia.create({ data: { listingId: owned.car.id, kind: "image", key: "synthetic-no-object.webp", sortOrder: 0 } });
+    expect(execute("reset", id).code).toBe(1);
+    expect(await db.listingMedia.findUnique({ where: { id: media.id } })).toEqual(media);
+    expect(await liveRecords(id)).toEqual(before);
+    await db.listingMedia.delete({ where: { id: media.id } });
+    await pool.query("CREATE SCHEMA graph_unknown; CREATE TABLE graph_unknown.reference (id text PRIMARY KEY)");
+    try { expect(execute("reset", id).code).toBe(1); expect(await liveRecords(id)).toEqual(before); }
+    finally { await pool.query("DROP TABLE graph_unknown.reference; DROP SCHEMA graph_unknown"); }
+    const foreign = await db.listingDraft.create({ data: { userId: "graph-foreign-user", payload: { reference: { listingId: owned.car.id } } } });
+    expect(execute("reset", id).code).toBe(1);
+    expect(await liveRecords(id)).toEqual(before);
+    await db.listingDraft.delete({ where: { id: foreign.id } });
+    expect(execute("reset", id).code).toBe(0);
+  });
+
+  it("holds an ordinary writer on the shared fence and refuses it after cleaning commits", async () => {
+    const id = "88".repeat(16), owned = await graph(id), client = await pool.connect();
+    let lateWrite: Promise<unknown> | undefined;
+    try {
+      await client.query("BEGIN");
+      const holderPid = (await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]?.pid;
+      if (holderPid === undefined) throw new Error("Fence holder backend unavailable");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`cf_${id}`]);
+      lateWrite = db.listing.update({ where: { id: owned.car.id }, data: { description: "Held writer must not commit" } }).then(value => ({ value }), error => ({ error }));
+      let waiting = false;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        // Activity snapshots are cached within this holder transaction. Refresh
+        // each observation and attribute the wait to this exact lock holder.
+        await client.query("SELECT pg_stat_clear_snapshot()");
+        const result = await client.query("SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=current_database() AND pid<>$1 AND wait_event_type='Lock' AND wait_event='advisory' AND $1=ANY(pg_blocking_pids(pid)) AND query LIKE '%listings%'", [holderPid]);
+        if (result.rows[0]?.count > 0) { waiting = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      expect(waiting).toBe(true);
+      await client.query(`UPDATE "cf_${id}".campaign_manifest SET state='cleaning'`);
+      await client.query("COMMIT");
+      expect(await lateWrite).toHaveProperty("error");
+      await expect(db.message.delete({ where: { id: owned.message.id } })).rejects.toThrow();
+      await db.user.update({ where: { id: "graph-foreign-user" }, data: { displayName: "Unrelated while cleaning" } });
+      expect(await db.listing.findUnique({ where: { id: owned.car.id } })).toEqual(owned.car);
+      expect(execute("reset", id).code).toBe(0);
+    } finally { await client.query("ROLLBACK"); client.release(); await lateWrite; }
+  });
+
+  it("bounds the exact row journal while retaining enough authority to dispose a full graph", async () => {
+    const id = "89".repeat(16), owned = await seed(id);
+    for (let index = 0; index < 107; index++) await db.listingDraft.create({ data: { userId: owned.actor("owner"), businessId: owned.business.id, payload: {} } });
+    expect(await liveRecords(id)).toHaveLength(128);
+    await expect(db.listingDraft.create({ data: { userId: owned.actor("owner"), businessId: owned.business.id, payload: {} } })).rejects.toThrow();
+    expect(await liveRecords(id)).toHaveLength(128);
+    expect(execute("reset", id).code).toBe(0);
+    expect(await db.listingDraft.count({ where: { businessId: owned.business.id } })).toBe(0);
+  });
+  // Snapshot control records and application data, not only the emitted receipt.
+  // These queries run only against this suite's hosted disposable PostgreSQL.
+  async function observationSnapshot(id: string) {
+    const control = await Promise.all(["campaign_manifest", "campaign_entities", "campaign_records", "campaign_events"].map(async table =>
+      (await pool.query(`SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb) AS rows FROM "cf_${id}".${table} t`)).rows));
+    const application = await Promise.all(["users", "dealerships", "dealership_members", "staff_grants", "audit_logs", "listings", "listing_drafts", "conversations", "conversation_participants", "messages", "business_enquiry_audits", "favorites", "dealership_invitations", "verified_contact_phones", "owned_vehicles", "blocked_users", "notification_preferences", "content_reports"].map(async table =>
+      (await pool.query(`SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::jsonb) AS rows FROM public.${table} t`)).rows));
+    return { control, application };
+  }
+
+  it.each(["identities", "cleaning", "disposed"] as const)("probe preserves %s state and every record/event on repeat", async state => {
+    const id = { identities: "b1", cleaning: "b2", disposed: "b3" }[state].repeat(16);
+    await graph(id);
+    if (state === "cleaning") {
+      const interrupted = execute("reset", id, profile, candidate, query => {
+        if (query.includes("DELETE FROM public.")) throw new Error("interrupt before disposal");
+      });
+      expect(interrupted.code).toBe(1);
+    }
+    if (state === "disposed") expect(execute("reset", id).code).toBe(0);
+    expect((await pool.query(`SELECT state FROM "cf_${id}".campaign_manifest`)).rows).toEqual([{ state }]);
+    const before = await observationSnapshot(id);
+    for (let repeat = 0; repeat < 2; repeat++) {
+      const result = execute("probe", id);
+      expect(result.code, result.sqlDiagnostic).toBe(0);
+      expect(result.receipt).toMatchObject({ state, candidate, namespace: `cf_${id}`, reservationId: id, profile,
+        fixtures: state === "disposed" ? "absent" : "present", tombstone: state === "disposed" });
+      expect(await observationSnapshot(id)).toEqual(before);
+      expect(result.receipt?.sha).toBe(candidate);
+      expect(result.receipt?.migrations).toEqual(expectedMigrations);
+      expect(result.receipt?.schema).toBe("retained-additive");
+      if (state === "disposed") {
+        expect(result.receipt?.storageDisposal).toEqual({ version: 1, scope: "business-v2-storage", state: "disposed",
+          rows: "absent", retainedAudits: 2, auditDisposition: "redacted-synthetic-audit", tombstone: "retained" });
+        const audits = await db.auditLog.findMany({ where: { targetType: "SyntheticCampaign", targetId: id } });
+        expect(audits).toHaveLength(2);
+        for (const audit of audits) expect(audit).toMatchObject({ actorId: null, details: { profile, disposition: "redacted-synthetic-audit" } });
+        expect((await liveRecords(id)).map(row => row.table_name)).toEqual(["audit_logs", "audit_logs"]);
+      } else {
+        expect(result.receipt?.storageDisposal?.state).not.toBe("disposed");
+      }
+      for (const field of ["queueJobs", "sinkRecords", "authenticated", "admission", "entities", "emails"]) expect(result.receipt).not.toHaveProperty(field);
+    }
+    if (state !== "disposed") expect(execute("reset", id).code).toBe(0);
+  });
+
+  it.each(["missing", "extra", "checksum", "unfinished", "schema"])("probe refuses %s migration/schema evidence without writes", async fault => {
+    const id = ({ missing: "b4", extra: "b5", checksum: "b6", unfinished: "b7", schema: "b8" } as Record<string, string>)[fault]?.repeat(16);
+    if (!id) throw new Error("unknown migration fault");
+    await seed(id);
+    expect(execute("reset", id).code).toBe(0);
+    const before = await observationSnapshot(id);
+    const migrations = expectedMigrations.map(row => ({ ...row }));
+    if (fault === "missing") migrations.pop();
+    if (fault === "extra") migrations.push({ name: "99999999_probe_extra", checksum: "f".repeat(64) });
+    if (fault === "checksum") {
+      const first = migrations[0];
+      if (!first) throw new Error("migration inventory is empty");
+      first.checksum = "f".repeat(64);
+    }
+    if (fault === "unfinished") await pool.query(`INSERT INTO public._prisma_migrations(id,checksum,migration_name,started_at) VALUES('probe-unfinished','synthetic','99999999_probe_unfinished',now())`);
+    try {
+      const result = execute("probe", id, profile, candidate, undefined, { expectedMigrations: migrations, schemaDisposition: fault === "schema" ? "discarded" : "retained-additive" });
+      expect(await observationSnapshot(id)).toEqual(before);
+      expect(result.code).toBe(1);
+      expect(result.receipt).toBeUndefined();
+    } finally {
+      if (fault === "unfinished") await pool.query(`DELETE FROM public._prisma_migrations WHERE id='probe-unfinished'`);
+    }
+  });
+
+  it("observes disposed candidate C under restored runtime M without rebinding or resetting C", async () => {
+    const id = "b9".repeat(16), runtimeMain = "d".repeat(40);
+    await graph(id);
+    expect(execute("reset", id).code).toBe(0);
+    const before = await observationSnapshot(id);
+    const result = execute("probe", id, profile, candidate, undefined, { target: runtimeMain });
+    expect(result.code, result.sqlDiagnostic).toBe(0);
+    expect(await observationSnapshot(id)).toEqual(before);
+    expect(result.receipt?.sha).toBe(runtimeMain);
+    expect(result.receipt?.candidate).toBe(candidate);
+    expect(result.receipt?.migrations).toEqual(expectedMigrations);
+    expect(result.receipt?.schema).toBe("retained-additive");
+    expect(result.receipt?.storageDisposal?.state).toBe("disposed");
+  });
+
+  it("refuses missing namespace, stale candidate and mixed profile without inventing disposal authority", async () => {
+    const id = "ba".repeat(16), missing = "bb".repeat(16);
+    await seed(id);
+    expect(execute("reset", id).code).toBe(0);
+    const before = await observationSnapshot(id);
+    for (const result of [execute("probe", missing), execute("probe", id, profile, "b".repeat(40)), execute("probe", id, "campaign897-identities-v1")]) {
+      expect(result.code).toBe(1);
+      expect(result.receipt).toBeUndefined();
+    }
+    expect((await pool.query("SELECT count(*)::int AS count FROM pg_namespace WHERE nspname=$1", [`cf_${missing}`])).rows).toEqual([{ count: 0 }]);
+    expect(await observationSnapshot(id)).toEqual(before);
+  });
+
+  it.each(["trigger", "journal", "binding", "audit"])("refuses changed terminal %s authority and preserves the observed damaged state", async fault => {
+    const id = ({ trigger: "bc", journal: "bd", binding: "be", audit: "bf" } as Record<string, string>)[fault]?.repeat(16);
+    if (!id) throw new Error("unknown authority fault");
+    await seed(id);
+    expect(execute("reset", id).code).toBe(0);
+    // Deliberate corruption belongs only to this disposable test database.
+    if (fault === "trigger") await pool.query(`ALTER TABLE public.users DISABLE TRIGGER "cf_${id}_business"`);
+    if (fault === "journal") await pool.query(`UPDATE "cf_${id}".campaign_manifest SET journal_hash='corrupt'`);
+    if (fault === "binding") await pool.query(`UPDATE "cf_${id}".campaign_manifest SET candidate='${"b".repeat(40)}'`);
+    if (fault === "audit") {
+      await pool.query(`ALTER TABLE public.audit_logs DISABLE TRIGGER "cf_${id}_business"`);
+      await pool.query(`UPDATE public.audit_logs SET details='{"corrupt":true}'::jsonb WHERE "targetType"='SyntheticCampaign' AND "targetId"=$1`, [id]);
+    }
+    const before = await observationSnapshot(id);
+    try {
+      const result = execute("probe", id);
+      expect(result.code).toBe(1);
+      expect(result.receipt).toBeUndefined();
+      expect(await observationSnapshot(id)).toEqual(before);
+    } finally {
+      if (fault === "trigger") await pool.query(`ALTER TABLE public.users ENABLE TRIGGER "cf_${id}_business"`);
+      if (fault === "audit") await pool.query(`ALTER TABLE public.audit_logs ENABLE TRIGGER "cf_${id}_business"`);
+    }
+  });
+
+});

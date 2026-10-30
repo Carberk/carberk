@@ -1,0 +1,234 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-dde97944/packages/contracts
+
+ ❯ src/schemas/diagnostics.spec.ts (15 tests | 7 failed) 10ms
+   ❯ released diagnostic identity compatibility (9)
+     × accepts deliberate typed customer vehicle facts only during finalization 3ms
+     × retains only the versioned safe release identity for buyer_private readers and PDF input 3ms
+     × retains only the versioned safe release identity for listing_public readers and PDF input 1ms
+     × refuses unsupported identity versions and restricted identifier material 0ms
+     × refuses unsupported identity versions and restricted identifier material 0ms
+     × refuses unsupported identity versions and restricted identifier material 0ms
+     × refuses unsupported identity versions and restricted identifier material 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/schemas/diagnostics.spec.ts > released diagnostic identity compatibility > accepts deliberate typed customer vehicle facts only during finalization
+ZodError: [
+  {
+    "code": "unrecognized_keys",
+    "keys": [
+      "vehicleDisplay"
+    ],
+    "path": [],
+    "message": "Unrecognized key(s) in object: 'vehicleDisplay'"
+  }
+]
+ ❯ get error ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js:39:31
+ ❯ ZodObject.parse ../../node_modules/.pnpm/zod@3.25.76/node_modules/zod/v3/types.js:114:22
+ ❯ src/schemas/diagnostics.spec.ts:16:43
+     14|  it("accepts deliberate typed customer vehicle facts only during final…
+     15|   const vehicleDisplay = { make: "Toyota", model: "Camry", year: 2018 …
+     16|   expect(DiagnosticReportTransitionSchema.parse({ expectedVersion: 2, …
+       |                                           ^
+     17|   for (const action of ["submit", "return", "withdraw"]) expect(Diagno…
+     18|   for (const unsafe of [{ ...vehicleDisplay, year: 0 }, { ...vehicleDi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  src/schemas/diagnostics.spec.ts > released diagnostic identity compatibility > retains only the versioned safe release identity for buyer_private readers and PDF input
+AssertionError: expected { …(20) } to match object { releaseIdentity: { …(3) } }
+(25 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "releaseIdentity": {
+-     "center": {
++   "audience": "buyer_private",
++   "authorId": null,
++   "correctionReason": null,
++   "finalizedAt": "2026-10-17T10:00:00.000Z",
++   "findings": [],
+    "id": "11111111-1111-4111-8111-111111111111",
+-       "names": {
+-         "en": "Ashgabat test center",
+-         "ru": "Тестовый центр Ашхабада",
+-         "tk": "Aşgabat synag merkezi",
++   "mileageKm": 1,
++   "observedAt": "2026-10-17T10:00:00.000Z",
++   "orderId": "11111111-1111-4111-8111-111111111111",
++   "returnReason": null,
++   "reviewerId": null,
++   "status": "finalized",
++   "successorOf": null,
++   "supersededBy": null,
++   "synthetic": true,
++   "template": {
++     "checks": [
++       {
++         "evidenceRequired": false,
++         "id": "brakes",
++         "label": {
++           "en": "Synthetic",
++           "ru": "Пример",
++           "tk": "Nusga",
++         },
++         "measurement": null,
++         "required": true,
++       },
++     ],
++     "limitations": {
++       "en": "Synthetic",
++       "ru": "Пример",
++       "tk": "Nusga",
++     },
++     "panels": [],
++     "syntheticNotice": {
++       "en": "Synthetic",
++       "ru": "Пример",
++       "tk": "Nusga",
+      },
++     "title": {
++       "en": "Synthetic",
++       "ru": "Пример",
++       "tk": "Nusga",
+      },
+-     "vehicle": {
+-       "catalog": null,
+-       "display": null,
+-       "maskedVin": "*************1234",
+-       "method": "vin",
+    },
++   "templateVersionId": "11111111-1111-4111-8111-111111111111",
+    "version": 1,
+-   },
++   "withdrawalReason": null,
++   "withdrawnAt": null,
+  }
+
+ ❯ src/schemas/diagnostics.spec.ts:36:41
+     34|   const releasedReport = { ...report, audience, releaseIdentity };
+     35|   for (const schema of [DiagnosticReportSchema, PublicDiagnosticReport…
+     36|    expect(schema.parse(releasedReport)).toMatchObject({ releaseIdentit…
+       |                                         ^
+     37|   }
+     38|   const snapshot = DiagnosticReleasedSnapshotSchema.parse({ report: re…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  src/schemas/diagnostics.spec.ts > released diagnostic identity compatibility > retains only the versioned safe release identity for listing_public readers and PDF input
+AssertionError: expected { …(20) } to match object { releaseIdentity: { …(3) } }
+(25 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "releaseIdentity": {
+-     "center": {
++   "audience": "listing_public",
++   "authorId": null,
++   "correctionReason": null,
++   "finalizedAt": "2026-10-17T10:00:00.000Z",
++   "findings": [],
+    "id": "11111111-1111-4111-8111-111111111111",
+-       "names": {
+-         "en": "Ashgabat test center",
+-         "ru": "Тестовый центр Ашхабада",
+-         "tk": "Aşgabat synag merkezi",
++   "mileageKm": 1,
++   "observedAt": "2026-10-17T10:00:00.000Z",
++   "orderId": "11111111-1111-4111-8111-111111111111",
++   "returnReason": null,
++   "reviewerId": null,
++   "status": "finalized",
++   "successorOf": null,
++   "supersededBy": null,
++   "synthetic": true,
++   "template": {
++     "checks": [
++       {
++         "evidenceRequired": false,
++         "id": "brakes",
++         "label": {
++           "en": "Synthetic",
++           "ru": "Пример",
++           "tk": "Nusga",
++         },
++         "measurement": null,
++         "required": true,
++       },
++     ],
++     "limitations": {
++       "en": "Synthetic",
++       "ru": "Пример",
++       "tk": "Nusga",
++     },
++     "panels": [],
++     "syntheticNotice": {
++       "en": "Synthetic",
++       "ru": "Пример",
++       "tk": "Nusga",
+      },
++     "title": {
++       "en": "Synthetic",
++       "ru": "Пример",
++       "tk": "Nusga",
+      },
+-     "vehicle": {
+-       "catalog": null,
+-       "display": null,
+-       "maskedVin": "*************1234",
+-       "method": "vin",
+    },
++   "templateVersionId": "11111111-1111-4111-8111-111111111111",
+    "version": 1,
+-   },
++   "withdrawalReason": null,
++   "withdrawnAt": null,
+  }
+
+ ❯ src/schemas/diagnostics.spec.ts:36:41
+     34|   const releasedReport = { ...report, audience, releaseIdentity };
+     35|   for (const schema of [DiagnosticReportSchema, PublicDiagnosticReport…
+     36|    expect(schema.parse(releasedReport)).toMatchObject({ releaseIdentit…
+       |                                         ^
+     37|   }
+     38|   const snapshot = DiagnosticReleasedSnapshotSchema.parse({ report: re…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  src/schemas/diagnostics.spec.ts > released diagnostic identity compatibility > refuses unsupported identity versions and restricted identifier material
+ FAIL  src/schemas/diagnostics.spec.ts > released diagnostic identity compatibility > refuses unsupported identity versions and restricted identifier material
+ FAIL  src/schemas/diagnostics.spec.ts > released diagnostic identity compatibility > refuses unsupported identity versions and restricted identifier material
+ FAIL  src/schemas/diagnostics.spec.ts > released diagnostic identity compatibility > refuses unsupported identity versions and restricted identifier material
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/schemas/diagnostics.spec.ts:49:26
+     47|  ])("refuses unsupported identity versions and restricted identifier m…
+     48|   const result = DiagnosticReleasedSnapshotSchema.safeParse({ report: …
+     49|   expect(result.success).toBe(false);
+       |                          ^
+     50|  });
+     51| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 8 passed (15)
+   Start at  01:32:29
+   Duration  102ms (transform 34%, import 29%, tests 29%, worker 8%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ dde97944/packages/contracts

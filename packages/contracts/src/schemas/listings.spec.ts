@@ -7,6 +7,7 @@ import {
   FeedListingSummarySchema,
   FeedResponseSchema,
   ListingDetailSchema,
+  ListingViewInstallIdSchema,
   ListingDraftPayloadSchema,
   MyListingsResponseSchema,
 } from "./listings";
@@ -243,4 +244,20 @@ describe("ListingDraftPayloadSchema", () => {
   it("accepts null as a cleared VIN so a draft update can remove the stored one", () => {
     expect(ListingDraftPayloadSchema.parse({ vin: null }).vin).toBeNull();
   });
+});
+
+
+describe("Listing view visibility compatibility", () => {
+  it("keeps the released-client lifetime counter required", () => {
+    expect(ListingDetailSchema.shape.viewCount.safeParse(undefined).success).toBe(false);
+  });
+  it("retains old clients' numeric totals and rejects negative totals", () => {
+    expect(ListingDetailSchema.shape.viewCount.safeParse(17).success).toBe(true);
+    expect(ListingDetailSchema.shape.viewCount.safeParse(-1).success).toBe(false);
+  });
+});
+
+it("canonicalizes the app UUID before dedupe and rejects malformed identifiers", () => {
+  expect(ListingViewInstallIdSchema.parse("550E8400-E29B-41D4-A716-446655440000")).toBe("550e8400-e29b-41d4-a716-446655440000");
+  expect(ListingViewInstallIdSchema.safeParse("invalid").success).toBe(false);
 });

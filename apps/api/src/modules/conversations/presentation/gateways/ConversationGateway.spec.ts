@@ -10,7 +10,11 @@ import type { PresencePort } from "../../../realtime/domain/ports/PresencePort";
 import { Conversation } from "../../domain/Conversation";
 import { Message } from "../../domain/Message";
 import { CONVERSATION_SOCKET_ERROR_CODES } from "../../domain/types";
-import type { ValidateConversationAccess } from "../../application/ValidateConversationAccess";
+import { ValidateConversationAccess } from "../../application/ValidateConversationAccess";
+import { BusinessEnquiryAccess } from "../../application/BusinessEnquiryAccess";
+import { ConversationAccessPolicy } from "../../application/ConversationAccessPolicy";
+import type { ConversationRepository } from "../../domain/ports/ConversationRepository";
+import { BusinessAuthorityDenied, type BusinessAuthorityPort } from "../../../identity/identity.public";
 import type { SendRealtimeMessage } from "../../application/SendRealtimeMessage";
 import type { UpdateWatermark, UpdateWatermarkResult } from "../../application/UpdateWatermark";
 import type { DeleteMessage } from "../../application/DeleteMessage";
@@ -155,6 +159,7 @@ describe("ConversationGateway", () => {
     expect(validateAccess.execute).toHaveBeenCalledWith({
       userId: "buyer-1",
       conversationId: CONV_1,
+      actor: { userId: "buyer-1", sessionId: "sid-1" },
     });
   });
 
@@ -369,6 +374,7 @@ describe("ConversationGateway", () => {
         }),
       });
       expect(sendMessage.execute).toHaveBeenCalledWith({
+        actor: { userId: "buyer-1", sessionId: "sid-1" },
         senderId: "buyer-1",
         conversationId: CONV_1,
         kind: "text",
@@ -1086,5 +1092,27 @@ describe("ConversationGateway", () => {
         }),
       );
     });
+  });
+});
+
+
+describe("business enquiry socket access", () => {
+  it("joins a buyer without a business header only while the current session is valid", async () => {
+    const conversation = Conversation.create({ id: CONV_1, listingId: LISTING_1, buyerId: "buyer-1", sellerId: "departed", businessId: "business" });
+    const repository = { async findById() { return conversation; } } as unknown as ConversationRepository;
+    let revoked = false;
+    const authority: BusinessAuthorityPort = {
+      async resolve(subject) {
+        if (revoked || subject.userId !== "buyer-1" || subject.sessionId !== "sid-1") throw new BusinessAuthorityDenied("SESSION_REQUIRED");
+        return { kind: "personal", userId: subject.userId };
+      },
+      async authorize() { throw new BusinessAuthorityDenied("MEMBERSHIP_REQUIRED"); },
+    };
+    const access = new ValidateConversationAccess(repository, new ConversationAccessPolicy({} as never, {} as never), new BusinessEnquiryAccess(authority));
+    const { gateway } = buildGateway(access);
+    const socket = buildSocket({ user: { sub: "buyer-1", sid: "sid-1", phone: "+993", role: "user" } });
+    expect(await gateway.handleJoin({ conversationId: CONV_1 }, socket)).toMatchObject({ ok: true });
+    revoked = true;
+    expect(await gateway.handleJoin({ conversationId: CONV_1 }, socket)).toMatchObject({ ok: false, code: "FORBIDDEN" });
   });
 });

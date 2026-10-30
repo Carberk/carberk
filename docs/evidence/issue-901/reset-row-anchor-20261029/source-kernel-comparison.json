@@ -1,0 +1,134 @@
+{
+  "spec": "packages/db/tests/diagnostic-source-kernel.e2e.spec.ts",
+  "command": "pnpm exec vitest run tests/diagnostic-source-kernel.e2e.spec.ts --reporter=verbose (cwd packages/db)",
+  "knownFlake": "Wall-clock fixture timestamps whose milliseconds end in 0 compare as e.g. 17.780 versus 17.78; affected tests vary per run.",
+  "runs": [
+    {
+      "commit": "25f80afcc38ecaf2ce370593afacc3d80a8bd999",
+      "label": "parent: no reset migration",
+      "rawPath": "/tmp/t3-58ab493d/logs/source-kernel-base-25f80afcc.log",
+      "rawSha256": "efcf3d580bb2b41972370ed5e9f831d5d4e57b8d2a7369c2594e5f6ec54b3a84",
+      "failed": 62,
+      "passed": 154,
+      "total": 216,
+      "timestampFlakeFailures": 20,
+      "otherFailures": 42
+    },
+    {
+      "commit": "7a172ea74d5ad191657f1006fae5a99fca8ab49f",
+      "label": "cherry-picked checkpoint 0d943fb8, before anchor branch",
+      "rawPath": "/tmp/t3-58ab493d/logs/source-kernel-base-7a172ea74.log",
+      "rawSha256": "f0dfe5aca9730dfcb562480688b1f162122ab6b15cfd9cdcf54f51e6992b4c73",
+      "failed": 64,
+      "passed": 152,
+      "total": 216,
+      "timestampFlakeFailures": 22,
+      "otherFailures": 42
+    },
+    {
+      "commit": "e8987ce02ca8b75b04d2fbf4b9c9f717d38df7e6",
+      "label": "this checkpoint, anchor branch added",
+      "rawPath": "/tmp/t3-58ab493d/logs/source-kernel-preservation.log",
+      "rawSha256": "4468dbf24c1c3228b4e27a531026fa0f94a642b143aa71ec961c00b6dea481d4",
+      "failed": 56,
+      "passed": 160,
+      "total": 216,
+      "timestampFlakeFailures": 15,
+      "otherFailures": 41
+    }
+  ],
+  "anchorOrdinaryBranchTests": {
+    "a sealed anchor cannot regress to pending through a valid unrelated receipt": {
+      "25f80afcc": "pass",
+      "7a172ea74": "fail",
+      "e8987ce02": "pass"
+    },
+    "a sealed anchor cannot regress to unavailable through a valid unrelated receipt": {
+      "25f80afcc": "pass",
+      "7a172ea74": "fail",
+      "e8987ce02": "pass"
+    },
+    "component erasure clears the first anchor and grant payload without altering raw date/mileage": {
+      "25f80afcc": "fail",
+      "7a172ea74": "pass",
+      "e8987ce02": "pass"
+    },
+    "a missing finish-time first seal fails atomically, legacy shells cannot be backfilled": {
+      "25f80afcc": "pass",
+      "7a172ea74": "pass",
+      "e8987ce02": "pass"
+    },
+    "no-grant first capture is unavailable, later same-identity captures never repin, and rollback leaves no claim": {
+      "25f80afcc": "pass",
+      "7a172ea74": "pass",
+      "e8987ce02": "pass"
+    },
+    "BOTH unavailable first captures reject late genuine grants and later observations never repin": {
+      "25f80afcc": "pass",
+      "7a172ea74": "pass",
+      "e8987ce02": "pass"
+    },
+    "order commissioner ABA before capture is sticky, including restore to the exact original values": {
+      "25f80afcc": "pass",
+      "7a172ea74": "pass",
+      "e8987ce02": "pass"
+    },
+    "the exported first-observation seal claims BOTH granted visits without repinning": {
+      "25f80afcc": "fail",
+      "7a172ea74": "pass",
+      "e8987ce02": "pass"
+    },
+    "direct INSERT discards forged identity/graph/effects and direct DELETE requires actual final effects": {
+      "25f80afcc": "pass",
+      "7a172ea74": "pass",
+      "e8987ce02": "pass"
+    }
+  },
+  "failingOnlyOnThisCheckpoint": [
+    {
+      "test": "current OWNER consent covers BOTH captured visits; eligibility restoration cannot undo member recreation",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "fresh persisted seller grants allow BOTH first captures, and date/mileage changes preserve the immutable slots",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "observed identity ABA on visit 1 stays changed and preserves the other first slot",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 0 captured audience ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 0 captured modelId ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 0 captured sellerId ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 0 pending audience ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 0 pending commissionerId ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 1 captured audience ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 1 pending modelId ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    },
+    {
+      "test": "visit 1 pending sellerId ABA remains sticky while the other visit and raw facts survive",
+      "class": "timestamp-flake"
+    }
+  ],
+  "nonFlakeFailuresOnlyOnThisCheckpoint": 0
+}
