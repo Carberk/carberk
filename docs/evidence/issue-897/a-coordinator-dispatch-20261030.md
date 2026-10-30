@@ -246,7 +246,14 @@ bucket is not part of the seam dispatch.
 
 This is the separate evidence-only continuation after seam assembly.
 
-- **Execution base:** `0e4dc31d02d55631adf5e6cef5fee750de8c061f`.
+- **Task:** `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-fixture-prep-20261030-r1`;
+  thread `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-fixture-prep-20261030-r1`;
+  worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-d9e9baec`, branch
+  `t3/a02-ordinary-fixture-manifest`, actual start HEAD
+  `064cf3486573cdd94c30c9500c6e6d45894f7ce1`. Selection is isolated
+  `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access. Preparation is
+  active and no runtime resources have been started.
+- **Execution base:** `064cf3486573cdd94c30c9500c6e6d45894f7ce1`.
   Compared to source base `52d901c50`, the only non-documentation change is
   the assembled expected-port seam. Accepted ordinary full100 and restricted
   preparation evidence remain valid because their source dependencies did not
