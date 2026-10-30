@@ -1,0 +1,140 @@
+{
+  "issue": 897,
+  "ticket": "A-03",
+  "purpose": "serialized coordinator-owned continuation plan; not executed or reserved",
+  "status": "UNRESERVED_AND_UNEXECUTED",
+  "sourceBase": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "preparedHead": "68b0d8c65191a92cd75eb2b9a53f850a07c6e690",
+  "candidateSourceEquality": "git diff --exit-code 52d901c50af1dde97ea22bda8efb1fdf21f169b1 HEAD -- apps packages scripts package.json pnpm-lock.yaml pnpm-workspace.yaml",
+  "coordination": {
+    "owner": "Milestone A coordinator",
+    "serial": true,
+    "maxWorkers": 1,
+    "prerequisites": [
+      "A-02 worker ownership/capacity/rollback/race evidence is complete on the exact assembled SHA",
+      "A-01 Standards S1 and A-11 Spec dispositions are resolved or explicitly carried open",
+      "final assembled SHA and migration manifest are recorded",
+      "exclusive timing slot is reserved by the coordinator"
+    ],
+    "noReuse": [
+      "Do not reuse the historical A-02 port 65379",
+      "Do not use shared PostgreSQL 5432, Redis 6379 or MinIO 9000",
+      "Do not use a foreign task database or retained namespace without a fresh task-owned database",
+      "Do not fake GITHUB_ACTIONS or worker isolation"
+    ]
+  },
+  "resources": [
+    {
+      "id": "r7c",
+      "kind": "task-owned-postgresql",
+      "status": "unreserved",
+      "composeProject": "auto_tm_a03_r7c_20261030",
+      "host": "127.0.0.1",
+      "postgresPort": 61151,
+      "database": "a03_r7c_20261030",
+      "role": "generated-r7c-nonowner-nonsuperuser-noinherit",
+      "redis": null,
+      "objectStorage": null,
+      "seed": "node /tmp/897-r7c-retained-provenance-20261026/seed-retained-a1.mjs",
+      "requiredNamespace": "cf_a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "requiredChecks": ["namespace is discovered from enabled tracker triggers", "USAGE true", "CREATE false", "SELECT true", "INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER false", "D/O/A/R trigger modes restored"]
+    },
+    {
+      "id": "r8",
+      "kind": "task-owned-compose",
+      "status": "unreserved",
+      "composeProject": "auto_tm_a03_r8_20261030",
+      "host": "127.0.0.1",
+      "postgresPort": 61154,
+      "database": "a03_r8_20261030",
+      "redisPort": 61155,
+      "minioPort": 61156,
+      "apiPort": 61157,
+      "bucket": "a03-diagnostic-private",
+      "workerIsolation": "required",
+      "requiredChecks": ["fresh migrations", "source and campaign readiness", "restricted role is nonowner/nonsuperuser", "private object and ID denial", "exact trigger and receipt restoration"]
+    },
+    {
+      "id": "r4",
+      "kind": "task-owned-compose",
+      "status": "unreserved",
+      "composeProject": "auto_tm_a03_r4_20261030",
+      "host": "127.0.0.1",
+      "postgresPort": 61158,
+      "database": "a03_r4_20261030",
+      "redisPort": 61159,
+      "minioPort": 61160,
+      "bucket": "a03-diagnostic-private",
+      "role": "generated-r4-nonowner-nonsuperuser-noinherit",
+      "requiredChecks": ["prepared worker dependency accepted", "exact guard restoration", "private object bytes and hashes", "purge and cleanup receipts are zero after teardown"]
+    },
+    {
+      "id": "r6a",
+      "kind": "task-owned-postgresql",
+      "status": "unreserved",
+      "composeProject": "auto_tm_a03_r6a_20261030",
+      "host": "127.0.0.1",
+      "postgresPort": 61161,
+      "database": "a03_r6a_20261030",
+      "role": "r6a_service_caller",
+      "redis": null,
+      "objectStorage": "in-memory boundary only for caller matrix; no deployed storage claim",
+      "requiredChecks": ["real Session and grant writers", "actual PID wait", "whole transactional snapshot", "private byte audience", "exact trigger restoration"]
+    }
+  ],
+  "serialRuns": [
+    {
+      "order": 1,
+      "resource": "r7c",
+      "commands": [
+        "pnpm --filter @auto-tm/contracts build",
+        "pnpm --filter @auto-tm/db build",
+        "pnpm --filter @auto-tm/db migrate:deploy",
+        "pnpm --filter @auto-tm/api build",
+        "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest run src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts -t 'rolls back a completed first cleanup and its claim on driver failure' --reporter=verbose",
+        "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest run src/modules/listings/infrastructure/PrismaUploadClaims.preparation.e2e.spec.ts --maxWorkers=1 --reporter=verbose",
+        "AUTO_TM_TEST_DATABASES=off pnpm --filter @auto-tm/api exec vitest run src/modules/listings/infrastructure/PrismaUploadClaims.e2e.spec.ts --maxWorkers=1 --reporter=verbose"
+      ],
+      "gate": "Do not continue if the retained namespace is absent, any fixture is skipped, or the restricted grant assertion is not exact"
+    },
+    {
+      "order": 2,
+      "resource": "r8",
+      "commands": [
+        "pnpm --filter @auto-tm/api exec vitest run src/modules/diagnostics/presentation/DiagnosticPublicTransferProof.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 -t 'admits the first ordinary public visit|links unchanged public Listing identity and ownership by normalized VIN with independent B release' --reporter=verbose",
+        "pnpm --filter @auto-tm/api exec vitest run src/modules/diagnostics/presentation/DiagnosticPublicTransferProof.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 -t 'serializes automatic consume behind authenticated .* ownership revocation at the real User lock|serializes independent B finalization against real business publisher membership revocation' --reporter=verbose",
+        "pnpm --filter @auto-tm/api exec vitest run src/modules/diagnostics/presentation/DiagnosticPublicTransferProof.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 -t 'keeps different-commissioner .* B usable after A-only product account purge|recovers only the existing B result after A-only product erasure' --reporter=verbose",
+        "pnpm --filter @auto-tm/api exec vitest run src/modules/diagnostics/presentation/DiagnosticPublicTransferProof.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 --reporter=verbose"
+      ],
+      "gate": "The full registered suite must account for every unexecuted body; a sequential pass does not close the race cells"
+    },
+    {
+      "order": 3,
+      "resource": "r4",
+      "commands": [
+        "pnpm --filter @auto-tm/api exec vitest run src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 -t 'R4 remaining restricted role cannot write without a receipt|R4 remaining actual purge fences retained material and raw/report pins atomically' --reporter=verbose",
+        "pnpm --filter @auto-tm/api exec vitest run src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 -t 'R4 actual purge and physical cleanup with|R4 remaining delivery refuses post-read|R4 remaining object collision races with' --reporter=verbose",
+        "pnpm --filter @auto-tm/worker exec vitest run src/jobs/diagnostics/DiagnosticIdentityRetention.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 --reporter=verbose"
+      ],
+      "gate": "Do not count offline boundary tests as PostgreSQL, role, trigger or object-storage acceptance"
+    },
+    {
+      "order": 4,
+      "resource": "r6a",
+      "commands": [
+        "pnpm --filter @auto-tm/db exec vitest run tests/service-history-callers.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 -t 'reaches its lawful live outcome, then refuses the same actor\\'s revoked Session without residue' --reporter=verbose",
+        "pnpm --filter @auto-tm/db exec vitest run tests/service-history-callers.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 -t 'refuses staff read after current|existing=.* push opposes actual|stable whole|accounts for real payment|stages, uploads, verifies and delivers original PDF bytes' --reporter=verbose",
+        "pnpm --filter @auto-tm/db exec vitest run tests/service-history-callers.e2e.spec.ts --maxWorkers=1 --bail=1 --retry=0 --reporter=verbose"
+      ],
+      "gate": "Preserve the 12 raw fault titles as open unless a lawful production writer proves the same assertion"
+    }
+  ],
+  "releaseRequirements": [
+    "await all callers and barrier observers",
+    "restore every D/O/A/R trigger mode exactly",
+    "assert source_receipts=0 and campaign_receipts=0",
+    "remove task roles, databases, containers, volumes, networks and owned object keys",
+    "record cleanup JSON and SHA256 hashes",
+    "release the exclusive timing slot before any next matrix"
+  ]
+}
