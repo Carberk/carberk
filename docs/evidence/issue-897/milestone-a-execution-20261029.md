@@ -30,6 +30,15 @@ open. No runtime resources or host-heavy slot are active. Accepted reset-cycle,
 staff/API, static and fresh ordinary full100 evidence is preserved. A remains
 unaccepted; only Parent may accept it.
 
+A-02's offline audit additionally found the frozen single-order >1,000-raw
+fixture blocked by ordinary scope admission, and worker-first capture/proof-use
+status expectations inconsistent with current expiry refusals. The worker
+continues other case preparation and fails closed for these three selectors.
+See the bounded producer's `overlimit-dependency.md` and
+`refusal-status-dependency.md`; no runtime or source/test scope expansion was
+attempted. The A-04 profile repair is a recorded unlaunched prerequisite plan;
+it has no active worker or verification/resource slot.
+
 All selected #897 A criteria remain required. Quiet-host reservations cover actual timing-sensitive setup, tests and necessary observation only. Independent isolated functional checks, source, design and read-only reviews proceed in parallel within four slots. One writer owns each shared contract and this coordinator alone assembles. Registry163's six-phase comparison is finished, its clone drained and stopped, and staff/reset explicitly released. No measurement window is reserved.
 
 The finite [worker comparison](worker-width-decision-20261029/receipt.md) is complete on the actual101-migration chain including164. Three repeats per capped diagnostic width preserve command outputs and rollback; host contention limits wall-clock claims. No wider production partition is selected and no further attribution is planned. The short authority trace identifies5s as Vitest's unset default carried into coordinator dispatch, with no ownership-expiry product SLO in the governing sources. The [selected correction](worker-verification-budget-decision-20261029.md) is a60s bound on the one refused-then-accepted test and its sampler. [Independent focused review](worker-verification-budget-review-r1-20261029.md) approves exactc1e909ad with no blockers. Every behavioral assertion, width10, closure cap and fresh revalidation is preserved; B5 and package budgets stay unchanged. Worker source65024d52 is now assembled byte-exactly before that timeout-only edit. TS7/TS6/lint and17 focused tests pass;23 database cases skipped. Next worker proof is one fresh ordinary full100 fixture/run under the reviewed budget plus the remaining real rollback/capacity/race cases. Partial ownership7 stays excluded.

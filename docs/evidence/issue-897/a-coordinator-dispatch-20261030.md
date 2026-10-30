@@ -37,6 +37,16 @@ mutation occurred.
 
 ## Next A-02 prerequisite dispatch
 
+Current route-audit blockers are recorded in the bounded producer's
+`overlimit-dependency.md` and `refusal-status-dependency.md`: ordinary guarded
+append cannot materialize the frozen one-order >1,000-raw fixture, and
+worker-first expiry refusal maps to 400/403 rather than the suite's 409. The
+worker stops those three selectors and continues other case audits. It must
+fail closed before connection/output for blocked selectors. No source/test
+expansion, case waiver or runtime PASS is authorized. Concrete criterion and
+fixture-authority dependencies have been sent to Parent; no routine fixture
+permission stop is introduced.
+
 The coordinator has scoped a separate bounded fixture-producer repair in
 `a-02-worker-restricted-20261030/bounded-producer-repair/contract.md` from exact
 base `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`. It owns only a new batch
@@ -90,8 +100,9 @@ the four missing migrations' compatibility and adjust only closed current
 profile data and directly affected ledger tests. No shared reset, DB, provider,
 controller, guard, migration or executor edit is authorized. This path is
 disjoint from A-02's new producer. Verification remains serialized: A-02's
-syntax/diff checks have finished; it continues source audit/commit while
-A-09R owns one offline Node suite slot. Runtime resources remain absent.
+syntax/diff checks have finished; it continues source audit/commit only.
+The A-04 profile plan is unlaunched and its future offline Node suite slot is
+not active. No services or host-heavy reservation exist.
 Actual dispatch identity is recorded after launch; a profile repair cannot
 pass A-04 or establish hosted restoration.
 

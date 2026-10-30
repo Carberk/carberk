@@ -47,9 +47,10 @@ bounded prerequisite repair, not a declaration of runtime compatibility.
   `node --test scripts/staging-railway.test.mjs` if offline as source confirms;
   `node --check scripts/staging-schema.mjs`; `git diff --check`; explicit path
   audit, immutable dependency hashes and compatibility rationale.
-- **Timing/CPU:** a single serialized offline Node verification slot is held
-  for this worker after the A-02 worker's completed syntax/diff checks; the
-  latter continues source audit/commit only. No other suite/build/timing work
+- **Timing/CPU:** this plan is unlaunched; no slot is active. A single
+  serialized offline Node verification slot will be reserved before a worker
+  launches, after the A-02 worker's completed syntax/diff checks; the latter
+  continues source audit/commit only. No other suite/build/timing work
   overlaps. Record actual start/end/duration and command argv. No CPU-affinity
   claim or performance conclusion. Root docs/Git/read-only work may continue.
 - **Resources:** no Compose, DB, Redis, object store, ports, device, Railway or
