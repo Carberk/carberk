@@ -122,7 +122,7 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
     if (name !== "overlimit") expect(fixture.dueGrantIds).toHaveLength(100);
     expect(new Set(fixture.dueGrantIds).size).toBe(fixture.dueGrantIds.length);
     const app = new URL(fixture.workerUrl), privileged = new URL(fixture.ownerUrl);
-    if (app.hostname !== "127.0.0.1" || app.port !== "65379" || !/^\/r6c_batch_[a-z0-9_]+$/.test(app.pathname) ||
+    if (app.hostname !== "127.0.0.1" || app.port !== (process.env["DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT"] ?? "65379") || !/^\/r6c_batch_[a-z0-9_]+$/.test(app.pathname) ||
       app.host !== privileged.host || app.pathname !== privileged.pathname || app.username === privileged.username) throw new Error("Separate task database and restricted caller required; ownership7 stays preserved");
     const prior = process.env["DATABASE_URL"];
     try {
