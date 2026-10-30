@@ -73,6 +73,21 @@ paths. They receive the initial findings, accepted fixes, affected commands
 and all unresolved A-02/A-03/A-04/A-05–A-10 acceptance gaps. The review must
 not convert verified S1 behavior into overall release acceptance.
 
+- **A-01 post-fix task:** `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a01-postfix-review-20261030-r2`;
+  thread `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a01-postfix-review-20261030-r2`;
+  worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-6c283b43`, branch
+  `t3/issue-897-post-fix-standards-review`, actual start HEAD
+  `235332721741f158bfb99cdf5d2dae85f7400234`.
+- **A-11 post-fix task:** `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-postfix-review-20261030-r3`;
+  thread `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-postfix-review-20261030-r3`;
+  worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-83be4f23`, branch
+  `t3/issue-897-post-fix-spec-review`, actual start HEAD
+  `235332721741f158bfb99cdf5d2dae85f7400234`.
+
+Both are isolated Sol 6.1 xhigh/priority full-access read-only reviews with no
+runtime resources. Their reports must name the exact assembled SHA and retain
+the unresolved A-02/A-03/A-04/A-05–A-10 gates.
+
 ## A-03 read-only preparation dispatch
 
 - **Task:** `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a03-matrix-prep-20261030-r1`.
