@@ -45,6 +45,34 @@ source-fix authority. Actual task/thread/worktree/start HEAD will be recorded
 after launch. The concrete future runtime resources/commands and exclusive
 timing/CPU contract are recorded before work; no resource or slot exists yet.
 
+### A-02 producer worker identity
+
+- Task: `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1`;
+  thread: `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1`.
+- Selection: `codex_work`, `gpt-6.1-sol`, `reasoningEffort=xhigh`,
+  `serviceTier=priority`, full access, isolated worktree; role
+  `implementation`; status running.
+- Worktree: `/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050`, branch
+  `t3/issue-897-a02-batch-fixture-producer`.
+- Actual immutable start HEAD: `077c4adedf9c6e776e0daca433c7855d968716ec`;
+  tree `98b1133686e034d06c9038b577e26246c3a7af2c`; clean before edits.
+  Source base `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`; the worker's
+  `git diff --exit-code BASE..HEAD -- . ':!docs'` exited 0 with no output.
+  This proves the intervening coordinator checkpoint is docs/evidence-only
+  relative to source/test/config/migrations. Original campaign source remains
+  `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
+- Offline receipt so far: new producer source is uncommitted; `node --check`
+  and `git diff --check` pass. No services, runtime, package commands, tests,
+  containers, ports, migration/reset or timing slot were started. The worker is
+  auditing ordinary route semantics. It may write only the exact new producer,
+  optional directly affected test, bounded-producer evidence and private
+  `/tmp/897-r6c-a02r2-20261030/producer-repair/` files in its contract.
+- Future serialized resources remain unprovisioned: Compose
+  `auto_tm_ci_897_r6c_a02r2_20261030`; PostgreSQL `127.0.0.1:61149`; Redis
+  `127.0.0.1:61148` DB0; MinIO `127.0.0.1:61150`, bucket
+  `diagnostic-test-private`; ten distinct `r6c_batch_a02r2_*` databases and
+  private root `/tmp/897-r6c-a02r2-20261030`. No foreign `65379` access.
+
 ### Prior S2 assembly
 
 The S2 implementation task is terminal with no pending work. It returned source
