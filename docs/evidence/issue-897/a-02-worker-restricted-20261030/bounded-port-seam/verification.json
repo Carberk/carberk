@@ -1,0 +1,213 @@
+{
+  "ticket": "A-02 bounded expected-PostgreSQL-port seam",
+  "recordedAtUtc": "2026-10-30T05:56:56.304109+00:00",
+  "scopeResult": "Single allowed port expression implemented; static evidence only; coordinator verification pending",
+  "a02Acceptance": "FAIL/open, unchanged",
+  "sourceBase": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "priorEvidenceHead": "6cf5c311d43b5ae0bca0f2543564f65b5d2e2a9e",
+  "coordinatorBase": "41e9a07a1d20b60369839b1190410f708937784b",
+  "actualImmutableVerificationHead": "57193573412c67da99f28f87d2fe9d0cd20503c1",
+  "branch": "t3/a-02-diagnostic-port-seam",
+  "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+  "receiptCommitPolicy": "This receipt is committed after the immutable source checkpoint. Its commit changes only the two allowed evidence files; the final handoff reports that later HEAD.",
+  "change": {
+    "path": "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts",
+    "line": 125,
+    "old": "app.port !== \"65379\"",
+    "new": "app.port !== (process.env[\"DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT\"] ?? \"65379\")",
+    "portMeaning": "PostgreSQL workerUrl port, not the HTTP API request port",
+    "verificationEnvironment": {
+      "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+    },
+    "fallback": "65379",
+    "allOtherTargetFileBytesUnchanged": true
+  },
+  "changedPathsIncludingReceipt": [
+    "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts",
+    "docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-port-seam/receipt.md",
+    "docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-port-seam/verification.json"
+  ],
+  "sourceEquality": {
+    "sourceBase": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+    "coordinatorBase": "41e9a07a1d20b60369839b1190410f708937784b",
+    "actualImmutableWorktreeHead": "57193573412c67da99f28f87d2fe9d0cd20503c1",
+    "branch": "t3/a-02-diagnostic-port-seam",
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+    "coordinatorInterveningChangedPathCount": 73,
+    "coordinatorInterveningChangesDocsOnly": true,
+    "comparedNonDocumentationTrackedPathCount": 3118,
+    "coordinatorBaseSourceEqualsCandidate": true,
+    "checkpointChangesFromCoordinatorBase": [
+      "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts"
+    ],
+    "checkpointSourceChangesFromCandidate": [
+      "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts"
+    ],
+    "checkpointEqualsCandidateAfterReversingOnlyAllowedPortSeam": true,
+    "candidateTargetSha256": "1a2d9b3a8747ff75dad4c32f43136a5759c0589f4a5976b80260eb6f69163953",
+    "checkpointTargetSha256": "3a19fb1e046f93e082ed85ce2b6bc7417ebba7753514d766a90efbca29d8b922",
+    "worktreeSourceMatchesImmutableCheckpoint": true,
+    "worktreeSourceMismatches": [],
+    "worktreeWasClean": true
+  },
+  "commands": {
+    "red-first": {
+      "argv": [
+        "node",
+        "/tmp/carberk-a02-port-seam-8400e79c/verify-port-guard.cjs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+      "environmentOverrides": {
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+      },
+      "startUtc": "2026-10-30T05:55:12.469757+00:00",
+      "endUtc": "2026-10-30T05:55:12.500525+00:00",
+      "exitCode": 1,
+      "stdout": "FAIL: configured PostgreSQL port 61149; expected=true, actual=false\nPASS: default PostgreSQL port 65379; expected=true, actual=true\nPASS: unset port rejects 61149; expected=false, actual=false\nFAIL: configured port rejects 65379; expected=false, actual=true\nPASS: loopback hostname remains exact; expected=false, actual=false\nPASS: database prefix remains exact; expected=false, actual=false\nPASS: privileged host must match; expected=false, actual=false\nPASS: privileged database must match; expected=false, actual=false\nPASS: caller usernames must differ; expected=false, actual=false\n7/9 static fixture URL guard checks passed; no imports, connections, or services.\n",
+      "stderr": ""
+    },
+    "green": {
+      "argv": [
+        "node",
+        "/tmp/carberk-a02-port-seam-8400e79c/verify-port-guard.cjs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+      "environmentOverrides": {
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+      },
+      "startUtc": "2026-10-30T05:55:36.925277+00:00",
+      "endUtc": "2026-10-30T05:55:36.955788+00:00",
+      "exitCode": 0,
+      "stdout": "PASS: configured PostgreSQL port 61149; expected=true, actual=true\nPASS: default PostgreSQL port 65379; expected=true, actual=true\nPASS: unset port rejects 61149; expected=false, actual=false\nPASS: configured port rejects 65379; expected=false, actual=false\nPASS: loopback hostname remains exact; expected=false, actual=false\nPASS: database prefix remains exact; expected=false, actual=false\nPASS: privileged host must match; expected=false, actual=false\nPASS: privileged database must match; expected=false, actual=false\nPASS: caller usernames must differ; expected=false, actual=false\n9/9 static fixture URL guard checks passed; no imports, connections, or services.\n",
+      "stderr": ""
+    },
+    "source-audit": {
+      "argv": [
+        "python3",
+        "/tmp/carberk-a02-port-seam-8400e79c/audit-source.py"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+      "environmentOverrides": {
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+      },
+      "startUtc": "2026-10-30T05:56:01.209032+00:00",
+      "endUtc": "2026-10-30T05:56:01.718479+00:00",
+      "exitCode": 0,
+      "stdout": "{\n  \"sourceBase\": \"52d901c50af1dde97ea22bda8efb1fdf21f169b1\",\n  \"coordinatorBase\": \"41e9a07a1d20b60369839b1190410f708937784b\",\n  \"actualImmutableWorktreeHead\": \"57193573412c67da99f28f87d2fe9d0cd20503c1\",\n  \"branch\": \"t3/a-02-diagnostic-port-seam\",\n  \"worktree\": \"/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c\",\n  \"coordinatorInterveningChangedPathCount\": 73,\n  \"coordinatorInterveningChangesDocsOnly\": true,\n  \"comparedNonDocumentationTrackedPathCount\": 3118,\n  \"coordinatorBaseSourceEqualsCandidate\": true,\n  \"checkpointChangesFromCoordinatorBase\": [\n    \"apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\"\n  ],\n  \"checkpointSourceChangesFromCandidate\": [\n    \"apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\"\n  ],\n  \"checkpointEqualsCandidateAfterReversingOnlyAllowedPortSeam\": true,\n  \"candidateTargetSha256\": \"1a2d9b3a8747ff75dad4c32f43136a5759c0589f4a5976b80260eb6f69163953\",\n  \"checkpointTargetSha256\": \"3a19fb1e046f93e082ed85ce2b6bc7417ebba7753514d766a90efbca29d8b922\",\n  \"worktreeSourceMatchesImmutableCheckpoint\": true,\n  \"worktreeSourceMismatches\": [],\n  \"worktreeWasClean\": true\n}\n",
+      "stderr": ""
+    },
+    "diff-audit": {
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "41e9a07a1d20b60369839b1190410f708937784b",
+        "HEAD"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+      "environmentOverrides": {
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+      },
+      "startUtc": "2026-10-30T05:56:17.639555+00:00",
+      "endUtc": "2026-10-30T05:56:17.655672+00:00",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "changed-paths": {
+      "argv": [
+        "git",
+        "diff",
+        "--name-status",
+        "41e9a07a1d20b60369839b1190410f708937784b",
+        "HEAD"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+      "environmentOverrides": {
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+      },
+      "startUtc": "2026-10-30T05:56:17.684529+00:00",
+      "endUtc": "2026-10-30T05:56:17.696286+00:00",
+      "exitCode": 0,
+      "stdout": "M\tapps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\n",
+      "stderr": ""
+    },
+    "source-diff": {
+      "argv": [
+        "git",
+        "diff",
+        "41e9a07a1d20b60369839b1190410f708937784b",
+        "HEAD",
+        "--",
+        "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+      "environmentOverrides": {
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+      },
+      "startUtc": "2026-10-30T05:56:17.721565+00:00",
+      "endUtc": "2026-10-30T05:56:17.733993+00:00",
+      "exitCode": 0,
+      "stdout": "diff --git a/apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts b/apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\nindex e70691b82..1783e6f91 100644\n--- a/apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\n+++ b/apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\n@@ -122,7 +122,7 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))(\"ow\n     if (name !== \"overlimit\") expect(fixture.dueGrantIds).toHaveLength(100);\n     expect(new Set(fixture.dueGrantIds).size).toBe(fixture.dueGrantIds.length);\n     const app = new URL(fixture.workerUrl), privileged = new URL(fixture.ownerUrl);\n-    if (app.hostname !== \"127.0.0.1\" || app.port !== \"65379\" || !/^\\/r6c_batch_[a-z0-9_]+$/.test(app.pathname) ||\n+    if (app.hostname !== \"127.0.0.1\" || app.port !== (process.env[\"DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT\"] ?? \"65379\") || !/^\\/r6c_batch_[a-z0-9_]+$/.test(app.pathname) ||\n       app.host !== privileged.host || app.pathname !== privileged.pathname || app.username === privileged.username) throw new Error(\"Separate task database and restricted caller required; ownership7 stays preserved\");\n     const prior = process.env[\"DATABASE_URL\"];\n     try {\n",
+      "stderr": ""
+    },
+    "node-version": {
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c",
+      "environmentOverrides": {
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT": "61149"
+      },
+      "startUtc": "2026-10-30T05:56:17.759031+00:00",
+      "endUtc": "2026-10-30T05:56:17.773326+00:00",
+      "exitCode": 0,
+      "stdout": "v24.13.0\n",
+      "stderr": ""
+    }
+  },
+  "temporaryScriptSources": {
+    "/tmp/carberk-a02-port-seam-8400e79c/verify-port-guard.cjs": "const assert = require(\"node:assert/strict\");\nconst fs = require(\"node:fs\");\nconst source = fs.readFileSync(\"apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\", \"utf8\");\nconst guard = source.match(/if \\(app\\.hostname !==[\\s\\S]*?\\) throw new Error\\(\"Separate task database and restricted caller required; ownership7 stays preserved\"\\);/);\nassert.ok(guard, \"Expected fixture guard must exist\");\nconst reject = new Function(\"app\", \"privileged\", \"process\", `${guard[0]}\\nreturn false;`);\nconst worker = \"postgresql://restricted@127.0.0.1:61149/r6c_batch_seam\";\nconst owner = \"postgresql://owner@127.0.0.1:61149/r6c_batch_seam\";\nfunction allowed(workerUrl, ownerUrl, env) {\n  try { return !reject(new URL(workerUrl), new URL(ownerUrl), { env }); }\n  catch (error) {\n    assert.equal(error.message, \"Separate task database and restricted caller required; ownership7 stays preserved\");\n    return false;\n  }\n}\nconst checks = [\n  [\"configured PostgreSQL port 61149\", worker, owner, process.env, true],\n  [\"default PostgreSQL port 65379\", worker.replace(\":61149/\", \":65379/\"), owner.replace(\":61149/\", \":65379/\"), {}, true],\n  [\"unset port rejects 61149\", worker, owner, {}, false],\n  [\"configured port rejects 65379\", worker.replace(\":61149/\", \":65379/\"), owner.replace(\":61149/\", \":65379/\"), process.env, false],\n  [\"loopback hostname remains exact\", worker.replace(\"127.0.0.1\", \"localhost\"), owner.replace(\"127.0.0.1\", \"localhost\"), process.env, false],\n  [\"database prefix remains exact\", worker.replace(\"r6c_batch_seam\", \"other_seam\"), owner.replace(\"r6c_batch_seam\", \"other_seam\"), process.env, false],\n  [\"privileged host must match\", worker, owner.replace(\":61149/\", \":61150/\"), process.env, false],\n  [\"privileged database must match\", worker, owner.replace(\"r6c_batch_seam\", \"r6c_batch_other\"), process.env, false],\n  [\"caller usernames must differ\", worker, owner.replace(\"owner@\", \"restricted@\"), process.env, false],\n];\nlet failures = 0;\nfor (const [label, workerUrl, ownerUrl, env, expected] of checks) {\n  const actual = allowed(workerUrl, ownerUrl, env);\n  console.log(`${actual === expected ? \"PASS\" : \"FAIL\"}: ${label}; expected=${expected}, actual=${actual}`);\n  if (actual !== expected) failures++;\n}\nconsole.log(`${checks.length - failures}/${checks.length} static fixture URL guard checks passed; no imports, connections, or services.`);\nprocess.exitCode = failures ? 1 : 0;\n",
+    "/tmp/carberk-a02-port-seam-8400e79c/audit-source.py": "import hashlib, json, os, stat, subprocess\nfrom pathlib import Path\ncandidate = \"52d901c50af1dde97ea22bda8efb1fdf21f169b1\"\nbase = \"41e9a07a1d20b60369839b1190410f708937784b\"\ntarget = \"apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts\"\nold = b'app.port !== \"65379\"'\nnew = b'app.port !== (process.env[\"DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT\"] ?? \"65379\")'\ndef git(*args):\n    return subprocess.check_output([\"git\", *args])\ndef tree(ref):\n    result = {}\n    for entry in git(\"ls-tree\", \"-rz\", ref).split(b\"\\0\"):\n        if not entry: continue\n        meta, path = entry.split(b\"\\t\", 1)\n        mode, kind, oid = meta.decode().split()\n        result[path.decode()] = {\"mode\": mode, \"type\": kind, \"oid\": oid}\n    return result\ndef changed(a, b):\n    return sorted(p for p in a.keys() | b.keys() if a.get(p) != b.get(p))\ndef source(entries):\n    return {p: v for p, v in entries.items() if not p.startswith(\"docs/\")}\nhead = git(\"rev-parse\", \"HEAD\").decode().strip()\nbranch = git(\"branch\", \"--show-current\").decode().strip()\nct, bt, ht = tree(candidate), tree(base), tree(head)\nbase_changes = changed(ct, bt)\nassert all(p.startswith(\"docs/\") for p in base_changes), base_changes\nassert source(ct) == source(bt)\nhead_changes = changed(bt, ht)\nassert head_changes == [target], head_changes\nexpected = git(\"show\", f\"{candidate}:{target}\")\nactual = git(\"show\", f\"{head}:{target}\")\nassert expected.count(old) == 1\nassert actual == expected.replace(old, new, 1)\nworktree_mismatches = []\nfor path, entry in source(ht).items():\n    p = Path(path)\n    data = os.readlink(p).encode() if entry[\"mode\"] == \"120000\" else p.read_bytes()\n    blob_oid = hashlib.sha1(b\"blob \" + str(len(data)).encode() + b\"\\0\" + data).hexdigest()\n    if blob_oid != entry[\"oid\"]:\n        worktree_mismatches.append(path)\nassert not worktree_mismatches, worktree_mismatches\nassert git(\"status\", \"--porcelain\").decode() == \"\"\nprint(json.dumps({\n  \"sourceBase\": candidate, \"coordinatorBase\": base,\n  \"actualImmutableWorktreeHead\": head, \"branch\": branch, \"worktree\": str(Path.cwd()),\n  \"coordinatorInterveningChangedPathCount\": len(base_changes),\n  \"coordinatorInterveningChangesDocsOnly\": True,\n  \"comparedNonDocumentationTrackedPathCount\": len(source(ct)),\n  \"coordinatorBaseSourceEqualsCandidate\": True,\n  \"checkpointChangesFromCoordinatorBase\": head_changes,\n  \"checkpointSourceChangesFromCandidate\": changed(source(ct), source(ht)),\n  \"checkpointEqualsCandidateAfterReversingOnlyAllowedPortSeam\": True,\n  \"candidateTargetSha256\": hashlib.sha256(expected).hexdigest(),\n  \"checkpointTargetSha256\": hashlib.sha256(actual).hexdigest(),\n  \"worktreeSourceMatchesImmutableCheckpoint\": True,\n  \"worktreeSourceMismatches\": worktree_mismatches,\n  \"worktreeWasClean\": True\n}, indent=2))\n",
+    "/tmp/carberk-a02-port-seam-8400e79c/capture.py": "import datetime, json, os, subprocess, sys\nfrom pathlib import Path\nname = sys.argv[1]\ncommand = sys.argv[2:]\nenv = os.environ.copy()\nenv[\"DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT\"] = \"61149\"\nstart = datetime.datetime.now(datetime.timezone.utc).isoformat()\nr = subprocess.run(command, env=env, text=True, capture_output=True)\nrecord = {\"argv\": command, \"cwd\": os.getcwd(), \"environmentOverrides\": {\"DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT\": \"61149\"}, \"startUtc\": start, \"endUtc\": datetime.datetime.now(datetime.timezone.utc).isoformat(), \"exitCode\": r.returncode, \"stdout\": r.stdout, \"stderr\": r.stderr}\nPath(\"/tmp/carberk-a02-port-seam-8400e79c\", name + \".command.json\").write_text(json.dumps(record, indent=2) + \"\\n\")\nprint(json.dumps(record, indent=2))\n"
+  },
+  "verificationNotRun": [
+    {
+      "command": "pnpm --filter @auto-tm/worker typecheck",
+      "status": "NOT RUN"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker lint",
+      "status": "NOT RUN"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker test src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts --maxWorkers=1",
+      "status": "NOT RUN"
+    },
+    {
+      "command": "pnpm --filter @auto-tm/worker build",
+      "status": "NOT RUN"
+    }
+  ],
+  "deferredReason": "Coordinator serialized verification with active A-09. No pnpm typecheck/lint/test/build may run in this slot. Coordinator owns affected verification after A-09, then ten authorized ordinary fixtures after assembly on fresh resources. This checkout also has no node_modules; no installation was attempted.",
+  "limits": {
+    "staticGuardOnly": true,
+    "vitestCaseBodiesRun": 0,
+    "fixtureManifestProduced": false,
+    "servicesStarted": false,
+    "dockerCommandsRun": false,
+    "databaseConnections": 0,
+    "apiRequests": 0,
+    "retainedResourcesTouched": false,
+    "fixturesOrLimitsChanged": false,
+    "dependencyConfigMigrationDeploymentNativeChanges": false,
+    "noPrOpenedOrPushPerformed": true
+  },
+  "collectionNotes": [
+    "Before the captured guard evaluation, a source-text probe also showed the 65379 prerequisite. Its first zsh wrapper tried to assign the read-only status variable and emitted \"zsh:16: read-only variable: status\" after the intentional Node RED. Retrying the wrapper with rc printed red_first_exit=1. No repository file changed. The captured red-first command above evaluates the actual guard and is the RED-first evidence used here.",
+    "The guard runner reads the exact if statement and evaluates only that JavaScript URL predicate. It imports Node built-ins, but no application modules, database client or service code. The summary wording \"no imports\" in its stdout means no application imports.",
+    "The user corrected the coordinator map resource wording: app.port is the PostgreSQL port 61149. The bounded writer did not edit the coordinator map or resource record."
+  ],
+  "docs": "Not applicable. Existing repository source and configuration were used; no external dependency or API changed."
+}
