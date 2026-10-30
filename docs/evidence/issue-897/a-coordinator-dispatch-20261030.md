@@ -193,7 +193,13 @@ contract edit authority.
   `t3/a-02-diagnostic-port-seam`; actual start HEAD
   `41e9a07a1d20b60369839b1190410f708937784b`. Selection is `codex_work`,
   `gpt-6.1-sol`, xhigh/priority, full access, isolated worktree. The child is
-  active; no result or source checkpoint is accepted yet.
+  terminal. Final child HEAD is `fc7c683cca83ab0a5c225c107ec43b92994405d7`;
+  source checkpoint is `57193573412c67da99f28f87d2fe9d0cd20503c1`.
+  Coordinator diff/path audit confirmed exactly the expected-port expression
+  and two evidence files, with every other test byte unchanged. Source and
+  receipt were assembled as `4dc654dac` and
+  `0e4dc31d02d55631adf5e6cef5fee750de8c061f`. No package verification or
+  runtime case ran; A-02 remains FAIL/open.
 - **Exact base:** `9038093f9b05fdcd360c005b1757bf24d62cce3f`; source base
   `52d901c50af1dde97ea22bda8efb1fdf21f169b1`, with docs-only intervening
   changes proven by the source comparison receipt.
@@ -235,6 +241,43 @@ the batch's `r6c_batch_*` databases. The batch object adapter uses bucket
 `diagnostic-test-private`. The coordinator will record the exact compatible
 manifest before fixture setup; changing these guards or using a different
 bucket is not part of the seam dispatch.
+
+### A-02 private ordinary fixture preparation
+
+This is the separate evidence-only continuation after seam assembly.
+
+- **Execution base:** `0e4dc31d02d55631adf5e6cef5fee750de8c061f`.
+  Compared to source base `52d901c50`, the only non-documentation change is
+  the assembled expected-port seam. Accepted ordinary full100 and restricted
+  preparation evidence remain valid because their source dependencies did not
+  change.
+- **Owner:** one isolated Sol 6.1 evidence worker, xhigh/priority and full
+  access. No source/test/config/migration edits. Writable evidence is limited
+  to `a-02-worker-restricted-20261030/fresh-ordinary-fixtures/**` and private
+  files under `/tmp/897-r6c-a02r2-20261030`. Prior receipts are immutable.
+- **Dependencies:** assembled seam; returned first A-02 receipt; unchanged
+  current migration pin; A-09 verification slot release before any package
+  command or runtime work. A-03 source-only work may continue.
+- **Preparation commands:** bounded `git`, `rg`, `sed` inspection, plus
+  offline `node --check` of any ticket-local evidence scripts. The worker
+  records exact executable argument/environment arrays for later bootstrap,
+  ordinary-route fixture creation, the ten batch selectors and cleanup.
+- **Resources:** the ten dedicated databases and Compose/Redis/MinIO/private
+  directory above. The coordinator owns provisioning, migrations, database
+  reset and teardown; no resource exists yet. A later API process's actual
+  loopback port and five-cohort admission bindings must enter the private
+  manifest before ordinary requests.
+- **Non-goals:** no native full100 acceptance rerun, cap/budget/rights-horizon
+  changes, protected-row insertion, guard bypass, foreign65379 access, B or
+  analytics activation.
+- **Artifact:** per-case ordinary-route plan, private manifest schema and
+  generation script/commands, actor/request/cutoff/cleanup bindings and a
+  public sanitized preparation receipt. Report any exact dependency requiring
+  source/test changes as a bounded proposal; do not make that change.
+- **Gate:** fixture preparation is ready only when each of the ten cases has
+  its required distinct ordinary graph and exact resource/actor/request
+  bindings. A-02 remains FAIL/open until all ten real bodies and cleanup are
+  executed and evidenced. Source inspection or a manifest alone is not PASS.
 
 ## A-04 terminal receipt and resource release
 
