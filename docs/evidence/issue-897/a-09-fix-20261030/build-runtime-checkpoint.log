@@ -1,0 +1,67 @@
+$ pnpm build && node ../../scripts/admin-session-runtime-smoke.mjs && node scripts/verify-standalone-assets.mjs
+$ next build
+▲ Next.js 16.3.8 (Turbopack)
+✓ Running next.config.ts took 74ms
+  Creating an optimized production build ...
+✓ Compiled successfully in 759ms
+  Running TypeScript ...
+  Finished TypeScript in 1019ms ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/17) ...
+  Generating static pages using 9 workers (4/17)
+  Generating static pages using 9 workers (8/17)
+  Generating static pages using 9 workers (12/17)
+✓ Generating static pages using 9 workers (17/17) in 83ms
+Turbopack build encountered 1 warning:
+./apps/admin/src/instrumentation.ts:14:7
+Warning: A Node.js API is used (process.exit at line: 14) which is not supported in the Edge Runtime.
+    Learn more: https://nextjs.org/docs/api-reference/edge-runtime
+  [90m12 |[0m     [36mif[0m (process.env.[33mNODE_ENV[0m === [32m"production"[0m && process.env[[32m"NEXT_RUNTIME"[0m] === [32m"nodejs"[0m) {
+  [90m13 |[0m       console.error([32m"API_BASE_URL must be configured as an http(s) URL."[0m);
+[33m[1m>[0m [90m14 |[0m       process.exit([35m1[0m);
+  [90m   |[0m       [33m[1m^^^^^^^^^^^^[0m
+  [90m15 |[0m     }
+  [90m16 |[0m     [36mthrow[0m error;
+  [90m17 |[0m   }
+Ecmascript file had an error
+  Finalizing page optimization ...
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /audit
+├ ƒ /business-admission
+├ ƒ /catalog/brands
+├ ƒ /diagnostics
+├ ƒ /diagnostics/evidence/[id]/[file]
+├ ƒ /diagnostics/orders/[id]/identity-provenance/[file]
+├ ƒ /diagnostics/orders/[id]/reinspection-comparison/provenance/[file]
+├ ƒ /healthz
+├ ƒ /improvement
+├ ƒ /improvement/artifacts/[id]/export
+├ ƒ /improvement/research-artifacts/[id]/export
+├ ƒ /listings
+├ ƒ /listings/[id]
+├ ƒ /login
+├ ƒ /operations
+├ ƒ /reports
+├ ƒ /reports/[id]
+├ ƒ /reports/inspection-interests
+├ ƒ /services
+├ ƒ /services/files/[id]/[file]
+├ ƒ /services/reports/[id]/[file]
+├ ƒ /users
+├ ƒ /users/[id]
+└ ƒ /workspace
+ƒ Proxy (Middleware)
+ƒ  (Dynamic)  server-rendered on demand
+PASS root GET: sole root page redirects after renewal; both cookies persisted
+PASS transient GET/action: 429/503/network/malformed return Russian503, preserve cookies and recover on retry
+PASS expired GET: cookies persisted; rendering uses renewed bearer
+PASS expiry links: current TOTP cookies survive; renewable session rotates before workspace
+PASS layout outage: error response, no expired-login redirect or cookie clearing
+PASS concurrent GET/Server Action: one rotation; original mutation runs once
+PASS cache expiry/loser: action redirect to login, both cookies cleared, no mutation, login GET without loop
+PASS ordinary expired POST: canceled with 303 login GET
+PASS restart loser: login; original action never runs
+PASS production startup: missing/non-http/invalid API_BASE_URL exits 1
+PASS standalone Dockerfile layout + runtime media origin: Assigned Avatar HTTP 200; layout=/tmp/issue-739-admin-layout-fvm6lh

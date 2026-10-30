@@ -1,0 +1,78 @@
+{
+  "issue": "897",
+  "round": "A-09 bounded Milestone A Standards S1 fix",
+  "reviewFinding": "A-01 Standards S1 accepted/open",
+  "specReview": "A-11 found no source-fix path; acceptance evidence remains separate",
+  "baseSHA": "6a902544f6135273b19c6bc46e37813034fe68fa",
+  "reviewedSourceSHA": "69948805f6f41f199634300ba2fbaf8c38630be1",
+  "coordinatorHead": "4002ce9fc7248ab172bce9ef7c42a24814646a99",
+  "redTestCheckpointSHA": "91c00cfd9281570ad66cfbdaff5e5a11108ac95e",
+  "checkpointSHA": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8",
+  "workerHead": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8",
+  "scope": {
+    "source": [
+      "apps/admin/src/app/diagnostics/DiagnosticIdentity.tsx",
+      "apps/admin/src/app/diagnostics/DiagnosticContinuity.tsx",
+      "apps/admin/src/app/(admin)/services/UploadRightsForm.tsx"
+    ],
+    "tests": [
+      "apps/admin/src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx",
+      "apps/admin/src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx"
+    ],
+    "evidence": "docs/evidence/issue-897/a-09-fix-20261030/",
+    "otherChanges": false
+  },
+  "redFirst": {
+    "command": "pnpm --filter @auto-tm/admin exec vitest run --reporter=verbose src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx 'src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx' -t 'composed|one-millisecond'",
+    "exitCode": 1,
+    "result": "Expected supplied identity/consume providers were ignored and equal-time expiry was accepted",
+    "artifact": "red-first.log"
+  },
+  "verification": [
+    {
+      "name": "contracts build prerequisite",
+      "command": "pnpm --filter @auto-tm/contracts build",
+      "exitCode": 0,
+      "workerHead": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8"
+    },
+    {
+      "name": "focused rendered/network tests",
+      "command": "pnpm --filter @auto-tm/admin exec vitest run --reporter=dot src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx src/app/diagnostics/DiagnosticWorkspace.spec.tsx src/app/diagnostics/DiagnosticWorkspace.transport.spec.tsx src/app/diagnostics/identity-transport.spec.ts src/app/diagnostics/identity-files.transport.spec.ts src/app/diagnostics/request-recovery.transport.spec.ts 'src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx' 'src/app/(admin)/services/ServiceWorkspace.spec.tsx' 'src/app/(admin)/services/ServiceWorkspace.transport.spec.tsx'",
+      "exitCode": 0,
+      "testsPassed": 334,
+      "filesPassed": 9,
+      "workerHead": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8"
+    },
+    {
+      "name": "TS7",
+      "command": "pnpm --filter @auto-tm/admin typecheck",
+      "exitCode": 0,
+      "workerHead": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8"
+    },
+    {
+      "name": "TS6",
+      "command": "pnpm --filter @auto-tm/admin exec tsc6 --noEmit",
+      "exitCode": 0,
+      "workerHead": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8"
+    },
+    {
+      "name": "ESLint",
+      "command": "pnpm --filter @auto-tm/admin lint",
+      "exitCode": 0,
+      "workerHead": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8"
+    },
+    {
+      "name": "build/runtime",
+      "command": "pnpm --filter @auto-tm/admin verify:runtime",
+      "exitCode": 0,
+      "workerHead": "f55d11c414cbb1a9a79e1a025b0d955e7e473fe8",
+      "artifact": "build-runtime-checkpoint.log"
+    }
+  ],
+  "diffPathAudit": {
+    "relativeTo": "4002ce9fc7248ab172bce9ef7c42a24814646a99",
+    "allowedPathsOnly": true,
+    "gitDiffCheckExitCode": 0
+  },
+  "finalReview": "not claimed; parent assembler owns review disposition"
+}

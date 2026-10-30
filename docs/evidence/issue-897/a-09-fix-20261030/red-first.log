@@ -1,0 +1,263 @@
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-3cd4f072/apps/admin
+ ↓ src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx > keeps the notice and close-awaiting reason and message independent
+ ↓ src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx > stages only staff-described real image rights
+ ↓ src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx > stages only staff-described synthetic image rights
+ ↓ src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx > requires the actual History communication expiry and reason instead of inventing a TTL
+ × src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx > rejects expired and equal-time rights and sends a one-millisecond-future expiry unchanged 18ms
+   → expected false to be true // Object.is equality
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > opens the exact B handoff across empty and 61+ handles without mutation or A disclosure in en
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > opens the exact B handoff across empty and 61+ handles without mutation or A disclosure in ru
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > opens the exact B handoff across empty and 61+ handles without mutation or A disclosure in tk
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > requires B intention review and sends only the explicit B command
+ × src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains composed stage and capture identities across exact network retries 134ms
+   → expected [ …(2) ] to deeply equal [ …(2) ]
+   → expected [ { …(2) }, { …(2) } ] to deeply equal [ { …(2) }, { …(2) } ]
+   → expected [ …(2) ] to deeply equal [ …(2) ]
+   → expected [ { kind: 'vin_stamp', …(3) } ] to deeply equal [ { kind: 'vin_stamp', …(3) } ]
+   → expected '51788a92-b6a4-4ae2-aaff-dadfc1179875' to be '11111111-1111-4111-8111-000000000902' // Object.is equality
+ × src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > uses the composed continuity generator for the frozen consume report identity across retry 101ms
+   → expected [ { …(4) }, { …(4) } ] to deeply equal [ { …(4) }, { …(4) } ]
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > explains unavailable B en observation and refreshes the current visit before review
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > explains unavailable B en authorization and refreshes the current visit before review
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > explains unavailable B ru observation and refreshes the current visit before review
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > explains unavailable B ru authorization and refreshes the current visit before review
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > explains unavailable B tk observation and refreshes the current visit before review
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > explains unavailable B tk authorization and refreshes the current visit before review
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps physical authorization visible in the persistent B summary across panels in en
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps physical authorization visible in the persistent B summary across panels in ru
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps physical authorization visible in the persistent B summary across panels in tk
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > checks uncertain execution status before enabling exact unchanged retry
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > renders all 41 bound materials and removes issuance controls
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps colliding names unselectable while retaining distinguishable people
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > does not allow image acknowledgment until protected image read succeeds
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > denial of any nested protected read removes the whole workspace and its inputs
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > requires restricted inspection of each historical issue before exposing its handoff link
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > discovered pending input has no execute control and no saved command
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > preserves a reason across locale changes and offers an explicit dirty leave choice
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > uploads no bytes before classification and records a complete correction using genuinely new verified support
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > issues the complete comparative command only after explicit material and same-vehicle review
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > stops a repeated handoff cursor and offers an explicit restart without choosing an alternative
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > opens an existing B result before checking the supplied proof and preserves ordinary report recovery
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > does not render a protected late comparison after the user leaves the workspace
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > image decode failure blocks acknowledgment and issuance
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps reviewer receipt proof-read and copy controls absent for a B-only technician
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > discarding classification input clears the real form rather than only its dirty indicator
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > validates correction fields on blur and links an ordered error summary without mutating
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > limits identifiers to twenty and returns removal focus to the preceding identifier
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps unsent input on Escape only inside the leave choice and restores the invoking focus
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > stops a longer receipt cursor cycle without exposing a retry command
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > validates the physical observation on blur and cannot send an invalid mileage
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > exposes the exact complete selectable link after clipboard failure and returns to its own receipt
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > reviews every one of 1 references and repeats actual A/B facts before issuance
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > reviews every one of 40 references and repeats actual A/B facts before issuance
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > reports duplicate kind and location beside both unsent identifiers
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > clears all protected content on image denial while another child read is pending
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > fences a late comparison when navigation selects a different order and actor
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > a new Session with no receipts still checks the current B result without claiming cancellation
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > clears a forbidden historical decision after current role loss
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > a concurrent correction winner clears retry readiness and never retargets the complete replacement
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > a recorded complete replacement refreshes and focuses the returned immutable record
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > checks every receipt page after a lost prepare and never attaches unsent input to a discovered preparation
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > expires an uncertain operation without leaving its exact command or protected reason available
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains exactly the classified stage intent and file when the upload result is uncertain
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retries a retained complete append command with identical identity and support order
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > reviews an out-of-order correction graph with its returned pin and issues the complete material union
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > offers only existing authorized assignment coordination when no technician name is usable
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps the collapsed intake summary in native keyboard navigation
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > names material controls with their localized visit role, ordinal, kind and location only in en
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > names material controls with their localized visit role, ordinal, kind and location only in ru
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > names material controls with their localized visit role, ordinal, kind and location only in tk
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > preserves the mounted purpose classification textarea and selection through EN RU TK
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > preserves the mounted basis classification textarea and selection through EN RU TK
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > preserves the mounted provenance classification textarea and selection through EN RU TK
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > preserves the mounted scheduleReason classification textarea and selection through EN RU TK
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps missing-successor status unestablished while allowing deliberate server-checked correction
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > does not certify a comparison record as a leaf when no successor was returned
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > shows all returned comparison bindings and evidence audit facts without changing issuance pins
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: unchanged
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: actor
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: order
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: capability
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: denied
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > holds reviewer-only lost-prepare recovery until the authorized workspace recheck returns: version
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > hides technician handoff controls and navigation reads from a reviewer-only exact link
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > marks the authorization reference visibly and semantically required in en
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > marks the authorization reference visibly and semantically required in ru
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > marks the authorization reference visibly and semantically required in tk
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > exposes required semantics on each support checkbox while accepting any selected support in en
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > exposes required semantics on each support checkbox while accepting any selected support in ru
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > exposes required semantics on each support checkbox while accepting any selected support in tk
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > keeps image and identity-record rights as two blank independent declarations and sends each only to its own write
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > binds the highest-orderVersion raw from a fresh identity-records read and requires explicit kind and identifiability
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > recovers a failed protected pair image with exact named controls, clears review and requires full re-review after retry
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > revokes a failed decoded object URL, clears acknowledgment and reload refetches the exact pair
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > Back to candidates revokes the protected pair and focuses the candidates heading
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > denial while retrying a protected pair image clears protected state and focuses the safe Back
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > renders A then B as complete independent chains with explicit correction edges and no row alignment
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > requires an explicit blank method choice and issues the admitted automatic VIN validation request shape
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > discovers B-owned usable handoffs across pages and consumes only the explicitly chosen local ordinal
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > re-enters a discovered pending link attempt under the same request without another preparation or browser persistence
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > offers no preparation while a lost prepare is undiscovered and stays fenced until every receipt page is read
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > an execute conflict retains the original request and frozen command for GET-first exact retry
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > editing after a pending GET re-enters the same request and recovers a late original commit without a second preparation
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > names protected pair images only by visit role, identifier kind and location in en
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > names protected pair images only by visit role, identifier kind and location in ru
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > names protected pair images only by visit role, identifier kind and location in tk
+ ↓ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > freezes sorted provenance before the first command and retries that exact frozen order
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains composed stage and capture identities across exact network retries
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+- Expected
++ Received
+  [
+-   "11111111-1111-4111-8111-000000000901",
+-   "11111111-1111-4111-8111-000000000901",
++   "d453996d-f139-41b8-b33a-12591617a44e",
++   "d453996d-f139-41b8-b33a-12591617a44e",
+  ]
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:121:94
+    119|  const stageWrites = writes.filter(item => item.path.endsWith("/identi…
+    120|  expect(stageWrites).toHaveLength(2);
+    121|  expect.soft(stageWrites.map(item => (item.body as D.DiagnosticIdentit…
+       |                                                                                              ^
+    122|  expect(stageWrites[1]).toEqual(stageWrites[0]);
+    123|  expect.soft(uploads).toEqual([
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains composed stage and capture identities across exact network retries
+AssertionError: expected [ { …(2) }, { …(2) } ] to deeply equal [ { …(2) }, { …(2) } ]
+- Expected
++ Received
+@@ -12,11 +12,11 @@
+            4,
+          ],
+          "type": "Buffer",
+        },
+      },
+-     "path": "/diagnostics/orders/11111111-1111-4111-8111-000000000001/identity-provenance/11111111-1111-4111-8111-000000000901?expectedOrderVersion=7",
++     "path": "/diagnostics/orders/11111111-1111-4111-8111-000000000001/identity-provenance/d453996d-f139-41b8-b33a-12591617a44e?expectedOrderVersion=7",
+    },
+    {
+      "body": File {
+        "lastModified": 1793339805456,
+        "name": "synthetic.png",
+@@ -29,8 +29,8 @@
+            4,
+          ],
+          "type": "Buffer",
+        },
+      },
+-     "path": "/diagnostics/orders/11111111-1111-4111-8111-000000000001/identity-provenance/11111111-1111-4111-8111-000000000901?expectedOrderVersion=7",
++     "path": "/diagnostics/orders/11111111-1111-4111-8111-000000000001/identity-provenance/d453996d-f139-41b8-b33a-12591617a44e?expectedOrderVersion=7",
+    },
+  ]
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:123:23
+    121|  expect.soft(stageWrites.map(item => (item.body as D.DiagnosticIdentit…
+    122|  expect(stageWrites[1]).toEqual(stageWrites[0]);
+    123|  expect.soft(uploads).toEqual([
+       |                       ^
+    124|   { path: "/diagnostics/orders/11111111-1111-4111-8111-000000000001/id…
+    125|   { path: "/diagnostics/orders/11111111-1111-4111-8111-000000000001/id…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains composed stage and capture identities across exact network retries
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+- Expected
++ Received
+  [
+-   "11111111-1111-4111-8111-000000000902",
+-   "11111111-1111-4111-8111-000000000902",
++   "51788a92-b6a4-4ae2-aaff-dadfc1179875",
++   "51788a92-b6a4-4ae2-aaff-dadfc1179875",
+  ]
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:129:44
+    127|  expect(appends).toHaveLength(2);
+    128|  expect(appends[1]).toEqual(appends[0]);
+    129|  expect.soft(appends.map(item => item.id)).toEqual(["11111111-1111-411…
+       |                                            ^
+    130|  expect.soft(appends[0]?.identifiers).toEqual([{ kind: "vin_stamp", lo…
+    131|  expect(screen.getByRole("heading", { name: c.root }).getAttribute("da…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains composed stage and capture identities across exact network retries
+AssertionError: expected [ { kind: 'vin_stamp', …(3) } ] to deeply equal [ { kind: 'vin_stamp', …(3) } ]
+- Expected
++ Received
+  [
+    {
+      "kind": "vin_stamp",
+      "location": "Plate",
+      "provenanceIds": [
+-       "11111111-1111-4111-8111-000000000901",
++       "d453996d-f139-41b8-b33a-12591617a44e",
+      ],
+      "value": "Observed",
+    },
+  ]
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:130:39
+    128|  expect(appends[1]).toEqual(appends[0]);
+    129|  expect.soft(appends.map(item => item.id)).toEqual(["11111111-1111-411…
+    130|  expect.soft(appends[0]?.identifiers).toEqual([{ kind: "vin_stamp", lo…
+       |                                       ^
+    131|  expect(screen.getByRole("heading", { name: c.root }).getAttribute("da…
+    132| });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains composed stage and capture identities across exact network retries
+AssertionError: expected '51788a92-b6a4-4ae2-aaff-dadfc1179875' to be '11111111-1111-4111-8111-000000000902' // Object.is equality
+Expected: "11111111-1111-4111-8111-000000000902"
+Received: "51788a92-b6a4-4ae2-aaff-dadfc1179875"
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:131:84
+    129|  expect.soft(appends.map(item => item.id)).toEqual(["11111111-1111-411…
+    130|  expect.soft(appends[0]?.identifiers).toEqual([{ kind: "vin_stamp", lo…
+    131|  expect(screen.getByRole("heading", { name: c.root }).getAttribute("da…
+       |                                                                                    ^
+    132| });
+    133|
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > uses the composed continuity generator for the frozen consume report identity across retry
+AssertionError: expected [ { …(4) }, { …(4) } ] to deeply equal [ { …(4) }, { …(4) } ]
+- Expected
++ Received
+  [
+    {
+      "expectedOrderVersion": 7,
+      "proofId": "11111111-1111-4111-8111-000000000003",
+      "reason": "My intended physical visit",
+-     "reportId": "11111111-1111-4111-8111-000000000904",
++     "reportId": "7318cad6-d301-4b8e-9c8e-820874c4a57c",
+    },
+    {
+      "expectedOrderVersion": 7,
+      "proofId": "11111111-1111-4111-8111-000000000003",
+      "reason": "My intended physical visit",
+-     "reportId": "11111111-1111-4111-8111-000000000904",
++     "reportId": "7318cad6-d301-4b8e-9c8e-820874c4a57c",
+    },
+  ]
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:148:97
+    146|  const executeWrites = writes.filter(item => item.path.endsWith("/exec…
+    147|  expect(executeWrites).toHaveLength(2);
+    148|  expect(executeWrites.map(item => (item.body as D.DiagnosticContinuity…
+       |                                                                                                 ^
+    149|   { proofId: "11111111-1111-4111-8111-000000000003", reportId: "111111…
+    150|   { proofId: "11111111-1111-4111-8111-000000000003", reportId: "111111…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+ FAIL  src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx > rejects expired and equal-time rights and sends a one-millisecond-future expiry unchanged
+AssertionError: expected false to be true // Object.is equality
+- Expected
++ Received
+- true
++ false
+ ❯ src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx:105:26
+    103|  fireEvent.change(screen.getByLabelText("Retention reason"), { target:…
+    104|  const upload = screen.getByRole("button", { name: "Upload attachment"…
+    105|  expect(upload.disabled).toBe(true);
+       |                          ^
+    106|  fireEvent.click(upload);
+    107|  expect(stages).toEqual([]);
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+ Test Files  2 failed (2)
+      Tests  3 failed | 95 skipped (98)
+   Start at  13:56:45
+   Duration  570ms (environment 38%, tests 32%, import 25%, transform 4%, worker 1%)
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 3cd4f072/apps/admin
+exit_code=1
