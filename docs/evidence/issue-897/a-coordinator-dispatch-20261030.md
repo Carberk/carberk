@@ -1,5 +1,45 @@
 # Milestone A dispatch — 2026-10-30
 
+## Current S2 follow-up
+
+A-01 post-fix Standards returned FAIL/open on S2. The first A-09 round
+preserved retry IDs and expiry semantics, but its optional ambient defaults
+remain in production composition. A-11 post-fix Spec returned FAIL/open on
+the existing A-02/A-03/A-04/A-05–A-10 evidence gaps, with no new source defect.
+
+- Task ID: `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a09-s2-fix-20261030-r1`.
+- Child thread: `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a09-s2-fix-20261030-r1`.
+- Worktree: `/Users/bagtyyar/.t3/worktrees/carberk/t3-6ab06b8e`, branch
+  `t3/issue-897-a09-s2-composition-fix`.
+- Exact source base and immutable checkout HEAD:
+  `a4a3e9cd6dd42ea1166260c3d780ed44456f4b8b`. The coordinator confirmed the
+  branch ref with `git rev-parse`; worker records the full equality receipt.
+- Returned selection: `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access,
+  worktree isolation. This is the only source writer.
+- Allowed paths: the three S1 modules, `DiagnosticWorkspace.tsx`,
+  `ServiceWorkspace.tsx`, directly affected rendered/network tests in those
+  two directories, and `a-09-fix-20261030/**`. An additional provider path
+  requires coordinator disposition before the worker writes it.
+- Required behavior: dependencies required at the feature boundary, bound by
+  real production composition; deterministic ID/time proof through the real
+  parent and network boundary; frozen exact retry commands and `expiry <= now`
+  preserved. A-11 evidence gaps add no writable source paths.
+- Verification slot: A-09 owns package/test/build execution until its terminal
+  receipt. A-02 fixture preparation remains offline. No concurrent host-heavy
+  or timing-sensitive run, deployment, native build or shared reset is allowed.
+- Resource manifest: no Compose project, DB, Redis, object namespace, API port
+  or device. Runtime services and host-heavy timing work are prohibited.
+- Commands: RED-first affected parent/network Vitest selectors, affected admin
+  typecheck/lint/build/runtime checks, `git diff --check`, changed-path audit
+  and source-equality audit. Exact executable receipts and selectors must be
+  supplied before assembly; this plan is not a run receipt.
+- Evidence: `a-09-fix-20261030/` with source checkpoint, evidence-inclusive
+  HEAD, exact commands/results and path audit. S2 stays FAIL/open until
+  assembly, affected verification and another independent review pass.
+
+The original dispatch entries below are history. No accepted ordinary full100,
+reset-cycle, staff/API or static evidence is invalidated by a planning commit.
+
 The Wayfinder map was recorded before any child launch. The reconciled
 candidate branch and PR head are at `6cf5c311` (the map and fast-forward
 reconciliation receipts are included). All children use GPT Sol 6.1,

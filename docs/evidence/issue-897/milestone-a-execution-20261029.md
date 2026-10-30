@@ -8,6 +8,17 @@ The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-
 
 ## Active critical path
 
+Current review disposition: A-01 post-fix Standards is FAIL/open on S2,
+recorded in `a-01-postfix-standards-review-20261030.md`. S1 operation-site
+injection preserves frozen commands and expiry semantics, but optional ambient
+fallbacks and omitted production-parent dependencies leave the criterion open.
+A-09 S2 is the sole implementation worker from exact base
+`a4a3e9cd6dd42ea1166260c3d780ed44456f4b8b`, with an exclusive affected-admin
+verification slot. A-11 post-fix Spec remains FAIL/open for missing acceptance
+evidence and found no new source defect. A-02 fixture preparation stays offline
+until the slot is released. A-03/A-04 and A-05–A-10 remain open. This state
+supersedes the earlier in-flight S1/seam/review descriptions above.
+
 All selected #897 A criteria remain required. Quiet-host reservations cover actual timing-sensitive setup, tests and necessary observation only. Independent isolated functional checks, source, design and read-only reviews proceed in parallel within four slots. One writer owns each shared contract and this coordinator alone assembles. Registry163's six-phase comparison is finished, its clone drained and stopped, and staff/reset explicitly released. No measurement window is reserved.
 
 The finite [worker comparison](worker-width-decision-20261029/receipt.md) is complete on the actual101-migration chain including164. Three repeats per capped diagnostic width preserve command outputs and rollback; host contention limits wall-clock claims. No wider production partition is selected and no further attribution is planned. The short authority trace identifies5s as Vitest's unset default carried into coordinator dispatch, with no ownership-expiry product SLO in the governing sources. The [selected correction](worker-verification-budget-decision-20261029.md) is a60s bound on the one refused-then-accepted test and its sampler. [Independent focused review](worker-verification-budget-review-r1-20261029.md) approves exactc1e909ad with no blockers. Every behavioral assertion, width10, closure cap and fresh revalidation is preserved; B5 and package budgets stay unchanged. Worker source65024d52 is now assembled byte-exactly before that timeout-only edit. TS7/TS6/lint and17 focused tests pass;23 database cases skipped. Next worker proof is one fresh ordinary full100 fixture/run under the reviewed budget plus the remaining real rollback/capacity/race cases. Partial ownership7 stays excluded.
