@@ -19,6 +19,22 @@ blocked by the dependency order in the Wayfinder map. No child is authorized
 to create another coordinator, publish/merge PR #904, mutate shared staging,
 build native artifacts, or claim final acceptance.
 
+The bounded A-09 fix round is now the only implementation child:
+
+- Task ID: `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a09-s1-fix-20261030-r1`.
+- Child thread: `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a09-s1-fix-20261030-r1`.
+- Exact base: `6a902544f6135273b19c6bc46e37813034fe68fa`.
+- Selection: `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access,
+  isolated worktree.
+- Allowed source paths are exactly the three S1 modules named in the map;
+  affected real component/network tests and the A-09 evidence directory are
+  the only additional writable paths. No reset, deployment, device, native,
+  artifact, B or analytics work is in this task.
+- The worker must preserve frozen IDs across exact retries and current expiry
+  semantics, use deterministic IDs/time in real rendered/network tests, and
+  return a checkpoint and affected verification. Any path or architecture
+  expansion stops the child and returns to coordinator review.
+
 ## Immutable worktree identity
 
 All three initial workers started at
