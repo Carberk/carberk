@@ -1,0 +1,26 @@
+{
+  "name": "create-database",
+  "program": "docker",
+  "arguments": [
+    "exec",
+    "auto_tm_ci_897_a02_f6408755-postgres-1",
+    "psql",
+    "-U",
+    "auto_tm_ci",
+    "-d",
+    "auto_tm_ci",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-c",
+    "CREATE DATABASE a02_worker"
+  ],
+  "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "startedAt": "2026-10-29T18:24:44.976Z",
+  "finishedAt": "2026-10-29T18:24:45.067Z",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "log": "create-database.log",
+  "logSha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7",
+  "environmentNames": []
+}

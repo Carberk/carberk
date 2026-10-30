@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-29T18:23:58.056590+00:00",
+  "candidateSha": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "runtime": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "method": "git archive; no second Git worktree; original tracked source/test contents unchanged",
+  "setupCorrections": [
+    "first execution used nonexistent runtime cwd, no process started",
+    "Python 3.9 lacks extractall filter; empty runtime preserved and archive member paths checked explicitly"
+  ]
+}

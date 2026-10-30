@@ -1,0 +1,14 @@
+{
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--frozen-lockfile"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-c04d2138",
+  "startedAt": "2026-10-29T18:21:07.102Z",
+  "endedAt": "2026-10-29T18:21:13.110Z",
+  "code": 0,
+  "signal": null,
+  "log": "setup-1.log",
+  "sha256": "6335e1819d7aeb317ae24ef345e75253c87884643bd17da74e8bb8d2c98ec493"
+}

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "docker",
+    "exec",
+    "auto_tm_ci_897_a02_f6408755-redis-1",
+    "redis-cli",
+    "DBSIZE"
+  ],
+  "recordedAt": "2026-10-29T18:27:17.427460+00:00",
+  "exitCode": 0,
+  "log": "redis-after-tests.log",
+  "logSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+}

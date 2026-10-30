@@ -236,8 +236,11 @@ declare A complete.
 - **Owner:** delegated Sol 6.1 implementation worker; coordinator assembles and
   reruns affected checks.
 - **Base:** the exact reviewed candidate SHA, normally `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
-- **Allowed paths:** only files named by A-01's bounded finding; matching tests
-  and `docs/evidence/issue-897/a-09-fix-20261030/`.
+- **Allowed paths:** only files named by the accepted blocking findings from
+  both independent axes, A-01 Standards S1 and any accepted A-11 Spec finding;
+  matching tests and `docs/evidence/issue-897/a-09-fix-20261030/`. The
+  coordinator fills the exact A-11 paths after its report. No path outside the
+  combined allow-list is writable.
 - **Depends on:** A-01 and A-11 reports. A-02–A-05 may continue only when their paths
   are disjoint from the proposed fix.
 - **Non-goals:** no opportunistic refactor, scope expansion, contract rewrite,

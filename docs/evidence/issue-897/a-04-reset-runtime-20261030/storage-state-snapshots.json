@@ -1,0 +1,790 @@
+{
+  "result": "PASS",
+  "evidenceLevel": "offline boundary fake only",
+  "before": [
+    {
+      "bucket": "listing-photos",
+      "versions": [
+        {
+          "Key": "pending/a.webp",
+          "VersionId": "v1",
+          "Size": 3,
+          "ETag": "same-etag"
+        },
+        {
+          "Key": "pending/a.webp",
+          "VersionId": "v2",
+          "Size": 3,
+          "ETag": "same-etag"
+        }
+      ],
+      "markers": [
+        {
+          "Key": "pending/a.webp",
+          "VersionId": "marker-v3"
+        }
+      ],
+      "uploads": [],
+      "bytes": [
+        {
+          "key": "[\"pending/a.webp\",\"v1\"]",
+          "sha256": "cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4"
+        },
+        {
+          "key": "[\"pending/a.webp\",\"v2\"]",
+          "sha256": "11507a0e2f5e69d5dfa40a62a1bd7b6ee57e6bcd85c67c9b8431b36fff21c437"
+        }
+      ]
+    },
+    {
+      "bucket": "listing-videos",
+      "versions": [],
+      "markers": [],
+      "uploads": [],
+      "bytes": []
+    },
+    {
+      "bucket": "chat-attachments",
+      "versions": [],
+      "markers": [],
+      "uploads": [],
+      "bytes": []
+    },
+    {
+      "bucket": "catalog-assets",
+      "versions": [
+        {
+          "Key": "brands/acme/logo.webp",
+          "VersionId": "logo-v1",
+          "Size": 16,
+          "ETag": "same-etag"
+        }
+      ],
+      "markers": [],
+      "uploads": [],
+      "bytes": [
+        {
+          "key": "[\"brands/acme/logo.webp\",\"logo-v1\"]",
+          "sha256": "6c1132db1e487fc5489318441ee32b3768c018aaeac170857ac2f018ab19279a"
+        }
+      ]
+    },
+    {
+      "bucket": "business-chat-private",
+      "versions": [
+        {
+          "Key": "business-chat-private/a/b/original.webp",
+          "VersionId": "null",
+          "Size": 12,
+          "ETag": "same-etag"
+        }
+      ],
+      "markers": [],
+      "uploads": [],
+      "bytes": [
+        {
+          "key": "[\"business-chat-private/a/b/original.webp\",\"null\"]",
+          "sha256": "8c51d2e804f455b0e1d0fb113b347be1b74c1da6debded103c08cc51dca08eda"
+        }
+      ]
+    },
+    {
+      "bucket": "service-private",
+      "versions": [],
+      "markers": [],
+      "uploads": [],
+      "bytes": []
+    },
+    {
+      "bucket": "configured-video",
+      "versions": [],
+      "markers": [],
+      "uploads": [
+        {
+          "Key": "video/v1/a/b/source.mp4",
+          "UploadId": "upload-1"
+        },
+        {
+          "Key": "video/v1/a/c/source.mp4",
+          "UploadId": "upload-2"
+        }
+      ],
+      "bytes": []
+    },
+    {
+      "bucket": "diagnostic-test-private",
+      "versions": [
+        {
+          "Key": "diagnostic-evidence/a/hash",
+          "VersionId": "d1",
+          "Size": 10,
+          "ETag": "same-etag"
+        }
+      ],
+      "markers": [],
+      "uploads": [],
+      "bytes": [
+        {
+          "key": "[\"diagnostic-evidence/a/hash\",\"d1\"]",
+          "sha256": "5a695eea5b00a31f8aef7dbb89c8f798fab371246ac1549afe84b16420707b99"
+        }
+      ]
+    },
+    {
+      "bucket": "outside",
+      "versions": [
+        {
+          "Key": "unowned-bytes",
+          "VersionId": "outside-v1",
+          "Size": 12,
+          "ETag": "same-etag"
+        }
+      ],
+      "markers": [],
+      "uploads": [],
+      "bytes": [
+        {
+          "key": "[\"unowned-bytes\",\"outside-v1\"]",
+          "sha256": "3515912e5bf62d7c0abdc59872772d8a472f304f8a37b267dd4da86d70970415"
+        }
+      ]
+    }
+  ],
+  "interrupted": {
+    "state": [
+      {
+        "bucket": "listing-photos",
+        "versions": [
+          {
+            "Key": "pending/a.webp",
+            "VersionId": "v1",
+            "Size": 3,
+            "ETag": "same-etag"
+          },
+          {
+            "Key": "pending/a.webp",
+            "VersionId": "v2",
+            "Size": 3,
+            "ETag": "same-etag"
+          }
+        ],
+        "markers": [
+          {
+            "Key": "pending/a.webp",
+            "VersionId": "marker-v3"
+          }
+        ],
+        "uploads": [],
+        "bytes": [
+          {
+            "key": "[\"pending/a.webp\",\"v1\"]",
+            "sha256": "cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4"
+          },
+          {
+            "key": "[\"pending/a.webp\",\"v2\"]",
+            "sha256": "11507a0e2f5e69d5dfa40a62a1bd7b6ee57e6bcd85c67c9b8431b36fff21c437"
+          }
+        ]
+      },
+      {
+        "bucket": "listing-videos",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "chat-attachments",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "catalog-assets",
+        "versions": [
+          {
+            "Key": "brands/acme/logo.webp",
+            "VersionId": "logo-v1",
+            "Size": 16,
+            "ETag": "same-etag"
+          }
+        ],
+        "markers": [],
+        "uploads": [],
+        "bytes": [
+          {
+            "key": "[\"brands/acme/logo.webp\",\"logo-v1\"]",
+            "sha256": "6c1132db1e487fc5489318441ee32b3768c018aaeac170857ac2f018ab19279a"
+          }
+        ]
+      },
+      {
+        "bucket": "business-chat-private",
+        "versions": [
+          {
+            "Key": "business-chat-private/a/b/original.webp",
+            "VersionId": "null",
+            "Size": 12,
+            "ETag": "same-etag"
+          }
+        ],
+        "markers": [],
+        "uploads": [],
+        "bytes": [
+          {
+            "key": "[\"business-chat-private/a/b/original.webp\",\"null\"]",
+            "sha256": "8c51d2e804f455b0e1d0fb113b347be1b74c1da6debded103c08cc51dca08eda"
+          }
+        ]
+      },
+      {
+        "bucket": "service-private",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "configured-video",
+        "versions": [],
+        "markers": [],
+        "uploads": [
+          {
+            "Key": "video/v1/a/c/source.mp4",
+            "UploadId": "upload-2"
+          }
+        ],
+        "bytes": []
+      },
+      {
+        "bucket": "diagnostic-test-private",
+        "versions": [
+          {
+            "Key": "diagnostic-evidence/a/hash",
+            "VersionId": "d1",
+            "Size": 10,
+            "ETag": "same-etag"
+          }
+        ],
+        "markers": [],
+        "uploads": [],
+        "bytes": [
+          {
+            "key": "[\"diagnostic-evidence/a/hash\",\"d1\"]",
+            "sha256": "5a695eea5b00a31f8aef7dbb89c8f798fab371246ac1549afe84b16420707b99"
+          }
+        ]
+      },
+      {
+        "bucket": "outside",
+        "versions": [
+          {
+            "Key": "unowned-bytes",
+            "VersionId": "outside-v1",
+            "Size": 12,
+            "ETag": "same-etag"
+          }
+        ],
+        "markers": [],
+        "uploads": [],
+        "bytes": [
+          {
+            "key": "[\"unowned-bytes\",\"outside-v1\"]",
+            "sha256": "3515912e5bf62d7c0abdc59872772d8a472f304f8a37b267dd4da86d70970415"
+          }
+        ]
+      }
+    ],
+    "journal": {
+      "version": 1,
+      "phase": "intent",
+      "plan": {
+        "binding": {
+          "reservationId": "33333333333333333333333333333333",
+          "owner": "alice",
+          "storageEpoch": "minio-new",
+          "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "operationId": "11111111111111111111111111111111",
+          "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+          "closureGeneration": "22222222222222222222222222222222",
+          "projectId": "176ddec0-dd65-4087-b82c-798599fc2ebe",
+          "environmentId": "652abc79-fdb0-48b0-9f6c-ad0ff572d7b2",
+          "endpoint": "http://minio.railway.internal:9000",
+          "referenceDigest": "d899f26eae200ad3e4ccf7d33b95458fcaa9b1970168dcf82ee45723cd8586a8"
+        },
+        "scopeDigest": "c801182a7cd0e180a3857b4967d1dadb15d8b0454b72615b06e10cc6c7e72915",
+        "versions": [
+          {
+            "bucket": "business-chat-private",
+            "key": "business-chat-private/a/b/original.webp",
+            "versionId": "null",
+            "size": 12,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "catalog-assets",
+            "key": "brands/acme/logo.webp",
+            "versionId": "logo-v1",
+            "size": 16,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "diagnostic-test-private",
+            "key": "diagnostic-evidence/a/hash",
+            "versionId": "d1",
+            "size": 10,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "listing-photos",
+            "key": "pending/a.webp",
+            "versionId": "v1",
+            "size": 3,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "listing-photos",
+            "key": "pending/a.webp",
+            "versionId": "v2",
+            "size": 3,
+            "etag": "same-etag"
+          }
+        ],
+        "deleteMarkers": [
+          {
+            "bucket": "listing-photos",
+            "key": "pending/a.webp",
+            "versionId": "marker-v3"
+          }
+        ],
+        "multipart": [
+          {
+            "bucket": "configured-video",
+            "key": "video/v1/a/b/source.mp4",
+            "uploadId": "upload-1"
+          },
+          {
+            "bucket": "configured-video",
+            "key": "video/v1/a/c/source.mp4",
+            "uploadId": "upload-2"
+          }
+        ],
+        "preserve": [
+          {
+            "bucket": "catalog-assets",
+            "key": "brands/acme/logo.webp",
+            "versionId": "logo-v1",
+            "size": 16,
+            "etag": "same-etag",
+            "sha256": "6c1132db1e487fc5489318441ee32b3768c018aaeac170857ac2f018ab19279a"
+          }
+        ]
+      },
+      "planDigest": "616e605053d479d567f07189e117713fbe1ba3482fe2d80f3dea2d6ca343d271",
+      "batches": [
+        {
+          "id": "b81a36d9df7a4b2aea14569d168b03ab9be13c9e62e55fec6e63f871382512df",
+          "operation": "AbortMultipartUpload",
+          "parameters": {
+            "Bucket": "configured-video",
+            "Key": "video/v1/a/b/source.mp4",
+            "UploadId": "upload-1"
+          },
+          "state": "intent"
+        }
+      ]
+    },
+    "effects": [
+      {
+        "operation": "AbortMultipartUpload",
+        "input": {
+          "Bucket": "configured-video",
+          "Key": "video/v1/a/b/source.mp4",
+          "UploadId": "upload-1"
+        }
+      }
+    ]
+  },
+  "completed": {
+    "state": [
+      {
+        "bucket": "listing-photos",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "listing-videos",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "chat-attachments",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "catalog-assets",
+        "versions": [
+          {
+            "Key": "brands/acme/logo.webp",
+            "VersionId": "logo-v1",
+            "Size": 16,
+            "ETag": "same-etag"
+          }
+        ],
+        "markers": [],
+        "uploads": [],
+        "bytes": [
+          {
+            "key": "[\"brands/acme/logo.webp\",\"logo-v1\"]",
+            "sha256": "6c1132db1e487fc5489318441ee32b3768c018aaeac170857ac2f018ab19279a"
+          }
+        ]
+      },
+      {
+        "bucket": "business-chat-private",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "service-private",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "configured-video",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "diagnostic-test-private",
+        "versions": [],
+        "markers": [],
+        "uploads": [],
+        "bytes": []
+      },
+      {
+        "bucket": "outside",
+        "versions": [
+          {
+            "Key": "unowned-bytes",
+            "VersionId": "outside-v1",
+            "Size": 12,
+            "ETag": "same-etag"
+          }
+        ],
+        "markers": [],
+        "uploads": [],
+        "bytes": [
+          {
+            "key": "[\"unowned-bytes\",\"outside-v1\"]",
+            "sha256": "3515912e5bf62d7c0abdc59872772d8a472f304f8a37b267dd4da86d70970415"
+          }
+        ]
+      }
+    ],
+    "journal": {
+      "version": 1,
+      "phase": "complete",
+      "plan": {
+        "binding": {
+          "reservationId": "33333333333333333333333333333333",
+          "owner": "alice",
+          "storageEpoch": "minio-new",
+          "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "operationId": "11111111111111111111111111111111",
+          "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+          "closureGeneration": "22222222222222222222222222222222",
+          "projectId": "176ddec0-dd65-4087-b82c-798599fc2ebe",
+          "environmentId": "652abc79-fdb0-48b0-9f6c-ad0ff572d7b2",
+          "endpoint": "http://minio.railway.internal:9000",
+          "referenceDigest": "d899f26eae200ad3e4ccf7d33b95458fcaa9b1970168dcf82ee45723cd8586a8"
+        },
+        "scopeDigest": "c801182a7cd0e180a3857b4967d1dadb15d8b0454b72615b06e10cc6c7e72915",
+        "versions": [
+          {
+            "bucket": "business-chat-private",
+            "key": "business-chat-private/a/b/original.webp",
+            "versionId": "null",
+            "size": 12,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "catalog-assets",
+            "key": "brands/acme/logo.webp",
+            "versionId": "logo-v1",
+            "size": 16,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "diagnostic-test-private",
+            "key": "diagnostic-evidence/a/hash",
+            "versionId": "d1",
+            "size": 10,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "listing-photos",
+            "key": "pending/a.webp",
+            "versionId": "v1",
+            "size": 3,
+            "etag": "same-etag"
+          },
+          {
+            "bucket": "listing-photos",
+            "key": "pending/a.webp",
+            "versionId": "v2",
+            "size": 3,
+            "etag": "same-etag"
+          }
+        ],
+        "deleteMarkers": [
+          {
+            "bucket": "listing-photos",
+            "key": "pending/a.webp",
+            "versionId": "marker-v3"
+          }
+        ],
+        "multipart": [
+          {
+            "bucket": "configured-video",
+            "key": "video/v1/a/b/source.mp4",
+            "uploadId": "upload-1"
+          },
+          {
+            "bucket": "configured-video",
+            "key": "video/v1/a/c/source.mp4",
+            "uploadId": "upload-2"
+          }
+        ],
+        "preserve": [
+          {
+            "bucket": "catalog-assets",
+            "key": "brands/acme/logo.webp",
+            "versionId": "logo-v1",
+            "size": 16,
+            "etag": "same-etag",
+            "sha256": "6c1132db1e487fc5489318441ee32b3768c018aaeac170857ac2f018ab19279a"
+          }
+        ]
+      },
+      "planDigest": "616e605053d479d567f07189e117713fbe1ba3482fe2d80f3dea2d6ca343d271",
+      "batches": [
+        {
+          "id": "b81a36d9df7a4b2aea14569d168b03ab9be13c9e62e55fec6e63f871382512df",
+          "operation": "AbortMultipartUpload",
+          "parameters": {
+            "Bucket": "configured-video",
+            "Key": "video/v1/a/b/source.mp4",
+            "UploadId": "upload-1"
+          },
+          "state": "intent"
+        },
+        {
+          "id": "8d4900a8d3ea1e588d682fde3d7bc5fc18447a39dadea7a2073e94b98ec877bd",
+          "operation": "AbortMultipartUpload",
+          "parameters": {
+            "Bucket": "configured-video",
+            "Key": "video/v1/a/c/source.mp4",
+            "UploadId": "upload-2"
+          },
+          "state": "replied"
+        },
+        {
+          "id": "2ca9a3c2b68fe0496f8fe962ff41cf7b20800a1db09b1d61b8f2a125c659b82b",
+          "operation": "DeleteObjects",
+          "parameters": {
+            "Bucket": "business-chat-private",
+            "Delete": {
+              "Quiet": false,
+              "Objects": [
+                {
+                  "Key": "business-chat-private/a/b/original.webp",
+                  "VersionId": "null"
+                }
+              ]
+            }
+          },
+          "state": "replied"
+        },
+        {
+          "id": "90114406ef01bb75dee3cd50a65233925fccc53de37242e36ec38fd6410f5e94",
+          "operation": "DeleteObjects",
+          "parameters": {
+            "Bucket": "diagnostic-test-private",
+            "Delete": {
+              "Quiet": false,
+              "Objects": [
+                {
+                  "Key": "diagnostic-evidence/a/hash",
+                  "VersionId": "d1"
+                }
+              ]
+            }
+          },
+          "state": "replied"
+        },
+        {
+          "id": "44ca09f825f8005a901dd7b30d547f3f61aa2fea63faed0e5519b92d33385c70",
+          "operation": "DeleteObjects",
+          "parameters": {
+            "Bucket": "listing-photos",
+            "Delete": {
+              "Quiet": false,
+              "Objects": [
+                {
+                  "Key": "pending/a.webp",
+                  "VersionId": "v1"
+                }
+              ]
+            }
+          },
+          "state": "replied"
+        },
+        {
+          "id": "66556be82b9c291b77e9ab63cf365600860155fd538b2658438c5c036be3b54b",
+          "operation": "DeleteObjects",
+          "parameters": {
+            "Bucket": "listing-photos",
+            "Delete": {
+              "Quiet": false,
+              "Objects": [
+                {
+                  "Key": "pending/a.webp",
+                  "VersionId": "v2"
+                }
+              ]
+            }
+          },
+          "state": "replied"
+        },
+        {
+          "id": "471244d370dae36b4800319f158f03dbea2b653272bf4e6026db3e7da07d13e2",
+          "operation": "DeleteObjects",
+          "parameters": {
+            "Bucket": "listing-photos",
+            "Delete": {
+              "Quiet": false,
+              "Objects": [
+                {
+                  "Key": "pending/a.webp",
+                  "VersionId": "marker-v3"
+                }
+              ]
+            }
+          },
+          "state": "replied"
+        }
+      ]
+    },
+    "effects": [
+      {
+        "operation": "AbortMultipartUpload",
+        "input": {
+          "Bucket": "configured-video",
+          "Key": "video/v1/a/b/source.mp4",
+          "UploadId": "upload-1"
+        }
+      },
+      {
+        "operation": "AbortMultipartUpload",
+        "input": {
+          "Bucket": "configured-video",
+          "Key": "video/v1/a/c/source.mp4",
+          "UploadId": "upload-2"
+        }
+      },
+      {
+        "operation": "DeleteObjects",
+        "input": {
+          "Bucket": "business-chat-private",
+          "Delete": {
+            "Quiet": false,
+            "Objects": [
+              {
+                "Key": "business-chat-private/a/b/original.webp",
+                "VersionId": "null"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "operation": "DeleteObjects",
+        "input": {
+          "Bucket": "diagnostic-test-private",
+          "Delete": {
+            "Quiet": false,
+            "Objects": [
+              {
+                "Key": "diagnostic-evidence/a/hash",
+                "VersionId": "d1"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "operation": "DeleteObjects",
+        "input": {
+          "Bucket": "listing-photos",
+          "Delete": {
+            "Quiet": false,
+            "Objects": [
+              {
+                "Key": "pending/a.webp",
+                "VersionId": "v1"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "operation": "DeleteObjects",
+        "input": {
+          "Bucket": "listing-photos",
+          "Delete": {
+            "Quiet": false,
+            "Objects": [
+              {
+                "Key": "pending/a.webp",
+                "VersionId": "v2"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "operation": "DeleteObjects",
+        "input": {
+          "Bucket": "listing-photos",
+          "Delete": {
+            "Quiet": false,
+            "Objects": [
+              {
+                "Key": "pending/a.webp",
+                "VersionId": "marker-v3"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "replayUnchanged": true,
+  "outsideAndCatalogUnchanged": true,
+  "realStorageResourcesCreated": 0
+}

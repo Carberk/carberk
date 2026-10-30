@@ -1,0 +1,15 @@
+{
+  "command": "node",
+  "args": [
+    "--test",
+    "--test-name-pattern=business.*(reset|restor|recover|disposal|recovery)|post-main campaign restoration|queue disposal|actual remote probe",
+    "scripts/staging-railway.test.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-c04d2138",
+  "startedAt": "2026-10-29T18:22:05.916Z",
+  "endedAt": "2026-10-29T18:26:27.870Z",
+  "code": 1,
+  "signal": null,
+  "log": "offline-3.log",
+  "sha256": "192e6e845b176557f6abea23487c45f531797f371dc37224f98e0e68030a9b0f"
+}

@@ -1,0 +1,42 @@
+{
+  "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "actualWorktreeHead": "6cf5c311d43b5ae0bca0f2543564f65b5d2e2a9e",
+  "trackedSourceOrTestChanges": [],
+  "committedSourceBaseDifferences": [],
+  "worktreeStatus": [
+    "?? docs/evidence/issue-897/a-04-reset-runtime-20261030/"
+  ],
+  "activeTaskNodeProcesses": [],
+  "containersMatchingProposedTaskPrefix": [],
+  "captureScratch": "/tmp/carberk-a04-c04d2138-Zy0AmR",
+  "captureScratchExists": false,
+  "postgresRedisObjectServicesCreatedByTask": 0,
+  "postgresSuiteExecution": "NOT RUN; deferred to coordinator CPU slot",
+  "realDatabaseStateSnapshots": "NOT AVAILABLE; no database was opened",
+  "sourceAndTestFilesReadOnly": true,
+  "suiteResults": {
+    "offline-1": {
+      "pass": 181,
+      "fail": 0
+    },
+    "offline-2": {
+      "pass": 51,
+      "fail": 1
+    },
+    "offline-3": {
+      "pass": 37,
+      "fail": 22
+    },
+    "red-1": {
+      "pass": 0,
+      "fail": 1
+    }
+  },
+  "receiptResult": "FAIL / OPEN",
+  "hostedAcceptance": "NOT CLAIMED",
+  "verificationCommands": [
+    "node --check docs/evidence/issue-897/a-04-reset-runtime-20261030/run-evidence.mjs",
+    "node --check docs/evidence/issue-897/a-04-reset-runtime-20261030/capture-state.mjs",
+    "git diff --check"
+  ]
+}

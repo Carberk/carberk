@@ -1,0 +1,15 @@
+{
+  "command": "node",
+  "args": [
+    "--test",
+    "--test-name-pattern=the assembled application schema can restore baseline code while retaining its exact campaign migrations",
+    "scripts/staging-ledger.test.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-c04d2138",
+  "startedAt": "2026-10-29T18:24:41.739Z",
+  "endedAt": "2026-10-29T18:24:41.811Z",
+  "code": 1,
+  "signal": null,
+  "log": "red-1.log",
+  "sha256": "c6926760067e48db215a6cc8ed57624bf48b76bc2a99daf05419a9fbc94a2275"
+}

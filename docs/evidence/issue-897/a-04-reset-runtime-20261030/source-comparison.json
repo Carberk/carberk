@@ -1,0 +1,80 @@
+{
+  "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "actualWorktreeHead": "6cf5c311d43b5ae0bca0f2543564f65b5d2e2a9e",
+  "branch": "t3/issue-897-a04-reset-evidence",
+  "changedCommittedPaths": [
+    "docs/evidence/issue-897/a-10-pr-reconciliation-20261030.md",
+    "docs/evidence/issue-897/a-wayfinder-ticket-map-20261030.md"
+  ],
+  "sourceDiff": "",
+  "sources": {
+    "packages/db/tests/operational-reset-rows.e2e.spec.ts": {
+      "baseHash": "7ce54129db0cb8f825150972e5a68577ba041c208c425d3279176db38d45fa23",
+      "headHash": "7ce54129db0cb8f825150972e5a68577ba041c208c425d3279176db38d45fa23",
+      "worktreeHash": "7ce54129db0cb8f825150972e5a68577ba041c208c425d3279176db38d45fa23",
+      "equal": true
+    },
+    "packages/db/scripts/staging-clean-reset.e2e.spec.ts": {
+      "baseHash": "5730f98f59e3e99fe5cc473a80c901bd6b6ab980117740ed1a545900677473c3",
+      "headHash": "5730f98f59e3e99fe5cc473a80c901bd6b6ab980117740ed1a545900677473c3",
+      "worktreeHash": "5730f98f59e3e99fe5cc473a80c901bd6b6ab980117740ed1a545900677473c3",
+      "equal": true
+    },
+    "scripts/staging-campaign.mjs": {
+      "baseHash": "3ec15a61cd1308a9db19510cf1716f48982ad542b2d6966ed50a5c5f447e51f7",
+      "headHash": "3ec15a61cd1308a9db19510cf1716f48982ad542b2d6966ed50a5c5f447e51f7",
+      "worktreeHash": "3ec15a61cd1308a9db19510cf1716f48982ad542b2d6966ed50a5c5f447e51f7",
+      "equal": true
+    },
+    "scripts/staging-control.mjs": {
+      "baseHash": "79459be54b3a37ff0e627a539a2e4534c0e0a68511dfac37587eb4395c9e45f7",
+      "headHash": "79459be54b3a37ff0e627a539a2e4534c0e0a68511dfac37587eb4395c9e45f7",
+      "worktreeHash": "79459be54b3a37ff0e627a539a2e4534c0e0a68511dfac37587eb4395c9e45f7",
+      "equal": true
+    },
+    "scripts/staging-clean-reset.mjs": {
+      "baseHash": "6666430cbbfab6e0b29da7b736c3d5f0d1eda2ce5a6409b7c63d75c3fb179a6c",
+      "headHash": "6666430cbbfab6e0b29da7b736c3d5f0d1eda2ce5a6409b7c63d75c3fb179a6c",
+      "worktreeHash": "6666430cbbfab6e0b29da7b736c3d5f0d1eda2ce5a6409b7c63d75c3fb179a6c",
+      "equal": true
+    },
+    "scripts/staging-clean-reset-remote.mjs": {
+      "baseHash": "6cf54abdd87eac6d4cbc2a2baca0cd10e4486cc98033f22fcb97de80f13bba72",
+      "headHash": "6cf54abdd87eac6d4cbc2a2baca0cd10e4486cc98033f22fcb97de80f13bba72",
+      "worktreeHash": "6cf54abdd87eac6d4cbc2a2baca0cd10e4486cc98033f22fcb97de80f13bba72",
+      "equal": true
+    },
+    "scripts/staging-clean-reset-storage.mjs": {
+      "baseHash": "a0404005686019f602904e499046318b2f0ef396f64313f7b52493d5897c08e5",
+      "headHash": "a0404005686019f602904e499046318b2f0ef396f64313f7b52493d5897c08e5",
+      "worktreeHash": "a0404005686019f602904e499046318b2f0ef396f64313f7b52493d5897c08e5",
+      "equal": true
+    },
+    "scripts/staging-railway.mjs": {
+      "baseHash": "6382a72f29268706a97e07b0e2237a68951ab1962ceacce5ce2f5444bb61502b",
+      "headHash": "6382a72f29268706a97e07b0e2237a68951ab1962ceacce5ce2f5444bb61502b",
+      "worktreeHash": "6382a72f29268706a97e07b0e2237a68951ab1962ceacce5ce2f5444bb61502b",
+      "equal": true
+    },
+    "scripts/staging-schema.mjs": {
+      "baseHash": "6d3d51216b066c7a36f822be762541653f4bd694e0639209f8deea2ecb9679e6",
+      "headHash": "6d3d51216b066c7a36f822be762541653f4bd694e0639209f8deea2ecb9679e6",
+      "worktreeHash": "6d3d51216b066c7a36f822be762541653f4bd694e0639209f8deea2ecb9679e6",
+      "equal": true
+    },
+    "packages/db/prisma/schema.prisma": {
+      "baseHash": "21cdc52efb2fb1a9cabdfe0955cfe8d75e60147f9e6dd14f83f9e45bf3df4c45",
+      "headHash": "21cdc52efb2fb1a9cabdfe0955cfe8d75e60147f9e6dd14f83f9e45bf3df4c45",
+      "worktreeHash": "21cdc52efb2fb1a9cabdfe0955cfe8d75e60147f9e6dd14f83f9e45bf3df4c45",
+      "equal": true
+    },
+    "packages/db/prisma/migrations/20261029190000_operational_reset_row_admission/migration.sql": {
+      "baseHash": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd",
+      "headHash": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd",
+      "worktreeHash": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd",
+      "equal": true
+    }
+  },
+  "command": "git diff --quiet 52d901c50af1dde97ea22bda8efb1fdf21f169b1 HEAD -- packages apps scripts package.json pnpm-lock.yaml pnpm-workspace.yaml",
+  "result": "PASS"
+}

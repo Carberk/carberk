@@ -1,0 +1,3155 @@
+{
+  "recordedAt": "2026-10-29T18:26:08.397Z",
+  "name": "after-preparation",
+  "project": "auto_tm_ci_897_a02_f6408755",
+  "database": "a02_worker",
+  "chainMatchesCandidate": true,
+  "allMigrationsFinished": true,
+  "migrations": [
+    {
+      "migration_name": "20260513201407_init",
+      "checksum": "8047c0ad646e98e1302c158d32d9d1dc6f54a05024ae29ed1e7ffaee4791a860",
+      "finished_at": "2026-10-29T18:25:11.065Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260514090000_multi_device_sessions_and_role_split",
+      "checksum": "f2b6b1d0d655ece5dfd64d9d800bcad4a05c91550969f4a3ce08de3da4d5a3c0",
+      "finished_at": "2026-10-29T18:25:11.078Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260514100000_otp_request_ip",
+      "checksum": "70ab10afbc02ab9d9296d2e9c452ba0dc44c92b3a0b8ad32b0f2b4a0776dd8cc",
+      "finished_at": "2026-10-29T18:25:11.082Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260514104615_delete_me_cascades",
+      "checksum": "af24a05134219508e15794874c252d8a1bc6780850d7388eeccdcad56553e193",
+      "finished_at": "2026-10-29T18:25:11.109Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260518081943_add_engine_type_transmission_drive_type",
+      "checksum": "8a7068c700f352714f558bf46492484770b8e9ea6a5c2293566256dc290c2841",
+      "finished_at": "2026-10-29T18:25:11.119Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260518083234_s4_listings_crud",
+      "checksum": "ab90ddaf05f5034928eb5ffacd871b20538c5d33b97201918411e8d17a612010",
+      "finished_at": "2026-10-29T18:25:11.136Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260518180741_add_seller_terms_to_listing",
+      "checksum": "10ec9bdf271645b46d08e9d017da0ba78257d8a82b02516db52b7eb6d612c454",
+      "finished_at": "2026-10-29T18:25:11.138Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260608010000_s7_admin_moderation",
+      "checksum": "7faad97bf4fc734a9bc519e6dd8019ba0aeac17810c5b5bd564a0cce0e8c0a8a",
+      "finished_at": "2026-10-29T18:25:11.162Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260609000000_account_deletion_grace",
+      "checksum": "e91fe7bbaa26c63d26c95c637cbd3f6c22bf9bd5ec7e0b544c06124a9c244698",
+      "finished_at": "2026-10-29T18:25:11.167Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260711000000_add_condition_disclosure_to_listing",
+      "checksum": "69f549c0121aa415cf3cc9afdc0c8a26ae8d1de235c921991f73cb5dbf61c846",
+      "finished_at": "2026-10-29T18:25:11.169Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260711100000_add_inspection_interest",
+      "checksum": "2aa118ed29b0fe321feab0a95325d66e083059ea4cae581464da0934f0aa5176",
+      "finished_at": "2026-10-29T18:25:11.178Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260713000000_s10_rich_chat_foundation",
+      "checksum": "ddd8437876b5cf1653f00bcec6138aff653ddb53bf1d64a3eabfd7190048fe2e",
+      "finished_at": "2026-10-29T18:25:11.189Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260713170000_add_notification_history_status",
+      "checksum": "8de22e29cb7ee0345155ef82c7343054b57ce6190e971937788a42fadd792b61",
+      "finished_at": "2026-10-29T18:25:11.192Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260719010000_align_prisma_schema_with_existing_database",
+      "checksum": "45e4e3d6acc26ca5275af153fbcc1163e3d832c695c39f1bd28c052db6aef2c8",
+      "finished_at": "2026-10-29T18:25:11.194Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260922000000_add_user_sign_in_methods",
+      "checksum": "485f470dc45b4f84ded7032d1a6fda31993103f44bb2d686a433bac0af6e2016",
+      "finished_at": "2026-10-29T18:25:11.202Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260923000000_add_sign_in_code_channel",
+      "checksum": "d8e3acc864e098b19a15c1cbaa1adc1d4478a9231b9cc6c925d8d5d897c1fe97",
+      "finished_at": "2026-10-29T18:25:11.209Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260928000000_add_listing_price_tmt",
+      "checksum": "65aee1669e4df2e004117e3168de4b15f978b1e305eaea73b2f8639dbac76009",
+      "finished_at": "2026-10-29T18:25:11.216Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260929000000_add_listing_public_number",
+      "checksum": "99e90be6eed8715ace3136cfd97a4f1f2131efb9804af52f5693bc3d706206c8",
+      "finished_at": "2026-10-29T18:25:11.229Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260929120000_add_brand_logo_key",
+      "checksum": "b1943a5457351d9b63c7f1ea9f103ed3e1a5dc3a402764f4ef1f44c4d30a9488",
+      "finished_at": "2026-10-29T18:25:11.232Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20260929130000_damaged_condition_disclosure",
+      "checksum": "9c861900135a09861e9a44b522e69bb6ab56908619a77c3132766d39da5467f0",
+      "finished_at": "2026-10-29T18:25:11.234Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261002000000_remove_reported_listing_status",
+      "checksum": "e9252f91ba28c9910151804a83db02daa236df12967fbd81c15d37fb41190bc0",
+      "finished_at": "2026-10-29T18:25:11.249Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261002120000_add_media_uploads",
+      "checksum": "bdc2a56e53a0670be0bcd44240b5ab015eb49f1616877f678a85d758c388ab6a",
+      "finished_at": "2026-10-29T18:25:11.262Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261003120000_add_otp_request_purpose",
+      "checksum": "a53f8d07762d19e8fa86715cfefa4686e69ba0396dacbcd2e5ef6535338aea40",
+      "finished_at": "2026-10-29T18:25:11.269Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261003180000_add_verified_contact_phones",
+      "checksum": "5733060102f2bcc56d0adf2815814e8b78b56d0e8afb14b98611a5a624e13d41",
+      "finished_at": "2026-10-29T18:25:11.276Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261003180100_clear_unverified_listing_contact_phones",
+      "checksum": "c9b70d53087dbc84f6967f41b8a2e84ea85a5266912732f52f8e36a06a4e155e",
+      "finished_at": "2026-10-29T18:25:11.281Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261005120000_add_user_name_number_and_avatar_index",
+      "checksum": "4edee95c37b5645feaddc75290dd6b2f742964cb932b3d563ff6451337c82085",
+      "finished_at": "2026-10-29T18:25:11.292Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261007120000_conditional_upload_protocol",
+      "checksum": "0ea7b599545fa4e6c05d259670dbd00349be352fef8b690660f1bbb0c5b3b481",
+      "finished_at": "2026-10-29T18:25:11.297Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261007130000_exclusive_upload_adoption",
+      "checksum": "6842d1028b6aadac98fcd4a1f081b8e7dcf752913edcfbf34f6a436d0aa0f451",
+      "finished_at": "2026-10-29T18:25:11.326Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261007130100_backfill_upload_adoption_state",
+      "checksum": "076017f1538827f2d906d8cfc4dcfbcd799f1103e194f28c2cc0bdff77329249",
+      "finished_at": "2026-10-29T18:25:11.332Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261011130000_correct_lugong_liugong_models",
+      "checksum": "2fb2cbdcce9c65e385c4ff539c1d822d8181fad75651df8284f24c285373e74b",
+      "finished_at": "2026-10-29T18:25:11.336Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261011140000_add_listing_media_thumb_hash",
+      "checksum": "b364a381237d9eeca4e29480443510304b4117118366249cad9bf7fa9c0a352d",
+      "finished_at": "2026-10-29T18:25:11.340Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261011150000_expand_conditional_media_manifest",
+      "checksum": "31c4af84bf9be9353c930e399366428b79266988043342ef61680ea6af584490",
+      "finished_at": "2026-10-29T18:25:11.345Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261014120000_restore_relisted_listings_published_at",
+      "checksum": "327290525e35afc76031dd46e820400478060d08dd9780202683b91b6bbcf718",
+      "finished_at": "2026-10-29T18:25:11.348Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015003500_listing_view_counts",
+      "checksum": "bdb25bde750cd12de85ca3a4bf4201ac927681539f1b1b70105a633f4dc26d5d",
+      "finished_at": "2026-10-29T18:25:11.358Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015010000_staff_capabilities",
+      "checksum": "88f7b84d80a31ee2918ea4a8e2ce9c578f8de766ca2d1317fe1f2713d6fd0c43",
+      "finished_at": "2026-10-29T18:25:11.363Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015020000_business_membership",
+      "checksum": "7a60b7b21b212c9bf38a14522eb937eb9762044039d05e6e16b7e76d1093c00a",
+      "finished_at": "2026-10-29T18:25:11.374Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015030000_business_inventory",
+      "checksum": "49143ea7a21fe5c6031a966794aedba44d69e3a3f9d6b6195dfbe57915ee93e8",
+      "finished_at": "2026-10-29T18:25:11.383Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015040000_first_party_measurement",
+      "checksum": "5da46ac7211e658eb1b1e96374c8be796ffad03c5ecb789a7692c4fc0dca384c",
+      "finished_at": "2026-10-29T18:25:11.413Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015050000_service_foundations",
+      "checksum": "66c9eec07c4c715624d42c30a00202a0727cb36b05f5ca850fed38a9901f9c9a",
+      "finished_at": "2026-10-29T18:25:11.479Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015060000_business_enquiries",
+      "checksum": "4d491f64ae7601fce337591a4fed5e14fc717fe5c1234aa83e4b3b2f1e5c36d8",
+      "finished_at": "2026-10-29T18:25:11.490Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015070000_diagnostic_intake",
+      "checksum": "9f5ce216f2dd4cbbcb75c9ce78d058244f5262170e51815c111c66563b32ebc6",
+      "finished_at": "2026-10-29T18:25:11.533Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015080000_service_push_subscriptions",
+      "checksum": "e2b04ea8e7f1c33924261fb2fcc0669c1c99dcfe628b8b0e8f0c7007ee47cf3b",
+      "finished_at": "2026-10-29T18:25:11.546Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015120000_listing_video_foundation",
+      "checksum": "8b1b907dbeb942c840330ca3a8f3ef9264ec0008c393f3d51d7961bd7305687b",
+      "finished_at": "2026-10-29T18:25:11.564Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015130000_support_operations",
+      "checksum": "57389de2321c518efe4f1a96adf7ae5bbf7df6b7224ff97c6a854f2708c88163",
+      "finished_at": "2026-10-29T18:25:11.568Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015140000_video_playback_authority",
+      "checksum": "019b9ea21c459d9e4e5df313f97957eba80a043ada053d8bd80fd13515b86eae",
+      "finished_at": "2026-10-29T18:25:11.575Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015150000_history_orders",
+      "checksum": "1eb35867354f2d8fcf9d15fdff2ce584eeeb4cdb252e4a5d47ce6c2a298a19b2",
+      "finished_at": "2026-10-29T18:25:11.616Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015160000_showroom_public_fields",
+      "checksum": "2d38d6d7960fc66078dcf46444ffbbd85b6deedb9f51145e21304d7dff52c02b",
+      "finished_at": "2026-10-29T18:25:11.619Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015170000_video_processing_fences",
+      "checksum": "ff8a5579df352a389385aeb47f78caed985301995c569c3a5b21db2e022f779b",
+      "finished_at": "2026-10-29T18:25:11.658Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015180000_history_delivery",
+      "checksum": "2d08ccc88142214fe0f22c29a1dd5ecf84239bc730f6076cab2e1104e724248d",
+      "finished_at": "2026-10-29T18:25:11.682Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015190000_diagnostic_reports",
+      "checksum": "4be9efc71ddd57f2b6b32efef199576d81d432d193580d8db41dcc44155ff3fd",
+      "finished_at": "2026-10-29T18:25:11.708Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015200000_measurement_insights",
+      "checksum": "dd412d0bc61628e4333dfb9b607b022f23742c17c9c59529acea91d9e3f325e0",
+      "finished_at": "2026-10-29T18:25:11.734Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015210000_history_recovery_offers",
+      "checksum": "8da84698db0e7f080a865daf5fceda3a43892e5454f86981855d597b678094e2",
+      "finished_at": "2026-10-29T18:25:11.738Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015220000_diagnostic_evidence_leases",
+      "checksum": "497b8aab18f382eefd0d68f7be0f7ad8622b1c9975e31488ec324811b5b1f61a",
+      "finished_at": "2026-10-29T18:25:11.741Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015230000_video_claim_target",
+      "checksum": "39d9c56041a02cf6d74f3a967adc37c37dbbc05f4a5487876a9abf4fbb5647d8",
+      "finished_at": "2026-10-29T18:25:11.746Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015240000_history_source_facts",
+      "checksum": "593a00d00ee4f0c686c05e07cbdeae60996b50252e0d350b341ad502c7bde8bd",
+      "finished_at": "2026-10-29T18:25:11.752Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015250000_video_source_manifest",
+      "checksum": "da45934af2bd21968d582661738ee13a1394320d442e0847abc53db01c01194d",
+      "finished_at": "2026-10-29T18:25:11.756Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015260000_video_write_protocol",
+      "checksum": "8c79eec4d6e7b465a6599f9d9e2224a327c3715cc8d95179c4c69ff9341c7708",
+      "finished_at": "2026-10-29T18:25:11.759Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015270000_history_mileage_not_null",
+      "checksum": "1081bd33f8c08b353ce4c0fa163ecf17d97eaee1d1a1ac7871c5e9f3d23add92",
+      "finished_at": "2026-10-29T18:25:11.762Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015280000_diagnostic_association_invalidation",
+      "checksum": "565854648750b86cceff78a86cff7693c9210510a3835b26f195928ed765baee",
+      "finished_at": "2026-10-29T18:25:11.765Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261015290000_conversation_measurement_cohorts",
+      "checksum": "350160257c66c5fb3a3dcd7b3681ceeefec89f35748de452a9599ee955675540",
+      "finished_at": "2026-10-29T18:25:11.768Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261021100000_diagnostic_reinspection_lineage",
+      "checksum": "d0f4aa1d73192bfffe468458f977c853483d8e2a43efca29e7a8f6aa83dc37d2",
+      "finished_at": "2026-10-29T18:25:11.775Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261021110000_diagnostic_identity_records",
+      "checksum": "b5919c3d4d5fd9f52a14c8a4f973fe7caa3e3e4c6611ff08e188579397ad1d70",
+      "finished_at": "2026-10-29T18:25:11.789Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261021120000_diagnostic_report_identity_pin",
+      "checksum": "1d299c923af088efc1b49d9e2b8124bef6c4a0476fc300ed78ab8e63d4a1e83c",
+      "finished_at": "2026-10-29T18:25:11.797Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261021130000_diagnostic_identity_evidence",
+      "checksum": "5351553647b355dc59eadf25a02e84aa7916e1b33da2117b00e40f47d49ecb82",
+      "finished_at": "2026-10-29T18:25:11.841Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261021140000_diagnostic_continuity_proofs",
+      "checksum": "77c6cab3b6731e9203556bcfa78a4ff2661d3a71db597a7b3c6150db925e5cb0",
+      "finished_at": "2026-10-29T18:25:11.861Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261021150000_diagnostic_continuity_proof_consumption",
+      "checksum": "f25d566779839d76749f9320ba102d6e282fbba365468c68e0d49eeed460a222",
+      "finished_at": "2026-10-29T18:25:11.875Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261021160000_diagnostic_automatic_vin_proof",
+      "checksum": "83176fd55e353ef02de460a42dd41471c3f07120c228a6df80ff71f829502acd",
+      "finished_at": "2026-10-29T18:25:11.878Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261022180000_diagnostic_public_continuity",
+      "checksum": "32fe0a8cb64aaaf187390b5c6a2fa72fe6a260547602ffdf572959409ea68a3f",
+      "finished_at": "2026-10-29T18:25:11.887Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261023090000_diagnostic_ownership_components",
+      "checksum": "f43b2c04ef6ed9f447acfc0e5ebf326a577b3cd1d96539439c43f05f537cad01",
+      "finished_at": "2026-10-29T18:25:11.905Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261023100000_diagnostic_ownership_disposal_same_graph",
+      "checksum": "cdb43cc361fd783c1e6d66d5eccef118861ef3e9ac4a75b233fc8b527b8ec547",
+      "finished_at": "2026-10-29T18:25:11.909Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261023110000_diagnostic_continuity_requests",
+      "checksum": "83188077748f02bf96d74d9588805f173129199333a8d4e9c160547e38fb52a2",
+      "finished_at": "2026-10-29T18:25:11.933Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261023120000_diagnostic_ownership_grants",
+      "checksum": "3696e93cfc56f13a95d8e38fd72e3e985d43105ce17ffdf7d5f7ce273efac3df",
+      "finished_at": "2026-10-29T18:25:11.955Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261023130000_diagnostic_source_kernel",
+      "checksum": "b9b2d465c04cc34693e5774d12910a33bb29b39d8452f5a2862dc24b667f4fbf",
+      "finished_at": "2026-10-29T18:25:11.982Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024010000_diagnostic_source_guard_repair",
+      "checksum": "786aa19839002c915cf00038f888c85e0b27a4d20b0905a1aac4edf5db5a1be3",
+      "finished_at": "2026-10-29T18:25:12.006Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024020000_campaign_preparation",
+      "checksum": "cceb9c0d75c8d1f3a9302548d7791ac752635c3775e7b5ca3ec3c516b7db9429",
+      "finished_at": "2026-10-29T18:25:12.023Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024030000_diagnostic_purge_effects",
+      "checksum": "23d894c79c5927d7d976c79e4cbe958af83725ccf172208b7f4d6132e0d3d4ba",
+      "finished_at": "2026-10-29T18:25:12.036Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024040000_diagnostic_intake_effects",
+      "checksum": "9d9155637143e152ac63baf255d074fe768ff0c4bcb4ec041dd75b32404903a5",
+      "finished_at": "2026-10-29T18:25:12.041Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024050000_diagnostic_kernel_invariants",
+      "checksum": "6fdb70cd2364b0125080293a1602f78788c1db450d82859613c04b0020b732f8",
+      "finished_at": "2026-10-29T18:25:12.047Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024060000_diagnostic_source_correction",
+      "checksum": "55fa19d86c4f30d6c6abab96985dfbfb7bc30b0e6d928da1f63ba8fdbd13b7f6",
+      "finished_at": "2026-10-29T18:25:12.052Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024070000_diagnostic_user_eligibility",
+      "checksum": "f5fabb22e4e6e5a2dace529e5bcb4de5e56a6daf18ebbff02351e9407430893e",
+      "finished_at": "2026-10-29T18:25:12.057Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024080000_diagnostic_moderation_complete_effects",
+      "checksum": "a82144b10637924c522188c2511fab6f906ee7ecc803875189155c3e8289e6c0",
+      "finished_at": "2026-10-29T18:25:12.062Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024090000_diagnostic_message_enquiry_fences",
+      "checksum": "19316d8fbab4d425af191477a997c49d0e518332b89dc9a39779c9a21d72995c",
+      "finished_at": "2026-10-29T18:25:12.068Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024100000_diagnostic_signin_intake_object_owners",
+      "checksum": "802bc18c5b98074046422b4e99b6e46877395166afe7f25fa80d37e53416fda6",
+      "finished_at": "2026-10-29T18:25:12.071Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024110000_diagnostic_user_insert_fence",
+      "checksum": "bad49d6a7a1329f7a5d7e63b4780a1edd53bb466693ab9605920b54641f3f271",
+      "finished_at": "2026-10-29T18:25:12.074Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024120000_diagnostic_account_noop_enquiry",
+      "checksum": "aa41c4e37f8bb267f10bf3d55e70abd0e3d4b87ce8260ba6e882bd8635959d0f",
+      "finished_at": "2026-10-29T18:25:12.077Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261024130000_diagnostic_intake_campaign_composition",
+      "checksum": "974217c5ec0f68426429e2a37120b0e9b419817dbea16ffd5cb8362ca3e118ed",
+      "finished_at": "2026-10-29T18:25:12.080Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261025010000_diagnostic_report_source_effects",
+      "checksum": "a21407fdf8025b6672656cb678ff34bbd3e05c97594c95e971fb801e66811fb9",
+      "finished_at": "2026-10-29T18:25:12.083Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261025015000_diagnostic_runtime_transport_corrections",
+      "checksum": "520c94deedd51c039f82b396b6bf08acd551838bc37698ca0a345aa92a165424",
+      "finished_at": "2026-10-29T18:25:12.089Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261025017500_diagnostic_effect_scope_alias_correction",
+      "checksum": "1fd74d6824c2e7ba47cf311d455c38ce51cbab074a7b16c53cc5b4fb3fbf328f",
+      "finished_at": "2026-10-29T18:25:12.093Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261025019000_diagnostic_user_insert_error_transport",
+      "checksum": "a6b7b46c95fd74f8e6f7b962bcb899b2575df7ec1db1f26962bc5853305d0e74",
+      "finished_at": "2026-10-29T18:25:12.096Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261025020000_diagnostic_listing_publication_effects",
+      "checksum": "6923b8e4869928d942d909d305a3ef7eebfe166ea82628f313baf665759d0d39",
+      "finished_at": "2026-10-29T18:25:12.102Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026010000_diagnostic_automatic_public_continuity",
+      "checksum": "886f521df508f121e306d3b3d27591845fd57484beac666482c330576c50844e",
+      "finished_at": "2026-10-29T18:25:12.106Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026011000_diagnostic_bootstrap_capability_qualification",
+      "checksum": "d7265b92ba944af1a62055a6ffd6ce9316f1203b75384929a89c3da86f8ccc3d",
+      "finished_at": "2026-10-29T18:25:12.109Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026012000_diagnostic_disposal_selector_precedence",
+      "checksum": "ac9e5b810a7cc7fd2d8ff6e8f4bc60b76d48368e0e7330ce766a449586e6aaef",
+      "finished_at": "2026-10-29T18:25:12.111Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026013000_diagnostic_purge_audit_details_precedence",
+      "checksum": "a4473bed2ff325a5b7a1a1c58220d5ef754592373545bc99d508606e4869442d",
+      "finished_at": "2026-10-29T18:25:12.117Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026014000_diagnostic_source_registry_evaluation",
+      "checksum": "6d3ea989e90a1169fa7f5b46cecfc6e4d1e0a23e8fde774916e54bb1d2592756",
+      "finished_at": "2026-10-29T18:25:12.125Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026015000_diagnostic_component_expiry_representation",
+      "checksum": "e0b3068681544bb5e48d016047e8a7e4304b3a737fb9c6e17ef547897c90e6cf",
+      "finished_at": "2026-10-29T18:25:12.129Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026016000_diagnostic_provenance_invalidation_parity",
+      "checksum": "87dd1162b90c334137859cbaf4afd61af068f50602a4ec438d041b22364e95b1",
+      "finished_at": "2026-10-29T18:25:12.132Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026016200_diagnostic_maintenance_compatibility",
+      "checksum": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379",
+      "finished_at": "2026-10-29T18:25:12.142Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026016300_diagnostic_registry_metadata_lookup",
+      "checksum": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7",
+      "finished_at": "2026-10-29T18:25:12.156Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261026016400_diagnostic_source_key_predicate",
+      "checksum": "fe7358f92acaeae0b57a442cf8e7b4aa28b56ee03aa6177fd7fb271a93bafdb6",
+      "finished_at": "2026-10-29T18:25:12.171Z",
+      "rolled_back_at": null
+    },
+    {
+      "migration_name": "20261029190000_operational_reset_row_admission",
+      "checksum": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd",
+      "finished_at": "2026-10-29T18:25:12.193Z",
+      "rolled_back_at": null
+    }
+  ],
+  "roles": [
+    {
+      "rolname": "auto_tm_ci",
+      "rolsuper": true,
+      "rolcreatedb": true,
+      "rolcreaterole": true,
+      "rolreplication": true,
+      "rolbypassrls": true
+    }
+  ],
+  "triggers": [
+    {
+      "relname": "audit_logs",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.audit_logs FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "audit_logs",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.audit_logs FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "audit_logs",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.audit_logs FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "audit_logs",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.audit_logs FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "audit_logs",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.audit_logs FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "blocked_users",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.blocked_users FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "blocked_users",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.blocked_users FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "blocked_users",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.blocked_users FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "blocked_users",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.blocked_users FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "business_enquiry_audits",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.business_enquiry_audits FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "business_enquiry_audits",
+      "tgname": "zz_diagnostic_source_enquiry_effect",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_enquiry_effect_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_enquiry_effect BEFORE INSERT OR DELETE OR UPDATE ON public.business_enquiry_audits FOR EACH ROW EXECUTE FUNCTION diagnostic_enquiry_effect_guard()"
+    },
+    {
+      "relname": "business_enquiry_audits",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.business_enquiry_audits FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "business_enquiry_audits",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.business_enquiry_audits FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "business_enquiry_audits",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.business_enquiry_audits FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "campaign_preparations",
+      "tgname": "campaign_preparation_immutable",
+      "tgenabled": "O",
+      "tgfoid": "campaign_preparation_immutable()",
+      "definition": "CREATE TRIGGER campaign_preparation_immutable BEFORE DELETE OR UPDATE ON public.campaign_preparations FOR EACH ROW EXECUTE FUNCTION campaign_preparation_immutable()"
+    },
+    {
+      "relname": "campaign_preparations",
+      "tgname": "campaign_preparation_insert",
+      "tgenabled": "O",
+      "tgfoid": "campaign_preparation_insert()",
+      "definition": "CREATE TRIGGER campaign_preparation_insert BEFORE INSERT ON public.campaign_preparations FOR EACH ROW EXECUTE FUNCTION campaign_preparation_insert()"
+    },
+    {
+      "relname": "campaign_preparations",
+      "tgname": "campaign_preparation_must_finish",
+      "tgenabled": "O",
+      "tgfoid": "campaign_preparation_must_finish()",
+      "definition": "CREATE CONSTRAINT TRIGGER campaign_preparation_must_finish AFTER INSERT ON public.campaign_preparations DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION campaign_preparation_must_finish()"
+    },
+    {
+      "relname": "campaign_preparations",
+      "tgname": "campaign_preparation_no_truncate",
+      "tgenabled": "O",
+      "tgfoid": "campaign_preparation_immutable()",
+      "definition": "CREATE TRIGGER campaign_preparation_no_truncate BEFORE TRUNCATE ON public.campaign_preparations FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_immutable()"
+    },
+    {
+      "relname": "content_reports",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.content_reports FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "content_reports",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.content_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "content_reports",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.content_reports FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "content_reports",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.content_reports FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "conversation_participants",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.conversation_participants FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "conversation_participants",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.conversation_participants FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "conversation_participants",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.conversation_participants FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "conversation_participants",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.conversation_participants FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "conversations",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.conversations FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "conversations",
+      "tgname": "zz_diagnostic_source_assignment_fence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_enquiry_assignment_fence()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_assignment_fence BEFORE INSERT OR UPDATE OF \"assigneeId\", \"businessId\" ON public.conversations FOR EACH ROW EXECUTE FUNCTION diagnostic_enquiry_assignment_fence()"
+    },
+    {
+      "relname": "conversations",
+      "tgname": "zz_diagnostic_source_enquiry_effect",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_enquiry_effect_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_enquiry_effect BEFORE INSERT OR DELETE OR UPDATE ON public.conversations FOR EACH ROW EXECUTE FUNCTION diagnostic_enquiry_effect_guard()"
+    },
+    {
+      "relname": "conversations",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.conversations FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "conversations",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.conversations FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "conversations",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.conversations FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "dealership_invitations",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.dealership_invitations FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "dealership_invitations",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.dealership_invitations FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "dealership_invitations",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.dealership_invitations FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "dealership_invitations",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.dealership_invitations FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "business_enquiry_membership_revocation",
+      "tgenabled": "O",
+      "tgfoid": "requeue_departed_business_enquiries()",
+      "definition": "CREATE TRIGGER business_enquiry_membership_revocation AFTER DELETE OR UPDATE OF status ON public.dealership_members FOR EACH ROW EXECUTE FUNCTION requeue_departed_business_enquiries()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "diagnostic_public_continuity_member_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_public_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_public_continuity_member_changed AFTER INSERT OR DELETE OR UPDATE OF \"userId\", \"dealershipId\", role, status ON public.dealership_members FOR EACH ROW EXECUTE FUNCTION diagnostic_public_continuity_source_changed()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "diagnostic_source_member_transition",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_transition()",
+      "definition": "CREATE TRIGGER diagnostic_source_member_transition AFTER INSERT OR DELETE OR UPDATE ON public.dealership_members FOR EACH ROW EXECUTE FUNCTION diagnostic_source_transition()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.dealership_members FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.dealership_members FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"userId\", \"dealershipId\", role, status ON public.dealership_members FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"userId\", \"dealershipId\", role, status ON public.dealership_members FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.dealership_members FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "dealership_members",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.dealership_members FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "dealerships",
+      "tgname": "diagnostic_public_continuity_business_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_public_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_public_continuity_business_changed AFTER DELETE OR UPDATE OF status ON public.dealerships FOR EACH ROW EXECUTE FUNCTION diagnostic_public_continuity_source_changed()"
+    },
+    {
+      "relname": "dealerships",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.dealerships FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "dealerships",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.dealerships FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "dealerships",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE DELETE OR UPDATE OF id, status, \"admissionMode\", \"admittedAt\" ON public.dealerships FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "dealerships",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, status, \"admissionMode\", \"admittedAt\" ON public.dealerships FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "dealerships",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.dealerships FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "dealerships",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.dealerships FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "diagnostic_audits",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_audits FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_audits",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_audits FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_audits",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"centerId\", \"orderId\", \"actorId\", action, details, \"createdAt\" ON public.diagnostic_audits FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_audits",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"centerId\", \"orderId\", \"actorId\", action, details, \"createdAt\" ON public.diagnostic_audits FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_audits",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_audits FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "diagnostic_audits",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.diagnostic_audits FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "diagnostic_center_assignments",
+      "tgname": "diagnostic_continuity_qualification_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_qualification_changed AFTER INSERT OR DELETE OR UPDATE ON public.diagnostic_center_assignments FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "diagnostic_center_assignments",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_center_assignments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_center_assignments",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_center_assignments FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_center_assignments",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"centerId\", \"userId\", capability, \"qualifiedUntil\", \"assignedAt\", \"revokedAt\" ON public.diagnostic_center_assignments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_center_assignments",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"centerId\", \"userId\", capability, \"qualifiedUntil\", \"assignedAt\", \"revokedAt\" ON public.diagnostic_center_assignments FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_center_assignments",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_center_assignments FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "diagnostic_center_assignments",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.diagnostic_center_assignments FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "diagnostic_centers",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_centers FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_centers",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_centers FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_centers",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, code, \"planCode\", names, \"operationalApproval\", \"createdAt\" ON public.diagnostic_centers FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_centers",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, code, \"planCode\", names, \"operationalApproval\", \"createdAt\" ON public.diagnostic_centers FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_centers",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_centers FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "diagnostic_centers",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.diagnostic_centers FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "diagnostic_continuity_proof_guard",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_proof_guard()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_proof_guard BEFORE INSERT OR UPDATE ON public.diagnostic_continuity_proofs FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_proof_guard()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "diagnostic_issued_request_binding",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_issued_request_binding()",
+      "definition": "CREATE TRIGGER diagnostic_issued_request_binding BEFORE INSERT ON public.diagnostic_continuity_proofs FOR EACH ROW EXECUTE FUNCTION diagnostic_issued_request_binding()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "diagnostic_public_continuity_atomic",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_public_continuity_atomic()",
+      "definition": "CREATE CONSTRAINT TRIGGER diagnostic_public_continuity_atomic AFTER INSERT OR UPDATE ON public.diagnostic_continuity_proofs DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION diagnostic_public_continuity_atomic()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "diagnostic_request_proof_deleted",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_request_record_deleted()",
+      "definition": "CREATE TRIGGER diagnostic_request_proof_deleted AFTER DELETE ON public.diagnostic_continuity_proofs FOR EACH ROW EXECUTE FUNCTION diagnostic_request_record_deleted()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_continuity_proofs FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_continuity_proofs FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF \"requestId\", id, \"predecessorReportId\", \"candidateOrderId\", \"predecessorOrderId\", \"issuerId\", \"issuerSessionId\", \"linkingTechnicianId\", content, bindings, \"rightsUntil\", \"issuedAt\", \"invalidatedAt\", \"consumedReportId\", \"consumedAt\", \"erasedAt\" ON public.diagnostic_continuity_proofs FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_continuity_proofs",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF \"requestId\", id, \"predecessorReportId\", \"candidateOrderId\", \"predecessorOrderId\", \"issuerId\", \"issuerSessionId\", \"linkingTechnicianId\", content, bindings, \"rightsUntil\", \"issuedAt\", \"invalidatedAt\", \"consumedReportId\", \"consumedAt\", \"erasedAt\" ON public.diagnostic_continuity_proofs FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_continuity_requests",
+      "tgname": "diagnostic_request_immutable",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_request_immutable()",
+      "definition": "CREATE TRIGGER diagnostic_request_immutable BEFORE INSERT OR UPDATE ON public.diagnostic_continuity_requests FOR EACH ROW EXECUTE FUNCTION diagnostic_request_immutable()"
+    },
+    {
+      "relname": "diagnostic_continuity_requests",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_continuity_requests FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_continuity_requests",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_continuity_requests FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_continuity_requests",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"createdAt\", \"actorId\", \"sessionId\", \"orderId\", kind ON public.diagnostic_continuity_requests FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_continuity_requests",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"createdAt\", \"actorId\", \"sessionId\", \"orderId\", kind ON public.diagnostic_continuity_requests FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_evidence",
+      "tgname": "diagnostic_evidence_identity",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_evidence_identity()",
+      "definition": "CREATE TRIGGER diagnostic_evidence_identity BEFORE UPDATE ON public.diagnostic_evidence FOR EACH ROW EXECUTE FUNCTION diagnostic_evidence_identity()"
+    },
+    {
+      "relname": "diagnostic_evidence",
+      "tgname": "diagnostic_evidence_owner_disjoint",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_object_owner_disjoint()",
+      "definition": "CREATE TRIGGER diagnostic_evidence_owner_disjoint BEFORE INSERT ON public.diagnostic_evidence FOR EACH ROW EXECUTE FUNCTION diagnostic_object_owner_disjoint()"
+    },
+    {
+      "relname": "diagnostic_evidence",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_evidence FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_evidence",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_evidence FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_evidence",
+      "tgname": "diagnostic_continuity_evidence_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_evidence_changed AFTER INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_evidence FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "diagnostic_identity_evidence",
+      "tgname": "diagnostic_identity_evidence_guard",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_identity_evidence_guard()",
+      "definition": "CREATE TRIGGER diagnostic_identity_evidence_guard BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_evidence FOR EACH ROW EXECUTE FUNCTION diagnostic_identity_evidence_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_evidence",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_identity_evidence FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_identity_evidence",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_evidence FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_evidence",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"orderId\", \"orderVersion\", \"identityRecordId\", \"observationHash\", identifiers, provenance, rights, \"rightsUntil\", \"supersedesId\", explanation, \"recordHash\", \"recordedById\", \"recordedAt\", \"erasedAt\" ON public.diagnostic_identity_evidence FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_evidence",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"orderId\", \"orderVersion\", \"identityRecordId\", \"observationHash\", identifiers, provenance, rights, \"rightsUntil\", \"supersedesId\", explanation, \"recordHash\", \"recordedById\", \"recordedAt\", \"erasedAt\" ON public.diagnostic_identity_evidence FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_identity_provenance",
+      "tgname": "diagnostic_continuity_provenance_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_provenance_changed AFTER DELETE OR UPDATE ON public.diagnostic_identity_provenance FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "diagnostic_identity_provenance",
+      "tgname": "diagnostic_identity_provenance_guard",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_identity_provenance_guard()",
+      "definition": "CREATE TRIGGER diagnostic_identity_provenance_guard BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_provenance FOR EACH ROW EXECUTE FUNCTION diagnostic_identity_provenance_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_provenance",
+      "tgname": "diagnostic_identity_provenance_owner_disjoint",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_object_owner_disjoint()",
+      "definition": "CREATE TRIGGER diagnostic_identity_provenance_owner_disjoint BEFORE INSERT ON public.diagnostic_identity_provenance FOR EACH ROW EXECUTE FUNCTION diagnostic_object_owner_disjoint()"
+    },
+    {
+      "relname": "diagnostic_identity_provenance",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_identity_provenance FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_identity_provenance",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_provenance FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_provenance",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"orderId\", \"contentType\", \"declaredSizeBytes\", rights, \"rightsUntil\", \"objectKey\", sha256, \"sizeBytes\", mime, state, epoch, \"createdById\", \"createdAt\", \"verifiedAt\", \"cleanupRequestedAt\", \"cleanupCompletedAt\", \"erasedAt\" ON public.diagnostic_identity_provenance FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_provenance",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"orderId\", \"contentType\", \"declaredSizeBytes\", rights, \"rightsUntil\", \"objectKey\", sha256, \"sizeBytes\", mime, state, epoch, \"createdById\", \"createdAt\", \"verifiedAt\", \"cleanupRequestedAt\", \"cleanupCompletedAt\", \"erasedAt\" ON public.diagnostic_identity_provenance FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "diagnostic_continuity_raw_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_raw_changed AFTER INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_records FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "diagnostic_identity_record_immutable",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_identity_record_immutable()",
+      "definition": "CREATE TRIGGER diagnostic_identity_record_immutable BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_records FOR EACH ROW EXECUTE FUNCTION diagnostic_identity_record_immutable()"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "diagnostic_ownership_raw_transaction",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_ownership_raw_transaction()",
+      "definition": "CREATE TRIGGER diagnostic_ownership_raw_transaction BEFORE INSERT OR UPDATE ON public.diagnostic_identity_records FOR EACH ROW EXECUTE FUNCTION diagnostic_ownership_raw_transaction()"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_identity_records FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "diagnostic_source_raw_erased",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_transition()",
+      "definition": "CREATE TRIGGER diagnostic_source_raw_erased AFTER DELETE OR UPDATE ON public.diagnostic_identity_records FOR EACH ROW EXECUTE FUNCTION diagnostic_source_transition()"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_identity_records FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"orderId\", \"orderVersion\", observation, \"observationHash\", \"recordedById\", \"recordedAt\", \"erasedAt\" ON public.diagnostic_identity_records FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_identity_records",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"orderId\", \"orderVersion\", observation, \"observationHash\", \"recordedById\", \"recordedAt\", \"erasedAt\" ON public.diagnostic_identity_records FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_order_assignments",
+      "tgname": "diagnostic_continuity_assignment_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_assignment_changed AFTER INSERT OR DELETE OR UPDATE ON public.diagnostic_order_assignments FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "diagnostic_order_assignments",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_order_assignments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_order_assignments",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_order_assignments FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_order_assignments",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"orderId\", \"userId\", capability, \"assignedAt\", \"revokedAt\" ON public.diagnostic_order_assignments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_order_assignments",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"orderId\", \"userId\", capability, \"assignedAt\", \"revokedAt\" ON public.diagnostic_order_assignments FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_order_assignments",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_order_assignments FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "diagnostic_order_assignments",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.diagnostic_order_assignments FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "diagnostic_ownership_components",
+      "tgname": "diagnostic_ownership_component_grant_guard",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_ownership_component_grant_guard()",
+      "definition": "CREATE TRIGGER diagnostic_ownership_component_grant_guard BEFORE INSERT OR UPDATE ON public.diagnostic_ownership_components FOR EACH ROW EXECUTE FUNCTION diagnostic_ownership_component_grant_guard()"
+    },
+    {
+      "relname": "diagnostic_ownership_components",
+      "tgname": "diagnostic_ownership_guard",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_ownership_guard()",
+      "definition": "CREATE TRIGGER diagnostic_ownership_guard BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_ownership_components FOR EACH ROW EXECUTE FUNCTION diagnostic_ownership_guard()"
+    },
+    {
+      "relname": "diagnostic_ownership_components",
+      "tgname": "diagnostic_source_component_erased",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_transition()",
+      "definition": "CREATE TRIGGER diagnostic_source_component_erased AFTER UPDATE ON public.diagnostic_ownership_components FOR EACH ROW EXECUTE FUNCTION diagnostic_source_transition()"
+    },
+    {
+      "relname": "diagnostic_ownership_components",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_ownership_components FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_ownership_components",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_ownership_components FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_ownership_components",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF \"grantId\", \"identityRecordId\", \"orderId\", \"orderVersion\", state, scope, \"sourceListingId\", \"identityDigest\", \"sellerId\", \"commissionerId\", \"businessId\", \"membershipId\", rights, \"rightsUntil\", \"declaredById\", \"declaredAt\", \"erasedAt\" ON public.diagnostic_ownership_components FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_ownership_components",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF \"grantId\", \"identityRecordId\", \"orderId\", \"orderVersion\", state, scope, \"sourceListingId\", \"identityDigest\", \"sellerId\", \"commissionerId\", \"businessId\", \"membershipId\", rights, \"rightsUntil\", \"declaredById\", \"declaredAt\", \"erasedAt\" ON public.diagnostic_ownership_components FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_ownership_grants",
+      "tgname": "diagnostic_ownership_grant_guard",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_ownership_grant_guard()",
+      "definition": "CREATE TRIGGER diagnostic_ownership_grant_guard BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_ownership_grants FOR EACH ROW EXECUTE FUNCTION diagnostic_ownership_grant_guard()"
+    },
+    {
+      "relname": "diagnostic_ownership_grants",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_ownership_grants FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_ownership_grants",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_ownership_grants FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_ownership_grants",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"orderId\", state, \"listingId\", \"identityDigest\", \"sellerId\", \"commissionerId\", \"businessId\", \"membershipId\", \"grantorId\", \"grantorMembershipId\", \"sessionId\", rights, \"rightsUntil\", \"declaredAt\", \"erasedAt\" ON public.diagnostic_ownership_grants FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_ownership_grants",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"orderId\", state, \"listingId\", \"identityDigest\", \"sellerId\", \"commissionerId\", \"businessId\", \"membershipId\", \"grantorId\", \"grantorMembershipId\", \"sessionId\", rights, \"rightsUntil\", \"declaredAt\", \"erasedAt\" ON public.diagnostic_ownership_grants FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_pdf_artifacts",
+      "tgname": "diagnostic_pdf_snapshot",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_pdf_snapshot()",
+      "definition": "CREATE TRIGGER diagnostic_pdf_snapshot BEFORE INSERT OR UPDATE ON public.diagnostic_pdf_artifacts FOR EACH ROW EXECUTE FUNCTION diagnostic_pdf_snapshot()"
+    },
+    {
+      "relname": "diagnostic_pdf_artifacts",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_pdf_artifacts FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_pdf_artifacts",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_pdf_artifacts FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "diagnostic_consumed_request_binding",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_consumed_request_binding()",
+      "definition": "CREATE TRIGGER diagnostic_consumed_request_binding BEFORE INSERT OR UPDATE ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_consumed_request_binding()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "diagnostic_continuity_report_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_report_changed AFTER INSERT OR DELETE OR UPDATE ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "diagnostic_report_evidence_pin",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_report_evidence_pin()",
+      "definition": "CREATE TRIGGER diagnostic_report_evidence_pin BEFORE INSERT OR UPDATE ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_report_evidence_pin()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "diagnostic_report_identity_pin",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_report_identity_pin()",
+      "definition": "CREATE TRIGGER diagnostic_report_identity_pin BEFORE INSERT OR UPDATE ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_report_identity_pin()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "diagnostic_report_pinned",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_report_pinned()",
+      "definition": "CREATE TRIGGER diagnostic_report_pinned BEFORE INSERT OR UPDATE ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_report_pinned()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "diagnostic_request_report_deleted",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_request_record_deleted()",
+      "definition": "CREATE TRIGGER diagnostic_request_report_deleted AFTER DELETE ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_request_record_deleted()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_reports FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"orderId\", \"templateVersionId\", \"predecessorId\", reinspection, audience, status, version, state, snapshot, \"snapshotHash\", \"identityRecordId\", \"identityRecordHash\", \"identityEvidenceId\", \"identityEvidenceHash\", \"continuityRequestId\", \"continuityRequestSessionId\", \"continuityProofId\", \"reinspectionOrderVersion\", \"finalizedAt\", \"withdrawnAt\", \"withdrawalReason\", \"createdAt\", \"updatedAt\", \"erasedAt\" ON public.diagnostic_reports FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_reports",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"orderId\", \"templateVersionId\", \"predecessorId\", reinspection, audience, status, version, state, snapshot, \"snapshotHash\", \"identityRecordId\", \"identityRecordHash\", \"identityEvidenceId\", \"identityEvidenceHash\", \"continuityRequestId\", \"continuityRequestSessionId\", \"continuityProofId\", \"reinspectionOrderVersion\", \"finalizedAt\", \"withdrawnAt\", \"withdrawalReason\", \"createdAt\", \"updatedAt\", \"erasedAt\" ON public.diagnostic_reports FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_source_anchors",
+      "tgname": "diagnostic_source_anchor_guard",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_anchor_guard()",
+      "definition": "CREATE TRIGGER diagnostic_source_anchor_guard BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_source_anchors FOR EACH ROW EXECUTE FUNCTION diagnostic_source_anchor_guard()"
+    },
+    {
+      "relname": "diagnostic_source_anchors",
+      "tgname": "diagnostic_source_anchor_live",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_anchor_live()",
+      "definition": "CREATE CONSTRAINT TRIGGER diagnostic_source_anchor_live AFTER INSERT OR UPDATE ON public.diagnostic_source_anchors DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION diagnostic_source_anchor_live()"
+    },
+    {
+      "relname": "diagnostic_source_anchors",
+      "tgname": "diagnostic_source_anchor_no_truncate",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_anchor_no_truncate BEFORE TRUNCATE ON public.diagnostic_source_anchors FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_source_anchors",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_source_anchors FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "campaign_source_finished",
+      "tgenabled": "O",
+      "tgfoid": "campaign_source_finished()",
+      "definition": "CREATE TRIGGER campaign_source_finished AFTER DELETE ON public.diagnostic_source_commands FOR EACH ROW EXECUTE FUNCTION campaign_source_finished()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_intake_campaign_completion",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_intake_campaign_completion()",
+      "definition": "CREATE TRIGGER diagnostic_intake_campaign_completion BEFORE DELETE ON public.diagnostic_source_commands FOR EACH ROW EXECUTE FUNCTION diagnostic_intake_campaign_completion()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_intake_completion",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_intake_completion()",
+      "definition": "CREATE TRIGGER diagnostic_intake_completion BEFORE DELETE ON public.diagnostic_source_commands FOR EACH ROW EXECUTE FUNCTION diagnostic_intake_completion()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_purge_completion",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_purge_completion()",
+      "definition": "CREATE TRIGGER diagnostic_purge_completion BEFORE DELETE ON public.diagnostic_source_commands FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_completion()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_source_completion",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_completion()",
+      "definition": "CREATE TRIGGER diagnostic_source_completion BEFORE DELETE ON public.diagnostic_source_commands FOR EACH ROW EXECUTE FUNCTION diagnostic_source_completion()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_source_insert_receipt",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_insert_receipt()",
+      "definition": "CREATE TRIGGER diagnostic_source_insert_receipt BEFORE INSERT ON public.diagnostic_source_commands FOR EACH ROW EXECUTE FUNCTION diagnostic_source_insert_receipt()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_source_must_finish",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_must_finish()",
+      "definition": "CREATE CONSTRAINT TRIGGER diagnostic_source_must_finish AFTER INSERT ON public.diagnostic_source_commands DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION diagnostic_source_must_finish()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_source_receipt_no_truncate",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_receipt_no_truncate BEFORE TRUNCATE ON public.diagnostic_source_commands FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_source_commands",
+      "tgname": "diagnostic_source_receipt_no_update",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_receipt_no_update BEFORE UPDATE ON public.diagnostic_source_commands FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_template_versions",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.diagnostic_template_versions FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "diagnostic_template_versions",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_template_versions FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "diagnostic_template_versions",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"centerId\", version, definition, synthetic, \"publishedById\", \"publishedAt\" ON public.diagnostic_template_versions FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "diagnostic_template_versions",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"centerId\", version, definition, synthetic, \"publishedById\", \"publishedAt\" ON public.diagnostic_template_versions FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "diagnostic_template_versions",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.diagnostic_template_versions FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "diagnostic_template_versions",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.diagnostic_template_versions FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "favorites",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.favorites FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "favorites",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.favorites FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "favorites",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.favorites FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "favorites",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.favorites FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "fcm_devices",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.fcm_devices FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "fcm_devices",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.fcm_devices FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_artifact_cleanup",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_artifact_cleanup FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_artifact_cleanup",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_artifact_cleanup FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_artifacts",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_artifacts FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_artifacts",
+      "tgname": "history_artifact_original_immutable",
+      "tgenabled": "O",
+      "tgfoid": "history_artifact_original_immutable()",
+      "definition": "CREATE TRIGGER history_artifact_original_immutable BEFORE UPDATE ON public.history_artifacts FOR EACH ROW EXECUTE FUNCTION history_artifact_original_immutable()"
+    },
+    {
+      "relname": "history_artifacts",
+      "tgname": "history_artifact_source_facts_immutable",
+      "tgenabled": "O",
+      "tgfoid": "history_artifact_source_facts_immutable()",
+      "definition": "CREATE TRIGGER history_artifact_source_facts_immutable BEFORE UPDATE ON public.history_artifacts FOR EACH ROW EXECUTE FUNCTION history_artifact_source_facts_immutable()"
+    },
+    {
+      "relname": "history_artifacts",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_artifacts FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_bookings",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_bookings FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_bookings",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_bookings FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_deliveries",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_deliveries FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_deliveries",
+      "tgname": "history_delivery_exact_order",
+      "tgenabled": "O",
+      "tgfoid": "history_delivery_exact_order()",
+      "definition": "CREATE TRIGGER history_delivery_exact_order BEFORE INSERT ON public.history_deliveries FOR EACH ROW EXECUTE FUNCTION history_delivery_exact_order()"
+    },
+    {
+      "relname": "history_deliveries",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_deliveries FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_orders",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_orders FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_orders",
+      "tgname": "history_order_identity_immutable",
+      "tgenabled": "O",
+      "tgfoid": "history_order_identity_immutable()",
+      "definition": "CREATE TRIGGER history_order_identity_immutable BEFORE UPDATE ON public.history_orders FOR EACH ROW EXECUTE FUNCTION history_order_identity_immutable()"
+    },
+    {
+      "relname": "history_orders",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_orders FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_payments",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_payments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_payments",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_payments FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_purchase_intents",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_purchase_intents FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_purchase_intents",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_purchase_intents FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_quotes",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_quotes FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_quotes",
+      "tgname": "history_quote_facts_immutable",
+      "tgenabled": "O",
+      "tgfoid": "history_quote_facts_immutable()",
+      "definition": "CREATE TRIGGER history_quote_facts_immutable BEFORE UPDATE ON public.history_quotes FOR EACH ROW EXECUTE FUNCTION history_quote_facts_immutable()"
+    },
+    {
+      "relname": "history_quotes",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_quotes FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "history_refunds",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.history_refunds FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "history_refunds",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.history_refunds FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "inspection_interests",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.inspection_interests FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "inspection_interests",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.inspection_interests FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "diagnostic_continuity_order_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_order_changed AFTER UPDATE ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "diagnostic_request_order_erased",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_request_order_erased()",
+      "definition": "CREATE TRIGGER diagnostic_request_order_erased AFTER UPDATE OF \"erasedAt\" ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION diagnostic_request_order_erased()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.inspection_orders FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "diagnostic_source_order_shell",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_order_shell()",
+      "definition": "CREATE TRIGGER diagnostic_source_order_shell AFTER INSERT ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION diagnostic_source_order_shell()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "diagnostic_source_order_transition",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_transition()",
+      "definition": "CREATE TRIGGER diagnostic_source_order_transition AFTER UPDATE ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION diagnostic_source_transition()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "inspection_order_identity_generation",
+      "tgenabled": "O",
+      "tgfoid": "inspection_order_identity_generation()",
+      "definition": "CREATE TRIGGER inspection_order_identity_generation BEFORE UPDATE OF \"identityEvidenceGeneration\" ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION inspection_order_identity_generation()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"centerId\", \"templateVersionId\", \"commissionerId\", \"requestKey\", audience, \"listingId\", status, version, epoch, \"physicalAuthorization\", \"publicationAuthorization\", \"observedVehicle\", \"listingIdentityDigest\", \"associationValidatedAt\", \"identityEvidenceGeneration\", synthetic, \"createdAt\", \"updatedAt\", \"erasedAt\" ON public.inspection_orders FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"centerId\", \"templateVersionId\", \"commissionerId\", \"requestKey\", audience, \"listingId\", status, version, epoch, \"physicalAuthorization\", \"publicationAuthorization\", \"observedVehicle\", \"listingIdentityDigest\", \"associationValidatedAt\", \"identityEvidenceGeneration\", synthetic, \"createdAt\", \"updatedAt\", \"erasedAt\" ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.inspection_orders FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "inspection_orders",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.inspection_orders FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "listing_drafts",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.listing_drafts FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "listing_drafts",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.listing_drafts FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "listing_drafts",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.listing_drafts FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "listing_drafts",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.listing_drafts FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "listing_drafts",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.listing_drafts FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "listing_media",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.listing_media FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "listing_media",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.listing_media FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "listing_media",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.listing_media FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "listing_media",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.listing_media FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "listing_media",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.listing_media FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "diagnostic_public_continuity_listing_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_public_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_public_continuity_listing_changed AFTER DELETE OR UPDATE OF \"sellerId\", \"businessId\", vin, \"brandId\", \"modelId\", year, status, \"deletedAt\" ON public.listings FOR EACH ROW EXECUTE FUNCTION diagnostic_public_continuity_source_changed()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "diagnostic_source_listing_transition",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_source_transition()",
+      "definition": "CREATE TRIGGER diagnostic_source_listing_transition AFTER DELETE OR UPDATE ON public.listings FOR EACH ROW EXECUTE FUNCTION diagnostic_source_transition()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.listings FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "invalidate_diagnostic_listing_association",
+      "tgenabled": "O",
+      "tgfoid": "invalidate_diagnostic_listing_association()",
+      "definition": "CREATE TRIGGER invalidate_diagnostic_listing_association AFTER UPDATE OF \"sellerId\", \"businessId\", \"brandId\", \"modelId\", year, vin ON public.listings FOR EACH ROW EXECUTE FUNCTION invalidate_diagnostic_listing_association()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.listings FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF id, \"sellerId\", \"businessId\", vin, \"brandId\", \"modelId\", year, \"deletedAt\", status, \"archivedByDeletion\" ON public.listings FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"sellerId\", \"businessId\", vin, \"brandId\", \"modelId\", year, \"deletedAt\", status, \"archivedByDeletion\" ON public.listings FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "listings",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.listings FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "listings",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.listings FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "measurement_investigation_exports",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.measurement_investigation_exports FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "measurement_investigation_exports",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_investigation_exports FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "measurement_outbox",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.measurement_outbox FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "measurement_outbox",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_outbox FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "measurement_outbox",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_outbox FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "measurement_principals",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.measurement_principals FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "measurement_principals",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_principals FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "measurement_records",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.measurement_records FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "measurement_records",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_records FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "measurement_rollups",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.measurement_rollups FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "measurement_rollups",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_rollups FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "measurement_state",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.measurement_state FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "measurement_state",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_state FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "measurement_visits",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.measurement_visits FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "measurement_visits",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.measurement_visits FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "media_upload_cleanups",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.media_upload_cleanups FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "media_upload_cleanups",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.media_upload_cleanups FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "media_upload_cleanups",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.media_upload_cleanups FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "media_uploads",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.media_uploads FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "media_uploads",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.media_uploads FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "media_uploads",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.media_uploads FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "media_uploads",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.media_uploads FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "media_uploads",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.media_uploads FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "messages",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.messages FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "messages",
+      "tgname": "zz_diagnostic_source_message_fence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_message_presence_fence()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_message_fence BEFORE INSERT OR UPDATE OF id ON public.messages FOR EACH ROW EXECUTE FUNCTION diagnostic_message_presence_fence()"
+    },
+    {
+      "relname": "messages",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "messages",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "messages",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.messages FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "notification_history",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.notification_history FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "notification_history",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.notification_history FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "notification_preferences",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.notification_preferences FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "notification_preferences",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.notification_preferences FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "notification_preferences",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.notification_preferences FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "notification_preferences",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.notification_preferences FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "otp_requests",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.otp_requests FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "otp_requests",
+      "tgname": "otp_requests_fill_compat_columns_trigger",
+      "tgenabled": "O",
+      "tgfoid": "otp_requests_fill_compat_columns()",
+      "definition": "CREATE TRIGGER otp_requests_fill_compat_columns_trigger BEFORE INSERT ON public.otp_requests FOR EACH ROW EXECUTE FUNCTION otp_requests_fill_compat_columns()"
+    },
+    {
+      "relname": "otp_requests",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.otp_requests FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "otp_requests",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.otp_requests FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "otp_requests",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.otp_requests FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "owned_vehicles",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.owned_vehicles FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "owned_vehicles",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.owned_vehicles FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "owned_vehicles",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.owned_vehicles FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "owned_vehicles",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.owned_vehicles FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "saved_searches",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.saved_searches FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "saved_searches",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.saved_searches FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_attachments",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_attachments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_attachments",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_attachments FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_audits",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_audits FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_audits",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_audits FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_audits",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.service_audits FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "service_audits",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.service_audits FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "service_conversations",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_conversations FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_conversations",
+      "tgname": "service_erasure_guard",
+      "tgenabled": "O",
+      "tgfoid": "service_erasure_epoch_guard()",
+      "definition": "CREATE TRIGGER service_erasure_guard BEFORE UPDATE ON public.service_conversations FOR EACH ROW EXECUTE FUNCTION service_erasure_epoch_guard()"
+    },
+    {
+      "relname": "service_conversations",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_conversations FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_conversations",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.service_conversations FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "service_conversations",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.service_conversations FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "service_erasure_fences",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_erasure_fences FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_erasure_fences",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_erasure_fences FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_erasure_fences",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.service_erasure_fences FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "service_erasure_fences",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.service_erasure_fences FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "service_messages",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_messages FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_messages",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_messages FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_messages",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.service_messages FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "service_messages",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.service_messages FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "service_outbox",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_outbox FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_outbox",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_outbox FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_outbox",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.service_outbox FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "service_outbox",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.service_outbox FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "service_push_subscriptions",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_push_subscriptions FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_push_subscriptions",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_push_subscriptions FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_read_states",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.service_read_states FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "service_read_states",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.service_read_states FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "service_read_states",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.service_read_states FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "service_read_states",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.service_read_states FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "sessions",
+      "tgname": "diagnostic_continuity_session_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_session_changed AFTER DELETE OR UPDATE OF \"userId\", \"expiresAt\", \"adminTotpExpiresAt\" ON public.sessions FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "sessions",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.sessions FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "sessions",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.sessions FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "sessions",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE DELETE OR UPDATE OF id, \"userId\", \"expiresAt\", \"adminTotpExpiresAt\" ON public.sessions FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "sessions",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"userId\", \"expiresAt\", \"adminTotpExpiresAt\" ON public.sessions FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "sessions",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.sessions FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "sessions",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.sessions FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "staff_grants",
+      "tgname": "diagnostic_continuity_grant_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_grant_changed AFTER INSERT OR DELETE OR UPDATE ON public.staff_grants FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "staff_grants",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.staff_grants FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "staff_grants",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.staff_grants FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "staff_grants",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE INSERT OR DELETE OR UPDATE OF \"userId\", capability, \"grantedAt\", \"revokedAt\" ON public.staff_grants FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "staff_grants",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF \"userId\", capability, \"grantedAt\", \"revokedAt\" ON public.staff_grants FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "staff_grants",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.staff_grants FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "staff_grants",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.staff_grants FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "support_cases",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.support_cases FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "support_cases",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.support_cases FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "support_cases",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.support_cases FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "support_cases",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.support_cases FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "totp_backup_codes",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.totp_backup_codes FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "totp_backup_codes",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.totp_backup_codes FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "totp_backup_codes",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE DELETE OR UPDATE OF id, \"totpEnrollmentId\", \"codeHash\", \"usedAt\" ON public.totp_backup_codes FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "totp_backup_codes",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"totpEnrollmentId\", \"codeHash\", \"usedAt\" ON public.totp_backup_codes FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "totp_backup_codes",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.totp_backup_codes FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "totp_backup_codes",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.totp_backup_codes FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "totp_enrollments",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.totp_enrollments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "totp_enrollments",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.totp_enrollments FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "totp_enrollments",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE DELETE OR UPDATE OF id, \"userId\", \"encryptedSecret\", \"verifiedAt\", \"createdAt\", \"updatedAt\" ON public.totp_enrollments FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "totp_enrollments",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, \"userId\", \"encryptedSecret\", \"verifiedAt\", \"createdAt\", \"updatedAt\" ON public.totp_enrollments FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "totp_enrollments",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.totp_enrollments FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "totp_enrollments",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.totp_enrollments FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "users",
+      "tgname": "business_enquiry_user_revocation",
+      "tgenabled": "O",
+      "tgfoid": "requeue_departed_business_enquiries()",
+      "definition": "CREATE TRIGGER business_enquiry_user_revocation AFTER UPDATE OF \"suspendedAt\", \"deletionScheduledAt\" ON public.users FOR EACH ROW EXECUTE FUNCTION requeue_departed_business_enquiries()"
+    },
+    {
+      "relname": "users",
+      "tgname": "diagnostic_continuity_user_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_continuity_user_changed AFTER UPDATE OF \"suspendedAt\", \"deletionScheduledAt\" ON public.users FOR EACH ROW EXECUTE FUNCTION diagnostic_continuity_source_changed()"
+    },
+    {
+      "relname": "users",
+      "tgname": "diagnostic_public_continuity_user_changed",
+      "tgenabled": "O",
+      "tgfoid": "diagnostic_public_continuity_source_changed()",
+      "definition": "CREATE TRIGGER diagnostic_public_continuity_user_changed AFTER UPDATE OF \"suspendedAt\", \"deletionScheduledAt\" ON public.users FOR EACH ROW EXECUTE FUNCTION diagnostic_public_continuity_source_changed()"
+    },
+    {
+      "relname": "users",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.users FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "users",
+      "tgname": "zz_diagnostic_source_creation_fence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_user_insert_fence()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_creation_fence BEFORE INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION diagnostic_user_insert_fence()"
+    },
+    {
+      "relname": "users",
+      "tgname": "zz_diagnostic_source_effective",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_effective BEFORE INSERT OR DELETE OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard()"
+    },
+    {
+      "relname": "users",
+      "tgname": "zz_diagnostic_source_presence",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_statement_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_presence BEFORE DELETE OR UPDATE OF id, phone, \"phoneVerifiedAt\", email, \"emailVerifiedAt\", role, \"suspendedAt\", \"deletionScheduledAt\", \"suspendedById\", \"suspensionReason\" ON public.users FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_statement_guard()"
+    },
+    {
+      "relname": "users",
+      "tgname": "zz_diagnostic_source_target",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_target BEFORE UPDATE OF id, phone, \"phoneVerifiedAt\", email, \"emailVerifiedAt\", role, \"suspendedAt\", \"deletionScheduledAt\", \"suspendedById\", \"suspensionReason\" ON public.users FOR EACH ROW EXECUTE FUNCTION diagnostic_source_row_guard('target')"
+    },
+    {
+      "relname": "users",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "users",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.users FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "vehicle_history_requests",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.vehicle_history_requests FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "vehicle_history_requests",
+      "tgname": "service_confirmed_vin_guard",
+      "tgenabled": "O",
+      "tgfoid": "service_confirmed_vin_immutable()",
+      "definition": "CREATE TRIGGER service_confirmed_vin_guard BEFORE UPDATE ON public.vehicle_history_requests FOR EACH ROW EXECUTE FUNCTION service_confirmed_vin_immutable()"
+    },
+    {
+      "relname": "vehicle_history_requests",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.vehicle_history_requests FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "verified_contact_phones",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.verified_contact_phones FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "verified_contact_phones",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.verified_contact_phones FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "verified_contact_phones",
+      "tgname": "zzzz_campaign_preparation",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_guard()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation BEFORE INSERT OR DELETE OR UPDATE ON public.verified_contact_phones FOR EACH ROW EXECUTE FUNCTION campaign_preparation_guard()"
+    },
+    {
+      "relname": "verified_contact_phones",
+      "tgname": "zzzz_campaign_preparation_truncate",
+      "tgenabled": "D",
+      "tgfoid": "campaign_preparation_truncate()",
+      "definition": "CREATE TRIGGER zzzz_campaign_preparation_truncate BEFORE TRUNCATE ON public.verified_contact_phones FOR EACH STATEMENT EXECUTE FUNCTION campaign_preparation_truncate()"
+    },
+    {
+      "relname": "video_cleanup_work",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.video_cleanup_work FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "video_cleanup_work",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.video_cleanup_work FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "video_generations",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.video_generations FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "video_generations",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.video_generations FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "video_generations",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.video_generations FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "video_grants",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.video_grants FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "video_grants",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.video_grants FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "video_process_work",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.video_process_work FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "video_process_work",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.video_process_work FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    },
+    {
+      "relname": "video_upload_sessions",
+      "tgname": "diagnostic_source_no_truncate",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_source_forbid()",
+      "definition": "CREATE TRIGGER diagnostic_source_no_truncate BEFORE TRUNCATE ON public.video_upload_sessions FOR EACH STATEMENT EXECUTE FUNCTION diagnostic_source_forbid()"
+    },
+    {
+      "relname": "video_upload_sessions",
+      "tgname": "zz_diagnostic_source_publication",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_listing_publication_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_publication BEFORE INSERT OR DELETE OR UPDATE ON public.video_upload_sessions FOR EACH ROW EXECUTE FUNCTION diagnostic_listing_publication_guard()"
+    },
+    {
+      "relname": "video_upload_sessions",
+      "tgname": "zz_diagnostic_source_purge",
+      "tgenabled": "D",
+      "tgfoid": "diagnostic_purge_row_guard()",
+      "definition": "CREATE TRIGGER zz_diagnostic_source_purge BEFORE INSERT OR DELETE OR UPDATE ON public.video_upload_sessions FOR EACH ROW EXECUTE FUNCTION diagnostic_purge_row_guard()"
+    }
+  ],
+  "receipts": [
+    {
+      "source": 0,
+      "campaign": 0
+    }
+  ],
+  "readiness": [
+    {
+      "source": false,
+      "campaign": false
+    }
+  ],
+  "connections": [],
+  "rows": {
+    "campaign_preparations": [],
+    "diagnostic_audits": [],
+    "diagnostic_center_assignments": [],
+    "diagnostic_centers": [],
+    "diagnostic_continuity_proofs": [],
+    "diagnostic_continuity_requests": [],
+    "diagnostic_evidence": [],
+    "diagnostic_identity_evidence": [],
+    "diagnostic_identity_provenance": [],
+    "diagnostic_identity_records": [],
+    "diagnostic_order_assignments": [],
+    "diagnostic_ownership_components": [],
+    "diagnostic_ownership_grants": [],
+    "diagnostic_pdf_artifacts": [],
+    "diagnostic_reports": [],
+    "diagnostic_source_anchors": [],
+    "diagnostic_source_commands": [],
+    "diagnostic_template_versions": [],
+    "inspection_orders": [],
+    "sessions": [],
+    "users": []
+  },
+  "buckets": [
+    {
+      "name": "diagnostic-test-private",
+      "objects": [],
+      "truncated": false
+    }
+  ]
+}

@@ -1,0 +1,998 @@
+{
+  "result": "PASS",
+  "evidenceLevel": "offline provider/time fake with real local Git ledger",
+  "scratch": "/tmp/carberk-a04-c04d2138-Zy0AmR",
+  "snapshots": [
+    {
+      "label": "before",
+      "ledger": {
+        "revision": "1f610cdcb2d8b866d206cfe63e00d1cb9d1a4d2c",
+        "state": {
+          "version": 1,
+          "queue": [],
+          "reservation": {
+            "parent": 897,
+            "pr": 902,
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "priority": 1,
+            "priorityEvidence": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897",
+            "id": "00000000000000000000000000000001",
+            "owner": "alice",
+            "readyAt": "2026-10-30T00:00:00.000Z",
+            "identity": {
+              "projectId": "project-staging",
+              "environmentId": "env-staging",
+              "environmentName": "staging",
+              "services": {
+                "api": "api-id",
+                "worker": "worker-id"
+              },
+              "credentialScope": "project:project-staging:env-staging",
+              "origins": {
+                "database": "postgresql://postgres.railway.internal:5432/railway",
+                "media": "http://minio.railway.internal:9000",
+                "publicMedia": "https://staging-media.example",
+                "api": "https://staging-api.example"
+              }
+            },
+            "namespace": "cf_00000000000000000000000000000001",
+            "lifecycle": "active",
+            "operation": null,
+            "deployments": null,
+            "evidence": [],
+            "recovery": {
+              "owner": "alice",
+              "action": "Restore latest fetched main and verify before release"
+            }
+          },
+          "history": []
+        }
+      },
+      "provider": {
+        "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "providerContract": {
+          "revision": "qualified-disposable-provider-v1",
+          "automaticPaths": {
+            "crash": "desired-zero",
+            "rollout": "desired-zero",
+            "cron": "desired-zero",
+            "wake": "desired-zero"
+          }
+        },
+        "desired": {
+          "api": {
+            "eu-west": 1
+          },
+          "worker": {
+            "eu-west": 1
+          }
+        },
+        "executions": [
+          {
+            "role": "api",
+            "deploymentId": "old-api",
+            "instanceId": "old-api-instance",
+            "bootId": "old-api-boot",
+            "mode": "business",
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+          },
+          {
+            "role": "worker",
+            "deploymentId": "old-worker",
+            "instanceId": "old-worker-instance",
+            "bootId": "old-worker-boot",
+            "mode": "business",
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+          }
+        ],
+        "executor": {
+          "role": "api",
+          "deploymentId": "reset-api",
+          "instanceId": "reset-api-instance",
+          "bootId": "reset-api-boot",
+          "mode": "maintenance-before-nest",
+          "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+          "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "storage": {
+          "serviceId": "minio",
+          "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "epochs": [
+            "minio-old"
+          ],
+          "accepted": []
+        },
+        "clock": {
+          "source": "storage-trusted",
+          "epoch": "time-authority-1",
+          "ticksMs": 0,
+          "storageTimeMs": 1000000,
+          "errorMs": 1
+        },
+        "issuance": null
+      },
+      "effects": []
+    },
+    {
+      "label": "unknown-horizon-refusal",
+      "ledger": {
+        "revision": "8881ad50ed3a9dedacc058643996a604affb6671",
+        "state": {
+          "version": 1,
+          "queue": [],
+          "reservation": {
+            "parent": 897,
+            "pr": 902,
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "priority": 1,
+            "priorityEvidence": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897",
+            "id": "00000000000000000000000000000001",
+            "owner": "alice",
+            "readyAt": "2026-10-30T00:00:00.000Z",
+            "identity": {
+              "projectId": "project-staging",
+              "environmentId": "env-staging",
+              "environmentName": "staging",
+              "services": {
+                "api": "api-id",
+                "worker": "worker-id"
+              },
+              "credentialScope": "project:project-staging:env-staging",
+              "origins": {
+                "database": "postgresql://postgres.railway.internal:5432/railway",
+                "media": "http://minio.railway.internal:9000",
+                "publicMedia": "https://staging-media.example",
+                "api": "https://staging-api.example"
+              }
+            },
+            "namespace": "cf_00000000000000000000000000000001",
+            "lifecycle": "active",
+            "operation": {
+              "id": "00000000000000000000000000000002",
+              "kind": "clean-reset",
+              "reservationId": "00000000000000000000000000000001",
+              "owner": "alice",
+              "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+              "identity": {
+                "projectId": "project-staging",
+                "environmentId": "env-staging",
+                "environmentName": "staging",
+                "services": {
+                  "api": "api-id",
+                  "worker": "worker-id"
+                },
+                "credentialScope": "project:project-staging:env-staging",
+                "origins": {
+                  "database": "postgresql://postgres.railway.internal:5432/railway",
+                  "media": "http://minio.railway.internal:9000",
+                  "publicMedia": "https://staging-media.example",
+                  "api": "https://staging-api.example"
+                }
+              },
+              "baseline": {
+                "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+                "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+                "providerContract": {
+                  "revision": "qualified-disposable-provider-v1",
+                  "automaticPaths": {
+                    "crash": "desired-zero",
+                    "rollout": "desired-zero",
+                    "cron": "desired-zero",
+                    "wake": "desired-zero"
+                  }
+                },
+                "desired": {
+                  "api": {
+                    "eu-west": 1
+                  },
+                  "worker": {
+                    "eu-west": 1
+                  }
+                },
+                "executions": [
+                  {
+                    "role": "api",
+                    "deploymentId": "old-api",
+                    "instanceId": "old-api-instance",
+                    "bootId": "old-api-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  },
+                  {
+                    "role": "worker",
+                    "deploymentId": "old-worker",
+                    "instanceId": "old-worker-instance",
+                    "bootId": "old-worker-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  }
+                ],
+                "executor": {
+                  "role": "api",
+                  "deploymentId": "reset-api",
+                  "instanceId": "reset-api-instance",
+                  "bootId": "reset-api-boot",
+                  "mode": "maintenance-before-nest",
+                  "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+                  "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+                },
+                "storage": {
+                  "serviceId": "minio",
+                  "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+                  "epochs": [
+                    "minio-old"
+                  ],
+                  "accepted": []
+                },
+                "clock": {
+                  "source": "storage-trusted",
+                  "epoch": "time-authority-1",
+                  "ticksMs": 0,
+                  "storageTimeMs": 1000000,
+                  "errorMs": 1
+                },
+                "issuance": null
+              },
+              "phase": "closed",
+              "closureGeneration": "0ce4991613472f0560a24cf5227426d9",
+              "closedClock": {
+                "source": "storage-trusted",
+                "epoch": "time-authority-1",
+                "ticksMs": 0,
+                "storageTimeMs": 1000000,
+                "errorMs": 1
+              }
+            },
+            "deployments": null,
+            "evidence": [],
+            "recovery": {
+              "owner": "alice",
+              "action": "Restore latest fetched main and verify before release"
+            }
+          },
+          "history": []
+        }
+      },
+      "provider": {
+        "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "providerContract": {
+          "revision": "qualified-disposable-provider-v1",
+          "automaticPaths": {
+            "crash": "desired-zero",
+            "rollout": "desired-zero",
+            "cron": "desired-zero",
+            "wake": "desired-zero"
+          }
+        },
+        "desired": {
+          "api": {
+            "eu-west": 0
+          },
+          "worker": {
+            "eu-west": 0
+          }
+        },
+        "executions": [
+          {
+            "role": "api",
+            "deploymentId": "reset-api",
+            "instanceId": "reset-api-instance",
+            "bootId": "reset-api-boot",
+            "mode": "maintenance-before-nest",
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "executor": {
+          "role": "api",
+          "deploymentId": "reset-api",
+          "instanceId": "reset-api-instance",
+          "bootId": "reset-api-boot",
+          "mode": "maintenance-before-nest",
+          "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+          "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "storage": {
+          "serviceId": "minio",
+          "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "epochs": [
+            "minio-old"
+          ],
+          "accepted": []
+        },
+        "clock": {
+          "source": "storage-trusted",
+          "epoch": "time-authority-1",
+          "ticksMs": 0,
+          "storageTimeMs": 1000000,
+          "errorMs": 1
+        },
+        "issuance": null
+      },
+      "effects": [
+        {
+          "kind": "stop-applications",
+          "operationId": "00000000000000000000000000000002"
+        }
+      ]
+    },
+    {
+      "label": "strict-expiry-equality-refusal",
+      "ledger": {
+        "revision": "8881ad50ed3a9dedacc058643996a604affb6671",
+        "state": {
+          "version": 1,
+          "queue": [],
+          "reservation": {
+            "parent": 897,
+            "pr": 902,
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "priority": 1,
+            "priorityEvidence": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897",
+            "id": "00000000000000000000000000000001",
+            "owner": "alice",
+            "readyAt": "2026-10-30T00:00:00.000Z",
+            "identity": {
+              "projectId": "project-staging",
+              "environmentId": "env-staging",
+              "environmentName": "staging",
+              "services": {
+                "api": "api-id",
+                "worker": "worker-id"
+              },
+              "credentialScope": "project:project-staging:env-staging",
+              "origins": {
+                "database": "postgresql://postgres.railway.internal:5432/railway",
+                "media": "http://minio.railway.internal:9000",
+                "publicMedia": "https://staging-media.example",
+                "api": "https://staging-api.example"
+              }
+            },
+            "namespace": "cf_00000000000000000000000000000001",
+            "lifecycle": "active",
+            "operation": {
+              "id": "00000000000000000000000000000002",
+              "kind": "clean-reset",
+              "reservationId": "00000000000000000000000000000001",
+              "owner": "alice",
+              "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+              "identity": {
+                "projectId": "project-staging",
+                "environmentId": "env-staging",
+                "environmentName": "staging",
+                "services": {
+                  "api": "api-id",
+                  "worker": "worker-id"
+                },
+                "credentialScope": "project:project-staging:env-staging",
+                "origins": {
+                  "database": "postgresql://postgres.railway.internal:5432/railway",
+                  "media": "http://minio.railway.internal:9000",
+                  "publicMedia": "https://staging-media.example",
+                  "api": "https://staging-api.example"
+                }
+              },
+              "baseline": {
+                "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+                "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+                "providerContract": {
+                  "revision": "qualified-disposable-provider-v1",
+                  "automaticPaths": {
+                    "crash": "desired-zero",
+                    "rollout": "desired-zero",
+                    "cron": "desired-zero",
+                    "wake": "desired-zero"
+                  }
+                },
+                "desired": {
+                  "api": {
+                    "eu-west": 1
+                  },
+                  "worker": {
+                    "eu-west": 1
+                  }
+                },
+                "executions": [
+                  {
+                    "role": "api",
+                    "deploymentId": "old-api",
+                    "instanceId": "old-api-instance",
+                    "bootId": "old-api-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  },
+                  {
+                    "role": "worker",
+                    "deploymentId": "old-worker",
+                    "instanceId": "old-worker-instance",
+                    "bootId": "old-worker-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  }
+                ],
+                "executor": {
+                  "role": "api",
+                  "deploymentId": "reset-api",
+                  "instanceId": "reset-api-instance",
+                  "bootId": "reset-api-boot",
+                  "mode": "maintenance-before-nest",
+                  "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+                  "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+                },
+                "storage": {
+                  "serviceId": "minio",
+                  "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+                  "epochs": [
+                    "minio-old"
+                  ],
+                  "accepted": []
+                },
+                "clock": {
+                  "source": "storage-trusted",
+                  "epoch": "time-authority-1",
+                  "ticksMs": 0,
+                  "storageTimeMs": 1000000,
+                  "errorMs": 1
+                },
+                "issuance": null
+              },
+              "phase": "closed",
+              "closureGeneration": "0ce4991613472f0560a24cf5227426d9",
+              "closedClock": {
+                "source": "storage-trusted",
+                "epoch": "time-authority-1",
+                "ticksMs": 0,
+                "storageTimeMs": 1000000,
+                "errorMs": 1
+              }
+            },
+            "deployments": null,
+            "evidence": [],
+            "recovery": {
+              "owner": "alice",
+              "action": "Restore latest fetched main and verify before release"
+            }
+          },
+          "history": []
+        }
+      },
+      "provider": {
+        "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "providerContract": {
+          "revision": "qualified-disposable-provider-v1",
+          "automaticPaths": {
+            "crash": "desired-zero",
+            "rollout": "desired-zero",
+            "cron": "desired-zero",
+            "wake": "desired-zero"
+          }
+        },
+        "desired": {
+          "api": {
+            "eu-west": 0
+          },
+          "worker": {
+            "eu-west": 0
+          }
+        },
+        "executions": [
+          {
+            "role": "api",
+            "deploymentId": "reset-api",
+            "instanceId": "reset-api-instance",
+            "bootId": "reset-api-boot",
+            "mode": "maintenance-before-nest",
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "executor": {
+          "role": "api",
+          "deploymentId": "reset-api",
+          "instanceId": "reset-api-instance",
+          "bootId": "reset-api-boot",
+          "mode": "maintenance-before-nest",
+          "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+          "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "storage": {
+          "serviceId": "minio",
+          "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "epochs": [
+            "minio-old"
+          ],
+          "accepted": []
+        },
+        "clock": {
+          "source": "storage-trusted",
+          "epoch": "time-authority-1",
+          "ticksMs": 102,
+          "storageTimeMs": 1000102,
+          "errorMs": 1
+        },
+        "issuance": {
+          "families": [
+            "v4"
+          ],
+          "expiresAtMs": 1000100,
+          "authorityDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "clockEpoch": "time-authority-1"
+        }
+      },
+      "effects": [
+        {
+          "kind": "stop-applications",
+          "operationId": "00000000000000000000000000000002"
+        }
+      ]
+    },
+    {
+      "label": "lost-drain-reply",
+      "ledger": {
+        "revision": "bed96f830d19e6fddc985a6a9e8c9bc7d6df1b34",
+        "state": {
+          "version": 1,
+          "queue": [],
+          "reservation": {
+            "parent": 897,
+            "pr": 902,
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "priority": 1,
+            "priorityEvidence": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897",
+            "id": "00000000000000000000000000000001",
+            "owner": "alice",
+            "readyAt": "2026-10-30T00:00:00.000Z",
+            "identity": {
+              "projectId": "project-staging",
+              "environmentId": "env-staging",
+              "environmentName": "staging",
+              "services": {
+                "api": "api-id",
+                "worker": "worker-id"
+              },
+              "credentialScope": "project:project-staging:env-staging",
+              "origins": {
+                "database": "postgresql://postgres.railway.internal:5432/railway",
+                "media": "http://minio.railway.internal:9000",
+                "publicMedia": "https://staging-media.example",
+                "api": "https://staging-api.example"
+              }
+            },
+            "namespace": "cf_00000000000000000000000000000001",
+            "lifecycle": "active",
+            "operation": {
+              "id": "00000000000000000000000000000002",
+              "kind": "clean-reset",
+              "reservationId": "00000000000000000000000000000001",
+              "owner": "alice",
+              "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+              "identity": {
+                "projectId": "project-staging",
+                "environmentId": "env-staging",
+                "environmentName": "staging",
+                "services": {
+                  "api": "api-id",
+                  "worker": "worker-id"
+                },
+                "credentialScope": "project:project-staging:env-staging",
+                "origins": {
+                  "database": "postgresql://postgres.railway.internal:5432/railway",
+                  "media": "http://minio.railway.internal:9000",
+                  "publicMedia": "https://staging-media.example",
+                  "api": "https://staging-api.example"
+                }
+              },
+              "baseline": {
+                "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+                "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+                "providerContract": {
+                  "revision": "qualified-disposable-provider-v1",
+                  "automaticPaths": {
+                    "crash": "desired-zero",
+                    "rollout": "desired-zero",
+                    "cron": "desired-zero",
+                    "wake": "desired-zero"
+                  }
+                },
+                "desired": {
+                  "api": {
+                    "eu-west": 1
+                  },
+                  "worker": {
+                    "eu-west": 1
+                  }
+                },
+                "executions": [
+                  {
+                    "role": "api",
+                    "deploymentId": "old-api",
+                    "instanceId": "old-api-instance",
+                    "bootId": "old-api-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  },
+                  {
+                    "role": "worker",
+                    "deploymentId": "old-worker",
+                    "instanceId": "old-worker-instance",
+                    "bootId": "old-worker-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  }
+                ],
+                "executor": {
+                  "role": "api",
+                  "deploymentId": "reset-api",
+                  "instanceId": "reset-api-instance",
+                  "bootId": "reset-api-boot",
+                  "mode": "maintenance-before-nest",
+                  "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+                  "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+                },
+                "storage": {
+                  "serviceId": "minio",
+                  "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+                  "epochs": [
+                    "minio-old"
+                  ],
+                  "accepted": []
+                },
+                "clock": {
+                  "source": "storage-trusted",
+                  "epoch": "time-authority-1",
+                  "ticksMs": 0,
+                  "storageTimeMs": 1000000,
+                  "errorMs": 1
+                },
+                "issuance": null
+              },
+              "phase": "drain-intent",
+              "closureGeneration": "0ce4991613472f0560a24cf5227426d9",
+              "closedClock": {
+                "source": "storage-trusted",
+                "epoch": "time-authority-1",
+                "ticksMs": 0,
+                "storageTimeMs": 1000000,
+                "errorMs": 1
+              },
+              "horizon": {
+                "families": [
+                  "v4"
+                ],
+                "expiresAtMs": 1000100,
+                "authorityDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+                "clockEpoch": "time-authority-1"
+              }
+            },
+            "deployments": null,
+            "evidence": [],
+            "recovery": {
+              "owner": "alice",
+              "action": "Restore latest fetched main and verify before release"
+            }
+          },
+          "history": []
+        }
+      },
+      "provider": {
+        "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "providerContract": {
+          "revision": "qualified-disposable-provider-v1",
+          "automaticPaths": {
+            "crash": "desired-zero",
+            "rollout": "desired-zero",
+            "cron": "desired-zero",
+            "wake": "desired-zero"
+          }
+        },
+        "desired": {
+          "api": {
+            "eu-west": 0
+          },
+          "worker": {
+            "eu-west": 0
+          }
+        },
+        "executions": [
+          {
+            "role": "api",
+            "deploymentId": "reset-api",
+            "instanceId": "reset-api-instance",
+            "bootId": "reset-api-boot",
+            "mode": "maintenance-before-nest",
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "executor": {
+          "role": "api",
+          "deploymentId": "reset-api",
+          "instanceId": "reset-api-instance",
+          "bootId": "reset-api-boot",
+          "mode": "maintenance-before-nest",
+          "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+          "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "storage": {
+          "serviceId": "minio",
+          "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "epochs": [
+            "minio-new"
+          ],
+          "accepted": []
+        },
+        "clock": {
+          "source": "storage-trusted",
+          "epoch": "time-authority-1",
+          "ticksMs": 200,
+          "storageTimeMs": 1000200,
+          "errorMs": 1
+        },
+        "issuance": {
+          "families": [
+            "v4"
+          ],
+          "expiresAtMs": 1000100,
+          "authorityDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "clockEpoch": "time-authority-1"
+        }
+      },
+      "effects": [
+        {
+          "kind": "stop-applications",
+          "operationId": "00000000000000000000000000000002"
+        },
+        {
+          "kind": "drain-storage",
+          "operationId": "00000000000000000000000000000002"
+        }
+      ]
+    },
+    {
+      "label": "fresh-controller-inventory-ready",
+      "ledger": {
+        "revision": "96635d04070fbce7d01d35b8467931740e9654c7",
+        "state": {
+          "version": 1,
+          "queue": [],
+          "reservation": {
+            "parent": 897,
+            "pr": 902,
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "priority": 1,
+            "priorityEvidence": "https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/897",
+            "id": "00000000000000000000000000000001",
+            "owner": "alice",
+            "readyAt": "2026-10-30T00:00:00.000Z",
+            "identity": {
+              "projectId": "project-staging",
+              "environmentId": "env-staging",
+              "environmentName": "staging",
+              "services": {
+                "api": "api-id",
+                "worker": "worker-id"
+              },
+              "credentialScope": "project:project-staging:env-staging",
+              "origins": {
+                "database": "postgresql://postgres.railway.internal:5432/railway",
+                "media": "http://minio.railway.internal:9000",
+                "publicMedia": "https://staging-media.example",
+                "api": "https://staging-api.example"
+              }
+            },
+            "namespace": "cf_00000000000000000000000000000001",
+            "lifecycle": "active",
+            "operation": {
+              "id": "00000000000000000000000000000002",
+              "kind": "clean-reset",
+              "reservationId": "00000000000000000000000000000001",
+              "owner": "alice",
+              "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+              "identity": {
+                "projectId": "project-staging",
+                "environmentId": "env-staging",
+                "environmentName": "staging",
+                "services": {
+                  "api": "api-id",
+                  "worker": "worker-id"
+                },
+                "credentialScope": "project:project-staging:env-staging",
+                "origins": {
+                  "database": "postgresql://postgres.railway.internal:5432/railway",
+                  "media": "http://minio.railway.internal:9000",
+                  "publicMedia": "https://staging-media.example",
+                  "api": "https://staging-api.example"
+                }
+              },
+              "baseline": {
+                "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+                "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+                "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+                "providerContract": {
+                  "revision": "qualified-disposable-provider-v1",
+                  "automaticPaths": {
+                    "crash": "desired-zero",
+                    "rollout": "desired-zero",
+                    "cron": "desired-zero",
+                    "wake": "desired-zero"
+                  }
+                },
+                "desired": {
+                  "api": {
+                    "eu-west": 1
+                  },
+                  "worker": {
+                    "eu-west": 1
+                  }
+                },
+                "executions": [
+                  {
+                    "role": "api",
+                    "deploymentId": "old-api",
+                    "instanceId": "old-api-instance",
+                    "bootId": "old-api-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  },
+                  {
+                    "role": "worker",
+                    "deploymentId": "old-worker",
+                    "instanceId": "old-worker-instance",
+                    "bootId": "old-worker-boot",
+                    "mode": "business",
+                    "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1"
+                  }
+                ],
+                "executor": {
+                  "role": "api",
+                  "deploymentId": "reset-api",
+                  "instanceId": "reset-api-instance",
+                  "bootId": "reset-api-boot",
+                  "mode": "maintenance-before-nest",
+                  "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+                  "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+                },
+                "storage": {
+                  "serviceId": "minio",
+                  "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+                  "epochs": [
+                    "minio-old"
+                  ],
+                  "accepted": []
+                },
+                "clock": {
+                  "source": "storage-trusted",
+                  "epoch": "time-authority-1",
+                  "ticksMs": 0,
+                  "storageTimeMs": 1000000,
+                  "errorMs": 1
+                },
+                "issuance": null
+              },
+              "phase": "inventory-ready",
+              "closureGeneration": "0ce4991613472f0560a24cf5227426d9",
+              "closedClock": {
+                "source": "storage-trusted",
+                "epoch": "time-authority-1",
+                "ticksMs": 0,
+                "storageTimeMs": 1000000,
+                "errorMs": 1
+              },
+              "horizon": {
+                "families": [
+                  "v4"
+                ],
+                "expiresAtMs": 1000100,
+                "authorityDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+                "clockEpoch": "time-authority-1"
+              },
+              "storageEpoch": "minio-new"
+            },
+            "deployments": null,
+            "evidence": [],
+            "recovery": {
+              "owner": "alice",
+              "action": "Restore latest fetched main and verify before release"
+            }
+          },
+          "history": []
+        }
+      },
+      "provider": {
+        "configurationDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "referenceDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "scopeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "providerContract": {
+          "revision": "qualified-disposable-provider-v1",
+          "automaticPaths": {
+            "crash": "desired-zero",
+            "rollout": "desired-zero",
+            "cron": "desired-zero",
+            "wake": "desired-zero"
+          }
+        },
+        "desired": {
+          "api": {
+            "eu-west": 0
+          },
+          "worker": {
+            "eu-west": 0
+          }
+        },
+        "executions": [
+          {
+            "role": "api",
+            "deploymentId": "reset-api",
+            "instanceId": "reset-api-instance",
+            "bootId": "reset-api-boot",
+            "mode": "maintenance-before-nest",
+            "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+            "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "executor": {
+          "role": "api",
+          "deploymentId": "reset-api",
+          "instanceId": "reset-api-instance",
+          "bootId": "reset-api-boot",
+          "mode": "maintenance-before-nest",
+          "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+          "entrypointDigest": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        "storage": {
+          "serviceId": "minio",
+          "configurationDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "epochs": [
+            "minio-new"
+          ],
+          "accepted": []
+        },
+        "clock": {
+          "source": "storage-trusted",
+          "epoch": "time-authority-1",
+          "ticksMs": 200,
+          "storageTimeMs": 1000200,
+          "errorMs": 1
+        },
+        "issuance": {
+          "families": [
+            "v4"
+          ],
+          "expiresAtMs": 1000100,
+          "authorityDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "clockEpoch": "time-authority-1"
+        }
+      },
+      "effects": [
+        {
+          "kind": "stop-applications",
+          "operationId": "00000000000000000000000000000002"
+        },
+        {
+          "kind": "drain-storage",
+          "operationId": "00000000000000000000000000000002"
+        }
+      ]
+    }
+  ],
+  "returnValue": {
+    "operationId": "00000000000000000000000000000002",
+    "closureGeneration": "0ce4991613472f0560a24cf5227426d9",
+    "phase": "inventory-ready",
+    "rowExecution": "blocked-parent-lawful-reset-contract",
+    "reopened": false
+  },
+  "rowsRedisObjectsReopened": false,
+  "restorationProved": false
+}

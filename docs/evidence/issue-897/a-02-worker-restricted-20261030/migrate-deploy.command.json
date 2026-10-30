@@ -1,0 +1,19 @@
+{
+  "name": "migrate-deploy",
+  "program": "pnpm",
+  "arguments": [
+    "--filter",
+    "@auto-tm/db",
+    "run",
+    "migrate:deploy"
+  ],
+  "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "startedAt": "2026-10-29T18:25:09.710Z",
+  "finishedAt": "2026-10-29T18:25:12.220Z",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "log": "migrate-deploy.log",
+  "logSha256": "125fdbee97bf9def7200f98206179ada4f04e22c83a3dc3c039ed49289c4fb90",
+  "environmentNames": []
+}

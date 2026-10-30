@@ -1,0 +1,500 @@
+{
+  "ticket": "A-02",
+  "result": "FAIL",
+  "reason": "The ten capacity/rollback/race cases failed setup and their bodies were skipped. Missing ordinary per-case fixtures prevent acceptance.",
+  "candidateSha": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "actualWorktreeHead": "6cf5c311d43b5ae0bca0f2543564f65b5d2e2a9e",
+  "candidateIdentityProof": {
+    "sourceComparison": "source-pins.json",
+    "postcheck": "source-postcheck.json",
+    "allRelevantFilesMatch": true,
+    "fileCount": 1619,
+    "headOnlyChanges": [
+      "docs/evidence/issue-897/a-10-pr-reconciliation-20261030.md",
+      "docs/evidence/issue-897/a-wayfinder-ticket-map-20261030.md"
+    ]
+  },
+  "migrationIdentity": {
+    "manifest": "migration-manifest.json",
+    "manifestSha256": "6db6fbf01a14c9a04cf4aa161b83133294647a777d7a39b62932990b44a019e8",
+    "count": 102,
+    "appliedReadback": "before-tests.json",
+    "exactAppliedChainMatches": true,
+    "allFinishedNoneRolledBack": true
+  },
+  "toolchain": {
+    "node": "24.13.0",
+    "pnpm": "12.11.2",
+    "vitest": "5.0.4"
+  },
+  "resources": {
+    "runtimeSnapshot": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+    "composeProject": "auto_tm_ci_897_a02_f6408755",
+    "containers": [
+      "auto_tm_ci_897_a02_f6408755-postgres-1",
+      "auto_tm_ci_897_a02_f6408755-redis-1",
+      "auto_tm_ci_897_a02_f6408755-minio-1"
+    ],
+    "ports": {
+      "postgres": 61139,
+      "redis": 61138,
+      "minio": 61140
+    },
+    "database": "a02_worker",
+    "dbOwner": "auto_tm_ci",
+    "redisNamespace": "dedicated Redis service, DB 0; preparation harness does not enqueue",
+    "objectNamespace": "dedicated MinIO service; diagnostic-test-private bucket; per-fixture UUID keys under diagnostic-evidence/ and diagnostic-pdf/"
+  },
+  "actors": [
+    {
+      "purpose": "migration and fixture setup/teardown only",
+      "role": "auto_tm_ci",
+      "owner": true,
+      "productionWorkerExecution": false
+    },
+    {
+      "purpose": "all twelve preparation worker scenarios",
+      "role": "r6c_diagnostic_worker_<random 8-hex suffix>",
+      "actualSuffixRetained": false,
+      "evidence": "Existing beforeAll asserts current_user=session_user, NOSUPERUSER/NOCREATEDB/NOCREATEROLE/NOREPLICATION/NOBYPASSRLS; owns zero public tables/functions/schema. All twelve tests and hooks passed. Harness does not persist the random suffix.",
+      "source": "apps/worker/src/jobs/diagnostics/DiagnosticWorkerPreparation.e2e.spec.ts:118-148"
+    },
+    {
+      "purpose": "capacity/rollback/race workers and ordinary API opponents",
+      "role": null,
+      "admitted": false,
+      "reason": "per-case ordinary fixture manifest absent"
+    }
+  ],
+  "preparation": {
+    "result": "PASS within the selected harness scope",
+    "tests": 12,
+    "passed": 12,
+    "skipped": 0,
+    "report": "restricted-preparation.vitest.json",
+    "output": "restricted-preparation.log",
+    "privacyAndCompleteness": "Due provenance rights and structured identity payload are erased; raw observations retained; exact eligible objects deleted; not-due/attached material retained; active write lease fenced; storage authentication failure retained for retry. These are the existing assertions; no grant/full ownership expiry acceptance is claimed.",
+    "concurrency": "For each TK/RU/EN render case, two simultaneous generate calls yield exactly one successful generation, attempts=1, ready PDF and stable report; subsequent generate returns false. This is narrower than the unexecuted ownership race matrix.",
+    "scenarioRestorations": "fixture-cleanup.json"
+  },
+  "batch": {
+    "result": "FAIL",
+    "commandExitCode": 1,
+    "totalCaseBodies": 10,
+    "executedCaseBodies": 0,
+    "skippedCaseBodies": 10,
+    "suiteSetupFailures": 10,
+    "report": "ownership-batch.vitest.json",
+    "output": "ownership-batch.log",
+    "firstFailure": "Separate ordinary fixture manifest required",
+    "failureLocation": "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts:117",
+    "cases": [
+      {
+        "case": "later-failure",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": null,
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "shared-multiple",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": null,
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "oldest-capacity",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": null,
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "overlimit",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": null,
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "worker-first-second-worker",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": "worker -> second worker",
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "second-worker-first-worker",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": "second worker -> worker",
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "worker-first-capture",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": "worker -> production capture",
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "capture-first-worker",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": "production capture -> worker",
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "worker-first-proof-use",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": "worker -> proof consumption",
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      },
+      {
+        "case": "proof-use-first-worker",
+        "acceptanceResult": "FAIL",
+        "execution": "beforeAll failed; body skipped by Vitest",
+        "firstFailure": "Separate ordinary fixture manifest required",
+        "plannedOrder": "proof consumption -> worker",
+        "observedBarrier": null,
+        "rollbackState": "not exercised; no fixture admitted or source mutation attempted",
+        "convergenceOrDuplicateDelivery": "not established"
+      }
+    ]
+  },
+  "acceptance": [
+    {
+      "criterion": "Restricted ownership erasure is private and complete",
+      "result": "FAIL / not established",
+      "evidence": "Restricted provenance/evidence preparation passed; the ownership matrix was not admitted. Accepted ordinary full100 was not rerun."
+    },
+    {
+      "criterion": "Capacity refusal is bounded",
+      "result": "FAIL / not established",
+      "evidence": "oldest-capacity and overlimit bodies skipped after fixture setup failure."
+    },
+    {
+      "criterion": "Rollback leaves no partial ownership",
+      "result": "FAIL / not established",
+      "evidence": "later-failure body skipped; empty unchanged fixture state is cleanup proof only, not rollback proof."
+    },
+    {
+      "criterion": "Both race orders converge without duplicate delivery or leaks",
+      "result": "FAIL / not established",
+      "evidence": "All six required ownership race bodies skipped; no barriers or opposing commands reached."
+    },
+    {
+      "criterion": "Fixture cleanup is complete",
+      "result": "PASS",
+      "evidence": "fixture-cleanup.json; source/campaign receipts 0/0; no rows/roles/connections/objects/Redis keys; triggers exactly restored; project containers and volumes removed."
+    }
+  ],
+  "cleanup": {
+    "fixtureChecks": {
+      "exactTriggerSnapshotRestored": true,
+      "rowsEmpty": true,
+      "noRestrictedFixtureRolesRemain": true,
+      "noOtherTaskDatabaseConnections": true,
+      "noSourceOrCampaignReceipts": true,
+      "guardsRestoredDormant": true,
+      "noStoredObjects": true,
+      "redisEmpty": true,
+      "candidateMigrationChainUnchanged": true,
+      "allTwelveScenarioRestorationsRecorded": true
+    },
+    "projectContainersAbsent": true,
+    "projectVolumesAbsent": true,
+    "output": "services-down.log",
+    "allOwnedFixtureResourcesClean": true,
+    "runtimeSnapshotRetainedForReproduction": "/tmp/carberk-a02-worker-restricted-f6408755/source"
+  },
+  "constraints": {
+    "sourceAndTestsUnchanged": true,
+    "apiOrDbContractChanges": false,
+    "ordinaryFull100Rerun": false,
+    "timeoutsOrWidthsChanged": false,
+    "productionSloClaimed": false,
+    "sharedDatabaseResetOrConnection": false,
+    "prOpened": false,
+    "delegation": false,
+    "externalMessagesSent": false
+  },
+  "nextDispatch": {
+    "owner": "Program Parent",
+    "required": "Provide or separately authorize production of ten distinct ordinary case fixtures on the exact 102-migration candidate chain, with an exact private manifest, actor/request bindings, declared-rights horizon and cleanup ownership.",
+    "boundedTestPrerequisite": "Existing batch harness pins port 65379 and r6c_batch_* DB names at line 124. That port currently belongs to a retained foreign task. A separate test-only dispatch is needed to bind the harness to a fresh exact resource identity before another isolated run.",
+    "sourceDefectClaimed": false
+  },
+  "commands": [
+    {
+      "name": "contracts-build",
+      "program": "pnpm",
+      "arguments": [
+        "--filter",
+        "@auto-tm/contracts",
+        "build"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:24:54.435Z",
+      "finishedAt": "2026-10-29T18:24:57.042Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "contracts-build.log",
+      "logSha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "environmentNames": []
+    },
+    {
+      "name": "create-database",
+      "program": "docker",
+      "arguments": [
+        "exec",
+        "auto_tm_ci_897_a02_f6408755-postgres-1",
+        "psql",
+        "-U",
+        "auto_tm_ci",
+        "-d",
+        "auto_tm_ci",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        "CREATE DATABASE a02_worker"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:24:44.976Z",
+      "finishedAt": "2026-10-29T18:24:45.067Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "create-database.log",
+      "logSha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7",
+      "environmentNames": []
+    },
+    {
+      "name": "db-build",
+      "program": "pnpm",
+      "arguments": [
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:24:57.044Z",
+      "finishedAt": "2026-10-29T18:24:59.809Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "db-build.log",
+      "logSha256": "aaa01ed38ee28605a76672cf91d245d21f651899526516fd2ac3575c9d28a5f3",
+      "environmentNames": []
+    },
+    {
+      "name": "migrate-deploy",
+      "program": "pnpm",
+      "arguments": [
+        "--filter",
+        "@auto-tm/db",
+        "run",
+        "migrate:deploy"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:25:09.710Z",
+      "finishedAt": "2026-10-29T18:25:12.220Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "migrate-deploy.log",
+      "logSha256": "125fdbee97bf9def7200f98206179ada4f04e22c83a3dc3c039ed49289c4fb90",
+      "environmentNames": []
+    },
+    {
+      "name": "ownership-batch",
+      "program": "pnpm",
+      "arguments": [
+        "--filter",
+        "@auto-tm/worker",
+        "test",
+        "src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts",
+        "--maxWorkers=1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/ownership-batch.vitest.json"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:26:18.740Z",
+      "finishedAt": "2026-10-29T18:26:19.724Z",
+      "exitCode": 1,
+      "signal": null,
+      "error": null,
+      "log": "ownership-batch.log",
+      "logSha256": "2ea398126395d4ad55792b48f5d2053727ef12990a0d571f1002a3f69b76e8ef",
+      "environmentNames": [
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE",
+        "DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_EVIDENCE_DIR"
+      ]
+    },
+    {
+      "name": "project-containers-after-cleanup",
+      "program": "docker",
+      "arguments": [
+        "ps",
+        "-a",
+        "--filter",
+        "label=com.docker.compose.project=auto_tm_ci_897_a02_f6408755",
+        "--format",
+        "{{json .}}"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:27:18.318Z",
+      "finishedAt": "2026-10-29T18:27:18.345Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "project-containers-after-cleanup.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "environmentNames": []
+    },
+    {
+      "name": "project-volumes-after-cleanup",
+      "program": "docker",
+      "arguments": [
+        "volume",
+        "ls",
+        "--filter",
+        "label=com.docker.compose.project=auto_tm_ci_897_a02_f6408755",
+        "--format",
+        "{{json .}}"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:27:18.345Z",
+      "finishedAt": "2026-10-29T18:27:18.366Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "project-volumes-after-cleanup.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "environmentNames": []
+    },
+    {
+      "command": [
+        "docker",
+        "exec",
+        "auto_tm_ci_897_a02_f6408755-redis-1",
+        "redis-cli",
+        "DBSIZE"
+      ],
+      "recordedAt": "2026-10-29T18:27:17.427460+00:00",
+      "exitCode": 0,
+      "log": "redis-after-tests.log",
+      "logSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "name": "restricted-preparation",
+      "program": "pnpm",
+      "arguments": [
+        "--filter",
+        "@auto-tm/worker",
+        "test",
+        "src/jobs/diagnostics/DiagnosticWorkerPreparation.e2e.spec.ts",
+        "--maxWorkers=1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/restricted-preparation.vitest.json"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:25:50.511Z",
+      "finishedAt": "2026-10-29T18:26:00.826Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "restricted-preparation.log",
+      "logSha256": "1cadfdb5e8a305091b97ce8d06c9d14def5eef8c37e58283280bda8e03a25e03",
+      "environmentNames": [
+        "DIAGNOSTIC_WORKER_PREPARATION_ACCEPTANCE",
+        "DIAGNOSTIC_WORKER_EVIDENCE_DIR"
+      ]
+    },
+    {
+      "name": "services-down",
+      "program": "docker",
+      "arguments": [
+        "compose",
+        "-p",
+        "auto_tm_ci_897_a02_f6408755",
+        "-f",
+        "/tmp/carberk-a02-worker-restricted-f6408755/source/infra/compose/docker-compose.ci.yml",
+        "-f",
+        "/tmp/carberk-a02-worker-restricted-f6408755/ports.yml",
+        "down",
+        "-v"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:27:17.497Z",
+      "finishedAt": "2026-10-29T18:27:18.315Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "services-down.log",
+      "logSha256": "cf556167c7d1297a4e645f40405ab1b2caaf479452b6a1b712d4a88a05fc201c",
+      "environmentNames": []
+    },
+    {
+      "name": "services-up",
+      "program": "docker",
+      "arguments": [
+        "compose",
+        "-p",
+        "auto_tm_ci_897_a02_f6408755",
+        "-f",
+        "/tmp/carberk-a02-worker-restricted-f6408755/source/infra/compose/docker-compose.ci.yml",
+        "-f",
+        "/tmp/carberk-a02-worker-restricted-f6408755/ports.yml",
+        "up",
+        "-d",
+        "--wait",
+        "--wait-timeout",
+        "180"
+      ],
+      "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+      "startedAt": "2026-10-29T18:24:38.738Z",
+      "finishedAt": "2026-10-29T18:24:44.975Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "log": "services-up.log",
+      "logSha256": "dd392d6e02fe5021446e3989768297129a99e2ba8af2845f58d4906f58f98352",
+      "environmentNames": []
+    }
+  ],
+  "scope": "Ticket-local evidence only; no final Milestone A or release acceptance.",
+  "docs": "not applicable; existing repository commands and installed configuration used, no dependency or API changes."
+}

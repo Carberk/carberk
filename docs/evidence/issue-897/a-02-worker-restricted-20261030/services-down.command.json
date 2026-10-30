@@ -1,0 +1,24 @@
+{
+  "name": "services-down",
+  "program": "docker",
+  "arguments": [
+    "compose",
+    "-p",
+    "auto_tm_ci_897_a02_f6408755",
+    "-f",
+    "/tmp/carberk-a02-worker-restricted-f6408755/source/infra/compose/docker-compose.ci.yml",
+    "-f",
+    "/tmp/carberk-a02-worker-restricted-f6408755/ports.yml",
+    "down",
+    "-v"
+  ],
+  "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "startedAt": "2026-10-29T18:27:17.497Z",
+  "finishedAt": "2026-10-29T18:27:18.315Z",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "log": "services-down.log",
+  "logSha256": "cf556167c7d1297a4e645f40405ab1b2caaf479452b6a1b712d4a88a05fc201c",
+  "environmentNames": []
+}

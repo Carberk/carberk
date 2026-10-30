@@ -10,9 +10,9 @@ in isolated worktrees. Their candidate identity remains the exact handoff base
 | Ticket | Task ID | State | Worktree policy |
 |---|---|---|---|
 | A-01 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a01-standards-spec-20261030-r1` | returned FAIL, S1 accepted/open | isolated |
-| A-02 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-worker-restricted-20261030-r1` | running | isolated |
-| A-04 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a04-reset-runtime-20261030-r1` | running | isolated |
-| A-11 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r1` | running, separate Spec context | isolated |
+| A-02 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-worker-restricted-20261030-r1` | terminal FAIL; evidence imported | isolated |
+| A-04 | `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a04-reset-runtime-20261030-r1` | terminal FAIL/open; evidence imported | isolated |
+| A-11 | r1 `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r1`; r2 `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r2` | r1 usage-limit failure; r2 running | isolated |
 
 A-03 and A-05 wait for their declared receipts. A-06 through A-10 remain
 blocked by the dependency order in the Wayfinder map. No child is authorized
@@ -56,8 +56,8 @@ dispatch from the coordinator.
 | Ticket | Commands/resources | CPU/timing reservation |
 |---|---|---|
 | A-01 | Static source/caller inspection; no runtime resources | none; returned |
-| A-02 | Exact ten batch selectors are in the map. Concrete fixture manifest, container, DB/Redis/object namespaces and ports awaited before host-heavy execution | exclusive next slot; no second heavy run |
-| A-04 | Offline Node suites from the map may run; exact remaining DB selectors and unique resource manifest awaited | PostgreSQL/timing execution queued behind A-02 |
+| A-02 | Exact ten batch selectors are in the map. Receipt records Compose `auto_tm_ci_897_a02_f6408755`, PostgreSQL `127.0.0.1:61139/a02_worker`, Redis `127.0.0.1:61138` DB0, MinIO `127.0.0.1:61140`, bucket `diagnostic-test-private`, sequential `--maxWorkers=1`; no ordinary fixture manifest was available | slot released after teardown; capacity/rollback/races remain open |
+| A-04 | Offline Node suites and captures completed; proposed resources were never reserved or created (`127.0.0.1:55404`, Redis `56404`, object `57404/57405`, prefix `carberk-a04-c04d2138-20261030`) | no hosted/DB/object run; slot released |
 
 Pending resource metadata is not a passed gate or permission to use another
 worker's resources. Shared resets/setup, contracts, deployed mutation, native
@@ -82,3 +82,61 @@ The `52d901c50..a8b5aa0d` diff contains only five files under
 and updated execution record. The same source/test/config comparison used for
 the first wave exited 0. Lightweight coordinator verification passed
 `pnpm check:agent-docs`, `pnpm check:glossary` and `git diff --check`.
+
+## A-02 terminal receipt and resource release
+
+Evidence was copied from the child worktree into
+`a-02-worker-restricted-20261030/` without changing its bytes. The child
+receipt and `SHA256SUMS` remain authoritative.
+
+- Candidate/base: `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
+- Immutable child HEAD: `6cf5c311d43b5ae0bca0f2543564f65b5d2e2a9e`; 1,619 relevant
+  files byte-match the candidate. The 102-migration manifest is
+  `6db6fbf01a14c9a04cf4aa161b83133294647a777d7a39b62932990b44a019e8`.
+- Exact selectors and environment are in `execution-manifest.json` and the
+  `.command.json` receipts. Resources were Compose project
+  `auto_tm_ci_897_a02_f6408755`, PostgreSQL `127.0.0.1:61139/a02_worker`, Redis
+  `127.0.0.1:61138` DB0, MinIO `127.0.0.1:61140` bucket
+  `diagnostic-test-private`, UUID fixture keys, and sequential `--maxWorkers=1`.
+- Restricted preparation passed 12/12. Batch setup failed because the required
+  ordinary per-case fixture manifest was absent; all ten case bodies were
+  skipped. Capacity, rollback and race gates remain FAIL/open. No source/test
+  changes, ordinary full100 rerun, shared DB access or PR occurred.
+- Cleanup passed: trigger readiness restored, receipts `0/0`, rows/roles/
+  connections/objects/Redis keys removed, and the Compose project and volumes
+  destroyed. The exclusive timing slot is released.
+
+The missing fixture manifest is a prerequisite blocker, not permission to use
+the retained foreign task on port 65379. A separate evidence-only dispatch is
+required if the Parent supplies or authorizes production of the ten private
+ordinary fixtures.
+
+## A-04 terminal receipt and resource release
+
+Evidence was copied from `/Users/bagtyyar/.t3/worktrees/carberk/t3-c04d2138/`
+into `a-04-reset-runtime-20261030/` without changing its bytes. The receipt
+records immutable HEAD `6cf5c311d43b5ae0bca0f2543564f65b5d2e2a9e`, source base
+`52d901c50af1dde97ea22bda8efb1fdf21f169b1`, reset-migration SHA256
+`a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd`, and
+source/config equality. Offline suites passed 181/181; controller/ledger was
+51/52 and Railway-focused was 37/59. The retained-schema restoration mismatch
+omits four candidate migrations. PostgreSQL, Redis, object storage, shared
+staging and hosted restoration were not run. No task containers or processes
+remain. A-04 is FAIL/open and this receipt does not authorize a source/profile
+fix.
+
+## A-11 failure
+
+The child task ended before returning a report with the provider usage-limit
+error. This is an environment blocker, not a Spec verdict. The Spec review is
+open and A-09 cannot start until an independent Spec report is returned and
+recorded. Retry r2 is a new independent review round carrying forward the r1
+brief, failure and unresolved review requirement.
+
+## A-11 retry identity
+
+- Task ID: `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r2`.
+- Child thread: `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-spec-review-20261030-r2`.
+- Selection: `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access,
+  isolated worktree. The retry is read-only and has no runtime resource
+  reservation.

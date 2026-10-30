@@ -1,0 +1,27 @@
+{
+  "candidate": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "candidateSchema": "21cdc52efb2fb1a9cabdfe0955cfe8d75e60147f9e6dd14f83f9e45bf3df4c45",
+  "result": "FAIL",
+  "failure": "Schema snapshot and migration inventory mismatch",
+  "migrationCount": 102,
+  "unlistedForSchema": [
+    {
+      "name": "20261026016200_diagnostic_maintenance_compatibility",
+      "checksum": "aebf91d78f4bd1711ac30ada3cb3b8b01da4999fcafbc963e45b839fc14ce379"
+    },
+    {
+      "name": "20261026016300_diagnostic_registry_metadata_lookup",
+      "checksum": "e6447a2cf87af81e935805bdd3c1a1f234eb838667ef851599a0ea40d289c4e7"
+    },
+    {
+      "name": "20261026016400_diagnostic_source_key_predicate",
+      "checksum": "fe7358f92acaeae0b57a442cf8e7b4aa28b56ee03aa6177fd7fb271a93bafdb6"
+    },
+    {
+      "name": "20261029190000_operational_reset_row_admission",
+      "checksum": "a46a2ea29d04d0f5ad0d480aa3d2c92ef677388b3f6a808676ab8baa4ab79cdd"
+    }
+  ],
+  "missingForSchema": [],
+  "checksumDrift": []
+}

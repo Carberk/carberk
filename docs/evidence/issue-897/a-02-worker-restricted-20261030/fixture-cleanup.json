@@ -1,0 +1,162 @@
+{
+  "recordedAt": "2026-10-29T18:27:17.430538+00:00",
+  "checks": {
+    "exactTriggerSnapshotRestored": true,
+    "rowsEmpty": true,
+    "noRestrictedFixtureRolesRemain": true,
+    "noOtherTaskDatabaseConnections": true,
+    "noSourceOrCampaignReceipts": true,
+    "guardsRestoredDormant": true,
+    "noStoredObjects": true,
+    "redisEmpty": true,
+    "candidateMigrationChainUnchanged": true,
+    "allTwelveScenarioRestorationsRecorded": true
+  },
+  "allChecksPassed": true,
+  "scenarioRestorations": [
+    {
+      "scenario": "active-write-lease",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "attached-verified",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "due-bound",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "due-unbound",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "evidence-rights",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "not-due",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "old-staged",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "old-verified-unattached",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "render-en",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "render-ru",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "render-tk",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    },
+    {
+      "scenario": "storage-retry",
+      "exactSnapshotRestored": true,
+      "readiness": [
+        {
+          "source": false,
+          "campaign": false
+        }
+      ],
+      "sourceReceipts": 0,
+      "campaignReceipts": 0
+    }
+  ]
+}

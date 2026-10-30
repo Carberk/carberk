@@ -1,0 +1,26 @@
+{
+  "name": "restricted-preparation",
+  "program": "pnpm",
+  "arguments": [
+    "--filter",
+    "@auto-tm/worker",
+    "test",
+    "src/jobs/diagnostics/DiagnosticWorkerPreparation.e2e.spec.ts",
+    "--maxWorkers=1",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=/Users/bagtyyar/.t3/worktrees/carberk/t3-f6408755/docs/evidence/issue-897/a-02-worker-restricted-20261030/restricted-preparation.vitest.json"
+  ],
+  "cwd": "/tmp/carberk-a02-worker-restricted-f6408755/source",
+  "startedAt": "2026-10-29T18:25:50.511Z",
+  "finishedAt": "2026-10-29T18:26:00.826Z",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "log": "restricted-preparation.log",
+  "logSha256": "1cadfdb5e8a305091b97ce8d06c9d14def5eef8c37e58283280bda8e03a25e03",
+  "environmentNames": [
+    "DIAGNOSTIC_WORKER_PREPARATION_ACCEPTANCE",
+    "DIAGNOSTIC_WORKER_EVIDENCE_DIR"
+  ]
+}
