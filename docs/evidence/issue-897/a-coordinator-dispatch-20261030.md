@@ -29,8 +29,6 @@ PR #904 read-back remains OPEN/DRAFT at
 auto-merge disabled. It differs from the coordinator candidate. No PR ref
 mutation occurred.
 
-## S2 assembly and prior planned round
-
 ## Next A-02 prerequisite dispatch
 
 The coordinator has scoped a separate bounded fixture-producer repair in
@@ -72,6 +70,20 @@ timing/CPU contract are recorded before work; no resource or slot exists yet.
   `127.0.0.1:61148` DB0; MinIO `127.0.0.1:61150`, bucket
   `diagnostic-test-private`; ten distinct `r6c_batch_a02r2_*` databases and
   private root `/tmp/897-r6c-a02r2-20261030`. No foreign `65379` access.
+
+## Planned A-09R reset profile prerequisite
+
+The accepted A-11 A-04 finding is separately bounded in
+`a-04-reset-runtime-20261030/profile-repair/contract.md`, exact source/base
+`2edf11b7e898a8f3adc5ac6b66ce4b907bffa40a`. One isolated writer may inspect
+the four missing migrations' compatibility and adjust only closed current
+profile data and directly affected ledger tests. No shared reset, DB, provider,
+controller, guard, migration or executor edit is authorized. This path is
+disjoint from A-02's new producer. Verification remains serialized: A-02's
+syntax/diff checks have finished; it continues source audit/commit while
+A-09R owns one offline Node suite slot. Runtime resources remain absent.
+Actual dispatch identity is recorded after launch; a profile repair cannot
+pass A-04 or establish hosted restoration.
 
 ### Prior S2 assembly
 

@@ -447,6 +447,15 @@ no symbolic final-SHA placeholder is an execution authorization.
 
 ## Dependency order
 
+Current A-04 prerequisite repair is A-09R under the exact
+[profile repair contract](a-04-reset-runtime-20261030/profile-repair/contract.md),
+base `2edf11b7e898a8f3adc5ac6b66ce4b907bffa40a`. It explicitly accepts the
+A-11 restoration-profile finding alongside the completed Standards dispositions.
+Only closed current-profile data and necessary ledger tests are writable;
+runtime/reset/provider/guard/migration changes remain excluded. Its offline
+verification slot follows A-02's completed syntax checks and precedes any
+coordinator runtime run. Neither repair checkpoint passes its acceptance ticket.
+
 1. Record this map and commit it. Reconcile/inspect PR state without mutation.
 2. Start A-01, A-02, and the read-only portion of A-04 in parallel. A-11
    follows A-01 in the freed read-only slot. Start A-03
