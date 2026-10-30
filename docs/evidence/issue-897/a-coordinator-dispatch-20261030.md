@@ -40,6 +40,20 @@ the existing A-02/A-03/A-04/A-05–A-10 evidence gaps, with no new source defect
 The original dispatch entries below are history. No accepted ordinary full100,
 reset-cycle, staff/API or static evidence is invalidated by a planning commit.
 
+The existing A-02 fixture-preparation task has now returned terminal with no
+pending child work. Its checkout stayed at `064cf3486573cdd94c30c9500c6e6d45894f7ce1`.
+The public receipt, source pins and schemas are imported byte-exactly into
+`a-02-worker-restricted-20261030/fresh-ordinary-fixtures/`. Private planning
+manifests and their original hash list are retained at
+`/tmp/897-r6c-a02r2-20261030/preparation-packet/` and the original child tree.
+No runtime IDs, bearer tokens, role passwords or fixture graphs were generated.
+The ordinary producer cannot emit the required multi-component, overlimit,
+arrival, capture-race or proof-use/retry fields. A separate bounded test/evidence
+producer repair must be scoped before execution; all ten targets are absent.
+The coordinator already owns authority to produce them on its fresh resources.
+The receipt's historical phrase "if authorized" introduces no permission stop.
+A-02 remains FAIL/open; no new service, port or timing reservation is active.
+
 The Wayfinder map was recorded before any child launch. The reconciled
 candidate branch and PR head are at `6cf5c311` (the map and fast-forward
 reconciliation receipts are included). All children use GPT Sol 6.1,

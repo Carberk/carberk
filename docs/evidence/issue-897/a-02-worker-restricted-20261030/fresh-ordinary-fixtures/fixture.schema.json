@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A-02 private ordinary batch fixture",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "dependency",
+    "ordinaryProducerEvidence",
+    "cutoff",
+    "dueGrantIds",
+    "independentComponentId",
+    "ownerUrl",
+    "workerUrl"
+  ],
+  "properties": {
+    "dependency": {
+      "const": "023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab"
+    },
+    "ordinaryProducerEvidence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "dueGrantIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "uniqueItems": true
+    },
+    "independentComponentId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "ownerUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "workerUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "multiComponentGrantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "newerGrantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "outsideGrantComponentId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "nonDueGrantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "arrivalRequest": {
+      "$ref": "#/$defs/request"
+    },
+    "race": {
+      "type": "object",
+      "required": [
+        "barrierUserId",
+        "request",
+        "candidateOrderId"
+      ],
+      "properties": {
+        "barrierUserId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "candidateOrderId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "retryRequest": {
+          "$ref": "#/$defs/request"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "request": {
+      "type": "object",
+      "required": [
+        "url",
+        "token",
+        "body"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "body": {}
+      }
+    }
+  }
+}

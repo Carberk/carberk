@@ -1,0 +1,39 @@
+{
+  "recordedAt": "2026-10-30T10:56:44.576105+00:00",
+  "candidateSourceBase": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "assembledCheckpoint": "064cf3486573cdd94c30c9500c6e6d45894f7ce1",
+  "startHead": "064cf3486573cdd94c30c9500c6e6d45894f7ce1",
+  "startTree": "9664024f610a182d0e0c7e7f0f7dd4e3fc0307d4",
+  "branch": "t3/a02-ordinary-fixture-manifest",
+  "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-d9e9baec",
+  "comparedTrackedFileCount": 3056,
+  "sourceTestConfigDifferencesFromBase": [
+    "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts"
+  ],
+  "allOtherComparedFilesEqual": true,
+  "exactSingleExpressionReplacement": true,
+  "batchSpecEqualsAuthorizedSeamCheckpoint": true,
+  "authorizedSeamCheckpoint": "57193573412c67da99f28f87d2fe9d0cd20503c1",
+  "baseSpecSha256": "1a2d9b3a8747ff75dad4c32f43136a5759c0589f4a5976b80260eb6f69163953",
+  "assembledSpecSha256": "3a19fb1e046f93e082ed85ce2b6bc7417ebba7753514d766a90efbca29d8b922",
+  "migrationCount": 102,
+  "migrationManifestSha256": "dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc",
+  "diskMigrationChainEqualsAcceptedManifest": true,
+  "hashes": {
+    "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts": "3a19fb1e046f93e082ed85ce2b6bc7417ebba7753514d766a90efbca29d8b922",
+    "apps/worker/src/jobs/diagnostics/testing/bootstrapOwnershipExpiryFixture.mjs": "bfaa1e665e02d47b5569b5ee556428fef722e7f070d80afab292226f39a7bf87",
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipExpiryFixture.mjs": "8ada8f016b7ddd2921c14048c26c3a615d84124450e137d0bd29b20596515cf0",
+    "apps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts": "0282e35b40555cfc32122fd0a0d2d153248d0f9c5fed120326e37b72139bd8b4",
+    "apps/worker/src/jobs/diagnostics/DiagnosticWorkerPreparation.ts": "5b1dd2534cbf14649f780eac42ed1a146c808ab82a320f8109b76558139bb05f",
+    "apps/api/src/modules/diagnostics/presentation/DiagnosticIntakeController.ts": "df1a2bba82f40b69003ab8ee630bde34534272c8af5665a771221967a3e51a01",
+    "apps/api/src/modules/diagnostics/presentation/DiagnosticReportsController.ts": "88eb65eb1d999acd2f9108da7500b288299c2fa43fa07801e102263eaee23647",
+    "apps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipCapture.ts": "4cd86de03dff827c6c343f0c15a5c59920ebeb7fd9af335023496ac5ab75d17e",
+    "apps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipGrants.ts": "4f6182655a48667b75cc486e977aa07238ea71a46e0398eb856d3954b11f8339",
+    "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.ts": "1aaf6ce787a902ae298b5514e04462ca29603709e740a065bf6d10e32041bfda",
+    "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts": "6514d0d8ee47ca2d9cac1537e591beace4195bd2c2c3c395a793d6b46a8612d8",
+    "packages/contracts/src/schemas/diagnostics.ts": "9dad35a0b088ddb907f27dad83081cffcc2ca0dbffbf1711eaa274aed9dbfc6c",
+    "infra/compose/docker-compose.ci.yml": "bff8f1a841757a691930c10da79d2e98197fe5aa59c30a86b94bcd162bf39b37",
+    "pnpm-lock.yaml": "175aeafe3cb3dd0bb906cca75991c60ce81f333f4cb2463d6ad5773f876c16c9",
+    "docs/evidence/issue-897/worker-fresh-ready-20261029/migration-manifest.json": "dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc"
+  }
+}

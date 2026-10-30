@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A-02 serialized execution packet",
+  "type": "object",
+  "required": [
+    "kind",
+    "status",
+    "resources",
+    "batchPerCase",
+    "cleanup"
+  ],
+  "properties": {
+    "kind": {
+      "const": "a02-serialized-execution-packet"
+    },
+    "status": {
+      "const": "prepared_blocked"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "batchPerCase": {
+      "type": "object"
+    },
+    "cleanup": {
+      "type": "object"
+    }
+  }
+}

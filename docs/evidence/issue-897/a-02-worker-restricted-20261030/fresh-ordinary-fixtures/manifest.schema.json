@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A-02 private ordinary fixture manifest metadata",
+  "type": "object",
+  "required": [
+    "kind",
+    "schemaVersion",
+    "status",
+    "task",
+    "source",
+    "resources",
+    "commonFixtureContract",
+    "cases",
+    "materializationGate"
+  ],
+  "properties": {
+    "kind": {
+      "const": "a02-private-ordinary-fixture-manifest"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "status": {
+      "const": "blocked_unmaterialized_preparation_only"
+    },
+    "task": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "commonFixtureContract": {
+      "type": "object"
+    },
+    "cases": {
+      "type": "object",
+      "minProperties": 10
+    },
+    "materializationGate": {
+      "type": "object"
+    }
+  }
+}
