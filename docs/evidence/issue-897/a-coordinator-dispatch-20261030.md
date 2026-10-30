@@ -207,15 +207,34 @@ contract edit authority.
   with `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE=1`,
   `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT=61149`, and
   `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_MANIFEST=$RUN/fixture-manifest.json`.
-- **Resources:** Compose project `auto_tm_ci_897_a02_r2_20261030`; PostgreSQL
-  `127.0.0.1:61149/a02_worker_r2`; Redis `127.0.0.1:61148` DB0; MinIO
-  `127.0.0.1:61150`; task database `127.0.0.1:61149`; bucket
-  `diagnostic-test-private-a02-r2`; object prefix
-  `carberk-a02-r2-20261030`; all fixture files private under `$RUN`.
+- **Resources:** Compose project `auto_tm_ci_897_r6c_a02r2_20261030`;
+  PostgreSQL `127.0.0.1:61149`, with separate databases
+  `r6c_batch_a02r2_later_failure`, `r6c_batch_a02r2_shared_multiple`,
+  `r6c_batch_a02r2_oldest_capacity`, `r6c_batch_a02r2_overlimit`,
+  `r6c_batch_a02r2_worker_first_second_worker`,
+  `r6c_batch_a02r2_second_worker_first_worker`,
+  `r6c_batch_a02r2_worker_first_capture`,
+  `r6c_batch_a02r2_capture_first_worker`,
+  `r6c_batch_a02r2_worker_first_proof_use`, and
+  `r6c_batch_a02r2_proof_use_first_worker`. Redis is `127.0.0.1:61148` DB0;
+  dedicated MinIO is `127.0.0.1:61150`, bucket `diagnostic-test-private`,
+  with ordinary UUID keys recorded in each private fixture. The isolated
+  endpoint/bucket is the object namespace; no foreign store is used. `$RUN`
+  is `/tmp/897-r6c-a02r2-20261030`, mode 700, fixture files mode 600.
 - **Reservation:** one exclusive host-heavy slot, one Vitest worker, no A-04,
   deployment, native build or other timing run overlaps. The slot is not a
   permission to start services until the worker records fixture ownership and
   the coordinator confirms ports remain free.
+  A-09 currently owns verification; the seam child may inspect/edit and run
+  only small offline checks. Its package typecheck/lint/test/build commands
+  are held for coordinator execution after A-09 releases the slot.
+
+The resource values above preserve the unchanged ordinary bootstrap guards:
+Compose prefix `auto_tm_ci_897_r6c_`, task evidence under `/tmp/897-r6c-`, and
+the batch's `r6c_batch_*` databases. The batch object adapter uses bucket
+`diagnostic-test-private`. The coordinator will record the exact compatible
+manifest before fixture setup; changing these guards or using a different
+bucket is not part of the seam dispatch.
 
 ## A-04 terminal receipt and resource release
 
