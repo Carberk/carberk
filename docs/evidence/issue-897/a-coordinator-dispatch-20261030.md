@@ -133,10 +133,11 @@ receipt and `SHA256SUMS` remain authoritative.
   connections/objects/Redis keys removed, and the Compose project and volumes
   destroyed. The exclusive timing slot is released.
 
-The missing fixture manifest is a prerequisite blocker, not permission to use
-the retained foreign task on port 65379. A separate evidence-only dispatch is
-required if the Parent supplies or authorizes production of the ten private
-ordinary fixtures.
+The missing fixture manifest was a prerequisite blocker, not permission to use
+the retained foreign task on port 65379. The coordinator owns production of
+the ten private ordinary fixtures under the fresh slot below. Fixture creation
+and the later batch run remain evidence-only and serialized; no additional
+founder or Parent permission stop is introduced.
 
 ## Planned A-02 retry seam slot
 

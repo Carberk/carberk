@@ -10,20 +10,19 @@ declare A complete.
 
 ## Reconciled starting state
 
-- Worktree is clean and the local branch matches
-  `origin/agent/release897-candidate-a-20261029` at the handoff checkpoint.
-- PR #904 is open/draft at `agent/spec-897-campaign` /
-  `023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab`.
-- The PR head is an ancestor of the candidate (`git rev-list --left-right
-  --count 52d901c50...origin/agent/spec-897-campaign` reports `118 0`). The
-  candidate branch therefore contains the PR history plus 118 commits. A
-  later fast-forward of the PR head, with the resulting URL/head/checks
-  recorded, is required before publication or merge. No force push or silent
-  branch rewrite is authorized.
+- Coordinator branch `agent/release897-candidate-a-20261029` and its remote
+  currently point to candidate `998e2cfa47a7c33ffd097ea0ffb07e36aaaa5284`.
+- PR #904 remains open/draft on `agent/spec-897-campaign` at its separately
+  verified head `b6dac5d17c140c8fd307a24df56d4a82ed070625`. The PR ref is not
+  implied to equal the coordinator candidate. The earlier fast-forward and
+  every later ref read remain in the reconciliation receipts; no force push,
+  silent rewrite or merge is authorized.
 - Already accepted evidence remains accepted: reset-cycle focused proof,
   staff/API fixes, static checks, and the fresh ordinary worker full100 run.
   Those runs are not to be repeated unless a changed dependency invalidates
   their evidence.
+  Current PR/candidate identity is preserved in
+  [the current read-back](a-10-pr-readback-20261030.md).
 
 ## Dispatch rules
 
@@ -115,6 +114,11 @@ alter assertions, limits, fixtures, source contracts or production code.
 
 - **Owner:** delegated Sol 6.1 API/worker evidence worker.
 - **Base:** `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
+- **Preparation checkout:** `998e2cfa4`, whose intervening changes are
+  coordinator documentation only. The initial dispatch is read-only matrix
+  preparation with no tests, builds, containers or runtime resources. It must
+  report its actual immutable start HEAD and source equality. A later runtime
+  continuation needs the final assembled SHA and a recorded exclusive slot.
 - **Allowed paths:** source/tests read-only across API callers, campaign
   namespace admission, source cleanup, worker erasure and service callers;
   write only
