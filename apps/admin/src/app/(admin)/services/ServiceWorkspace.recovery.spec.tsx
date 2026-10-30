@@ -1,8 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 
+import { serviceStage } from "./actions";
 import { ServiceWorkspace } from "./ServiceWorkspace";
+import { UploadRightsForm } from "./UploadRightsForm";
 
 import { AdminLocaleProvider } from "@/lib/i18n";
 
@@ -75,3 +79,45 @@ it.each(["real", "synthetic"])("stages only staff-described %s image rights", as
  await view.findByText("Attachment ready to send");
  expect(view.stages[0]).toMatchObject({ category: "history_communication", rights: { provenance: "real: Owner image, recorded consent H17", schedule: { kind: "until", until: "2099-01-01T00:00:00.000Z", reason: "Case-specific permitted retention H17" } } });
  });
+
+function RightsUpload({ now }: { now: () => number }) {
+ const [rights, setRights] = useState<S.ServiceRights | null>(null), [staged, setStaged] = useState(false);
+ return <><UploadRightsForm purpose="history" locale="en" locked={false} onChange={setRights} now={now}/><button disabled={!rights} onClick={async () => {
+  if (!rights) return;
+  const result = await serviceStage(id, { visibility: "customer", contentType: "image/jpeg", sizeBytes: 1, filename: "history.jpg", category: "history_communication", rights });
+  setStaged(result.ok);
+ }}>Upload attachment</button>{staged && <p>Attachment staged</p>}</>;
+}
+it("rejects expired and equal-time rights and sends a one-millisecond-future expiry unchanged", async () => {
+ let currentTime = 4070908800000;
+ const stages: { path: string; body: unknown }[] = [];
+ vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+  stages.push({ path: new URL(String(url)).pathname, body: JSON.parse(String(init?.body)) });
+  return Response.json({ id });
+ });
+ render(<RightsUpload now={() => currentTime}/>);
+ fireEvent.change(screen.getByLabelText("Image source"), { target: { value: "real" } });
+ fireEvent.change(screen.getByLabelText("Rights basis"), { target: { value: "Customer permission for case H17" } });
+ fireEvent.change(screen.getByLabelText("Source and permission evidence"), { target: { value: "Owner image, recorded consent H17" } });
+ fireEvent.change(screen.getByLabelText("Retention expiry in UTC"), { target: { value: "2098-12-31T23:59:59.999Z" } });
+ fireEvent.change(screen.getByLabelText("Retention reason"), { target: { value: "Case-specific permitted retention H17" } });
+ const upload = screen.getByRole("button", { name: "Upload attachment" }) as HTMLButtonElement;
+ expect(upload.disabled).toBe(true);
+ fireEvent.click(upload);
+ expect(stages).toEqual([]);
+ fireEvent.change(screen.getByLabelText("Retention expiry in UTC"), { target: { value: "2099-01-01T00:00:00.000Z" } });
+ expect(upload.disabled).toBe(true);
+ fireEvent.click(upload);
+ expect(stages).toEqual([]);
+ fireEvent.change(screen.getByLabelText("Retention expiry in UTC"), { target: { value: "2099-01-01T00:00:00.001Z" } });
+ expect(upload.disabled).toBe(false);
+ fireEvent.click(upload);
+ await screen.findByText("Attachment staged");
+ expect(stages).toEqual([{ path: "/api/v1/services/conversations/11111111-1111-4111-8111-111111111111/attachments", body: { visibility: "customer", contentType: "image/jpeg", sizeBytes: 1, filename: "history.jpg", category: "history_communication", rights: { category: "history_communication", purpose: "Vehicle History communication", basis: "Customer permission for case H17", provenance: "real: Owner image, recorded consent H17", identifiability: "personal", use: ["service"], schedule: { kind: "until", until: "2099-01-01T00:00:00.001Z", reason: "Case-specific permitted retention H17" }, supplierRestrictions: "", hold: null } } }]);
+ // A later field edit revalidates with the current clock, as in the existing form.
+ currentTime = 4070908800001;
+ fireEvent.change(screen.getByLabelText("Retention reason"), { target: { value: "Current time has reached the permitted expiry" } });
+ expect(upload.disabled).toBe(true);
+ fireEvent.click(upload);
+ expect(stages).toHaveLength(1);
+});

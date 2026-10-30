@@ -18,7 +18,9 @@ type Declaration = { purpose: string; basis: string; provenance: string; identif
 const blankDeclaration = (): Declaration => ({ purpose: "", basis: "", provenance: "", identifiability: "", until: "", scheduleReason: "", restrictions: "" });
 const transportRights = (value: Declaration) => ({ category: "vehicle_observation" as const, purpose: value.purpose, basis: value.basis, provenance: value.provenance, identifiability: value.identifiability, use: ["service"] as ["service"], schedule: { kind: "until" as const, until: value.until ? `${value.until}:00.000Z` : "", reason: value.scheduleReason }, supplierRestrictions: value.restrictions, hold: null });
 const declarationText = [{ key: "purpose", max: 300 }, { key: "basis", max: 500 }, { key: "provenance", max: 1000 }, { key: "scheduleReason", max: 500 }] as const;
-export function DiagnosticIdentity({ context, denied, onDirty, onLock, onRecorded, focusRecord }: { context: D.DiagnosticWorkspace; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onRecorded(id:string): void; focusRecord?: string | undefined }) {
+const defaultIdGenerator = () => crypto.randomUUID();
+type DiagnosticIdentityProps = { context: D.DiagnosticWorkspace; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onRecorded(id:string): void; focusRecord?: string | undefined; idGenerator?: () => string };
+export function DiagnosticIdentity({ context, denied, onDirty, onLock, onRecorded, focusRecord, idGenerator = defaultIdGenerator }: DiagnosticIdentityProps) {
  const { locale } = useAdminLocale(), c = continuityCopy[locale], base = diagnosticCopy[locale], order = context.order;
  const [activity,setActivity]=useState<"staging"|"uploading"|"recording"|null>(null);
  const [records, setRecords] = useState<D.DiagnosticIdentityRecord[]>([]), [evidence, setEvidence] = useState<D.DiagnosticIdentityEvidence[]>([]), [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(false), [blocked, setBlocked] = useState(false), [invalid, setInvalid] = useState(false), [saved, setSaved] = useState(false);
@@ -79,7 +81,7 @@ export function DiagnosticIdentity({ context, denied, onDirty, onLock, onRecorde
  async function upload() {
   if (!file || blocked || busy || captureIntent.current || (!stageIntent.current && (!imageRightsValid || !currentRaw))) { imageValidation.validate(); return; }
   if (!stageIntent.current) {
-   const input = D.DiagnosticIdentityProvenanceStageSchema.safeParse({ id: crypto.randomUUID(), expectedOrderVersion: order.version, contentType: file.type, sizeBytes: file.size, rights: imageRights });
+   const input = D.DiagnosticIdentityProvenanceStageSchema.safeParse({ id: idGenerator(), expectedOrderVersion: order.version, contentType: file.type, sizeBytes: file.size, rights: imageRights });
    if (!input.success) { setInvalid(true); return; } stageIntent.current = { file, input: input.data };
   }
   const intent = stageIntent.current; setUncertain(true);
@@ -99,7 +101,7 @@ export function DiagnosticIdentity({ context, denied, onDirty, onLock, onRecorde
   if (!captureIntent.current && (!validation.validate() || !captureReady)) return;
   if (!captureIntent.current && !replacementReview) { setReplacementReview(true); return; }
   if (!captureIntent.current) {
-   const input = D.DiagnosticIdentityEvidenceCaptureSchema.safeParse({ id: crypto.randomUUID(), expectedOrderVersion: order.version, identityRecordId: currentRaw?.id, identifiers, rights: recordRights, correction: parent ? { supersedesId: parent.id, explanation } : null });
+   const input = D.DiagnosticIdentityEvidenceCaptureSchema.safeParse({ id: idGenerator(), expectedOrderVersion: order.version, identityRecordId: currentRaw?.id, identifiers, rights: recordRights, correction: parent ? { supersedesId: parent.id, explanation } : null });
    if (!input.success || !usableParent || (parent && !hasUnused)) { setInvalid(true); form.current?.querySelector<HTMLElement>(":invalid")?.focus(); return; }
    captureIntent.current = input.data;
   }
