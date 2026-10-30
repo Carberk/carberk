@@ -3,11 +3,10 @@ import type { ServiceMessagingSchemas as S } from "@auto-tm/contracts";
 
 import { uploadRightsCopy } from "./uploadRightsCopy";
 
-type Props = { purpose: S.ServicePurpose; locale: string; locked: boolean; onChange: (rights: S.ServiceRights | null) => void; now?: () => number };
-const defaultNow = () => Date.now();
+type Props = { purpose: S.ServicePurpose; locale: string; locked: boolean; onChange: (rights: S.ServiceRights | null) => void; now: () => number };
 
 /** Record the operator's evidence before accepting bytes; never infer rights from a file or staff role. */
-export function UploadRightsForm({ purpose, locale, locked, onChange, now = defaultNow }: Props) {
+export function UploadRightsForm({ purpose, locale, locked, onChange, now }: Props) {
  const c = uploadRightsCopy(locale);
  const [source, setSource] = useState(""), [basis, setBasis] = useState(""), [provenance, setProvenance] = useState(""), [until, setUntil] = useState(""), [reason, setReason] = useState(""), [restrictions, setRestrictions] = useState("");
  useEffect(() => {

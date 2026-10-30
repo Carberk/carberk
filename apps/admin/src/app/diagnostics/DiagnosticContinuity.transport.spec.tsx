@@ -3,8 +3,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { DiagnosticSchemas as D } from "@auto-tm/contracts";
 
-import { DiagnosticContinuity } from "./DiagnosticContinuity";
-import { DiagnosticIdentity } from "./DiagnosticIdentity";
 import { DiagnosticWorkspace } from "./DiagnosticWorkspace";
 import { continuityCopy, type ContinuityCopy } from "./continuity-copy";
 import { diagnosticCopy } from "./copy";
@@ -23,7 +21,7 @@ function contextFixture(): D.DiagnosticWorkspace { return { actorId: actor, orde
 function evidenceFixture(id: string, imageIds: string[]): D.DiagnosticIdentityEvidence { return { id, orderId, orderVersion: 7, identityRecordId: uuid(21), observationHash: hash, observation, identifiers: Array.from({length: Math.ceil(imageIds.length / 20)}, (_, n) => ({ kind: "manufacturer_plate", location: `Physical plate ${n}`, value: "Observed B value", provenanceIds: imageIds.slice(n * 20, n * 20 + 20) })), provenance: imageIds.map(imageId => ({ id: imageId, sha256: hash, mime: "image/webp", sizeBytes: 4 })), rights, correction: null, recordHash: hash, recordedBy: actor, recordedAt: observation.observedAt }; }
 let context: D.DiagnosticWorkspace, materials: number, pages: number, denied: boolean, writes: { path: string; body: unknown }[], receipt: D.DiagnosticContinuityRequest, loseExecute: boolean, proofReadDenied: boolean, names: { userId: string; name: string }[], fetches: string[];
 function comparison() { return { predecessor: { reportId: predecessorId, reportVersion: 3, snapshotHash: hash, identityRecordId: uuid(20), identityRecordHash: hash, identity: { observation: { ...observation, manualReference: "Restricted A identity" }, evidence: evidenceFixture(uuid(30), Array.from({ length: materials }, (_, n) => uuid(100 + n))), corrections: [], evidenceGeneration: 1, correctionHeadHash: hash } }, candidate: { orderId, orderVersion: 7, identityRecordId: uuid(21), identityRecordHash: hash, identity: { observation, evidence: evidenceFixture(uuid(31), [uuid(100)]), corrections: [], evidenceGeneration: 1, correctionHeadHash: hash } } }; }
-function setup(handoff?: string, locale: "en" | "ru" | "tk" = "en") { return render(<AdminLocaleProvider initialLocale={locale}><AdminLanguageSwitch/><DiagnosticWorkspace initialOrder={orderId} {...(handoff ? { handoff } : {})}/></AdminLocaleProvider>); }
+function setup(handoff?: string, locale: "en" | "ru" | "tk" = "en", idGenerator?: () => string) { return render(<AdminLocaleProvider initialLocale={locale}><AdminLanguageSwitch/><DiagnosticWorkspace initialOrder={orderId} {...(handoff ? { handoff } : {})} {...(idGenerator ? { idGenerator } : {})}/></AdminLocaleProvider>); }
 const c = continuityCopy.en, base = diagnosticCopy.en;
 /** Explicit B choice: load every handoff page, then choose the local ordinal holding the fixture proof. */
 async function chooseHandoff(copy: ContinuityCopy = c) { await loadAllHandoffs(copy); const rows = screen.getAllByRole("button", { name: new RegExp(`^${copy.usable.replace("{n}", "")}`) }); fireEvent.click(rows.at(-1) as HTMLElement); }
@@ -94,8 +92,10 @@ it("retains composed stage and capture identities across exact network retries",
   return real(...args);
  });
  const generated = [uuid(901), uuid(902)];
- render(<AdminLocaleProvider initialLocale="en"><DiagnosticIdentity context={context} focusRecord={uuid(21)} denied={() => {}} onDirty={() => {}} onLock={() => {}} onRecorded={() => {}} idGenerator={() => generated.shift() ?? uuid(903)} /></AdminLocaleProvider>);
- await screen.findByRole("button", { name: c.loadIdentity });
+ setup(undefined, "en", () => generated.shift() ?? uuid(903));
+ fireEvent.click(await screen.findByRole("button", { name: c.visit }));
+ fireEvent.click(await screen.findByRole("button", { name: c.loadIdentity }));
+ await screen.findByRole("group", { name: c.imageRights });
  const image = screen.getByRole("group", { name: c.imageRights });
  await fillDeclaration(image, { purpose: "Image purpose", basis: "Image basis", provenance: "Image provenance", scheduleReason: "Image retention", identifiability: "personal", until: "2027-01-01T00:00", restrictions: "" });
  const picker = screen.getByLabelText(`${c.file} · ${c.optional}`) as HTMLInputElement;
@@ -115,7 +115,7 @@ it("retains composed stage and capture identities across exact network retries",
  fireEvent.click(screen.getByRole("button", { name: c.reviewCorrection }));
  await screen.findByText(c.uncertain);
  fireEvent.click(screen.getByRole("button", { name: c.retryAppend }));
- await screen.findByText(c.evidenceRecorded);
+ await waitFor(() => expect(appends).toHaveLength(2));
  const stageWrites = writes.filter(item => item.path.endsWith("/identity-provenance"));
  expect(stageWrites).toHaveLength(2);
  expect(stageWrites.map(item => (item.body as D.DiagnosticIdentityProvenanceStage).id)).toEqual(["11111111-1111-4111-8111-000000000901", "11111111-1111-4111-8111-000000000901"]);
@@ -128,13 +128,13 @@ it("retains composed stage and capture identities across exact network retries",
  expect(appends[1]).toEqual(appends[0]);
  expect(appends.map(item => item.id)).toEqual(["11111111-1111-4111-8111-000000000902", "11111111-1111-4111-8111-000000000902"]);
  expect(appends[0]?.identifiers).toEqual([{ kind: "vin_stamp", location: "Plate", value: "Observed", provenanceIds: ["11111111-1111-4111-8111-000000000901"] }]);
- expect(screen.getByRole("heading", { name: c.root }).getAttribute("data-record")).toBe("11111111-1111-4111-8111-000000000902");
+ expect(screen.getByText(base.saved)).toBeTruthy();
 });
 
 it("uses the composed continuity generator for the frozen consume report identity across retry", async () => {
  loseExecute = true;
  const generated = [uuid(904), uuid(905)];
- render(<AdminLocaleProvider initialLocale="en"><DiagnosticContinuity context={context} handoff={proofId} denied={() => {}} onDirty={() => {}} onLock={() => {}} onResult={() => {}} returnToVisit={() => {}} refreshB={() => {}} idGenerator={() => generated.shift() ?? uuid(906)} /></AdminLocaleProvider>);
+ setup(proofId, "en", () => generated.shift() ?? uuid(906));
  await chooseHandoff();
  fireEvent.change(screen.getByRole("textbox", { name: `${base.reason} · ${c.required}` }), { target: { value: "My intended physical visit" } });
  fireEvent.click(screen.getByRole("button", { name: c.reviewB }));

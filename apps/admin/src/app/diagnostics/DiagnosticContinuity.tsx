@@ -14,9 +14,8 @@ type Comparison = Extract<Awaited<ReturnType<typeof actions.diagnosticReinspecti
 type Attempt = { requestId: string; input: D.DiagnosticContinuityRequestExecute; pending: boolean };
 type Method = D.DiagnosticContinuityProofIssuance["method"];
 type Handoff = D.DiagnosticContinuityHandoffs["handoffs"][number];
-const defaultIdGenerator = () => crypto.randomUUID();
-type DiagnosticContinuityProps = { context: D.DiagnosticWorkspace; handoff?: string | undefined; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onResult(reportId: string): void; returnToVisit(): void; refreshB(): void; coordinateAssignments?: (()=>void) | undefined; idGenerator?: () => string };
-export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock, onResult, returnToVisit, refreshB, coordinateAssignments, idGenerator = defaultIdGenerator }: DiagnosticContinuityProps) {
+type DiagnosticContinuityProps = { context: D.DiagnosticWorkspace; handoff?: string | undefined; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onResult(reportId: string): void; returnToVisit(): void; refreshB(): void; coordinateAssignments?: (()=>void) | undefined; idGenerator: () => string };
+export function DiagnosticContinuity({ context, handoff, denied, onDirty, onLock, onResult, returnToVisit, refreshB, coordinateAssignments, idGenerator }: DiagnosticContinuityProps) {
  const { locale } = useAdminLocale(), c = continuityCopy[locale], base = diagnosticCopy[locale], order = context.order;
  const [activity,setActivity]=useState<"preparing"|"issuing"|"creating"|null>(null);
  const [busy, setBusy] = useState(false), [error, setError] = useState(false), [blocked, setBlocked] = useState(false), [uncertain, setUncertain] = useState(false);

@@ -18,9 +18,8 @@ type Declaration = { purpose: string; basis: string; provenance: string; identif
 const blankDeclaration = (): Declaration => ({ purpose: "", basis: "", provenance: "", identifiability: "", until: "", scheduleReason: "", restrictions: "" });
 const transportRights = (value: Declaration) => ({ category: "vehicle_observation" as const, purpose: value.purpose, basis: value.basis, provenance: value.provenance, identifiability: value.identifiability, use: ["service"] as ["service"], schedule: { kind: "until" as const, until: value.until ? `${value.until}:00.000Z` : "", reason: value.scheduleReason }, supplierRestrictions: value.restrictions, hold: null });
 const declarationText = [{ key: "purpose", max: 300 }, { key: "basis", max: 500 }, { key: "provenance", max: 1000 }, { key: "scheduleReason", max: 500 }] as const;
-const defaultIdGenerator = () => crypto.randomUUID();
-type DiagnosticIdentityProps = { context: D.DiagnosticWorkspace; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onRecorded(id:string): void; focusRecord?: string | undefined; idGenerator?: () => string };
-export function DiagnosticIdentity({ context, denied, onDirty, onLock, onRecorded, focusRecord, idGenerator = defaultIdGenerator }: DiagnosticIdentityProps) {
+type DiagnosticIdentityProps = { context: D.DiagnosticWorkspace; denied(): void; onDirty(value: boolean): void; onLock(value: boolean): void; onRecorded(id:string): void; focusRecord?: string | undefined; idGenerator: () => string };
+export function DiagnosticIdentity({ context, denied, onDirty, onLock, onRecorded, focusRecord, idGenerator }: DiagnosticIdentityProps) {
  const { locale } = useAdminLocale(), c = continuityCopy[locale], base = diagnosticCopy[locale], order = context.order;
  const [activity,setActivity]=useState<"staging"|"uploading"|"recording"|null>(null);
  const [records, setRecords] = useState<D.DiagnosticIdentityRecord[]>([]), [evidence, setEvidence] = useState<D.DiagnosticIdentityEvidence[]>([]), [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(false), [blocked, setBlocked] = useState(false), [invalid, setInvalid] = useState(false), [saved, setSaved] = useState(false);

@@ -25,7 +25,8 @@ it.each([["en", "Service inbox"], ["ru", "Входящие сервисов"], [
 });
 it("keeps a failed draft and retries with the same idempotency identity through real actions", async () => {
  firstFailure = true;
- const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace/></AdminLocaleProvider>);
+ const generated = ["22222222-2222-4222-8222-222222222222", "33333333-3333-4333-8333-333333333333"];
+ const screen = render(<AdminLocaleProvider initialLocale="en"><ServiceWorkspace idGenerator={() => generated.shift() ?? id}/></AdminLocaleProvider>);
  await waitFor(() => expect(screen.getByRole("button", { name: "General Support" })).toBeTruthy());
  fireEvent.click(screen.getByRole("button", { name: "General Support" }));
  await waitFor(() => expect(screen.getByText("Synthetic service reply")).toBeTruthy());
@@ -34,7 +35,7 @@ it("keeps a failed draft and retries with the same idempotency identity through 
  await waitFor(() => expect(screen.getByRole("button", { name: "Retry sending" })).toBeTruthy());
  expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("Retry this synthetic reply");
  fireEvent.submit(form);
- await waitFor(() => expect(sends).toHaveLength(2)); expect(sends[0]?.["clientMessageId"]).toBe(sends[1]?.["clientMessageId"]);
+ await waitFor(() => expect(sends).toHaveLength(2)); expect(sends.map(send => send["clientMessageId"])).toEqual(["22222222-2222-4222-8222-222222222222", "22222222-2222-4222-8222-222222222222"]);
 });
 it("removes protected content after denial and preserves draft while switching locale", async () => {
  const screen = render(<AdminLocaleProvider initialLocale="en"><AdminLanguageSwitch/><ServiceWorkspace/></AdminLocaleProvider>);
