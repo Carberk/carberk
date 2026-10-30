@@ -138,6 +138,40 @@ the retained foreign task on port 65379. A separate evidence-only dispatch is
 required if the Parent supplies or authorizes production of the ten private
 ordinary fixtures.
 
+## Planned A-02 retry seam slot
+
+The first A-02 run is terminal FAIL/open because its ten ownership bodies were
+skipped without a private ordinary fixture manifest. The test also binds the
+task API to retained foreign port `65379`, so the coordinator recorded this
+separate bounded test-only dispatch before any retry. It has no production or
+contract edit authority.
+
+- **Planned task:** A-02 bounded test seam, fresh Sol 6.1 delegated worker;
+  task/thread/worktree IDs are recorded after dispatch and before its result is
+  accepted.
+- **Exact base:** `9038093f9b05fdcd360c005b1757bf24d62cce3f`; source base
+  `52d901c50af1dde97ea22bda8efb1fdf21f169b1`, with docs-only intervening
+  changes proven by the source comparison receipt.
+- **Allowed path:**
+  `apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts`
+  only, plus A-02 evidence files. The sole permitted change is an explicit
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT` expected-port seam; no assertion,
+  limit, fixture, production or migration changes.
+- **Exact retry command:**
+  `pnpm --filter @auto-tm/worker test src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=$EVIDENCE/ownership-batch.vitest.json`
+  with `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE=1`,
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT=61159`, and
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_MANIFEST=$RUN/fixture-manifest.json`.
+- **Resources:** Compose project `auto_tm_ci_897_a02_r2_20261030`; PostgreSQL
+  `127.0.0.1:61149/a02_worker_r2`; Redis `127.0.0.1:61148` DB0; MinIO
+  `127.0.0.1:61150`; task API `127.0.0.1:61159`; bucket
+  `diagnostic-test-private-a02-r2`; object prefix
+  `carberk-a02-r2-20261030`; all fixture files private under `$RUN`.
+- **Reservation:** one exclusive host-heavy slot, one Vitest worker, no A-04,
+  deployment, native build or other timing run overlaps. The slot is not a
+  permission to start services until the worker records fixture ownership and
+  the coordinator confirms ports remain free.
+
 ## A-04 terminal receipt and resource release
 
 Evidence was copied from `/Users/bagtyyar/.t3/worktrees/carberk/t3-c04d2138/`

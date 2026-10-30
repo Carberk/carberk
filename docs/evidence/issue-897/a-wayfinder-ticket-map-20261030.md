@@ -87,6 +87,30 @@ declare A complete.
   race orders converge without duplicate delivery or leaked data; FAIL on
   skipped/ambiguous cases or dirty fixture state.
 
+#### A-02 bounded test-seam dispatch for the evidence retry
+
+The first evidence run is blocked by a test prerequisite, not by a production
+finding. Its harness still hard-codes the retained foreign task port `65379`.
+The coordinator may dispatch one separate, test-only seam change before the
+retry. That change must parameterize the expected task API port through an
+explicit `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT` environment value while
+retaining the separate `r6c_batch_*` database and caller checks. It may not
+alter assertions, limits, fixtures, source contracts or production code.
+
+- **Exact base:** `9038093f9b05fdcd360c005b1757bf24d62cce3f`; source base remains
+  `52d901c50af1dde97ea22bda8efb1fdf21f169b1`, with intervening coordinator
+  commits proven docs-only.
+- **Allowed path:** `apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts`
+  only, plus `docs/evidence/issue-897/a-02-worker-restricted-20261030/**` in
+  the bounded fix worktree. No other source, test, migration or config path.
+- **Verification:** RED-first reproduction of the current hard-coded-port
+  failure, then the same ten case selectors with
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT=61159`, a private manifest, and
+  `--maxWorkers=1`; diff audit must show only the port seam.
+- **Gate:** PASS only when the seam is minimal and the later evidence run
+  supplies all ten private fixture files and proves every case. A seam patch
+  alone leaves A-02 FAIL/open.
+
 ### A-03 — Caller, namespace, privacy, and erasure matrices
 
 - **Owner:** delegated Sol 6.1 API/worker evidence worker.
