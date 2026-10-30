@@ -92,7 +92,7 @@ declare A complete.
 The first evidence run is blocked by a test prerequisite, not by a production
 finding. Its harness still hard-codes the retained foreign task port `65379`.
 The coordinator may dispatch one separate, test-only seam change before the
-retry. That change must parameterize the expected task API port through an
+retry. That change must parameterize the expected task database port through an
 explicit `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT` environment value while
 retaining the separate `r6c_batch_*` database and caller checks. It may not
 alter assertions, limits, fixtures, source contracts or production code.
@@ -105,7 +105,7 @@ alter assertions, limits, fixtures, source contracts or production code.
   the bounded fix worktree. No other source, test, migration or config path.
 - **Verification:** RED-first reproduction of the current hard-coded-port
   failure, then the same ten case selectors with
-  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT=61159`, a private manifest, and
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT=61149`, a private manifest, and
   `--maxWorkers=1`; diff audit must show only the port seam.
 - **Gate:** PASS only when the seam is minimal and the later evidence run
   supplies all ten private fixture files and proves every case. A seam patch

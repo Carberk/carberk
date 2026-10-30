@@ -142,13 +142,17 @@ ordinary fixtures.
 
 The first A-02 run is terminal FAIL/open because its ten ownership bodies were
 skipped without a private ordinary fixture manifest. The test also binds the
-task API to retained foreign port `65379`, so the coordinator recorded this
+task database URL to retained foreign port `65379`, so the coordinator recorded this
 separate bounded test-only dispatch before any retry. It has no production or
 contract edit authority.
 
-- **Planned task:** A-02 bounded test seam, fresh Sol 6.1 delegated worker;
-  task/thread/worktree IDs are recorded after dispatch and before its result is
-  accepted.
+- **Task:** `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-port-seam-20261030-r1`;
+  thread `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-port-seam-20261030-r1`;
+  worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-8400e79c`; branch
+  `t3/a-02-diagnostic-port-seam`; actual start HEAD
+  `41e9a07a1d20b60369839b1190410f708937784b`. Selection is `codex_work`,
+  `gpt-6.1-sol`, xhigh/priority, full access, isolated worktree. The child is
+  active; no result or source checkpoint is accepted yet.
 - **Exact base:** `9038093f9b05fdcd360c005b1757bf24d62cce3f`; source base
   `52d901c50af1dde97ea22bda8efb1fdf21f169b1`, with docs-only intervening
   changes proven by the source comparison receipt.
@@ -160,11 +164,11 @@ contract edit authority.
 - **Exact retry command:**
   `pnpm --filter @auto-tm/worker test src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=$EVIDENCE/ownership-batch.vitest.json`
   with `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_ACCEPTANCE=1`,
-  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT=61159`, and
+  `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_PORT=61149`, and
   `DIAGNOSTIC_WORKER_OWNERSHIP_BATCH_MANIFEST=$RUN/fixture-manifest.json`.
 - **Resources:** Compose project `auto_tm_ci_897_a02_r2_20261030`; PostgreSQL
   `127.0.0.1:61149/a02_worker_r2`; Redis `127.0.0.1:61148` DB0; MinIO
-  `127.0.0.1:61150`; task API `127.0.0.1:61159`; bucket
+  `127.0.0.1:61150`; task database `127.0.0.1:61149`; bucket
   `diagnostic-test-private-a02-r2`; object prefix
   `carberk-a02-r2-20261030`; all fixture files private under `$RUN`.
 - **Reservation:** one exclusive host-heavy slot, one Vitest worker, no A-04,
