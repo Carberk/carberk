@@ -38,6 +38,46 @@ The bounded A-09 fix round is now the only implementation child:
   return a checkpoint and affected verification. Any path or architecture
   expansion stops the child and returns to coordinator review.
 
+### A-09 actual checkout identity
+
+The existing active A-09 child is in
+`/Users/bagtyyar/.t3/worktrees/carberk/t3-3cd4f072`, branch
+`t3/issue-897-inject-ids-and-clock`. Its actual immutable start HEAD is
+`4002ce9fc7248ab172bce9ef7c42a24814646a99`, while the requested source
+checkpoint was `6a902544f6135273b19c6bc46e37813034fe68fa`. The intervening
+commit changes only the A-11 report, ticket map and dispatch ledger. The
+source/test/config comparison from `52d901c50` to that actual HEAD exited 0.
+S1 remains FAIL/open until the source fix is assembled and affected
+verification names that assembled SHA.
+
+## A-03 read-only preparation dispatch
+
+- **Task:** `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a03-matrix-prep-20261030-r1`.
+- **Thread:** `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a03-matrix-prep-20261030-r1`.
+- **Worktree/branch:** `/Users/bagtyyar/.t3/worktrees/carberk/t3-bef1130f`,
+  `t3/a-03-caller-privacy-matrix-evidence`.
+- **Actual start HEAD:** `68b0d8c65191a92cd75eb2b9a53f850a07c6e690`.
+  Source base remains `52d901c50af1dde97ea22bda8efb1fdf21f169b1`; the
+  intervening source/test/config comparison exited 0 with no output.
+- **Selection:** isolated `codex_work` / `gpt-6.1-sol`, xhigh/priority,
+  full access.
+- **Allowed writes:** only
+  `docs/evidence/issue-897/a-03-caller-privacy-matrix-20261030/**` and `/tmp`.
+  Source/tests/config are read-only. No services, test execution or builds.
+- **Dependency:** A-02's terminal FAIL receipt is available. Its ten missing
+  ownership cases remain open dependencies for A-03 acceptance.
+- **Commands:** `git rev-parse HEAD`, `git diff --name-status
+  52d901c50af1dde97ea22bda8efb1fdf21f169b1 HEAD`, `git diff --exit-code
+  52d901c50af1dde97ea22bda8efb1fdf21f169b1 HEAD -- apps packages scripts
+  .github infra pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json`,
+  and bounded `rg`/`sed` source/evidence inspection. The worker returns exact
+  executable suite selectors for every remaining R7c/R8/R4/R6a matrix cell.
+- **Resources/CPU:** none, source-only. No runtime reservation is granted.
+- **Evidence/gate:** return a per-cell status with preserved criteria, accepted
+  receipt references, source locations, missing verification and a proposed
+  concrete resource manifest. Preparation can finish while A-03 stays open.
+  Source searches do not replace required runtime proof.
+
 ## Immutable worktree identity
 
 All three initial workers started at
