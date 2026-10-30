@@ -50,6 +50,29 @@ source/test/config comparison from `52d901c50` to that actual HEAD exited 0.
 S1 remains FAIL/open until the source fix is assembled and affected
 verification names that assembled SHA.
 
+### A-09 assembly and post-fix review
+
+The worker returned source/test checkpoint
+`f55d11c414cbb1a9a79e1a025b0d955e7e473fe8` and evidence-inclusive HEAD
+`ca536cb449bcb7d17df5b682ef645e8126751035`. Coordinator assembly is
+`99097510f84c6d682bf9838f82a629f36dd5b442`, with source assembly commit
+`c5fb8cf4`. The five allow-listed admin source/tests match the worker's exact
+checkpoint bytes after conflict resolution. The earlier A-02 seam is the only
+other non-documentation delta from `52d901c50`.
+
+Coordinator verification on the assembled SHA passed the same 334 focused
+rendered/network tests, admin TS7/TS6/lint/build/runtime, worker TS7/TS6 and
+focused seam lint. See [assembled verification](a-09-fix-assembled-verification-20261030.md).
+S1 remains FAIL/open until post-fix independent review returns.
+
+The next independent round reviews `git diff 52d901c50af1dde97ea22bda8efb1fdf21f169b1...99097510f84c6d682bf9838f82a629f36dd5b442 -- apps packages scripts .github infra pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json`.
+Standards A-01 r2 and Spec A-11 r3 use separate isolated Sol 6.1 xhigh/priority
+read-only workers, with no runtime resources or package verification. Only
+the coordinator writes their reports under the existing evidence ticket
+paths. They receive the initial findings, accepted fixes, affected commands
+and all unresolved A-02/A-03/A-04/A-05–A-10 acceptance gaps. The review must
+not convert verified S1 behavior into overall release acceptance.
+
 ## A-03 read-only preparation dispatch
 
 - **Task:** `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a03-matrix-prep-20261030-r1`.
