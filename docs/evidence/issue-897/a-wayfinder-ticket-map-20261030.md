@@ -11,8 +11,12 @@ declare A complete.
 ## Reconciled starting state
 
 - Coordinator branch `agent/release897-candidate-a-20261029` currently carries
-  docs checkpoint `638683943`; the final assembled source/test SHA for the A-09
-  fix is `99097510f84c6d682bf9838f82a629f36dd5b442`. Future CI, review and
+  docs checkpoint `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`; the assembled
+  source/verification SHA for the A-09 S2 fix is
+  `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Independent A-01 Standards
+  r3 passes on this source and closes S1/S2; A-11 r4 is FAIL/open on the
+  remaining acceptance evidence, with no additional source defect.
+  Future CI, review and
   acceptance packets must name the exact assembled SHA they exercise.
 - PR #904 remains open/draft on `agent/spec-897-campaign` at its separately
   verified head `b6dac5d17c140c8fd307a24df56d4a82ed070625`. The PR ref is not
@@ -111,6 +115,18 @@ alter assertions, limits, fixtures, source contracts or production code.
 - **Gate:** PASS only when the seam is minimal and the later evidence run
   supplies all ten private fixture files and proves every case. A seam patch
   alone leaves A-02 FAIL/open.
+
+#### A-02 prerequisite — bounded ordinary batch producer
+
+The terminal fixture-preparation packet proves all ten fixture targets absent
+and the existing ordinary producer unable to emit required case fields. A
+separate implementation dispatch is authorized only under the exact owner,
+base, paths, limits, commands, resources, dependencies, non-goals, artifact and
+gate in the [bounded producer contract](a-02-worker-restricted-20261030/bounded-producer-repair/contract.md).
+Execution is offline until coordinator assembly and resource reservation.
+This narrow exception does not grant other evidence workers source-edit
+authority. A seam, script or planning receipt cannot pass A-02; all ten real
+case bodies and cleanup remain required.
 
 ### A-03 — Caller, namespace, privacy, and erasure matrices
 

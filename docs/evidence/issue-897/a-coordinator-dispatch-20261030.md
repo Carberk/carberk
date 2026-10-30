@@ -1,6 +1,51 @@
 # Milestone A dispatch — 2026-10-30
 
-## Current S2 follow-up
+## Current immutable review identities and disposition
+
+Both review rounds were launched from actual immutable HEAD
+`8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`, reviewing source/verification SHA
+`4b2c8a6f6161f9c825945637f6f848c64adeb145`. Coordinator read-back confirmed
+both worktree HEADs. `git diff --exit-code 4b2c8a6f6161f9c825945637f6f848c64adeb145..8c6fe1d1cc91b44100279a2f82da2a0d5421cc72 -- . ':!docs'`
+exits 0; the intervening checkpoint contains evidence/docs only. The original
+source base remains `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
+
+- A-01 task `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a01-s2-postfix-review-20261030-r3`;
+  thread `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a01-s2-postfix-review-20261030-r3`;
+  worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-070ab17b`, branch
+  `t3/issue-897-s2-standards-review`. Terminal PASS, no blockers; S1/S2
+  resolved on the pinned source. See `a-01-s2-standards-review-20261030.md`.
+- A-11 task `node:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-s2-postfix-review-20261030-r4`;
+  thread `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a11-s2-postfix-review-20261030-r4`;
+  worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-a5e5960a`, branch
+  `t3/issue-897-milestone-a-spec-review-2`. Terminal FAIL/open on the existing
+  evidence gates, no additional source defect. Report and accepted blocking
+  dispositions: `a-11-s2-spec-review-20261030.md`. No duplicate was dispatched.
+
+Both returned selections are `codex_work`, `gpt-6.1-sol`, xhigh/priority,
+full access, worktree isolation. Read-only commands and no-resource contract
+below apply to both; no host-heavy slot, ports, services or package commands.
+PR #904 read-back remains OPEN/DRAFT at
+`b6dac5d17c140c8fd307a24df56d4a82ed070625` on `agent/spec-897-campaign`,
+auto-merge disabled. It differs from the coordinator candidate. No PR ref
+mutation occurred.
+
+## S2 assembly and prior planned round
+
+## Next A-02 prerequisite dispatch
+
+The coordinator has scoped a separate bounded fixture-producer repair in
+`a-02-worker-restricted-20261030/bounded-producer-repair/contract.md` from exact
+base `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`. It owns only a new batch
+producer, its directly affected optional boundary test and ticket evidence.
+The ordinary full100 producer/bootstrap, all ten assertions and production
+source/config/migrations stay read-only. No runtime or package execution is
+authorized in this offline dispatch. Both independent review findings and
+dispositions above are dependencies; Spec gaps are not silently turned into
+source-fix authority. Actual task/thread/worktree/start HEAD will be recorded
+after launch. The concrete future runtime resources/commands and exclusive
+timing/CPU contract are recorded before work; no resource or slot exists yet.
+
+### Prior S2 assembly
 
 The S2 implementation task is terminal with no pending work. It returned source
 `15a63bf0b29fc36d009e248fec68770c25cad5a7` and evidence HEAD
@@ -8,8 +53,8 @@ The S2 implementation task is terminal with no pending work. It returned source
 verification passed at `4b2c8a6f6161f9c825945637f6f848c64adeb145`; the complete
 source/test/config comparison to the worker evidence HEAD exits 0. Exact
 commands, selectors, timings and outputs are in `a-09-fix-20261030/s2-assembled/`.
-The exclusive package slot is released. S1/S2 stay FAIL/open pending independent
-review of the assembled composition.
+The exclusive package slot is released. The returned A-01 report above now
+closes S1/S2 on this source; earlier open dispositions below remain historical.
 
 ### Planned independent S2 review round
 

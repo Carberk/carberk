@@ -4,20 +4,26 @@ Active coordinator: T3 `mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230`, Sol 6.1 xhigh
 
 Current authority is the founder's fresh-coordinator brief and Parent's contract clarification on 30 October. A is the internal campaign candidate only. Unfinished B prototype work and analytics product completion/real collection remain outside A; B, C and C-Activation retain their separate founder gates. Only the Parent declares A complete. Exact APK/AAB, required deployed/native evidence, protected PR #904 delivery and restoration remain open A requirements.
 
-The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-coordinator-dispatch-20261030.md) own current tickets, exact bases, paths, commands, resources, task/thread/worktree identities and dependency order. PR #904 was explicitly fast-forwarded from `023e6a5d` with no history rewrite; its current head is separately recorded as `b6dac5d17` in the [current read-back](a-10-pr-readback-20261030.md), while the coordinator has later docs-only checkpoints. A-01 remains FAIL/open on Standards S1; A-11 Spec returned FAIL/open on missing acceptance evidence with no additional source-fix path. A-09 is active on the three S1 modules. A separate disjoint A-02 test-port seam is active, with verification held behind A-09. A-03 read-only matrix preparation is active with no runtime resources. A-02 fixture production is routine authorized candidate evidence owned by this coordinator after seam assembly. A-02 and A-04 runtime gates remain FAIL/open; A-05 through A-10 remain pending. Accepted reset-cycle, staff/API, static and fresh ordinary full100 evidence is preserved. The detailed rows below are historical snapshots where superseded by this state.
+The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-coordinator-dispatch-20261030.md) own current tickets, exact bases, paths, commands, resources, task/thread/worktree identities and dependency order. Coordinator checkpoint `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72` contains assembled source/verification SHA `4b2c8a6f6161f9c825945637f6f848c64adeb145` plus docs/evidence only. PR #904 remains OPEN/DRAFT at the separate head `b6dac5d17c140c8fd307a24df56d4a82ed070625`, auto-merge disabled. Neither the candidate nor the PR was merged. The detailed rows below are historical snapshots where superseded by the current state.
 
 ## Active critical path
 
-Current review disposition: A-01 post-fix Standards is FAIL/open on S2,
-recorded in `a-01-postfix-standards-review-20261030.md`. S1 operation-site
-injection preserves frozen commands and expiry semantics, but optional ambient
-fallbacks and omitted production-parent dependencies leave the criterion open.
-A-09 S2 is the sole implementation worker from exact base
-`a4a3e9cd6dd42ea1166260c3d780ed44456f4b8b`, with an exclusive affected-admin
-verification slot. A-11 post-fix Spec remains FAIL/open for missing acceptance
-evidence and found no new source defect. A-02 fixture preparation stays offline
-until the slot is released. A-03/A-04 and A-05–A-10 remain open. This state
-supersedes the earlier in-flight S1/seam/review descriptions above.
+Current review disposition: independent A-01 r3 is PASS on `4b2c8a6f…`,
+recorded in `a-01-s2-standards-review-20261030.md`. S1/S2 are closed on that
+source after S2 assembly and coordinator verification: 334 affected tests,
+TS7/TS6, lint and build/runtime all passed. A-09 is terminal and its package
+slot is released. Independent A-11 r4 returned FAIL/open for missing acceptance
+evidence with no additional source defect, recorded in
+`a-11-s2-spec-review-20261030.md`. The A-02 seam is assembled, and fixture preparation is terminal with
+all ten target files absent. Its ordinary producer needs a separately bounded
+test/evidence repair before runtime execution; its offline contract is now
+recorded in `a-02-worker-restricted-20261030/bounded-producer-repair/contract.md`.
+A-03 preparation is terminal;
+its per-cell runtime matrix remains open. A-04 is RED/open on four missing
+retained-schema migrations and unproved runtime/restoration. A-05–A-10 remain
+open. No runtime resources or host-heavy slot are active. Accepted reset-cycle,
+staff/API, static and fresh ordinary full100 evidence is preserved. A remains
+unaccepted; only Parent may accept it.
 
 All selected #897 A criteria remain required. Quiet-host reservations cover actual timing-sensitive setup, tests and necessary observation only. Independent isolated functional checks, source, design and read-only reviews proceed in parallel within four slots. One writer owns each shared contract and this coordinator alone assembles. Registry163's six-phase comparison is finished, its clone drained and stopped, and staff/reset explicitly released. No measurement window is reserved.
 
