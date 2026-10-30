@@ -239,13 +239,17 @@ declare A complete.
   `6a902544f6135273b19c6bc46e37813034fe68fa`. Its post-review changes are
   evidence-only and have source/config equality to the reviewed
   `69948805f6f41f199634300ba2fbaf8c38630be1` state.
-- **Allowed paths:** A-01 Standards S1 names exactly
+- **Allowed paths:** The accepted review findings are recorded from both
+  independent reports. A-01 Standards finding S1 names exactly
   `apps/admin/src/app/diagnostics/DiagnosticIdentity.tsx`,
   `apps/admin/src/app/diagnostics/DiagnosticContinuity.tsx`, and
   `apps/admin/src/app/(admin)/services/UploadRightsForm.tsx`, plus their
   affected component tests and `docs/evidence/issue-897/a-09-fix-20261030/`.
-  A-11 returned no source-fix finding, so it adds no source path to this
-  allow-list. No path outside this combined disposition is writable.
+  A-11 Spec findings are the still-open A-02 restricted-worker evidence gap,
+  A-03 caller/privacy matrix gap, A-04 reset/restoration gap, and A-05 through
+  A-10 release evidence gaps; they require evidence or serialized acceptance,
+  add no source-fix path, and remain outside this worker's writable scope. No
+  path outside this combined Standards/Spec disposition is writable.
 - **Depends on:** A-01 and A-11 reports. A-02–A-05 may continue only when their paths
   are disjoint from the proposed fix.
 - **Non-goals:** no opportunistic refactor, scope expansion, contract rewrite,

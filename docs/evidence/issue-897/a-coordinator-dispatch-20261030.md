@@ -26,10 +26,13 @@ The bounded A-09 fix round is now the only implementation child:
 - Exact base: `6a902544f6135273b19c6bc46e37813034fe68fa`.
 - Selection: `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access,
   isolated worktree.
-- Allowed source paths are exactly the three S1 modules named in the map;
-  affected real component/network tests and the A-09 evidence directory are
-  the only additional writable paths. No reset, deployment, device, native,
-  artifact, B or analytics work is in this task.
+- The review disposition includes both reports: A-01 Standards S1 is the
+  bounded source finding, while A-11 Spec records open A-02/A-03/A-04 and
+  A-05–A-10 evidence/acceptance gaps with no source-fix paths. Allowed source
+  paths are therefore exactly the three S1 modules named in the map; affected
+  real component/network tests and the A-09 evidence directory are the only
+  additional writable paths. No reset, deployment, device, native, artifact,
+  B or analytics work is in this task.
 - The worker must preserve frozen IDs across exact retries and current expiry
   semantics, use deterministic IDs/time in real rendered/network tests, and
   return a checkpoint and affected verification. Any path or architecture
