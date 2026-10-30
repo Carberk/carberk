@@ -292,6 +292,19 @@ alter assertions, limits, fixtures, source contracts or production code.
 - **Gate:** PASS when the named finding is fixed with no new scope and all
   affected checks are green; FAIL otherwise, returning to coordinator review.
 
+#### A-09 S2 follow-up round
+
+The post-fix A-01 review returned FAIL/open on S2. The first A-09 round fixed
+operation-site reads but left optional ambient fallbacks and production parents
+that omit the dependencies. The follow-up may change only the three S1 modules,
+their production composition/provider boundaries (`DiagnosticWorkspace`,
+`ServiceWorkspace` and the chosen admin runtime provider), directly affected
+rendered/network tests, and the A-09 evidence directory. It must make the
+dependencies required at the module boundary and exercise the real parents with
+deterministic providers. No other feature, B, analytics, reset, deployment,
+native, artifact or release path is in scope. S2 remains FAIL/open until this
+round is assembled, verified and independently reviewed again.
+
 ### A-10 — Current-PR reconciliation, protected merge, and final acceptance
 
 - **Owner:** coordinator (the delegated worker may prepare a read-only checklist
