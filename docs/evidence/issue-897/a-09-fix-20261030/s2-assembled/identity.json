@@ -1,0 +1,56 @@
+{
+  "sourceBase": "a4a3e9cd6dd42ea1166260c3d780ed44456f4b8b",
+  "workerStartHead": "a4a3e9cd6dd42ea1166260c3d780ed44456f4b8b",
+  "workerSourceCheckpoint": "15a63bf0b29fc36d009e248fec68770c25cad5a7",
+  "workerEvidenceHead": "cee54c5615e9b50a2e265c8c2b035e823848161b",
+  "assembledVerificationSha": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+  "sourceEquality": [
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "cee54c5615e9b50a2e265c8c2b035e823848161b",
+        "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+        "--",
+        "apps",
+        "packages",
+        "scripts",
+        ".github",
+        "infra",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "package.json",
+        "turbo.json"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--name-only",
+        "a4a3e9cd6dd42ea1166260c3d780ed44456f4b8b",
+        "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+        "--",
+        "apps",
+        "packages",
+        "scripts",
+        ".github",
+        "infra",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "package.json",
+        "turbo.json"
+      ],
+      "exitCode": 0,
+      "stdout": "apps/admin/src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx\napps/admin/src/app/(admin)/services/ServiceWorkspace.spec.tsx\napps/admin/src/app/(admin)/services/ServiceWorkspace.tsx\napps/admin/src/app/(admin)/services/UploadRightsForm.tsx\napps/admin/src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx\napps/admin/src/app/diagnostics/DiagnosticContinuity.tsx\napps/admin/src/app/diagnostics/DiagnosticIdentity.tsx\napps/admin/src/app/diagnostics/DiagnosticWorkspace.tsx\n",
+      "stderr": ""
+    }
+  ],
+  "resourceSlot": "A-09 serialized admin-only; no task runtime resources",
+  "pr904Head": "b6dac5d17c140c8fd307a24df56d4a82ed070625",
+  "pr904State": "OPEN DRAFT, autoMergeRequest=null"
+}

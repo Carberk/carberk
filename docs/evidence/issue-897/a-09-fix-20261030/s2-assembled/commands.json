@@ -1,0 +1,105 @@
+[
+  {
+    "candidate": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@auto-tm/admin",
+      "exec",
+      "vitest",
+      "run",
+      "--reporter=dot",
+      "src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx",
+      "src/app/diagnostics/DiagnosticWorkspace.spec.tsx",
+      "src/app/diagnostics/DiagnosticWorkspace.transport.spec.tsx",
+      "src/app/diagnostics/identity-transport.spec.ts",
+      "src/app/diagnostics/identity-files.transport.spec.ts",
+      "src/app/diagnostics/request-recovery.transport.spec.ts",
+      "src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx",
+      "src/app/(admin)/services/ServiceWorkspace.spec.tsx",
+      "src/app/(admin)/services/ServiceWorkspace.transport.spec.tsx"
+    ],
+    "startUtc": "2026-10-30T11:53:19.117390+00:00",
+    "finishUtc": "2026-10-30T11:53:26.826499+00:00",
+    "durationSeconds": 7.709,
+    "exitCode": 0,
+    "output": "01-output.txt"
+  },
+  {
+    "candidate": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@auto-tm/admin",
+      "typecheck"
+    ],
+    "startUtc": "2026-10-30T11:53:26.826826+00:00",
+    "finishUtc": "2026-10-30T11:53:27.397153+00:00",
+    "durationSeconds": 0.57,
+    "exitCode": 0,
+    "output": "02-output.txt"
+  },
+  {
+    "candidate": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@auto-tm/admin",
+      "exec",
+      "tsc6",
+      "--noEmit"
+    ],
+    "startUtc": "2026-10-30T11:53:27.397340+00:00",
+    "finishUtc": "2026-10-30T11:53:29.678788+00:00",
+    "durationSeconds": 2.281,
+    "exitCode": 0,
+    "output": "03-output.txt"
+  },
+  {
+    "candidate": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@auto-tm/admin",
+      "lint"
+    ],
+    "startUtc": "2026-10-30T11:53:29.679127+00:00",
+    "finishUtc": "2026-10-30T11:53:32.442946+00:00",
+    "durationSeconds": 2.764,
+    "exitCode": 0,
+    "output": "04-output.txt"
+  },
+  {
+    "candidate": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@auto-tm/admin",
+      "verify:runtime"
+    ],
+    "startUtc": "2026-10-30T11:53:32.443203+00:00",
+    "finishUtc": "2026-10-30T11:53:49.093629+00:00",
+    "durationSeconds": 16.65,
+    "exitCode": 0,
+    "output": "05-output.txt"
+  },
+  {
+    "candidate": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "argv": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "startUtc": "2026-10-30T11:53:49.093940+00:00",
+    "finishUtc": "2026-10-30T11:53:49.117515+00:00",
+    "durationSeconds": 0.024,
+    "exitCode": 0,
+    "output": "06-output.txt"
+  }
+]

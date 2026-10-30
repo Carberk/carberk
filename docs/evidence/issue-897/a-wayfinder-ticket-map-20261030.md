@@ -294,6 +294,13 @@ alter assertions, limits, fixtures, source contracts or production code.
 
 #### A-09 S2 follow-up round
 
+Assembled verification checkpoint `4b2c8a6f6161f9c825945637f6f848c64adeb145`
+passes all 334 affected tests, both admin TypeScript compilers, lint and runtime
+verification. Its receipt is `a-09-s2-assembled-verification-20261030.md`.
+S1/S2 remain FAIL/open until the fresh independent review returns. The repair
+slot is released; A-02 fixture production still requires the separately scoped
+producer dependency repair recorded in its preparation receipt.
+
 The post-fix A-01 review returned FAIL/open on S2. The first A-09 round fixed
 operation-site reads but left optional ambient fallbacks and production parents
 that omit the dependencies. The follow-up may change only the three S1 modules,

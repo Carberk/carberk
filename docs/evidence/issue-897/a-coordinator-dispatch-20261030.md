@@ -2,6 +2,35 @@
 
 ## Current S2 follow-up
 
+The S2 implementation task is terminal with no pending work. It returned source
+`15a63bf0b29fc36d009e248fec68770c25cad5a7` and evidence HEAD
+`cee54c5615e9b50a2e265c8c2b035e823848161b`. Coordinator assembly and affected
+verification passed at `4b2c8a6f6161f9c825945637f6f848c64adeb145`; the complete
+source/test/config comparison to the worker evidence HEAD exits 0. Exact
+commands, selectors, timings and outputs are in `a-09-fix-20261030/s2-assembled/`.
+The exclusive package slot is released. S1/S2 stay FAIL/open pending independent
+review of the assembled composition.
+
+### Planned independent S2 review round
+
+- Owners: two fresh isolated Sol 6.1 reviewers, Standards A-01 and Spec A-11;
+  neither implemented the fix. Each will receive a distinct new task.
+- Source base: `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Record actual checkout
+  HEAD and prove any planning/receipt delta has no relevant source changes.
+- Allowed paths/resources: read-only source, tests and evidence; no writes,
+  formatting, commits, package commands, services, timing reservation or ports.
+- Dependencies: completed S2 assembly/affected verification, prior S1/S2 and
+  Spec reports. Standards traces required dependencies through real parents;
+  Spec retains every still-open R7c/R8/R4/R6a and release criterion.
+- Commands: immutable identity reads, source-only `git diff` against the base,
+  and bounded `rg`/`sed` inspection. Accepted expensive proof is not rerun.
+- Evidence: coordinator records returned reports with task/thread/worktree,
+  exact SHA, provider/options, cited criteria/rules and findings dispositions.
+- Gates: Standards PASS only when S1/S2 and changed-code obligations are
+  resolved. Spec honestly remains FAIL/open while any required evidence is
+  absent. Neither report declares A accepted. Material new findings return
+  to recorded disposition before another bounded source dispatch.
+
 A-01 post-fix Standards returned FAIL/open on S2. The first A-09 round
 preserved retry IDs and expiry semantics, but its optional ambient defaults
 remain in production composition. A-11 post-fix Spec returned FAIL/open on

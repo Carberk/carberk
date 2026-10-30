@@ -1,0 +1,307 @@
+UTC: 2026-10-30T11:35:50.451899+00:00
+CWD: /Users/bagtyyar/.t3/worktrees/carberk/t3-6ab06b8e
+HEAD: a4a3e9cd6dd42ea1166260c3d780ed44456f4b8b
+COMMAND: pnpm --filter @auto-tm/admin exec vitest run --reporter=dot src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx 'src/app/(admin)/services/ServiceWorkspace.spec.tsx' 'src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx'
+EXIT: 1
+
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-6ab06b8e/apps/admin
+
+······x···x·········xx·············································x·········································
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > retains composed stage and capture identities across exact network retries
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+  [
+-   "11111111-1111-4111-8111-000000000901",
+-   "11111111-1111-4111-8111-000000000901",
++   "827c7639-97b4-4ce6-9c73-8cd99dcbbf26",
++   "827c7639-97b4-4ce6-9c73-8cd99dcbbf26",
+  ]
+
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:121:89
+    119|  const stageWrites = writes.filter(item => item.path.endsWith("/identi…
+    120|  expect(stageWrites).toHaveLength(2);
+    121|  expect(stageWrites.map(item => (item.body as D.DiagnosticIdentityProv…
+       |                                                                                         ^
+    122|  expect(stageWrites[1]).toEqual(stageWrites[0]);
+    123|  expect(uploads).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > uses the composed continuity generator for the frozen consume report identity across retry
+AssertionError: expected [ { …(4) }, { …(4) } ] to deeply equal [ { …(4) }, { …(4) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "expectedOrderVersion": 7,
+      "proofId": "11111111-1111-4111-8111-000000000003",
+      "reason": "My intended physical visit",
+-     "reportId": "11111111-1111-4111-8111-000000000904",
++     "reportId": "1625a079-3748-40e8-951d-39180797e036",
+    },
+    {
+      "expectedOrderVersion": 7,
+      "proofId": "11111111-1111-4111-8111-000000000003",
+      "reason": "My intended physical visit",
+-     "reportId": "11111111-1111-4111-8111-000000000904",
++     "reportId": "1625a079-3748-40e8-951d-39180797e036",
+    },
+  ]
+
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:148:97
+    146|  const executeWrites = writes.filter(item => item.path.endsWith("/exec…
+    147|  expect(executeWrites).toHaveLength(2);
+    148|  expect(executeWrites.map(item => (item.body as D.DiagnosticContinuity…
+       |                                                                                                 ^
+    149|   { proofId: "11111111-1111-4111-8111-000000000003", reportId: "111111…
+    150|   { proofId: "11111111-1111-4111-8111-000000000003", reportId: "111111…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx > offers only existing authorized assignment coordination when no technician name is usable
+AssertionError: expected false to be true // Object.is equality
+
+Ignored nodes: comments, script, style
+[36m<html[39m
+  [33mlang[39m=[32m"en"[39m
+[36m>[39m
+  [36m<head />[39m
+  [36m<body>[39m
+    [36m<div>[39m
+      [36m<label[39m
+        [33mclass[39m=[32m"flex items-center gap-2 text-sm"[39m
+      [36m>[39m
+        [0mLanguage[0m
+        [36m<select[39m
+          [33maria-label[39m=[32m"Language"[39m
+          [33mclass[39m=[32m"min-h-11 rounded-md border bg-surface px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 dark:focus-visible:outline-neutral-100"[39m
+        [36m>[39m
+          [36m<option[39m
+            [33mlang[39m=[32m"tk"[39m
+            [33mvalue[39m=[32m"tk"[39m
+          [36m>[39m
+            [0mTürkmençe[0m
+          [36m</option>[39m
+          [36m<option[39m
+            [33mlang[39m=[32m"ru"[39m
+            [33mvalue[39m=[32m"ru"[39m
+          [36m>[39m
+            [0mРусский[0m
+          [36m</option>[39m
+          [36m<option[39m
+            [33mlang[39m=[32m"en"[39m
+            [33mvalue[39m=[32m"en"[39m
+          [36m>[39m
+            [0mEnglish[0m
+          [36m</option>[39m
+        [36m</select>[39m
+      [36m</label>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"space-y-6"[39m
+      [36m>[39m
+        [36m<header[39m
+          [33mclass[39m=[32m"space-y-2"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-2xl font-semibold"[39m
+          [36m>[39m
+            [0mDiagnostic inspections[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"max-w-prose text-sm text-text-secondary"[39m
+          [36m>[39m
+            [0mSynthetic inspections only. Live center booking remains closed.[0m
+          [36m</p>[39m
+        [36m</header>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex flex-wrap gap-3"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"min-h-11 rounded-md border border-text-secondary bg-background px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-secondary"[39m
+          [36m>[39m
+            [0mBack to assigned work[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"min-h-11 rounded-md border border-text-secondary bg-background px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-secondary"[39m
+          [36m>[39m
+            [0mLoad current version[0m
+          [36m</button>[39m
+        [36m</div>[39m
+        [36m<section[39m
+          [33mclass[39m=[32m"space-y-3 rounded-lg border border-border p-4"[39m
+        [36m>[39m
+          [36m<h2[39m
+            [33mclass[39m=[32m"text-lg font-medium"[39m
+            [33mdata-destination[39m=[32m"true"[39m
+            [33mtabindex[39m=[32m"-1"[39m
+          [36m>[39m
+            [0mCurrent inspection B[0m
+          [36m</h2>[39m
+          [36m<dl[39m
+            [33mclass[39m=[32m"grid gap-2 break-words sm:grid-cols-[12rem_1fr]"[39m
+          [36m>[39m
+            [36m<dt>[39m
+              [0mVehicle matching method[0m
+            [36m</dt>[39m
+            [36m<dd>[39m
+              [0mAuthorized manual match[0m
+            [36m</dd>[39m
+            [36m<dt>[39m
+              [0mManual decision reference[0m
+            [36m</dt>[39m
+            [36m<dd[39m
+              [33mclass[39m=[32m"break-all font-mono"[39m
+            [36m>[39m
+              [0mAuthorized physical visit B[0m
+            [36m</dd>[39m
+            [36m<dt>[39m
+              [0mActual inspection time, UTC[0m
+            [36m</dt>[39m
+            [36m<dd>[39m
+              [0m24/10/2026, 10:00:00[0m
+              [0m UTC[0m
+            [36m</dd>[39m
+            [36m<dt>[39m
+              [0mRecorded mileage, km[0m
+            [36m</dt>[39m
+            [36m<dd>[39m
+              [0m129,000[0m
+              [0m km[0m
+            [36m</dd>[39m
+          [36m</dl>[39m
+          [36m<p>[39m
+            [0mPinned template[0m
+            [0m: [0m
+            [0mSynthetic template[0m
+            [0m · [0m
+            [0m2[0m
+          [36m</p>[39m
+          [36m<p>[39m
+            [0mReport audience[0m
+            [0m: [0m
+            [0mBuyer private[0m
+          [36m</p>[39m
+          [36m<p>[39m
+            [0mAppointment[0m
+            [0m: [0m
+            [0mArrived[0m
+          [36m</p>[39m
+          [36m<p>[39m
+            [0mPhysical authorization[0m
+            [0m: [0m
+            [0mSaved[0m
+          [36m</p>[39m
+        [36m</section>[39m
+        [36m<nav[39m
+          [33maria-label[39m=[32m"Diagnostic inspections"[39m
+          [33mclass[39m=[32m"flex flex-wrap gap-3"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"min-h-11 rounded-md border border-text-secondary bg-background px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-secondary"[39m
+          [36m>[39m
+            [0mVisit and identity[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-current[39m=[32m"step"[39m
+            [33mclass[39m=[32m"min-h-11 rounded-md border border-text-secondary bg-background px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-secondary"[39m
+          [36m>[39m
+            [0mLink a previous inspection[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"min-h-11 rounded-md border border-text-secondary bg-background px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text-secondary"[39m
+          [36m>[39m
+            [0mReports and revisions[0m
+          [36m</button>[39m
+        [36m</nav>[39m
+        [36m<div[39m
+          [33mdata-panel[39m=[32m"visit"[39m
+          [33mhidden[39m=[32m""[39m
+        [36m>[39m
+          [36m<section[39m
+            [33mclass[39m=[32m"space-y-4 rounded-lg border border-border p-4 font-sans md:p-6"[39m
+          [36m>[39m
+            [36m<h2[39m
+              [33mclass[39m=[32m"text-lg font-medium"[39m
+              [33mtabindex[39m=[32m"-1"[39m
+            [36m>[39m
+              [0mStructured identity history[0m
+            [36m</h2>[39m
+            [36m<p>[39m
+              [0mReload does not restore form...
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/app/diagnostics/DiagnosticContinuity.transport.spec.tsx:410:499
+
+ ❯ runWithExpensiveErrorDiagnosticsDisabled ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback ../../node_modules/.pnpm/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx > rejects expired and equal-time rights through the service parent and stages a one-millisecond-future expiry unchanged
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/app/(admin)/services/ServiceWorkspace.recovery.spec.tsx:90:26
+     88|  fireEvent.change(view.getByLabelText("Retention reason"), { target: {…
+     89|  const picker = view.getByLabelText("Upload attachment") as HTMLInputE…
+     90|  expect(picker.disabled).toBe(true);
+       |                          ^
+     91|  expect(view.stages).toEqual([]);
+     92|  fireEvent.change(view.getByLabelText("Retention expiry in UTC"), { ta…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/app/(admin)/services/ServiceWorkspace.spec.tsx > keeps a failed draft and retries with the same idempotency identity through real actions
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+  [
+-   "22222222-2222-4222-8222-222222222222",
+-   "22222222-2222-4222-8222-222222222222",
++   "a2f568a0-60c7-4c28-bef9-9fdee4bbfc07",
++   "a2f568a0-60c7-4c28-bef9-9fdee4bbfc07",
+  ]
+
+ ❯ src/app/(admin)/services/ServiceWorkspace.spec.tsx:38:105
+     36|  expect((screen.getByLabelText("Message") as HTMLTextAreaElement).valu…
+     37|  fireEvent.submit(form);
+     38|  await waitFor(() => expect(sends).toHaveLength(2)); expect(sends.map(…
+       |                                                                                                         ^
+     39| });
+     40| it("removes protected content after denial and preserves draft while s…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  5 failed | 104 passed (109)
+   Start at  19:35:50
+   Duration  5.75s (tests 84%, environment 10%, import 6%, transform 1%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 6ab06b8e/apps/admin
+
