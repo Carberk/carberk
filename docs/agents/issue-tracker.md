@@ -1,6 +1,6 @@
 # Issue tracker — GitHub Issues
 
-This repo tracks all issues in **GitHub Issues**, using the `gh` CLI.
+This repo tracks all issues in **GitHub Issues**. Use a verified GitHub connection through the repository CLI helper or the current host's MCP/connector; [GitHub operations](github-operations.md#verify-the-active-connection) owns access checks and transport instructions.
 
 ## Required tracking before dispatch
 
@@ -8,6 +8,8 @@ This repo tracks all issues in **GitHub Issues**, using the `gh` CLI.
 2. Before a worker starts, its issue must identify the owner, immutable base SHA, allowed paths/resources, dependencies, non-goals, verification commands, evidence and pass/fail acceptance. A document heading or local ticket ID alone does not satisfy this gate. Existing thread/worktree identities and historical checkpoints survive migration.
 3. Record assignments, blockers, current status, accepted findings and completion evidence in the issue. Link its number from the dispatch and execution receipts. Repository maps describe scope or preserve evidence; they are not a second live task tracker. Thread completion and checkpoint commits do not close an implementation issue.
 4. If GitHub refuses a required write, preserve the exact request body and error, report the block and hold new dispatch that depends on the missing issue/update. Do not silently move tracking into documents, chat or another service. A tracker change requires an explicit founder decision.
+
+Ticket managers and their delegates read the same governing GitHub issue and report evidence back to it through the assigned update owner. A thread or delegate is an executor, not a replacement ticket. Separately scoped work needs its own GitHub issue before dispatch. Changing hosts or providers does not change these rules or the founder's model restrictions.
 
 For `403 Resource not accessible by integration`, stop writes after the first permission refusal and arrange a permission/access correction. Do not repeat the request or retry it through another account, tool or endpoint to bypass the refusal. Resume after the access change is verified. This message indicates insufficient integration access; it is not evidence of a rate limit. Actual rate-limit responses require following GitHub's retry/reset headers, while keeping GitHub as the tracker.
 
