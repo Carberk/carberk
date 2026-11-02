@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "lsof",
+    "-nP",
+    "-iTCP:61168",
+    "-iTCP:61169",
+    "-iTCP:61170",
+    "-sTCP:LISTEN"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "started_at": "2026-11-02T23:49:30.764427+00:00",
+  "ended_at": "2026-11-02T23:49:30.790318+00:00",
+  "duration_seconds": 0.0259,
+  "exit_code": 1,
+  "stdout": {
+    "path": "phase-b-raw/reserved-port-listeners.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "stderr": {
+    "path": "phase-b-raw/reserved-port-listeners.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "recorded_at": "2026-11-02T23:49:31.078394+00:00",
+  "status": "NOT_STARTED_NO_RUNTIME_OBJECTS_CREATED",
+  "project": "auto_tm_ci_897_938_20261103_r1",
+  "project_container_rows": 0,
+  "project_volumes": [],
+  "project_networks": [],
+  "reserved_listeners": "",
+  "foreign65379_container_ids": [
+    "c5343d232d17"
+  ],
+  "foreign65379_expected_id": "c5343d232d17",
+  "foreign65379_baseline_id_unchanged": true,
+  "foreign_operations": "read-only docker inventory; no exec/connect/mutation",
+  "runtime_actions": {
+    "compose_up": 0,
+    "db_connections": 0,
+    "role_grants": 0,
+    "migrations_applied": 0,
+    "test_runs": 0,
+    "redis_commands": 0,
+    "object_storage_commands": 0,
+    "compose_down": 0
+  },
+  "not_created": [
+    "base_database",
+    "globalSetup_template",
+    "globalSetup_worker_w1",
+    "non_owner_roles",
+    "source_receipts",
+    "campaign_receipts",
+    "MinIO_bucket_or_keys",
+    "Redis_DB1_keys"
+  ],
+  "sql_zero_row_assertions": "NOT_RUN; no owned database exists; no foreign DB was queried",
+  "guard_mode_comparison": "NOT_APPLICABLE; no database/guard modes were created or changed",
+  "connection_and_role_cleanup": "NOT_APPLICABLE; none opened/created",
+  "proof_scope": "No runtime resources were created by this writer; inventory proves no matching project resources or reserved port listeners at terminal snapshot. This is not a completed real-DB cleanup run.",
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-a",
+        "--filter",
+        "label=com.docker.compose.project=auto_tm_ci_897_938_20261103_r1",
+        "--format",
+        "{{json .}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_at": "2026-11-02T23:49:30.720861+00:00",
+      "ended_at": "2026-11-02T23:49:30.735217+00:00",
+      "duration_seconds": 0.014366,
+      "exit_code": 0,
+      "stdout": {
+        "path": "phase-b-raw/project-containers.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "phase-b-raw/project-containers.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "ls",
+        "--format",
+        "{{json .}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_at": "2026-11-02T23:49:30.735400+00:00",
+      "ended_at": "2026-11-02T23:49:30.751062+00:00",
+      "duration_seconds": 0.01567,
+      "exit_code": 0,
+      "stdout": {
+        "path": "phase-b-raw/volume-inventory.stdout",
+        "sha256": "f84c5f7db83c98bd7263c1a8248d859af83e58f4f740be3ffd570689f1f55256",
+        "bytes": 40576
+      },
+      "stderr": {
+        "path": "phase-b-raw/volume-inventory.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "network",
+        "ls",
+        "--format",
+        "{{json .}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_at": "2026-11-02T23:49:30.751206+00:00",
+      "ended_at": "2026-11-02T23:49:30.764299+00:00",
+      "duration_seconds": 0.013101,
+      "exit_code": 0,
+      "stdout": {
+        "path": "phase-b-raw/network-inventory.stdout",
+        "sha256": "b0417313fe1ca5ca7b29db77728fd6b2464eb25727f7d44011023ae25935b8b2",
+        "bytes": 8238
+      },
+      "stderr": {
+        "path": "phase-b-raw/network-inventory.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "argv": [
+        "lsof",
+        "-nP",
+        "-iTCP:61168",
+        "-iTCP:61169",
+        "-iTCP:61170",
+        "-sTCP:LISTEN"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_at": "2026-11-02T23:49:30.764427+00:00",
+      "ended_at": "2026-11-02T23:49:30.790318+00:00",
+      "duration_seconds": 0.0259,
+      "exit_code": 1,
+      "stdout": {
+        "path": "phase-b-raw/reserved-port-listeners.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "phase-b-raw/reserved-port-listeners.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-a",
+        "--filter",
+        "name=^/auto_tm_ci_897_r6c_candidatea_1-postgres-1$",
+        "--format",
+        "{{json .}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_at": "2026-11-02T23:49:30.790470+00:00",
+      "ended_at": "2026-11-02T23:49:30.818684+00:00",
+      "duration_seconds": 0.028224,
+      "exit_code": 0,
+      "stdout": {
+        "path": "phase-b-raw/foreign65379-read-only.stdout",
+        "sha256": "cb76e56d9f02544ae8887d4748f206578f24bbb05190396fa0f5ca853c30a73d",
+        "bytes": 1240
+      },
+      "stderr": {
+        "path": "phase-b-raw/foreign65379-read-only.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    }
+  ]
+}

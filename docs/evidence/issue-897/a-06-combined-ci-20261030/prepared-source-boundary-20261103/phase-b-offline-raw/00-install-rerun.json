@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "pnpm",
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--filter",
+    "@auto-tm/api...",
+    "--filter",
+    "@auto-tm/worker..."
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "started_utc": "2026-11-02T23:05:01Z",
+  "ended_utc": "2026-11-02T23:05:02Z",
+  "duration_seconds": 0.332,
+  "exit_code": 0,
+  "store_dir": "/Users/bagtyyar/Library/pnpm/store/v11",
+  "log": "/tmp/issue938-prepared-reader-r1/offline/00-install-rerun.log",
+  "log_sha256": "3441f317587b14b0f35d2fa5ac143d72807b3b042bca8a453d99288d33bfa591"
+}

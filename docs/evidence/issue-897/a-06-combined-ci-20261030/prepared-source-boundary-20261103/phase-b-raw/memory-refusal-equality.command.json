@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--quiet",
+    "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+    "HEAD",
+    "--",
+    "packages/db/src/testing/DiagnosticMemoryDatabase.ts"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "started_at": "2026-11-02T23:49:30.949594+00:00",
+  "ended_at": "2026-11-02T23:49:30.957666+00:00",
+  "duration_seconds": 0.008081,
+  "exit_code": 0,
+  "stdout": {
+    "path": "phase-b-raw/memory-refusal-equality.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "stderr": {
+    "path": "phase-b-raw/memory-refusal-equality.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

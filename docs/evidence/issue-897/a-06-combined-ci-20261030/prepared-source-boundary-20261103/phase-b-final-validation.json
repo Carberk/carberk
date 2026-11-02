@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-11-02T23:54:04.607110+00:00",
+  "kind": "evidence-consistency-audit-not-tests",
+  "source_head": "cf6c483c974580b3a57dffca1d29aa9dfbf133b8",
+  "source_tree": "f9b9db8d7d7ef544887bc1472272f4a0e3134697",
+  "artifact_hashes_verified": 83,
+  "case_mappings": 56,
+  "rejected_placeholder_cases": 43,
+  "restored_files_verified": 9,
+  "offline_raw_logs_verified": 14,
+  "runtime_actions": 0,
+  "negative_resource_inventory_consistent": true,
+  "non_doc_source_equal_to_87456f4f": true,
+  "code_ready": false,
+  "ticket_pass": false,
+  "raw_stream_note": "Original staged diff check reported formatting warnings for two captured Git stdout files; base64 storage now preserves their exact bytes. All 14 historical offline log hashes verified from versionable base64."
+}

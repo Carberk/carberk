@@ -1,0 +1,72 @@
+{
+  "recorded_at": "2026-11-02T23:51:40.730796+00:00",
+  "status": "ORIGINAL_COVERAGE_RESTORED_NO_ACCEPTANCE_RUN",
+  "rejected_draft_commit": "7a3333dadf8dd668c9b7df886d37988496839598",
+  "restoration_commit": "cf6c483c974580b3a57dffca1d29aa9dfbf133b8",
+  "restoration_tree": "f9b9db8d7d7ef544887bc1472272f4a0e3134697",
+  "initial_base": "1149953c1237ea362509db7dddbed29c60395d0a",
+  "tree_equals_initial_base": true,
+  "original_four_case_count": 56,
+  "unchanged_five_case_count": 168,
+  "required_total": 224,
+  "files": [
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "base_sha256": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "restored_sha256": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "base_sha256": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "restored_sha256": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "base_sha256": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "restored_sha256": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "base_sha256": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "restored_sha256": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+      "base_sha256": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "restored_sha256": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+      "base_sha256": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "restored_sha256": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+      "base_sha256": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "restored_sha256": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+      "base_sha256": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "restored_sha256": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "byte_equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+      "base_sha256": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "restored_sha256": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "byte_equal": true
+    }
+  ],
+  "memory_refusal": "byte-identical to source 87456f4f; preserved",
+  "replacement_files_and_helper": "absent from delivered source; rejected draft retained in git history",
+  "source_delta_to_initial_base": "none",
+  "tests_executed": 0
+}

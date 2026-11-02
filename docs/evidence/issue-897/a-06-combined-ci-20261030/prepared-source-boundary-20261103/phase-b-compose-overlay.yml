@@ -1,0 +1,21 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: auto_tm_897_938_r1
+      POSTGRES_USER: auto_tm_ci
+      POSTGRES_PASSWORD: auto_tm_ci_pass
+    ports: !override
+      - "127.0.0.1:61169:5432"
+  redis:
+    ports: !override
+      - "127.0.0.1:61168:6379"
+  minio:
+    ports: !override
+      - "127.0.0.1:61170:9000"
+volumes:
+  postgres-data:
+    name: auto_tm_ci_897_938_20261103_r1-postgres-data
+  redis-data:
+    name: auto_tm_ci_897_938_20261103_r1-redis-data
+  minio-data:
+    name: auto_tm_ci_897_938_20261103_r1-minio-data

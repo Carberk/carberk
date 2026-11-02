@@ -1,0 +1,53 @@
+{
+  "kind": "coordinator static audit of terminal failure; evidence archive only, no source assembly",
+  "time_utc": "2026-11-02T23:57:08.390730+00:00",
+  "candidate_before_archive": "1149953c1237ea362509db7dddbed29c60395d0a",
+  "source": "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+  "worker_source_restoration": "cf6c483c974580b3a57dffca1d29aa9dfbf133b8",
+  "worker_evidence": "ea76125d390896447b7f78961c3110a2bf2ec5cd",
+  "rejected_draft_do_not_assemble": "7a3333dadf8dd668c9b7df886d37988496839598",
+  "verified_artifact_hashes": 83,
+  "decoded_streams": 16,
+  "offline_command_hashes": 14,
+  "restored_files": 9,
+  "preserved_existing_evidence": 6,
+  "copied_new_evidence": 78,
+  "checks": [
+    {
+      "label": "exact_restoration",
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "1149953c1237ea362509db7dddbed29c60395d0a",
+        "cf6c483c974580b3a57dffca1d29aa9dfbf133b8",
+        "--",
+        "."
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "final_non_docs",
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "1149953c1237ea362509db7dddbed29c60395d0a",
+        "ea76125d390896447b7f78961c3110a2bf2ec5cd",
+        "--",
+        ".",
+        ":(exclude)docs/**",
+        ":(exclude)docs"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "runtime_admission": "FAIL; no probe/full/runtime ran",
+  "worker_slot": "terminal, released; no active writer",
+  "next_owner": "existing A coordinator; Parent disposes F47 boundary; further implementation must be newly bounded in actual #938",
+  "cleanup": "no task runtime resources created; preserve t3/2d375913, worktree, commits and /tmp recovery; foreign65379 untouched"
+}

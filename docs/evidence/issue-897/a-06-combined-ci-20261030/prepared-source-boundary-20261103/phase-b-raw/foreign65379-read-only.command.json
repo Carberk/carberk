@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "docker",
+    "ps",
+    "-a",
+    "--filter",
+    "name=^/auto_tm_ci_897_r6c_candidatea_1-postgres-1$",
+    "--format",
+    "{{json .}}"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "started_at": "2026-11-02T23:49:30.790470+00:00",
+  "ended_at": "2026-11-02T23:49:30.818684+00:00",
+  "duration_seconds": 0.028224,
+  "exit_code": 0,
+  "stdout": {
+    "path": "phase-b-raw/foreign65379-read-only.stdout",
+    "sha256": "cb76e56d9f02544ae8887d4748f206578f24bbb05190396fa0f5ca853c30a73d",
+    "bytes": 1240
+  },
+  "stderr": {
+    "path": "phase-b-raw/foreign65379-read-only.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}
