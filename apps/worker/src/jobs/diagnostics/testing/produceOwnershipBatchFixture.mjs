@@ -12,15 +12,11 @@ const dependency = "023e6a5dcefbcd5d7e7c71bf4bba18f01a3d01ab";
 const privateRoot = "/tmp/897-r6c-a02r2-20261030";
 const migrationSha256 = "dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc";
 const acceptedPinsPath = "docs/evidence/issue-897/a-02-worker-restricted-20261030/fresh-ordinary-fixtures/source-pins.json";
+const correctionSpecPinPath = "docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/correction-spec-pin-20261102.json";
+const batchSpecPath = "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts";
+const correctionSpecSha256 = "55a86bf9fde74829e5200aa05b87abfc489756c5d1ef38d732bf5f12914a47d3";
 const cases = ["later-failure", "shared-multiple", "oldest-capacity", "overlimit", "worker-first-second-worker", "second-worker-first-worker",
   "worker-first-capture", "capture-first-worker", "worker-first-proof-use", "proof-use-first-worker"];
-// These are dependencies of the unchanged assertions, not alternative fixtures.
-// Refuse BEFORE creating a DB client, issuing HTTP or writing an output file.
-const blocked = {
-  overlimit: "ordinary observation_append expands all raw rows of its order and refuses source scope >1000; cannot produce the required >1000 raw rows on one order",
-  "worker-first-capture": "expired classified capture returns HTTP400 (or HTTP403 without classification), while the unchanged suite requires HTTP409",
-  "worker-first-proof-use": "expired/missing proof and stale source-plan refusal return HTTP403, while the unchanged suite requires HTTP409",
-};
 const started = Date.now(), deadline = started + 120_000;
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -33,7 +29,6 @@ if (!configPath) throw new Error("Explicit private batch producer config require
 const config = JSON.parse(await readFile(configPath, "utf8"));
 const name = config.case;
 if (!cases.includes(name)) throw new Error("Unknown ownership batch selector");
-if (blocked[name]) throw new Error(`A02_BATCH_DEPENDENCY_OPEN [${name}]: ${blocked[name]}`);
 const root = resolve(config.evidenceDir ?? "");
 const dbUrl = address(process.env.DATABASE_URL), workerUrl = address(config.workerUrl), ownerUrl = address(config.ownerUrl);
 const redis = address(process.env.REDIS_URL), minio = address(process.env.MINIO_ENDPOINT);
@@ -85,14 +80,24 @@ if (principalNames.some(who => !same(config.visits[0].people[who], config.visits
   config.visits[0].centerId !== config.visits[1].centerId || config.vin !== bootstrap.vin) throw new Error("Shared comparison pair must retain its original staff/center binding");
 const principals = [...new Map(config.visits.flatMap(visit => Object.values(visit.people)).map(person => [person.userId, person])).values()];
 if (principals.length !== 404 || new Set(cohorts.instances.flatMap(instance => instance.userIds)).size !== 404) throw new Error("Exact 404-principal admission required");
-const accepted = JSON.parse(await readFile(acceptedPinsPath, "utf8"));
+const acceptedBytes = await readFile(acceptedPinsPath);
+if (hash(acceptedBytes) !== "6da95e027f0b1a810671039d4083da8b00f5238c7a2e33fb686337cbdef2b02e") throw new Error("Historical accepted pin manifest changed");
+const accepted = JSON.parse(acceptedBytes);
+const correctionSpecPin = JSON.parse(await readFile(correctionSpecPinPath, "utf8"));
+if (correctionSpecPin.path !== batchSpecPath || correctionSpecPin.sha256 !== correctionSpecSha256 ||
+  correctionSpecPin.authority !== "c0eb1e282013070b1f0582a10515f240986de578" ||
+  correctionSpecPin.correctionContract !== "596b587b73b0580e41581a0a67945bdf425e5db1") throw new Error("Correction batch-spec pin mismatch");
 const files = [...config.sourceAndLoadedFiles, ...bootstrap.loadedFiles];
 const callerModules = ["DiagnosticOwnershipGrants", "DiagnosticOwnershipCapture", "PrismaDiagnosticIntake", "PrismaDiagnosticContinuityProofs"];
 for (const module of callerModules) for (const path of [`apps/api/src/modules/diagnostics/infrastructure/${module}.ts`, `apps/api/dist/src/modules/diagnostics/infrastructure/${module}.js`]) {
   if (!files.some(file => file.path === path && /^[a-f0-9]{64}$/.test(file.sha256))) throw new Error("Source and loaded caller pins required");
 }
 const checkFiles = async () => {
-  for (const [path, sha256] of Object.entries(accepted.hashes)) if (hash(await readFile(path)) !== sha256) throw new Error("Accepted dependency bytes changed");
+  if (hash(await readFile(batchSpecPath)) !== correctionSpecSha256) throw new Error("Corrected batch-spec bytes changed");
+  for (const [path, sha256] of Object.entries(accepted.hashes)) {
+    if (path === batchSpecPath) continue;
+    if (hash(await readFile(path)) !== sha256) throw new Error("Accepted dependency bytes changed");
+  }
   for (const { path, sha256 } of files) if (hash(await readFile(path)) !== sha256) throw new Error("Pinned source/compiled loaded bytes changed");
 };
 await checkFiles();
@@ -171,6 +176,10 @@ const append = async material => {
     material.component.rightsUntil.toISOString() !== material.componentRights.schedule.until) throw new Error("Ordinary capture did not retain the exact available classification");
   return material;
 };
+const appendMany = async (material, count) => {
+  for (let index = 0; index < count; index += 1) await append(material);
+  return material;
+};
 const capture = async (prepared, grantEnd, componentEnd) => {
   const grantRights = rights(grantEnd), componentRights = rights(componentEnd);
   const grant = await request(prepared.visit, "commissioner", "POST", `orders/${prepared.order.id}/ownership-grant`, { rights: grantRights });
@@ -247,7 +256,13 @@ try {
   const sessions = await db.session.findMany({ where: { id: { in: principals.map(person => person.sessionId) } }, select: { id: true, userId: true, expiresAt: true } });
   if (sessions.length !== 404 || sessions.some(session => session.expiresAt.getTime() <= deadline + 600_000) ||
     principals.some(person => !sessions.some(session => session.id === person.sessionId && session.userId === person.userId))) throw new Error("All ordinary source/request Sessions must outlive expiry and validation");
-  const orders = [await visitOrder(config.visits[0]), await visitOrder(config.visits[1]), ...await parallel(config.visits.slice(2), visitOrder)];
+  // Only overlimit's first ten selected roots share an ordinary seller-owned
+  // Listing/commissioner. Their own center staff and templates stay unchanged.
+  // All ten are in the first accepted API cohort; no foreign principal is used.
+  const visits = config.visits.map((visit, index) => name === "overlimit" && index >= 2 && index <= 10 ? {
+    ...visit, listingId: config.visits[0].listingId, people: { ...visit.people, commissioner: config.visits[0].people.commissioner },
+  } : visit);
+  const orders = [await visitOrder(visits[0]), await visitOrder(visits[1]), ...await parallel(visits.slice(2), visitOrder)];
   let newerOrder, arrivalOrder, controlOrder;
   if (name === "oldest-capacity") {
     newerOrder = await visitOrder(config.visits[99]); arrivalOrder = await visitOrder(config.visits[101]); controlOrder = await visitOrder(config.visits[100]);
@@ -263,7 +278,8 @@ try {
   await append(material[2]);
   const proof = await sharedProof(material[0], material[1]);
   const opponentFirst = name === "capture-first-worker" || name === "proof-use-first-worker";
-  if (name !== "proof-use-first-worker") {
+  const proofUse = name === "worker-first-proof-use" || name === "proof-use-first-worker";
+  if (!proofUse) {
     await request(material[1].visit, "technician", "POST", proof.path, proof.request.body);
     const consumed = await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: proof.command.reportId } });
     if (consumed.continuityProofId !== proof.proofId || consumed.reinspectionOrderVersion !== proof.command.expectedOrderVersion ||
@@ -272,9 +288,18 @@ try {
     if (!same(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: consumed.id } }), consumed)) throw new Error("Exact consumed retry changed its report");
     consumedRetries.push(proof.request);
   }
+  const overlimitFirstGroup = material.filter((_, index) => index === 0 || index >= 2 && index <= 10);
+  if (name === "overlimit") {
+    // The unchanged worker's first command contains ten grant roots. Build
+    // complete ordinary order histories under those roots, in parallel only
+    // across the five bounded API slots. The first ten selected roots retain
+    // 510 raw/component pairs, so one connected command crosses the kernel
+    // scope bound without summing separate commands or protected rows.
+    await parallel(overlimitFirstGroup, item => appendMany(item, item === material[2] ? 49 : 50));
+  }
   const independent = material[100], extras = {};
   if (name === "oldest-capacity") {
-    const newer = await capture(newerOrder, cutoff, cutoff); await capture(controlOrder, later, later);
+    const newer = await capture(newerOrder, new Date(cutoff.getTime() + 1), cutoff); await capture(controlOrder, later, later);
     Object.assign(extras, { newerGrantId: newer.grant.id, nonDueGrantId: material[101].grant.id, outsideGrantComponentId: material[101].raw.id,
       arrivalRequest: privateRequest(arrivalOrder.visit, "commissioner", `orders/${arrivalOrder.order.id}/ownership-grant`, { rights: rights(later) }) });
   }
@@ -284,24 +309,34 @@ try {
   // The first worker group must wait on a real User in that group's source
   // prefix. The same fixture supports either worker acquiring that prefix first.
   const barrierUserId = config.visits[2].people.technician.userId;
-  const candidate = name === "proof-use-first-worker" ? material[1] : material[2];
-  const opponent = name === "proof-use-first-worker" ? proof.request : privateRequest(candidate.visit, "technician", `orders/${candidate.order.id}/vehicle`, observation(candidate));
+  const candidate = proofUse ? material[1] : material[2];
+  const opponent = proofUse ? proof.request : privateRequest(candidate.visit, "technician", `orders/${candidate.order.id}/vehicle`, observation(candidate));
   const race = { barrierUserId, candidateOrderId: candidate.order.id, request: opponent,
-    ...(name === "proof-use-first-worker" ? { retryRequest: JSON.parse(JSON.stringify(opponent)) } : {}) };
+    ...(proofUse ? { retryRequest: JSON.parse(JSON.stringify(opponent)) } : {}) };
   const state = await retained();
   const residual = state.components.filter(row => row.state === "available" && row.rightsUntil && row.rightsUntil <= cutoff && !selected.some(grant => grant.id === row.grantId));
-  if (state.grants.length !== (name === "oldest-capacity" ? 104 : 102) || state.components.filter(row => row.grantId === material[2].grant.id).length !== 2 ||
+  if (state.grants.length !== (name === "oldest-capacity" ? 104 : 102) || state.components.filter(row => row.grantId === material[2].grant.id).length !== (name === "overlimit" ? 51 : 2) ||
     !state.proofs.some(row => row.id === proof.proofId && row.predecessorOrderId === material[0].order.id && row.candidateOrderId === material[1].order.id) ||
     !residual.some(row => row.identityRecordId === independent.raw.id) || residual.length !== (name === "oldest-capacity" ? 3 : 1) ||
     state.grants.some(row => row.state !== "available") || state.components.some(row => row.state !== "available")) throw new Error("Required ordinary ownership/proof graph missing");
   if (name === "oldest-capacity") {
     const newer = state.grants.find(row => row.id === extras.newerGrantId), outside = state.components.find(row => row.identityRecordId === extras.outsideGrantComponentId);
     const nonDue = state.grants.find(row => row.id === extras.nonDueGrantId);
-    if (!newer || newer.rightsUntil.getTime() !== cutoff.getTime() || newer.rightsUntil <= selected[99].rightsUntil ||
+    const newerComponent = state.components.find(row => row.grantId === newer?.id);
+    const rank = [...state.grants].sort((a, b) => a.rightsUntil - b.rightsUntil || a.id.localeCompare(b.id)).findIndex(row => row.id === extras.newerGrantId);
+    if (!newer || newer.rightsUntil.getTime() !== cutoff.getTime() + 1 || rank !== 100 || newer.rightsUntil <= selected[99].rightsUntil ||
+      !newerComponent?.rightsUntil || newerComponent.rightsUntil.getTime() !== cutoff.getTime() ||
       selected.some(row => row.id === newer.id) || !outside || !nonDue || outside.grantId !== nonDue.id || !outside.rightsUntil ||
       outside.rightsUntil > cutoff || !nonDue.rightsUntil || nonDue.rightsUntil <= cutoff) {
       throw new Error("Oldest-capacity requires the literal 101st grant and outside due component");
     }
+  }
+  if (name === "overlimit" && (overlimitFirstGroup.length !== 10 || overlimitFirstGroup.some((item, index) => {
+    const grant = state.grants.find(row => row.id === item.grant.id);
+    return item.grant.id !== selected[index].id || grant?.listingId !== visits[0].listingId ||
+      grant?.commissionerId !== visits[0].people.commissioner.userId || state.raw.filter(row => row.orderId === item.order.id).length !== 51;
+  }))) {
+    throw new Error("A02_BATCH_DEPENDENCY_OPEN [overlimit]: complete connected first-ten ordinary roots required");
   }
   await checkFiles(); checkDeadline(); await receipts();
   if (Date.now() >= cutoff.getTime() - 2000) throw new Error("Ordinary setup missed immutable opponent handoff margin; retain failure state");
@@ -312,20 +347,26 @@ try {
   const emptyReceipts = await receipts();
   const readinessAfter = await db.$queryRawUnsafe("SELECT diagnostic_source_guards_ready() AS source,campaign_preparation_ready() AS campaign");
   if (!same(readinessAfter, readiness)) throw new Error("Guard readiness changed during ordinary production");
+  const overlimitRootGrantIds = name === "overlimit" ? selected.slice(0, 10).map(row => row.id) : undefined;
+  const overlimitRootOrderIds = name === "overlimit" ? overlimitFirstGroup.map(item => item.order.id) : undefined;
   const fixture = { dependency, ordinaryProducerEvidence: join(root, "producer.json"), cutoff: cutoff.toISOString(), dueGrantIds: selected.map(row => row.id),
     independentComponentId: independent.raw.id, ownerUrl: config.ownerUrl, workerUrl: config.workerUrl, multiComponentGrantId: material[2].grant.id,
+    ...(name === "overlimit" ? { overlimitRootGrantIds, overlimitRootOrderIds, overlimitRawCount: state.raw.filter(row => overlimitRootOrderIds.includes(row.orderId)).length } : {}),
     orderIds, consumedRetries, race, ...extras };
   await writeJson("producer-retained.json", state);
-  await writeJson("producer.json", { dependency, case: name, acceptedPinsPath, sourceAndLoadedFiles: files, migrations: applied, actor, sessions,
+  await writeJson("producer.json", { dependency, case: name, acceptedPinsPath, correctionSpecPinPath, correctionSpecPin, sourceAndLoadedFiles: files, migrations: applied, actor, sessions,
+    selection: selected.map((row, index) => ({ rank: index + 1, id: row.id, rightsUntil: row.rightsUntil })),
+    ...(name === "oldest-capacity" ? { newerRank: 101, newerRightsUntil: new Date(cutoff.getTime() + 1), independentComponentRightsUntil: cutoff } : {}),
     resourceIdentity: config.resourceIdentity, startedAt: new Date(started).toISOString(), setupDeadline: new Date(deadline).toISOString(), cutoff: cutoff.toISOString(),
     handoff: { opponentFirst, targetAt: new Date(handoffAt).toISOString(), databaseNow: clock.now, actualAt: new Date().toISOString(), nativeSuiteStartupAndBarrierUnproved: true },
     commands, orderIds, keys, receipts: emptyReceipts, readiness: readinessAfter });
   if (opponentFirst && Date.now() >= cutoff.getTime()) throw new Error("Output serialization missed pre-cutoff handoff; fixture not emitted");
   await writeJson("fixture.json", fixture);
 } catch (error) {
+  const message = `A02_BATCH_DEPENDENCY_OPEN [${name}]: ${String(error)}`;
   await writeJson("producer-first-failure.json", { dependency, case: name, startedAt: new Date(started).toISOString(), failedAt: new Date().toISOString(),
-    message: String(error), commands, orderIds, keys });
-  throw error;
+    message, commands, orderIds, keys });
+  throw new Error(message, { cause: error });
 } finally {
   // Keep failure state. Coordinator owns the unchanged bootstrap cleanup, exact
   // trigger restoration, private object inventory and task Compose destruction.

@@ -8,7 +8,7 @@ const producer = resolve("apps/worker/src/jobs/diagnostics/testing/produceOwners
 const privateRoot = "/tmp/897-r6c-a02r2-20261030/producer-repair";
 // Exercise the real executable's admission boundary. No services, DB client,
 // protected fixture rows or bootstrap receipt are created by these tests.
-test("blocked selectors and unsafe task URLs refuse before runtime composition or output", async () => {
+test("unknown selectors and unsafe task URLs refuse before runtime composition or output", async () => {
   await mkdir(privateRoot, { recursive: true, mode: 0o700 });
   const root = await mkdtemp(join(privateRoot, "boundary-"));
   const configPath = join(root, "input.private.json");
@@ -29,14 +29,9 @@ test("blocked selectors and unsafe task URLs refuse before runtime composition o
     assert.deepEqual(await readdir(output), []);
   };
   try {
-    for (const [name, reason] of [
-      ["overlimit", "cannot produce the required >1000 raw rows on one order"],
-      ["worker-first-capture", "HTTP400 (or HTTP403 without classification)"],
-      ["worker-first-proof-use", "return HTTP403"],
-    ]) {
-      const result = await run({ case: name, evidenceDir: output });
-      await refused(result, `A02_BATCH_DEPENDENCY_OPEN [${name}]`);
-      assert.ok(result.stderr.includes(reason));
+    for (const name of ["later-failure", "shared-multiple", "oldest-capacity", "overlimit", "worker-first-second-worker", "second-worker-first-worker",
+      "worker-first-capture", "capture-first-worker", "worker-first-proof-use", "proof-use-first-worker"]) {
+      await refused(await run({ case: name, evidenceDir: output }), "Explicit valid task URL required");
     }
     await refused(await run({ case: "substituted-case", evidenceDir: output }), "Unknown ownership batch selector");
     const name = "shared-multiple", database = "r6c_batch_a02r2_shared_multiple";

@@ -22,6 +22,9 @@ interface Fixture {
   ownerUrl: string;
   workerUrl: string;
   multiComponentGrantId?: string;
+  overlimitRootGrantIds?: string[];
+  overlimitRootOrderIds?: string[];
+  overlimitRawCount?: number;
   newerGrantId?: string;
   outsideGrantComponentId?: string;
   nonDueGrantId?: string;
@@ -176,6 +179,58 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
       expect(inventory?.scope).toBeLessThanOrEqual(1000); expect(inventory?.effects).toBeLessThanOrEqual(1000);
       inventories.push({ ids: residual.slice(index, index + 10), ...inventory });
     }
+    if (name === "overlimit") {
+      expect(selected).toHaveLength(100);
+      const rootGrantIds = required(fixture.overlimitRootGrantIds), rootOrderIds = required(fixture.overlimitRootOrderIds);
+      expect(rootGrantIds).toHaveLength(10); expect(rootOrderIds).toHaveLength(10);
+      expect(rootGrantIds).toEqual(selected.slice(0, 10));
+      const grants = rootGrantIds.map(id => required(before.grants.find(row => row.id === id)));
+      expect(rootOrderIds).toEqual(grants.map(row => row.orderId));
+      // All ten roots retain the same real Listing/commissioner edges. Staff,
+      // centers and request versions remain those admitted by ordinary routes.
+      const listingId = required(grants[0]?.listingId), commissionerId = required(grants[0]?.commissionerId);
+      for (const grant of grants) expect(grant).toMatchObject({ listingId, commissionerId });
+      const scopeKeys = new Map<string, { table: string; key: Record<string, string> }>();
+      const effectKeys = new Map<string, { table: string; key: Record<string, string> }>();
+      const key = (row: { table: string; key: Record<string, string> }) => JSON.stringify([row.table, Object.entries(row.key).sort()]);
+      const singletonInventories = [];
+      for (const id of rootGrantIds) {
+        const row = await workerPlannedRow(db, { table: "diagnostic_ownership_grants", key: { id } }, grantPatch(now));
+        const command = { operation: "ownership_expire", roots: [{ table: row.table, key: row.key }], rows: [row], cutoff: now,
+          actorUserId: null, sessionId: null, campaign: null };
+        const [found] = await db.$queryRaw<{ scope: { table: string; key: Record<string, string> }[];
+          effects: { table: string; key: Record<string, string> }[] }[]>`WITH scoped AS MATERIALIZED
+          (SELECT diagnostic_source_scope(${JSON.stringify(command)}::jsonb) AS value)
+          SELECT value AS scope,diagnostic_source_effects(${JSON.stringify(command)}::jsonb,value) AS effects FROM scoped`;
+        const inventory = required(found);
+        expect(inventory.scope.length).toBeLessThanOrEqual(1000); expect(inventory.effects.length).toBeLessThanOrEqual(1000);
+        expect(inventory.scope).toContainEqual({ table: "listings", key: { id: listingId } });
+        expect(inventory.scope).toContainEqual({ table: "users", key: { id: commissionerId } });
+        for (const item of inventory.scope) scopeKeys.set(key(item), item);
+        for (const item of inventory.effects) effectKeys.set(key(item), { table: item.table, key: item.key });
+        singletonInventories.push({ id, ...inventory });
+      }
+      const raw = before.raw.filter(row => rootOrderIds.includes(row.orderId));
+      const components = before.components.filter(row => row.grantId && rootGrantIds.includes(row.grantId));
+      expect(raw).toHaveLength(510); expect(components).toHaveLength(510);
+      expect(fixture.overlimitRawCount).toBe(510);
+      for (const row of raw) expect(scopeKeys.has(key({ table: "diagnostic_identity_records", key: { id: row.id } }))).toBe(true);
+      for (const row of components) {
+        const item = { table: "diagnostic_ownership_components", key: { identityRecordId: row.identityRecordId } };
+        expect(scopeKeys.has(key(item))).toBe(true); expect(effectKeys.has(key(item))).toBe(true);
+      }
+      // Distinct registered raw/component keys alone exceed the cardinality cap.
+      // Full singleton inventories include all other retained/derived keys. This
+      // is the lower bound of ONE first ten-root command, never several cleanups.
+      expect(raw.length + components.length).toBeGreaterThan(1000);
+      expect(scopeKeys.size).toBeGreaterThan(1000);
+      expect(residual).toContain(fixture.independentComponentId);
+      expect(before.grants.some(row => required(row.rightsUntil) > now)).toBe(true);
+      await writeFile(`${root}/overlimit-cardinality.json`, JSON.stringify({ rootGrantIds, rootOrderIds,
+        sharedRetainedEdges: { listingId, commissionerId }, raw: raw.length, components: components.length,
+        distinctScopeKeys: scopeKeys.size, distinctEffectKeys: effectKeys.size, scopeKeys: [...scopeKeys.values()],
+        effectKeys: [...effectKeys.values()], singletonInventories, singletonOverlimitRuntimeProof: false }, null, 2), { flag: "wx" });
+    }
     await writeFile(`${root}/full-group-inventories.json`, JSON.stringify(inventories, null, 2), { flag: "wx" });
     expect(await snapshot()).toEqual(before); await receipts();
   });
@@ -194,11 +249,31 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
 
   it("honors the selected command and race contract without retries or widened limits", async () => {
     if (name === "overlimit") {
-      expect(selected).toHaveLength(1);
-      const order = required(before.grants.find(row => row.id === selected[0])).orderId;
-      expect(before.raw.filter(row => row.orderId === order).length).toBeGreaterThan(1000);
-      await expect(worker().cleanup()).rejects.toThrow("diagnostic_source_scope_limit");
-      expect(await snapshot()).toEqual(before); await receipts();
+      // Snapshot every public persisted table, including audits, immutable
+      // evidence, bootstrap controls and both receipt tables. The failed first
+      // group must leave the complete baseline equal, not just eight row types.
+      const tables = await db.$queryRaw<{ table: string }[]>`SELECT tablename AS table FROM pg_tables WHERE schemaname='public' ORDER BY tablename`;
+      const persisted = async () => {
+        const state: Record<string, unknown> = {};
+        for (const { table } of tables) {
+          if (!/^[a-z_]+$/.test(table)) throw new Error("Unexpected public baseline table");
+          state[table] = await db.$queryRawUnsafe(`SELECT to_jsonb(t) AS row FROM public.${quote(table)} t ORDER BY to_jsonb(t)::text`);
+        }
+        return state;
+      };
+      const baseline = await persisted();
+      await writeFile(`${root}/overlimit-persisted-before.json`, JSON.stringify(baseline, null, 2), { flag: "wx" });
+      // Production still refuses any connected singleton above the same bound.
+      // This lawful ten-root union is not a singleton runtime proof and grants
+      // no subdivision, skip or smaller-command retry after refusal.
+      let refusal: string | undefined;
+      await expect(worker().cleanup().catch((error: unknown) => { refusal = String(error); throw error; })).rejects.toThrow("diagnostic_source_scope_limit");
+      const after = await persisted();
+      expect(after).toEqual(baseline); expect(await snapshot()).toEqual(before); await receipts();
+      await writeFile(`${root}/overlimit-persisted-after.json`, JSON.stringify(after, null, 2), { flag: "wx" });
+      await writeFile(`${root}/overlimit-refusal.json`, JSON.stringify({ firstRootGrantIds: selected.slice(0, 10),
+        restrictedRole: role, workerInvocations: 1, refusal: required(refusal), completePersistedEquality: true,
+        sourceReceipts: 0, campaignReceipts: 0, singletonOverlimitRuntimeProof: false }), { flag: "wx" });
       return;
     }
     if (name === "later-failure") {
@@ -243,6 +318,11 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
       const workerFirst = name.startsWith("worker-first") || name === "oldest-capacity";
       const race = fixture.race;
       if (!race) throw new Error("Real opponent and exact User barrier fixture required");
+      if (name === "worker-first-capture" || name === "worker-first-proof-use") {
+        expect((await db.$queryRaw<{ expired: boolean }[]>`SELECT clock_timestamp() AT TIME ZONE 'UTC'>=${now}::timestamp AS expired`)[0]?.expired).toBe(true);
+      }
+      const refusalAudits = name === "worker-first-capture" || name === "worker-first-proof-use" ?
+        await db.diagnosticAudit.findMany({ orderBy: { id: "asc" } }) : undefined;
       const beforeOpponent = async () => name === "oldest-capacity" ? request(required(fixture.arrivalRequest)) : secondWorker ? worker().cleanup() : request(race.request);
       try {
         await owner.$transaction(async tx => {
@@ -271,7 +351,9 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
           if (chain.settled && !chain.rows.length) {
             const result = required((await second)[0]);
             if (result.status === "rejected") throw result.reason;
-            expect(result.value).toMatchObject({ status: name === "oldest-capacity" ? 201 : 409 });
+            if (name === "worker-first-capture") expect(result.value).toMatchObject({ status: 400, body: { code: "DIAGNOSTIC_INVALID_INPUT" } });
+            else if (name === "worker-first-proof-use") expect(result.value).toMatchObject({ status: 403, body: { code: "DIAGNOSTIC_NO_ACCESS" } });
+            else expect(result.value).toMatchObject({ status: 201 });
           }
           await writeFile(`${root}/barrier.json`, JSON.stringify({ holder: required(holder).pid, firstPid,
             secondPids: chain.rows.map(row => row.pid), role, workerFirst, opponentRefusedBeforePrefix: chain.settled && !chain.rows.length }), { flag: "wx" });
@@ -289,10 +371,16 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
         else expect(opponent.value).toBe(0);
       } else {
         if (opponent.status === "rejected") throw opponent.reason;
-        expect(opponent.value).toMatchObject({ status: name === "oldest-capacity" || !workerFirst ? 201 : 409 });
+        if (name === "worker-first-capture") expect(opponent.value).toMatchObject({ status: 400, body: { code: "DIAGNOSTIC_INVALID_INPUT" } });
+        else if (name === "worker-first-proof-use") expect(opponent.value).toMatchObject({ status: 403, body: { code: "DIAGNOSTIC_NO_ACCESS" } });
+        else expect(opponent.value).toMatchObject({ status: 201 });
       }
       // Preserve immutable rows even when a real opponent added its own row.
       const raced = await snapshot();
+      if (refusalAudits) {
+        expect(raced.raw).toEqual(before.raw); expect(raced.reports).toEqual(before.reports);
+        expect(await db.diagnosticAudit.findMany({ orderBy: { id: "asc" } })).toEqual(refusalAudits);
+      }
       // A stale command cannot leave half a group's grant/component effects.
       // Earlier committed groups remain valid; the faulted group stays exact.
       for (let offset = 0; offset < selected.length; offset += 10) {
@@ -330,8 +418,10 @@ describe.skipIf(!enabled).each(cases.filter(name => !only || name === only))("ow
         expect(released).toHaveLength(1);
         expect(required(released[0]).continuityProofId).not.toBeNull(); expect(required(released[0]).reinspectionOrderVersion).not.toBeNull();
         if (!race.retryRequest) throw new Error("Consumed retry request required");
+        const auditsBeforeRetry = await db.diagnosticAudit.findMany({ orderBy: { id: "asc" } });
         expect(await request(race.retryRequest)).toMatchObject({ status: 201 });
         expect(await db.diagnosticReportRecord.findUniqueOrThrow({ where: { id: required(released[0]).id } })).toEqual(released[0]);
+        expect(await db.diagnosticAudit.findMany({ orderBy: { id: "asc" } })).toEqual(auditsBeforeRetry);
       }
       await receipts();
       if (workerOutcome.status === "fulfilled") {
