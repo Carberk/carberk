@@ -138,6 +138,13 @@ Parent restored availability; coordinator revalidated the exact
 No replacement exists. Three blocked selectors stay fail-closed; all
 case/runtime/cleanup gates remain.
 
+The same continuation has now produced source checkpoint
+`5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, with recovery-preserving RED
+checkpoint `a13d2b14da5d54dd9bec41156c407f0482d0eee1`. Corrected evidence is
+pending. Coordinator verified exact paths, all accepted pins/migrations and
+recovery hashes in the [intermediate receipt](a-02-producer-checkpoint-5a0a2b12-20261102.json).
+It is not assembled, runtime-ready or A-02 PASS.
+
 The terminal fixture-preparation packet proves all ten fixture targets absent
 and the existing ordinary producer unable to emit required case fields. A
 separate implementation dispatch is authorized only under the exact owner,

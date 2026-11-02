@@ -1,0 +1,41 @@
+{
+  "recordedAt": "2026-11-02T02:38:43.547293+00:00",
+  "state": "INTERMEDIATE SOURCE CHECKPOINT; NOT ASSEMBLED; A-02 FAIL/open",
+  "childWorktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+  "sourceBase": "8c6fe1d1cc91b44100279a2f82da2a0d5421cc72",
+  "originalSourceBase": "52d901c50af1dde97ea22bda8efb1fdf21f169b1",
+  "sourceCheckpoint": "5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b",
+  "tree": "d0a28b674929ec5d898c6c31e65a5f6415d0be46",
+  "redPreservationCheckpoint": "a13d2b14da5d54dd9bec41156c407f0482d0eee1",
+  "redProducerEqualsRecovery": true,
+  "recoveryArtifactHashCount": 6,
+  "allowedSourcePaths": [
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs",
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+  ],
+  "nonDocumentationEqualityExcludingOnlyAllowedPathsExit": 0,
+  "acceptedPinsVerified": 15,
+  "diskMigrationEntriesVerified": 102,
+  "finalSourceHashes": {
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs": "9f902c4385b893fffa8b86a630f3743dc37d0bc22899fbf9feb66d6240146134",
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs": "4f9f8c1a29213e632e7a51e096e37a770c67b3c8de7cf9084a3fd1c9f90aba1e"
+  },
+  "workerReportedVerification": {
+    "nodeCheck": 0,
+    "realCliBoundaryTest": {
+      "passed": 1,
+      "total": 1,
+      "durationMs": 304.91
+    },
+    "red": "query-option override admission before correction",
+    "diffCheck": 0,
+    "status": "corrected raw evidence pending; not rerun by coordinator"
+  },
+  "blockedSelectors": [
+    "overlimit",
+    "worker-first-capture",
+    "worker-first-proof-use"
+  ],
+  "runtime": "none materialized; no assembly or resource start",
+  "candidateSource": "4b2c8a6f6161f9c825945637f6f848c64adeb145"
+}

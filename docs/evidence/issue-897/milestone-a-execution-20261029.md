@@ -8,6 +8,16 @@ The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-
 
 ## Active critical path
 
+Latest A-02 update: source checkpoint `5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`
+is in the same isolated child; corrected evidence is pending. Coordinator
+confirmed the exact producer/test allow-list, 15 accepted pins, 102 disk
+migration entries and six recovery artifact hashes. RED checkpoint
+`a13d2b14da5d54dd9bec41156c407f0482d0eee1` preserves the resumed dirty source.
+Worker reports a green 1/1 real CLI refusal-boundary test; its complete raw
+receipt is not yet collected and this is not runtime acceptance. No source was
+assembled, no resource started and three selectors remain OPEN/fail-closed.
+See `a-02-producer-checkpoint-5a0a2b12-20261102.json` and the current ledger.
+
 Parent now reports restored Sol 6.1 availability. The coordinator has
 revalidated current candidate/source/base, both preserved child versions,
 recovery hashes, blocked-selector dispositions and the exact

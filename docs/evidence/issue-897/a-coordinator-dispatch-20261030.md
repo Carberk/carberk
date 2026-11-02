@@ -1,5 +1,40 @@
 # Milestone A dispatch — 2026-10-30
 
+## A-02 source checkpoint received — 2026-11-02
+
+The existing continuation reported clean source checkpoint
+`5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, tree
+`d0a28b674929ec5d898c6c31e65a5f6415d0be46`. Coordinator read-back confirms
+the source SHA/tree and allowed new producer/test paths. Corrected evidence is
+still being prepared by that same child; this is an intermediate checkpoint,
+not an assembled or accepted repair.
+
+The preceding RED checkpoint
+`a13d2b14da5d54dd9bec41156c407f0482d0eee1` preserves the resumed dirty
+producer byte-exactly (SHA-256 `51eb66f2…`) plus its real CLI boundary test.
+Coordinator verified all six private recovery artifacts remain unchanged,
+all 15 accepted input pins match and all 102 disk migration checksum entries
+match the exact accepted manifest. Non-documentation source equality from
+`8c6fe1d1cc91b44100279a2f82da2a0d5421cc72` exits 0 excluding only the allowed
+new producer and test. Original source remains `52d901c50…`; the integration
+candidate still has accepted source `4b2c8a6f…` and docs-only later changes.
+
+Worker reports `node --check` exit 0, `git diff --check` exit 0 and 1/1 real CLI
+boundary test green (304.91 ms), with RED query-option override admission
+preserved before correction. Coordinator inspected that test at its executable
+boundary and source guards, but has not rerun it or yet received corrected raw
+execution receipts. The exact limits of this interim read-back and file hashes
+are in [the checkpoint receipt](a-02-producer-checkpoint-5a0a2b12-20261102.json).
+
+Seven ordinary source plans were audited, not materialized. `overlimit`,
+`worker-first-capture` and `worker-first-proof-use` still fail closed before
+DB client, HTTP or output and retain their OPEN criterion/status dependencies.
+No suite assertion, guard, cap, ordinary producer/bootstrap, production source
+or migration changed. No assembly, package run, runtime/resource setup or PR
+mutation occurred. A-02 stays FAIL/open; count remains **2 PASS / 9 OPEN**.
+Completion/evidence will return from the same child; no poll, duplicate or
+replacement task is started.
+
 ## Same-worktree continuation revalidated — 2026-11-02
 
 Parent reports restored Sol 6.1 availability. Coordinator revalidated clean
