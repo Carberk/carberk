@@ -1,5 +1,17 @@
 # Milestone A dispatch — 2026-10-30
 
+## Same-worktree continuation revalidated — 2026-11-02
+
+Parent reports restored Sol 6.1 availability. Coordinator revalidated clean
+candidate `bd9ef02ea37ba4550b49743a538b094ad9e336cf`, accepted source equality,
+child HEAD `b774ce00105323b0d0334499f1db25e6c51a7f15`, all recovery hashes and
+unchanged dirty producer bytes. The exact [resume contract](a-02-worker-restricted-20261030/bounded-producer-repair/resume-20261102.md)
+continues only the existing child thread/worktree. Overlimit and both
+worker-first refusal dispositions remain OPEN and fail-closed. No replacement,
+runtime resource, new checkout or stale-handoff assembly is authorized. Earlier
+usage-blocked state below is historical once this continuation starts. Count
+remains **2 PASS / 9 OPEN**; A remains unaccepted and PR #904 unchanged.
+
 ## Recovery update — 2026-11-02
 
 A-02's bounded producer task r1 is terminal **failed** on the provider usage

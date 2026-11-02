@@ -8,6 +8,13 @@ The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-
 
 ## Active critical path
 
+Parent now reports restored Sol 6.1 availability. The coordinator has
+revalidated current candidate/source/base, both preserved child versions,
+recovery hashes, blocked-selector dispositions and the exact
+`bounded-producer-repair/resume-20261102.md` contract. Only same-thread/worktree
+offline completion resumes; three selectors remain OPEN/fail-closed. No runtime
+resources, duplicate task or provider switch are authorized by this recovery.
+
 Recovery update, 2026-11-02: the A-02 producer task is terminal failed on the
 provider usage limit, with no pending child work. Source checkpoint
 `f880da06f68ba82ffe6951e10c100868bcfca7c5`, evidence HEAD

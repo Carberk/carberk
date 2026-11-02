@@ -18,7 +18,7 @@ This is ticket-scope acceptance only: **2 passed, 9 open; A is NOT accepted**.
 | Tickets | Current state |
 |---|---|
 | A-01, A-09 (bounded S1/S2) | PASS, Parent accepted on exact source above |
-| A-02 | FAIL/open; producer task failed on usage limit, unfinished work preserved |
+| A-02 | FAIL/open; availability restored, same-worktree offline continuation revalidated; three selectors blocked |
 | A-03, A-04, A-11 | FAIL/open; required evidence incomplete |
 | A-05, A-06, A-07, A-08, A-10 | Waiting on their recorded dependencies |
 
@@ -133,7 +133,10 @@ alter assertions, limits, fixtures, source contracts or production code.
 Current execution: r1 ended on the provider usage limit before corrected
 handoff. The coordinator preserved both commits and the dirty correction;
 neither is assembled. See [recovery](a-02-worker-restricted-20261030/bounded-producer-repair/recovery-20261102.md).
-There is no active replacement worker. All case/runtime/cleanup gates remain.
+Parent restored availability; coordinator revalidated the exact
+[same-worktree continuation](a-02-worker-restricted-20261030/bounded-producer-repair/resume-20261102.md).
+No replacement exists. Three blocked selectors stay fail-closed; all
+case/runtime/cleanup gates remain.
 
 The terminal fixture-preparation packet proves all ten fixture targets absent
 and the existing ordinary producer unable to emit required case fields. A
