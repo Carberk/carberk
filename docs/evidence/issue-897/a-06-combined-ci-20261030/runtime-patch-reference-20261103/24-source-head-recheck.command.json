@@ -1,0 +1,16 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-b0b6a4c4",
+  "argv": [
+    "git",
+    "rev-parse",
+    "HEAD"
+  ],
+  "started": "2026-11-02T22:13:55.329Z",
+  "ended": "2026-11-02T22:13:55.342Z",
+  "durationMs": 10.153792,
+  "exit": 0,
+  "signal": null,
+  "error": null,
+  "stdoutSha256": "c3623bb6a258cc3ae2590f0222bd2fa7a3ad38a28c6b73f6cfdfe563941bca2b",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

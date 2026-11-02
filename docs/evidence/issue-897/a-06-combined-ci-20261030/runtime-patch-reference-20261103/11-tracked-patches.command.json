@@ -1,0 +1,17 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-b0b6a4c4",
+  "argv": [
+    "git",
+    "ls-files",
+    "patches"
+  ],
+  "started": "2026-11-02T22:11:56.686Z",
+  "ended": "2026-11-02T22:11:56.695Z",
+  "durationMs": 9.493333,
+  "exit": 0,
+  "signal": null,
+  "error": null,
+  "stdinSha256": null,
+  "stdoutSha256": "2c8692789a856438736c8058d6e20120d0fd941d7cffa79cc51ba55ea0994bfd",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

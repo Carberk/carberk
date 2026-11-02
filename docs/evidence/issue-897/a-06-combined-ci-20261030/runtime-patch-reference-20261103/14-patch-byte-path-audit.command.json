@@ -1,0 +1,16 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-b0b6a4c4",
+  "argv": [
+    "node",
+    "--input-type=module"
+  ],
+  "started": "2026-11-02T22:12:00.718Z",
+  "ended": "2026-11-02T22:12:39.176Z",
+  "durationMs": 38458.454958,
+  "exit": 0,
+  "signal": null,
+  "error": null,
+  "stdinSha256": "c0d5805395ceda5e4235c5fec82cc8b764b1e0a75ba16a6439c8b14019cd3314",
+  "stdoutSha256": "6ac9134e60420ec2ca87f03377d83faaba15279e76ddb8cf623d4259f378a17f",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

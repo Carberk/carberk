@@ -1,0 +1,18 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-b0b6a4c4",
+  "argv": [
+    "git",
+    "for-each-ref",
+    "--format=%(refname)",
+    "refs/heads/agent/issue-936"
+  ],
+  "started": "2026-11-02T22:11:53.184Z",
+  "ended": "2026-11-02T22:11:53.207Z",
+  "durationMs": 22.908042,
+  "exit": 0,
+  "signal": null,
+  "error": null,
+  "stdinSha256": null,
+  "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

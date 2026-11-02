@@ -1,0 +1,23 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-b0b6a4c4",
+  "argv": [
+    "gh",
+    "run",
+    "view",
+    "41009553578",
+    "--job",
+    "123912096931",
+    "--log",
+    "--repo",
+    "Carberk/carberk"
+  ],
+  "started": "2026-11-02T22:11:56.695Z",
+  "ended": "2026-11-02T22:12:00.675Z",
+  "durationMs": 3980.295916,
+  "exit": 0,
+  "signal": null,
+  "error": null,
+  "stdinSha256": null,
+  "stdoutSha256": "91aac28409e41f91b824f35aa861c355bc3dc831f8d930cb270a428f1a1e0752",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

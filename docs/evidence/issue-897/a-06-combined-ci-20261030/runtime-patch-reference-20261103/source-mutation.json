@@ -1,0 +1,11 @@
+{
+  "executor": "issue936-runtime-patch-reference-20261103-r1",
+  "slot": "issue936-reference-offline-20261103-r1",
+  "started": "2026-11-02T22:12:00.676Z",
+  "ended": "2026-11-02T22:12:00.676Z",
+  "path": "scripts/api-image-runtime-smoke.mjs",
+  "oldLiteral": "expo-modules-core@55.0.26.patch",
+  "newLiteral": "expo-modules-core@55.0.27.patch",
+  "beforeSha256": "1a400ceb7a9ef96cd8477400df4b7eee9284f920e98a971fa9243d5454515162",
+  "afterSha256": "4a26cb1d8b6ad507a32041223f1982fa0252537cfac5f48e3b4bf0e378473cd8"
+}

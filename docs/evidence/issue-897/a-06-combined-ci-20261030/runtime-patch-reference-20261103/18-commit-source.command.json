@@ -1,0 +1,18 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-b0b6a4c4",
+  "argv": [
+    "git",
+    "commit",
+    "-m",
+    "fix: align API image smoke patch reference with tracked input"
+  ],
+  "started": "2026-11-02T22:12:39.213Z",
+  "ended": "2026-11-02T22:12:39.246Z",
+  "durationMs": 32.860959,
+  "exit": 0,
+  "signal": null,
+  "error": null,
+  "stdinSha256": null,
+  "stdoutSha256": "1261afaeaa5f250c874b289c46bc0c5937490f6b23086901f75ac9781dae2a50",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
