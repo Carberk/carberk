@@ -43,11 +43,12 @@ trees, excluding the in-progress edits. The source commit's parent is exactly
 `57b44c06`. Source paths are committed; this report and its pin/audits form the
 separate evidence checkpoint.
 
-The evidence HEAD is the commit containing this file. Its exact post-commit
-HEAD/tree, clean status and complete path diff are recorded in
+The evidence checkpoint starts at `c9089f62`; the final evidence-only commit
+updates the verification record with the terminal HEAD/tree, clean status and
+complete path diff. Those exact values are also in
 `/tmp/897-r6c-a02r2-20261030/producer-repair/correction-terminal-20261102.json`
 and returned with the handoff. A tracked file cannot contain its own commit
-hash; the external receipt binds this packet without a self-referential claim.
+hash; the external receipt binds the final packet without a self-referential claim.
 
 Preserved ancestors include `f880da06f68ba82ffe6951e10c100868bcfca7c5`,
 `b774ce00105323b0d0334499f1db25e6c51a7f15` and
