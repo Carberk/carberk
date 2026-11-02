@@ -26,12 +26,16 @@ journey/CI/deployment/artifact/protected-delivery gates. PR904 stays OPEN/DRAFT
 at its separate head. No source, PR ref, test, build, runtime or resource action
 is implied by this reconciliation.
 
-The next ready action is the coordinator's read-only audit of A-02 source
+The coordinator's read-only A-02 audit passed for source
 `9e48011e54a23822504d9cb5ae5f6d7a9f96028e` and evidence
-`91676477a6812e16d5813c64454948d095b63eb1` against the correction contract,
-allow-list, pins and recovery. Assembly, affected verification and fresh
-exact-SHA Standards/Spec review follow only after that audit. Existing fresh
-resources remain unstarted and port65379 is prohibited.
+`91676477a6812e16d5813c64454948d095b63eb1`, recorded in
+`bounded-producer-repair/coordinator-preassembly-audit-20261102.json`. The
+audited source is assembled at `4199eb86d4846fecc6b53edca6c447ec868b1566`,
+tree `23b2039438bc45c865527a6cc4f825890a095cb2`. This source-only merge does
+not establish package, compiled/applied-pin, runtime or cleanup acceptance.
+Affected verification and fresh exact-SHA Standards/Spec review now precede
+any real A-02 case. Existing fresh resources remain unstarted and port65379 is
+prohibited.
 
 ## Founder model-policy correction, 2026-11-02
 

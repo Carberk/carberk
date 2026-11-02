@@ -25,11 +25,15 @@ gaps remain open. The earlier 2 PASS / 9 OPEN snapshots below are historical
 where superseded by this explicit extension. A stays unaccepted and PR904
 separate OPEN/DRAFT, unchanged.
 
-After this reconciliation is committed/pushed, the next ready action is a
-read-only pre-assembly audit of A-02 source `9e48011e5` and evidence `91676477a`
-against its exact allow-list, pins, corrected contract and recovery. No worker
-or source/runtime action started during reconciliation. Future fixes require
-separate bounded contracts; runtime retains its explicit resource/cleanup gate.
+The coordinator's read-only A-02 pre-assembly audit passed for source
+`9e48011e54a23822504d9cb5ae5f6d7a9f96028e` and evidence
+`91676477a6812e16d5813c64454948d095b63eb1`, including the exact allow-list,
+corrected pin, 14 unchanged accepted hashes, 102 migrations and six recovery
+hashes. The source is assembled at `4199eb86d4846fecc6b53edca6c447ec868b1566`,
+tree `23b2039438bc45c865527a6cc4f825890a095cb2`. No runtime or package
+acceptance follows. Affected verification and fresh exact-SHA Standards/Spec
+review precede the ten real cases. Future fixes require separate bounded
+contracts; runtime retains its explicit resource/cleanup gate.
 
 Founder model policy effective 2026-11-02 supersedes every earlier priority/Fast
 selection. Use only `codex_work/gpt-6.1-sol`, explicit `serviceTier=default`,

@@ -19,7 +19,7 @@ This is ticket-scope acceptance only: **1 passed, 10 open; A is NOT accepted**.
 |---|---|
 | A-01 | OPEN again for supplemental PR-audit AUDIT-S2/AUDIT-S3; its earlier r3 PASS remains historical for its recorded S1/S2 paths and SHA |
 | A-09 (bounded S1/S2) | PASS, Parent accepted on exact source above |
-| A-02 | FAIL/open; correction source `9e48011e5`, evidence `91676477a` received clean; assembly/affected verification/review/runtime/cleanup pending |
+| A-02 | FAIL/open; bounded correction assembled at `4199eb86`; affected verification, review, ten runtime bodies and cleanup pending |
 | A-03, A-04, A-11 | FAIL/open; required evidence incomplete |
 | A-05, A-06, A-07, A-08, A-10 | Waiting on their recorded dependencies |
 
@@ -30,6 +30,15 @@ adapter clock) and AUDIT-S3 (proxy repository-module mocks) remain open and
 are accepted into bounded A remediation. These AUDIT IDs are distinct from
 the earlier A-01/A-09 S1/S2 names. Parent's disposition changes the overall
 Standards gate, not the recorded historical A-01/A-09 results.
+
+A-02's returned source `9e48011e54a23822504d9cb5ae5f6d7a9f96028e` and evidence
+`91676477a6812e16d5813c64454948d095b63eb1` passed the coordinator's read-only
+allow-list, pin and recovery audit and were assembled as source checkpoint
+`4199eb86d4846fecc6b53edca6c447ec868b1566`, tree
+`23b2039438bc45c865527a6cc4f825890a095cb2`. This is source-only. Affected
+package verification and fresh exact-SHA Standards/Spec review are required
+before any real acceptance case. The ten bodies, cleanup, compiled/applied
+pins and native timing remain unproved.
 
 - Coordinator branch `agent/release897-candidate-a-20261029` had clean, pushed
   docs baseline `6d8fc6797a496d139e13cfb10bacc01cb243c1ad` before this update;
