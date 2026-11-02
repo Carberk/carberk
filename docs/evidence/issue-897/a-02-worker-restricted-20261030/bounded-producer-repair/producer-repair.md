@@ -1,5 +1,15 @@
 # A-02 bounded producer repair handoff
 
+**HISTORICAL / SUPERSEDED.** This describes the unaccepted initial producer at
+`f880da06f68ba82ffe6951e10c100868bcfca7c5`, not the corrected source. Its
+overlimit construction, proof participant pairing, worker-first status readiness,
+oldest-capacity shape and unconditional no-wait claims must not be relied on.
+The earlier immutable version remains in `b774ce00105323b0d0334499f1db25e6c51a7f15`
+and the private recovery snapshot. Use the
+[2026-11-02 corrected handoff](producer-repair-20261102.md) for source
+`5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`. No version of this packet proves
+A-02 runtime acceptance.
+
 Status: offline source repair prepared; A-02 remains open. No services, containers,
 ports, migrations, resets, database access, builds, package tests, deployments or
 timing run in this dispatch.

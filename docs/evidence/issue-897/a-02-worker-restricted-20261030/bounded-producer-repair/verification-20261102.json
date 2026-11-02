@@ -1,0 +1,260 @@
+{
+  "sourceCheckpoint": "5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b",
+  "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+  "branch": "t3/issue-897-a02-batch-fixture-producer",
+  "scope": "Offline verification and checkpoint commands only; source inspection calls omitted. No runtime fixture production.",
+  "clockResolution": "UTC start/end from clock tool at one-second resolution; durations are exact tool-reported values, not inferred elapsed intervals. Node runner millisecond durations remain in output.",
+  "records": [
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "node --test apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      },
+      "programArgv": [
+        "node",
+        "--test",
+        "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      ],
+      "startedAtUTC": "2026-11-02 02:34:11 UTC",
+      "endedAtUTC": "2026-11-02 02:34:11 UTC",
+      "toolReportedWallTimeSeconds": 0.079334667,
+      "exitCode": 1,
+      "output": "✖ blocked selectors and unsafe task URLs refuse before runtime composition or output (143.51675ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 176.635416\n\n✖ failing tests:\n\ntest at apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs:11:1\n✖ blocked selectors and unsafe task URLs refuse before runtime composition or output (143.51675ms)\n  AssertionError [ERR_ASSERTION]: node:internal/fs/promises:1163\n    return await PromisePrototypeThen(\n           ^\n  \n  Error: ENOENT: no such file or directory, realpath '/tmp/897-r6c-a02r2-20261030/producer-repair/boundary-gejRRw/bootstrap.json'\n      at async realpath (node:internal/fs/promises:1163:10)\n      at async file:///Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050/apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs:53:57 {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'realpath',\n    path: '/tmp/897-r6c-a02r2-20261030/producer-repair/boundary-gejRRw/bootstrap.json'\n  }\n  \n  Node.js v24.13.0\n  \n      at refused (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050/apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs:28:12)\n      at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050/apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs:56:13)\n      at async Test.run (node:internal/test_runner/test:1113:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git add apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs && git commit -m 'test(worker): preserve resumed producer and red URL admission case' && git rev-parse HEAD HEAD^{tree}"
+      },
+      "startedAtUTC": "2026-11-02 02:34:30 UTC",
+      "endedAtUTC": "2026-11-02 02:34:31 UTC",
+      "toolReportedWallTimeSeconds": 0.000006791,
+      "exitCode": 0,
+      "output": "[t3/issue-897-a02-batch-fixture-producer a13d2b14] test(worker): preserve resumed producer and red URL admission case\n 2 files changed, 353 insertions(+), 173 deletions(-)\n create mode 100644 apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs\na13d2b14da5d54dd9bec41156c407f0482d0eee1\nfadc5e950eb5d88b53a5d67d01771f91493ce40d\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "node --test apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      },
+      "programArgv": [
+        "node",
+        "--test",
+        "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      ],
+      "startedAtUTC": "2026-11-02 02:34:50 UTC",
+      "endedAtUTC": "2026-11-02 02:34:50 UTC",
+      "toolReportedWallTimeSeconds": 0.161339667,
+      "exitCode": 0,
+      "output": "✔ blocked selectors and unsafe task URLs refuse before runtime composition or output (236.215625ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 266.362083\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "node --check apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs"
+      },
+      "programArgv": [
+        "node",
+        "--check",
+        "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs"
+      ],
+      "startedAtUTC": "2026-11-02 02:36:13 UTC",
+      "endedAtUTC": "2026-11-02 02:36:13 UTC",
+      "toolReportedWallTimeSeconds": 0.000007125,
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "node --test apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      },
+      "programArgv": [
+        "node",
+        "--test",
+        "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      ],
+      "startedAtUTC": "2026-11-02 02:36:13 UTC",
+      "endedAtUTC": "2026-11-02 02:36:13 UTC",
+      "toolReportedWallTimeSeconds": 0.195425625,
+      "exitCode": 0,
+      "output": "✔ blocked selectors and unsafe task URLs refuse before runtime composition or output (272.488625ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 304.909667\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --check"
+      },
+      "startedAtUTC": "2026-11-02 02:36:13 UTC",
+      "endedAtUTC": "2026-11-02 02:36:14 UTC",
+      "toolReportedWallTimeSeconds": 0.00000725,
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --exit-code 8c6fe1d1cc91b44100279a2f82da2a0d5421cc72 -- . ':!docs' ':!apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs' ':!apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs'"
+      },
+      "startedAtUTC": "2026-11-02 02:36:14 UTC",
+      "endedAtUTC": "2026-11-02 02:36:14 UTC",
+      "toolReportedWallTimeSeconds": 0.000006666,
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "shasum -a 256 /tmp/issue897-a02-recovery-20261102/producer-committed.mjs /tmp/issue897-a02-recovery-20261102/producer-working.mjs /tmp/issue897-a02-recovery-20261102/producer-working.patch /tmp/issue897-a02-recovery-20261102/committed-handoff.md /tmp/issue897-a02-recovery-20261102/git-status.txt /tmp/issue897-a02-recovery-20261102/committed-paths.txt"
+      },
+      "startedAtUTC": "2026-11-02 02:36:14 UTC",
+      "endedAtUTC": "2026-11-02 02:36:14 UTC",
+      "toolReportedWallTimeSeconds": 0.00000725,
+      "exitCode": 0,
+      "output": "36efd18b4babb4b13a2dfcb5fd91f6af9e33a4279795500804dc7081361011b6  /tmp/issue897-a02-recovery-20261102/producer-committed.mjs\n51eb66f2c15a5f11f6bd2d345e01b5e6ee091f1f4a89d2c8ed96b0b5846fcd3a  /tmp/issue897-a02-recovery-20261102/producer-working.mjs\nefeba75f283bcc8d91ac9f3da16000e6f3d8732b07f2b9b63ceac01b8ea27e24  /tmp/issue897-a02-recovery-20261102/producer-working.patch\nf11c9b44fe55cbca3174a026e37c29e105b74467c44c2402ec2be049d2a95471  /tmp/issue897-a02-recovery-20261102/committed-handoff.md\nc821f7d7a17ea3946c3d001de61d7d9282d203c8979b6f7622d1b4107aa70691  /tmp/issue897-a02-recovery-20261102/git-status.txt\n6ebd38618e83457ed4572c7fbff62882c5e092f1001e96a1bb7d95748419fabd  /tmp/issue897-a02-recovery-20261102/committed-paths.txt\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --name-status 077c4adedf9c6e776e0daca433c7855d968716ec && git diff --stat 077c4adedf9c6e776e0daca433c7855d968716ec && git status --short"
+      },
+      "startedAtUTC": "2026-11-02 02:36:14 UTC",
+      "endedAtUTC": "2026-11-02 02:36:14 UTC",
+      "toolReportedWallTimeSeconds": 0.000006959,
+      "exitCode": 0,
+      "output": "A\tapps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs\nA\tapps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs\nA\tdocs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair.md\n .../testing/produceOwnershipBatchFixture.mjs       | 333 +++++++++++++++++++++\n .../testing/produceOwnershipBatchFixture.test.mjs  |  65 ++++\n .../bounded-producer-repair/producer-repair.md     |  88 ++++++\n 3 files changed, 486 insertions(+)\n M apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "jq -r '.hashes | to_entries[] | \"\\(.value)  \\(.key)\"' docs/evidence/issue-897/a-02-worker-restricted-20261030/fresh-ordinary-fixtures/source-pins.json | shasum -a 256 -c -"
+      },
+      "startedAtUTC": "2026-11-02 02:36:30 UTC",
+      "endedAtUTC": "2026-11-02 02:36:30 UTC",
+      "toolReportedWallTimeSeconds": 0.000007458,
+      "exitCode": 0,
+      "output": "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts: OK\napps/worker/src/jobs/diagnostics/testing/bootstrapOwnershipExpiryFixture.mjs: OK\napps/worker/src/jobs/diagnostics/testing/produceOwnershipExpiryFixture.mjs: OK\napps/worker/src/jobs/diagnostics/DiagnosticArtifactWorker.ts: OK\napps/worker/src/jobs/diagnostics/DiagnosticWorkerPreparation.ts: OK\napps/api/src/modules/diagnostics/presentation/DiagnosticIntakeController.ts: OK\napps/api/src/modules/diagnostics/presentation/DiagnosticReportsController.ts: OK\napps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipCapture.ts: OK\napps/api/src/modules/diagnostics/infrastructure/DiagnosticOwnershipGrants.ts: OK\napps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.ts: OK\napps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts: OK\npackages/contracts/src/schemas/diagnostics.ts: OK\ninfra/compose/docker-compose.ci.yml: OK\npnpm-lock.yaml: OK\ndocs/evidence/issue-897/worker-fresh-ready-20261029/migration-manifest.json: OK\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "jq -r '.migrations[] | \"\\(.checksum)  packages/db/prisma/migrations/\\(.migration_name)/migration.sql\"' docs/evidence/issue-897/worker-fresh-ready-20261029/migration-manifest.json | shasum -a 256 -c -"
+      },
+      "startedAtUTC": "2026-11-02 02:36:30 UTC",
+      "endedAtUTC": "2026-11-02 02:36:30 UTC",
+      "toolReportedWallTimeSeconds": 0.000006667,
+      "exitCode": 0,
+      "output": "packages/db/prisma/migrations/20260513201407_init/migration.sql: OK\npackages/db/prisma/migrations/20260514090000_multi_device_sessions_and_role_split/migration.sql: OK\npackages/db/prisma/migrations/20260514100000_otp_request_ip/migration.sql: OK\npackages/db/prisma/migrations/20260514104615_delete_me_cascades/migration.sql: OK\npackages/db/prisma/migrations/20260518081943_add_engine_type_transmission_drive_type/migration.sql: OK\npackages/db/prisma/migrations/20260518083234_s4_listings_crud/migration.sql: OK\npackages/db/prisma/migrations/20260518180741_add_seller_terms_to_listing/migration.sql: OK\npackages/db/prisma/migrations/20260608010000_s7_admin_moderation/migration.sql: OK\npackages/db/prisma/migrations/20260609000000_account_deletion_grace/migration.sql: OK\npackages/db/prisma/migrations/20260711000000_add_condition_disclosure_to_listing/migration.sql: OK\npackages/db/prisma/migrations/20260711100000_add_inspection_interest/migration.sql: OK\npackages/db/prisma/migrations/20260713000000_s10_rich_chat_foundation/migration.sql: OK\npackages/db/prisma/migrations/20260713170000_add_notification_history_status/migration.sql: OK\npackages/db/prisma/migrations/20260719010000_align_prisma_schema_with_existing_database/migration.sql: OK\npackages/db/prisma/migrations/20260922000000_add_user_sign_in_methods/migration.sql: OK\npackages/db/prisma/migrations/20260923000000_add_sign_in_code_channel/migration.sql: OK\npackages/db/prisma/migrations/20260928000000_add_listing_price_tmt/migration.sql: OK\npackages/db/prisma/migrations/20260929000000_add_listing_public_number/migration.sql: OK\npackages/db/prisma/migrations/20260929120000_add_brand_logo_key/migration.sql: OK\npackages/db/prisma/migrations/20260929130000_damaged_condition_disclosure/migration.sql: OK\npackages/db/prisma/migrations/20261002000000_remove_reported_listing_status/migration.sql: OK\npackages/db/prisma/migrations/20261002120000_add_media_uploads/migration.sql: OK\npackages/db/prisma/migrations/20261003120000_add_otp_request_purpose/migration.sql: OK\npackages/db/prisma/migrations/20261003180000_add_verified_contact_phones/migration.sql: OK\npackages/db/prisma/migrations/20261003180100_clear_unverified_listing_contact_phones/migration.sql: OK\npackages/db/prisma/migrations/20261005120000_add_user_name_number_and_avatar_index/migration.sql: OK\npackages/db/prisma/migrations/20261007120000_conditional_upload_protocol/migration.sql: OK\npackages/db/prisma/migrations/20261007130000_exclusive_upload_adoption/migration.sql: OK\npackages/db/prisma/migrations/20261007130100_backfill_upload_adoption_state/migration.sql: OK\npackages/db/prisma/migrations/20261011130000_correct_lugong_liugong_models/migration.sql: OK\npackages/db/prisma/migrations/20261011140000_add_listing_media_thumb_hash/migration.sql: OK\npackages/db/prisma/migrations/20261011150000_expand_conditional_media_manifest/migration.sql: OK\npackages/db/prisma/migrations/20261014120000_restore_relisted_listings_published_at/migration.sql: OK\npackages/db/prisma/migrations/20261015003500_listing_view_counts/migration.sql: OK\npackages/db/prisma/migrations/20261015010000_staff_capabilities/migration.sql: OK\npackages/db/prisma/migrations/20261015020000_business_membership/migration.sql: OK\npackages/db/prisma/migrations/20261015030000_business_inventory/migration.sql: OK\npackages/db/prisma/migrations/20261015040000_first_party_measurement/migration.sql: OK\npackages/db/prisma/migrations/20261015050000_service_foundations/migration.sql: OK\npackages/db/prisma/migrations/20261015060000_business_enquiries/migration.sql: OK\npackages/db/prisma/migrations/20261015070000_diagnostic_intake/migration.sql: OK\npackages/db/prisma/migrations/20261015080000_service_push_subscriptions/migration.sql: OK\npackages/db/prisma/migrations/20261015120000_listing_video_foundation/migration.sql: OK\npackages/db/prisma/migrations/20261015130000_support_operations/migration.sql: OK\npackages/db/prisma/migrations/20261015140000_video_playback_authority/migration.sql: OK\npackages/db/prisma/migrations/20261015150000_history_orders/migration.sql: OK\npackages/db/prisma/migrations/20261015160000_showroom_public_fields/migration.sql: OK\npackages/db/prisma/migrations/20261015170000_video_processing_fences/migration.sql: OK\npackages/db/prisma/migrations/20261015180000_history_delivery/migration.sql: OK\npackages/db/prisma/migrations/20261015190000_diagnostic_reports/migration.sql: OK\npackages/db/prisma/migrations/20261015200000_measurement_insights/migration.sql: OK\npackages/db/prisma/migrations/20261015210000_history_recovery_offers/migration.sql: OK\npackages/db/prisma/migrations/20261015220000_diagnostic_evidence_leases/migration.sql: OK\npackages/db/prisma/migrations/20261015230000_video_claim_target/migration.sql: OK\npackages/db/prisma/migrations/20261015240000_history_source_facts/migration.sql: OK\npackages/db/prisma/migrations/20261015250000_video_source_manifest/migration.sql: OK\npackages/db/prisma/migrations/20261015260000_video_write_protocol/migration.sql: OK\npackages/db/prisma/migrations/20261015270000_history_mileage_not_null/migration.sql: OK\npackages/db/prisma/migrations/20261015280000_diagnostic_association_invalidation/migration.sql: OK\npackages/db/prisma/migrations/20261015290000_conversation_measurement_cohorts/migration.sql: OK\npackages/db/prisma/migrations/20261021100000_diagnostic_reinspection_lineage/migration.sql: OK\npackages/db/prisma/migrations/20261021110000_diagnostic_identity_records/migration.sql: OK\npackages/db/prisma/migrations/20261021120000_diagnostic_report_identity_pin/migration.sql: OK\npackages/db/prisma/migrations/20261021130000_diagnostic_identity_evidence/migration.sql: OK\npackages/db/prisma/migrations/20261021140000_diagnostic_continuity_proofs/migration.sql: OK\npackages/db/prisma/migrations/20261021150000_diagnostic_continuity_proof_consumption/migration.sql: OK\npackages/db/prisma/migrations/20261021160000_diagnostic_automatic_vin_proof/migration.sql: OK\npackages/db/prisma/migrations/20261022180000_diagnostic_public_continuity/migration.sql: OK\npackages/db/prisma/migrations/20261023090000_diagnostic_ownership_components/migration.sql: OK\npackages/db/prisma/migrations/20261023100000_diagnostic_ownership_disposal_same_graph/migration.sql: OK\npackages/db/prisma/migrations/20261023110000_diagnostic_continuity_requests/migration.sql: OK\npackages/db/prisma/migrations/20261023120000_diagnostic_ownership_grants/migration.sql: OK\npackages/db/prisma/migrations/20261023130000_diagnostic_source_kernel/migration.sql: OK\npackages/db/prisma/migrations/20261024010000_diagnostic_source_guard_repair/migration.sql: OK\npackages/db/prisma/migrations/20261024020000_campaign_preparation/migration.sql: OK\npackages/db/prisma/migrations/20261024030000_diagnostic_purge_effects/migration.sql: OK\npackages/db/prisma/migrations/20261024040000_diagnostic_intake_effects/migration.sql: OK\npackages/db/prisma/migrations/20261024050000_diagnostic_kernel_invariants/migration.sql: OK\npackages/db/prisma/migrations/20261024060000_diagnostic_source_correction/migration.sql: OK\npackages/db/prisma/migrations/20261024070000_diagnostic_user_eligibility/migration.sql: OK\npackages/db/prisma/migrations/20261024080000_diagnostic_moderation_complete_effects/migration.sql: OK\npackages/db/prisma/migrations/20261024090000_diagnostic_message_enquiry_fences/migration.sql: OK\npackages/db/prisma/migrations/20261024100000_diagnostic_signin_intake_object_owners/migration.sql: OK\npackages/db/prisma/migrations/20261024110000_diagnostic_user_insert_fence/migration.sql: OK\npackages/db/prisma/migrations/20261024120000_diagnostic_account_noop_enquiry/migration.sql: OK\npackages/db/prisma/migrations/20261024130000_diagnostic_intake_campaign_composition/migration.sql: OK\npackages/db/prisma/migrations/20261025010000_diagnostic_report_source_effects/migration.sql: OK\npackages/db/prisma/migrations/20261025015000_diagnostic_runtime_transport_corrections/migration.sql: OK\npackages/db/prisma/migrations/20261025017500_diagnostic_effect_scope_alias_correction/migration.sql: OK\npackages/db/prisma/migrations/20261025019000_diagnostic_user_insert_error_transport/migration.sql: OK\npackages/db/prisma/migrations/20261025020000_diagnostic_listing_publication_effects/migration.sql: OK\npackages/db/prisma/migrations/20261026010000_diagnostic_automatic_public_continuity/migration.sql: OK\npackages/db/prisma/migrations/20261026011000_diagnostic_bootstrap_capability_qualification/migration.sql: OK\npackages/db/prisma/migrations/20261026012000_diagnostic_disposal_selector_precedence/migration.sql: OK\npackages/db/prisma/migrations/20261026013000_diagnostic_purge_audit_details_precedence/migration.sql: OK\npackages/db/prisma/migrations/20261026014000_diagnostic_source_registry_evaluation/migration.sql: OK\npackages/db/prisma/migrations/20261026015000_diagnostic_component_expiry_representation/migration.sql: OK\npackages/db/prisma/migrations/20261026016000_diagnostic_provenance_invalidation_parity/migration.sql: OK\npackages/db/prisma/migrations/20261026016200_diagnostic_maintenance_compatibility/migration.sql: OK\npackages/db/prisma/migrations/20261026016300_diagnostic_registry_metadata_lookup/migration.sql: OK\npackages/db/prisma/migrations/20261026016400_diagnostic_source_key_predicate/migration.sql: OK\npackages/db/prisma/migrations/20261029190000_operational_reset_row_admission/migration.sql: OK\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --exit-code 8c6fe1d1cc91b44100279a2f82da2a0d5421cc72..077c4adedf9c6e776e0daca433c7855d968716ec -- . ':!docs'"
+      },
+      "startedAtUTC": "2026-11-02 02:36:30 UTC",
+      "endedAtUTC": "2026-11-02 02:36:30 UTC",
+      "toolReportedWallTimeSeconds": 0.000007,
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git add apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs && git commit -m 'test(worker): finish guarded ownership batch fixture source audit' && git rev-parse HEAD HEAD^{tree} && git status --short"
+      },
+      "startedAtUTC": "2026-11-02 02:36:30 UTC",
+      "endedAtUTC": "2026-11-02 02:36:31 UTC",
+      "toolReportedWallTimeSeconds": 0.000008458,
+      "exitCode": 0,
+      "output": "[t3/issue-897-a02-batch-fixture-producer 5a0a2b12] test(worker): finish guarded ownership batch fixture source audit\n 1 file changed, 20 insertions(+), 6 deletions(-)\n5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b\nd0a28b674929ec5d898c6c31e65a5f6415d0be46\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "mkdir -p /tmp/897-r6c-a02r2-20261030/producer-repair && git diff --binary 077c4adedf9c6e776e0daca433c7855d968716ec..5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b -- apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs > /tmp/897-r6c-a02r2-20261030/producer-repair/source-5a0a2b12.patch && shasum -a 256 /tmp/897-r6c-a02r2-20261030/producer-repair/source-5a0a2b12.patch apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      },
+      "startedAtUTC": "2026-11-02 02:36:49 UTC",
+      "endedAtUTC": "2026-11-02 02:36:49 UTC",
+      "toolReportedWallTimeSeconds": 0.000014542,
+      "exitCode": 0,
+      "output": "3009c084b56630a2c7a989c13e835edaaea6b9b87fabc30a1461557d955d300f  /tmp/897-r6c-a02r2-20261030/producer-repair/source-5a0a2b12.patch\n9f902c4385b893fffa8b86a630f3743dc37d0bc22899fbf9feb66d6240146134  apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs\n4f9f8c1a29213e632e7a51e096e37a770c67b3c8de7cf9084a3fd1c9f90aba1e  apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git show a13d2b14da5d54dd9bec41156c407f0482d0eee1:apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs | shasum -a 256"
+      },
+      "startedAtUTC": "2026-11-02 02:36:49 UTC",
+      "endedAtUTC": "2026-11-02 02:36:49 UTC",
+      "toolReportedWallTimeSeconds": 0.000011333,
+      "exitCode": 0,
+      "output": "51eb66f2c15a5f11f6bd2d345e01b5e6ee091f1f4a89d2c8ed96b0b5846fcd3a  -\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git show f880da06f68ba82ffe6951e10c100868bcfca7c5:apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs | shasum -a 256"
+      },
+      "startedAtUTC": "2026-11-02 02:36:49 UTC",
+      "endedAtUTC": "2026-11-02 02:36:49 UTC",
+      "toolReportedWallTimeSeconds": 0.000007083,
+      "exitCode": 0,
+      "output": "36efd18b4babb4b13a2dfcb5fd91f6af9e33a4279795500804dc7081361011b6  -\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --name-status 077c4adedf9c6e776e0daca433c7855d968716ec..5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b && git log -4 --oneline && git status --porcelain"
+      },
+      "startedAtUTC": "2026-11-02 02:36:49 UTC",
+      "endedAtUTC": "2026-11-02 02:36:50 UTC",
+      "toolReportedWallTimeSeconds": 0.000007208,
+      "exitCode": 0,
+      "output": "A\tapps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs\nA\tapps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs\nA\tdocs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair.md\n5a0a2b121 test(worker): finish guarded ownership batch fixture source audit\na13d2b14d test(worker): preserve resumed producer and red URL admission case\nb774ce001 docs(evidence): record offline A-02 producer handoff\nf880da06f test(worker): add bounded ordinary ownership batch producer\n"
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --check"
+      },
+      "startedAtUTC": "2026-11-02 02:41:15 UTC",
+      "endedAtUTC": "2026-11-02 02:41:15 UTC",
+      "toolReportedWallTimeSeconds": 0.000006792,
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --exit-code 5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b -- . ':!docs'"
+      },
+      "startedAtUTC": "2026-11-02 02:41:15 UTC",
+      "endedAtUTC": "2026-11-02 02:41:15 UTC",
+      "toolReportedWallTimeSeconds": 0.00000725,
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git diff --exit-code 077c4adedf9c6e776e0daca433c7855d968716ec -- . ':!apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs' ':!apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs' ':!docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair'"
+      },
+      "startedAtUTC": "2026-11-02 02:41:15 UTC",
+      "endedAtUTC": "2026-11-02 02:41:15 UTC",
+      "toolReportedWallTimeSeconds": 0.000020333,
+      "exitCode": 0,
+      "output": ""
+    },
+    {
+      "tool": "exec_command",
+      "input": {
+        "cmd": "git status --short && git diff --stat && shasum -a 256 apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      },
+      "startedAtUTC": "2026-11-02 02:41:15 UTC",
+      "endedAtUTC": "2026-11-02 02:41:15 UTC",
+      "toolReportedWallTimeSeconds": 0.000007375,
+      "exitCode": 0,
+      "output": " M docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair.md\n?? docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair-20261102.md\n?? docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/verification-20261102.json\n .../bounded-producer-repair/producer-repair.md                 | 10 ++++++++++\n 1 file changed, 10 insertions(+)\n9f902c4385b893fffa8b86a630f3743dc37d0bc22899fbf9feb66d6240146134  apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs\n4f9f8c1a29213e632e7a51e096e37a770c67b3c8de7cf9084a3fd1c9f90aba1e  apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs\n"
+    }
+  ]
+}
