@@ -1,0 +1,130 @@
+{
+  "kind": "GitHub issue migration read-back evidence; not a live tracker",
+  "verifiedAtUtc": "2026-11-02T18:40:25Z",
+  "localDate": "2026-11-03",
+  "repository": "Carberk/carberk",
+  "transport": "GitHub connected app",
+  "authenticatedLogin": "bagtyyarkovusov",
+  "organizationInstallation": 177915268,
+  "parentIssue": "https://github.com/Carberk/carberk/issues/897",
+  "parentComment": "https://github.com/Carberk/carberk/issues/897#issuecomment-6585003890",
+  "parentCommentReadBackExact": true,
+  "candidateHead": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+  "currentSource": "4199eb86d4846fecc6b53edca6c447ec868b1566",
+  "acceptedUiFixSource": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+  "nonDocumentationComparisonExit": 0,
+  "publishedPrHead": "b6dac5d17c140c8fd307a24df56d4a82ed070625",
+  "publishedPrState": "OPEN/DRAFT; read-only",
+  "immutableEvidenceLinksVerified": 10,
+  "issueBodyReadBacks": [
+    {
+      "issue_number": 924,
+      "url": "https://github.com/Carberk/carberk/issues/924",
+      "state": "open",
+      "title": "[A-01] Supplemental Standards review for PR-audit S2/S3",
+      "body_sha256": "13da1ba508dedb2409e5f547e74a211fc4457be1b6fb35bea0a45c26fb7c76d0",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 925,
+      "url": "https://github.com/Carberk/carberk/issues/925",
+      "state": "open",
+      "title": "[A-02] Restricted worker capacity, rollback, and race matrix",
+      "body_sha256": "cbc417168e14634309caeb2564b1f08ed769b07a96927f36a16234e21fce5b8b",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 926,
+      "url": "https://github.com/Carberk/carberk/issues/926",
+      "state": "open",
+      "title": "[A-03] Caller, namespace, privacy, and erasure matrices",
+      "body_sha256": "8c20ca3996d3f9e26d7f8f24ea7dd267d43f4a7eec8edff76522df150acc4b28",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 927,
+      "url": "https://github.com/Carberk/carberk/issues/927",
+      "state": "open",
+      "title": "[A-04] Lawful reset lifecycle proof and hosted plan",
+      "body_sha256": "aba8ef93da8419319ad62827d5b64090eb32002903d12fff2f17b6316b3bbcfe",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 928,
+      "url": "https://github.com/Carberk/carberk/issues/928",
+      "state": "open",
+      "title": "[A-05] Staff continuity protected/native journey acceptance",
+      "body_sha256": "20630b60215ed872a72c9057c8b433f636ff10345e68f0d0aeb73145f0240378",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 929,
+      "url": "https://github.com/Carberk/carberk/issues/929",
+      "state": "open",
+      "title": "[A-06] Combined candidate CI and static gate",
+      "body_sha256": "b74655575518756655ff2492a3ba07daa31c46df9275dfcc49c932db09df01fb",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 930,
+      "url": "https://github.com/Carberk/carberk/issues/930",
+      "state": "open",
+      "title": "[A-07] Railway deployed acceptance and restoration preparation",
+      "body_sha256": "871108615f1f5d33068a8e9dbc4512ce8d95ee3410e6c1f8c7a9ff044789becc",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 931,
+      "url": "https://github.com/Carberk/carberk/issues/931",
+      "state": "open",
+      "title": "[A-08] Exact installable APK/AAB artifact evidence",
+      "body_sha256": "74331edde9dd10204a7a0bf101d533fcc53eed44f7b04f77d3a19b045ff568bb",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 932,
+      "url": "https://github.com/Carberk/carberk/issues/932",
+      "state": "open",
+      "title": "[A-09] One bounded fix round after independent review",
+      "body_sha256": "b4f47df3692ccb796e7ea1f9723faf56562c919d916e769a92afac8730145a2c",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 933,
+      "url": "https://github.com/Carberk/carberk/issues/933",
+      "state": "open",
+      "title": "[A-10] Current-PR reconciliation, protected merge, and final acceptance",
+      "body_sha256": "f6bcd082d36a8ddbf237e75b3109f1c363f74ee9226a95ebb7c932adaccdb2d0",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 934,
+      "url": "https://github.com/Carberk/carberk/issues/934",
+      "state": "open",
+      "title": "[A-11] Independent Spec review",
+      "body_sha256": "3ed99f9919f7322eccb140ec14b8ef9b4b204c2076459f6c57d635eef389c25a",
+      "exact_body_match": true
+    },
+    {
+      "issue_number": 935,
+      "url": "https://github.com/Carberk/carberk/issues/935",
+      "state": "open",
+      "title": "[A supplemental repair] Fix post-lock clock and real proxy test boundaries",
+      "body_sha256": "61ba9ad46f80fbedbb8f0c18954eecbcf6090d5dbfe2e62a9bf895d0bbcf2b27",
+      "exact_body_match": true
+    }
+  ],
+  "coordinatorHandoff": {
+    "threadLink": "t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230",
+    "clientRequestId": "release-parent-github-issue-map-20261103",
+    "scope": "Read actual issue contracts, verify host access, report readiness/mismatches only; no workers or runtime dispatch"
+  },
+  "exclusions": [
+    "No issue closures",
+    "No source changes",
+    "No package/test/build/native/runtime/reset/deployment",
+    "No PR #904 or A candidate ref mutation; no PR creation retry",
+    "No cleanup deletion"
+  ],
+  "priorRefusal": "The earlier connected-app 403 is retained. Successful issue writes followed verified organization installation/access correction; no alternate transport was used."
+}

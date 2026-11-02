@@ -1,5 +1,7 @@
 # GitHub tracking correction — 2 November 2026
 
+The [3 November migration receipt](#verified-issue-migration-3-november-2026) records the later successful access correction. The refusal and configuration observations below remain historical evidence.
+
 Founder requires GitHub Issues for release task contracts, assignments, dependencies and status. The repository already named GitHub as its issue tracker. No founder decision authorized the document-only A tracker. Maps and execution receipts remain evidence, not substitutes for issue pages.
 
 The attempted migration of A-01 through A-11 failed. The connected integration returned `403 Resource not accessible by integration` from issue creation; no issue was created. The batch incorrectly continued through all eleven permission failures. Future writes stop at the first such refusal. No alternate tool, credential or endpoint has been used to bypass it. The earlier PR-creation refusal remains preserved and has not been retried.
@@ -27,3 +29,13 @@ Signed-in Chrome's personal Applications page identifies installation `167479145
 A bounded local metadata check found the Claude CLI installed, no global `mcpServers` entries in `~/.claude.json`, and no repository `.mcp.json`. This does not exclude plugin, connector or T3-injected servers. Verify `/mcp` and the active session's exposed tools rather than inferring access from those files. No Claude model was run and no server was installed.
 
 [GitHub operations](../../agents/github-operations.md#verify-the-active-connection) now gives Codex, Claude Code, T3 and CLI instructions without sharing credentials or treating one host's access as another's. `CLAUDE.md` already imports `AGENTS.md`, so both entry points reach the GitHub-first gate. The existing A coordinator will receive the immutable documentation checkpoint; this is a policy handoff, not authorization to resume tickets or create a second tracker. A acceptance and B/C/activation gates remain unchanged.
+
+## Verified issue migration, 3 November 2026
+
+The connected app now returns Carberk organization installation `177915268`, authenticated login `bagtyyarkovusov`, and repository coverage for `Carberk/carberk`. Authorized issue writes and exact body readbacks succeeded through the same connected app after that correction. The earlier 403 and PR-creation refusal remain preserved; no alternate transport or PR-creation retry was used.
+
+The live [parent issue comment](https://github.com/Carberk/carberk/issues/897#issuecomment-6585003890) links all eleven A gates, #924 through #934, plus supplemental audit repair #935. Each actual issue records its owner, exact base, paths/resources, dependencies, non-goals, commands, evidence and acceptance. [Readback hashes](release-parent-github-migration-20261103.json) establish the published bodies; GitHub owns later changes. This receipt does not establish a second task map.
+
+The migration corrected stale source wording. Candidate `a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568` includes A-02's assembled preparation source `4199eb86d4846fecc6b53edca6c447ec868b1566`; their non-documentation comparison exits 0. `4b2c8a6f6161f9c825945637f6f848c64adeb145` remains the earlier accepted UI S1/S2 source. Its bounded PASS does not pass the supplemental audit, real A-02 cases or milestone.
+
+The existing A coordinator received the real issue map for read-only contract/access validation and readiness reporting. No worker was started or duplicated. PR #904's published ref remains unchanged. No package test, service, DB, hosted, reset, build, device, deployment or cleanup action ran. All issues remain open pending protected campaign finalization; original-eleven disposition is still 1 PASS / 10 OPEN, with #935 an additional open repair. A acceptance and B/C/activation gates remain closed.
