@@ -3,7 +3,6 @@
   "sourceHead": "9e48011e54a23822504d9cb5ae5f6d7a9f96028e",
   "sourceTree": "33a26963c3db13f8e62b6b2b0ad1998bd4a5c633",
   "sourceParent": "57b44c0645a0197ecd237975e41d1909b03dd36b",
-  "evidenceHead": "c9089f620f0c2b3e1bc758f703431acb61ef7459",
   "evidenceWorktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
   "branch": "t3/issue-897-a02-batch-fixture-producer",
   "allowList": {
@@ -45,7 +44,7 @@
     "exitCode": 0,
     "stdout": "",
     "stderr": "",
-    "meaning": "Required clean pre-edit source comparison; initial status/tree were the pinned evidence base."
+    "meaning": "Timed repeat of the pre-edit empty source comparison. HEAD remained the pinned evidence base, but edits were already in progress; this command compared committed trees only. The initial clean comparison itself preceded edits and did not have per-command UTC timestamps recorded."
   },
   "serialOfflineChecks": [
     {
@@ -140,11 +139,17 @@
       "privacy/erasure/retry closure",
       "role/object/receipt restoration",
       "cleanup and Parent acceptance"
+    ],
+    "openDependencies": [
+      "overlimit: actual lawful construction within E-2s and native120s; 719 HTTP requests after declaration at <=5 inflight, then real restricted one-command >1000-key union refusal/whole-state equality/restoration",
+      "worker-first-capture: literal 400/DIAGNOSTIC_INVALID_INPUT from the same actual-expired classified request in both branches; no unrelated invalidity/new rows/audit",
+      "worker-first-proof-use: literal 403/DIAGNOSTIC_NO_ACCESS from the same expired/disposed pending proof request in both branches; no new report/audit/privacy regression",
+      "opponent-first: native startup, beforeAll and real pre-expiry request/barrier within fixed E-2s handoff margin",
+      "compiled/loaded modules and applied102-migration pin absent/unproved offline; coordinator build/bootstrap and assembly verification required",
+      "all ten runtime bodies, object/role/trigger restoration, private resource cleanup and Parent acceptance"
     ]
   },
-  "evidenceTree": "39fb6c074006868afbcfb67379c4af603ab32e87",
-  "evidenceParent": "9e48011e54a23822504d9cb5ae5f6d7a9f96028e",
-  "workingTree": "clean at terminal audit; final evidence update is intentionally pending",
+  "workingTree": "clean at the first evidence-inclusive checkpoint audited below; final clean status is in the external terminal receipt",
   "finalTerminalAudits": [
     {
       "argv": [
@@ -223,5 +228,25 @@
       "stderr": ""
     }
   ],
-  "postEvidenceAllowListAudit": "The final name-only diff contains exactly three allowed source paths and four files under bounded-producer-repair; no production/config/migration path changed."
+  "postEvidenceAllowListAudit": "The final name-only diff contains exactly three allowed source paths and four files under bounded-producer-repair; no production/config/migration path changed.",
+  "firstEvidenceHead": "c9089f620f0c2b3e1bc758f703431acb61ef7459",
+  "firstEvidenceTree": "39fb6c074006868afbcfb67379c4af603ab32e87",
+  "firstEvidenceParent": "9e48011e54a23822504d9cb5ae5f6d7a9f96028e",
+  "evidenceIdentityScope": "firstEvidenceHead/tree identify the first evidence-inclusive checkpoint audited below. The final evidence-only update is identified by the external terminal receipt and final handoff, avoiding a self-referential commit hash.",
+  "finalEvidenceIdentityReceipt": "/tmp/897-r6c-a02r2-20261030/producer-repair/correction-terminal-20261102.json",
+  "sourceCommitCommandReceipt": {
+    "shellCommand": "git add apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs && git commit -m 'test(worker): correct ordinary ownership batch fixtures' && git rev-parse HEAD HEAD^{tree}",
+    "exitCode": 0,
+    "commitTimeUTC": "2026-11-02T03:29:03+00:00",
+    "perCommandStartEndCaptured": false,
+    "note": "Source identity is verified by Git; the exact UTC start/end of this checkpoint command was not captured. No timestamp was invented."
+  },
+  "messagingAttempt": {
+    "target": "mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230",
+    "tool": "mcp__t3_code__t3_thread_send",
+    "mode": "steer",
+    "result": "thread_not_sendable: Thread has no running turn that can be steered",
+    "retry": false,
+    "handoff": "this existing task returns the source/evidence packet directly"
+  }
 }
