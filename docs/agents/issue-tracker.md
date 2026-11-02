@@ -2,6 +2,17 @@
 
 This repo tracks all issues in **GitHub Issues**, using the `gh` CLI.
 
+## Required tracking before dispatch
+
+1. Find and read the actual GitHub issue, its governing criteria, dependencies and latest execution updates before selecting or resuming a ticket. Search for an existing issue before creating one.
+2. Before a worker starts, its issue must identify the owner, immutable base SHA, allowed paths/resources, dependencies, non-goals, verification commands, evidence and pass/fail acceptance. A document heading or local ticket ID alone does not satisfy this gate. Existing thread/worktree identities and historical checkpoints survive migration.
+3. Record assignments, blockers, current status, accepted findings and completion evidence in the issue. Link its number from the dispatch and execution receipts. Repository maps describe scope or preserve evidence; they are not a second live task tracker. Thread completion and checkpoint commits do not close an implementation issue.
+4. If GitHub refuses a required write, preserve the exact request body and error, report the block and hold new dispatch that depends on the missing issue/update. Do not silently move tracking into documents, chat or another service. A tracker change requires an explicit founder decision.
+
+For `403 Resource not accessible by integration`, stop writes after the first permission refusal and arrange a permission/access correction. Do not repeat the request or retry it through another account, tool or endpoint to bypass the refusal. Resume after the access change is verified. This message indicates insufficient integration access; it is not evidence of a rate limit. Actual rate-limit responses require following GitHub's retry/reset headers, while keeping GitHub as the tracker.
+
+After release acceptance, track documentation/evidence cleanup as a GitHub task. Reconcile issue links and make an explicit keep/archive/remove inventory before deleting stale maps or duplicate receipts. Preserve the immutable evidence, hashes and recovery references needed to substantiate the accepted release. Release work does not authorize an early cleanup sweep.
+
 Skills that read this file: user-global generic skills (`triage`, `qa`, `request-refactor-plan`) and the project workflow skills at `.claude/skills/` (`create-sprint-issues`, `run-issue`) — see [ADR-0040](../adr/0040-repo-canonical-workflow-skills.md). Sprint start, tasklist reconciliation, and dependency-label updates use the canonical verified sequence in [`sprint-transitions.md`](sprint-transitions.md).
 
 ## Operations

@@ -6,6 +6,8 @@ Read the request and acceptance criteria, then [CONTEXT-MAP.md](CONTEXT-MAP.md),
 
 Every delivery follows [coding workflow](docs/agents/coding-workflow.md). It owns roles, review, verification, recovery and the approved exception. Repository skills live only in [.claude/skills](.claude/skills); open linked skills manually when the host cannot discover them. [ADR-0098](docs/adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) establishes this workflow. Staging automation and direct promotion remain gated by operational readiness.
 
+Before selecting, dispatching, resuming or reporting a ticket, read its GitHub issue under [issue tracking](docs/agents/issue-tracker.md). GitHub owns task status and dependencies; repository plans, evidence and agent threads link to that issue.
+
 | When changing | Read before editing |
 |---|---|
 | Domain logic, ownership or documentation | [Domain guidance](docs/agents/domain.md) |

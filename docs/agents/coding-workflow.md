@@ -12,7 +12,7 @@ Chief of Staff uses [run-queue](../../.claude/skills/run-queue/SKILL.md) for one
 
 ## Implement and assemble
 
-1. Inspect existing branches, worktrees, PRs and durable state before assigning a writer. Resume existing attempts with [resume-issue](../../.claude/skills/resume-issue/SKILL.md).
+1. Read the actual GitHub issue and satisfy the [tracking-before-dispatch gate](issue-tracker.md#required-tracking-before-dispatch). Inspect existing branches, worktrees, PRs and durable state before assigning a writer. Resume existing attempts with [resume-issue](../../.claude/skills/resume-issue/SKILL.md).
 2. Reserve `agent/spec-<parent>-<slug>` from current `origin/main`. Open its one draft PR early, after the first checkpoint. Keep the parent and each issue's [Execution state](../../.claude/skills/run-issue/EXECUTION-STATE.md) current.
 3. Dispatch one isolated [run-issue](../../.claude/skills/run-issue/SKILL.md) writer per ready issue from a supplied integration SHA. Each owns `agent/issue-<N>`, pushes a reservation before edits and stops after verification. Writers open no issue PRs. Dependency work may proceed from a verified prerequisite incorporated into the integration candidate; dependencies close only through the final PR.
 4. One assembly writer merges verified issue checkpoints in dependency order, reconciles current `main`, inspects the combined diff and runs full candidate checks. Mechanical conflicts are implementation work; conflicts with multiple valid semantic resolutions need direction. Only one writer changes the integration branch at a time.
