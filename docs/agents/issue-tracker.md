@@ -17,6 +17,16 @@ After release acceptance, track documentation/evidence cleanup as a GitHub task.
 
 Skills that read this file: user-global generic skills (`triage`, `qa`, `request-refactor-plan`) and the project workflow skills at `.claude/skills/` (`create-sprint-issues`, `run-issue`) — see [ADR-0040](../adr/0040-repo-canonical-workflow-skills.md). Sprint start, tasklist reconciliation, and dependency-label updates use the canonical verified sequence in [`sprint-transitions.md`](sprint-transitions.md).
 
+## Preparation in the execution contract
+
+Tickets that run code include bounded preparation in the existing issue: required workspace dependencies, frozen restore commands, generated/build output paths, import checks and relevant input hashes. Derive these from the checked-in package exports and test setup. Preparation permissions cover only the recorded commands and paths; runtime resources retain their own reservations.
+
+Prepare once in the assigned worktree. Reuse valid installed/generated output while its relevant lockfile, schema, source, build-script and toolchain inputs match. Use the configured package store; keep installed and generated trees local to their owning worktree. Rebuild affected dependencies when inputs change.
+
+Check required imports before expensive test selectors. Module-resolution or global-setup failure is setup failure; behavior RED requires an actual governed behavior assertion to fail. Setup success does not establish runtime acceptance.
+
+Authorize routine preparation and conditional test continuation together at dispatch. The worker continues within that contract without another approval round; an uncovered prerequisite or guard refusal returns to the coordinator. Use compact phase/blocker/next-action updates linked to raw receipts, and reuse accepted evidence whose relevant inputs are unchanged.
+
 ## Operations
 
 [GitHub operations](github-operations.md) documents bounded reads and file-based writes. Fetch omitted governing content before implementing or reviewing.
