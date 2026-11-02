@@ -1,6 +1,91 @@
 # Milestone A dispatch — 2026-10-30
 
-## A-02 source checkpoint received — 2026-11-02
+## Parent disposition and clean A-02 handoff, 2026-11-02
+
+Read Parent authority directly from immutable commit
+`c0eb1e282013070b1f0582a10515f240986de578`, path
+`docs/evidence/issue-897/release-parent-a02-disposition-20261102.md`.
+No merge of that separate parent-only documentation branch is required.
+The [existing map](a-wayfinder-ticket-map-20261030.md) now records this
+disposition. Count remains **2 PASS / 9 OPEN**; A-02 and A remain unaccepted.
+
+The existing continuation is terminal, with clean source checkpoint
+`5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, tree
+`d0a28b674929ec5d898c6c31e65a5f6415d0be46`, and separate final evidence
+HEAD `57b44c0645a0197ecd237975e41d1909b03dd36b`, tree
+`4a616b5fd5efc88199e0b8b187a22057ae7be161`. The earlier evidence
+checkpoint `77458f5137c4b31b222438c30d98b86ae814e131` is retained as its
+parent. Corrected handoff `producer-repair-20261102.md` supersedes the original
+`producer-repair.md`, including its unsupported readiness claims. No source
+from this child is assembled.
+
+Coordinator [terminal read-back](a-02-producer-handoff-57b44c06-20261102.json)
+proves clean status, actual source/evidence trees, documentation-only
+`5a0a2b12..57b44c06`, docs-only original planning interval, the full exact
+two-source-path/evidence allow-list, all 15 accepted pins, 102 disk migrations
+and six recovery hashes. The child's raw Node RED/GREEN/check receipts are
+collected there, including the final 1/1 green CLI test at 304.909667ms.
+Coordinator did not rerun those Node tests or start runtime/package work.
+Seven plans have source audit only. The oldest-capacity declaration dependency
+is OPEN, and the three blocked selectors remain fail-closed at this historical
+source until the separately bounded correction. No case or cleanup has passed.
+
+### Serialized next correction in the same existing child
+
+The [bounded correction contract](a-02-worker-restricted-20261030/bounded-producer-repair/correction-20261102.md)
+is recorded before dispatch. Source base is `5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`;
+actual clean edit/evidence base is `57b44c0645a0197ecd237975e41d1909b03dd36b`.
+Only the existing child/worktree/branch below may write. No duplicate delegate
+or provider change is created. The next continuation task/run receipt enters
+this ledger after send; this paragraph is a pre-dispatch contract.
+
+- Owner: the original A-02 child, worktree
+  `/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050`, branch
+  `t3/issue-897-a02-batch-fixture-producer`; `codex_work`, `gpt-6.1-sol`,
+  xhigh/priority, full access. Its original task and latest completed
+  continuation task/thread identifiers are retained below.
+- Allowed writes: the exact batch spec, new producer, direct boundary test and
+  ticket evidence named by the contract. Production API/worker, contracts,
+  migrations/config and accepted ordinary producer/bootstrap stay read-only.
+- Capacity: complete lawfully produced ordinary roots, shared retained edges,
+  registry/effect union above 1,000 keys in one unchanged first worker command,
+  at most ten roots. Actual restricted refusal, cardinality pressure, all
+  persisted baseline equality, zero source/campaign receipts and restoration
+  are required. No summing under-cap groups, truncation, subdivision, retry,
+  skip, protected insertion, cap increase or singleton runtime claim.
+- Statuses: literal classified capture HTTP400/`DIAGNOSTIC_INVALID_INPUT`
+  and proof-use HTTP403/`DIAGNOSTIC_NO_ACCESS` in both early/final branches,
+  actual expiry, unchanged reverse-before-E HTTP201 and same requests. Retain
+  barriers, closure/privacy, exact retries, no duplicate reports/audits and
+  immutable state. The producer's oldest-capacity declaration is repaired
+  separately inside its existing path; the corresponding suite assertions
+  remain unchanged.
+- Pins: preserve the historical accepted manifest, add exact corrected-spec
+  evidence and preserve the other 14 hashes, all migrations, compiled/source
+  binding and resource guards. No implicit acceptance of changed input bytes.
+- Offline commands and receipt targets: exact argv in the contract. No package
+  commands, services, runtime fixture/DB/HTTP/object work or heavy timing slot
+  in this correction. Commit new source and evidence HEADs without rewriting
+  prior refs/recovery. Return honest OPEN dependencies if unchanged routes and
+  limits cannot produce any required shape.
+- Runtime resources are planned only: Compose
+  `auto_tm_ci_897_r6c_a02r2_20261030`, PG61149, Redis61148 DB0,
+  MinIO61150/`diagnostic-test-private`, the ten distinct `r6c_batch_a02r2_*`
+  databases enumerated below, and private root `/tmp/897-r6c-a02r2-20261030`.
+  Port65379 is prohibited. Coordinator alone performs assembly/readiness,
+  reserves one exclusive slot with one Vitest worker and at most five producer
+  requests, and records concrete per-case commands/ports/names/timings and
+  cleanup. No A-04/build/native/deployment/timing overlap.
+- Gate: source audit/affected checks and fresh independent Standards/Spec on
+  the exact assembled SHA precede runtime readiness. A-02 stays FAIL/open until
+  every required real body and cleanup is evidenced. Parent alone accepts A.
+  PR904 remains OPEN/DRAFT at the separately verified head
+  `b6dac5d17c140c8fd307a24df56d4a82ed070625`; it is untouched.
+
+## Historical intermediate source checkpoint, 2026-11-02
+
+The terminal handoff and disposition above supersede current-state wording in
+the retained intermediate/recovery records below.
 
 The existing continuation reported clean source checkpoint
 `5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, tree
@@ -86,8 +171,8 @@ active and no routine fixture permission stop is introduced.
 
 Parent accepted A-01 PASS and the bounded A-09 S1/S2 PASS on exact assembled
 source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Count:
-**2 passed, 9 open**. A-02's offline producer repair is terminal failed on usage
-limit, with unfinished work preserved; A-03/A-04/A-11
+**2 passed, 9 open**. A-02 returned the clean offline handoff recorded above
+and is awaiting the separately bounded correction; A-03/A-04/A-11
 are FAIL/open; A-05/A-06/A-07/A-08/A-10 wait. A is NOT accepted. Earlier S1/S2
 FAIL/open entries below are historical and superseded by returned reports.
 
@@ -118,7 +203,10 @@ PR #904 read-back remains OPEN/DRAFT at
 auto-merge disabled. It differs from the coordinator candidate. No PR ref
 mutation occurred.
 
-## Next A-02 prerequisite dispatch
+## Historical A-02 prerequisite dispatch
+
+The Parent disposition and separately pinned correction above supersede the
+unresolved criterion/status questions and current-task wording in this record.
 
 Current route-audit blockers are recorded in the bounded producer's
 `overlimit-dependency.md` and `refusal-status-dependency.md`: ordinary guarded

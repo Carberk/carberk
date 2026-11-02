@@ -2,42 +2,51 @@
 
 Active coordinator: T3 `mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230`, Sol 6.1 xhigh/priority, full access, supervised by the Release Program Parent. Resumed the same clean worktree from `52d901c50af1dde97ea22bda8efb1fdf21f169b1`. The former coordinator `mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833` is preserved as historical handoff evidence, not an active writer.
 
-Current authority is the founder's fresh-coordinator brief and Parent's contract clarification on 30 October. A is the internal campaign candidate only. Unfinished B prototype work and analytics product completion/real collection remain outside A; B, C and C-Activation retain their separate founder gates. Only the Parent declares A complete. Exact APK/AAB, required deployed/native evidence, protected PR #904 delivery and restoration remain open A requirements.
+Current authority is the founder's fresh-coordinator brief, Parent's contract clarification on 30 October, and the immutable 2 November A-02 disposition `c0eb1e282013070b1f0582a10515f240986de578`. A is the internal campaign candidate only. Unfinished B prototype work and analytics product completion/real collection remain outside A; B, C and C-Activation retain their separate founder gates. Only the Parent declares A complete. Exact APK/AAB, required deployed/native evidence, protected PR #904 delivery and restoration remain open A requirements.
 
-The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-coordinator-dispatch-20261030.md) own current tickets, exact bases, paths, commands, resources, task/thread/worktree identities and dependency order. Coordinator checkpoint `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72` contains assembled source/verification SHA `4b2c8a6f6161f9c825945637f6f848c64adeb145` plus docs/evidence only. PR #904 remains OPEN/DRAFT at the separate head `b6dac5d17c140c8fd307a24df56d4a82ed070625`, auto-merge disabled. Neither the candidate nor the PR was merged. The detailed rows below are historical snapshots where superseded by the current state.
+The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-coordinator-dispatch-20261030.md) own current tickets, exact bases, paths, commands, resources, task/thread/worktree identities and dependency order. The clean pushed documentation baseline before this update is `6d8fc6797a496d139e13cfb10bacc01cb243c1ad`; the candidate retains assembled source/verification SHA `4b2c8a6f6161f9c825945637f6f848c64adeb145` plus docs/evidence only. PR #904 remains OPEN/DRAFT at the separate head `b6dac5d17c140c8fd307a24df56d4a82ed070625`, auto-merge disabled. Neither the candidate nor the PR was merged. The detailed rows below are historical snapshots where superseded by the current state.
 
 ## Active critical path
 
-Latest A-02 update: source checkpoint `5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`
-is in the same isolated child; corrected evidence is pending. Coordinator
-confirmed the exact producer/test allow-list, 15 accepted pins, 102 disk
-migration entries and six recovery artifact hashes. RED checkpoint
-`a13d2b14da5d54dd9bec41156c407f0482d0eee1` preserves the resumed dirty source.
-Worker reports a green 1/1 real CLI refusal-boundary test; its complete raw
-receipt is not yet collected and this is not runtime acceptance. No source was
-assembled, no resource started and three selectors remain OPEN/fail-closed.
-See `a-02-producer-checkpoint-5a0a2b12-20261102.json` and the current ledger.
+The existing A-02 continuation returned a clean terminal handoff. Source is
+`5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, tree
+`d0a28b674929ec5d898c6c31e65a5f6415d0be46`; separate evidence HEAD is
+`57b44c0645a0197ecd237975e41d1909b03dd36b`, tree
+`4a616b5fd5efc88199e0b8b187a22057ae7be161`. The source/evidence distinction,
+exact allowed paths, documentation-only intervals, 15 accepted pins, 102 disk
+migration entries and six recovery hashes were revalidated by the coordinator.
+The raw Node command receipts are collected in
+[a-02-producer-handoff-57b44c06-20261102.json](a-02-producer-handoff-57b44c06-20261102.json).
+No case/runtime/cleanup acceptance or source assembly follows from that audit.
+Three selectors remain fail-closed at this historical source; oldest-capacity
+also has a recorded declaration dependency. Original source/evidence refs and
+the dirty recovery preserved in `a13d2b14da5d54dd9bec41156c407f0482d0eee1`
+remain intact. The original stale handoff is explicitly superseded.
 
-Parent now reports restored Sol 6.1 availability. The coordinator has
-revalidated current candidate/source/base, both preserved child versions,
-recovery hashes, blocked-selector dispositions and the exact
-`bounded-producer-repair/resume-20261102.md` contract. Only same-thread/worktree
-offline completion resumes; three selectors remain OPEN/fail-closed. No runtime
-resources, duplicate task or provider switch are authorized by this recovery.
+The Parent's [immutable disposition](https://github.com/Carberk/carberk/blob/c0eb1e282013070b1f0582a10515f240986de578/docs/evidence/issue-897/release-parent-a02-disposition-20261102.md)
+now resolves the criterion/status questions. Capacity must exceed 1,000 complete
+registry/effect keys inside one actual unchanged first worker command with no
+more than ten ordinary roots, preserving every admission guard and proving
+real cardinality pressure/refusal, complete persisted-state equality and zero
+receipts. Classified capture must assert literal HTTP400/INVALID_INPUT, and
+proof-use literal HTTP403/NO_ACCESS in both branches at real expiry. Reverse
+admission remains201 with identical requests, barriers, privacy/erasure and
+retry/duplicate assertions. No production repair is authorized.
 
-Recovery update, 2026-11-02: the A-02 producer task is terminal failed on the
-provider usage limit, with no pending child work. Source checkpoint
-`f880da06f68ba82ffe6951e10c100868bcfca7c5`, evidence HEAD
-`b774ce00105323b0d0334499f1db25e6c51a7f15` and its uncommitted correction
-remain preserved and unassembled. Its committed handoff is stale. Exact
-identity/hash/snapshot and resume constraints are in
-`a-02-worker-restricted-20261030/bounded-producer-repair/recovery-20261102.md`.
-No replacement, runtime/resource reservation or PR mutation occurred. The
-remaining in-flight wording below is historical where superseded here.
+The existing map and ledger record a [separate bounded correction](a-02-worker-restricted-20261030/bounded-producer-repair/correction-20261102.md)
+from source `5a0a2b12` and actual evidence/edit base `57b44c06` in the same
+isolated child/worktree. Only the batch spec, new producer/direct boundary test
+and ticket evidence may change. Historical pins stay intact; new assertions
+need an explicit corrected-spec pin and unchanged remaining input proof.
+Assembly, affected verification and new independent Standards/Spec reviews
+must name the resulting exact source SHA. Fresh resource/timing reservation
+remains coordinator-owned and unstarted. Port65379 is prohibited. The earlier
+usage-blocked/resume/intermediate states remain historical in the ledger and
+recovery artifacts, and do not create a new task or routine permission stop.
 
 Parent accepted A-01 PASS and bounded A-09 S1/S2 PASS on exact assembled
 source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Current count
-is **2 passed, 9 open**: A-02 usage-blocked offline repair; A-03/A-04/A-11 FAIL/open;
+is **2 passed, 9 open**: A-02 separately bounded offline correction; A-03/A-04/A-11 FAIL/open;
 A-05/A-06/A-07/A-08/A-10 waiting. This does not accept A or mutate PR #904.
 
 Current review disposition: independent A-01 r3 is PASS on `4b2c8a6f…`,
@@ -59,8 +68,9 @@ unaccepted; only Parent may accept it.
 
 A-02's offline audit additionally found the frozen single-order >1,000-raw
 fixture blocked by ordinary scope admission, and worker-first capture/proof-use
-status expectations inconsistent with current expiry refusals. The worker
-continues other case preparation and fails closed for these three selectors.
+status expectations inconsistent with current expiry refusals. That frozen source
+fails closed for these three selectors; the Parent disposition and separately
+pinned correction above now govern the next work.
 See the bounded producer's `overlimit-dependency.md` and
 `refusal-status-dependency.md`; no runtime or source/test scope expansion was
 attempted. The A-04 profile repair is a recorded unlaunched prerequisite plan;

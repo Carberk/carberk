@@ -1,0 +1,270 @@
+{
+  "recordedAtUTC": "2026-11-02T02:56:50.622045+00:00",
+  "state": "TERMINAL OFFLINE HANDOFF; NOT ASSEMBLED; A-02 FAIL/open",
+  "coordinatorHeadBeforeDocumentation": "6d8fc6797a496d139e13cfb10bacc01cb243c1ad",
+  "sourceCheckpoint": "5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b",
+  "sourceTree": "d0a28b674929ec5d898c6c31e65a5f6415d0be46",
+  "evidenceHead": "57b44c0645a0197ecd237975e41d1909b03dd36b",
+  "evidenceTree": "4a616b5fd5efc88199e0b8b187a22057ae7be161",
+  "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+  "branch": "t3/issue-897-a02-batch-fixture-producer",
+  "changedPathsFromOriginalWorkerStart": [
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs",
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs",
+    "docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair-20261102.md",
+    "docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair.md",
+    "docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/verification-20261102.json"
+  ],
+  "sourceFileHashes": {
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs": "9f902c4385b893fffa8b86a630f3743dc37d0bc22899fbf9feb66d6240146134",
+    "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs": "4f9f8c1a29213e632e7a51e096e37a770c67b3c8de7cf9084a3fd1c9f90aba1e"
+  },
+  "workerVerificationArtifact": {
+    "path": "docs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/verification-20261102.json",
+    "sha256": "22bac02000996990aa5fc80ce4f4a529fcd673f08a8eb874b9e4fc0154189786",
+    "nodeCommandReceipts": [
+      {
+        "tool": "exec_command",
+        "input": {
+          "cmd": "node --test apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+        },
+        "programArgv": [
+          "node",
+          "--test",
+          "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+        ],
+        "startedAtUTC": "2026-11-02 02:34:11 UTC",
+        "endedAtUTC": "2026-11-02 02:34:11 UTC",
+        "toolReportedWallTimeSeconds": 0.079334667,
+        "exitCode": 1,
+        "output": "\u2716 blocked selectors and unsafe task URLs refuse before runtime composition or output (143.51675ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 176.635416\n\n\u2716 failing tests:\n\ntest at apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs:11:1\n\u2716 blocked selectors and unsafe task URLs refuse before runtime composition or output (143.51675ms)\n  AssertionError [ERR_ASSERTION]: node:internal/fs/promises:1163\n    return await PromisePrototypeThen(\n           ^\n  \n  Error: ENOENT: no such file or directory, realpath '/tmp/897-r6c-a02r2-20261030/producer-repair/boundary-gejRRw/bootstrap.json'\n      at async realpath (node:internal/fs/promises:1163:10)\n      at async file:///Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050/apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs:53:57 {\n    errno: -2,\n    code: 'ENOENT',\n    syscall: 'realpath',\n    path: '/tmp/897-r6c-a02r2-20261030/producer-repair/boundary-gejRRw/bootstrap.json'\n  }\n  \n  Node.js v24.13.0\n  \n      at refused (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050/apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs:28:12)\n      at TestContext.<anonymous> (file:///Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050/apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs:56:13)\n      at async Test.run (node:internal/test_runner/test:1113:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: false,\n    expected: true,\n    operator: '==',\n    diff: 'simple'\n  }\n"
+      },
+      {
+        "tool": "exec_command",
+        "input": {
+          "cmd": "node --test apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+        },
+        "programArgv": [
+          "node",
+          "--test",
+          "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+        ],
+        "startedAtUTC": "2026-11-02 02:34:50 UTC",
+        "endedAtUTC": "2026-11-02 02:34:50 UTC",
+        "toolReportedWallTimeSeconds": 0.161339667,
+        "exitCode": 0,
+        "output": "\u2714 blocked selectors and unsafe task URLs refuse before runtime composition or output (236.215625ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 266.362083\n"
+      },
+      {
+        "tool": "exec_command",
+        "input": {
+          "cmd": "node --check apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs"
+        },
+        "programArgv": [
+          "node",
+          "--check",
+          "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs"
+        ],
+        "startedAtUTC": "2026-11-02 02:36:13 UTC",
+        "endedAtUTC": "2026-11-02 02:36:13 UTC",
+        "toolReportedWallTimeSeconds": 7.125e-06,
+        "exitCode": 0,
+        "output": ""
+      },
+      {
+        "tool": "exec_command",
+        "input": {
+          "cmd": "node --test apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+        },
+        "programArgv": [
+          "node",
+          "--test",
+          "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+        ],
+        "startedAtUTC": "2026-11-02 02:36:13 UTC",
+        "endedAtUTC": "2026-11-02 02:36:13 UTC",
+        "toolReportedWallTimeSeconds": 0.195425625,
+        "exitCode": 0,
+        "output": "\u2714 blocked selectors and unsafe task URLs refuse before runtime composition or output (272.488625ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 304.909667\n"
+      }
+    ]
+  },
+  "audits": {
+    "acceptedPins": 15,
+    "diskMigrations": 102,
+    "migrationManifestSha256": "dce7ff20c196e9d9f04aec10b342f38fa3c40c1e20a9a7de2e5c8cc5a82b05dc",
+    "recoveryArtifacts": 6,
+    "sourceEvidenceEqualityExit": 0,
+    "allowListPass": true,
+    "childClean": true
+  },
+  "records": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.466209+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.480018+00:00",
+      "durationSeconds": 0.013375375000000002,
+      "exit": 0,
+      "stdout": "57b44c0645a0197ecd237975e41d1909b03dd36b\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.480048+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.530379+00:00",
+      "durationSeconds": 0.050362833,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b^{tree}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.530424+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.542285+00:00",
+      "durationSeconds": 0.011880291000000001,
+      "exit": 0,
+      "stdout": "d0a28b674929ec5d898c6c31e65a5f6415d0be46\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "57b44c0645a0197ecd237975e41d1909b03dd36b^{tree}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.542313+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.551495+00:00",
+      "durationSeconds": 0.009193999999999994,
+      "exit": 0,
+      "stdout": "4a616b5fd5efc88199e0b8b187a22057ae7be161\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b..57b44c0645a0197ecd237975e41d1909b03dd36b",
+        "--",
+        ".",
+        ":!docs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.551515+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.560863+00:00",
+      "durationSeconds": 0.009370667,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "8c6fe1d1cc91b44100279a2f82da2a0d5421cc72..077c4adedf9c6e776e0daca433c7855d968716ec",
+        "--",
+        ".",
+        ":!docs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.560897+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.572203+00:00",
+      "durationSeconds": 0.011320916999999986,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--name-only",
+        "077c4adedf9c6e776e0daca433c7855d968716ec..57b44c0645a0197ecd237975e41d1909b03dd36b"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.572227+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.583975+00:00",
+      "durationSeconds": 0.011763541999999988,
+      "exit": 0,
+      "stdout": "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs\napps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs\ndocs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair-20261102.md\ndocs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/producer-repair.md\ndocs/evidence/issue-897/a-02-worker-restricted-20261030/bounded-producer-repair/verification-20261102.json\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "8c6fe1d1cc91b44100279a2f82da2a0d5421cc72..57b44c0645a0197ecd237975e41d1909b03dd36b",
+        "--",
+        ".",
+        ":!docs",
+        ":!apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs",
+        ":!apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+      "startedAtUTC": "2026-11-02T02:56:50.584006+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.593437+00:00",
+      "durationSeconds": 0.009447167000000006,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "4b2c8a6f6161f9c825945637f6f848c64adeb145..HEAD",
+        "--",
+        ".",
+        ":!docs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "startedAtUTC": "2026-11-02T02:56:50.593466+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.603832+00:00",
+      "durationSeconds": 0.010383957999999999,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "startedAtUTC": "2026-11-02T02:56:50.622050+00:00",
+      "endedAtUTC": "2026-11-02T02:56:50.630186+00:00",
+      "durationSeconds": 0.008150207999999992,
+      "exit": 0,
+      "stdout": "6d8fc6797a496d139e13cfb10bacc01cb243c1ad\n",
+      "stderr": ""
+    }
+  ],
+  "limitations": [
+    "No coordinator rerun of worker Node tests",
+    "Seven source plans audited; no runtime/cleanup evidence",
+    "Three selectors still pre-runtime blocked at this historical source",
+    "Oldest-capacity declaration dependency open",
+    "Parent c0eb1e282013070b1f0582a10515f240986de578 authorizes only a separately recorded correction",
+    "No assembly, resources, packages, production changes or PR mutation"
+  ]
+}

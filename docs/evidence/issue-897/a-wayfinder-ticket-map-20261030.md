@@ -18,12 +18,13 @@ This is ticket-scope acceptance only: **2 passed, 9 open; A is NOT accepted**.
 | Tickets | Current state |
 |---|---|
 | A-01, A-09 (bounded S1/S2) | PASS, Parent accepted on exact source above |
-| A-02 | FAIL/open; availability restored, same-worktree offline continuation revalidated; three selectors blocked |
+| A-02 | FAIL/open; clean offline handoff received; separately bounded correction recorded before same-child continuation |
 | A-03, A-04, A-11 | FAIL/open; required evidence incomplete |
 | A-05, A-06, A-07, A-08, A-10 | Waiting on their recorded dependencies |
 
-- Coordinator branch `agent/release897-candidate-a-20261029` currently carries
-  docs checkpoint `8c6fe1d1cc91b44100279a2f82da2a0d5421cc72`; the assembled
+- Coordinator branch `agent/release897-candidate-a-20261029` had clean, pushed
+  docs baseline `6d8fc6797a496d139e13cfb10bacc01cb243c1ad` before this update;
+  later coordinator commits remain documentation/evidence only. The assembled
   source/verification SHA for the A-09 S2 fix is
   `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Independent A-01 Standards
   r3 passes on this source and closes S1/S2; A-11 r4 is FAIL/open on the
@@ -86,9 +87,11 @@ This is ticket-scope acceptance only: **2 passed, 9 open; A is NOT accepted**.
 
 - **Owner:** delegated Sol 6.1 worker; coordinator serializes DB reset/setup.
 - **Base:** `52d901c50af1dde97ea22bda8efb1fdf21f169b1`.
-- **Allowed paths:** `apps/worker/src/jobs/diagnostics/**`,
-  `apps/worker/test/**`, and ticket-local evidence under
-  `docs/evidence/issue-897/a-02-worker-restricted-20261030/`.
+- **Allowed paths:** evidence only under
+  `docs/evidence/issue-897/a-02-worker-restricted-20261030/` for evidence work.
+  The original broad worker-path wording grants no production/test edit
+  authority. Source/test corrections require the exact separately recorded
+  exceptions below.
 - **Depends on:** A-01 review is not required to start; uses the accepted
   worker budget and fresh migration pin already assembled.
 - **Non-goals:** no ordinary full100 rerun, no width/timeout redesign, no
@@ -135,15 +138,20 @@ handoff. The coordinator preserved both commits and the dirty correction;
 neither is assembled. See [recovery](a-02-worker-restricted-20261030/bounded-producer-repair/recovery-20261102.md).
 Parent restored availability; coordinator revalidated the exact
 [same-worktree continuation](a-02-worker-restricted-20261030/bounded-producer-repair/resume-20261102.md).
-No replacement exists. Three blocked selectors stay fail-closed; all
+No replacement exists. This recovery stage is historical; the clean terminal
+handoff and separately bounded correction below now govern. All
 case/runtime/cleanup gates remain.
 
 The same continuation has now produced source checkpoint
 `5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, with recovery-preserving RED
-checkpoint `a13d2b14da5d54dd9bec41156c407f0482d0eee1`. Corrected evidence is
-pending. Coordinator verified exact paths, all accepted pins/migrations and
-recovery hashes in the [intermediate receipt](a-02-producer-checkpoint-5a0a2b12-20261102.json).
-It is not assembled, runtime-ready or A-02 PASS.
+checkpoint `a13d2b14da5d54dd9bec41156c407f0482d0eee1`. Its corrected terminal
+evidence HEAD is `57b44c0645a0197ecd237975e41d1909b03dd36b`, tree
+`4a616b5fd5efc88199e0b8b187a22057ae7be161`. Coordinator revalidated clean
+status, the exact two-file source allow-list, documentation-only evidence
+interval, all accepted pins/migrations and six recovery hashes in the
+[terminal handoff receipt](a-02-producer-handoff-57b44c06-20261102.json).
+The [intermediate receipt](a-02-producer-checkpoint-5a0a2b12-20261102.json)
+remains historical. No source is assembled or runtime-ready.
 
 The terminal fixture-preparation packet proves all ten fixture targets absent
 and the existing ordinary producer unable to emit required case fields. A
@@ -154,6 +162,42 @@ Execution is offline until coordinator assembly and resource reservation.
 This narrow exception does not grant other evidence workers source-edit
 authority. A seam, script or planning receipt cannot pass A-02; all ten real
 case bodies and cleanup remain required.
+
+#### A-02 separately bounded criterion/status correction
+
+The Parent's immutable [disposition](https://github.com/Carberk/carberk/blob/c0eb1e282013070b1f0582a10515f240986de578/docs/evidence/issue-897/release-parent-a02-disposition-20261102.md)
+supersedes the one-order/raw-count shape and the two worker-first 409
+expectations. No production repair is authorized. The existing child alone
+continues from source `5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, actual
+clean evidence/worktree HEAD `57b44c0645a0197ecd237975e41d1909b03dd36b`, under
+the [separate correction contract](a-02-worker-restricted-20261030/bounded-producer-repair/correction-20261102.md).
+Its owner, exact paths, commands, dependencies, evidence, resource/CPU limits,
+non-goals and acceptance gate are recorded before dispatch.
+
+Capacity now requires a complete lawful connected registry/effect union over
+1,000 keys in one actual unchanged worker command, with at most ten roots in
+its first group. Cardinality pressure, the real restricted-worker
+`diagnostic_source_scope_limit`, entire persisted-state equality, zero receipts
+and restoration must all be proved. Several under-cap commands do not qualify.
+Single-root above-cap refusal remains invariant; singleton runtime proof is
+not claimed. If unchanged ordinary routes cannot produce the union, that
+dependency stays OPEN.
+
+Both early-refusal and final branches must assert literal classified capture
+HTTP400/`DIAGNOSTIC_INVALID_INPUT` and proof-use HTTP403/`DIAGNOSTIC_NO_ACCESS`
+at actual expiry. Reverse-before-E remains HTTP201 with the same requests,
+real barriers, complete erasure/privacy, exact retries and no duplicate
+reports/audits. The frozen oldest-capacity plan additionally needs a lawful
+newer-grant/due-component correction while preserving its original assertions.
+
+The old three-selector fail-closed state is historical at `5a0a2b12`; none is
+passed by this disposition. Preserve historical source pins, add an exact
+corrected-spec pin, and prove the other accepted hashes unchanged. Assembly,
+affected checks and fresh independent Standards/Spec reviews must cover the
+new exact assembled SHA before runtime readiness. Fresh resources and exclusive
+timing remain coordinator-owned and unstarted; port65379 is prohibited.
+A remains **2 PASS / 9 OPEN**, unaccepted. PR904 and B/C/activation gates are
+unchanged.
 
 ### A-03 — Caller, namespace, privacy, and erasure matrices
 
