@@ -1,0 +1,75 @@
+{
+  "kind": "fresh read-only GitHub issue-contract clarity audit",
+  "date": "2026-11-03",
+  "reviewer": "gpt-6.1-sol fresh context",
+  "repository": "Carberk/carberk",
+  "parent_issue": 897,
+  "parent_map_comment": 6585003890,
+  "audit_comment": 6586432005,
+  "candidate_docs_head": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+  "assembled_source": "4199eb86d4846fecc6b53edca6c447ec868b1566",
+  "earlier_ui_fix_source": "4b2c8a6f6161f9c825945637f6f848c64adeb145",
+  "pr904_head": "b6dac5d17c140c8fd307a24df56d4a82ed070625",
+  "issues_reviewed": [
+    897,
+    924,
+    925,
+    926,
+    927,
+    928,
+    929,
+    930,
+    931,
+    932,
+    933,
+    934,
+    935
+  ],
+  "original_a_disposition": "1 PASS / 10 OPEN; A unaccepted",
+  "supplemental_repair": "#935 OPEN, undispatched",
+  "findings_and_resolutions": [
+    {
+      "severity": "P1",
+      "scope": "#897",
+      "finding": "Opening body contained obsolete PR head, broad current authority and superseded model wording.",
+      "resolution": "Added a canonical current control record and marked the older execution block historical."
+    },
+    {
+      "severity": "P2",
+      "scope": "#924,#935",
+      "finding": "Audit evidence write scope was broader than preserved byte-for-byte audit files.",
+      "resolution": "Restricted new receipts to supplemental-repair-935/** and forbade overwriting preserved reports/manifests."
+    },
+    {
+      "severity": "P2",
+      "scope": "#924,#925,#929,#933,#934,#935",
+      "finding": "Phase language could read as circular dependencies.",
+      "resolution": "Separated initial findings, bounded repair, fresh exact-SHA review, runtime evidence, combined CI and protected delivery."
+    },
+    {
+      "severity": "P2",
+      "scope": "#925,#924,#934,#935",
+      "finding": "Immutable audit reconciliation retained pre-assembly wording.",
+      "resolution": "Marked it as a preserved pre-assembly snapshot and pointed current status to #925 assembled receipt."
+    },
+    {
+      "severity": "P2",
+      "scope": "#926",
+      "finding": "Historical matrix contained absolute /tmp references.",
+      "resolution": "Marked those cells unavailable/non-proof and required portable committed or immutable GitHub evidence; added explicit API selectors."
+    },
+    {
+      "severity": "P3",
+      "scope": "#928,#931",
+      "finding": "Mobile selectors and EAS production/config paths were underspecified; app.json was wrong.",
+      "resolution": "Added exact mobile Vitest paths, app.config.js, and explicit staging/production EAS config/build commands."
+    }
+  ],
+  "execution_exclusions": [
+    "No issue closed",
+    "No worker/resource dispatch",
+    "No package/test/build/native/runtime/reset/deployment",
+    "No PR/ref mutation",
+    "No provider/model switch"
+  ]
+}
