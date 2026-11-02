@@ -3,7 +3,7 @@
 // CONFIG extends the accepted ordinary bootstrap's private producer config with
 // case, workerUrl and ownerUrl. Runtime materialization is separate from offline audit.
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, realpath, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -42,16 +42,19 @@ if (config.dependency !== dependency || config.resourceIdentity?.composeProject 
   config.resourceIdentity.ports?.postgres !== 61149 || config.resourceIdentity.ports?.redis !== 61148 || config.resourceIdentity.ports?.minio !== 61150 ||
   !inside(privateRoot, root) || !inside(privateRoot, resolve(configPath)) || !inside(privateRoot, resolve(config.resourceIdentity.bootstrapReceipt ?? "/")) ||
   [dbUrl, workerUrl, ownerUrl].some(url => url.protocol !== "postgresql:" && url.protocol !== "postgres:") ||
-  [dbUrl, workerUrl, ownerUrl].some(url => url.hostname !== "127.0.0.1" || url.port !== "61149" || url.pathname !== `/r6c_batch_a02r2_${name.replaceAll("-", "_")}`) ||
+  [dbUrl, workerUrl, ownerUrl].some(url => url.hostname !== "127.0.0.1" || url.port !== "61149" || url.pathname !== `/r6c_batch_a02r2_${name.replaceAll("-", "_")}` || url.search || url.hash) ||
   new Set([dbUrl.username, workerUrl.username, ownerUrl.username]).size !== 3 ||
-  redis.protocol !== "redis:" || redis.hostname !== "127.0.0.1" || redis.port !== "61148" || !["", "/", "/0"].includes(redis.pathname) ||
-  minio.protocol !== "http:" || minio.hostname !== "127.0.0.1" || minio.port !== "61150" ||
+  redis.protocol !== "redis:" || redis.hostname !== "127.0.0.1" || redis.port !== "61148" || !["", "/", "/0"].includes(redis.pathname) || redis.search || redis.hash ||
+  minio.protocol !== "http:" || minio.hostname !== "127.0.0.1" || minio.port !== "61150" || minio.pathname !== "/" || minio.username || minio.password || minio.search || minio.hash ||
   apis.length !== 5 || new Set(apis.map(url => url.origin)).size !== 5 ||
-  apis.some(url => url.protocol !== "http:" || url.hostname !== "127.0.0.1" || !url.port || ["65379", "61149", "61148", "61150"].includes(url.port) || url.username || url.password || url.search || url.hash) ||
+  apis.some(url => url.protocol !== "http:" || url.hostname !== "127.0.0.1" || !url.port || ["65379", "61149", "61148", "61150"].includes(url.port) || url.pathname !== "/" || url.username || url.password || url.search || url.hash) ||
   !Array.isArray(config.visits) || config.visits.length !== 102) throw new Error("Exact private task resource and five-cohort identity required");
 const canonicalRoot = await realpath(privateRoot);
 if (![await realpath(root), await realpath(configPath), await realpath(config.resourceIdentity.bootstrapReceipt)].every(path => inside(canonicalRoot, path))) {
   throw new Error("Private path escaped through a symlink");
+}
+if (((await stat(canonicalRoot)).mode & 0o077) || ((await stat(root)).mode & 0o077) || ((await stat(configPath)).mode & 0o077)) {
+  throw new Error("Task root, case directory and config must remain private");
 }
 const bootstrap = JSON.parse(await readFile(config.resourceIdentity.bootstrapReceipt, "utf8"));
 const bootstrapState = JSON.parse(await readFile(join(dirname(config.resourceIdentity.bootstrapReceipt), "bootstrap-state.private.json"), "utf8"));
@@ -286,9 +289,20 @@ try {
   const race = { barrierUserId, candidateOrderId: candidate.order.id, request: opponent,
     ...(name === "proof-use-first-worker" ? { retryRequest: JSON.parse(JSON.stringify(opponent)) } : {}) };
   const state = await retained();
+  const residual = state.components.filter(row => row.state === "available" && row.rightsUntil && row.rightsUntil <= cutoff && !selected.some(grant => grant.id === row.grantId));
   if (state.grants.length !== (name === "oldest-capacity" ? 104 : 102) || state.components.filter(row => row.grantId === material[2].grant.id).length !== 2 ||
     !state.proofs.some(row => row.id === proof.proofId && row.predecessorOrderId === material[0].order.id && row.candidateOrderId === material[1].order.id) ||
-    !state.components.some(row => row.identityRecordId === independent.raw.id && row.state === "available" && row.rightsUntil.getTime() === cutoff.getTime())) throw new Error("Required ordinary ownership/proof graph missing");
+    !residual.some(row => row.identityRecordId === independent.raw.id) || residual.length !== (name === "oldest-capacity" ? 3 : 1) ||
+    state.grants.some(row => row.state !== "available") || state.components.some(row => row.state !== "available")) throw new Error("Required ordinary ownership/proof graph missing");
+  if (name === "oldest-capacity") {
+    const newer = state.grants.find(row => row.id === extras.newerGrantId), outside = state.components.find(row => row.identityRecordId === extras.outsideGrantComponentId);
+    const nonDue = state.grants.find(row => row.id === extras.nonDueGrantId);
+    if (!newer || newer.rightsUntil.getTime() !== cutoff.getTime() || newer.rightsUntil <= selected[99].rightsUntil ||
+      selected.some(row => row.id === newer.id) || !outside || !nonDue || outside.grantId !== nonDue.id || !outside.rightsUntil ||
+      outside.rightsUntil > cutoff || !nonDue.rightsUntil || nonDue.rightsUntil <= cutoff) {
+      throw new Error("Oldest-capacity requires the literal 101st grant and outside due component");
+    }
+  }
   await checkFiles(); checkDeadline(); await receipts();
   if (Date.now() >= cutoff.getTime() - 2000) throw new Error("Ordinary setup missed immutable opponent handoff margin; retain failure state");
   const handoffAt = cutoff.getTime() - (opponentFirst ? 2000 : 0);
