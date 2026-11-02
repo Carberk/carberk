@@ -8,9 +8,9 @@ Load the procedure for the current role and phase. Startup needs the section bel
 
 ## Cleanup during delivery
 
-At each bounded delivery handoff and after each merge, the integration owner reviews cleanup candidates and records eligible tuples or exact keep reasons in the actual GitHub issue. Previously merged, completed work can retire during another release; the full [safe cleanup gate](worktree-merge-cleanup.md#safe-cleanup-gate) still applies. An unmerged candidate keeps its worktrees and recovery refs.
+At each bounded delivery handoff and after each merge, the integration owner reviews the affected cleanup tuples and records eligibility or exact keep reasons in the actual GitHub issue. Previously merged, completed work can retire during another release; the full [safe cleanup gate](worktree-merge-cleanup.md#safe-cleanup-gate) still applies. An unmerged candidate keeps its worktrees and recovery refs.
 
-Run the read-only [cleanup report](worktree-cleanup.md#run-the-cleanup-gate) first. Reserve an idle boundary before applying it: every implementer has stopped, no assembly or verification conflicts, and process/session/PR coverage is adequate. Coordinate this shared Git operation with the integration owner. A terminal message from one worker does not establish that all writers are idle.
+Reserve an idle boundary for the repository-wide [cleanup report and apply](worktree-cleanup.md#run-the-cleanup-gate): every implementer has stopped, no assembly or verification conflicts, and process/session/PR coverage is adequate. Review the read-only report before applying it. Coordinate this shared Git operation with the integration owner, and keep repeated global scans out of individual ticket execution. A terminal message from one worker does not establish that all writers are idle.
 
 Remove only the gate's eligible items, recheck immediately before removal, and record what was removed or preserved. Keep active attempts, unique or unassembled work and required evidence. Broad release-document/evidence cleanup follows acceptance and an explicit keep/archive/remove inventory; routine branch retirement need not wait for the whole release.
 
