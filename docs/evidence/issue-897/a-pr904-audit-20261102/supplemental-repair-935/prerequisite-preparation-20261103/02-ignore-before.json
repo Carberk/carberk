@@ -1,0 +1,46 @@
+{
+  "checkedAtUtc": "2026-11-02T20:52:10.695Z",
+  "paths": [
+    {
+      "path": "node_modules/.issue935-probe",
+      "ignored": true,
+      "rule": ".gitignore:2:node_modules/\tnode_modules/.issue935-probe"
+    },
+    {
+      "path": "apps/api/node_modules/.issue935-probe",
+      "ignored": true,
+      "rule": ".gitignore:2:node_modules/\tapps/api/node_modules/.issue935-probe"
+    },
+    {
+      "path": "apps/admin/node_modules/.issue935-probe",
+      "ignored": true,
+      "rule": "apps/admin/.gitignore:4:/node_modules\tapps/admin/node_modules/.issue935-probe"
+    },
+    {
+      "path": "packages/contracts/dist/index.js",
+      "ignored": true,
+      "rule": ".gitignore:6:dist/\tpackages/contracts/dist/index.js"
+    },
+    {
+      "path": "packages/db/dist/src/index.js",
+      "ignored": true,
+      "rule": ".gitignore:6:dist/\tpackages/db/dist/src/index.js"
+    },
+    {
+      "path": "packages/db/generated/client.ts",
+      "ignored": true,
+      "rule": ".gitignore:74:packages/db/generated/\tpackages/db/generated/client.ts"
+    },
+    {
+      "path": "packages/contracts/.build.lock/owner",
+      "ignored": false,
+      "authorizedTransient": true
+    },
+    {
+      "path": "packages/db/.build.lock/owner",
+      "ignored": false,
+      "authorizedTransient": true
+    }
+  ],
+  "existingBuildLocks": false
+}

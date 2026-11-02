@@ -1,0 +1,15 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "e322a639c6c996b04f6eca7c0144db9f9af04293",
+  "argv": [
+    "node",
+    "scripts/check-runtime-imports.cjs"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T20:56:13.322170+00:00",
+  "ended_at_utc": "2026-11-02T20:56:13.507054+00:00",
+  "duration_seconds": 0.184782209,
+  "exit_code": 0,
+  "raw_log": "06-runtime-imports.raw.log",
+  "raw_log_sha256": "1e0492688a55c82bff2405aacdcc7a8bab46621ae0fc12ded1e471fb132c6ad2"
+}

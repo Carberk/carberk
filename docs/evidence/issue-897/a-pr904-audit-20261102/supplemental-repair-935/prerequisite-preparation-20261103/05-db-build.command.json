@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "e322a639c6c996b04f6eca7c0144db9f9af04293",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/db",
+    "build"
+  ],
+  "environment_overrides": {
+    "DATABASE_URL": "postgresql://issue935_prereq:synthetic@127.0.0.1:9/issue935_prereq_unreachable?schema=public"
+  },
+  "started_at_utc": "2026-11-02T20:55:40.217207+00:00",
+  "ended_at_utc": "2026-11-02T20:55:44.801206+00:00",
+  "duration_seconds": 4.583919249999999,
+  "exit_code": 0,
+  "raw_log": "05-db-build.raw.log",
+  "raw_log_sha256": "fd6897a3f4c71dfaf7c3922a6975961626ab82486855e5f01035683166cc54b0"
+}

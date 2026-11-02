@@ -1,0 +1,17 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "e322a639c6c996b04f6eca7c0144db9f9af04293",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/contracts",
+    "build"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T20:55:07.084034+00:00",
+  "ended_at_utc": "2026-11-02T20:55:08.746708+00:00",
+  "duration_seconds": 1.662614583,
+  "exit_code": 0,
+  "raw_log": "04-contracts-build.raw.log",
+  "raw_log_sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616"
+}
