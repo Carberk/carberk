@@ -14,4 +14,6 @@ The [tracking-before-dispatch rule](../../agents/issue-tracker.md#required-track
 
 Permission correction must occur on the GitHub app installation/connection, with access to `Carberk/carberk` and the requested issue-write permission. The repository owner can review installation access; if the app does not request write permission, its provider must add that capability. Once corrected and verified, resume the prepared migration without duplicating existing issues or workers.
 
+On 2 November 2026 the ChatGPT GitHub connection was changed from `Allow low-risk actions` to `Allow all actions` and read back successfully. A single retry of the identical A-01 create request still returned `403 Resource not accessible by integration`. The remaining refusal is therefore at GitHub app installation/repository scope or the app's granted `Issues: write` permission. No further write retries were made.
+
 Sources: [GitHub permission errors](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api#resource-not-accessible), [issue creation permissions](https://docs.github.com/en/rest/issues/issues#create-an-issue), [installed app access](https://docs.github.com/en/apps/using-github-apps/reviewing-and-modifying-installed-github-apps).
