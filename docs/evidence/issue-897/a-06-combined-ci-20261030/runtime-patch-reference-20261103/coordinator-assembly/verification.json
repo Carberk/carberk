@@ -1,0 +1,54 @@
+[
+  {
+    "name": "syntax",
+    "argv": [
+      "node",
+      "--check",
+      "scripts/api-image-runtime-smoke.mjs"
+    ],
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "head": "913114eeff9025785b85d755c703feec491d6d69",
+    "started_utc": "2026-11-02T22:16:19.835219+00:00",
+    "ended_utc": "2026-11-02T22:16:19.951447+00:00",
+    "seconds": 0.10717195800000001,
+    "exit": 0,
+    "stdin_sha256": null,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "static-check",
+    "argv": [
+      "node",
+      "--input-type=module"
+    ],
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "head": "913114eeff9025785b85d755c703feec491d6d69",
+    "started_utc": "2026-11-02T22:16:19.951480+00:00",
+    "ended_utc": "2026-11-02T22:16:20.048478+00:00",
+    "seconds": 0.089498875,
+    "exit": 0,
+    "stdin_sha256": "01860cd0101053a224966de8baff04341a1f24b76ec95b41a3811350cacab84d",
+    "stdout_sha256": "6969495799cd20eeb2819d95c4384c1cd910985394d084d4bbd0888e456b98f0",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "name": "range-diff-check",
+    "argv": [
+      "git",
+      "diff",
+      "--check",
+      "bc17e2bc86429d58536e4c3a749f51d9803cbd3a",
+      "HEAD"
+    ],
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "head": "913114eeff9025785b85d755c703feec491d6d69",
+    "started_utc": "2026-11-02T22:16:20.048497+00:00",
+    "ended_utc": "2026-11-02T22:16:20.066661+00:00",
+    "seconds": 0.01078870799999998,
+    "exit": 0,
+    "stdin_sha256": null,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

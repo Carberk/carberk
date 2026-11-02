@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {execFileSync} from "node:child_process";
+import {createHash} from "node:crypto";
+const base="bc17e2bc86429d58536e4c3a749f51d9803cbd3a";
+const script="scripts/api-image-runtime-smoke.mjs";
+const git=(...a)=>execFileSync("git",a);
+const expected=git("show",`${base}:${script}`).toString().replace("expo-modules-core@55.0.26.patch","expo-modules-core@55.0.27.patch");
+assert.deepEqual(readFileSync(script),Buffer.from(expected));
+const config=readFileSync("pnpm-workspace.yaml");assert.deepEqual(config,git("show",`${base}:pnpm-workspace.yaml`));
+const patches=["expo-modules-core@55.0.27.patch","react-native-reanimated@4.2.1.patch"];
+const hashes=patches.map(name=>{const path=`patches/${name}`;const b=readFileSync(path);assert.deepEqual(b,git("show",`${base}:${path}`));assert(config.toString().includes(`"${name.slice(0,-6)}": ${path}`));return {path,sha256:createHash("sha256").update(b).digest("hex")};});
+assert.equal(git("diff","--name-only","87456f4fe6b564d2edbc40ef807d6a75ef37f452","HEAD","--",":(exclude)docs/**",":(exclude)docs").toString(),"");
+console.log(JSON.stringify({assembled:git("rev-parse","HEAD").toString().trim(),source:"87456f4fe6b564d2edbc40ef807d6a75ef37f452",exact_script_bytes:true,patches:hashes,runtime_executed:false}));

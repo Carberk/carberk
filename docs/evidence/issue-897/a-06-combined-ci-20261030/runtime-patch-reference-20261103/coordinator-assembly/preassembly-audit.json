@@ -1,0 +1,18 @@
+{
+  "audited_at_utc": "2026-11-02T22:15:48.651140+00:00",
+  "base": "bc17e2bc86429d58536e4c3a749f51d9803cbd3a",
+  "source": "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+  "evidence": "913114eeff9025785b85d755c703feec491d6d69",
+  "changed_paths": 92,
+  "source_paths": [
+    "scripts/api-image-runtime-smoke.mjs"
+  ],
+  "new_evidence_paths": 91,
+  "artifact_hashes_verified": 90,
+  "raw_stream_hashes_verified": 56,
+  "command_hashes_verified": 28,
+  "expected_script_bytes_equal": true,
+  "source_evidence_non_doc_equal": true,
+  "full_range_diff_check_exit": 0,
+  "runtime_executed": false
+}
