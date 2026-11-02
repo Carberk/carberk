@@ -1,0 +1,377 @@
+{
+  "status": "HISTORICAL_ATTEMPTS_ONLY",
+  "commands": [
+    {
+      "argv": [
+        "pnpm",
+        "install",
+        "--offline",
+        "--frozen-lockfile",
+        "--filter",
+        "@auto-tm/api...",
+        "--filter",
+        "@auto-tm/worker..."
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:05:01Z",
+      "ended_utc": "2026-11-02T23:05:02Z",
+      "duration_seconds": 0.332,
+      "exit_code": 0,
+      "store_dir": "/Users/bagtyyar/Library/pnpm/store/v11",
+      "log": "/tmp/issue938-prepared-reader-r1/offline/00-install-rerun.log",
+      "log_sha256": "3441f317587b14b0f35d2fa5ac143d72807b3b042bca8a453d99288d33bfa591",
+      "metadata_file": "phase-b-offline-raw/00-install-rerun.json",
+      "evidence_log": "phase-b-offline-raw/00-install-rerun.log.base64",
+      "copied_log_sha256": "3441f317587b14b0f35d2fa5ac143d72807b3b042bca8a453d99288d33bfa591",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:05:17Z",
+      "ended_utc": "2026-11-02T23:05:24Z",
+      "duration_seconds": 6.515,
+      "exit_code": 0,
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "log": "/tmp/issue938-prepared-reader-r1/offline/10-api-build-final.log",
+      "log_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "metadata_file": "phase-b-offline-raw/10-api-build-final.json",
+      "evidence_log": "phase-b-offline-raw/10-api-build-final.log.base64",
+      "copied_log_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 3,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:58:55Z",
+      "ended_utc": "2026-11-02T22:59:00Z",
+      "duration_seconds": 4.574,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/03.log",
+      "log_sha256": "36137b0fba0d5dcb3a16ef56d2042b92647f33fdc6f17877ebdbf6867b8edd1b",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-followup.json",
+      "evidence_log": "phase-b-offline-raw/03.log.base64",
+      "copied_log_sha256": "36137b0fba0d5dcb3a16ef56d2042b92647f33fdc6f17877ebdbf6867b8edd1b",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 4,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:59:00Z",
+      "ended_utc": "2026-11-02T22:59:03Z",
+      "duration_seconds": 3.071,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/04.log",
+      "log_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-followup.json",
+      "evidence_log": "phase-b-offline-raw/04.log.base64",
+      "copied_log_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 5,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "node",
+        "-e",
+        "require('@auto-tm/db'); require('@auto-tm/contracts'); console.log('prepared runtime imports ok')"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:59:03Z",
+      "ended_utc": "2026-11-02T22:59:03Z",
+      "duration_seconds": 0.247,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/05.log",
+      "log_sha256": "1eaeba3d83fdcfde12b7e3d970e91523d7577d2504bafb43ff86e9f6df2cfde7",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-followup.json",
+      "evidence_log": "phase-b-offline-raw/05.log.base64",
+      "copied_log_sha256": "1eaeba3d83fdcfde12b7e3d970e91523d7577d2504bafb43ff86e9f6df2cfde7",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 6,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "node",
+        "--input-type=module",
+        "-e",
+        "await import('@auto-tm/db'); await import('@auto-tm/contracts'); console.log('prepared ESM imports ok')"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:59:03Z",
+      "ended_utc": "2026-11-02T22:59:03Z",
+      "duration_seconds": 0.176,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/06.log",
+      "log_sha256": "53a506a10f9a5fc3f42aebfcd568ce535e1c131f02315f9e50b8b7af83fe6c85",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-followup.json",
+      "evidence_log": "phase-b-offline-raw/06.log.base64",
+      "copied_log_sha256": "53a506a10f9a5fc3f42aebfcd568ce535e1c131f02315f9e50b8b7af83fe6c85",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 7,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:59:03Z",
+      "ended_utc": "2026-11-02T22:59:06Z",
+      "duration_seconds": 2.701,
+      "exit_code": 1,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/07.log",
+      "log_sha256": "42e3a17b7c7852349a36df5eb6a330e6529ff3ce0faaafe7f58e8de3e483f9a2",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-followup.json",
+      "evidence_log": "phase-b-offline-raw/07.log.base64",
+      "copied_log_sha256": "42e3a17b7c7852349a36df5eb6a330e6529ff3ce0faaafe7f58e8de3e483f9a2",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 7,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:00:37Z",
+      "ended_utc": "2026-11-02T23:00:39Z",
+      "duration_seconds": 2.293,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/07-rerun.log",
+      "log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-rerun.json",
+      "evidence_log": "phase-b-offline-raw/07-rerun.log.base64",
+      "copied_log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 8,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:00:39Z",
+      "ended_utc": "2026-11-02T23:00:47Z",
+      "duration_seconds": 7.679,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/08-rerun.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-rerun.json",
+      "evidence_log": "phase-b-offline-raw/08-rerun.log.base64",
+      "copied_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 9,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:00:47Z",
+      "ended_utc": "2026-11-02T23:00:53Z",
+      "duration_seconds": 6.014,
+      "exit_code": 1,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/09-rerun.log",
+      "log_sha256": "8324a9acd03ba50298892ff23197f13f2fffaba2d72d2b697889eba0510b06eb",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-rerun.json",
+      "evidence_log": "phase-b-offline-raw/09-rerun.log.base64",
+      "copied_log_sha256": "8324a9acd03ba50298892ff23197f13f2fffaba2d72d2b697889eba0510b06eb",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 9,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:01:24Z",
+      "ended_utc": "2026-11-02T23:01:30Z",
+      "duration_seconds": 5.649,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/09-rerun2.log",
+      "log_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-rerun2.json",
+      "evidence_log": "phase-b-offline-raw/09-rerun2.log.base64",
+      "copied_log_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 10,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:01:30Z",
+      "ended_utc": "2026-11-02T23:01:39Z",
+      "duration_seconds": 9.491,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/10-rerun2.log",
+      "log_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      },
+      "metadata_file": "phase-b-offline-raw/manifest-rerun2.json",
+      "evidence_log": "phase-b-offline-raw/10-rerun2.log.base64",
+      "copied_log_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 1,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/contracts",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:58:13Z",
+      "ended_utc": "2026-11-02T22:58:14Z",
+      "duration_seconds": 1.362,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/01.log",
+      "log_sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "env": {},
+      "metadata_file": "phase-b-offline-raw/manifest.json",
+      "evidence_log": "phase-b-offline-raw/01.log.base64",
+      "copied_log_sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    },
+    {
+      "index": 2,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:58:14Z",
+      "ended_utc": "2026-11-02T22:58:15Z",
+      "duration_seconds": 0.93,
+      "exit_code": 1,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/02.log",
+      "log_sha256": "59f5c4be51b272748919059e6a6a31b203c0f750d7b629e37a63fe701c50c191",
+      "env": {},
+      "metadata_file": "phase-b-offline-raw/manifest.json",
+      "evidence_log": "phase-b-offline-raw/02.log.base64",
+      "copied_log_sha256": "59f5c4be51b272748919059e6a6a31b203c0f750d7b629e37a63fe701c50c191",
+      "log_hash_matches_metadata": true,
+      "stream_format": "preserved original combined raw .log; separate stdout/stderr not recorded",
+      "evidence_encoding": "base64",
+      "copied_log_sha256_meaning": "SHA256 of decoded raw bytes, equal to original log SHA256"
+    }
+  ],
+  "environment_completeness": "Only environment values explicitly captured by original metadata are available; full inherited environment is not reconstructed.",
+  "input_completeness": "Current input hashes are separately observed. Earlier attempts lack complete contemporaneous source hashes.",
+  "final_draft_validation": "NOT_ESTABLISHED"
+}

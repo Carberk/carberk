@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "git",
+    "diff",
+    "--name-status",
+    "1149953c1237ea362509db7dddbed29c60395d0a",
+    "HEAD"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "started_at": "2026-11-02T23:49:30.922060+00:00",
+  "ended_at": "2026-11-02T23:49:30.939291+00:00",
+  "duration_seconds": 0.01724,
+  "exit_code": 0,
+  "stdout": {
+    "path": "phase-b-raw/source-path-diff.stdout",
+    "sha256": "4f46d981bb89f0d8cb5a92108e088351e36f4834521cae27c4c686b47e5b56b8",
+    "bytes": 731
+  },
+  "stderr": {
+    "path": "phase-b-raw/source-path-diff.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

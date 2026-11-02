@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "docker",
+    "compose",
+    "-f",
+    "infra/compose/docker-compose.ci.yml",
+    "-f",
+    "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+    "-p",
+    "auto_tm_ci_897_938_20261103_r1",
+    "config",
+    "--format",
+    "json"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "started_at": "2026-11-02T23:49:30.818841+00:00",
+  "ended_at": "2026-11-02T23:49:30.921901+00:00",
+  "duration_seconds": 0.103071,
+  "exit_code": 0,
+  "stdout": {
+    "path": "phase-b-raw/final-compose-config-not-started.stdout",
+    "sha256": "b149279b6c43ca4c100c6b8f6d88018d08c17dd1747547ea83a5b65921e1dbda",
+    "bytes": 3082
+  },
+  "stderr": {
+    "path": "phase-b-raw/final-compose-config-not-started.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

@@ -1,0 +1,9 @@
+A	apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts
+D	apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts
+A	apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts
+D	apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts
+A	apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts
+D	apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts
+A	apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts
+D	apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts
+A	apps/api/test/helpers/diagnosticPreparedReaderFixture.ts

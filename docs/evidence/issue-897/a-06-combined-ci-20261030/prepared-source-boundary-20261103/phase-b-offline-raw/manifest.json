@@ -1,0 +1,39 @@
+{
+  "phase": "offline-preparation",
+  "commands": [
+    {
+      "index": 1,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/contracts",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:58:13Z",
+      "ended_utc": "2026-11-02T22:58:14Z",
+      "duration_seconds": 1.362,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/01.log",
+      "log_sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "env": {}
+    },
+    {
+      "index": 2,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T22:58:14Z",
+      "ended_utc": "2026-11-02T22:58:15Z",
+      "duration_seconds": 0.93,
+      "exit_code": 1,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/02.log",
+      "log_sha256": "59f5c4be51b272748919059e6a6a31b203c0f750d7b629e37a63fe701c50c191",
+      "env": {}
+    }
+  ]
+}

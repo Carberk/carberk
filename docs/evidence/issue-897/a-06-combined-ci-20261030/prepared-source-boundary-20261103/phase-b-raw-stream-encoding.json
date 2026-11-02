@@ -1,0 +1,134 @@
+{
+  "encoding": "base64",
+  "reason": "Raw .log evidence would be ignored by repository ignore rules; two Git stdout streams contain original trailing whitespace/terminal blank lines. Base64 preserves exact bytes and prevents documentation whitespace warnings. Original combined .log copies remain in owned /tmp.",
+  "streams": [
+    {
+      "original_evidence_path": "phase-b-offline-raw/09-rerun.log",
+      "storage_path": "phase-b-offline-raw/09-rerun.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 913,
+      "decoded_sha256": "8324a9acd03ba50298892ff23197f13f2fffaba2d72d2b697889eba0510b06eb",
+      "stored_sha256": "b81a8fe57d910eeb5ac079bdae3befb411a95ddaa115661ed092f507fceaa1e0"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/10-rerun2.log",
+      "storage_path": "phase-b-offline-raw/10-rerun2.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 13,
+      "decoded_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "stored_sha256": "ec49b09551ce409773a882164ce6f4e757ee942a923c8e8c085b5e084af127f9"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/09-rerun2.log",
+      "storage_path": "phase-b-offline-raw/09-rerun2.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 28,
+      "decoded_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "stored_sha256": "f0fb1d83a8edb26f8e4f3b0100a996c2127aa85714c7e58c8333ae6908c08524"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/08-rerun.log",
+      "storage_path": "phase-b-offline-raw/08-rerun.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/01.log",
+      "storage_path": "phase-b-offline-raw/01.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 25,
+      "decoded_sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "stored_sha256": "60815f83a064a760cf566b9cfb9cf727a9e4b903a327a3c69594caf57a6806f2"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/03.log",
+      "storage_path": "phase-b-offline-raw/03.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 194,
+      "decoded_sha256": "36137b0fba0d5dcb3a16ef56d2042b92647f33fdc6f17877ebdbf6867b8edd1b",
+      "stored_sha256": "2d97bf26c9c31c5f2375ba4decc3343986e9b7a46d10a4aa6c18bfcd5a68b10d"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/02.log",
+      "storage_path": "phase-b-offline-raw/02.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 425,
+      "decoded_sha256": "59f5c4be51b272748919059e6a6a31b203c0f750d7b629e37a63fe701c50c191",
+      "stored_sha256": "b2032e036f5f5ca4e7f25778ad8846e378e58eee2cc5efe02019049aab1811fd"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/06.log",
+      "storage_path": "phase-b-offline-raw/06.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 24,
+      "decoded_sha256": "53a506a10f9a5fc3f42aebfcd568ce535e1c131f02315f9e50b8b7af83fe6c85",
+      "stored_sha256": "a5da73482ad9eb242fcce6cb8eadab62d259b80343680cb8bba6491e53d47403"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/07.log",
+      "storage_path": "phase-b-offline-raw/07.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 6734,
+      "decoded_sha256": "42e3a17b7c7852349a36df5eb6a330e6529ff3ce0faaafe7f58e8de3e483f9a2",
+      "stored_sha256": "6b21691b0173099bdbaa6973a801a3e4d12c21e57bab3c750f21bb0ca1ecf482"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/05.log",
+      "storage_path": "phase-b-offline-raw/05.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 28,
+      "decoded_sha256": "1eaeba3d83fdcfde12b7e3d970e91523d7577d2504bafb43ff86e9f6df2cfde7",
+      "stored_sha256": "194bf7f7bfb86997e02754280058f5ac9e3c106578da89bab5a440233c3b6902"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/04.log",
+      "storage_path": "phase-b-offline-raw/04.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 13,
+      "decoded_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "stored_sha256": "ec49b09551ce409773a882164ce6f4e757ee942a923c8e8c085b5e084af127f9"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/07-rerun.log",
+      "storage_path": "phase-b-offline-raw/07-rerun.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 15,
+      "decoded_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "stored_sha256": "77ae717504618f5ec99ed6aa53e4a4c8c913ca0f3b8f02d78b166378c362a785"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/10-api-build-final.log",
+      "storage_path": "phase-b-offline-raw/10-api-build-final.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 13,
+      "decoded_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "stored_sha256": "ec49b09551ce409773a882164ce6f4e757ee942a923c8e8c085b5e084af127f9"
+    },
+    {
+      "original_evidence_path": "phase-b-offline-raw/00-install-rerun.log",
+      "storage_path": "phase-b-offline-raw/00-install-rerun.log.base64",
+      "encoding": "base64",
+      "decoded_bytes": 198,
+      "decoded_sha256": "3441f317587b14b0f35d2fa5ac143d72807b3b042bca8a453d99288d33bfa591",
+      "stored_sha256": "09fc048875f455e53c3391696deb42b768b424876b92fde599960b5be43759cf"
+    },
+    {
+      "original_evidence_path": "phase-b-raw/source-amend-timeline.stdout",
+      "storage_path": "phase-b-raw/source-amend-timeline.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 575,
+      "decoded_sha256": "abd3b3ad9d49cf52b40b09af427170d62fd4f12b5900ecfbe4732e9fcb16b1d4",
+      "stored_sha256": "c1f723a9ff08ecfd61500f2ed03c69516139917e81f21616b7e3f9708edbc0be"
+    },
+    {
+      "original_evidence_path": "phase-b-raw/worktree-inventory.stdout",
+      "storage_path": "phase-b-raw/worktree-inventory.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 60414,
+      "decoded_sha256": "8b378a388b7e44e7917a50ba86967fceb14ab0e26105f46670a715c20e637b6f",
+      "stored_sha256": "c037ac9f9c35718ba99d48664fdf9e7db8f04bcca8da140465d3386eefefeafd"
+    }
+  ]
+}

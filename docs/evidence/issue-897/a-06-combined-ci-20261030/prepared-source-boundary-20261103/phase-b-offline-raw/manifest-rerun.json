@@ -1,0 +1,64 @@
+{
+  "phase": "offline-checks-rerun",
+  "commands": [
+    {
+      "index": 7,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:00:37Z",
+      "ended_utc": "2026-11-02T23:00:39Z",
+      "duration_seconds": 2.293,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/07-rerun.log",
+      "log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      }
+    },
+    {
+      "index": 8,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:00:39Z",
+      "ended_utc": "2026-11-02T23:00:47Z",
+      "duration_seconds": 7.679,
+      "exit_code": 0,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/08-rerun.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      }
+    },
+    {
+      "index": 9,
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "started_utc": "2026-11-02T23:00:47Z",
+      "ended_utc": "2026-11-02T23:00:53Z",
+      "duration_seconds": 6.014,
+      "exit_code": 1,
+      "log": "/tmp/issue938-prepared-reader-r1/offline/09-rerun.log",
+      "log_sha256": "8324a9acd03ba50298892ff23197f13f2fffaba2d72d2b697889eba0510b06eb",
+      "env": {
+        "DATABASE_URL": "postgresql://offline:offline@127.0.0.1:1/offline"
+      }
+    }
+  ]
+}
