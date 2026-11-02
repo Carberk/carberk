@@ -71,5 +71,21 @@
     "No package/test/build/native/runtime/reset/deployment",
     "No PR/ref mutation",
     "No provider/model switch"
-  ]
+  ],
+  "phase_order_clarity_update": {
+    "issues": [
+      924,
+      925,
+      929,
+      930,
+      931,
+      933,
+      934,
+      935
+    ],
+    "source_readiness": "#924/#934 may inspect and recheck the exact source after #935; these bounded dispositions do not claim overall acceptance.",
+    "runtime_evidence": "#925/#926/#927 and local #928 evidence remain required after source readiness and concrete resources.",
+    "deployed_artifact_phase": "#930 reaches deployed-ready, #931 consumes the same reserved candidate for artifact/device proof, then #930 restores current main and releases the reservation.",
+    "final_delivery": "#933 owns protected publication/merge, merged SHA, issue reconciliation and cleanup after pre-merge evidence; Parent alone accepts A."
+  }
 }
