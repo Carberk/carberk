@@ -1,0 +1,51 @@
+{
+  "checked_at_utc": "2026-11-02T20:37:36.087474+00:00",
+  "paths": [
+    {
+      "path": "node_modules",
+      "exists": true,
+      "is_symlink": false
+    },
+    {
+      "path": "apps/api/node_modules",
+      "exists": true,
+      "is_symlink": false
+    },
+    {
+      "path": "apps/admin/node_modules",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/db/generated",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/db/dist/src/index.js",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/db/dist/src/index.d.ts",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/db/dist/src/testing/index.js",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/contracts/dist/index.js",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/contracts/dist/index.d.ts",
+      "exists": false,
+      "is_symlink": false
+    }
+  ],
+  "observed_side_effect": "Authorized pnpm exec automatically copied 1,036 packages from the existing store, zero downloads, and ran the Prisma preinstall script. No explicit install command was invoked. Existing dependency output was preserved; no cleanup or second package command followed."
+}

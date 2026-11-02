@@ -1,0 +1,56 @@
+{
+  "checked_at_utc": "2026-11-02T20:30:15.115908+00:00",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "paths": [
+    {
+      "path": "node_modules",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "apps/api/node_modules",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "apps/admin/node_modules",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "apps/api/node_modules/.bin/vitest",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "apps/admin/node_modules/.bin/vitest",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/db/dist/src/index.js",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/db/dist/src/index.d.ts",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/db/dist/src/testing/index.js",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/contracts/dist/index.js",
+      "exists": false,
+      "is_symlink": false
+    },
+    {
+      "path": "packages/contracts/dist/index.d.ts",
+      "exists": false,
+      "is_symlink": false
+    }
+  ]
+}

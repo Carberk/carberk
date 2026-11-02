@@ -1,0 +1,47 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_at_utc": "2026-11-02T20:39:33.764334+00:00",
+      "ended_at_utc": "2026-11-02T20:39:33.775887+00:00",
+      "duration_seconds": 0.011314458,
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "started_at_utc": "2026-11-02T20:39:33.775906+00:00",
+      "ended_at_utc": "2026-11-02T20:39:33.788657+00:00",
+      "duration_seconds": 0.012758499999999992,
+      "exit_code": 2,
+      "output": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/api-prerequisite.raw.log:59: new blank line at EOF.\n"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--cached",
+        "--check",
+        "--",
+        ".",
+        ":(exclude)**/*.raw.log"
+      ],
+      "started_at_utc": "2026-11-02T20:40:26.465172+00:00",
+      "ended_at_utc": "2026-11-02T20:40:26.478643+00:00",
+      "duration_seconds": 0.013088457999999997,
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "raw_log": "diff-check.raw.log",
+  "raw_log_sha256": "56de58f50b63c4afb8e0e30dc2681f1c4157e994fbd6ee016031a9e41d623b09"
+}

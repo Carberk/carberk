@@ -1,0 +1,32 @@
+{
+  "classification": "prerequisite probe; not behavioral RED",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+    "src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+    "src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+    "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+    "src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+    "src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+    "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+    "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+    "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+    "--maxWorkers=1"
+  ],
+  "environment_overrides": {
+    "AUTO_TM_TEST_DATABASES": "off"
+  },
+  "source_head": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+  "started_at_utc": "2026-11-02T20:30:15.116411+00:00",
+  "ended_at_utc": "2026-11-02T20:30:19.027645+00:00",
+  "duration_seconds": 3.8963535830000002,
+  "exit_code": 1,
+  "raw_log": "api-prerequisite.raw.log",
+  "raw_log_sha256": "353192c034f0531a60d4c6f929d00211dae9be3a55108cf69e19d9a979b6a96b"
+}

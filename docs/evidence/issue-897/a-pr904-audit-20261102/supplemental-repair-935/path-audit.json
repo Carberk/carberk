@@ -1,0 +1,60 @@
+{
+  "base_and_unchanged_source_commit": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+  "assembled_source_pin": "4199eb86d4846fecc6b53edca6c447ec868b1566",
+  "changed_paths": [
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/api-prerequisite.command.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/api-prerequisite.raw.log"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/diff-check.command.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/diff-check.raw.log"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/handoff.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/path-audit.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/post-probe-prerequisites.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisites.json"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/preservation.json"
+    }
+  ],
+  "all_paths_within_new_supplemental_evidence": true,
+  "source_test_configuration_dependency_lockfile_changes": [],
+  "cached_direct_source_equality_excluding_only_docs": {
+    "argv": [
+      "git",
+      "diff",
+      "--cached",
+      "--exit-code",
+      "4199eb86d4846fecc6b53edca6c447ec868b1566",
+      "--",
+      ".",
+      ":(exclude)docs/**",
+      ":(exclude)docs"
+    ],
+    "exit_code": 0,
+    "output": ""
+  },
+  "ignored_dependency_side_effect": "Root and API node_modules created by automatic pnpm setup during the single authorized API selector; preserved and not committed."
+}

@@ -1,0 +1,104 @@
+{
+  "base": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+  "checked_at_utc": "2026-11-02T20:37:36.185394+00:00",
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+        "--",
+        ".",
+        ":(exclude)docs/**",
+        ":(exclude)docs"
+      ],
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+        "--",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        ".npmrc",
+        "package.json",
+        "apps/api/package.json",
+        "apps/admin/package.json",
+        "packages/db/package.json",
+        "packages/contracts/package.json"
+      ],
+      "exit_code": 0,
+      "output": ""
+    }
+  ],
+  "historical_audit_files": [
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/architecture.html",
+      "base_blob": "3261d86bd738abf598f5c7849bf39e7ba3a2a928",
+      "current_blob": "3261d86bd738abf598f5c7849bf39e7ba3a2a928",
+      "matches": true,
+      "sha256": "8a18017206bbbe29b703883cbbd9970d1b0ed0bfc3259d75632bd5cd486c9915"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/diff-check.txt",
+      "base_blob": "65069bf27d5e3393a678aa4c2bc7cf89767fc133",
+      "current_blob": "65069bf27d5e3393a678aa4c2bc7cf89767fc133",
+      "matches": true,
+      "sha256": "464192ca8ddd84392559c8bb77cdce3506c2e2e4ab49378cdb1fa8722e4067d6"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/final-evidence-manifest.json",
+      "base_blob": "459c25dcb7896bbc43e512128d5620cf7a30fb37",
+      "current_blob": "459c25dcb7896bbc43e512128d5620cf7a30fb37",
+      "matches": true,
+      "sha256": "0f62944a506205d87b6949434109698ff50e9dca54c9c3fdcd728df32f96761b"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/interrupted-spec-notes.md",
+      "base_blob": "9f74118a271e55ecce9228a4bddd03381ec6825f",
+      "current_blob": "9f74118a271e55ecce9228a4bddd03381ec6825f",
+      "matches": true,
+      "sha256": "daaa596a8b4a49a2f09f67546d4d25573d59d90dbf08ba8ad44f632f4d545461"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/report.md",
+      "base_blob": "52c17bd0312b52f6f5c6379c0c09a76f9988f4fb",
+      "current_blob": "52c17bd0312b52f6f5c6379c0c09a76f9988f4fb",
+      "matches": true,
+      "sha256": "a4c36f7bffe6771282757d35a6bb25faa332d407455a403a05145e58a247a8b9"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/reviewer-provenance.json",
+      "base_blob": "f384cf7b8b4b46b0fffbc24897fbcab7e600fa1b",
+      "current_blob": "f384cf7b8b4b46b0fffbc24897fbcab7e600fa1b",
+      "matches": true,
+      "sha256": "1589d6468c863ebb4501178cc72269a330c2ebabb5e63cf7c118536f1cb4e3af"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/spec-review.md",
+      "base_blob": "9ad51b7adc08b5a174c5c3647ec992fd48dfd555",
+      "current_blob": "9ad51b7adc08b5a174c5c3647ec992fd48dfd555",
+      "matches": true,
+      "sha256": "59b9c2e457061589a96b87a9e7a0a89114908a8a9db124164905cc34089d81d6"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/standards-review.md",
+      "base_blob": "a0ae0eb8e6ec87bf3c2adf23fec0945e31159b12",
+      "current_blob": "a0ae0eb8e6ec87bf3c2adf23fec0945e31159b12",
+      "matches": true,
+      "sha256": "3d1115dee9e968b3ea82c9aef4149e7cfd73f5f302e79a475ca3d03609e74c5f"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/static-evidence.json",
+      "base_blob": "343e4f17c0799f4d811e8906bf326f17887f7d48",
+      "current_blob": "343e4f17c0799f4d811e8906bf326f17887f7d48",
+      "matches": true,
+      "sha256": "294f6dce5fa5a54c9e0895db43458d41cfbfe792b92c7a26f1e5b2dca786dbc1"
+    }
+  ]
+}
