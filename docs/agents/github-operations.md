@@ -9,7 +9,22 @@ Use the installed `gh` CLI through `pnpm agent:github`, or an already configured
 3. After a verified access correction, send one authorized real issue write and read back its returned URL/body before continuing a migration batch. Search for existing issues first. Preserve the request if the result is uncertain and reconcile whether it succeeded before resending. A settings screenshot or successful read is not a successful write receipt.
 4. At the first permission refusal, stop writes and report the exact error, transport, account and repository without credentials. Preserve the intended body and arrange an access correction. Follow the [refusal rule](issue-tracker.md#required-tracking-before-dispatch); another tool, account, browser session or provider is not a retry path around that refusal. GitHub remains the tracker while access is blocked.
 
-### Host-specific tools
+## Connection recovery
+
+Classify the actual error before changing transports:
+
+| Failure | Action |
+|---|---|
+| Connector/network timeout or transport failure without a permission refusal | Use an already installed, authenticated alternative such as `gh`, after the checks below. One bounded read retry is enough before recovery; keep further failing-connector calls out of the work loop. |
+| `403 Resource not accessible by integration`, another permission refusal or a host guard | Stop writes and correct access under the [refusal rule](issue-tracker.md#required-tracking-before-dispatch). Transport/account/endpoint switching cannot bypass it. |
+| GitHub explicitly reports a rate limit | Honor `Retry-After` and reset headers. Do not rotate credentials or transports to evade the limit. A bare transport failure does not establish rate limiting. |
+| Write may have succeeded but its response/readback failed | Preserve the body and reconcile the actual issue/comment before any resend. An uncertain result is not permission to create a duplicate. |
+
+Before CLI fallback, verify the authenticated login and target repository permissions with existing credentials. For example, use `gh api user --jq .login`, `gh api repos/Carberk/carberk --jq .permissions` and, when rate limiting is suspected, `gh api rate_limit`. Verify the same approved account and repository coverage; use an explicit `--repo Carberk/carberk` or repository-qualified API path. Keep credentials out of output. Recovery adds no new account, credential, package, provider or action authority.
+
+Read the full governing issue and reconcile pending writes through the verified connection. Send one already-authorized real issue write from its body file and verify the returned URL and exact body before continuing a batch or dependent dispatch. Record the transport change and verified receipts in the parent issue. This fallback preserves GitHub as the tracker and all original scope/merge/model gates. A recorded permission refusal for another action, such as PR creation, remains blocked until its own access correction is verified.
+
+## Host-specific tools
 
 | Runtime | Access check and use |
 |---|---|
