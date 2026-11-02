@@ -1,0 +1,8 @@
+{
+  "kind": "A-02 bounded correction batch-spec pin",
+  "path": "apps/worker/src/jobs/diagnostics/DiagnosticWorkerOwnershipBatch.e2e.spec.ts",
+  "sha256": "55a86bf9fde74829e5200aa05b87abfc489756c5d1ef38d732bf5f12914a47d3",
+  "sourceBase": "5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b",
+  "authority": "c0eb1e282013070b1f0582a10515f240986de578",
+  "correctionContract": "596b587b73b0580e41581a0a67945bdf425e5db1"
+}
