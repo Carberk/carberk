@@ -12,6 +12,25 @@ runtime resource, new checkout or stale-handoff assembly is authorized. Earlier
 usage-blocked state below is historical once this continuation starts. Count
 remains **2 PASS / 9 OPEN**; A remains unaccepted and PR #904 unchanged.
 
+### Existing-child continuation receipt
+
+The coordinator sent the recorded offline contract to the same existing child
+using stable request `issue897-a02-existing-recovery-resume-20261102-r1`.
+Delivery returned `started`, run
+`run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A19e6e17f-fa2f-44ab-9065-2410f17a9389%253Adelegate-task%253Aissue897-a02-batch-producer-repair-20261030-r1:ordinal:2`.
+T3 records this continuation turn as task
+`node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-existing-recovery-resume-20261102-r1`.
+This is a follow-up record in the original child, not a duplicate delegate or
+checkout. Thread remains
+`thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1`,
+worktree `/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050`, branch
+`t3/issue-897-a02-batch-fixture-producer`. Committed start HEAD remains
+`b774ce00105323b0d0334499f1db25e6c51a7f15` plus the exact preserved dirty
+producer. Original r1 remains terminal failed; no new provider/model selection
+or resource was created. The existing `codex_work` / `gpt-6.1-sol`,
+xhigh/priority, full-access selection is retained. Completion returns here;
+no running-task poll is scheduled.
+
 ## Recovery update — 2026-11-02
 
 A-02's bounded producer task r1 is terminal **failed** on the provider usage
