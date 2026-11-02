@@ -1,0 +1,18 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+  "argv": [
+    "git",
+    "diff",
+    "--cached",
+    "--check",
+    "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T21:31:33.194390+00:00",
+  "ended_at_utc": "2026-11-02T21:31:33.224090+00:00",
+  "duration_seconds": 0.029616,
+  "exit_code": 2,
+  "raw_log": "repair-diff-complete-range.raw.log",
+  "raw_log_sha256": "b02c6eef903b70c876ced6445cd5b215dd38df334b05fd84bcdcf5a739a57844"
+}

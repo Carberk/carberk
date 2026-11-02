@@ -1,0 +1,550 @@
+{
+  "createdAtUtc": "2026-11-02T21:34:59.806133+00:00",
+  "base": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+  "sourceCommit": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+  "paths": [
+    {
+      "status": "M",
+      "path": "apps/admin/src/app/diagnostics/evidence-proxy.spec.ts",
+      "baseSha256": "1f02b05bd979eb75b1567e85fa7b192f7e699d6f9aae89bb0bc772530f2fcf88",
+      "finalSha256": "74f48d414db2f8e5adaf27c16c004fbd607ccd295e3b0845bf2b1ec0db0acd8c",
+      "gitBlob": "3dfacbcb5c6c958338426afbae62ebf09f86fe33"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/application/testing/DiagnosticMaterialHarness.ts",
+      "baseSha256": "acc4c7f6cde880960e47c9573151dab9a2ac1c9203253c7eab36eb8b81ae6cd0",
+      "finalSha256": "516741c3ac451d6462a5b34b28158a1842d94fcb77bebd69b8553898fca49eff",
+      "gitBlob": "861c79960b15522a91ed0758988a9bee8e9c492f"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/application/testing/ReportPreparedHarness.ts",
+      "baseSha256": "54a7f4e667d0d99e3c85924b7ff3d55dcc477d60d05e1159713c6373816d3901",
+      "finalSha256": "01851cbfe54935af757a5e40df0ea8d346bcf21c4f1bbd03483b685e6b32e73e",
+      "gitBlob": "107dbc45fe28ba30d011b0def0879f12ddc1ab3b"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "baseSha256": "b0eb6f34bff3cabe5ba00877494d1ddcb32fa9ecef39004a8293dcc84cae0657",
+      "finalSha256": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "gitBlob": "7e6559cac6520e615512751e4ad5eb6ba9453e90"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts",
+      "baseSha256": "b113b33222d8160b4be8eaef1ae6e3987f5fedad29cb101fb61202b7017beb39",
+      "finalSha256": "aec8cbc30cc5e6eef371d6a45828bace5a5fc64e669d4e71228ce7002d2b25da",
+      "gitBlob": "4715950883b7180b4bce6eb4f7abf46ca7e284bc"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+      "baseSha256": "6e8b1d90cf14354531913554178d7b2a15d534c012afa9a7e16d3d6a5b38cb2c",
+      "finalSha256": "5a3598128d0a5b1eb6691453bcbd46fc59f21ecc537eabf62f69b613c873831b",
+      "gitBlob": "f6d3ee401b991119f3c271bb3a625fa61ddddbe1"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.e2e.spec.ts",
+      "baseSha256": "f7235e05722b19e7dacd914aa7c51bb2be56ee577cf037d8b09366b29e8eaa14",
+      "finalSha256": "f3f75af64898810689a22bc39644a7e12656c0c2874bbaee64238171172ede0c",
+      "gitBlob": "fc4776dd1fa90c845ab527a8cd6ed6ac7a5613ff"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+      "baseSha256": "c798c8dd89ead7322e33910d62f1877ab1dc0a3a3ca5a5d9e3c21cf39c552a9a",
+      "finalSha256": "8f6741a5d8ef72c2ab871f3a8501cdc2c8b58d337ca636edeb6ff3c158990959",
+      "gitBlob": "9f9824ee9fc05fe3911d3b9bd4e58af2b982250d"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+      "baseSha256": "f9371e551ba415448124ea238560fc0e17f9ed749038fb42027d7d470cd0f28d",
+      "finalSha256": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "gitBlob": "6465e452055125b8d78e1daf4f62422773ff40a0"
+    },
+    {
+      "status": "A",
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+      "baseSha256": null,
+      "finalSha256": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "gitBlob": "3d3cb6ab9f144656962660e2d6c4d96e5e2413c6"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.ts",
+      "baseSha256": "25a9273509d93722a6365a72bb5efeeb56bf55fadcbfe42ee37f6f5f0333b172",
+      "finalSha256": "323f588469366b7a9a77ed68276af42c6d4566cc2b95a153e3a1556d0e0466e1",
+      "gitBlob": "5af635a4261b10dba53e29ccc124a9f3ca5a7ef9"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "baseSha256": "eeb32d858d64e1210a6682701881b0dfad192de0c1a2914a3702993dacd3ca4e",
+      "finalSha256": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "gitBlob": "209493d3a530ff54ec0d81c61643001d2ac4bee0"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "baseSha256": "0e4325e5591f09da936c11e06921d867846ed354aaa3a6a0cdd07fbbbcfd9cf8",
+      "finalSha256": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "gitBlob": "cbc2d257e6be970ec8cf85775b927fbe82f850af"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "baseSha256": "eb14588287c87cb45e58705ff81a5a18be8f1a1bd115f91834f5defd0b626ea0",
+      "finalSha256": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "gitBlob": "ccd2c4ec15705efd9be3d01d4b034d347378daa3"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/api-prerequisite.command.json",
+      "baseSha256": null,
+      "finalSha256": "c5c0c82de9fd3448e529c393321683fa9376291c23abede46597d756e8664762",
+      "gitBlob": "e386d69dbf3a1e5c5e7e6f840bcd49353f984c00"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/api-prerequisite.raw.log",
+      "baseSha256": null,
+      "finalSha256": "353192c034f0531a60d4c6f929d00211dae9be3a55108cf69e19d9a979b6a96b",
+      "gitBlob": "46f8be51c5bd7eb6bccfcb466f91ecdb5a65b069"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/diff-check.command.json",
+      "baseSha256": null,
+      "finalSha256": "fa9bea164e719c91577fe4c8181964b90698682bb291aa58d878e490662e8eec",
+      "gitBlob": "291295234890a4f57baad019bffcee79d3916dc4"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/diff-check.raw.log",
+      "baseSha256": null,
+      "finalSha256": "56de58f50b63c4afb8e0e30dc2681f1c4157e994fbd6ee016031a9e41d623b09",
+      "gitBlob": "0a4d6643733f5cc585b2c2643ff85d84c6c11dac"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/handoff.md",
+      "baseSha256": null,
+      "finalSha256": "f9c18dd39dcd132465b6841b26708667b16bf008dfb0b75a22f085beae83f02c",
+      "gitBlob": "48d032af9ca6fe442bb40d4a475621c9c20e6d90"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/path-audit.json",
+      "baseSha256": null,
+      "finalSha256": "7d487bf64ed79699db459126b0a3a3f290d3db08d831b1d3ce172fa2de6ee8e2",
+      "gitBlob": "a04048beafd3a1d0e8c04c5d18260b6f33949eea"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/post-probe-prerequisites.json",
+      "baseSha256": null,
+      "finalSha256": "c8002de7a4dab664cb0c9392d1680a450e4faa477611a9700142369b4a59d54c",
+      "gitBlob": "60268c293789585b49588f19c5fb925b10d763df"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/01-inputs-before.json",
+      "baseSha256": null,
+      "finalSha256": "478951f0eccba60ff7538f17365c6fea8afb1d12d067269de4d5c4153a77b2de",
+      "gitBlob": "438e6ceb585118817ef18dba9736ffd7be5e17cf"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/02-ignore-before.json",
+      "baseSha256": null,
+      "finalSha256": "899dbf8437a8d772c934642fbd9ce0b50b14000070ce35ab43c699b48ec1dd14",
+      "gitBlob": "dc094109ce7282e0005315d340e38ca34cd6ca25"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/03-install-offline.command.json",
+      "baseSha256": null,
+      "finalSha256": "d619d1232e940478c39b2512dbcfb51e317c0a56176ea36707aa2f9cb13c5f46",
+      "gitBlob": "d7ac0a8b04138720b2a47d642071210cfef33d49"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/03-install-offline.raw.log",
+      "baseSha256": null,
+      "finalSha256": "a0d11a4adc283419251f0d05c6c2eeb157be0585be21c1fdf26b0ff3c81347b9",
+      "gitBlob": "d73cf84a6d39039dda8cbdbe50dbf1f15021ebca"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/04-contracts-build.command.json",
+      "baseSha256": null,
+      "finalSha256": "03635f2fd8e581e5aa6563265fb4961b209c61852361dd754f0843c172bec436",
+      "gitBlob": "1e353f3ba09f3a6caf8f447d757a696f1b969d60"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/04-contracts-build.raw.log",
+      "baseSha256": null,
+      "finalSha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "gitBlob": "8178e4ca770aeae45e898e4fd6040ab38ca04ee8"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/05-db-build.command.json",
+      "baseSha256": null,
+      "finalSha256": "304833be61024cad73fcde5b00f0061028684ade1f9e732cc4cc1dbf378d3f3e",
+      "gitBlob": "2e344d59f8f66ff998052b6bb037eea4fe225127"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/05-db-build.raw.log",
+      "baseSha256": null,
+      "finalSha256": "fd6897a3f4c71dfaf7c3922a6975961626ab82486855e5f01035683166cc54b0",
+      "gitBlob": "20380a66e905bfbc75afcef97c4a1208a0b34e06"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/06-runtime-imports.command.json",
+      "baseSha256": null,
+      "finalSha256": "d7a4bdb578be68a2e8a650341f55669844d8edd2bfdf520f1873ec314f4bfebf",
+      "gitBlob": "a354c17e2a265fda5dc00900258d284ba28a39e9"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/06-runtime-imports.raw.log",
+      "baseSha256": null,
+      "finalSha256": "1e0492688a55c82bff2405aacdcc7a8bab46621ae0fc12ded1e471fb132c6ad2",
+      "gitBlob": "c5723392fcedaa57e0f4434d0c7f448af8bc852c"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/07-inputs-after.json",
+      "baseSha256": null,
+      "finalSha256": "461373cbe31698818fb44a3bb42dafb9044ff605faed4bb7eec361b942e57014",
+      "gitBlob": "4491dce15efd4714ecb0e5ebb86b246c936e9881"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/08-generated-output-hashes.json",
+      "baseSha256": null,
+      "finalSha256": "2f1c8e9a36a03fb2925d09aa430a2d7d56f112c7e77965603264d049710749f9",
+      "gitBlob": "3bc4d4228aae3939bda3cd9e57c41475250d25a1"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/09-preparation-receipt-r2.md",
+      "baseSha256": null,
+      "finalSha256": "40b87cccb92f50beb0f21592b3249af5fac783d54bdc830297d9bc347b264b2c",
+      "gitBlob": "c01e9cffe5e7ac4663f1f0f65f761217710f6d7d"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-green.command.json",
+      "baseSha256": null,
+      "finalSha256": "296f0c3b5c320ab604c11abf518d785e790553b9ee107aeab8521090a4db6340",
+      "gitBlob": "a4d9fae4f6eba0af1c91b133d533fff65ab33162"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-green.raw.log",
+      "baseSha256": null,
+      "finalSha256": "0f2fc257ec68b96881cc1101dd5d07d6c3fa4e58d918ffb802b170576f3b65e2",
+      "gitBlob": "f509de1c052f5a12f26968b1bd2de4814c65e788"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-lint.command.json",
+      "baseSha256": null,
+      "finalSha256": "1c6902669ddb2ac4b961d58c2feb45649726a4b0499aea9d1952e64948290ce7",
+      "gitBlob": "2f36fcc9cb501055a9f22385dece01ab98766013"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-lint.raw.log",
+      "baseSha256": null,
+      "finalSha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "gitBlob": "e4899a88263456efda012fb5405b907e7afb79b2"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-red.command.json",
+      "baseSha256": null,
+      "finalSha256": "1b7ab86f90f22dd8af84bb4b0481a8c1dfc3c977a82c86ad6752a12c12cab5d4",
+      "gitBlob": "2860947adeebe66a29b81fbc55b4bdd85eb72ece"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-red.raw.log",
+      "baseSha256": null,
+      "finalSha256": "f908208c7e269befea3c3c958bcea50390850df997a3ec1dc3c640dbc153084d",
+      "gitBlob": "778d1b2886043e7fb7b973cc3fa7197dd8cf40b7"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts6.command.json",
+      "baseSha256": null,
+      "finalSha256": "eabf754cbe0de28f4072c2c13ea11060330299c0805c59a1d5eb850ec6c2896b",
+      "gitBlob": "2ae42f0570ce57b58435c6debad410cc7542b42e"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts6.raw.log",
+      "baseSha256": null,
+      "finalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts7.command.json",
+      "baseSha256": null,
+      "finalSha256": "bc0c6879f7a848b562aca770673c39779554b2964a42967bb648eaf0c67b30f7",
+      "gitBlob": "3b3faa1e7f998a6a6536f82cd571d55490abc52c"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts7.raw.log",
+      "baseSha256": null,
+      "finalSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "gitBlob": "f5b99e8a88f3351bff2d974f340241915d097a47"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-green.command.json",
+      "baseSha256": null,
+      "finalSha256": "bbc3cb473f33bae27e668aeef162d79b2de5b816f1744501078803ff39132675",
+      "gitBlob": "19728b748a96e00be065374b76f32c20271b5158"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-green.raw.log",
+      "baseSha256": null,
+      "finalSha256": "55b71af6fd5ec3545b5b42a7fac14843748bd00d67ed288692a5ed4dee0f45a4",
+      "gitBlob": "e63dc63413483e91bd906322d77b87232663fc18"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-lint.command.json",
+      "baseSha256": null,
+      "finalSha256": "c0cc6ee5b1a4da886e868022796218a9a118729b8e73b54e573b36bec1507c14",
+      "gitBlob": "3ff9759cbec26adab0d8ad2ce9f5e75387fd2812"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-lint.raw.log",
+      "baseSha256": null,
+      "finalSha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "gitBlob": "e4899a88263456efda012fb5405b907e7afb79b2"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red-confirmed.command.json",
+      "baseSha256": null,
+      "finalSha256": "1606fe89fefe61984911d189e06444a953acc93e25816bf0bfe1e15cc9b957e1",
+      "gitBlob": "c5bbd4a7edf5d520e95c9961a244323ab0293dfb"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red-confirmed.raw.log",
+      "baseSha256": null,
+      "finalSha256": "1983447e8108ae2147f258d19e30a8cea9c90f0fcc070be29d5789f13a26d570",
+      "gitBlob": "9c7b1060228d0ebf5a8ccfc4303c9364abe2e085"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red.command.json",
+      "baseSha256": null,
+      "finalSha256": "df9f6690c2bdb52e3b768b0deabab86b6f64995343e097390bf2ff8ad04b724b",
+      "gitBlob": "251c388436af5e4a9234c74701f787c018302208"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red.raw.log",
+      "baseSha256": null,
+      "finalSha256": "85513836f6dc517e23bb9d098e4867588bad706ceed7e526cd1e1c7b614a2afc",
+      "gitBlob": "b795ad716c25e2a2f78b81ae4c99239ce1044bbb"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts6.command.json",
+      "baseSha256": null,
+      "finalSha256": "ca36f3357e48dede9ec71bf2f8a87848a14079bcbe927ddf177d352e2a62533d",
+      "gitBlob": "6083e3cb9f486eb3a0da20eabf2f289ee28146d2"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts6.raw.log",
+      "baseSha256": null,
+      "finalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts7.command.json",
+      "baseSha256": null,
+      "finalSha256": "8210d1f1c8fbeff49340568c1fc14de41adc46d23a5e96ff13bd780150a2489c",
+      "gitBlob": "627aac68fa343c649639f8fb1bde9fb4653353d3"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts7.raw.log",
+      "baseSha256": null,
+      "finalSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "gitBlob": "f5b99e8a88f3351bff2d974f340241915d097a47"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-command-runner-r2.py",
+      "baseSha256": null,
+      "finalSha256": "78b522eb0d70c98751be62959a9d2e0c50b0cc7d79b8b4551bf17036f1459ff2",
+      "gitBlob": "e307840cef9c774bf98190ea138c76bb26ee4f83"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-authored-range.command.json",
+      "baseSha256": null,
+      "finalSha256": "6ac7e7b5614c7b4150f4fbce9404d91baa47e7c5521666d1a56bec99ce37eda0",
+      "gitBlob": "f00eb701f25e3fa9e88575dc6f0a59950b71fe0c"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-authored-range.raw.log",
+      "baseSha256": null,
+      "finalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-complete-range.command.json",
+      "baseSha256": null,
+      "finalSha256": "9065fc3313e9e3d6f77955ef866d5ae11542f26b2f2c979f5d25ee37b5147f89",
+      "gitBlob": "268273c28609ad6dbbfa48f5aa5314ac76ba62b1"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-complete-range.raw.log",
+      "baseSha256": null,
+      "finalSha256": "b02c6eef903b70c876ced6445cd5b215dd38df334b05fd84bcdcf5a739a57844",
+      "gitBlob": "e7f74df60f1617486fcd9d808652c16926820ef3"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-source-range.command.json",
+      "baseSha256": null,
+      "finalSha256": "2a87d6b68684c90e374bd22a8aec2f8c613896d6cead7d6f6857481b6df4cf80",
+      "gitBlob": "596b27373af923be03f6aa353e3fa9b8ac131a78"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-source-range.raw.log",
+      "baseSha256": null,
+      "finalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-working.command.json",
+      "baseSha256": null,
+      "finalSha256": "9a7d2919143a30385ecb8cdd1973baed1906e12fe2ae3a538f06d7738e83f233",
+      "gitBlob": "07cb5e16aa79167ee2e09e67516403e3d5b005d0"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-working.raw.log",
+      "baseSha256": null,
+      "finalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-final-audit-command.command.json",
+      "baseSha256": null,
+      "finalSha256": "7098d64671a909d1b3e70a82a0496987635c3eb27acb3d19362ada2f9ddff1be",
+      "gitBlob": "70f2973950dcefe7d856a35c93eadbf92e07c7e2"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-final-audit-command.raw.log",
+      "baseSha256": null,
+      "finalSha256": "8ceb1a8a874112e66abfd27586cb8d8dc73009fdc5fdc6376f8ea61acedec9a0",
+      "gitBlob": "13bf313dc8ba1bf93b856fe6e9272a3ef63d180c"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-final-audit-r2.json",
+      "baseSha256": null,
+      "finalSha256": "e26fca5c0ad10e801935b26a7076741286192b1596cf0117de1a52ec4e025b83",
+      "gitBlob": "d0036fafb3bfb739de6d049beaf5feebc620cfad"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-final-audit-script-r2.py",
+      "baseSha256": null,
+      "finalSha256": "c6f4daa13b9ac6392afc38f178eca7b3971ba8ec6b424f5e881b0d7a39883600",
+      "gitBlob": "4a66b6a686af2b2296a987835d52d190aa0805c3"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-final-input-hashes-r2.json",
+      "baseSha256": null,
+      "finalSha256": "7434273d5a5d28b2cbfb7991da6ea7add2e57efb4332979954ef08e257f2fa2c",
+      "gitBlob": "5c92ae2681e566a5de9c1cb14de62eb376810f11"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-red-receipt-r2.md",
+      "baseSha256": null,
+      "finalSha256": "9d2bb119e0de0dbef0c0e66588d03a661e97e93a420686a5e14ab1d456c69ec1",
+      "gitBlob": "41060f3e179d814bf17a5c76706f275b29ebd326"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-source-push.command.json",
+      "baseSha256": null,
+      "finalSha256": "cb576a73929f3536c3a405aa0afccd28e29a64bb49a1188411d850f7861c9fb9",
+      "gitBlob": "c129700da8f6792ceb8ba108655df642ef092faf"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-source-push.raw.log",
+      "baseSha256": null,
+      "finalSha256": "ae3dd615c6fbf268ac9b60c05c74a1b9e64a8df516fe51b9a33af1da66626bec",
+      "gitBlob": "3dcb2829ff437de683fa1e18f321d2275dd65554"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-terminal-handoff-r2.md",
+      "baseSha256": null,
+      "finalSha256": "9f1087be2095f50b03f49804c16e3474834c6a0ada980dd38e347580f4ec4a37",
+      "gitBlob": "8b0a4f9ac242366bb613dedfeec221c3f42ed7f3"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisites.json",
+      "baseSha256": null,
+      "finalSha256": "52fb38ce60a66caad707a5e47288b1037906dee3dfd1c8dd8d4e92bb3cf36d12",
+      "gitBlob": "62dbdaca5d4654556cb91c51156fa61e5261f911"
+    },
+    {
+      "status": "A",
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/preservation.json",
+      "baseSha256": null,
+      "finalSha256": "fc63bc67d72303dcb17204d0b8d4cde659e9a4e2b5ffc2c88c89f97cf363b3b1",
+      "gitBlob": "2a9372607d66d01ff45ffddfd96cb2d3bb390af2"
+    },
+    {
+      "status": "M",
+      "path": "packages/db/tests/service-history-callers.e2e.spec.ts",
+      "baseSha256": "f8ffe915c4f8eb4219012f25677f6c39b80bd8487197bad588fbe72329fa7680",
+      "finalSha256": "d84eb0686218bcd2f6b709a45959f7ef1affb89af14d5f64dfce71a65a9c9b51",
+      "gitBlob": "046f96753ad88140fa7d426a53993b011403c5d0"
+    }
+  ],
+  "manifestSelf": {
+    "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-terminal-path-hashes-r2.json",
+    "note": "Self hash is recorded by the final evidence Git commit and terminal readback to avoid recursive hashing."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "source": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+  "sourcePaths": 15,
+  "commandsHashed": 18,
+  "unchangedExistingInputs": 3106,
+  "preservedPins": [
+    [
+      "e322a639c6c996b04f6eca7c0144db9f9af04293",
+      18
+    ],
+    [
+      "06b2110c3f26c5beb54ca514269ab9b7a785ac48",
+      31
+    ],
+    [
+      "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      38
+    ]
+  ],
+  "generatedOutputs": 779,
+  "apiFailuresRemoved": 9,
+  "apiUnchangedFailures": 47
+}

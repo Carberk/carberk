@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/admin",
+    "exec",
+    "tsc6",
+    "--noEmit"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T21:19:29.231662+00:00",
+  "ended_at_utc": "2026-11-02T21:19:31.749086+00:00",
+  "duration_seconds": 2.51733,
+  "exit_code": 0,
+  "raw_log": "repair-admin-ts6.raw.log",
+  "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,19 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "typecheck"
+  ],
+  "environment_overrides": {
+    "AUTO_TM_TEST_DATABASES": "off"
+  },
+  "started_at_utc": "2026-11-02T21:16:55.166873+00:00",
+  "ended_at_utc": "2026-11-02T21:16:57.978606+00:00",
+  "duration_seconds": 2.81164875,
+  "exit_code": 0,
+  "raw_log": "repair-api-ts7.raw.log",
+  "raw_log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+}

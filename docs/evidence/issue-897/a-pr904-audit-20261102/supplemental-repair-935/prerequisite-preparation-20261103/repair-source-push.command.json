@@ -1,0 +1,17 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+  "argv": [
+    "git",
+    "push",
+    "origin",
+    "agent/issue-935"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T21:22:12.090432+00:00",
+  "ended_at_utc": "2026-11-02T21:22:16.354514+00:00",
+  "duration_seconds": 4.263977917,
+  "exit_code": 0,
+  "raw_log": "repair-source-push.raw.log",
+  "raw_log_sha256": "ae3dd615c6fbf268ac9b60c05c74a1b9e64a8df516fe51b9a33af1da66626bec"
+}

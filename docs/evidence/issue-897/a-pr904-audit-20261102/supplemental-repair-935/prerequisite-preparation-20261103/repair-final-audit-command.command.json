@@ -1,0 +1,15 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+  "argv": [
+    "python3",
+    "/tmp/issue935-r2-final-audit.py"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T21:29:47.827809+00:00",
+  "ended_at_utc": "2026-11-02T21:29:56.512677+00:00",
+  "duration_seconds": 8.684792999999999,
+  "exit_code": 0,
+  "raw_log": "repair-final-audit-command.raw.log",
+  "raw_log_sha256": "8ceb1a8a874112e66abfd27586cb8d8dc73009fdc5fdc6376f8ea61acedec9a0"
+}

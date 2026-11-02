@@ -1,0 +1,941 @@
+{
+  "checkedAtUtc": "2026-11-02T21:29:56.493695+00:00",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "executor": "issue935-supplemental-repair-20261103-r1",
+  "branch": "agent/issue-935",
+  "scaffold": {
+    "ref": "t3/57c0ba42",
+    "head": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568"
+  },
+  "sourceCommit": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+  "sourceTree": "d14d276081a86dc8721423567a01077f54fdb505",
+  "redCheckpoint": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+  "preparationCheckpoint": "06b2110c3f26c5beb54ca514269ab9b7a785ac48",
+  "checks": [
+    {
+      "label": "Base source equals assembled source excluding ONLY docs",
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "4199eb86d4846fecc6b53edca6c447ec868b1566",
+        "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+        "--",
+        ".",
+        ":(exclude)docs/**",
+        ":(exclude)docs"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "Full final source intentionally differs from assembled source",
+      "argv": [
+        "git",
+        "diff",
+        "--quiet",
+        "4199eb86d4846fecc6b53edca6c447ec868b1566",
+        "cd7f4adb773f0a190dba74015ca2583f615c791b",
+        "--",
+        ".",
+        ":(exclude)docs/**",
+        ":(exclude)docs"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "Everything outside exact allowed source and docs equals assembled source",
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "4199eb86d4846fecc6b53edca6c447ec868b1566",
+        "cd7f4adb773f0a190dba74015ca2583f615c791b",
+        "--",
+        ".",
+        ":(exclude)docs/**",
+        ":(exclude)docs",
+        ":(exclude)apps/admin/src/app/diagnostics/evidence-proxy.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/application/testing/DiagnosticMaterialHarness.ts",
+        ":(exclude)apps/api/src/modules/identity/application/testing/ReportPreparedHarness.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.e2e.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.ts",
+        ":(exclude)apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+        ":(exclude)apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+        ":(exclude)packages/db/tests/service-history-callers.e2e.spec.ts"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "changedPathsAtSource": [
+    {
+      "path": "apps/admin/src/app/diagnostics/evidence-proxy.spec.ts",
+      "baseSha256": "1f02b05bd979eb75b1567e85fa7b192f7e699d6f9aae89bb0bc772530f2fcf88",
+      "sourceSha256": "74f48d414db2f8e5adaf27c16c004fbd607ccd295e3b0845bf2b1ec0db0acd8c",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/application/testing/DiagnosticMaterialHarness.ts",
+      "baseSha256": "acc4c7f6cde880960e47c9573151dab9a2ac1c9203253c7eab36eb8b81ae6cd0",
+      "sourceSha256": "516741c3ac451d6462a5b34b28158a1842d94fcb77bebd69b8553898fca49eff",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/application/testing/ReportPreparedHarness.ts",
+      "baseSha256": "54a7f4e667d0d99e3c85924b7ff3d55dcc477d60d05e1159713c6373816d3901",
+      "sourceSha256": "01851cbfe54935af757a5e40df0ea8d346bcf21c4f1bbd03483b685e6b32e73e",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "baseSha256": "b0eb6f34bff3cabe5ba00877494d1ddcb32fa9ecef39004a8293dcc84cae0657",
+      "sourceSha256": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts",
+      "baseSha256": "b113b33222d8160b4be8eaef1ae6e3987f5fedad29cb101fb61202b7017beb39",
+      "sourceSha256": "aec8cbc30cc5e6eef371d6a45828bace5a5fc64e669d4e71228ce7002d2b25da",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+      "baseSha256": "6e8b1d90cf14354531913554178d7b2a15d534c012afa9a7e16d3d6a5b38cb2c",
+      "sourceSha256": "5a3598128d0a5b1eb6691453bcbd46fc59f21ecc537eabf62f69b613c873831b",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.e2e.spec.ts",
+      "baseSha256": "f7235e05722b19e7dacd914aa7c51bb2be56ee577cf037d8b09366b29e8eaa14",
+      "sourceSha256": "f3f75af64898810689a22bc39644a7e12656c0c2874bbaee64238171172ede0c",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+      "baseSha256": "c798c8dd89ead7322e33910d62f1877ab1dc0a3a3ca5a5d9e3c21cf39c552a9a",
+      "sourceSha256": "8f6741a5d8ef72c2ab871f3a8501cdc2c8b58d337ca636edeb6ff3c158990959",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+      "baseSha256": "f9371e551ba415448124ea238560fc0e17f9ed749038fb42027d7d470cd0f28d",
+      "sourceSha256": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+      "baseSha256": null,
+      "sourceSha256": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.ts",
+      "baseSha256": "25a9273509d93722a6365a72bb5efeeb56bf55fadcbfe42ee37f6f5f0333b172",
+      "sourceSha256": "323f588469366b7a9a77ed68276af42c6d4566cc2b95a153e3a1556d0e0466e1",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "baseSha256": "eeb32d858d64e1210a6682701881b0dfad192de0c1a2914a3702993dacd3ca4e",
+      "sourceSha256": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "baseSha256": "0e4325e5591f09da936c11e06921d867846ed354aaa3a6a0cdd07fbbbcfd9cf8",
+      "sourceSha256": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "scope": "source/test"
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "baseSha256": "eb14588287c87cb45e58705ff81a5a18be8f1a1bd115f91834f5defd0b626ea0",
+      "sourceSha256": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "scope": "source/test"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/api-prerequisite.command.json",
+      "baseSha256": null,
+      "sourceSha256": "c5c0c82de9fd3448e529c393321683fa9376291c23abede46597d756e8664762",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/api-prerequisite.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "353192c034f0531a60d4c6f929d00211dae9be3a55108cf69e19d9a979b6a96b",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/diff-check.command.json",
+      "baseSha256": null,
+      "sourceSha256": "fa9bea164e719c91577fe4c8181964b90698682bb291aa58d878e490662e8eec",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/diff-check.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "56de58f50b63c4afb8e0e30dc2681f1c4157e994fbd6ee016031a9e41d623b09",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/handoff.md",
+      "baseSha256": null,
+      "sourceSha256": "f9c18dd39dcd132465b6841b26708667b16bf008dfb0b75a22f085beae83f02c",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/path-audit.json",
+      "baseSha256": null,
+      "sourceSha256": "7d487bf64ed79699db459126b0a3a3f290d3db08d831b1d3ce172fa2de6ee8e2",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/post-probe-prerequisites.json",
+      "baseSha256": null,
+      "sourceSha256": "c8002de7a4dab664cb0c9392d1680a450e4faa477611a9700142369b4a59d54c",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/01-inputs-before.json",
+      "baseSha256": null,
+      "sourceSha256": "478951f0eccba60ff7538f17365c6fea8afb1d12d067269de4d5c4153a77b2de",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/02-ignore-before.json",
+      "baseSha256": null,
+      "sourceSha256": "899dbf8437a8d772c934642fbd9ce0b50b14000070ce35ab43c699b48ec1dd14",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/03-install-offline.command.json",
+      "baseSha256": null,
+      "sourceSha256": "d619d1232e940478c39b2512dbcfb51e317c0a56176ea36707aa2f9cb13c5f46",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/03-install-offline.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "a0d11a4adc283419251f0d05c6c2eeb157be0585be21c1fdf26b0ff3c81347b9",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/04-contracts-build.command.json",
+      "baseSha256": null,
+      "sourceSha256": "03635f2fd8e581e5aa6563265fb4961b209c61852361dd754f0843c172bec436",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/04-contracts-build.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/05-db-build.command.json",
+      "baseSha256": null,
+      "sourceSha256": "304833be61024cad73fcde5b00f0061028684ade1f9e732cc4cc1dbf378d3f3e",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/05-db-build.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "fd6897a3f4c71dfaf7c3922a6975961626ab82486855e5f01035683166cc54b0",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/06-runtime-imports.command.json",
+      "baseSha256": null,
+      "sourceSha256": "d7a4bdb578be68a2e8a650341f55669844d8edd2bfdf520f1873ec314f4bfebf",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/06-runtime-imports.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "1e0492688a55c82bff2405aacdcc7a8bab46621ae0fc12ded1e471fb132c6ad2",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/07-inputs-after.json",
+      "baseSha256": null,
+      "sourceSha256": "461373cbe31698818fb44a3bb42dafb9044ff605faed4bb7eec361b942e57014",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/08-generated-output-hashes.json",
+      "baseSha256": null,
+      "sourceSha256": "2f1c8e9a36a03fb2925d09aa430a2d7d56f112c7e77965603264d049710749f9",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/09-preparation-receipt-r2.md",
+      "baseSha256": null,
+      "sourceSha256": "40b87cccb92f50beb0f21592b3249af5fac783d54bdc830297d9bc347b264b2c",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-red.command.json",
+      "baseSha256": null,
+      "sourceSha256": "1b7ab86f90f22dd8af84bb4b0481a8c1dfc3c977a82c86ad6752a12c12cab5d4",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-red.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "f908208c7e269befea3c3c958bcea50390850df997a3ec1dc3c640dbc153084d",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red-confirmed.command.json",
+      "baseSha256": null,
+      "sourceSha256": "1606fe89fefe61984911d189e06444a953acc93e25816bf0bfe1e15cc9b957e1",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red-confirmed.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "1983447e8108ae2147f258d19e30a8cea9c90f0fcc070be29d5789f13a26d570",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red.command.json",
+      "baseSha256": null,
+      "sourceSha256": "df9f6690c2bdb52e3b768b0deabab86b6f64995343e097390bf2ff8ad04b724b",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red.raw.log",
+      "baseSha256": null,
+      "sourceSha256": "85513836f6dc517e23bb9d098e4867588bad706ceed7e526cd1e1c7b614a2afc",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-red-receipt-r2.md",
+      "baseSha256": null,
+      "sourceSha256": "9d2bb119e0de0dbef0c0e66588d03a661e97e93a420686a5e14ab1d456c69ec1",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisites.json",
+      "baseSha256": null,
+      "sourceSha256": "52fb38ce60a66caad707a5e47288b1037906dee3dfd1c8dd8d4e92bb3cf36d12",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/preservation.json",
+      "baseSha256": null,
+      "sourceSha256": "fc63bc67d72303dcb17204d0b8d4cde659e9a4e2b5ffc2c88c89f97cf363b3b1",
+      "scope": "new supplemental evidence"
+    },
+    {
+      "path": "packages/db/tests/service-history-callers.e2e.spec.ts",
+      "baseSha256": "f8ffe915c4f8eb4219012f25677f6c39b80bd8487197bad588fbe72329fa7680",
+      "sourceSha256": "d84eb0686218bcd2f6b709a45959f7ef1affb89af14d5f64dfce71a65a9c9b51",
+      "scope": "source/test"
+    }
+  ],
+  "constructorInventory": [
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/application/testing/DiagnosticMaterialHarness.ts:95:  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/application/testing/ReportPreparedHarness.ts:108:  const authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime), new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime), runtime, new CampaignDiagnosticAdmission(new ConfigService()));",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:50:  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts:135:    authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts:445:        const staff = new PrismaStaffAuthority(db, { now: () => new Date(clock) });",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts:60:  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db, clock), clock);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.e2e.spec.ts:65:    authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts:258:    const revoke = (client: PrismaService) => new PrismaStaffAuthority(client, { now: () => at }).change(manage(key, false), at);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts:324:    const key = \"noop-left\"; const repo = new PrismaStaffAuthority(runtime(), { now: () => at });",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts:349:    await expect(new PrismaStaffAuthority(runtime(undefined, true), { now: () => at }).change(manage(key, false), at)).rejects.toThrow(\"identity caller rollback sentinel\");",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts:363:    await new PrismaStaffAuthority(runtime(), { now: () => at }).change({ ...manage(key, kind !== \"inactive\"), targetUserId: other }, at);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts:261:    const db = staffFixture(); const repo = new PrismaStaffAuthority(db.service, staffClock);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts:272:    const db = staffFixture(); await new PrismaStaffAuthority(db.service, staffClock).change({ ...input, grant: false }, now);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts:282:    await expect(new PrismaStaffAuthority(db.service, staffClock).change({ ...input, ...(kind === \"founder capability\" ? { capability: \"staff.manage\" } : {}) }, now)).rejects.toThrow();",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts:287:    await expect(new PrismaStaffAuthority(db.service, staffClock).change(input, now)).rejects.toThrow(\"diagnostic_source_final_effect\");",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts:423:      const result = afterWait(db, at, () => new PrismaStaffAuthority(db.service, staffClock).change({ userId: \"u\", sessionId: \"s\", targetUserId: \"target\", capability: \"diagnostics.technician\", reason: \"Approved\", grant }, now), expiry.includes(\"resource lock\"));",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts:81:      const repository = new PrismaStaffAuthority(db.prisma, clock);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts:109:  const result = new PrismaStaffAuthority(db.prisma, clock).change(input, mutationTime);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:71:        { provide: STAFF_AUTHORITY_PORT, useValue: new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime) },",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts:21:  const authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(f.db, runtime), runtime), new CheckBusinessAuthority(new PrismaBusinessAuthority(f.db), runtime), runtime, null!);",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:68:        { provide: STAFF_AUTHORITY_PORT, useValue: new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime) },",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:packages/db/tests/service-history-callers.e2e.spec.ts:161:  grantWriter = database => new PrismaStaffAuthority(database, { now: () => now }) as GrantWriter;",
+    "cd7f4adb773f0a190dba74015ca2583f615c791b:packages/db/tests/service-history-callers.e2e.spec.ts:171:   new CheckStaffAuthority(new PrismaStaffAuthority(database, { now: clock }), { now: clock }),"
+  ],
+  "commands": [
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/03-install-offline.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "e322a639c6c996b04f6eca7c0144db9f9af04293",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api...",
+        "--filter",
+        "@auto-tm/admin...",
+        "install",
+        "--frozen-lockfile",
+        "--offline"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T20:52:36.850826+00:00",
+      "ended_at_utc": "2026-11-02T20:52:38.311350+00:00",
+      "duration_seconds": 1.460426375,
+      "exit_code": 0,
+      "raw_log": "03-install-offline.raw.log",
+      "raw_log_sha256": "a0d11a4adc283419251f0d05c6c2eeb157be0585be21c1fdf26b0ff3c81347b9",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/04-contracts-build.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "e322a639c6c996b04f6eca7c0144db9f9af04293",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/contracts",
+        "build"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T20:55:07.084034+00:00",
+      "ended_at_utc": "2026-11-02T20:55:08.746708+00:00",
+      "duration_seconds": 1.662614583,
+      "exit_code": 0,
+      "raw_log": "04-contracts-build.raw.log",
+      "raw_log_sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/05-db-build.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "e322a639c6c996b04f6eca7c0144db9f9af04293",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "environment_overrides": {
+        "DATABASE_URL": "postgresql://issue935_prereq:synthetic@127.0.0.1:9/issue935_prereq_unreachable?schema=public"
+      },
+      "started_at_utc": "2026-11-02T20:55:40.217207+00:00",
+      "ended_at_utc": "2026-11-02T20:55:44.801206+00:00",
+      "duration_seconds": 4.583919249999999,
+      "exit_code": 0,
+      "raw_log": "05-db-build.raw.log",
+      "raw_log_sha256": "fd6897a3f4c71dfaf7c3922a6975961626ab82486855e5f01035683166cc54b0",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/06-runtime-imports.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "e322a639c6c996b04f6eca7c0144db9f9af04293",
+      "argv": [
+        "node",
+        "scripts/check-runtime-imports.cjs"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T20:56:13.322170+00:00",
+      "ended_at_utc": "2026-11-02T20:56:13.507054+00:00",
+      "duration_seconds": 0.184782209,
+      "exit_code": 0,
+      "raw_log": "06-runtime-imports.raw.log",
+      "raw_log_sha256": "1e0492688a55c82bff2405aacdcc7a8bab46621ae0fc12ded1e471fb132c6ad2",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-green.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/admin",
+        "exec",
+        "vitest",
+        "run",
+        "src/app/diagnostics/evidence-proxy.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:16:44.102305+00:00",
+      "ended_at_utc": "2026-11-02T21:16:44.598527+00:00",
+      "duration_seconds": 0.49588641699999997,
+      "exit_code": 0,
+      "raw_log": "repair-admin-green.raw.log",
+      "raw_log_sha256": "0f2fc257ec68b96881cc1101dd5d07d6c3fa4e58d918ffb802b170576f3b65e2",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-lint.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/admin",
+        "lint"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:20:00.203974+00:00",
+      "ended_at_utc": "2026-11-02T21:20:02.306690+00:00",
+      "duration_seconds": 2.102627334,
+      "exit_code": 0,
+      "raw_log": "repair-admin-lint.raw.log",
+      "raw_log_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-red.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "06b2110c3f26c5beb54ca514269ab9b7a785ac48",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/admin",
+        "exec",
+        "vitest",
+        "run",
+        "src/app/diagnostics/evidence-proxy.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:05:57.380552+00:00",
+      "ended_at_utc": "2026-11-02T21:05:58.762980+00:00",
+      "duration_seconds": 1.3820824999999999,
+      "exit_code": 1,
+      "raw_log": "repair-admin-red.raw.log",
+      "raw_log_sha256": "f908208c7e269befea3c3c958bcea50390850df997a3ec1dc3c640dbc153084d",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts6.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/admin",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:19:29.231662+00:00",
+      "ended_at_utc": "2026-11-02T21:19:31.749086+00:00",
+      "duration_seconds": 2.51733,
+      "exit_code": 0,
+      "raw_log": "repair-admin-ts6.raw.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts7.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/admin",
+        "typecheck"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:19:09.271643+00:00",
+      "ended_at_utc": "2026-11-02T21:19:09.744076+00:00",
+      "duration_seconds": 0.47234116699999995,
+      "exit_code": 0,
+      "raw_log": "repair-admin-ts7.raw.log",
+      "raw_log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-green.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+        "src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+        "src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+        "src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+        "src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+        "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "started_at_utc": "2026-11-02T21:16:02.218775+00:00",
+      "ended_at_utc": "2026-11-02T21:16:05.772760+00:00",
+      "duration_seconds": 3.55344425,
+      "exit_code": 1,
+      "raw_log": "repair-api-green.raw.log",
+      "raw_log_sha256": "55b71af6fd5ec3545b5b42a7fac14843748bd00d67ed288692a5ed4dee0f45a4",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-lint.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "started_at_utc": "2026-11-02T21:18:27.163930+00:00",
+      "ended_at_utc": "2026-11-02T21:18:33.316252+00:00",
+      "duration_seconds": 6.152232208,
+      "exit_code": 0,
+      "raw_log": "repair-api-lint.raw.log",
+      "raw_log_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red-confirmed.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "06b2110c3f26c5beb54ca514269ab9b7a785ac48",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+        "src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+        "src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+        "src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+        "src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+        "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "started_at_utc": "2026-11-02T21:06:23.844387+00:00",
+      "ended_at_utc": "2026-11-02T21:06:27.229053+00:00",
+      "duration_seconds": 3.384516916,
+      "exit_code": 1,
+      "raw_log": "repair-api-red-confirmed.raw.log",
+      "raw_log_sha256": "1983447e8108ae2147f258d19e30a8cea9c90f0fcc070be29d5789f13a26d570",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "06b2110c3f26c5beb54ca514269ab9b7a785ac48",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+        "src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+        "src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+        "src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+        "src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+        "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "started_at_utc": "2026-11-02T21:02:50.793966+00:00",
+      "ended_at_utc": "2026-11-02T21:02:54.878356+00:00",
+      "duration_seconds": 4.084032125,
+      "exit_code": 1,
+      "raw_log": "repair-api-red.raw.log",
+      "raw_log_sha256": "85513836f6dc517e23bb9d098e4867588bad706ceed7e526cd1e1c7b614a2afc",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts6.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "started_at_utc": "2026-11-02T21:17:41.005484+00:00",
+      "ended_at_utc": "2026-11-02T21:17:53.167718+00:00",
+      "duration_seconds": 12.162113708,
+      "exit_code": 0,
+      "raw_log": "repair-api-ts6.raw.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts7.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "started_at_utc": "2026-11-02T21:16:55.166873+00:00",
+      "ended_at_utc": "2026-11-02T21:16:57.978606+00:00",
+      "duration_seconds": 2.81164875,
+      "exit_code": 0,
+      "raw_log": "repair-api-ts7.raw.log",
+      "raw_log_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-source-range.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+        "HEAD",
+        "--",
+        ".",
+        ":(exclude)docs/**",
+        ":(exclude)docs"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:23:13.859377+00:00",
+      "ended_at_utc": "2026-11-02T21:23:13.885792+00:00",
+      "duration_seconds": 0.026286292000000003,
+      "exit_code": 0,
+      "raw_log": "repair-diff-source-range.raw.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-working.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:20:26.071278+00:00",
+      "ended_at_utc": "2026-11-02T21:20:26.097577+00:00",
+      "duration_seconds": 0.026205458,
+      "exit_code": 0,
+      "raw_log": "repair-diff-working.raw.log",
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawLogHashMatches": true
+    },
+    {
+      "path": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-source-push.command.json",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+      "head": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+      "argv": [
+        "git",
+        "push",
+        "origin",
+        "agent/issue-935"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-02T21:22:12.090432+00:00",
+      "ended_at_utc": "2026-11-02T21:22:16.354514+00:00",
+      "duration_seconds": 4.263977917,
+      "exit_code": 0,
+      "raw_log": "repair-source-push.raw.log",
+      "raw_log_sha256": "ae3dd615c6fbf268ac9b60c05c74a1b9e64a8df516fe51b9a33af1da66626bec",
+      "rawLogHashMatches": true
+    }
+  ],
+  "apiFailureComparison": {
+    "runs": {
+      "repair-api-red-confirmed": {
+        "failures": [
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > lets only the selected current B technician reload a minimal usable handle without A access",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uses only B command fields and recovers B after proof payload loss and later A erasure",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer Session expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer grant loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer qualification loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer A assignment loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer B assignment loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A erasure at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A raw erasure at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A rights expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses B rights expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses changed B version at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses changed A version at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses proof rights expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses permanent invalidation at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B Session changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B grant changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B qualification changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B B assignment changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > keeps readable historical proofs separate from current usability and traverses beyond 50",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > binds continuation to the query, actor, Session, B and expiry, without inherited authority",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > rejects A bindings, protected fields and unrecognized query/command fields",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > recovers lost preparation and issuance replies without storing pending text or duplicating issuance",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > recovers a B-only committed request after proof disposal and A erasure without its command",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > refuses unknown identities, new Sessions, wrong actors/kinds and pending command fields",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > keeps an invalidated issued request historical and refuses first consumption after authority loss",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > bounds request discovery, binds continuations to Session/B/query and stages linkage only",
+          "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts > projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > traverses more than 50 with stable tie ordering and an anchored scan, without protected fields",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > returns only named currently eligible distinct B technicians to a non-reception reviewer",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > uses scoped empty semantics and omits inaccessible or incomplete retained material",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > binds continuation to B, actor, Session and strict query scope",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment grant loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment inactive loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment assignment loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment unnamed loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > rejects a second current Session, cursor tampering without retaining pair data",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits disconnected retained identity claims, expired B material and inconsistent raw history",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > allows an empty bounded page to continue without claiming absence",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits malformed required retained evidence without a partial candidate or protected error",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > keeps existing observations without a classification working",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > cannot classify a later raw to repair an earlier missing anchor",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as active without adding publisher admission to observation",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as suspended without adding publisher admission to observation",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as missing without adding publisher admission to observation",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > session deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > session deadline > after expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > elevation deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > elevation deadline > after expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > session deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > session deadline > after expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > elevation deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > elevation deadline > after expiry preserves earlier mutation time or rolls back all effects",
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > permits current injected authority even when ambient time is past expiry"
+        ],
+        "failuresBySuite": {
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts": 27,
+          "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts": 1,
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts": 13,
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts": 6,
+          "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts": 9
+        },
+        "totals": [
+          "\n\n Test Files  5 failed | 4 passed (9)",
+          "      Tests  56 failed | 168 passed (224)"
+        ]
+      },
+      "repair-api-green": {
+        "failures": [
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > keeps existing observations without a classification working",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > cannot classify a later raw to repair an earlier missing anchor",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as active without adding publisher admission to observation",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as suspended without adding publisher admission to observation",
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as missing without adding publisher admission to observation",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > lets only the selected current B technician reload a minimal usable handle without A access",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uses only B command fields and recovers B after proof payload loss and later A erasure",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer Session expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer grant loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer qualification loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer A assignment loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer B assignment loss at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A erasure at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A raw erasure at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A rights expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses B rights expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses changed B version at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses changed A version at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses proof rights expiry at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses permanent invalidation at read and again at action",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B Session changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B grant changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B qualification changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B B assignment changes even on empty pages and consumed result recovery",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > keeps readable historical proofs separate from current usability and traverses beyond 50",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > binds continuation to the query, actor, Session, B and expiry, without inherited authority",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > rejects A bindings, protected fields and unrecognized query/command fields",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > recovers lost preparation and issuance replies without storing pending text or duplicating issuance",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > recovers a B-only committed request after proof disposal and A erasure without its command",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > refuses unknown identities, new Sessions, wrong actors/kinds and pending command fields",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > keeps an invalidated issued request historical and refuses first consumption after authority loss",
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > bounds request discovery, binds continuations to Session/B/query and stages linkage only",
+          "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts > projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > traverses more than 50 with stable tie ordering and an anchored scan, without protected fields",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > returns only named currently eligible distinct B technicians to a non-reception reviewer",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > uses scoped empty semantics and omits inaccessible or incomplete retained material",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > binds continuation to B, actor, Session and strict query scope",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment grant loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment inactive loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment assignment loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment unnamed loss",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > rejects a second current Session, cursor tampering without retaining pair data",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits disconnected retained identity claims, expired B material and inconsistent raw history",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > allows an empty bounded page to continue without claiming absence",
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits malformed required retained evidence without a partial candidate or protected error"
+        ],
+        "failuresBySuite": {
+          "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts": 6,
+          "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts": 27,
+          "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts": 1,
+          "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts": 13
+        },
+        "totals": [
+          "\n\n Test Files  4 failed | 5 passed (9)",
+          "      Tests  47 failed | 177 passed (224)"
+        ]
+      }
+    },
+    "removedFailures": [
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > permits current injected authority even when ambient time is past expiry",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > elevation deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > elevation deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > session deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > session deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > elevation deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > elevation deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > session deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > session deadline > exactly at expiry preserves earlier mutation time or rolls back all effects"
+    ],
+    "addedFailures": []
+  },
+  "summary": {
+    "originalTrackedNonDocInputs": 3120,
+    "unchangedOriginalInputs": 3106,
+    "changedAllowedExistingInputs": 14,
+    "newAllowedInputs": 1,
+    "sourceTestPaths": 15,
+    "generatedOutputsUnchangedAndIgnored": 779
+  }
+}

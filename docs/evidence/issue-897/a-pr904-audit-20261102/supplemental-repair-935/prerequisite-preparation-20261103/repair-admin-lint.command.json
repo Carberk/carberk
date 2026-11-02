@@ -1,0 +1,17 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "019cd45ebb883e5d5cee9b0b21a301b2199e2c85",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/admin",
+    "lint"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T21:20:00.203974+00:00",
+  "ended_at_utc": "2026-11-02T21:20:02.306690+00:00",
+  "duration_seconds": 2.102627334,
+  "exit_code": 0,
+  "raw_log": "repair-admin-lint.raw.log",
+  "raw_log_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632"
+}
