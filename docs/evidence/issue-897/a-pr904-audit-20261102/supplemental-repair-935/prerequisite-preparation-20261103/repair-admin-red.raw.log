@@ -1,0 +1,86 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42/apps/admin
+
+ ❯ src/app/diagnostics/evidence-proxy.spec.ts (5 tests | 2 failed) 19ms
+   × uses the current production host cookie and normalized configured upstream 3ms
+   × refuses a missing current framework cookie before any upstream read 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/diagnostics/evidence-proxy.spec.ts > uses the current production host cookie and normalized configured upstream
+AssertionError: expected "vi.fn()" to be called with arguments: [ …(2) ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+-   "https://private-api.example.invalid/api/v1/diagnostics/reports/11111111-1111-4111-8111-111111111111/evidence/11111111-1111-4111-8111-111111111111?findingId=11111111-1111-4111-8111-111111111111&expectedVersion=3",
+-   ObjectContaining {
++   "https://api.example.invalid/diagnostics/reports/11111111-1111-4111-8111-111111111111/evidence/11111111-1111-4111-8111-111111111111?findingId=11111111-1111-4111-8111-111111111111&expectedVersion=3",
++   {
+      "body": Uint8Array [
+        4,
+        5,
+        6,
+      ],
+      "cache": "no-store",
+-     "headers": ObjectContaining {
+-       "Authorization": "Bearer fresh-production-session",
++     "headers": {
++       "Authorization": "Bearer current-staff-session",
++       "Content-Type": "application/octet-stream",
++       "X-Evidence-Type": "image/jpeg",
++     },
++     "method": "PUT",
++     "signal": AbortSignal {
++       Symbol(kEvents): Map {},
++       Symbol(events.maxEventTargetListeners): 0,
++       Symbol(events.maxEventTargetListenersWarned): false,
++       Symbol(kHandlers): Map {},
++       Symbol(kAborted): false,
++       Symbol(kReason): undefined,
++       Symbol(kComposite): false,
++       Symbol(kTimeout): true,
+      },
+    },
+  ]
+
+
+Number of calls: 1
+
+ ❯ src/app/diagnostics/evidence-proxy.spec.ts:48:19
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/app/diagnostics/evidence-proxy.spec.ts > refuses a missing current framework cookie before any upstream read
+AssertionError: expected 200 to be 403 // Object.is equality
+
+- Expected
++ Received
+
+- 403
++ 200
+
+ ❯ src/app/diagnostics/evidence-proxy.spec.ts:55:24
+     53|  const upstream=vi.fn(async()=>Response.json({id}));vi.stubGlobal("fet…
+     54|  const result=await GET(new Request(url),context);
+     55|  expect(result.status).toBe(403);
+       |                        ^
+     56|  expect(await result.json()).toEqual({code:"DIAGNOSTIC_NO_ACCESS"});
+     57|  expect(result.headers.get("Cache-Control")).toBe("no-store, private");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+   Start at  05:05:58
+   Duration  122ms (transform 39%, tests 35%, import 21%, worker 5%)
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 57c0ba42/apps/admin
+

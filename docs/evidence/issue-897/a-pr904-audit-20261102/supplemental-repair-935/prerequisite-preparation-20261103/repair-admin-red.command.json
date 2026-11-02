@@ -1,0 +1,21 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "06b2110c3f26c5beb54ca514269ab9b7a785ac48",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/admin",
+    "exec",
+    "vitest",
+    "run",
+    "src/app/diagnostics/evidence-proxy.spec.ts",
+    "--maxWorkers=1"
+  ],
+  "environment_overrides": {},
+  "started_at_utc": "2026-11-02T21:05:57.380552+00:00",
+  "ended_at_utc": "2026-11-02T21:05:58.762980+00:00",
+  "duration_seconds": 1.3820824999999999,
+  "exit_code": 1,
+  "raw_log": "repair-admin-red.raw.log",
+  "raw_log_sha256": "f908208c7e269befea3c3c958bcea50390850df997a3ec1dc3c640dbc153084d"
+}

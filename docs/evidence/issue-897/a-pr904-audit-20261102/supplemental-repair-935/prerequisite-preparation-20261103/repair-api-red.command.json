@@ -1,0 +1,31 @@
+{
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-57c0ba42",
+  "head": "06b2110c3f26c5beb54ca514269ab9b7a785ac48",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+    "src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+    "src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+    "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+    "src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+    "src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+    "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+    "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+    "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+    "--maxWorkers=1"
+  ],
+  "environment_overrides": {
+    "AUTO_TM_TEST_DATABASES": "off"
+  },
+  "started_at_utc": "2026-11-02T21:02:50.793966+00:00",
+  "ended_at_utc": "2026-11-02T21:02:54.878356+00:00",
+  "duration_seconds": 4.084032125,
+  "exit_code": 1,
+  "raw_log": "repair-api-red.raw.log",
+  "raw_log_sha256": "85513836f6dc517e23bb9d098e4867588bad706ceed7e526cd1e1c7b614a2afc"
+}
