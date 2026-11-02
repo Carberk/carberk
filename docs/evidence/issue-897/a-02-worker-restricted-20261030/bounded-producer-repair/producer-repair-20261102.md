@@ -131,7 +131,7 @@ No new provider, clock seam, route or contract architecture was introduced.
 |---|---|---|
 | `later-failure` | 100 ordered due grants, multi-component grant, cross-group consumed proof, independent due component; unchanged suite owns later-group fault and rollback/resume assertions. | Implemented/source-audited; runtime, fault and cleanup unproved. |
 | `shared-multiple` | Shared pair at ranks 0/10; one selected grant has two components; consumed report and exact consume retry binding persist. | Implemented/source-audited; full inventories/closure unproved. |
-| `oldest-capacity` | Extra ordinary order/grant has rights E as the 101st after E-1ms; its component is independently due. Another due component is under the literal later grant. Separate arrival order has no grant; fixture returns its real commissioner grant request. A distinct later control remains. | Implemented/source-audited; selection freeze, arrival, independent capacity and cleanup unproved. |
+| `oldest-capacity` | The source creates extra ordinary orders and a real arrival request, but its current `newer` grant declaration is still `rightsUntil = E` while its component is also due. That cannot honestly establish the required newer-than-selected grant with a due component under it; the next separately pinned producer correction must change this source plan. | **OPEN source correction dependency**; no fixture or runtime claim. |
 | `worker-first-second-worker` | Same ordinary graph; barrier User is present in first group's source prefix. Suite starts its first worker then second worker. | Implemented/source-audited; actual lock chain and outcomes unproved. |
 | `second-worker-first-worker` | Distinct fresh graph and same genuine first-group User barrier; suite reverses its worker call order. | Implemented/source-audited; actual lock chain and outcomes unproved. |
 | `capture-first-worker` | Returns the real classified append request with current version/grant/rights; producer targets E-2 seconds and refuses a missed handoff. Suite owns the audit barrier before E. | Implemented/source-audited; native startup/beforeAll/barrier timing and appended-row closure unproved. |
@@ -171,7 +171,9 @@ in both branches, and reverse201 are permitted for a **next separately pinned
 test+producer correction**. Coordinator explicitly froze this handoff at
 `5a0a2b12`; the current allow-list was not expanded. Those corrections are not
 implemented or verified here. The three fail-closed selectors remain the honest
-historical state of this exact source, pending the next dispatch contract.
+historical state of this exact source, pending the next dispatch contract. The
+oldest-capacity declaration issue above is also recorded for that next producer
+correction; this handoff does not silently label it runtime-ready.
 
 ## Verification and remaining gates
 
@@ -199,7 +201,8 @@ only launches rejected CLI inputs and verifies empty output directories. Port
 65379 appears only as a rejected string; it was never contacted. No host-heavy
 slot or future PG61149/Redis61148/MinIO61150 resource was started.
 
-Coordinator owns the next bounded correction, diff audit/assembly, affected
+Coordinator owns the next bounded correction, including the oldest-capacity
+declaration repair, diff audit/assembly, affected
 package verification, required review, resource reservation, actual ordinary
 production, all ten unchanged-or-separately-authorized selector bodies and
 cleanup. Runtime row closure, zero receipts, exact trigger restoration, object
