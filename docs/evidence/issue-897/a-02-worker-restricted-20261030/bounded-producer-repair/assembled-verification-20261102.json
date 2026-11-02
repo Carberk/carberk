@@ -1,0 +1,94 @@
+{
+  "sourceSHA": "4199eb86d4846fecc6b53edca6c447ec868b1566",
+  "actualDocumentationHead": "83b828e2511d707defc2eabff3c2fddb2535a86f",
+  "slotStartedAtUTC": "2026-11-02T11:48:26.736924+00:00",
+  "records": [
+    {
+      "argv": [
+        "node",
+        "--check",
+        "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.mjs"
+      ],
+      "startedAtUTC": "2026-11-02T11:48:26.737113+00:00",
+      "endedAtUTC": "2026-11-02T11:48:26.772660+00:00",
+      "durationSeconds": 0.035563458000000006,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "node",
+        "--test",
+        "apps/worker/src/jobs/diagnostics/testing/produceOwnershipBatchFixture.test.mjs"
+      ],
+      "startedAtUTC": "2026-11-02T11:48:26.772990+00:00",
+      "endedAtUTC": "2026-11-02T11:48:27.228780+00:00",
+      "durationSeconds": 0.45580891700000004,
+      "exit": 0,
+      "stdout": "\u2714 unknown selectors and unsafe task URLs refuse before runtime composition or output (396.51925ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 430.253084\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "typecheck"
+      ],
+      "startedAtUTC": "2026-11-02T11:48:27.229144+00:00",
+      "endedAtUTC": "2026-11-02T11:48:28.719220+00:00",
+      "durationSeconds": 1.490108292,
+      "exit": 0,
+      "stdout": "",
+      "stderr": "$ tsc --noEmit\n"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "startedAtUTC": "2026-11-02T11:48:28.719613+00:00",
+      "endedAtUTC": "2026-11-02T11:48:32.574792+00:00",
+      "durationSeconds": 3.855214541,
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "lint"
+      ],
+      "startedAtUTC": "2026-11-02T11:48:32.575201+00:00",
+      "endedAtUTC": "2026-11-02T11:48:35.565000+00:00",
+      "durationSeconds": 2.989823792000001,
+      "exit": 0,
+      "stdout": "",
+      "stderr": "$ eslint . --max-warnings 0\n"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/worker",
+        "test:unit",
+        "--maxWorkers=1"
+      ],
+      "startedAtUTC": "2026-11-02T11:48:35.565357+00:00",
+      "endedAtUTC": "2026-11-02T11:48:46.336051+00:00",
+      "durationSeconds": 10.770744209,
+      "exit": 0,
+      "stdout": "\n RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/apps/worker\n\n[Nest] 97131  - 11/02/2026, 7:48:45 PM     LOG [NotificationFanoutProcessor] [notification-fanout] received job job-1 name direct-message\n[Nest] 97131  - 11/02/2026, 7:48:45 PM     LOG [NotificationFanoutProcessor] [notification-fanout] received job job-1 name direct-message\n[Nest] 97131  - 11/02/2026, 7:48:45 PM     LOG [NotificationFanoutProcessor] [notification-fanout] received job job-1 name saved-search-match\n[Nest] 97131  - 11/02/2026, 7:48:45 PM     LOG [NotificationFanoutProcessor] [notification-fanout] skipping unhandled job job-1 name saved-search-match\n\n Test Files  47 passed (47)\n      Tests  361 passed (361)\n   Start at  19:48:35\n   Duration  10.42s (tests 70%, import 24%, transform 4%, setup 2%, worker 1%)\n\n    Isolate  47 workers spawned \u00b7 ~43ms startup each (spawn + environment, per file)\n             at least ~1.97s faster with isolate: false \u2014 reuses workers across files instead of one per file\n\n",
+      "stderr": "$ AUTO_TM_TEST_DATABASES=off vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests --maxWorkers=1\n[Nest] 97131  - 11/02/2026, 7:48:45 PM   ERROR [NotificationFanoutProcessor] Object(1) {\n  errors: {\n    formErrors: [],\n    fieldErrors: {\n      category: [\n        'Required'\n      ],\n      recipientUserId: [\n        'Required'\n      ],\n      historyId: [\n        'Required'\n      ],\n      title: [\n        'Required'\n      ],\n      body: [\n        'Required'\n      ],\n      deepLink: [\n        'Required'\n      ],\n      data: [\n        'Required'\n      ]\n    }\n  }\n}\n[notification-fanout] invalid direct-message payload for job job-1\n"
+    }
+  ],
+  "status": "AFFECTED CHECKS PASS; slot released; runtime/cleanup unproved",
+  "slotEndedAtUTC": "2026-11-02T11:48:46.336477+00:00"
+}
