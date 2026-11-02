@@ -68,7 +68,7 @@ describe("B-owned continuity handoff through real HTTP, application, authority a
       providers: [...Reflect.getMetadata("providers", DiagnosticsModule),
         { provide: PrismaService, useValue: db }, { provide: ConfigService, useValue: new ConfigService({}) },
         { provide: DIAGNOSTIC_RUNTIME, useValue: runtime },
-        { provide: STAFF_AUTHORITY_PORT, useValue: new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime) },
+        { provide: STAFF_AUTHORITY_PORT, useValue: new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime) },
         { provide: BUSINESS_AUTHORITY_PORT, useValue: new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime) },
         { provide: STAFF_BINDING_PORT, useClass: PrismaStaffBindings }, { provide: PUBLISHER_BINDING_PORT, useClass: PrismaPublisherBindings }],
     }).compile();

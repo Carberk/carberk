@@ -62,7 +62,7 @@ describe("real prepared R5 report, proof, request and document adapters", () => 
     db = new PrismaService(); pool = new Pool({ connectionString: process.env["DATABASE_URL"] });
     const runtime = { now: () => new Date(clock), id: () => id(`generated-${++generatedId}`), syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
     const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime);
-    authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
+    authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
     intake = new PrismaDiagnosticIntake(db, authority, business, new DiagnosticPublicBindings(new PrismaPublisherBindings()), runtime);
     identity = new PrismaDiagnosticIdentityEvidence(db, authority, objects, runtime);
     const access = new DiagnosticReportAccess(authority, runtime), bindings = new DiagnosticPublicBindings(new PrismaPublisherBindings());

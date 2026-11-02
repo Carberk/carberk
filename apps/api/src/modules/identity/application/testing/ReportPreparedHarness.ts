@@ -105,7 +105,7 @@ export function reportPreparedHarness() {
   const db = new Proxy({} as PrismaService, { get(_target, property) { return property === "$transaction" ? transaction : Reflect.get(memory.client, property); } });
   let generatedId = 0;
   const runtime = { now: () => new Date(clock), id: () => `22222222-2222-4222-8222-${String(++generatedId).padStart(12, "0")}`, syntheticAllowed: () => true, publicSyntheticAllowed: () => false };
-  const authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime), new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime), runtime, new CampaignDiagnosticAdmission(new ConfigService()));
+  const authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime), new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime), runtime, new CampaignDiagnosticAdmission(new ConfigService()));
   const bindings = new DiagnosticPublicBindings(new PrismaPublisherBindings()), access = new DiagnosticReportAccess(authority, runtime);
   const stored = new Map<string, Uint8Array>();
   const objects: DiagnosticObjects = { sanitize: async bytes => ({ bytes, mime: "image/webp" }), put: async (key, bytes) => { stored.set(key, bytes); }, remove: async key => { stored.delete(key); },

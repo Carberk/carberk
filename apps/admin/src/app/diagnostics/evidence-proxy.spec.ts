@@ -7,8 +7,6 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: (name: string) => 
  const value = framework.cookies.get(name);
  return value === undefined ? undefined : { name, value };
 } }) }));
-vi.mock("@/lib/cookies",()=>({getAccessToken:async()=>"current-staff-session"}));
-vi.mock("@/lib/api-config",()=>({getApiBaseUrl:()=>"https://api.example.invalid"}));
 const id="11111111-1111-4111-8111-111111111111",context={params:Promise.resolve({id,file:id})};
 const url=`https://admin.example.invalid/diagnostics/evidence/${id}/${id}?findingId=${id}&expectedVersion=3`;
 const headers={"Content-Type":"application/octet-stream","X-Evidence-Type":"image/jpeg",Origin:"https://admin.example.invalid"};

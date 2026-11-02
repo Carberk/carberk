@@ -255,7 +255,7 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
   });
   it.each(["left", "right"])("backup elevation opposes staff revocation in both orders, %s", async order => {
     const key = `revoke-${order}`; const input = { ...elevation(key), usedAt: at, codeHash: "one-use" };
-    const revoke = (client: PrismaService) => new PrismaStaffAuthority(client).change(manage(key, false), at);
+    const revoke = (client: PrismaService) => new PrismaStaffAuthority(client, { now: () => at }).change(manage(key, false), at);
     const elevate = (client: PrismaService) => totp(client).consumeBackupCodeAndElevate(input);
     const results = order === "left" ? await oppose("source", revoke, elevate) : await oppose("source", elevate, revoke);
     if (order === "left") {
@@ -321,7 +321,7 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     expect(await db.totpBackupCode.findUnique({ where: { id: id(key, "backup") } })).toBeNull();
   });
   it("real staff no-ops emit no audit, while revoke and regrant each audit once", async () => {
-    const key = "noop-left"; const repo = new PrismaStaffAuthority(runtime());
+    const key = "noop-left"; const repo = new PrismaStaffAuthority(runtime(), { now: () => at });
     await repo.change(manage(key, true), at);
     expect(await db.auditLog.count({ where: { targetId: id(key, "staff") } })).toBe(0);
     await repo.change(manage(key, false), at); await repo.change(manage(key, false), at);
@@ -346,7 +346,7 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     const beforeSession = await db.session.findUniqueOrThrow({ where: { id: subject.sessionId } });
     const beforeGrant = await db.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId: subject.userId, capability: "diagnostics.technician" } } });
     const audits = await db.auditLog.count({ where: { targetId: subject.userId } });
-    await expect(new PrismaStaffAuthority(runtime(undefined, true)).change(manage(key, false), at)).rejects.toThrow("identity caller rollback sentinel");
+    await expect(new PrismaStaffAuthority(runtime(undefined, true), { now: () => at }).change(manage(key, false), at)).rejects.toThrow("identity caller rollback sentinel");
     expect(await db.staffGrant.findUniqueOrThrow({ where: { userId_capability: { userId: subject.userId, capability: "diagnostics.technician" } } })).toEqual(beforeGrant);
     expect(await db.auditLog.count({ where: { targetId: subject.userId } })).toBe(audits);
     expect(await db.session.findUniqueOrThrow({ where: { id: subject.sessionId } })).toEqual(beforeSession);
@@ -360,7 +360,7 @@ describe("Identity caller-owned preparation under PostgreSQL opposition", { conc
     // Make a fresh lawful pending enrollment through the actual ordinary caller.
     const other = id(key, "other"); const enrollment = await totp(runtime()).createPending(other, "synthetic");
     const good = await sessions(runtime()).create({ userId: other, refreshTokenHash: fixture(key).tokens.unused, deviceLabel: null, userAgent: null, expiresAt: end });
-    await new PrismaStaffAuthority(runtime()).change({ ...manage(key, kind !== "inactive"), targetUserId: other }, at);
+    await new PrismaStaffAuthority(runtime(), { now: () => at }).change({ ...manage(key, kind !== "inactive"), targetUserId: other }, at);
     const sessionId = kind === "missing" ? randomUUID() : kind === "foreign" ? subject.sessionId : good.id;
     if (kind === "expired") await sessions(runtime()).rotateRefreshToken(good.id, fixture(key).tokens.unused, fixture(key).tokens.expired, at, expired);
     await expect(totp(runtime()).completeFirstVerification({ userId: other, enrollmentId: enrollment.id, sessionId, verifiedAt: at, codeHashes: [randomUUID()], adminTotpExpiresAt: end })).rejects.toThrow("SESSION_NOT_FOUND");

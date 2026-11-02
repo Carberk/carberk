@@ -143,7 +143,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   // API source into the DB compiler's rootDir or replace production authority.
   const load = async (path: string) => import(/* @vite-ignore */ fileURLToPath(new URL(`../../../apps/api/src/modules/${path}.ts`, import.meta.url)));
   const { PrismaServiceMessaging } = await load("service-messaging/infrastructure/PrismaServiceMessaging") as { PrismaServiceMessaging: new (database: unknown, staff: unknown, store: unknown, runtime: unknown, campaign: unknown) => Caller };
-  const { PrismaStaffAuthority } = await load("identity/infrastructure/PrismaStaffAuthority") as { PrismaStaffAuthority: new (database: unknown) => unknown };
+  const { PrismaStaffAuthority } = await load("identity/infrastructure/PrismaStaffAuthority") as { PrismaStaffAuthority: new (database: unknown, clock: { now(): Date }) => unknown };
   const { CheckStaffAuthority } = await load("identity/application/CheckStaffAuthority") as { CheckStaffAuthority: new (repository: unknown, clock: unknown) => unknown };
   const { CampaignServiceAdmission } = await load("service-messaging/infrastructure/campaignServiceAdmission") as { CampaignServiceAdmission: new (config: unknown) => unknown };
   const { PrismaSessionRepository } = await load("identity/infrastructure/PrismaSessionRepository") as { PrismaSessionRepository: new (database: unknown, hasher: unknown) => SessionWriter };
@@ -158,7 +158,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   // read adapters use this case's database; mutation/audit use the owner's tx.
   suspensionWriter = database => new SuspendUser(database, new PrismaIdentityReadAdapter(db), new PrismaIdentityAdminRepository(db), new PrismaContentReportRepository(db), new PrismaAuditLogRepository(db), new PrismaConversationRepository(db));
   sessionWriter = database => new PrismaSessionRepository(database, { compare: async () => { throw new Error("unexpected password comparison"); } });
-  grantWriter = database => new PrismaStaffAuthority(database) as GrantWriter;
+  grantWriter = database => new PrismaStaffAuthority(database, { now: () => now }) as GrantWriter;
   deletionWriter = database => new PrismaAccountDeletionUnitOfWork(database);
   const { PrismaPushTokenRepository } = await load("notifications/infrastructure/PrismaPushTokenRepository") as { PrismaPushTokenRepository: new (database: unknown) => { save(token: unknown): Promise<void> } };
   const { PushToken } = await load("notifications/domain/PushToken") as { PushToken: { create(data: unknown): unknown } };
@@ -168,7 +168,7 @@ describe("real Service and History callers on disposable restricted PostgreSQL",
   const pdfModule = createRequire(fileURLToPath(new URL("../../../apps/api/package.json", import.meta.url)))("pdf-lib") as { PDFDocument: { create(): Promise<{ addPage(): void; setCreationDate(at: Date): void; setModificationDate(at: Date): void; save(): Promise<Uint8Array> }> } };
   pdf = async () => { const document = await pdfModule.PDFDocument.create(); document.addPage(); document.setCreationDate(now); document.setModificationDate(now); return document.save(); };
   construct = (database, enabled, store = closedStore, campaign = false, clock = () => now) => new PrismaServiceMessaging(database,
-   new CheckStaffAuthority(new PrismaStaffAuthority(database), { now: clock }),
+   new CheckStaffAuthority(new PrismaStaffAuthority(database, { now: clock }), { now: clock }),
    store,
    { now: clock, id: fixtureId, syntheticEnabled: () => enabled, syntheticSubjectAllowed: () => enabled },
    new CampaignServiceAdmission({ get: (key: string) => campaign ? ({ AUTOTM_COMMIT_SHA: "c".repeat(40), APP_ENV: "test" } as Record<string, string>)[key] : undefined }));

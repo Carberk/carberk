@@ -6,14 +6,16 @@ import { Prisma, type PrismaService } from "@auto-tm/db";
 import { PrismaSessionRepository } from "./PrismaSessionRepository";
 import { PrismaTotpEnrollmentRepository } from "./PrismaTotpEnrollmentRepository";
 import { PrismaStaffAuthority } from "./PrismaStaffAuthority";
+import { MutableClock } from "../application/testing/MutableClock";
 import { PrismaOtpRequestRepository } from "./PrismaOtpRequestRepository";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
 import { PrismaUserRepository } from "./PrismaUserRepository";
 
 const now = new Date("2026-10-24T12:00:00Z");
 const later = new Date("2027-01-01T00:00:00Z");
+const staffClock = new MutableClock(now);
 // All lifecycle fixtures, including pruning, use an explicit clock restored per test.
-beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now); });
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now); staffClock.current = now; });
 afterEach(() => { vi.useRealTimers(); });
 type Row = Record<string, unknown> & {
   id?: unknown; userId?: unknown; role?: unknown; suspendedAt?: unknown; deletionScheduledAt?: unknown;
@@ -256,7 +258,7 @@ describe("staff changes preserve live authority, no-op and audit", () => {
   }
   const input = { userId: "u", sessionId: "s", targetUserId: "target", capability: "diagnostics.technician", reason: "  Approved training  ", grant: true };
   it("grants and revokes with exactly one durable audit per real change", async () => {
-    const db = staffFixture(); const repo = new PrismaStaffAuthority(db.service);
+    const db = staffFixture(); const repo = new PrismaStaffAuthority(db.service, staffClock);
     await repo.change(input, now);
     await repo.change(input, now);
     expect(db.rows.auditLog).toHaveLength(1);
@@ -267,7 +269,7 @@ describe("staff changes preserve live authority, no-op and audit", () => {
     expect(db.rows.staffGrant.find(row => row.userId === "target")!.revokedAt).toEqual(now);
   });
   it("absent revoke writes no grant or audit", async () => {
-    const db = staffFixture(); await new PrismaStaffAuthority(db.service).change({ ...input, grant: false }, now);
+    const db = staffFixture(); await new PrismaStaffAuthority(db.service, staffClock).change({ ...input, grant: false }, now);
     expect(db.rows.staffGrant).toHaveLength(1); expect(db.rows.auditLog).toEqual([]);
   });
   it.each(["actor revoked", "expired elevation", "wrong Session", "inactive actor", "inactive target", "founder capability"])("refuses %s without a grant or audit", async kind => {
@@ -277,12 +279,12 @@ describe("staff changes preserve live authority, no-op and audit", () => {
     if (kind === "wrong Session") db.rows.session[0]!.userId = "target";
     if (kind === "inactive actor") db.rows.user[0]!.suspendedAt = now;
     if (kind === "inactive target") db.rows.user[1]!.deletionScheduledAt = now;
-    await expect(new PrismaStaffAuthority(db.service).change({ ...input, ...(kind === "founder capability" ? { capability: "staff.manage" } : {}) }, now)).rejects.toThrow();
+    await expect(new PrismaStaffAuthority(db.service, staffClock).change({ ...input, ...(kind === "founder capability" ? { capability: "staff.manage" } : {}) }, now)).rejects.toThrow();
     expect(db.rows.staffGrant).toHaveLength(1); expect(db.rows.auditLog).toEqual([]);
   });
   it("rolls back both grant and audit when completion refuses", async () => {
     const db = staffFixture(); db.refuseFinish = true;
-    await expect(new PrismaStaffAuthority(db.service).change(input, now)).rejects.toThrow("diagnostic_source_final_effect");
+    await expect(new PrismaStaffAuthority(db.service, staffClock).change(input, now)).rejects.toThrow("diagnostic_source_final_effect");
     expect(db.rows.staffGrant).toHaveLength(1); expect(db.rows.auditLog).toEqual([]);
   });
 });
@@ -361,6 +363,7 @@ async function afterWait<T>(db: IdentityDatabase, executionTime: Date, work: () 
   const result = work();
   await waiting;
   vi.setSystemTime(executionTime);
+  staffClock.current = executionTime;
   release();
   return result;
 }
@@ -417,7 +420,7 @@ describe.each(boundaries)("execution $label expiry after preparation waits", ({ 
       db.rows.session[0]!.expiresAt = expiry === "Session" ? deadline : later;
       db.rows.session[0]!.adminTotpExpiresAt = expiry === "Session" ? later : deadline;
       const original = structuredClone(db.rows);
-      const result = afterWait(db, at, () => new PrismaStaffAuthority(db.service).change({ userId: "u", sessionId: "s", targetUserId: "target", capability: "diagnostics.technician", reason: "Approved", grant }, now), expiry.includes("resource lock"));
+      const result = afterWait(db, at, () => new PrismaStaffAuthority(db.service, staffClock).change({ userId: "u", sessionId: "s", targetUserId: "target", capability: "diagnostics.technician", reason: "Approved", grant }, now), expiry.includes("resource lock"));
       if (!allowed) {
         await expect(result).rejects.toThrow(expiry === "Session" ? "SESSION_REQUIRED" : "ELEVATION_REQUIRED");
         expect(db.rows).toEqual(original);

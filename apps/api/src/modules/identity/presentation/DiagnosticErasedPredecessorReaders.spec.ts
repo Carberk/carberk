@@ -18,7 +18,7 @@ async function fixture() {
     user: { id: id(n), role: "user", suspendedAt: null, deletionScheduledAt: null, dealershipMemberships: [], staffGrants: n === 30 ? [{ capability: "diagnostics.technician" }] : [] } });
   f.memory.seed("diagnosticOrderAssignment", { id: id(200), orderId: id(4), userId: id(30), capability: "diagnostics.technician", revokedAt: null });
   f.memory.seed("diagnosticCenterAssignment", { centerId: id(12), userId: id(30), capability: "diagnostics.technician", revokedAt: null, qualifiedUntil: future });
-  const authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(f.db), runtime), new CheckBusinessAuthority(new PrismaBusinessAuthority(f.db), runtime), runtime, null!);
+  const authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(f.db, runtime), runtime), new CheckBusinessAuthority(new PrismaBusinessAuthority(f.db), runtime), runtime, null!);
   const access = new DiagnosticReportAccess(authority, runtime);
   const reports = new PrismaDiagnosticReports(f.db, authority, runtime, access, null!, null!);
   const documents = new PrismaDiagnosticDocuments(f.db, access, null!);

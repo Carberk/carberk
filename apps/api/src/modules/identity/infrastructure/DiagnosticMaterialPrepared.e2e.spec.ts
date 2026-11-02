@@ -132,7 +132,7 @@ describe("real prepared diagnostic material adapters", () => {
     bytes = await sharp({ create: { width: 2, height: 2, channels: 3, background: "red" } }).png().toBuffer();
     const runtime = { now: () => new Date(clock), id: randomUUID, syntheticAllowed: () => true };
     const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime);
-    authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
+    authority = new DiagnosticAuthority(new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime), business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
     intake = new PrismaDiagnosticIntake(db, authority, business, new DiagnosticPublicBindings(new PrismaPublisherBindings()), runtime);
     identity = new PrismaDiagnosticIdentityEvidence(db, authority, objects, runtime);
     evidence = new PrismaDiagnosticEvidence(db, new DiagnosticReportAccess(authority, runtime), objects, runtime);
@@ -442,7 +442,7 @@ describe("real prepared diagnostic material adapters", () => {
       if (defect === "permission") {
         // Lawful distinct elevated manager invokes the unchanged authority writer.
         // It owns preparation, sorted locks, policy checks, mutation and audit.
-        const staff = new PrismaStaffAuthority(db);
+        const staff = new PrismaStaffAuthority(db, { now: () => new Date(clock) });
         for (const capability of ["diagnostics.technician", "diagnostics.reception"]) {
           await staff.change({ userId: id("manager"), sessionId: id("manager-session"), targetUserId: subject().userId,
             capability, grant: false, reason: "Synthetic post-GET authority revocation" }, clock);

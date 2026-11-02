@@ -47,7 +47,7 @@ async function fixture() {
   memory.seed("listing", { id: id(8), sellerId: id(7), businessId: null, vin: "SYN-123", brandId: id(9), modelId: id(10), year: 2020, deletedAt: null });
   const runtime = { now: () => now, id: randomUUID, syntheticAllowed: () => true };
   const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime);
-  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime);
+  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime);
   const authority = new DiagnosticAuthority(staff, business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
   const intake = new PrismaDiagnosticIntake(db, authority, business, new DiagnosticPublicBindings(new PrismaPublisherBindings()), runtime);
   const controller = new DiagnosticIntakeController(intake);

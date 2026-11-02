@@ -92,7 +92,7 @@ export function materialHarness() {
   const db = new Proxy({} as PrismaService, { get(_target, property) { return property === "$transaction" ? transaction : Reflect.get(memory.client, property); } });
   const runtime = { now: () => new Date(clock), id: randomUUID, syntheticAllowed: () => true };
   const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), runtime);
-  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db), runtime);
+  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db, runtime), runtime);
   const authority = new DiagnosticAuthority(staff, business, runtime, new CampaignDiagnosticAdmission(new ConfigService()));
   const stored = new Map<string, Uint8Array>();
   let onPut: (() => Promise<void>) | undefined, onRead: (() => Promise<void>) | undefined, putFailure = false;

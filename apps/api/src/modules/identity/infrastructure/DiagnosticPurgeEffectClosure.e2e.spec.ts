@@ -57,7 +57,7 @@ describe("B1 disposal of lawful persisted ownership and consumed retry graphs", 
   const runtime = diagnosticRuntime(config);
   const clock = { now: () => new Date() };
   const business = new CheckBusinessAuthority(new PrismaBusinessAuthority(db), clock);
-  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db), clock);
+  const staff = new CheckStaffAuthority(new PrismaStaffAuthority(db, clock), clock);
   const authority = new DiagnosticAuthority(staff, business, runtime, new CampaignDiagnosticAdmission(config));
   const bindings = new DiagnosticPublicBindings(new PrismaPublisherBindings());
   const objects = new S3DiagnosticObjects(config);

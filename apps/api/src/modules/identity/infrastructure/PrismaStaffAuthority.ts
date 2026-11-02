@@ -3,10 +3,15 @@ import { PrismaService, withDiagnosticSourceCommand, type DiagnosticSourceRow, t
 import { StaffAuthorityDenied, type StaffSubject } from "../domain/ports/StaffAuthorityPort";
 import type { StaffAuthorityRepository, StaffAuthoritySnapshot, StaffGrantChange } from "../domain/ports/StaffAuthorityRepository";
 import { assertStaffGrantChange } from "../domain/staffPolicy";
+import type { ClockPort } from "../domain/ports/ClockPort";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 @Injectable()
 export class PrismaStaffAuthority implements StaffAuthorityRepository {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(IDENTITY_TOKENS.ClockPort) private readonly clock: ClockPort,
+  ) {}
   /** With a supplied transaction this is authorization only. Its caller owns the
    * complete campaign/source preparation, including actor User, Session, current
    * and absent capability keys and retained graph, before ANY service/history
@@ -63,7 +68,7 @@ export class PrismaStaffAuthority implements StaffAuthorityRepository {
           assertStaffGrantChange({ userId: user.id, sessionUserId: session.userId, role: user.role,
             suspended: !!user.suspendedAt, deleting: !!user.deletionScheduledAt,
             expiresAt: session.expiresAt, elevatedUntil: session.adminTotpExpiresAt,
-            capabilities: grants.map((grant) => grant.capability) }, input, new Date());
+            capabilities: grants.map((grant) => grant.capability) }, input, this.clock.now());
           if (!target || (input.grant && (target.suspendedAt || target.deletionScheduledAt))) throw new StaffAuthorityDenied("GRANT_FORBIDDEN");
           const locked = await tx.staffGrant.findUnique({ where: { userId_capability: { userId: input.targetUserId, capability: input.capability } } });
           if (input.grant === (!!locked && locked.revokedAt === null)) throw staffNoChange;
