@@ -8,6 +8,29 @@ The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-
 
 ## Active critical path
 
+The supplemental PR904 audit is reconciled in
+[a-pr904-audit-reconciliation-20261102.md](a-pr904-audit-reconciliation-20261102.md).
+Original report, reviewer provenance and manifests are preserved byte-exactly
+under `a-pr904-audit-20261102/`, pinned to PR head `b6dac5d17` and base
+`9fde309c3`. AUDIT-S1 is resolved on the current assembled A source. AUDIT-S2
+(staff adapter execution clock) and AUDIT-S3 (proxy repository-module mocks)
+remain present and Parent accepted them into bounded A remediation. These are
+supplemental AUDIT IDs, distinct from the earlier A-01/A-09 S1/S2 names.
+
+A-01's overall Standards gate therefore reopens. Earlier A-01 r3 and bounded
+A-09 S1/S2 passes remain valid for their exact recorded source/findings; they
+do not pass this supplemental audit. Current count is **1 PASS / 10 OPEN**,
+with A-09's bounded historical fix the one retained PASS. All five audit Spec
+gaps remain open. The earlier 2 PASS / 9 OPEN snapshots below are historical
+where superseded by this explicit extension. A stays unaccepted and PR904
+separate OPEN/DRAFT, unchanged.
+
+After this reconciliation is committed/pushed, the next ready action is a
+read-only pre-assembly audit of A-02 source `9e48011e5` and evidence `91676477a`
+against its exact allow-list, pins, corrected contract and recovery. No worker
+or source/runtime action started during reconciliation. Future fixes require
+separate bounded contracts; runtime retains its explicit resource/cleanup gate.
+
 Founder model policy effective 2026-11-02 supersedes every earlier priority/Fast
 selection. Use only `codex_work/gpt-6.1-sol`, explicit `serviceTier=default`,
 `reasoningEffort=xhigh` for architecture/dependency diagnosis, tricky work,

@@ -1,0 +1,27 @@
+{
+  "reviewedHead": "b6dac5d17c140c8fd307a24df56d4a82ed070625",
+  "base": "9fde309c3da17f2661fe9c266504e6e56a1b97c9",
+  "finalGitStatus": "clean",
+  "reportLocalCitationsChecked": 70,
+  "citationErrors": [],
+  "standards": {
+    "documentedP2": 3,
+    "optionalHeuristics": 1
+  },
+  "spec": {
+    "acceptanceP1": 5
+  },
+  "reviewerModel": "gpt-6.1-sol",
+  "reasoningEffort": "xhigh",
+  "serviceTier": "default",
+  "files": {
+    "architecture.html": "8a18017206bbbe29b703883cbbd9970d1b0ed0bfc3259d75632bd5cd486c9915",
+    "diff-check.txt": "464192ca8ddd84392559c8bb77cdce3506c2e2e4ab49378cdb1fa8722e4067d6",
+    "interrupted-spec-notes.md": "daaa596a8b4a49a2f09f67546d4d25573d59d90dbf08ba8ad44f632f4d545461",
+    "report.md": "a4c36f7bffe6771282757d35a6bb25faa332d407455a403a05145e58a247a8b9",
+    "reviewer-provenance.json": "1589d6468c863ebb4501178cc72269a330c2ebabb5e63cf7c118536f1cb4e3af",
+    "spec-review.md": "59b9c2e457061589a96b87a9e7a0a89114908a8a9db124164905cc34089d81d6",
+    "standards-review.md": "3d1115dee9e968b3ea82c9aef4149e7cfd73f5f302e79a475ca3d03609e74c5f",
+    "static-evidence.json": "294f6dce5fa5a54c9e0895db43458d41cfbfe792b92c7a26f1e5b2dca786dbc1"
+  }
+}

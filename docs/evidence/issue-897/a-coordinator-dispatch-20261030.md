@@ -1,5 +1,38 @@
 # Milestone A dispatch — 2026-10-30
 
+## PR #904 audit reconciliation, 2026-11-02
+
+The independent audit is preserved under
+`docs/evidence/issue-897/a-pr904-audit-20261102/` with exact PR head
+`b6dac5d17c140c8fd307a24df56d4a82ed070625`, base
+`9fde309c3da17f2661fe9c266504e6e56a1b97c9`, reviewer provenance and manifests.
+It was read-only and did not review the newer candidate. The concise
+[reconciliation](a-pr904-audit-reconciliation-20261102.md) distinguishes its
+AUDIT-S1/S2/S3 IDs from the earlier A-01/A-09 S1/S2 findings.
+
+AUDIT-S1 is resolved on assembled source `4b2c8a6f6161f9c825945637f6f848c64adeb145`
+under A-01/A-09's recorded scope. AUDIT-S2, the staff adapter's post-lock
+execution clock, and AUDIT-S3, repository-module mocks in evidence proxy tests,
+remain unchanged in the current candidate and are accepted into bounded A
+remediation by Parent. A-01's earlier r3 PASS remains historical for its
+recorded findings and SHA; the overall Standards gate is OPEN again until the
+two supplemental issues are fixed, affected-verified and independently reviewed.
+The current accounting is **1 PASS / 10 OPEN**. No A-01/A-09 result is silently
+expanded.
+
+All five audit Spec items remain open: A-04 restoration profile/lifecycle,
+A-02 restricted runtime evidence, A-03 privacy matrix, and A-05 through A-10
+journey/CI/deployment/artifact/protected-delivery gates. PR904 stays OPEN/DRAFT
+at its separate head. No source, PR ref, test, build, runtime or resource action
+is implied by this reconciliation.
+
+The next ready action is the coordinator's read-only audit of A-02 source
+`9e48011e54a23822504d9cb5ae5f6d7a9f96028e` and evidence
+`91676477a6812e16d5813c64454948d095b63eb1` against the correction contract,
+allow-list, pins and recovery. Assembly, affected verification and fresh
+exact-SHA Standards/Spec review follow only after that audit. Existing fresh
+resources remain unstarted and port65379 is prohibited.
+
 ## Founder model-policy correction, 2026-11-02
 
 Effective immediately, this policy supersedes every earlier priority/Fast
@@ -57,7 +90,7 @@ policy, preserved refs/worktree/recovery, and is held for coordinator assembly
 and review. No new worker, worktree or implementation task was created. The
 correction handoff remains a source/evidence result, not A-02 PASS.
 
-Current count is **2 PASS / 9 OPEN**; A remains unaccepted. PR904, B/C/activation
+Current count is **1 PASS / 10 OPEN**; A remains unaccepted. PR904, B/C/activation
 gates and all resource holds remain unchanged.
 
 ## Parent disposition and clean A-02 handoff, 2026-11-02

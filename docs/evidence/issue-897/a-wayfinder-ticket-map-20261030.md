@@ -13,14 +13,23 @@ declare A complete.
 Parent accepted the A-01 and bounded A-09 S1/S2 gates on exact assembled
 source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`, after reading
 both independent reports, the affected verification receipt and this gate.
-This is ticket-scope acceptance only: **2 passed, 9 open; A is NOT accepted**.
+This is ticket-scope acceptance only: **1 passed, 10 open; A is NOT accepted**.
 
 | Tickets | Current state |
 |---|---|
-| A-01, A-09 (bounded S1/S2) | PASS, Parent accepted on exact source above |
+| A-01 | OPEN again for supplemental PR-audit AUDIT-S2/AUDIT-S3; its earlier r3 PASS remains historical for its recorded S1/S2 paths and SHA |
+| A-09 (bounded S1/S2) | PASS, Parent accepted on exact source above |
 | A-02 | FAIL/open; correction source `9e48011e5`, evidence `91676477a` received clean; assembly/affected verification/review/runtime/cleanup pending |
 | A-03, A-04, A-11 | FAIL/open; required evidence incomplete |
 | A-05, A-06, A-07, A-08, A-10 | Waiting on their recorded dependencies |
+
+The [PR #904 audit reconciliation](a-pr904-audit-reconciliation-20261102.md)
+preserves the exact audited PR head/base, reviewer provenance and evidence
+manifests. AUDIT-S1 is resolved on the assembled A candidate; AUDIT-S2 (staff
+adapter clock) and AUDIT-S3 (proxy repository-module mocks) remain open and
+are accepted into bounded A remediation. These AUDIT IDs are distinct from
+the earlier A-01/A-09 S1/S2 names. Parent's disposition changes the overall
+Standards gate, not the recorded historical A-01/A-09 results.
 
 - Coordinator branch `agent/release897-candidate-a-20261029` had clean, pushed
   docs baseline `6d8fc6797a496d139e13cfb10bacc01cb243c1ad` before this update;

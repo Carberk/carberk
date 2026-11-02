@@ -1,0 +1,32 @@
+apps/worker/src/operations/OperationsSmtpConfig.spec.ts:18: new blank line at EOF.
+docs/evidence/issue-897/artifact-environment-preflight-20261029.md:31: new blank line at EOF.
+docs/evidence/issue-897/checkpoint-4fc77bba-20261021.md:31: new blank line at EOF.
+docs/evidence/issue-897/checkpoint-db44fcbf-20261021.md:26: new blank line at EOF.
+docs/evidence/issue-897/mobile-assembled-20261029/typecheck-stale-contracts.txt:16: new blank line at EOF.
+docs/evidence/issue-897/r7b-runtime-matrix-20261025/full25.txt:36: new blank line at EOF.
+docs/evidence/issue-897/r7g-recovery-20261029/897-r7g-standards-source-review-a3de-20261027-r1.md:5: trailing whitespace.
++Base: `776fad4a6bdbc7be2cd54f9d2b95b93233a0d8ef`  
+docs/evidence/issue-897/r7g-recovery-20261029/897-r7g-standards-source-review-a3de-20261027-r1.md:6: trailing whitespace.
++Base tree: `1fb93ae50da22246e57b27f56aea600c32e5ef93`  
+docs/evidence/issue-897/r7g-recovery-20261029/897-r7g-standards-source-review-a3de-20261027-r1.md:7: trailing whitespace.
++Reviewed target: `a3de0cb72c238ae271f9bc1e63e00172f75eaf9c`  
+docs/evidence/issue-901/reset-row-anchor-20261029/focused-anchor-green.txt:21: new blank line at EOF.
+docs/evidence/issue-901/reset-row-anchor-20261029/focused-anchor-red.txt:57: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-evidence-green.txt:29: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-evidence-red.txt:65: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-final-green.txt:38: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-grant-green.txt:37: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-grant-red.txt:73: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-ownership-green.txt:25: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-ownership-red.txt:61: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-provenance-green.txt:33: new blank line at EOF.
+docs/evidence/issue-901/reset-row-guards-20261029/focused-provenance-red.txt:69: new blank line at EOF.
+docs/evidence/issue-915/staff-continuity-final-ux-review-r1-20261029.md:3: trailing whitespace.
++Date: 2026-10-29  
+docs/evidence/issue-915/staff-continuity-final-ux-review-r1-20261029.md:40: new blank line at EOF.
+packages/db/prisma/migrations/20261015070000_diagnostic_intake/migration.sql:160: new blank line at EOF.
+packages/db/prisma/migrations/20261015200000_measurement_insights/migration.sql:114: new blank line at EOF.
+packages/db/prisma/migrations/20261021160000_diagnostic_automatic_vin_proof/migration.sql:34: new blank line at EOF.
+scripts/testing/retained-schema/20261015070000_diagnostic_intake.sql:160: new blank line at EOF.
+scripts/testing/retained-schema/20261015200000_measurement_insights.sql:114: new blank line at EOF.
+scripts/testing/retained-schema/20261021160000_diagnostic_automatic_vin_proof.sql:34: new blank line at EOF.

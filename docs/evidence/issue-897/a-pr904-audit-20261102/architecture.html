@@ -1,0 +1,33 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box}body{margin:0;color:var(--foreground);font-family:var(--font-sans)}h3{font-size:16px;margin:10px 0}p,summary{font-size:13px;line-height:1.45}svg{display:block;width:100%;height:auto}svg text{font-family:var(--font-sans);fill:var(--foreground);font-size:12px;text-anchor:middle}rect{fill:var(--card);stroke:var(--border);rx:8}.gate{fill:var(--warning-surface);stroke:var(--warning)}.source{fill:var(--secondary);stroke:var(--primary)}.arrow{fill:none;stroke:var(--muted-foreground);stroke-width:1.6;marker-end:url(#arr)}.note{font-size:11px;fill:var(--muted-foreground)}pre{font:11px/1.5 var(--font-mono);padding:12px;overflow:auto;background:var(--code-background);border-radius:var(--radius)}section{margin:0 0 20px}details{margin-top:10px}
+</style></head><body>
+<section><h3>Release orchestration and acceptance gates</h3>
+<svg viewBox="0 0 700 345" role="img" aria-label="Founder authorizes a bounded outcome. Coordinator dispatches ticket workers, assembles, reviews, verifies, accepts and restores staging before protected merge. Production and analytics activation require separate gates."><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="currentColor"/></marker></defs>
+<rect x="8" y="14" width="190" height="53"/><text x="103" y="36">Founder / Release Parent</text><text x="103" y="53" class="note">Scope, exclusions, final A decision</text>
+<rect x="254" y="14" width="190" height="53" class="source"/><text x="349" y="36">Release coordinator</text><text x="349" y="53" class="note">Dependencies, ownership, evidence</text>
+<rect x="500" y="14" width="190" height="53"/><text x="595" y="36">Bounded ticket workers</text><text x="595" y="53" class="note">Checkpoint + evidence, no acceptance</text>
+<path class="arrow" d="M198 40H254"/><path class="arrow" d="M444 40H500"/>
+<rect x="500" y="111" width="190" height="53"/><text x="595" y="133">Sole assembler</text><text x="595" y="150" class="note">One exact candidate, one draft PR</text>
+<path class="arrow" d="M595 67V111"/>
+<rect x="254" y="111" width="190" height="53" class="gate"/><text x="349" y="133">Standards + Spec, then fixes</text><text x="349" y="150" class="note">Independent read-only reviews</text><path class="arrow" d="M500 138H444"/>
+<rect x="8" y="111" width="190" height="53" class="gate"/><text x="103" y="133">Applicable checks / exact CI</text><text x="103" y="150" class="note">Missing evidence blocks completion</text><path class="arrow" d="M254 138H198"/>
+<rect x="8" y="208" width="190" height="53" class="gate"/><text x="103" y="230">Staging / native / artifacts</text><text x="103" y="247" class="note">Reserved acceptance + restoration</text><path class="arrow" d="M103 164V208"/>
+<rect x="254" y="208" width="190" height="53" class="gate"/><text x="349" y="230">Protected PR merge</text><text x="349" y="247" class="note">Only after all required gates</text><path class="arrow" d="M198 235H254"/>
+<rect x="500" y="208" width="190" height="53" class="gate"/><text x="595" y="230">Separate release decisions</text><text x="595" y="247" class="note">Production, store, analytics, service</text><path class="arrow" d="M444 235H500"/>
+<text x="350" y="308" class="note">At PR b6dac5d: A is unaccepted. Open gates do not authorize activation.</text>
+</svg></section>
+<section><h3>Admin and diagnostics authorization</h3>
+<svg viewBox="0 0 700 390" role="img" aria-label="Browser uses server cookies and API bearer authentication. Marketplace AdminGuard and purpose StaffGuard are separate. Diagnostics checks current identity, grant, qualification, assignment, audience and pair-bound proof inside the transaction.">
+<rect x="8" y="12" width="190" height="52"/><text x="103" y="34">Browser / personal sign-in</text><text x="103" y="51" class="note">HTTP-only cookies on admin server</text>
+<rect x="254" y="12" width="190" height="52"/><text x="349" y="34">Next server → API bearer</text><text x="349" y="51" class="note">JWT identity, Session id</text><path class="arrow" d="M198 38H254"/>
+<rect x="500" y="12" width="190" height="52" class="source"/><text x="595" y="34">Identity public ports</text><text x="595" y="51" class="note">Current state, not navigation</text><path class="arrow" d="M444 38H500"/>
+<rect x="8" y="112" width="205" height="63" class="source"/><text x="110" y="135">Marketplace AdminGuard</text><text x="110" y="152" class="note">Current admin + own live Session</text><text x="110" y="166" class="note">+ unexpired personal TOTP</text>
+<rect x="248" y="112" width="205" height="63" class="source"/><text x="350" y="135">Purpose StaffGuard</text><text x="350" y="152" class="note">Named grant + active User</text><text x="350" y="166" class="note">+ live Session + TOTP</text>
+<rect x="488" y="112" width="205" height="63" class="source"/><text x="590" y="135">Diagnostics owner transaction</text><text x="590" y="152" class="note">Calls the authority ports directly</text><text x="590" y="166" class="note">Also supports commissioner reads</text>
+<path class="arrow" d="M349 64V88H110V112"/><path class="arrow" d="M349 88V112"/><path class="arrow" d="M349 88H590V112"/>
+<rect x="8" y="229" width="205" height="58"/><text x="110" y="252">Moderation / directories / audit</text><text x="110" y="270" class="note">No implicit private staff grant</text><path class="arrow" d="M110 175V229"/>
+<rect x="248" y="229" width="205" height="58" class="gate"/><text x="350" y="252">Owning feature scope</text><text x="350" y="270" class="note">Assignment, audience, reason, audit</text><path class="arrow" d="M350 175V229"/>
+<rect x="488" y="229" width="205" height="58" class="gate"/><text x="590" y="250">Center + order + audience</text><text x="590" y="266" class="note">Current qualification and assignment</text><text x="590" y="279" class="note">Private comparison needs A and B</text><path class="arrow" d="M590 175V229"/>
+<rect x="248" y="330" width="445" height="48" class="gate"/><text x="470" y="350">Proof / report / evidence / PDF</text><text x="470" y="366" class="note">Locked rechecks, exact bindings, rights, atomic audit; otherwise refuse</text><path class="arrow" d="M590 287V330"/>
+</svg><p>Public report reads use a separate synthetic-public gate, finalized snapshot, current Listing eligibility, consent and validated association. A link or known ID never grants private access.</p></section>
+</body></html>

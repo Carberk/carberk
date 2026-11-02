@@ -1,0 +1,21 @@
+{
+  "base": "9fde309c3da17f2661fe9c266504e6e56a1b97c9",
+  "head": "b6dac5d17c140c8fd307a24df56d4a82ed070625",
+  "candidateSeparate": "4feaebd70ce7f92c5fd3e96d95fc47f557758c6c",
+  "checkout": "b6dac5d17c140c8fd307a24df56d4a82ed070625",
+  "mergeBase": "9fde309c3da17f2661fe9c266504e6e56a1b97c9",
+  "status": "",
+  "schemaSha256": "21cdc52efb2fb1a9cabdfe0955cfe8d75e60147f9e6dd14f83f9e45bf3df4c45",
+  "migrations": 102,
+  "unlistedAddedMigrations": [
+    "20261026016200_diagnostic_maintenance_compatibility",
+    "20261026016300_diagnostic_registry_metadata_lookup",
+    "20261026016400_diagnostic_source_key_predicate",
+    "20261029190000_operational_reset_row_admission"
+  ],
+  "sourceChangesSinceReviewedCheckpoint": [],
+  "diffCheckExit": 2,
+  "diffCheckDiagnosticCount": 28,
+  "candidateDelta": "55 files changed, 4096 insertions(+), 53 deletions(-)",
+  "method": "Read-only git and Python source/profile inspection. No tests, builds, services, network, devices, hosted resources or ref mutations."
+}
