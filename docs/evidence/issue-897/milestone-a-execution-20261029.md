@@ -8,9 +8,19 @@ The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-
 
 ## Active critical path
 
+Recovery update, 2026-11-02: the A-02 producer task is terminal failed on the
+provider usage limit, with no pending child work. Source checkpoint
+`f880da06f68ba82ffe6951e10c100868bcfca7c5`, evidence HEAD
+`b774ce00105323b0d0334499f1db25e6c51a7f15` and its uncommitted correction
+remain preserved and unassembled. Its committed handoff is stale. Exact
+identity/hash/snapshot and resume constraints are in
+`a-02-worker-restricted-20261030/bounded-producer-repair/recovery-20261102.md`.
+No replacement, runtime/resource reservation or PR mutation occurred. The
+remaining in-flight wording below is historical where superseded here.
+
 Parent accepted A-01 PASS and bounded A-09 S1/S2 PASS on exact assembled
 source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Current count
-is **2 passed, 9 open**: A-02 active offline repair; A-03/A-04/A-11 FAIL/open;
+is **2 passed, 9 open**: A-02 usage-blocked offline repair; A-03/A-04/A-11 FAIL/open;
 A-05/A-06/A-07/A-08/A-10 waiting. This does not accept A or mutate PR #904.
 
 Current review disposition: independent A-01 r3 is PASS on `4b2c8a6f…`,

@@ -1,10 +1,27 @@
 # Milestone A dispatch — 2026-10-30
 
+## Recovery update — 2026-11-02
+
+A-02's bounded producer task r1 is terminal **failed** on the provider usage
+limit; it has no pending child work. No active worker or replacement exists.
+Committed source `f880da06f68ba82ffe6951e10c100868bcfca7c5`, evidence HEAD
+`b774ce00105323b0d0334499f1db25e6c51a7f15`, and a dirty producer correction
+are preserved in the original child worktree and a hashed private snapshot.
+The committed handoff is stale and neither version is assembled. See
+`a-02-worker-restricted-20261030/bounded-producer-repair/recovery-20261102.md`
+and its JSON manifest. Syntax-only recovery passed; no runtime gate ran.
+Provider retry text says Nov 5th, 2026 4:01 AM without a timezone. The overlimit
+and HTTP-status dispositions remain pending; no waiver is inferred. Prior
+in-flight descriptions below are historical. Count stays **2 passed, 9 open**;
+A is unaccepted. A-04 profile repair remains unlaunched. No resource slot is
+active and no routine fixture permission stop is introduced.
+
 ## Current immutable review identities and disposition
 
 Parent accepted A-01 PASS and the bounded A-09 S1/S2 PASS on exact assembled
 source/verification `4b2c8a6f6161f9c825945637f6f848c64adeb145`. Count:
-**2 passed, 9 open**. A-02 is active offline producer repair; A-03/A-04/A-11
+**2 passed, 9 open**. A-02's offline producer repair is terminal failed on usage
+limit, with unfinished work preserved; A-03/A-04/A-11
 are FAIL/open; A-05/A-06/A-07/A-08/A-10 wait. A is NOT accepted. Earlier S1/S2
 FAIL/open entries below are historical and superseded by returned reports.
 

@@ -1,0 +1,54 @@
+{
+  "recordedAt": "2026-11-02T02:25:39.637567+00:00",
+  "childWorktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050",
+  "childHead": "b774ce00105323b0d0334499f1db25e6c51a7f15",
+  "childTree": "9746b42f6d9affb06f6d6e1c5b48978779975489",
+  "sourceCheckpoint": "f880da06f68ba82ffe6951e10c100868bcfca7c5",
+  "snapshotRoot": "/tmp/issue897-a02-recovery-20261102",
+  "artifacts": [
+    {
+      "name": "producer-committed.mjs",
+      "bytes": 22997,
+      "sha256": "36efd18b4babb4b13a2dfcb5fd91f6af9e33a4279795500804dc7081361011b6"
+    },
+    {
+      "name": "producer-working.mjs",
+      "bytes": 29679,
+      "sha256": "51eb66f2c15a5f11f6bd2d345e01b5e6ee091f1f4a89d2c8ed96b0b5846fcd3a"
+    },
+    {
+      "name": "producer-working.patch",
+      "bytes": 52608,
+      "sha256": "efeba75f283bcc8d91ac9f3da16000e6f3d8732b07f2b9b63ceac01b8ea27e24"
+    },
+    {
+      "name": "committed-handoff.md",
+      "bytes": 5151,
+      "sha256": "f11c9b44fe55cbca3174a026e37c29e105b74467c44c2402ec2be049d2a95471"
+    },
+    {
+      "name": "git-status.txt",
+      "bytes": 77,
+      "sha256": "c821f7d7a17ea3946c3d001de61d7d9282d203c8979b6f7622d1b4107aa70691"
+    },
+    {
+      "name": "committed-paths.txt",
+      "bytes": 173,
+      "sha256": "6ebd38618e83457ed4572c7fbff62882c5e092f1001e96a1bb7d95748419fabd"
+    }
+  ],
+  "syntaxCheck": {
+    "argv": [
+      "node",
+      "--check",
+      "/tmp/issue897-a02-recovery-20261102/producer-working.mjs"
+    ],
+    "exit": 0
+  },
+  "limitations": [
+    "Provider failure before completed corrected handoff",
+    "Committed handoff is stale relative to discovered route dependencies",
+    "Working draft is unreviewed/uncommitted and not assembled",
+    "No runtime acceptance or cleanup proof"
+  ]
+}
