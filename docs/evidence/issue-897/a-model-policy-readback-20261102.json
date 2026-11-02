@@ -1,0 +1,69 @@
+{
+  "recordedAtUTC": "2026-11-02T04:04:02.336Z",
+  "authority": "Founder execution-policy correction, effective immediately 2026-11-02",
+  "policy": {
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "serviceTier": "default",
+    "reasoning": {
+      "highReasoning": "xhigh",
+      "routine": "medium"
+    },
+    "forbidden": [
+      "Fast mode",
+      "priority service",
+      "low",
+      "high/max/ultra substitutes"
+    ]
+  },
+  "safeBoundary": "A-02 implementation run ordinal3 completed with clean source9e48011e5/evidence91676477a before propagation; no interruption",
+  "verifiedCoordinator": {
+    "threadId": "mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230",
+    "modelSelection": {
+      "instanceId": "codex_work",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "medium"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "runtimeMode": "full-access",
+    "interactionMode": "default"
+  },
+  "verifiedChild": {
+    "threadId": "thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1",
+    "modelSelection": {
+      "instanceId": "codex_work",
+      "model": "gpt-6.1-sol",
+      "options": [
+        {
+          "id": "reasoningEffort",
+          "value": "medium"
+        },
+        {
+          "id": "serviceTier",
+          "value": "default"
+        }
+      ]
+    },
+    "runtimeMode": "full-access",
+    "interactionMode": "default"
+  },
+  "propagation": {
+    "taskId": "node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-model-policy-20261102-r1",
+    "runOrdinal": 4,
+    "status": "completed",
+    "acknowledged": true,
+    "newWorker": false
+  },
+  "limitations": [
+    "Configuration readback is persisted selection; does not rewrite historical live-run settings",
+    "No source assembly, package checks, resources, PR mutation or acceptance"
+  ]
+}

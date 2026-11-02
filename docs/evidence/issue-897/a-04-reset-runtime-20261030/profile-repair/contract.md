@@ -5,8 +5,11 @@ A-11 r4 retains A-04's restoration criterion; the A-04 receipt reproduces
 `Schema snapshot and migration inventory mismatch`. Coordinator authorizes a
 bounded prerequisite repair, not a declaration of runtime compatibility.
 
-- **Owner:** one isolated delegated `codex_work`, `gpt-6.1-sol`, xhigh/priority,
-  full access worker. Sole assembler and reset/deployment owner is the A
+- **Owner:** one isolated delegated `codex_work`, `gpt-6.1-sol`, full access
+  worker. Under the 2026-11-02 Founder policy, configure and verify
+  `reasoningEffort=xhigh`, `serviceTier=default` for this dependency repair;
+  use medium/default for routine bookkeeping. Never Fast/priority or low,
+  and never high/max/ultra substitutes. Sole assembler and reset/deployment owner is the A
   coordinator. No nested agents, PR, shared staging or native work.
 - **Exact base:** `2edf11b7e898a8f3adc5ac6b66ce4b907bffa40a`; assembled admin
   source/verification remains `4b2c8a6f6161f9c825945637f6f848c64adeb145`,

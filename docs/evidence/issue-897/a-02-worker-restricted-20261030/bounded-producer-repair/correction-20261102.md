@@ -5,6 +5,14 @@ worktree. It records the Parent's criterion disposition without creating a
 second map or changing production behavior. A-02 remains FAIL/open until the
 unchanged worker command runs all ten real cases and cleanup.
 
+The 2026-11-02 Founder model-policy correction in the
+[existing ledger](../../a-coordinator-dispatch-20261030.md) supersedes the
+historical priority selection below. Future high-reasoning A-02 work requires
+`reasoningEffort=xhigh`, `serviceTier=default`; routine work requires
+`medium/default`. Verify supported returned settings before a continuation.
+Never Fast/priority, low, or high/max/ultra substitutes. Preserve the existing
+checkpoints and safe configuration boundary.
+
 ## Authority and exact identities
 
 Parent authority is [release-parent-a02-disposition-20261102.md](https://github.com/Carberk/carberk/blob/c0eb1e282013070b1f0582a10515f240986de578/docs/evidence/issue-897/release-parent-a02-disposition-20261102.md)
@@ -22,9 +30,9 @@ The existing child returned a clean terminal handoff:
 | Worktree | `/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050` |
 | Branch | `t3/issue-897-a02-batch-fixture-producer` |
 | Completed continuation task | `node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-existing-recovery-resume-20261102-r1` |
-| Active correction task | `node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-bounded-correction-20261102-r1`, run ordinal `3` |
+| Completed correction task | `node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-bounded-correction-20261102-r1`, run ordinal `3` |
 | Original child thread | `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1` |
-| Provider selection | `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access |
+| Historical correction-run selection | `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access; superseded for future work by the Founder policy above |
 | Original campaign source | `52d901c50af1dde97ea22bda8efb1fdf21f169b1` |
 | Accepted assembled source | `4b2c8a6f6161f9c825945637f6f848c64adeb145` |
 

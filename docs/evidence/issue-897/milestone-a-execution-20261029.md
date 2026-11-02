@@ -1,12 +1,34 @@
 # Milestone A execution state
 
-Active coordinator: T3 `mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230`, Sol 6.1 xhigh/priority, full access, supervised by the Release Program Parent. Resumed the same clean worktree from `52d901c50af1dde97ea22bda8efb1fdf21f169b1`. The former coordinator `mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833` is preserved as historical handoff evidence, not an active writer.
+Active coordinator: T3 `mcp:7bd149ca-47be-4af9-b4e0-446a4dfa0230`, Sol 6.1, full access, supervised by the Release Program Parent. Resumed the same clean worktree from `52d901c50af1dde97ea22bda8efb1fdf21f169b1`. The former coordinator `mcp:ac0bb7f1-e0a9-4ffa-b92b-fb4b4b91e833` is preserved as historical handoff evidence, not an active writer.
 
 Current authority is the founder's fresh-coordinator brief, Parent's contract clarification on 30 October, and the immutable 2 November A-02 disposition `c0eb1e282013070b1f0582a10515f240986de578`. A is the internal campaign candidate only. Unfinished B prototype work and analytics product completion/real collection remain outside A; B, C and C-Activation retain their separate founder gates. Only the Parent declares A complete. Exact APK/AAB, required deployed/native evidence, protected PR #904 delivery and restoration remain open A requirements.
 
 The [Wayfinder map](a-wayfinder-ticket-map-20261030.md) and [dispatch ledger](a-coordinator-dispatch-20261030.md) own current tickets, exact bases, paths, commands, resources, task/thread/worktree identities and dependency order. The clean pushed documentation baseline before this update is `6d8fc6797a496d139e13cfb10bacc01cb243c1ad`; the candidate retains assembled source/verification SHA `4b2c8a6f6161f9c825945637f6f848c64adeb145` plus docs/evidence only. PR #904 remains OPEN/DRAFT at the separate head `b6dac5d17c140c8fd307a24df56d4a82ed070625`, auto-merge disabled. Neither the candidate nor the PR was merged. The detailed rows below are historical snapshots where superseded by the current state.
 
 ## Active critical path
+
+Founder model policy effective 2026-11-02 supersedes every earlier priority/Fast
+selection. Use only `codex_work/gpt-6.1-sol`, explicit `serviceTier=default`,
+`reasoningEffort=xhigh` for architecture/dependency diagnosis, tricky work,
+independent review, security/privacy/concurrency and final gates, and `medium`
+for medium/small/routine work. Never low or high/max/ultra substitutes.
+Configure and verify returned settings before future dispatch/continuation;
+record capability mismatches without fallback. Preserve checkpoints and change
+active workers only at supported safe boundaries.
+
+Both coordinator and existing A-02 child now read back medium/default for this
+routine policy record/acknowledgement. A-02 completed its bounded correction
+before propagation, so no active implementation was interrupted. The same
+child acknowledged the policy and remains held. Any next high-reasoning
+assembly/diagnosis/review requires an xhigh/default readback first. The actual
+configuration and propagation receipts are in the existing dispatch ledger.
+
+The returned A-02 correction is source `9e48011e54a23822504d9cb5ae5f6d7a9f96028e`
+and evidence HEAD `91676477a6812e16d5813c64454948d095b63eb1`. It is clean but
+unassembled and has no package, review, runtime or cleanup acceptance. The
+policy adds no source scope, resource, PR change or acceptance authority.
+The earlier handoff state below remains historical where superseded here.
 
 The existing A-02 continuation returned a clean terminal handoff. Source is
 `5a0a2b1216b696bc9b2f6b89ef0764cc3f18cd1b`, tree

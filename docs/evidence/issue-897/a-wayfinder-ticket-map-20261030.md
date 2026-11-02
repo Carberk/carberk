@@ -18,7 +18,7 @@ This is ticket-scope acceptance only: **2 passed, 9 open; A is NOT accepted**.
 | Tickets | Current state |
 |---|---|
 | A-01, A-09 (bounded S1/S2) | PASS, Parent accepted on exact source above |
-| A-02 | FAIL/open; clean offline handoff received; separately bounded correction recorded before same-child continuation |
+| A-02 | FAIL/open; correction source `9e48011e5`, evidence `91676477a` received clean; assembly/affected verification/review/runtime/cleanup pending |
 | A-03, A-04, A-11 | FAIL/open; required evidence incomplete |
 | A-05, A-06, A-07, A-08, A-10 | Waiting on their recorded dependencies |
 
@@ -45,6 +45,16 @@ This is ticket-scope acceptance only: **2 passed, 9 open; A is NOT accepted**.
 
 ## Dispatch rules
 
+- Founder policy effective 2026-11-02 supersedes earlier model selections.
+  Use only `codex_work` / `gpt-6.1-sol`, explicit `serviceTier=default`, never
+  Fast/priority. Use `reasoningEffort=xhigh` for architecture, dependency
+  diagnosis, tricky implementation, independent review, security/privacy,
+  concurrency and final gates; `medium` for medium/small/routine work. Never
+  low or high/max/ultra substitutes. Configure and verify supported returned
+  options before every dispatch/continuation; record mismatches without
+  fallback. Preserve checkpoints and apply active-worker changes at a safe
+  boundary without duplicates or abrupt interruption. Actual configuration
+  and same-child propagation receipts are in the [existing ledger](a-coordinator-dispatch-20261030.md).
 - Every ticket below has one owner, one exact source base, explicit paths,
   dependencies, non-goals, commands, evidence output, and a pass/fail gate.
 - Ready tickets use isolated GPT Sol 6.1 full-access worktrees. Workers may

@@ -1,5 +1,65 @@
 # Milestone A dispatch — 2026-10-30
 
+## Founder model-policy correction, 2026-11-02
+
+Effective immediately, this policy supersedes every earlier priority/Fast
+selection and prospective instruction in this ledger or its linked contracts.
+Historical receipts retain the settings that actually ran; they grant no
+future exception.
+
+- Provider/model: `codex_work` / `gpt-6.1-sol` only for the coordinator, every
+  ticket manager, worker and independent reviewer. Never switch providers.
+- Service: explicit `serviceTier=default` for every future dispatch and
+  continuation. Never Fast mode or priority service.
+- Reasoning: explicit `reasoningEffort=xhigh` for architecture, dependency
+  diagnosis, tricky implementation, independent review, security/privacy,
+  concurrency and final gates. Use `medium` for medium, small and routine
+  tasks. Never `low`; `high`, `max` and `ultra` are not substitutes.
+- Before each launch or continuation, choose the effort for the actual task,
+  configure supported options and verify the returned settings. Record an
+  unsupported option or capability mismatch instead of silently falling back.
+  Active work changes only at the next supported safe boundary; preserve
+  checkpoints and do not duplicate or abruptly interrupt it.
+
+The coordinator read the supported configuration interface. The catalog search
+returned inherited xhigh/priority but no matching model-option rows. Direct
+configuration accepted the exact requested values; subsequent readbacks
+confirmed `gpt-6.1-sol`, `serviceTier=default`, and both requested reasoning
+levels. No fallback or service-tier mismatch remains.
+The [configuration readback receipt](a-model-policy-readback-20261102.json)
+preserves the exact final persisted selections and propagation identity. This
+does not claim to rewrite a completed run's actual service settings.
+
+The A-02 bounded correction returned clean source
+`9e48011e54a23822504d9cb5ae5f6d7a9f96028e`, tree
+`33a26963c3db13f8e62b6b2b0ad1998bd4a5c633`, and evidence HEAD
+`91676477a6812e16d5813c64454948d095b63eb1`, tree
+`8ac98c5eb239b840747b9ce75725491bc1b0cb4b`, before this policy was propagated.
+Its prior xhigh/priority execution is historical. Read-back confirmed clean
+status; source, package verification, independent review, runtime and cleanup
+acceptance remain unassembled/unproved. The policy update itself authorizes no
+new source scope, runtime resource, PR mutation or acceptance.
+
+The safe configuration boundary was the completed A-02 run ordinal3. The
+coordinator and existing child were configured/read back to default service,
+then to medium/default for this routine policy record/acknowledgement. Both
+remain full access. Any next A-02 implementation, dependency diagnosis,
+assembly/review or final-gate work must first configure/read back xhigh/default.
+The coordinator's high-reasoning receipt inspection used xhigh/default before
+returning to medium/default for policy bookkeeping.
+
+Propagation reused the original child/worktree only. Existing-child message
+`message:mcp:adb39827-7411-40fa-8511-68a7f99397bd:thread-send:issue897-a02-model-policy-20261102-r1`
+started acknowledgement task
+`node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-model-policy-20261102-r1`,
+run ordinal4, at medium/default. It is terminal completed and acknowledged the
+policy, preserved refs/worktree/recovery, and is held for coordinator assembly
+and review. No new worker, worktree or implementation task was created. The
+correction handoff remains a source/evidence result, not A-02 PASS.
+
+Current count is **2 PASS / 9 OPEN**; A remains unaccepted. PR904, B/C/activation
+gates and all resource holds remain unchanged.
+
 ## Parent disposition and clean A-02 handoff, 2026-11-02
 
 Read Parent authority directly from immutable commit
@@ -54,7 +114,8 @@ child; completion returns its source/evidence handoff here.
 - Owner: the original A-02 child, worktree
   `/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050`, branch
   `t3/issue-897-a02-batch-fixture-producer`; `codex_work`, `gpt-6.1-sol`,
-  xhigh/priority, full access. Its original task and latest completed
+  xhigh/priority at the original dispatch, full access. The Founder policy
+  above supersedes that service selection for every continuation. Its original task and latest completed
   continuation task/thread identifiers are retained below.
 - Allowed writes: the exact batch spec, new producer, direct boundary test and
   ticket evidence named by the contract. Production API/worker, contracts,
