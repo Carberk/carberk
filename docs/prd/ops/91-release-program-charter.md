@@ -9,7 +9,7 @@ This charter governs milestones A, B and C for the Carberk release. The mileston
 - **C** verifies the combined A and B candidate, including native, deployed and signing evidence.
 - **C-Activation** is a later gate for real analytics and operations. C does not grant that approval.
 
-The parent release thread owns program scope, dependencies, ticket-map authority, milestone exits and escalation. Only the parent may declare A, B or C complete. All coordinators and ticket workers use GPT Sol 6.1.
+The parent release thread owns program scope, dependency decisions, milestone exits and escalation. GitHub Issues record live contracts, assignments, status and dependencies. Only the parent may declare A, B or C complete. All release roles use `codex_work/gpt-6.1-sol`, service tier `default`: `xhigh` for demanding work and independent review, `medium` for routine work. Never Fast/priority or another reasoning level or provider.
 
 ## Current authority
 
@@ -52,17 +52,17 @@ flowchart TD
 
 Planning and spec freeze for B may proceed during A. B implementation requires both parent acceptance of A and the B freeze. This includes B code, migrations, shared contract changes and production tests. C cannot start until B acceptance.
 
-## Ticket-map authority
+## Ticket tracking authority
 
-The parent owns milestone scope. The A coordinator owns the [A Wayfinder ticket map at `46e82c394`](https://github.com/Carberk/carberk/blob/46e82c3942edeccfb66c81d7f7375b51d9f534fe/docs/evidence/issue-897/a-wayfinder-ticket-map-20261030.md), committed before dispatch. That map and the A execution record own A ticket dependencies; this charter does not maintain a second map. The coordinator records material changes for parent disposition and preserves live writers and checkpoints.
+The parent owns milestone scope. [Campaign #897](https://github.com/Carberk/carberk/issues/897) and its actual child issues own live A contracts, assignments, status and dependencies. The A coordinator owns execution updates and sole assembly. The [original A Wayfinder map at `46e82c394`](https://github.com/Carberk/carberk/blob/46e82c3942edeccfb66c81d7f7375b51d9f534fe/docs/evidence/issue-897/a-wayfinder-ticket-map-20261030.md) and repository execution records are historical evidence. Before selection, resume, dispatch or status reporting, follow the [GitHub tracking gate](../../agents/issue-tracker.md#required-tracking-before-dispatch). Material scope changes require parent disposition while preserving live writers and checkpoints.
 
-Parent oversight on 30 October 2026 verified PR #904 and both candidate refs at `dc8549ba21cd40704a377e7bdea3438e44b75ad7`, following ancestor-only fast-forward reconciliation. The [reconciliation receipt](https://github.com/Carberk/carberk/blob/dc8549ba21cd40704a377e7bdea3438e44b75ad7/docs/evidence/issue-897/a-10-pr-reconciliation-20261030.md) and [dispatch ledger](https://github.com/Carberk/carberk/blob/dc8549ba21cd40704a377e7bdea3438e44b75ad7/docs/evidence/issue-897/a-coordinator-dispatch-20261030.md) preserve provenance. A-01, A-02 and A-04 were running in isolated Sol 6.1 xhigh/priority worktrees. A-03 and A-05 awaited dependencies. No ticket or milestone pass is implied.
+Parent oversight on 30 October 2026 verified PR #904 and both candidate refs at `dc8549ba21cd40704a377e7bdea3438e44b75ad7`, following ancestor-only fast-forward reconciliation. The [reconciliation receipt](https://github.com/Carberk/carberk/blob/dc8549ba21cd40704a377e7bdea3438e44b75ad7/docs/evidence/issue-897/a-10-pr-reconciliation-20261030.md) and [dispatch ledger](https://github.com/Carberk/carberk/blob/dc8549ba21cd40704a377e7bdea3438e44b75ad7/docs/evidence/issue-897/a-coordinator-dispatch-20261030.md) preserve provenance. A-01, A-02 and A-04 were running in isolated Sol 6.1 xhigh/priority worktrees. Those settings and A-03/A-05's waiting states are historical, not current dispatch authority. No ticket or milestone pass is implied.
 
 Review stays open while blocking findings remain, even when a fix list is accepted. The parent directed the coordinator to record actual worker HEADs, concrete verification commands and exclusive resources, and to keep evidence work read-only until a separate fix dispatch. Final acceptance uses the resulting assembled SHA and affected verification.
 
-B's ticket map is created from the frozen prototype contract. At minimum it must separate shared contracts, mobile implementation, admin implementation, worker/PDF work and integration verification. A B worker may own only disjoint paths and resources. No B ticket may edit PR #904's branch.
+B's GitHub issues are created from the frozen prototype contract. At minimum they must separate shared contracts, mobile implementation, admin implementation, worker/PDF work and integration verification. Every frozen prototype requirement must map to an issue and observable acceptance evidence. A B worker may own only disjoint paths and resources. No B ticket may edit PR #904's branch.
 
-C's map is verification work, not a second implementation queue. It contains one serialized assembly owner, one independent Standards and Spec review round, one fix round, native/device verification, deployed staging verification and exact-artifact signing evidence. Database resets, deployments, native builds and final acceptance are serialized by the C coordinator.
+C's GitHub issues cover verification: one serialized assembly owner, one independent Standards and Spec review round, one fix round, native/device verification, deployed staging verification and exact-artifact signing evidence. Database resets, deployments, native builds and final acceptance are serialized by the C coordinator.
 
 ## Ticket contract
 
@@ -87,7 +87,7 @@ A passes only when the parent has an exact candidate SHA with the selected campa
 
 ### B exit
 
-B passes only when production code implements the frozen approved prototype decisions, the B ticket map is complete, applicable checks and review/fixes are green, and the result is compatible with the accepted A candidate. Prototype screenshots or mocked paths cannot substitute for production evidence. B does not activate real analytics.
+B passes only when production code implements the frozen approved prototype decisions, all B GitHub issue criteria are evidenced, applicable checks and review/fixes are green, and the result is compatible with the accepted A candidate. Prototype screenshots or mocked paths cannot substitute for production evidence. B does not activate real analytics.
 
 ### C exit
 
