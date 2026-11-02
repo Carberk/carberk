@@ -22,6 +22,7 @@ The existing child returned a clean terminal handoff:
 | Worktree | `/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050` |
 | Branch | `t3/issue-897-a02-batch-fixture-producer` |
 | Completed continuation task | `node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-existing-recovery-resume-20261102-r1` |
+| Active correction task | `node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-bounded-correction-20261102-r1`, run ordinal `3` |
 | Original child thread | `thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1` |
 | Provider selection | `codex_work`, `gpt-6.1-sol`, xhigh/priority, full access |
 | Original campaign source | `52d901c50af1dde97ea22bda8efb1fdf21f169b1` |

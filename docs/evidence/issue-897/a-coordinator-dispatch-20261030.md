@@ -39,6 +39,18 @@ Only the existing child/worktree/branch below may write. No duplicate delegate
 or provider change is created. The next continuation task/run receipt enters
 this ledger after send; this paragraph is a pre-dispatch contract.
 
+The contract is now active in the same child. T3 returned `started` for task
+`node:delegated-task:command%3Amcp%3Aadb39827-7411-40fa-8511-68a7f99397bd%3Athread-send%3Aissue897-a02-bounded-correction-20261102-r1`,
+run
+`run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A19e6e17f-fa2f-44ab-9065-2410f17a9389%253Adelegate-task%253Aissue897-a02-batch-producer-repair-20261030-r1:ordinal:3`,
+message `message:mcp:adb39827-7411-40fa-8511-68a7f99397bd:thread-send:issue897-a02-bounded-correction-20261102-r1`.
+The existing child thread is
+`thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1`,
+link [A-02 bounded ordinary batch fixture producer](<t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/thread:delegated-task:command%3Amcp%3A19e6e17f-fa2f-44ab-9065-2410f17a9389%3Adelegate-task%3Aissue897-a02-batch-producer-repair-20261030-r1>).
+The task is offline and remains subject to the exact paths, commands and
+fail-closed dependencies in the correction contract. Do not poll this running
+child; completion returns its source/evidence handoff here.
+
 - Owner: the original A-02 child, worktree
   `/Users/bagtyyar/.t3/worktrees/carberk/t3-fac70050`, branch
   `t3/issue-897-a02-batch-fixture-producer`; `codex_work`, `gpt-6.1-sol`,
