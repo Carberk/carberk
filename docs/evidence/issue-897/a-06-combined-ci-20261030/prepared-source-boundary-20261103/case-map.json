@@ -1,0 +1,1051 @@
+{
+  "issue": 938,
+  "kind": "immutable Phase A diagnosis evidence, not live task tracking",
+  "base": "4afccd4347fdf8b110475ac1472dbb75e30f5f36",
+  "source": "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+  "original_diagnosis_base": "bc17e2bc86429d58536e4c3a749f51d9803cbd3a",
+  "raw_log": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-green.raw.log",
+  "raw_sha256": "55b71af6fd5ec3545b5b42a7fac14843748bd00d67ed288692a5ed4dee0f45a4",
+  "counts": {
+    "fail": 47,
+    "already_passed_in_four_files": 9,
+    "four_file_total": 56,
+    "unchanged_five_file_total": 168,
+    "original_selection_total": 224
+  },
+  "cases": [
+    {
+      "id": "F01",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1",
+      "baseline": "FAIL",
+      "stack_group": 1,
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL",
+      "reached_source_location": "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:60:20",
+      "fixture_cause": "M1",
+      "criterion": "observation equals original payload; component available with seller/commissioner/classification; raw v1 hash equals diagnosticObservationHash.",
+      "proposed_change": "Use real PostgreSQL and persisted component reads. Available cases declare a lawful grant before the first raw; no-grant cases retain no-grant semantics.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 60
+    },
+    {
+      "id": "F02",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "keeps existing observations without a classification working",
+      "baseline": "FAIL",
+      "stack_group": 2,
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL",
+      "reached_source_location": "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:68:13",
+      "fixture_cause": "M1",
+      "criterion": "ordinary observation succeeds; exactly one unavailable component with no retained ownership content.",
+      "proposed_change": "Use real PostgreSQL and persisted component reads. Available cases declare a lawful grant before the first raw; no-grant cases retain no-grant semantics.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 68
+    },
+    {
+      "id": "F03",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "cannot classify a later raw to repair an earlier missing anchor",
+      "baseline": "FAIL",
+      "stack_group": 3,
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL",
+      "reached_source_location": "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:90:5",
+      "fixture_cause": "M1",
+      "criterion": "after an unclassified first raw, both component states remain unavailable; later classification cannot backfill.",
+      "proposed_change": "Declare a lawful grant BEFORE the first raw, omit grantId for the first observation, supply the same preexisting grant and classification only for the later raw. Verify no backfill and no new late grant.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 90
+    },
+    {
+      "id": "F04",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "records Business source membership as active without adding publisher admission to observation",
+      "baseline": "FAIL",
+      "stack_group": 4,
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL",
+      "reached_source_location": "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:98:5",
+      "fixture_cause": "M1",
+      "criterion": "available component retains original Business and sales membership; observation does not require publisher admission.",
+      "proposed_change": "Keep commissioner sales membership. Add a distinct active Business OWNER actor/session for ordinary grant issuance; do not change original sales role to owner. Pass returned grantId at observation.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 98
+    },
+    {
+      "id": "F05",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "records Business source membership as suspended without adding publisher admission to observation",
+      "baseline": "FAIL",
+      "stack_group": 4,
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL",
+      "reached_source_location": "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:98:5",
+      "fixture_cause": "M1",
+      "criterion": "suspended/missing source membership gives unavailable component with no sellerId; observation still succeeds.",
+      "proposed_change": "No unauthorized grant; keep original suspended/missing membership and classification, assert unavailable and no seller retention.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 98
+    },
+    {
+      "id": "F06",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "records Business source membership as missing without adding publisher admission to observation",
+      "baseline": "FAIL",
+      "stack_group": 4,
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL",
+      "reached_source_location": "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:98:5",
+      "fixture_cause": "M1",
+      "criterion": "suspended/missing source membership gives unavailable component with no sellerId; observation still succeeds.",
+      "proposed_change": "No unauthorized grant; keep original suspended/missing membership and classification, assert unavailable and no seller retention.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 98
+    },
+    {
+      "id": "F07",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "lets only the selected current B technician reload a minimal usable handle without A access",
+      "baseline": "FAIL",
+      "stack_group": 5,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:95:21",
+      "fixture_cause": "M2",
+      "criterion": "minimal selected-B handle and no-store; foreign403; newly assigned other technician gets scoped empty, never A access.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 95
+    },
+    {
+      "id": "F08",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uses only B command fields and recovers B after proof payload loss and later A erasure",
+      "baseline": "FAIL",
+      "stack_group": 6,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:107:21",
+      "fixture_cause": "M2",
+      "criterion": "first201 minimal report result; proof disposal/A erasure preserves B recovery and exact201 retry; changed/unknown409; one consume audit; erased B removes result/refuses409.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 107
+    },
+    {
+      "id": "F09",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses issuer Session expiry at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F10",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses issuer grant loss at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F11",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses issuer qualification loss at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F12",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses issuer A assignment loss at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F13",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses issuer B assignment loss at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F14",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses A erasure at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F15",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses A raw erasure at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F16",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses A rights expiry at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F17",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses B rights expiry at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F18",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses changed B version at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F19",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses changed A version at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F20",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses proof rights expiry at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F21",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "uniformly omits and refuses permanent invalidation at read and again at action",
+      "baseline": "FAIL",
+      "stack_group": 7,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "fixture_cause": "M2",
+      "criterion": "initial handle count1; after named transition, handoffs empty/result null; exact403 DIAGNOSTIC_NO_ACCESS; B reports0 and consume audits0.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 140
+    },
+    {
+      "id": "F22",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "fences B Session changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "stack_group": 8,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:156:21",
+      "fixture_cause": "M2",
+      "criterion": "first consume201; after the named B-authority loss, handoff read403 and exact consume retry403.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 156
+    },
+    {
+      "id": "F23",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "fences B grant changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "stack_group": 8,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:156:21",
+      "fixture_cause": "M2",
+      "criterion": "first consume201; after the named B-authority loss, handoff read403 and exact consume retry403.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 156
+    },
+    {
+      "id": "F24",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "fences B qualification changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "stack_group": 8,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:156:21",
+      "fixture_cause": "M2",
+      "criterion": "first consume201; after the named B-authority loss, handoff read403 and exact consume retry403.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 156
+    },
+    {
+      "id": "F25",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "fences B B assignment changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "stack_group": 8,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:156:21",
+      "fixture_cause": "M2",
+      "criterion": "first consume201; after the named B-authority loss, handoff read403 and exact consume retry403.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 156
+    },
+    {
+      "id": "F26",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "keeps readable historical proofs separate from current usability and traverses beyond 50",
+      "baseline": "FAIL",
+      "stack_group": 9,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:163:21",
+      "fixture_cause": "M2",
+      "criterion": "historical proof read200; 61 historical unusable proofs plus usable proof, four pages with1062-byte continuation; exact selected handle once and replay exhaustion.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition. Produce independent valid proofs then lawful invalidation; never clone proof JSON or bypass proof binding.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 163
+    },
+    {
+      "id": "F27",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "binds continuation to the query, actor, Session, B and expiry, without inherited authority",
+      "baseline": "FAIL",
+      "stack_group": 10,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:180:21",
+      "fixture_cause": "M2",
+      "criterion": "query-cross-use403, tampered continuation403, continuation expires at15min; no inherited authority.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 180
+    },
+    {
+      "id": "F28",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "rejects A bindings, protected fields and unrecognized query/command fields",
+      "baseline": "FAIL",
+      "stack_group": 11,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:189:21",
+      "fixture_cause": "M2",
+      "criterion": "extra predecessor/rationale/request fields400 and query predecessor field400; unchanged strict schemas.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 189
+    },
+    {
+      "id": "F29",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "recovers lost preparation and issuance replies without storing pending text or duplicating issuance",
+      "baseline": "FAIL",
+      "stack_group": 12,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:210:27",
+      "fixture_cause": "M2",
+      "criterion": "pending/completed recovery without command text; exact repeat stable; three distinct issued proofs/audits; changed reason/actor/version/provenance409.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 210
+    },
+    {
+      "id": "F30",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "recovers a B-only committed request after proof disposal and A erasure without its command",
+      "baseline": "FAIL",
+      "stack_group": 13,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:231:21",
+      "fixture_cause": "M2",
+      "criterion": "committed request list/detail/byte-identical execute retry survives proof disposal/A erasure; changed commands409; one consume/reinspection audit; revoked B403.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 231
+    },
+    {
+      "id": "F31",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "refuses unknown identities, new Sessions, wrong actors/kinds and pending command fields",
+      "baseline": "FAIL",
+      "stack_group": 14,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:251:21",
+      "fixture_cause": "M2",
+      "criterion": "protected pending command field400; new Session/wrong actor/kind/unknown request403; zero B reports; pending request persists.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 251
+    },
+    {
+      "id": "F32",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "keeps an invalidated issued request historical and refuses first consumption after authority loss",
+      "baseline": "FAIL",
+      "stack_group": 15,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:267:23",
+      "fixture_cause": "M2",
+      "criterion": "issued request remains historical through invalidation; first consumption after B qualification loss403; exactly one proof.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition. This failure is request preparation before any proof issuance, not a failed consume.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 267
+    },
+    {
+      "id": "F33",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "scenario": "bounds request discovery, binds continuations to Session/B/query and stages linkage only",
+      "baseline": "FAIL",
+      "stack_group": 16,
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:280:34",
+      "fixture_cause": "M2",
+      "criterion": "21 request handles across20+1 with1062-byte cursor; cross-query403; no persisted command/reason/commandHash; Session/B binding and15min expiry403.",
+      "proposed_change": "Real PostgreSQL complete fixture; ordinary material/report/proof/request production, real authority and production controller composition. This failure is request preparation before any proof issuance, not a failed consume.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 280
+    },
+    {
+      "id": "F34",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "scenario": "projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source",
+      "baseline": "FAIL",
+      "stack_group": 17,
+      "reached_diagnostic": "Error: DIAGNOSTIC_NO_ACCESS",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts:33:25",
+      "fixture_cause": "M4",
+      "criterion": "Same commissioner/staff projections,3 unavailable documents,no A id; exact technician retry DTO and immutable B row; foreign/revoked403-equivalent rule errors.",
+      "proposed_change": "Produce B by public proof consume/HTTP reinspection, then retry via public consume that owns complete prefix. Exercise lawful A-only erasure and persisted B snapshot, no direct reinspectionLocks entry.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 33
+    },
+    {
+      "id": "F35",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "traverses more than 50 with stable tie ordering and an anchored scan, without protected fields",
+      "baseline": "FAIL",
+      "stack_group": 18,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:83:66",
+      "fixture_cause": "M3",
+      "criterion": "61 exact ordered distinct reportIds; anchored bounded scan, no protected fields, scoped no-store, explicit continuation/exhaustion.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 83
+    },
+    {
+      "id": "F36",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "returns only named currently eligible distinct B technicians to a non-reception reviewer",
+      "baseline": "FAIL",
+      "stack_group": 19,
+      "reached_diagnostic": "AssertionError: expected { status: 403, body: { …(2) }, …(1) } to match object { status: 200, body: { …(1) } }",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:98:51",
+      "fixture_cause": "M3",
+      "criterion": "exact one named B technician; foreign403; qualification expiry gives200 with empty technician list.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 98
+    },
+    {
+      "id": "F37",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "uses scoped empty semantics and omits inaccessible or incomplete retained material",
+      "baseline": "FAIL",
+      "stack_group": 20,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:109:29",
+      "fixture_cause": "M3",
+      "criterion": "unassigned A, expired A provenance and erased A raw omitted;200 explicit exhausted scoped empty.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 109
+    },
+    {
+      "id": "F38",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "binds continuation to B, actor, Session and strict query scope",
+      "baseline": "FAIL",
+      "stack_group": 21,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:114:82",
+      "fixture_cause": "M3",
+      "criterion": "baseline200; wrong B/malformed cursor/wrong actor/expired Session403; unknown query field400.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 114
+    },
+    {
+      "id": "F39",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments",
+      "baseline": "FAIL",
+      "stack_group": 22,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:137:26",
+      "fixture_cause": "M3",
+      "criterion": "200 pages and exact replay; later arrival outside time fence excluded; unseen A rights/assignment rechecked; exact19 surviving ids and no protected IDs.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 137
+    },
+    {
+      "id": "F40",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment grant loss",
+      "baseline": "FAIL",
+      "stack_group": 23,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:166:29",
+      "fixture_cause": "M3",
+      "criterion": "200 and exactly empty technician list after the named grant/inactive/assignment/unnamed transition.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 166
+    },
+    {
+      "id": "F41",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment inactive loss",
+      "baseline": "FAIL",
+      "stack_group": 23,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:166:29",
+      "fixture_cause": "M3",
+      "criterion": "200 and exactly empty technician list after the named grant/inactive/assignment/unnamed transition.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 166
+    },
+    {
+      "id": "F42",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment assignment loss",
+      "baseline": "FAIL",
+      "stack_group": 23,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:166:29",
+      "fixture_cause": "M3",
+      "criterion": "200 and exactly empty technician list after the named grant/inactive/assignment/unnamed transition.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 166
+    },
+    {
+      "id": "F43",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment unnamed loss",
+      "baseline": "FAIL",
+      "stack_group": 23,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:166:29",
+      "fixture_cause": "M3",
+      "criterion": "200 and exactly empty technician list after the named grant/inactive/assignment/unnamed transition.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 166
+    },
+    {
+      "id": "F44",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "rejects a second current Session, cursor tampering without retaining pair data",
+      "baseline": "FAIL",
+      "stack_group": 24,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:170:82",
+      "fixture_cause": "M3",
+      "criterion": "baseline200 and1062-byte cursor; second Session/tampered cursor/15min expiry403 without stored pair data.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 170
+    },
+    {
+      "id": "F45",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "omits disconnected retained identity claims, expired B material and inconsistent raw history",
+      "baseline": "FAIL",
+      "stack_group": 25,
+      "reached_diagnostic": "AssertionError: expected undefined to deeply equal [ { …(3) } ]",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:183:36",
+      "fixture_cause": "M3",
+      "criterion": "valid baseline singleton then empty after disconnected evidence, contradictory raw history and expired B material. Raw failure is undefined candidates; status is not recorded.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch. Keep all three independent subscenarios; lawful append/supersession/clock alternatives require equivalence proof, otherwise return the precise fault-fixture dependency.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 183
+    },
+    {
+      "id": "F46",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "allows an empty bounded page to continue without claiming absence",
+      "baseline": "FAIL",
+      "stack_group": 26,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:199:26",
+      "fixture_cause": "M3",
+      "criterion": "first200 empty page is not exhausted,1062-byte cursor; second returns only final candidate and true exhaustion.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 199
+    },
+    {
+      "id": "F47",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "omits malformed required retained evidence without a partial candidate or protected error",
+      "baseline": "FAIL",
+      "stack_group": 27,
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality",
+      "reached_source_location": "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:208:29",
+      "fixture_cause": "M3",
+      "criterion": "200 exact scoped exhausted empty, no partial candidate or protected error for malformed retained provenance.",
+      "proposed_change": "Real PostgreSQL catalog/FK closure and complete center/template/commissioner/users/sessions/assignment graph; no fake closure patch. Existing UPDATE violates evidence immutability. No illegal UPDATE, disabled integrity guard or weaker input-error oracle is authorized. Return fault-boundary dependency if no lawful equivalent.",
+      "boundary": "real PostgreSQL + production repository/controller",
+      "source_assertion_line": 208
+    },
+    {
+      "id": "P01",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "refuses an expired classification atomically before ordinary observation writes",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 74,
+      "criterion": "literal classification expiry refuses atomically, raw count0 and order version unchanged",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P02",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "strictly refuses malformed classification before writes: %j [ownershipClassification=null]",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 85,
+      "criterion": "rejection, raw count0, components empty",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P03",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "strictly refuses malformed classification before writes: %j [extra sellerId]",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 85,
+      "criterion": "rejection, raw count0, components empty",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P04",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "scenario": "strictly refuses malformed classification before writes: %j [rights extra=true]",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 85,
+      "criterion": "rejection, raw count0, components empty",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P05",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "normalizes current B assignment loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 123,
+      "criterion": "exact403 equal unknown-B response for both endpoints with no-store",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P06",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "normalizes current B qualification loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 123,
+      "criterion": "exact403 equal unknown-B response for both endpoints with no-store",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P07",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "normalizes current B erasure loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 123,
+      "criterion": "exact403 equal unknown-B response for both endpoints with no-store",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P08",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "normalizes current B session loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 123,
+      "criterion": "exact403 equal unknown-B response for both endpoints with no-store",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    },
+    {
+      "id": "P09",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "scenario": "keeps many unassigned visits out of continuation and exhaustion semantics",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "source_assertion_line": 151,
+      "criterion": "response body remains exactly equal before/after61 unrelated unassigned visits",
+      "proposed_change": "Retain same scenario and every assertion in real-DB classification; passing negative paths are not evidence the positive boundary works."
+    }
+  ],
+  "shared_stack_groups": [
+    {
+      "group": 1,
+      "headers": [
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1"
+      ],
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL\n ❯ Proxy.$queryRaw ../../packages/db/src/testing/DiagnosticMemoryDatabase.ts:102:60\n ❯ withDiagnosticSourceCommand ../../packages/db/src/diagnostic-source-command.ts:69:58\n ❯ diagnosticMutation src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.ts:92:10\n     90| export async function diagnosticMutation<T>(tx: Tx, command: Diagnosti…\n     91|   if (contexts.has(tx)) throw denied();\n     92|   return withDiagnosticSourceCommand(tx, command, async receipt => {\n       |          ^\n     93|     await diagnosticReceiptPrefix(tx, receipt, command.operation);\n     94|     return work(receipt);\n ❯ src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.ts:352:14\n ❯ DiagnosticIntakeController.run src/modules/diagnostics/presentation/DiagnosticIntakeController.ts:26:14\n ❯ src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:60:20",
+      "sha256": "2996806f682e93782929bb39960e1e2980b6a0e9cedfeebbd1804f83a259a9c2"
+    },
+    {
+      "group": 2,
+      "headers": [
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > keeps existing observations without a classification working"
+      ],
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL\n ❯ Proxy.$queryRaw ../../packages/db/src/testing/DiagnosticMemoryDatabase.ts:102:60\n ❯ withDiagnosticSourceCommand ../../packages/db/src/diagnostic-source-command.ts:69:58\n ❯ diagnosticMutation src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.ts:92:10\n     90| export async function diagnosticMutation<T>(tx: Tx, command: Diagnosti…\n     91|   if (contexts.has(tx)) throw denied();\n     92|   return withDiagnosticSourceCommand(tx, command, async receipt => {\n       |          ^\n     93|     await diagnosticReceiptPrefix(tx, receipt, command.operation);\n     94|     return work(receipt);\n ❯ src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.ts:352:14\n ❯ DiagnosticIntakeController.run src/modules/diagnostics/presentation/DiagnosticIntakeController.ts:26:14\n ❯ src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:68:13",
+      "sha256": "71ce03a89822f2d925d5baa2dd31a4c20299f2baf5a3ed44dd0f57b3a0c71aa6"
+    },
+    {
+      "group": 3,
+      "headers": [
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > cannot classify a later raw to repair an earlier missing anchor"
+      ],
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL\n ❯ Proxy.$queryRaw ../../packages/db/src/testing/DiagnosticMemoryDatabase.ts:102:60\n ❯ withDiagnosticSourceCommand ../../packages/db/src/diagnostic-source-command.ts:69:58\n ❯ diagnosticMutation src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.ts:92:10\n     90| export async function diagnosticMutation<T>(tx: Tx, command: Diagnosti…\n     91|   if (contexts.has(tx)) throw denied();\n     92|   return withDiagnosticSourceCommand(tx, command, async receipt => {\n       |          ^\n     93|     await diagnosticReceiptPrefix(tx, receipt, command.operation);\n     94|     return work(receipt);\n ❯ src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.ts:352:14\n ❯ DiagnosticIntakeController.run src/modules/diagnostics/presentation/DiagnosticIntakeController.ts:26:14\n ❯ src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:90:5",
+      "sha256": "abae47799f3199685c1d35fe63c0a75a5273e3adb171dfabe9d03cedf166e2d8"
+    },
+    {
+      "group": 4,
+      "headers": [
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as active without adding publisher admission to observation",
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as suspended without adding publisher admission to observation",
+        "src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts > classified forward ownership capture through the real intake transport > records Business source membership as missing without adding publisher admission to observation"
+      ],
+      "reached_diagnostic": "Error: Prepared source acceptance requires real PostgreSQL\n ❯ Proxy.$queryRaw ../../packages/db/src/testing/DiagnosticMemoryDatabase.ts:102:60\n ❯ withDiagnosticSourceCommand ../../packages/db/src/diagnostic-source-command.ts:69:58\n ❯ diagnosticMutation src/modules/diagnostics/infrastructure/DiagnosticPreparedIntake.ts:92:10\n     90| export async function diagnosticMutation<T>(tx: Tx, command: Diagnosti…\n     91|   if (contexts.has(tx)) throw denied();\n     92|   return withDiagnosticSourceCommand(tx, command, async receipt => {\n       |          ^\n     93|     await diagnosticReceiptPrefix(tx, receipt, command.operation);\n     94|     return work(receipt);\n ❯ src/modules/diagnostics/infrastructure/PrismaDiagnosticIntake.ts:352:14\n ❯ DiagnosticIntakeController.run src/modules/diagnostics/presentation/DiagnosticIntakeController.ts:26:14\n ❯ src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts:98:5",
+      "sha256": "c7793da278394e9cf106844cb96e590256a705a2ea71079f37895e27be22d47f"
+    },
+    {
+      "group": 5,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > lets only the selected current B technician reload a minimal usable handle without A access"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:95:21",
+      "sha256": "c26d755f9697aeede04a6b656768a4cd3fba1b04baa58e50ac927d8b1c87e90b"
+    },
+    {
+      "group": 6,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uses only B command fields and recovers B after proof payload loss and later A erasure"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:107:21",
+      "sha256": "d8e11d72f5c5ecf803cbe401c0fe8676d8a0fa1a483a0c023e8804b3cad97731"
+    },
+    {
+      "group": 7,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer Session expiry at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer grant loss at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer qualification loss at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer A assignment loss at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses issuer B assignment loss at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A erasure at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A raw erasure at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses A rights expiry at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses B rights expiry at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses changed B version at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses changed A version at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses proof rights expiry at read and again at action",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > uniformly omits and refuses permanent invalidation at read and again at action"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:140:21",
+      "sha256": "c5f55f1f85d9f894c71b04090cb1f7e03d8029bd227f4c6bff15bff06ecc3dbc"
+    },
+    {
+      "group": 8,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B Session changes even on empty pages and consumed result recovery",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B grant changes even on empty pages and consumed result recovery",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B qualification changes even on empty pages and consumed result recovery",
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > fences B B assignment changes even on empty pages and consumed result recovery"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:156:21",
+      "sha256": "affcb90abc693557783fc74f4b61e5a04fee1fca0b623627197e93161e020842"
+    },
+    {
+      "group": 9,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > keeps readable historical proofs separate from current usability and traverses beyond 50"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:163:21",
+      "sha256": "fede0af506988943ae6fa27c22d88b7b8bd94075ce1a0bd29e0e3589391b2c98"
+    },
+    {
+      "group": 10,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > binds continuation to the query, actor, Session, B and expiry, without inherited authority"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:180:21",
+      "sha256": "c0f8761ffe4944277179f75d7ad032bce6e58b0dd9965ed596fb5d9bf114031e"
+    },
+    {
+      "group": 11,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > rejects A bindings, protected fields and unrecognized query/command fields"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:189:21",
+      "sha256": "ce638eae1accc5a08300ec07f5bbe626e28552ed5cfc1cd76fecf9581bd34c83"
+    },
+    {
+      "group": 12,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > recovers lost preparation and issuance replies without storing pending text or duplicating issuance"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:210:27\n    208|     // Existing real issuance/comparison fixtures work before the new …\n    209|     const legacy = await post(`${b}/continuity-proofs`, issuanceComman…\n    210|     expect(legacy.status).toBe(201);\n       |                           ^\n    211|     const requestId = await prepare(\"issue\");\n    212|     expect((await get(requestPath)).body).toEqual({ requests: [{ reque…",
+      "sha256": "289909507e7f133d241486523263365f37585d0274a6e8acace7a77ad9aafc80"
+    },
+    {
+      "group": 13,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > recovers a B-only committed request after proof disposal and A erasure without its command"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:231:21",
+      "sha256": "bdcefe4d3e187fb49443559271f7dc5e905e8aa0830b4e4c3dd74f8458137a35"
+    },
+    {
+      "group": 14,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > refuses unknown identities, new Sessions, wrong actors/kinds and pending command fields"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ issue src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:90:27\n\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:251:21",
+      "sha256": "41de48901ac84d888a4021e58160ba508d2798e0467ee70cb90b85c65195f501"
+    },
+    {
+      "group": 15,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > keeps an invalidated issued request historical and refuses first consumption after authority loss"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ prepare src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:202:29\n    200|   async function prepare(kind: \"issue\" | \"consume\", actor = reviewer) {\n    201|     const response = await post(requestPath, { kind }, actor);\n    202|     expect(response.status).toBe(201);\n       |                             ^\n    203|     expect(response.headers[\"cache-control\"]).toBe(\"no-store, private\"…\n    204|     return response.body.requestId as string;\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:267:23",
+      "sha256": "68ec606f6c290732271d648470b68b24ad4ce07adfca6df4db5f4a18233efe0c"
+    },
+    {
+      "group": 16,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts > B-owned continuity handoff through real HTTP, application, authority and database-boundary fake > bounds request discovery, binds continuations to Session/B/query and stages linkage only"
+      ],
+      "reached_diagnostic": "AssertionError: expected 500 to be 201 // Object.is equality\n\n- Expected\n+ Received\n\n- 201\n+ 500\n\n ❯ prepare src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:202:29\n    200|   async function prepare(kind: \"issue\" | \"consume\", actor = reviewer) {\n    201|     const response = await post(requestPath, { kind }, actor);\n    202|     expect(response.status).toBe(201);\n       |                             ^\n    203|     expect(response.headers[\"cache-control\"]).toBe(\"no-store, private\"…\n    204|     return response.body.requestId as string;\n ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts:280:34",
+      "sha256": "936fdfff9c77f511fc918752ac90b514fabc06e101e5f234a782e63a91131d80"
+    },
+    {
+      "group": 17,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts > projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source"
+      ],
+      "reached_diagnostic": "Error: DIAGNOSTIC_NO_ACCESS\n ❯ denied src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts:20:22\n     18| type Row = Prisma.DiagnosticReportRecordGetPayload<object>;\n     19| type Order = Prisma.InspectionOrderGetPayload<object>;\n     20| const denied = () => new DiagnosticRuleError(\"DIAGNOSTIC_NO_ACCESS\");\n       |                      ^\n     21| const json = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSO…\n     22|\n ❯ PrismaDiagnosticReports.reinspectionLocks src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts:398:41\n ❯ src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts:32:71\n ❯ ../../packages/db/src/testing/DiagnosticMemoryDatabase.ts:193:32\n ❯ DiagnosticMemoryDatabase.client.$transaction ../../packages/db/src/testing/DiagnosticMemoryDatabase.ts:191:32\n ❯ retry src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts:32:28\n ❯ src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts:33:25",
+      "sha256": "da2ab9f36241258a8c31c64b31eb8d87fb4af2f28ff051805f3a382685f9edf7"
+    },
+    {
+      "group": 18,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > traverses more than 50 with stable tie ordering and an anchored scan, without protected fields"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:83:66\n     81|     let route = `${b}/predecessor-candidates`; const seen: string[] = …\n     82|     for (let page = 0; page < 20; page++) {\n     83|       const response = await get(route); expect(response.status).toBe(…\n       |                                                                  ^\n     84|       expect(response.headers[\"cache-control\"]).toBe(\"no-store, privat…\n     85|       expect(response.body.scope).toBe(\"currently_authorized_retained_…",
+      "sha256": "bab9713a45904735ea89493ecd0c841d249ffe90f8437aa2ec41e3620cea3a70"
+    },
+    {
+      "group": 19,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > returns only named currently eligible distinct B technicians to a non-reception reviewer"
+      ],
+      "reached_diagnostic": "AssertionError: expected { status: 403, body: { …(2) }, …(1) } to match object { status: 200, body: { …(1) } }\n(8 matching properties omitted from actual)\n\n- Expected\n+ Received\n\n  {\n    \"body\": {\n-     \"technicians\": [\n-       {\n-         \"name\": \"B technician\",\n-         \"userId\": \"11111111-1111-4111-8111-000000000002\",\n+     \"code\": \"DIAGNOSTIC_NO_ACCESS\",\n+     \"message\": \"Inspection request could not be completed\",\n    },\n-     ],\n-   },\n-   \"status\": 200,\n+   \"status\": 403,\n  }\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:98:51\n     96|   });\n     97|   it(\"returns only named currently eligible distinct B technicians to …\n     98|     expect(await get(`${b}/linking-technicians`)).toMatchObject({ stat…\n       |                                                   ^\n     99|     expect((await get(`${b}/linking-technicians`, { userId: id(3), ses…\n    100|     await db.diagnosticCenterAssignment.updateMany({ where: { userId: …",
+      "sha256": "39401bb7de2eb3c79ee4c53457c0e2452642d6432fd77b1ca35cdecd65624a99"
+    },
+    {
+      "group": 20,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > uses scoped empty semantics and omits inaccessible or incomplete retained material"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:109:29\n    107|     await db.diagnosticIdentityRecord.updateMany({ where: { orderId: i…\n    108|     const response = await get(`${b}/predecessor-candidates`);\n    109|     expect(response.status).toBe(200);\n       |                             ^\n    110|     expect(response.body).toEqual({ candidates: [], nextCursor: null, …\n    111|   });",
+      "sha256": "3df4cc76ca4437c14bf3c447ef30b0a9f05fb7011eb7c388d057a917a3cdde9c"
+    },
+    {
+      "group": 21,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > binds continuation to B, actor, Session and strict query scope"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:114:82\n    112|   it(\"binds continuation to B, actor, Session and strict query scope\",…\n    113|     for (let n = 30; n < 51; n++) visit(n);\n    114|     const first = await get(`${b}/predecessor-candidates`); expect(fir…\n       |                                                                                  ^\n    115|     const cursor = encodeURIComponent(first.body.nextCursor);\n    116|     visit(21, false);",
+      "sha256": "4e9b8a8a72cef0d75414f4ad369b80686e9bf39700f51226fa4554bbd82e24c1"
+    },
+    {
+      "group": 22,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:137:26\n    135|     for (let n = 30; n < 72; n++) visit(n);\n    136|     const first = await get(`${b}/predecessor-candidates`);\n    137|     expect(first.status).toBe(200); expect(first.body.candidates).toHa…\n       |                          ^\n    138|     const next = `${b}/predecessor-candidates?cursor=${encodeURICompon…\n    139|     const page = await get(next);",
+      "sha256": "ab8d115d44ce928ca8545e626684a59c8eec6effbea2462e1b852c3fdb27a41b"
+    },
+    {
+      "group": 23,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment grant loss",
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment inactive loss",
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment assignment loss",
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits a B technician after current Identity or assignment unnamed loss"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:166:29\n    164|     if (loss === \"unnamed\") await db.user.update({ where: { id: id(2) …\n    165|     const response = await get(`${b}/linking-technicians`);\n    166|     expect(response.status).toBe(200); expect(response.body).toEqual({…\n       |                             ^\n    167|   });\n    168|   it(\"rejects a second current Session, cursor tampering without retai…",
+      "sha256": "50046188fbc973cf5abab25d80d9e92ac67c032ef7071568e22dda1ceb350f5b"
+    },
+    {
+      "group": 24,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > rejects a second current Session, cursor tampering without retaining pair data"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:170:82\n    168|   it(\"rejects a second current Session, cursor tampering without retai…\n    169|     for (let n = 30; n < 51; n++) visit(n);\n    170|     const first = await get(`${b}/predecessor-candidates`); expect(fir…\n       |                                                                                  ^\n    171|     const cursor: string = first.body.nextCursor;\n    172|     expect(cursor).toHaveLength(1062);",
+      "sha256": "83051df9a6d1f3e9c15f35e9ffaafa52a0007f150aff5ef2ccd457c26153c6c2"
+    },
+    {
+      "group": 25,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits disconnected retained identity claims, expired B material and inconsistent raw history"
+      ],
+      "reached_diagnostic": "AssertionError: expected undefined to deeply equal [ { …(3) } ]\n\n- Expected:\n[\n  {\n    \"mileageKm\": 100,\n    \"observedAt\": \"2026-10-21T12:00:00.000Z\",\n    \"reportId\": \"11111111-1111-4111-8111-000000004030\",\n  },\n]\n\n+ Received:\nundefined\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:183:36\n    181|     visit(30);\n    182|     const before = await get(`${b}/predecessor-candidates`);\n    183|     expect(before.body.candidates).toEqual([{ reportId: id(4030), obse…\n       |                                    ^\n    184|     const evidence = await db.diagnosticIdentityEvidence.findUniqueOrT…\n    185|     memory.seed(\"diagnosticIdentityEvidence\", { ...evidence, id: id(90…",
+      "sha256": "d7c8b058fa6a33c762a3df88b7a4b6f4e9d9e1706db481a01be03bfe6dd9cac4"
+    },
+    {
+      "group": 26,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > allows an empty bounded page to continue without claiming absence"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:199:26\n    197|     await db.diagnosticIdentityProvenance.updateMany({ where: { orderI…\n    198|     const first = await get(`${b}/predecessor-candidates`);\n    199|     expect(first.status).toBe(200); expect(first.body.candidates).toEq…\n       |                          ^\n    200|     expect(first.body.exhausted).toBe(false); expect(first.body.nextCu…\n    201|     const second = await get(`${b}/predecessor-candidates?cursor=${fir…",
+      "sha256": "fd6e0593fcaa104f5f6ce06b0da0fc314f986c34b664eec777d537771b1c35ef"
+    },
+    {
+      "group": 27,
+      "headers": [
+        "src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts > B-scoped discovery through real HTTP, application, authority and database-boundary fake > omits malformed required retained evidence without a partial candidate or protected error"
+      ],
+      "reached_diagnostic": "AssertionError: expected 403 to be 200 // Object.is equality\n\n- Expected\n+ Received\n\n- 200\n+ 403\n\n ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts:208:29\n    206|     await db.diagnosticIdentityEvidence.update({ where: { id: id(3030)…\n    207|     const response = await get(`${b}/predecessor-candidates`);\n    208|     expect(response.status).toBe(200);\n       |                             ^\n    209|     expect(response.body).toEqual({ candidates: [], nextCursor: null, …\n    210|   });",
+      "sha256": "c825e58c7dccbd0b919f9c8fbb89e21ffa77ec5f94e2a35ba2046ed5550c0a4d"
+    }
+  ]
+}

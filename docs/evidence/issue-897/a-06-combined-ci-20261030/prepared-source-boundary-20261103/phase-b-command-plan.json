@@ -1,0 +1,261 @@
+{
+  "proposal_only": true,
+  "base": "4afccd4347fdf8b110475ac1472dbb75e30f5f36",
+  "source": "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+  "source_paths": [
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "preparation": [
+    [
+      "pnpm",
+      "install",
+      "--offline",
+      "--frozen-lockfile",
+      "--filter",
+      "@auto-tm/api...",
+      "--filter",
+      "@auto-tm/worker..."
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/contracts",
+      "build"
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/db",
+      "build"
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/worker",
+      "build"
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "exec",
+      "node",
+      "-e",
+      "require('@auto-tm/db'); require('@auto-tm/contracts'); console.log('prepared runtime imports ok')"
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "exec",
+      "node",
+      "--input-type=module",
+      "-e",
+      "await import('@auto-tm/db'); await import('@auto-tm/contracts'); console.log('prepared ESM imports ok')"
+    ]
+  ],
+  "offline_checks": [
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "typecheck"
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "exec",
+      "tsc6",
+      "--noEmit"
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "lint"
+    ],
+    [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "build"
+    ]
+  ],
+  "probe_argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "--maxWorkers=1",
+    "-t",
+    "accepts a separate synthetic classification|lets only the selected current B technician reload|returns only named currently eligible distinct B technicians|projects commissioner and currently assigned staff reads"
+  ],
+  "full_56_argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "--maxWorkers=1"
+  ],
+  "unchanged_168_argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+    "src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+    "src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+    "src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+    "src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+    "--maxWorkers=1"
+  ],
+  "counts_must_equal": {
+    "probe": 4,
+    "four_e2e_suites": 56,
+    "unchanged_unit_selection": 168,
+    "full_original_equivalent": 224
+  },
+  "resource_proposal": {
+    "status": "PLANNED / NOT RESERVED / NOT STARTED",
+    "project": "auto_tm_ci_897_938_20261103_r1",
+    "postgres": "127.0.0.1:61169",
+    "redis": "127.0.0.1:61168",
+    "minio": "127.0.0.1:61170",
+    "base_db": "auto_tm_897_938_r1",
+    "template": "auto_tm_897_938_r1_t<actual-six-hex>_template",
+    "worker": "auto_tm_897_938_r1_t<actual-six-hex>_w1",
+    "redis_worker_db": 1,
+    "bucket": "diagnostic-test-private",
+    "object_prefix": "issue938/<suite>/<case>/",
+    "runtime_roles": "r938_<suite-id32>",
+    "offline_slot": "issue938-implementation-package-r1, 60min after recorded identity/release",
+    "runtime_slot": "issue938-probe-full-cleanup-r1, 45min after actual source pin + revalidation + explicit release",
+    "forbidden": [
+      "65379",
+      "foreign/shared/retained resources",
+      "935 planned61159",
+      "925 planned61149/61148/61150"
+    ],
+    "runtime_release_gate": "After Parent disposition, actual source/checkpoint pin, recorded exact privilege SQL and path/case audit, actual models and a fresh exclusive UTC reservation. This is implementation verification before #924/#934 readiness, never #925 acceptance."
+  },
+  "resource_commands": {
+    "config": [
+      "docker",
+      "compose",
+      "--file",
+      "infra/compose/docker-compose.ci.yml",
+      "--file",
+      "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+      "--project-name",
+      "auto_tm_ci_897_938_20261103_r1",
+      "config",
+      "--format",
+      "json"
+    ],
+    "up": [
+      "docker",
+      "compose",
+      "--file",
+      "infra/compose/docker-compose.ci.yml",
+      "--file",
+      "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+      "--project-name",
+      "auto_tm_ci_897_938_20261103_r1",
+      "up",
+      "--detach",
+      "--wait",
+      "--wait-timeout",
+      "120"
+    ],
+    "postgres_binding": [
+      "docker",
+      "compose",
+      "--file",
+      "infra/compose/docker-compose.ci.yml",
+      "--file",
+      "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+      "--project-name",
+      "auto_tm_ci_897_938_20261103_r1",
+      "port",
+      "postgres",
+      "5432"
+    ],
+    "redis_binding": [
+      "docker",
+      "compose",
+      "--file",
+      "infra/compose/docker-compose.ci.yml",
+      "--file",
+      "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+      "--project-name",
+      "auto_tm_ci_897_938_20261103_r1",
+      "port",
+      "redis",
+      "6379"
+    ],
+    "minio_binding": [
+      "docker",
+      "compose",
+      "--file",
+      "infra/compose/docker-compose.ci.yml",
+      "--file",
+      "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+      "--project-name",
+      "auto_tm_ci_897_938_20261103_r1",
+      "port",
+      "minio",
+      "9000"
+    ],
+    "bounded_logs": [
+      "docker",
+      "compose",
+      "--file",
+      "infra/compose/docker-compose.ci.yml",
+      "--file",
+      "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+      "--project-name",
+      "auto_tm_ci_897_938_20261103_r1",
+      "logs",
+      "--no-color",
+      "--tail",
+      "100"
+    ],
+    "down": [
+      "docker",
+      "compose",
+      "--file",
+      "infra/compose/docker-compose.ci.yml",
+      "--file",
+      "/tmp/issue938-prepared-reader-r1/compose-overlay.yml",
+      "--project-name",
+      "auto_tm_ci_897_938_20261103_r1",
+      "down",
+      "--volumes",
+      "--remove-orphans"
+    ],
+    "cleanup_gate": "All labels/IDs must match the actually recorded fresh project. No broad Docker prune or foreign scan/apply. Capture exact SQL and object cleanup argv in runtime reservation before release."
+  }
+}

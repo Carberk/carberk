@@ -1,0 +1,71 @@
+{
+  "phase": "A, read-only diagnosis only",
+  "time_utc": "2026-11-02T22:32:09.007389+00:00",
+  "base": "4afccd4347fdf8b110475ac1472dbb75e30f5f36",
+  "source": "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+  "counts": {
+    "fail": 47,
+    "already_passed_in_four_files": 9,
+    "four_file_total": 56,
+    "unchanged_five_file_total": 168,
+    "original_selection_total": 224
+  },
+  "validations": "direct Python JSON/cardinality/source equality/evidence link inspection; not application tests",
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+        "--",
+        ".",
+        ":(exclude)docs/**",
+        ":(exclude)docs"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "paths": [
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/case-map.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/case-map.md",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/input-manifest.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/phase-a-report.md",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/phase-b-command-plan.json"
+  ],
+  "artifact_sha256": {
+    "case-map.json": "38e8a578e38168f9c143337b8e6743aef07cbec50a51f5f0ae5e582a2b872fd7",
+    "case-map.md": "a23fed018582ab1ae3c4c362d14deb09fc8aabfbbc665454c84ad5a8923179a8",
+    "input-manifest.json": "8b4c6ddd48885e77cca92f453a930fa5d7e7ff83e7ec6464fc8c6ec5f9a78608",
+    "phase-a-report.md": "7eecf54226c2d7358b7f45d1f409d4c62875eb96439aa0ae933e245e6efdf2da",
+    "phase-b-command-plan.json": "e63a8fdc2f6495f32469e1c785d4ff19dbad1c36d2295232940997ef3c27b629"
+  },
+  "not_run": [
+    "package",
+    "install",
+    "build",
+    "test",
+    "service",
+    "DB",
+    "runtime",
+    "native",
+    "hosted",
+    "cleanup",
+    "PR"
+  ],
+  "new_worker": false,
+  "validation_note": "Initial unstaged no-index whitespace check returned1 with empty output because the file differs from /dev/null. Correct staged diff --check returns0. No application test or setup result is inferred."
+}
