@@ -1,0 +1,175 @@
+{
+  "governingIssue": "https://github.com/Carberk/carberk/issues/935",
+  "checkedAtUtc": "2026-11-02T21:41:56.120764+00:00",
+  "base": "a6de7b1b51039ea4b1d24ef7db9d8b21ca91d568",
+  "workerSource": "cd7f4adb773f0a190dba74015ca2583f615c791b",
+  "workerEvidenceHead": "b9bf4313c41d3b192021c203cfe1815a91921feb",
+  "sourcePaths": [
+    "apps/admin/src/app/diagnostics/evidence-proxy.spec.ts",
+    "apps/api/src/modules/identity/application/testing/DiagnosticMaterialHarness.ts",
+    "apps/api/src/modules/identity/application/testing/ReportPreparedHarness.ts",
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.e2e.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/DiagnosticPurgeEffectClosure.e2e.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.e2e.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.e2e.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+    "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+    "packages/db/tests/service-history-callers.e2e.spec.ts"
+  ],
+  "evidenceFileCount": 63,
+  "outsideAllowList": [],
+  "sourceEqualsEvidenceHead": true,
+  "redProductionUnchanged": true,
+  "rawCommands": [
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/03-install-offline.command.json",
+      "sha256": "a0d11a4adc283419251f0d05c6c2eeb157be0585be21c1fdf26b0ff3c81347b9",
+      "exitCode": 0,
+      "seconds": 1.460426375
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/04-contracts-build.command.json",
+      "sha256": "b7f0ea1d214cf2fa8644e73701e08d32e0227cf23b7651d28eb59fe30e0c3616",
+      "exitCode": 0,
+      "seconds": 1.662614583
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/05-db-build.command.json",
+      "sha256": "fd6897a3f4c71dfaf7c3922a6975961626ab82486855e5f01035683166cc54b0",
+      "exitCode": 0,
+      "seconds": 4.583919249999999
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/06-runtime-imports.command.json",
+      "sha256": "1e0492688a55c82bff2405aacdcc7a8bab46621ae0fc12ded1e471fb132c6ad2",
+      "exitCode": 0,
+      "seconds": 0.184782209
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-green.command.json",
+      "sha256": "0f2fc257ec68b96881cc1101dd5d07d6c3fa4e58d918ffb802b170576f3b65e2",
+      "exitCode": 0,
+      "seconds": 0.49588641699999997
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-lint.command.json",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "exitCode": 0,
+      "seconds": 2.102627334
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-red.command.json",
+      "sha256": "f908208c7e269befea3c3c958bcea50390850df997a3ec1dc3c640dbc153084d",
+      "exitCode": 1,
+      "seconds": 1.3820824999999999
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts6.command.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "seconds": 2.51733
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-admin-ts7.command.json",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "exitCode": 0,
+      "seconds": 0.47234116699999995
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-green.command.json",
+      "sha256": "55b71af6fd5ec3545b5b42a7fac14843748bd00d67ed288692a5ed4dee0f45a4",
+      "exitCode": 1,
+      "seconds": 3.55344425
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-lint.command.json",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "exitCode": 0,
+      "seconds": 6.152232208
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red-confirmed.command.json",
+      "sha256": "1983447e8108ae2147f258d19e30a8cea9c90f0fcc070be29d5789f13a26d570",
+      "exitCode": 1,
+      "seconds": 3.384516916
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-red.command.json",
+      "sha256": "85513836f6dc517e23bb9d098e4867588bad706ceed7e526cd1e1c7b614a2afc",
+      "exitCode": 1,
+      "seconds": 4.084032125
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts6.command.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "seconds": 12.162113708
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-api-ts7.command.json",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "exitCode": 0,
+      "seconds": 2.81164875
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-authored-range.command.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "seconds": 0.03862425
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-complete-range.command.json",
+      "sha256": "b02c6eef903b70c876ced6445cd5b215dd38df334b05fd84bcdcf5a739a57844",
+      "exitCode": 2,
+      "seconds": 0.029616
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-source-range.command.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "seconds": 0.026286292000000003
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-diff-working.command.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "seconds": 0.026205458
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-final-audit-command.command.json",
+      "sha256": "8ceb1a8a874112e66abfd27586cb8d8dc73009fdc5fdc6376f8ea61acedec9a0",
+      "exitCode": 0,
+      "seconds": 8.684792999999999
+    },
+    {
+      "receipt": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/prerequisite-preparation-20261103/repair-source-push.command.json",
+      "sha256": "ae3dd615c6fbf268ac9b60c05c74a1b9e64a8df516fe51b9a33af1da66626bec",
+      "exitCode": 0,
+      "seconds": 4.263977917
+    }
+  ],
+  "apiFailureNames": {
+    "red": 56,
+    "after": 47,
+    "removed": [
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > permits current injected authority even when ambient time is past expiry",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > elevation deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > elevation deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > session deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=false uses the injected execution clock after locks > session deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > elevation deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > elevation deadline > exactly at expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > session deadline > after expiry preserves earlier mutation time or rolls back all effects",
+      "src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts > staff grant=true uses the injected execution clock after locks > session deadline > exactly at expiry preserves earlier mutation time or rolls back all effects"
+    ],
+    "added": []
+  },
+  "affectedGate": "OPEN: full API selector47fail/177pass; no runtime/cleanup or independent review acceptance",
+  "scopeAudit": "15 source paths; no other source/config/migration change",
+  "rawWhitespace": "full-range diff-check exits2 only for preserved raw EOF blank lines; source/authored checks exit0"
+}
