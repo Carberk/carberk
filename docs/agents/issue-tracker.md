@@ -27,6 +27,14 @@ Check required imports before expensive test selectors. Module-resolution or glo
 
 Authorize routine preparation and conditional test continuation together at dispatch. The worker continues within that contract without another approval round; an uncovered prerequisite or guard refusal returns to the coordinator. Use compact phase/blocker/next-action updates linked to raw receipts, and reuse accepted evidence whose relevant inputs are unchanged.
 
+## Terminal handoff
+
+The coordinator records one concise update in the actual issue: current phase, owner/worktree, delivered source and evidence commits, assembled and verified SHAs, result or remaining blocker, next action/owner, and the [cleanup tuple or keep reason](worktree-lifecycle.md#cleanup-during-delivery). Distinguish implemented, assembled, reviewed, runtime-proven and accepted phases; an implementation checkpoint does not close a verification gate.
+
+Before another attempt, reconcile the issue with existing branches, assemblies and evidence. Resume the eligible owned attempt and reuse valid results. Identify the concrete missing prerequisite, failing behavior or unproven criterion before assigning more implementation. Record setup/execution time and blocking waits in existing receipts so repeated preparation can be corrected.
+
+When bounded repairs share a review boundary, assemble compatible ready changes before the required independent review on one exact SHA, preserving each repair's affected checks. Keep ready work within the [workflow's ownership and serialization rules](coding-workflow.md#implement-and-assemble); a blocked issue does not authorize another competing writer or broader scope.
+
 ## Operations
 
 [GitHub operations](github-operations.md) documents bounded reads and file-based writes. Fetch omitted governing content before implementing or reviewing.
