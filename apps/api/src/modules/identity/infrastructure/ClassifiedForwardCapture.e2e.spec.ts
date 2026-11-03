@@ -27,6 +27,17 @@ describe("issue938 recovery stage1", () => {
       expect(raw.orderVersion).toBe(7);
       expect(raw.observationHash).toBe(diagnosticObservationHash(visit.order.id, 7, observed));
       expect(await f.db.diagnosticOwnershipGrant.count({ where: { orderId: visit.order.id, state: "available" } })).toBe(1);
+      expect(f.ledger).toEqual([
+        { orderId: visit.order.id, event: "create", version: 0 },
+        { orderId: visit.order.id, event: "physical authorization", version: 1 },
+        { orderId: visit.order.id, event: "publication authorization", version: 2 },
+        { orderId: visit.order.id, event: "reviewer assignment", version: 3 },
+        { orderId: visit.order.id, event: "technician assignment", version: 4 },
+        { orderId: visit.order.id, event: "confirmed", version: 5 },
+        { orderId: visit.order.id, event: "arrived", version: 6 },
+        { orderId: visit.order.id, event: "grant before first raw", version: 6 },
+        { orderId: visit.order.id, event: "first raw", version: 7 },
+      ]);
     });
   });
 });

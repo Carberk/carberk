@@ -18,6 +18,20 @@ describe("issue938 recovery stage1", () => {
       expect(f.actors.commissionerA.userId).not.toBe(f.actors.commissionerB.userId);
       expect(f.actors.technicianA.userId).not.toBe(f.actors.technicianB.userId);
       const proofId = await f.issue(a, b, report, 8);
+      expect(f.ledger.filter(entry => entry.orderId === b.order.id)).toEqual([
+        { orderId: b.order.id, event: "create", version: 0 },
+        { orderId: b.order.id, event: "physical authorization", version: 1 },
+        { orderId: b.order.id, event: "publication authorization", version: 2 },
+        { orderId: b.order.id, event: "reviewer assignment", version: 3 },
+        { orderId: b.order.id, event: "technician assignment", version: 4 },
+        { orderId: b.order.id, event: "confirmed", version: 5 },
+        { orderId: b.order.id, event: "arrived", version: 6 },
+        { orderId: b.order.id, event: "grant before first raw", version: 6 },
+        { orderId: b.order.id, event: "first raw", version: 7 },
+        { orderId: b.order.id, event: "provenance stage-upload", version: 7 },
+        { orderId: b.order.id, event: "retained evidence append", version: 8 },
+        { orderId: b.order.id, event: "proof issue-read", version: 8 },
+      ]);
       const input = { reportId: f.id("B-reinspection"), predecessorId: report.id, reason: "Independent visit", proofId, expectedOrderVersion: 8 };
       const retry = () => f.send<D.DiagnosticReportRecord>("technicianB", "POST", `orders/${b.order.id}/reinspections`, input);
       const created = await retry(); expect(created.status).toBe(201);

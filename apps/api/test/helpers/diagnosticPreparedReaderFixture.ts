@@ -299,9 +299,13 @@ export class DiagnosticPreparedReaderFixture {
     await step("appointment", { state: "arrived" }, "arrived", publicVisit ? 6 : 5);
     return { order, commissioner, technician };
   }
-  private record(order: D.DiagnosticOrder, event: string, version: number) {
+  private record(order: { id: string; version: number }, event: string, version: number) {
     this.dependency(order.version === version, `version:${event}`, { expected: version, actual: order.version });
     this.ledger.push({ orderId: order.id, event, version });
+  }
+  /** Unchanged-version checkpoints read the persisted order, not a route response. */
+  private async persisted(orderId: string): Promise<{ id: string; version: number }> {
+    return this.db.inspectionOrder.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, version: true } });
   }
   async observe(visit: Visit, observation: Omit<D.DiagnosticObservedVehicle, "expectedVersion">, ownershipRights?: object): Promise<D.DiagnosticOrder> {
     let grant: { id: string } | undefined;
@@ -310,10 +314,14 @@ export class DiagnosticPreparedReaderFixture {
       this.dependency(await this.db.diagnosticIdentityRecord.count({ where: { orderId: visit.order.id } }) === 0, "grant_before_first_raw");
       grant = await this.admitted(visit.commissioner, `orders/${visit.order.id}/ownership-grant`, { rights: ownershipRights });
       this.record((await this.send<D.DiagnosticOrder>(visit.technician, "GET", `orders/${visit.order.id}`)).body, "grant before first raw", 6);
+    } else {
+      // Buyer-private orders never receive an ownership grant; checkpoint the unchanged version before first raw.
+      this.dependency(await this.db.diagnosticOwnershipGrant.count({ where: { orderId: visit.order.id } }) === 0, "private_no_ownership_grant");
+      this.record(await this.persisted(visit.order.id), "no ownership grant", 5);
     }
     visit.order = await this.admitted(visit.technician, `orders/${visit.order.id}/vehicle`, { expectedVersion: visit.order.version, ...observation,
       ...(grant ? { ownershipGrantId: grant.id, ownershipClassification: { rights: ownershipRights } } : {}) });
-    this.record(visit.order, "first observation", visit.order.audience === "listing_public" ? 7 : 6);
+    this.record(visit.order, "first raw", visit.order.audience === "listing_public" ? 7 : 6);
     const history = await this.send<D.DiagnosticIdentityRecord[]>(visit.technician, "GET", `orders/${visit.order.id}/identity-records`);
     this.dependency(history.status === 200 && history.body.length === 1, "first_raw_history", history);
     const raw = history.body[0]; this.dependency(raw, "first_raw_missing"); visit.raw = raw; return visit.order;
@@ -329,6 +337,7 @@ export class DiagnosticPreparedReaderFixture {
     this.dependency(uploaded.status === 200, "provenance_upload", uploaded);
     const stored = await this.db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: provenanceId } });
     this.dependency(stored.objectKey === key && stored.sha256 === image.sha256 && stored.sizeBytes === 72, "stored_object_descriptor", stored);
+    this.record(await this.persisted(visit.order.id), "provenance stage-upload", visit.order.audience === "listing_public" ? 7 : 6);
     const evidence = await this.admitted<D.DiagnosticIdentityEvidence>(visit.technician, `orders/${visit.order.id}/identity-evidence`, {
       id: this.id(`evidence-${visit.order.id}`), expectedOrderVersion: visit.order.version, identityRecordId: raw.id,
       identifiers: [{ kind: "vin_stamp", location: "Synthetic plate", value: "SYN-123", provenanceIds: [provenanceId] }], rights: preparedReaderRights, correction: null,
@@ -363,6 +372,7 @@ export class DiagnosticPreparedReaderFixture {
     const proof = await this.admitted<{ proofId: string }>("reviewer", `orders/${b.order.id}/continuity-proofs`, { predecessorId: report.id, expectedPredecessorVersion: 3,
       expectedOrderVersion: expectedCandidateVersion, predecessorIdentityRecordId: a.raw.id, candidateIdentityRecordId: b.raw.id, linkingTechnicianId: this.actors.technicianB.userId,
       method: "comparative_attestation", rationale: "Private reviewer rationale", provenanceRecordIds: [a.provenanceId, b.provenanceId] });
+    this.record(await this.persisted(b.order.id), "proof issue-read", b.order.audience === "listing_public" ? 8 : 7);
     return proof.proofId;
   }
   async expireSelectedQualification(): Promise<void> {
