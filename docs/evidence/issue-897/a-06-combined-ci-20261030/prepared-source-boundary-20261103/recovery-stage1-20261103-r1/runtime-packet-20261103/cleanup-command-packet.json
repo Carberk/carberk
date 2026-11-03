@@ -484,6 +484,7 @@
     "capturePath": "/tmp/issue938-runtime-packet-20261103/applied-migrations.json",
     "captureCommand": "capture-applied-migrations.mjs",
     "requiresAllFinished": true,
-    "requiresChecksumEquality": true
+    "requiresChecksumEquality": true,
+    "captureDatabaseRole": "base-database stand-in: the same pinned migration deploy is captured before Vitest; globalSetup drops its template/worker before process exit"
   }
 }

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { stripVTControlCharacters } from "node:util";
 const path = process.env.STAGE_STDOUT_PATH;
 if (!path) throw new Error("STAGE_STDOUT_PATH is required");
-const text = readFileSync(path, "utf8");
+const text = stripVTControlCharacters(readFileSync(path, "utf8"));
 const segments = text.split("938_cleanup_receipt").slice(1);
 if (segments.length !== 7) throw new Error(`expected exactly seven cleanup receipts, found ${segments.length}`);
 const required = ["callers: 0", "sourceReceipts: 0", "campaignReceipts: 0", "objectsEmpty: true", "roleAbsent: true", "guardModesRestored: true", "failures: []"];

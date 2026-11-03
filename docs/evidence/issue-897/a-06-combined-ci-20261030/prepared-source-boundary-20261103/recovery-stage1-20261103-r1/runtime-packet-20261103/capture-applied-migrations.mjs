@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packetRoot = dirname(fileURLToPath(import.meta.url));
@@ -14,7 +14,15 @@ const capturePath = process.env.MIGRATION_CAPTURE_PATH;
 const database = process.env.MIGRATION_DATABASE ?? "auto_tm_897_938_s1r1";
 if (!workdir || !capturePath) throw new Error("RUNTIME_PACKET_WORKDIR and MIGRATION_CAPTURE_PATH are required");
 const input = JSON.parse(readFileSync(inputPinsPath, "utf8"));
-const expected = Object.fromEntries(Object.entries(input.migrations).map(([path, sha]) => [basename(dirname(path)), sha]));
+const expected = input.migrations;
+const migrationNames = Object.keys(expected);
+if (migrationNames.length !== 102 || new Set(migrationNames).size !== migrationNames.length) throw new Error(`expected 102 distinct migration pins, found ${migrationNames.length}`);
+for (const name of migrationNames) {
+  const migrationPath = join(workdir, "packages/db/prisma/migrations", name, "migration.sql");
+  if (!existsSync(migrationPath)) throw new Error(`pinned migration folder is missing: ${name}`);
+  const digest = createHash("sha256").update(readFileSync(migrationPath)).digest("hex");
+  if (digest !== expected[name]) throw new Error(`disk migration hash mismatch for ${name}`);
+}
 const args = ["compose", "--file", baseCompose, "--file", overlay, "--project-name", project, "exec", "-T", "postgres", "psql", "-U", "auto_tm_ci", "-d", database, "-X", "-v", "ON_ERROR_STOP=1", "-At", "-F", "\t", "-c", "SELECT migration_name, checksum, (finished_at IS NOT NULL)::int FROM _prisma_migrations ORDER BY started_at;"];
 const raw = execFileSync("docker", args, { cwd: workdir, encoding: "utf8" });
 const rows = raw.split(/\r?\n/).filter(Boolean).map(line => {

@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-03T05:36:56.621Z",
+  "recordedAt": "2026-11-03T05:57:13.790Z",
   "argv": [
     "/usr/local/bin/node",
     "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/packet-validation.mjs"
@@ -44,13 +44,16 @@
     ],
     "scriptsSyntaxChecked": 6,
     "explicitWorkingDirectories": true,
+    "noColor": true,
+    "migrationNamesChecked": 102,
     "appliedMigrationPlan": {
       "inputPinsPath": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/input-pins.json",
       "expectedMigrationCount": 102,
       "capturePath": "/tmp/issue938-runtime-packet-20261103/applied-migrations.json",
       "captureCommand": "capture-applied-migrations.mjs",
       "requiresAllFinished": true,
-      "requiresChecksumEquality": true
+      "requiresChecksumEquality": true,
+      "captureDatabaseRole": "base-database stand-in: the same pinned migration deploy is captured before Vitest; globalSetup drops its template/worker before process exit"
     }
   },
   "hashes": {
@@ -58,9 +61,9 @@
     "owned-postgres-cleanup.mjs": "90800e369ff9919bae0afcab8f0182772b464cffe6593366f9b888e452231602",
     "owned-source-campaign-check.mjs": "f25c38cff0d1c7945c4dfdf8a45b55e64f6f4270de8275d97d52ba69bc46e77f",
     "owned-s3-inventory.mjs": "8097dfdf56da0c495f0a981cf941230a40ca4d8b76a81118576eb08d46712f0b",
-    "read-cleanup-receipts.mjs": "b74afc58f3d68f7f161f8f7959fa8f905cbdfffd69ecdcb6608c11520359ba15",
-    "capture-applied-migrations.mjs": "626ea38403d5d9839041f06a3944810da4425728dddea92511360a6b23fa3678",
-    "stage-command.json": "24c110041acedf8ac662f514bd707887b948c32a127b4d943c7b2e6fe88e0f7b",
-    "cleanup-command-packet.json": "2ef56c620fc11f80889ddb366a4e36321713b955fdda0c97fa80dad8ef1cd21a"
+    "read-cleanup-receipts.mjs": "6d5c109c5dfa33cc503ddb3bfa4aad7426d2e2d3d5dbfa1e4051669541ae4348",
+    "capture-applied-migrations.mjs": "529dee8e43db814778b3db1074ad9d4dd37f2ed37f4356e30f3d1c0b460dbad2",
+    "stage-command.json": "bbff4d6efa52323f4e02b71cf7a93eaa548677821a3ccb17907a20a96e36a376",
+    "cleanup-command-packet.json": "7bf67643c0b32193d134324aa04a628a2ceceb12da9720422a075562d2550d9c"
   }
 }
