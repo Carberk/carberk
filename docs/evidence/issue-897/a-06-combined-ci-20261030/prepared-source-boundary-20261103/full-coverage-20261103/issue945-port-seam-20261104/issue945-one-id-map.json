@@ -1,0 +1,82 @@
+{
+  "kind": "issue945-one-id-map",
+  "recorded_at_utc": "2026-11-03T22:17:33.997995+00:00",
+  "id": "I945",
+  "issue": 945,
+  "title": "[A test seam] Parameterize diagnostic fixture expected Postgres port",
+  "governing_parent": 897,
+  "blocked_predecessor": 944,
+  "candidate_identity": {
+    "coordinator_commit": "39c63fad462885846840149b15771654980bdaa7",
+    "coordinator_tree": "ea4f2d4b3b397a0e6cfd1e72064b5e0421b4e35d",
+    "reviewed_source_commit": "5b60645bae20e416781cda66b98123635f209341",
+    "reviewed_source_tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6",
+    "red_checkpoint": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+    "red_checkpoint_tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+    "source_checkpoint": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+    "source_tree": "2ee8e9ee3940eb9b3678c3aa33a6ec6bfe804e98",
+    "evidence_commit": "The documentation-only descendant that contains this packet; its exact SHA is returned in the terminal handoff."
+  },
+  "criteria": [
+    {
+      "criterion_id": "I945-C1",
+      "criterion": "Absent override retains historical expected PostgreSQL port 61169.",
+      "implementation": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:84-86,211-212",
+      "proof": "checks/final/focused-boundary-green.stdout; test assertion \"toBe(61169)\"",
+      "result": "pass"
+    },
+    {
+      "criterion_id": "I945-C2",
+      "criterion": "Explicit override accepts only a strict decimal TCP port in range 1..65535 and validates it at the fixture boundary.",
+      "implementation": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:84-88,211-212",
+      "proof": "Focused boundary test accepts 61172; strict parser rejects invalid overrides, initialize maps undefined to 938_fixture_dependency:expected_postgres_port. See source.diff and final raw output.",
+      "result": "pass"
+    },
+    {
+      "criterion_id": "I945-C3",
+      "criterion": "Malformed, non-integer, zero and out-of-range overrides are rejected without URL fallback.",
+      "implementation": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:84-88,211-212",
+      "proof": "checks/final/focused-boundary-green.stdout; 8 table cases assert undefined",
+      "result": "pass"
+    },
+    {
+      "criterion_id": "I945-C4",
+      "criterion": "Hostname/database-name, Redis DB1, MinIO, and VITEST_POOL_ID=1 ownership checks remain unchanged.",
+      "implementation": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:205-216; unchanged lines outside the expected-port comparison",
+      "proof": "allow-list-audit.json exact_fixture_inverse proves every fixture byte outside the seam is preserved; all pre-existing source paths other than the allowed helper are unchanged.",
+      "result": "pass"
+    },
+    {
+      "criterion_id": "I945-C5",
+      "criterion": "No production/config/dependency/migration/workflow/runtime or #944 changes are made.",
+      "implementation": "allow-list-audit.json",
+      "proof": "exact changed-path allow-list; no runtime resources started",
+      "result": "pass"
+    },
+    {
+      "criterion_id": "I945-C6",
+      "criterion": "Required focused test, API typecheck, verified TS6, lint, build and diff-check pass serially.",
+      "implementation": "checks/final/offline-command-receipts.json",
+      "proof": "checks/final/offline-command-receipts.json; six exit-0 commands verified serially; provenance/verified-ts6-* records version 6.0.3 output and @typescript/typescript6 package 6.0.2 identity.",
+      "result": "pass"
+    },
+    {
+      "criterion_id": "I945-C7",
+      "criterion": "After assembly, obtain fresh exact-SHA independent Standards and Spec reviews, then repin #944 before runtime.",
+      "owner": "A coordinator",
+      "result": "pending coordinator handoff; not claimed by implementation writer"
+    }
+  ],
+  "runtime": {
+    "issue944_runtime_run": false,
+    "services_started": false,
+    "database_connections": 0,
+    "redis_or_minio_resources_started": false,
+    "vitest_pool_id_1_prerequisite_changed": false
+  },
+  "allowed_paths": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/**"
+  ]
+}

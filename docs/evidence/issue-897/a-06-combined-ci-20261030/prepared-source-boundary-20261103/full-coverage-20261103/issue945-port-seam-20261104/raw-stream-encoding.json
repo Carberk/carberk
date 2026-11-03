@@ -1,0 +1,71 @@
+{
+  "kind": "issue945-lossless-raw-stream-storage",
+  "reason": "Git flags trailing blank lines in eight raw streams. These exact bytes are stored as base64; receipts retain logical raw paths and decoded SHA-256 values.",
+  "read_rule": "For a receipt path present in streams.logical_path, decode streams.stored_path as base64 before verifying its raw SHA-256. Other streams are stored verbatim.",
+  "streams": [
+    {
+      "logical_path": "checks/attempt-1-lint-failure/api-lint.stderr",
+      "stored_path": "checks/attempt-1-lint-failure/api-lint.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 219,
+      "decoded_sha256": "b5c61e4e91901721d48ebe1766e6bc1bfb1336dc73909d1c56caa5d8fb3a7407",
+      "stored_sha256": "61259038d92131bb842b022594c8528420db175920faaeb3a24374f144685205"
+    },
+    {
+      "logical_path": "checks/attempt-1-lint-failure/api-lint.stdout",
+      "stored_path": "checks/attempt-1-lint-failure/api-lint.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 368,
+      "decoded_sha256": "afb8e9ccb8bbcd272c6c745be9229b63be052d2500de0e66992fa4d7cf28f342",
+      "stored_sha256": "64949b83f6301d75151ab2e3590a2356e7b7a11a39a713588fabdc536623ec4e"
+    },
+    {
+      "logical_path": "checks/attempt-1-lint-failure/focused-boundary-green.stdout",
+      "stored_path": "checks/attempt-1-lint-failure/focused-boundary-green.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 220,
+      "decoded_sha256": "bcc2b7d22685b09462088520f70fdd3a770b647640b9d1fabd7f7d3ef0ce88b7",
+      "stored_sha256": "e8053526904794140528dc9a67b645d346e6204461007b545d795ac34998cbb8"
+    },
+    {
+      "logical_path": "checks/attempt-2-ts4111-failure/api-typecheck.stderr",
+      "stored_path": "checks/attempt-2-ts4111-failure/api-typecheck.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 206,
+      "decoded_sha256": "06f4ee0a685ee660457e722d017e63770201169fc454b3395a8e17c957ece1c6",
+      "stored_sha256": "03c8acd9601d11c30d079c85b4d98acc66d0b3171bc246e34b8c896c688a1e10"
+    },
+    {
+      "logical_path": "checks/attempt-2-ts4111-failure/focused-boundary-green.stdout",
+      "stored_path": "checks/attempt-2-ts4111-failure/focused-boundary-green.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 209,
+      "decoded_sha256": "f901e7eef06d6cae3ac0f748ecf918f8f776741015f44fafcddfd04b31345140",
+      "stored_sha256": "8d7d626d4dfa375261de35e43db755aa4166228556efc56d9be4a69f87a11f73"
+    },
+    {
+      "logical_path": "checks/final/focused-boundary-green.stdout",
+      "stored_path": "checks/final/focused-boundary-green.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 220,
+      "decoded_sha256": "c105878bf82ccad9f0f60a41537197304155f2049b9e19ac7a73fc4288817c53",
+      "stored_sha256": "94699d58415b16786b6fc9ac812ecf9d00d19bfd642f1bd395e707f5e81901cf"
+    },
+    {
+      "logical_path": "checks/red/red.stderr",
+      "stored_path": "checks/red/red.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 3111,
+      "decoded_sha256": "60dfefedd1e4a207c3447e6219ba6a792490127499cf6fc6e8a91a208373db1a",
+      "stored_sha256": "54037f59a49e24b15eb61241d91a0fb4d38c7a8a149c7ef2e0b98d87087fd811"
+    },
+    {
+      "logical_path": "checks/red/red.stdout",
+      "stored_path": "checks/red/red.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 996,
+      "decoded_sha256": "ba2009d4597f872c4b72ba67647fa3373d43e04a0ce78fca6530043cb9d21603",
+      "stored_sha256": "1eff34189ee68b87e9fb108e06467cdd437d2668a7001f35bebd425b46290ad7"
+    }
+  ]
+}

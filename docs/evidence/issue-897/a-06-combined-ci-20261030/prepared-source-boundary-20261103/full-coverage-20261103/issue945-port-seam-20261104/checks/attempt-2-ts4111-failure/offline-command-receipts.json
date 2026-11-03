@@ -1,0 +1,68 @@
+{
+  "receipt_version": 2,
+  "kind": "issue945-port-seam-offline-serial-checks-corrected",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "source_checkpoint": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+  "source_tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+  "commands": [
+    {
+      "name": "focused-boundary-green",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off",
+        "NODE_OPTIONS": "--import=tsx"
+      },
+      "started_at_utc": "2026-11-03T22:12:01.518317+00:00",
+      "ended_at_utc": "2026-11-03T22:12:03.110857+00:00",
+      "started_monotonic_ns": 18447750,
+      "ended_monotonic_ns": 1610900041,
+      "elapsed_ns": 1592452291,
+      "elapsed_seconds": "1.592452291",
+      "exit": 0,
+      "stdout": "focused-boundary-green.stdout",
+      "stderr": "focused-boundary-green.stderr",
+      "stdout_sha256": "f901e7eef06d6cae3ac0f748ecf918f8f776741015f44fafcddfd04b31345140",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 209,
+      "stderr_bytes": 0
+    },
+    {
+      "name": "api-typecheck",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T22:12:03.129608+00:00",
+      "ended_at_utc": "2026-11-03T22:12:05.511662+00:00",
+      "started_monotonic_ns": 1629666708,
+      "ended_monotonic_ns": 4011702500,
+      "elapsed_ns": 2382035792,
+      "elapsed_seconds": "2.382035792",
+      "exit": 1,
+      "stdout": "api-typecheck.stdout",
+      "stderr": "api-typecheck.stderr",
+      "stdout_sha256": "b31e28e374c3603c2eb1f0af579807d8e48eb3328015177bbf9fb447f0ffbe59",
+      "stderr_sha256": "06f4ee0a685ee660457e722d017e63770201169fc454b3395a8e17c957ece1c6",
+      "stdout_bytes": 1359,
+      "stderr_bytes": 206
+    }
+  ]
+}

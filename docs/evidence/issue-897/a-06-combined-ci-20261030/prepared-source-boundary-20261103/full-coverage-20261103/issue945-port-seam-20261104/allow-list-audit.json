@@ -1,0 +1,143 @@
+{
+  "kind": "issue945-final-allow-list-audit",
+  "recorded_at_utc": "2026-11-03T22:20:14.888394+00:00",
+  "coordinator_base": {
+    "commit": "39c63fad462885846840149b15771654980bdaa7",
+    "tree": "ea4f2d4b3b397a0e6cfd1e72064b5e0421b4e35d"
+  },
+  "reviewed_source_candidate": {
+    "commit": "5b60645bae20e416781cda66b98123635f209341",
+    "tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6"
+  },
+  "red_checkpoint": {
+    "commit": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+    "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979"
+  },
+  "source_checkpoint": {
+    "commit": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+    "tree": "2ee8e9ee3940eb9b3678c3aa33a6ec6bfe804e98"
+  },
+  "allowed_paths": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/**"
+  ],
+  "source_changes_base_to_source": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "source_changes_reviewed_to_source": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "source_files": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+      "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+      "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+    },
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+      "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+      "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+    }
+  },
+  "source_diff": {
+    "path": "source.diff",
+    "sha256": "a0adbd47d24b5581658aaf28271c9f55e32836410e0282762d993ad8e94141ad"
+  },
+  "base_non_doc_equals_reviewed_source": true,
+  "compared_non_doc_entries": 3126,
+  "reviewed_to_coordinator_added_docs": [
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/f16-f17-supplemental-amended-20261103-r1/issue944-authoritative-setup-stop-port-seam.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/f16-f17-supplemental-amended-20261103-r1/issue944-recovery-manifest.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/f16-f17-supplemental-amended-20261103-r1/runtime-receipt-reconciliation.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/f16-f17-supplemental-amended-20261103-r1/runtime-resource-manifest.json"
+  ],
+  "all_prior_docs_preserved": {
+    "count": 2802,
+    "equal": true,
+    "changed": []
+  },
+  "all_prior_evidence_preserved": {
+    "count": 2346,
+    "equal": true,
+    "changed": []
+  },
+  "exact_fixture_inverse": {
+    "equals_reviewed_candidate_bytes": true,
+    "reversed_only": [
+      "historical-port constant",
+      "strict environment-port reader",
+      "fixture expected_postgres_port dependency check",
+      "one expected-port comparison"
+    ],
+    "restored_helper_sha256": "98e7efa987248ee34fbb9027b6f1b9de39ede2dd159ed53134798a19e2356ae2"
+  },
+  "all_other_tracked_paths_unchanged_from_coordinator": true,
+  "production_paths_changed": [],
+  "config_dependency_migration_workflow_paths_changed": [],
+  "existing_selector_or_assertion_paths_changed": [],
+  "preserved_checks": {
+    "hostname": "127.0.0.1",
+    "database_pattern": "^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$",
+    "redis_host": "127.0.0.1:61168",
+    "redis_database": "/1",
+    "minio_endpoint": "http://127.0.0.1:61170",
+    "bucket": "diagnostic-test-private",
+    "VITEST_POOL_ID": "1 remains required; workerUrls and worker allocation unchanged"
+  },
+  "tracked_working_diff_at_source_checkpoint": [],
+  "untracked_paths_before_evidence_commit": [
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/allow-list-audit.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/api-lint.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/api-lint.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/api-tsc6.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/api-tsc6.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/api-typecheck.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/api-typecheck.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/focused-boundary-green.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/focused-boundary-green.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-1-lint-failure/offline-command-receipts.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-2-ts4111-failure/api-typecheck.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-2-ts4111-failure/api-typecheck.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-2-ts4111-failure/focused-boundary-green.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-2-ts4111-failure/focused-boundary-green.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/attempt-2-ts4111-failure/offline-command-receipts.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-build.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-build.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-lint.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-lint.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-tsc6.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-tsc6.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-typecheck.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/api-typecheck.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/focused-boundary-green.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/focused-boundary-green.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/git-diff-check.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/git-diff-check.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/offline-command-receipts.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/final/offline-command-receipts.original.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/red/red.command.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/red/red.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/checks/red/red.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/identity-base-settings.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/issue945-one-id-map.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/packet.md",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/issue945-full-read.command.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/issue945-full-read.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/issue945-full-read.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/verified-ts6-package.command.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/verified-ts6-package.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/verified-ts6-package.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/verified-ts6-version.command.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/verified-ts6-version.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue945-port-seam-20261104/provenance/verified-ts6-version.stdout"
+  ],
+  "all_untracked_within_evidence_allow_list": true,
+  "runtime": {
+    "issue944_run": false,
+    "services_started": false,
+    "runtime_resources_touched": false,
+    "migration_executed": false
+  },
+  "review_gate": "Independent exact-SHA Standards and Spec reviews remain coordinator-owned after assembly. No #944 retry before review and repinning."
+}

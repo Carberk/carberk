@@ -1,0 +1,22 @@
+{
+  "name": "verified-ts6-version",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "tsc6",
+    "--version"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "environment_overrides": {},
+  "head": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+  "started_at_utc": "2026-11-03T22:18:40.226526+00:00",
+  "ended_at_utc": "2026-11-03T22:18:40.353479+00:00",
+  "elapsed_ns": 126937208,
+  "exit": 0,
+  "stdout": "verified-ts6-version.stdout",
+  "stderr": "verified-ts6-version.stderr",
+  "stdout_sha256": "13af495bed3deeb9d4f80a19f5b54797937e54e69bdffe4292db85b4e211fdde",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

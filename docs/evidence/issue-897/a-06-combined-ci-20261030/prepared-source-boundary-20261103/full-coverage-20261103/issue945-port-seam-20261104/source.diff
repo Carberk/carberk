@@ -1,0 +1,77 @@
+diff --git a/apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts b/apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts
+new file mode 100644
+index 000000000..6cdd5d158
+--- /dev/null
++++ b/apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts
+@@ -0,0 +1,34 @@
++import { afterEach, describe, expect, it } from "vitest";
++
++import { expectedDiagnosticPostgresPort } from "./diagnosticPreparedReaderFixture";
++
++const originalPort = process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"];
++
++afterEach(() => {
++  if (originalPort === undefined) {
++    delete (process.env as { DIAGNOSTIC_EXPECTED_POSTGRES_PORT?: string }).DIAGNOSTIC_EXPECTED_POSTGRES_PORT;
++  } else process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"] = originalPort;
++});
++
++describe("diagnostic prepared reader expected PostgreSQL port", () => {
++  it("keeps the historical port when no override is configured", () => {
++    delete (process.env as { DIAGNOSTIC_EXPECTED_POSTGRES_PORT?: string }).DIAGNOSTIC_EXPECTED_POSTGRES_PORT;
++
++    expect(expectedDiagnosticPostgresPort()).toBe(61169);
++  });
++
++  it("accepts a strict decimal TCP port override", () => {
++    process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"] = "61172";
++
++    expect(expectedDiagnosticPostgresPort()).toBe(61172);
++  });
++
++  it.each(["", "61169.0", " 61169", "+61169", "1e4", "0", "65536", "-1"])(
++    "rejects malformed or out-of-range override %j",
++    value => {
++      process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"] = value;
++
++      expect(expectedDiagnosticPostgresPort()).toBeUndefined();
++    },
++  );
++});
+diff --git a/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts b/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts
+index 059a663b8..05f119a5b 100644
+--- a/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts
++++ b/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts
+@@ -75,6 +75,7 @@ const { PrismaIdentityReadAdapter } = appRequire("./src/modules/identity/infrast
+ const { PrismaIdentityAdminRepository } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityAdminRepository") as { PrismaIdentityAdminRepository: new (db: PrismaService) => IdentityAdminPort };
+ const { PrismaIdentityCheckAdapter } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityCheckAdapter") as { PrismaIdentityCheckAdapter: new (db: PrismaService) => IdentityCheckPort };
+ const bucket = "diagnostic-test-private";
++const historicalDiagnosticPostgresPort = 61169;
+ const people: Person[] = ["commissionerA", "commissionerB", "reception", "technicianA", "technicianB", "reviewer", "foreign"];
+ const operators: Operator[] = ["founder", "owner", "staffManager", "admin"];
+ const capabilities: Partial<Record<Person, string>> = {
+@@ -82,6 +83,12 @@ const capabilities: Partial<Record<Person, string>> = {
+   reviewer: "diagnostics.reviewer", foreign: "diagnostics.technician",
+ };
+ const localized = { tk: "Synthetic", ru: "Synthetic", en: "Synthetic" };
++export function expectedDiagnosticPostgresPort(value = process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"]): number | undefined {
++  if (value === undefined) return historicalDiagnosticPostgresPort;
++  if (!/^[1-9][0-9]{0,4}$/.test(value)) return undefined;
++  const port = Number(value);
++  return port <= 65535 ? port : undefined;
++}
+ export const preparedReaderRights = {
+   category: "vehicle_observation", purpose: "Synthetic discovery", basis: "Owned synthetic fixture",
+   provenance: "Generated fixture", identifiability: "pseudonymous", use: ["service"],
+@@ -202,8 +209,10 @@ export class DiagnosticPreparedReaderFixture {
+     const expected = workerUrls(configured, Number(process.env["VITEST_POOL_ID"]));
+     const databaseUrl = process.env["DATABASE_URL"];
+     this.dependency(databaseUrl === expected.databaseUrl && process.env["REDIS_URL"] === expected.redisUrl, "worker_urls");
++    const expectedPostgresPort = expectedDiagnosticPostgresPort();
++    this.dependency(expectedPostgresPort !== undefined, "expected_postgres_port", process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"]);
+     const url = new URL(expected.databaseUrl);
+-    this.dependency(url.hostname === "127.0.0.1" && url.port === "61169" && /^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$/.test(url.pathname.slice(1)), "owned_worker_database");
++    this.dependency(url.hostname === "127.0.0.1" && url.port === String(expectedPostgresPort) && /^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$/.test(url.pathname.slice(1)), "owned_worker_database");
+     this.dependency(new URL(expected.redisUrl).host === "127.0.0.1:61168" && new URL(expected.redisUrl).pathname === "/1", "owned_redis_db1");
+     this.dependency(process.env["MINIO_ENDPOINT"] === "http://127.0.0.1:61170" && process.env["DIAGNOSTIC_PRIVATE_BUCKET"] === bucket, "owned_storage");
+     this.cleanupReceipt.database = url.pathname.slice(1);

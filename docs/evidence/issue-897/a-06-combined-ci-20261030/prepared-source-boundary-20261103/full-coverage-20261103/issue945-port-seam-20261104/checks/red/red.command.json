@@ -1,0 +1,32 @@
+{
+  "name": "focused-boundary-red",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "--maxWorkers=1"
+  ],
+  "environment_overrides": {
+    "AUTO_TM_TEST_DATABASES": "off",
+    "NODE_OPTIONS": "--import=tsx"
+  },
+  "started_at_utc": "2026-11-03T22:09:04.437521+00:00",
+  "ended_at_utc": "2026-11-03T22:09:05.934783+00:00",
+  "started_monotonic_ns": 38567041,
+  "ended_monotonic_ns": 1535709541,
+  "elapsed_ns": 1497142500,
+  "elapsed_seconds": "1.497142500",
+  "exit": 1,
+  "stdout": "red.stdout",
+  "stderr": "red.stderr",
+  "stdout_sha256": "ba2009d4597f872c4b72ba67647fa3373d43e04a0ce78fca6530043cb9d21603",
+  "stderr_sha256": "60dfefedd1e4a207c3447e6219ba6a792490127499cf6fc6e8a91a208373db1a",
+  "stdout_bytes": 996,
+  "stderr_bytes": 3111
+}

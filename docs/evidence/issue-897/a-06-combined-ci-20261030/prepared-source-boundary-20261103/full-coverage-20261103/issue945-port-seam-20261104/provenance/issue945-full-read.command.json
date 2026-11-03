@@ -1,0 +1,22 @@
+{
+  "name": "issue945-full-read",
+  "argv": [
+    "gh",
+    "issue",
+    "view",
+    "945",
+    "--json",
+    "number,title,body,comments,state,url,updatedAt"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "environment_overrides": {},
+  "head": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+  "started_at_utc": "2026-11-03T22:18:38.103998+00:00",
+  "ended_at_utc": "2026-11-03T22:18:40.215946+00:00",
+  "elapsed_ns": 2111881667,
+  "exit": 0,
+  "stdout": "issue945-full-read.stdout",
+  "stderr": "issue945-full-read.stderr",
+  "stdout_sha256": "9a34a176c2db7841a8ba68a30b44e3081125c463fb00c6a4c2b3026945b26115",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

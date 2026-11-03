@@ -1,0 +1,41 @@
+{
+  "kind": "issue945-initial-identity-and-settings",
+  "durable_record_assembled_at_utc": "2026-11-03T22:20:14.690554+00:00",
+  "initial_observations_recorded_before_source_edits": {
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+    "branch": "t3/issue-945-diagnostic-postgres-port-seam",
+    "head": "39c63fad462885846840149b15771654980bdaa7",
+    "tree": "ea4f2d4b3b397a0e6cfd1e72064b5e0421b4e35d",
+    "status_porcelain": "",
+    "clean": true,
+    "tracked_and_untracked_changes": [],
+    "reviewed_source_commit": "5b60645bae20e416781cda66b98123635f209341",
+    "reviewed_source_tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6",
+    "non_documentation_source_equal": true
+  },
+  "capture_note": "The initial identity/status/trees were read before the first test edit in the session. This durable JSON was assembled during finalization; it is not represented as a separately timestamped pre-edit command receipt.",
+  "execution_settings": {
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "xhigh",
+    "service_tier": "default",
+    "access": "full-access",
+    "source": "Coordinator settings readback in #945 dispatch comment",
+    "source_url": "https://github.com/Carberk/carberk/issues/945#issuecomment-6616440484",
+    "source_created_at": "2026-11-03T21:58:20Z",
+    "runtime": "T3 Code through Codex harness; danger-full-access; approval policy never"
+  },
+  "branch_reservation": {
+    "remote": "origin",
+    "ref": "refs/heads/agent/issue-945-diagnostic-postgres-port-seam",
+    "reserved_at_commit": "39c63fad462885846840149b15771654980bdaa7",
+    "reservation_was_before_edits": true,
+    "owned_local_branch_preserved": true
+  },
+  "tools_read_before_first_edit": {
+    "node": "v24.13.0",
+    "pnpm": "12.11.2",
+    "git": "2.54.0 (Apple Git-157)"
+  },
+  "docs": "No external API or dependency behavior changed; no documentation lookup was needed."
+}
