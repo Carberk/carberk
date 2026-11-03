@@ -1,0 +1,64 @@
+{
+  "kind": "issue939-h1-contract-path-blocker",
+  "recorded_at": "2026-11-03T15:08:42Z",
+  "issue": 939,
+  "contract_release": "https://github.com/Carberk/carberk/issues/939",
+  "coordinator": {
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "branch": "agent/release897-candidate-a-20261029",
+    "head": "5ce546b2db0ff5335a948a2bdef723c61b103885",
+    "tree": "3457e38b11b1696966e0c9df73fb49c741368317",
+    "porcelain": "clean",
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh",
+    "serviceTier": "default",
+    "runtime": "full-access"
+  },
+  "executor": {
+    "thread": "<t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/thread:delegated-task:command%3Amcp%3A6985d3b1-7279-441b-9911-57bc5619ebe0%3Adelegate-task%3Aeecba4b0-1abf-4f7e-8a1f-77ab1841738e>",
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "branch": "t3/2d375913",
+    "head": "4b869f12829f59b18361bd37ba3cc5dc675cc879",
+    "tree": "bc40df98d6a5e081dc927be2696e3706f594694c",
+    "porcelain": "clean",
+    "source_input": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+    "non_documentation_equality": true,
+    "provider": "claudeAgent",
+    "model": "claude-opus-5-5",
+    "effort": "high",
+    "fastMode": false,
+    "runtime": "full-access"
+  },
+  "contract_paths": {
+    "listed_by_939": [
+      "apps/api/test/e2e/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/test/e2e/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "apps/api/test/e2e/ClassifiedForwardCapture.e2e.spec.ts",
+      "apps/api/test/e2e/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    ],
+    "listed_test_paths_exist_in_executor": false,
+    "actual_existing_test_paths": [
+      "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts"
+    ],
+    "helper_path_exists_in_executor": true
+  },
+  "blocker": "#939's four allowed e2e paths do not exist in the clean executor; the existing replacement files are under apps/api/src/modules/identity/{presentation,infrastructure}. Creating or editing the test/e2e paths would violate the released five-path contract and would not be a one-for-one continuation of the existing source.",
+  "actions_taken": [
+    "read actual #897, #938 and #939",
+    "verified GitHub identity and repository",
+    "verified coordinator and executor clean identities/settings",
+    "verified source equality and inventory hash 324669d09c6d66115a703c300ead0c673eca4974b73493c45d7f6821fb86c5d3"
+  ],
+  "actions_not_taken": [
+    "no source edits",
+    "no package/build/test commands",
+    "no writer release or duplicate dispatch",
+    "no runtime resource reservation"
+  ],
+  "next_action": "Parent amends #939's four e2e allowed paths to the existing src/modules/identity paths, or records an exact approved mapping. Resume the same executor only after that readback."
+}
