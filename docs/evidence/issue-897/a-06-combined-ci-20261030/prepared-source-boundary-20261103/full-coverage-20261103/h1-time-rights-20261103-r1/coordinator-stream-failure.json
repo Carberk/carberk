@@ -1,0 +1,39 @@
+{
+  "kind": "issue939-h1-coordinator-stream-failure",
+  "recorded_at": "2026-11-03T17:38:01Z",
+  "failure": "stream disconnected before completion: stream closed before response.completed",
+  "classification": "coordinator_provider_stream_interruption",
+  "behavioral_verdict": null,
+  "executor": {
+    "thread": "<t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/thread:delegated-task:command%3Amcp%3A6985d3b1-7279-441b-9911-57bc5619ebe0%3Adelegate-task%3Aeecba4b0-1abf-4f7e-8a1f-77ab1841738e>",
+    "run": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A6985d3b1-7279-441b-9911-57bc5619ebe0%253Adelegate-task%253Aeecba4b0-1abf-4f7e-8a1f-77ab1841738e:ordinal:9",
+    "status_at_recovery": "running",
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "branch": "t3/2d375913",
+    "base_head": "4b869f12829f59b18361bd37ba3cc5dc675cc879",
+    "base_tree": "bc40df98d6a5e081dc927be2696e3706f594694c",
+    "current_worktree_status": "modified source files and untracked checks evidence; writer remains active",
+    "modified_paths_observed": [
+      "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    ],
+    "runtime": "unreserved"
+  },
+  "coordinator": {
+    "head": "204948bd194dc9a954a1c3f70db2b03069a6140d",
+    "tree": "7bf83813e69cc08da09f31f56e0bf34d6aaa9367",
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh",
+    "serviceTier": "default",
+    "runtime": "full-access"
+  },
+  "actions": [
+    "resumed the same coordinator context",
+    "verified ordinal 9 remains active",
+    "left the writer and partial worktree untouched",
+    "did not create a duplicate writer or reserve runtime"
+  ],
+  "next_action": "Wait for ordinal 9's terminal handoff, then audit exact source/evidence and static readiness before any review or runtime gate."
+}
