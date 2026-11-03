@@ -1,0 +1,311 @@
+{
+  "kind": "issue939-f16-f17-supplemental-two-case-map",
+  "recorded_at": "2026-11-03T20:22:52.417443+00:00",
+  "contract": [
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6612779049",
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6614404848",
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6614443867"
+  ],
+  "inventory": {
+    "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/lawful-feasibility-stop.json",
+    "sha256": "324669d09c6d66115a703c300ead0c673eca4974b73493c45d7f6821fb86c5d3"
+  },
+  "source_base": "594a6297cb81816daa80836feea318004afbe9c6",
+  "candidate": "3ee5cdb8bf56114268240e401498e84372554fd7",
+  "source_checkpoint": "b52b1f0660d7dac8b26ad9c3c31029d7a07733f5",
+  "source_tree": "89148c4aee6eebb4b3afd34917a5796743862b3c",
+  "cases": [
+    {
+      "id": "F16",
+      "scenario": "uniformly omits and refuses A rights expiry at read and again at action",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 133,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 63,
+      "target_row_line": 58,
+      "selected_material": "A provenance",
+      "selector_name_unchanged": true,
+      "supplement": {
+        "before_deadline": [
+          "expect(before.status).toBe(200);",
+          "expect(before.headers[\"cache-control\"]).toBe(\"no-store, private\");",
+          "expect(before.body).toEqual({ candidates: [{ reportId: report.id, observedAt: \"2026-10-21T12:00:00.000Z\", mileageKm: 123000 }], nextCursor: null, exhausted: true, scope: \"currently_authorized_retained_predecessors\" });"
+        ],
+        "at_deadline_readback": [
+          "expect(d.now).toEqual(deadline);",
+          "expect(d[selected.visit][selected.kind]).toEqual(deadline);",
+          "expect(others).toHaveLength(3);",
+          "expect(later?.valueOf()).toBeGreaterThan(deadline.valueOf());",
+          "expect([...d.qualificationRevocations, ...d.assignmentRevocations]).toEqual([null, null, null, null, null, null, null]);",
+          "expect(d.proof).toEqual({ rightsUntil: deadline, invalidatedAt: null, consumedAt: null, erasedAt: null });"
+        ],
+        "at_deadline_route": [
+          "expect(at.status).toBe(200);",
+          "expect(at.headers[\"cache-control\"]).toBe(\"no-store, private\");",
+          "expect(at.body).toEqual({ candidates: [], nextCursor: null, exhausted: true, scope: \"currently_authorized_retained_predecessors\" });"
+        ]
+      },
+      "refusal_locus": {
+        "boundary": "identity graph/projectIdentity (PrismaDiagnosticReports.compared -> comparisonFacts -> PrismaDiagnosticIdentityEvidence.identity)",
+        "side": "A identity (predecessor)",
+        "loader_line": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts:188",
+        "cause": "A provenance !retained -> live(rightsUntil > runtime.now()) false -> A evidence unusable -> chain refusal DIAGNOSTIC_NO_ACCESS",
+        "comparisonRights_reached": false
+      }
+    },
+    {
+      "id": "F17",
+      "scenario": "uniformly omits and refuses B rights expiry at read and again at action",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 134,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 63,
+      "target_row_line": 59,
+      "selected_material": "B evidence",
+      "selector_name_unchanged": true,
+      "supplement": {
+        "before_deadline": [
+          "expect(before.status).toBe(200);",
+          "expect(before.headers[\"cache-control\"]).toBe(\"no-store, private\");",
+          "expect(before.body).toEqual({ candidates: [{ reportId: report.id, observedAt: \"2026-10-21T12:00:00.000Z\", mileageKm: 123000 }], nextCursor: null, exhausted: true, scope: \"currently_authorized_retained_predecessors\" });"
+        ],
+        "at_deadline_readback": [
+          "expect(d.now).toEqual(deadline);",
+          "expect(d[selected.visit][selected.kind]).toEqual(deadline);",
+          "expect(others).toHaveLength(3);",
+          "expect(later?.valueOf()).toBeGreaterThan(deadline.valueOf());",
+          "expect([...d.qualificationRevocations, ...d.assignmentRevocations]).toEqual([null, null, null, null, null, null, null]);",
+          "expect(d.proof).toEqual({ rightsUntil: deadline, invalidatedAt: null, consumedAt: null, erasedAt: null });"
+        ],
+        "at_deadline_route": [
+          "expect(at.status).toBe(200);",
+          "expect(at.headers[\"cache-control\"]).toBe(\"no-store, private\");",
+          "expect(at.body).toEqual({ candidates: [], nextCursor: null, exhausted: true, scope: \"currently_authorized_retained_predecessors\" });"
+        ]
+      },
+      "refusal_locus": {
+        "boundary": "identity graph/projectIdentity (PrismaDiagnosticReports.compared -> comparisonFacts -> PrismaDiagnosticIdentityEvidence.identity)",
+        "side": "B identity (candidate)",
+        "loader_line": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts:189",
+        "cause": "B evidence !live(rightsUntil > runtime.now()) -> chain refusal DIAGNOSTIC_NO_ACCESS",
+        "comparisonRights_reached": false
+      }
+    }
+  ],
+  "e2e_diff": {
+    "removed_lines_rewritten_by_suffix_only": 4,
+    "added_lines": 33,
+    "all_base_expect_lines_kept_in_order": true,
+    "assertion_order_in_body": "baseline handoff -> predecessor before -> transition -> deadline readback -> predecessor at deadline -> original empty-handoff -> 403 -> zero reports -> zero audit"
+  },
+  "other_rows_unchanged": "F11 issuer qualification loss and F20 proof rights expiry carry no Selected element; their supplement blocks are not entered.",
+  "helper": {
+    "removed_lines": 0,
+    "added_method": "pairDeadlines (read-only)",
+    "db_calls": [
+      "diagnosticCenterAssignment.findUniqueOrThrow",
+      "diagnosticContinuityProof.findUniqueOrThrow",
+      "diagnosticIdentityEvidence.findUniqueOrThrow",
+      "diagnosticIdentityProvenance.findUniqueOrThrow",
+      "diagnosticOrderAssignment.findUniqueOrThrow",
+      "session.findUniqueOrThrow"
+    ],
+    "writes_or_clock_moves": false
+  },
+  "refusal_path_source_facts": [
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticDiscovery.ts",
+      "line": 50,
+      "text": "try { candidates.push(await this.proofs.retainedCandidate(tx, subject, orderId, row.id)); }",
+      "blob": "71160a4a8914a8d8d4747e1bc46595438521cdb1"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticDiscovery.ts",
+      "line": 51,
+      "text": "catch (error) { if (!(error instanceof DiagnosticRuleError)) throw error; }",
+      "blob": "71160a4a8914a8d8d4747e1bc46595438521cdb1"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts",
+      "line": 271,
+      "text": "const pair = await this.reports.compared(tx, subject, orderId, predecessorId);",
+      "blob": "341dcf80f2b627c7a131a6ea51cd1d2978637d1e"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts",
+      "line": 277,
+      "text": "await this.comparisonRights(tx, pair, \"comparative_attestation\", provenance, this.runtime.now());",
+      "blob": "341dcf80f2b627c7a131a6ea51cd1d2978637d1e"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts",
+      "line": 188,
+      "text": "const a = await (locked ? this.evidenceRecords.identity.bind(this.evidenceRecords)",
+      "blob": "30272ba82b266d323f36318c34c8bbc3cdce6ba5"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts",
+      "line": 189,
+      "text": "const b = await (locked ? this.evidenceRecords.identity.bind(this.evidenceRecords)",
+      "blob": "30272ba82b266d323f36318c34c8bbc3cdce6ba5"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 48,
+      "text": "return until > this.runtime.now() && D.DiagnosticIdentityRightsSchema.safeParse(rights).success;",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 51,
+      "text": "return row.state === \"verified\" && !row.cleanupRequestedAt && !row.erasedAt && !!row.objectKey && this.live(row.rights, row.rightsUntil);",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 242,
+      "text": "|| !this.live(record.rights, record.rightsUntil) || !items.success || !items.data.length ||",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 243,
+      "text": "items.data.some(item => { const held = provenance.get(item.id); return !held || !this.retained(held) || held.sha256 !== item.sha256; }) ||",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 358,
+      "text": "if (chain.some(record => !usable.has(record.id))) throw denied();",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "path": "apps/api/src/modules/diagnostics/domain/PrivateContinuityAttestation.ts",
+      "line": 135,
+      "text": "return new Date(Math.min(...ends.map(value => value.valueOf())));",
+      "blob": "fccca9ef506674983f6bb047ab3fcecccb433aad"
+    }
+  ],
+  "proof_independent_route": {
+    "PrismaDiagnosticDiscovery.predecessors": true,
+    "PrismaDiagnosticContinuityProofs.retainedCandidate": true,
+    "PrismaDiagnosticReports.compared+comparisonFacts": true,
+    "PrismaDiagnosticIdentityEvidence (whole file)": true
+  },
+  "deadline_semantics": {
+    "selected": "equals the predeclared deadline and the injected clock",
+    "later": [
+      "other three A/B provenance/evidence rights (2027-01-01)",
+      "reviewer, technicianA and technicianB qualifications (bootstrap DB time + 2h)",
+      "reviewer and technicianB Session expiry and elevation (2027-01-01)"
+    ],
+    "active": "reviewer/technician qualification and order-assignment revocations all null",
+    "proof": "issued, not invalidated, consumed or erased; rightsUntil equals the selected deadline by construction (min of bound material ends, PrivateContinuityAttestation.ts). The coincidence is asserted explicitly, not claimed later. The route reads no proof, so the proof deadline is not the cause. No live-proof/expired-material state is claimed."
+  },
+  "session_expiry": "No Session is expired or revoked; Sessions are read back as later than the deadline.",
+  "allow_list": {
+    "changed_non_doc_paths": [
+      "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    ],
+    "within": true,
+    "production_migration_guard_config_dependency_workflow_unchanged_vs_candidate": true,
+    "vitest_timeouts_unchanged": true
+  },
+  "forbidden_markers": {
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts": [],
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": []
+  },
+  "original_nine_plus_memory": [
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "expected": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "current": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "expected": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "current": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "expected": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "current": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "expected": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "current": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+      "expected": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "current": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+      "expected": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "current": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+      "expected": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "current": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+      "expected": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "current": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+      "expected": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "current": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "equal": true
+    },
+    {
+      "path": "packages/db/src/testing/DiagnosticMemoryDatabase.ts",
+      "expected": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "current": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "equal": true
+    }
+  ],
+  "prior_evidence_preserved": {
+    "count": 2394,
+    "all_equal": true
+  },
+  "accounting": {
+    "original_cases": 56,
+    "companion_cases": 168,
+    "frozen_selection": 224,
+    "accepted_cases_added": 0,
+    "f16_f17_status": "OPEN (enriched source only)",
+    "full_224_executable": false
+  },
+  "runtime_risks_unproven": [
+    "predecessor-candidates after a proof is issued for the same (A, B) pair (no proof read on the route, unexecuted)",
+    "reviewer read cost of two extra discovery reads under the unchanged 120s testTimeout"
+  ],
+  "not_run": [
+    "tests",
+    "PostgreSQL",
+    "Redis",
+    "MinIO",
+    "runtime",
+    "review"
+  ],
+  "not_claimed": [
+    "F16/F17 accepted",
+    "#939 PASS",
+    "#938 PASS",
+    "Milestone A acceptance"
+  ]
+}
