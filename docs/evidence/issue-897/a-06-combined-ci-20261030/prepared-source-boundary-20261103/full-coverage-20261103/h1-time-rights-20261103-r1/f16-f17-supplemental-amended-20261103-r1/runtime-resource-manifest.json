@@ -113,6 +113,13 @@
       "name": "restoration"
     }
   ],
+  "contractCorrection": {
+    "cleanup": "base dropped, Redis DB1 flushed, Compose down --volumes --remove-orphans; owned ports/resources absent",
+    "next": "rerun setup with corrected base REDIS_URL=/0, then run exact selector only after setup receipts pass",
+    "observedSetup": "Compose up, empty base creation and migrations passed; no F16/F17 test ran",
+    "rawLogs": "/tmp/issue939-runtime-f16f17-20261103/logs/runtime/",
+    "reason": "pre-test manifest env correction; REDIS_URL=/1 would make globalSetup derive worker DB2"
+  },
   "createdAt": "2026-11-03T20:56:01Z",
   "identities": {
     "coordinator": {
@@ -398,7 +405,7 @@
     ],
     "sourceUnchanged": true
   },
-  "status": "PREREQUISITES_PASS_RUNTIME_HELD",
+  "status": "RUNTIME_SETUP_CORRECTION_PENDING",
   "stopPolicy": "Stop immediately at first setup, build, migration, selection, semantic/test, timeout, cleanup or restoration failure. Preserve raw argv, environment-key names, UTC start/end, exit, stdout/stderr and hashes. Do not rerun a completed successful case or broaden the selector; cleanup is mandatory after any started service.",
   "test": {
     "argv": [
@@ -420,7 +427,7 @@
     "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
     "envKeys": [
       "DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1",
-      "REDIS_URL=redis://127.0.0.1:61168/1",
+      "REDIS_URL=redis://127.0.0.1:61168/0",
       "MINIO_ENDPOINT=http://127.0.0.1:61170",
       "MINIO_PUBLIC_URL=http://127.0.0.1:61170",
       "MINIO_ACCESS_KEY=minioadmin",
@@ -431,6 +438,7 @@
       "DIAGNOSTIC_SYNTHETIC_ENABLED=true",
       "AUTO_TM_TEST_DATABASES=unset"
     ],
+    "redisWorkerAssignment": "base REDIS_URL uses DB0; globalSetup assigns VITEST_POOL_ID=1 to Redis DB1; helper verifies worker DB1",
     "requiredRuntimeAssertions": [
       "before-deadline exact one-candidate DTO",
       "before and at-deadline cache-control no-store, private",
@@ -453,5 +461,5 @@
       "sha256": "ad7080454434586c0ae88ca672189cc6573ef9ab206726685d39ab57c1a779e2"
     }
   },
-  "updatedAt": "2026-11-03T21:07:16Z"
+  "updatedAt": "2026-11-03T21:10:00Z"
 }
