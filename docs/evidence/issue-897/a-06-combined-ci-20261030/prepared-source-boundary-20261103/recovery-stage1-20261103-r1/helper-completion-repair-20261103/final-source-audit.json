@@ -1,0 +1,77 @@
+{
+  "kind": "helper-completion-repair-final-source-audit",
+  "base_head": "3378a787627650c3e442f6c0e98be0c5592bebd2",
+  "base_tree": "c6420365757043df387aef656fe2b516517b9cf1",
+  "source_checkpoint": "ad4d182136dd3e5aa7573b31e7306ad7c2c15471",
+  "source_tree": "c669f525b021e6288b6a9a5521b2195b806a1369",
+  "assembled_candidate": "ec2494b909c8438a6479f2b62c94a42e1f7900b4",
+  "changed_paths_base_to_source": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "non_doc_paths_candidate_to_source": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "helper": {
+    "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "base_blob": "850ab1f135c9408f8c4cc2d857980d91c0d7e5e9",
+    "source_blob": "48053c66e5a7a88520f1373a1d0662211f965fec",
+    "source_sha256": "89dcb0be3a828f03ec1c1092284889f5ed7401e9dfa98d765f773674a2184287",
+    "diff_numstat": "5\t4\tapps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "diff_sha256": "13f010fb9cd77c8730255869ad8c87282344e70ad349355611037346b373a671",
+    "diff": "diff --git a/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts b/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts\nindex 850ab1f13..48053c66e 100644\n--- a/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts\n+++ b/apps/api/test/helpers/diagnosticPreparedReaderFixture.ts\n@@ -496,12 +496,13 @@ export async function withPreparedReaderFixture<T>(kind: Suite, scenario: string\n   options: { partialFailure?: boolean; cleanup?: (receipt: PreparedReaderCleanup) => void } = {}): Promise<T> {\n   const fixture = new DiagnosticPreparedReaderFixture(kind, scenario);\n   let original: unknown;\n-  let result: T | undefined;\n-  try { await fixture.initialize(options.partialFailure); result = await work(fixture); }\n+  // Successful completion is tracked explicitly: stage1 callbacks resolve with `void`, so `undefined` is a valid result.\n+  let completion: { readonly value: T } | undefined;\n+  try { await fixture.initialize(options.partialFailure); completion = { value: await work(fixture) }; }\n   catch (error) { original = error; }\n   const cleanup = await fixture.close(); options.cleanup?.(cleanup);\n   if (cleanup.failures.length) throw new AggregateError([...(original === undefined ? [] : [original]), ...cleanup.failures], \"938_fixture_cleanup_failed\");\n   if (original !== undefined) throw original;\n-  if (result === undefined) throw new Error(\"938_fixture_missing_result\");\n-  return result;\n+  if (completion === undefined) throw new Error(\"938_fixture_missing_result\");\n+  return completion.value;\n }\n"
+  },
+  "unchanged_paths": [
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "base_blob": "c45a3cf7a7356ccd8dc8310abbd8d8b4e7d1b540",
+      "candidate_blob": "c45a3cf7a7356ccd8dc8310abbd8d8b4e7d1b540",
+      "source_blob": "c45a3cf7a7356ccd8dc8310abbd8d8b4e7d1b540",
+      "source_sha256": "d7e20cf8f9aade8a213a7c005ca83eff7a8318bf561abd09b2e43594f288e99e",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "base_blob": "b37804dd30f4e39ff03ae962e43de5b696c0a39b",
+      "candidate_blob": "b37804dd30f4e39ff03ae962e43de5b696c0a39b",
+      "source_blob": "b37804dd30f4e39ff03ae962e43de5b696c0a39b",
+      "source_sha256": "dd0a34ba6891ef68ad6465291be61f2f2314b05e3dae5f5cd3c7edec8b40e0fc",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "base_blob": "31cd86c86978e5daeeb48723be91e3c643a94af2",
+      "candidate_blob": "31cd86c86978e5daeeb48723be91e3c643a94af2",
+      "source_blob": "31cd86c86978e5daeeb48723be91e3c643a94af2",
+      "source_sha256": "95cfbad07a0702f4e5a145a88ec59ce2220ffde32d94e39b20c3b322d3043734",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "base_blob": "5aafbe4586eb7cdbca8b5721aa9e32c73afff981",
+      "candidate_blob": "5aafbe4586eb7cdbca8b5721aa9e32c73afff981",
+      "source_blob": "5aafbe4586eb7cdbca8b5721aa9e32c73afff981",
+      "source_sha256": "13b76bb92cbf502c03ad2cc572bed87bcc6c53ec87ba5cd4154e8c1b1073d050",
+      "equal": true
+    },
+    {
+      "path": "packages/db/src/testing/DiagnosticMemoryDatabase.ts",
+      "base_blob": "891bf61685addc418cfe026605a7ef770d803ce6",
+      "candidate_blob": "891bf61685addc418cfe026605a7ef770d803ce6",
+      "source_blob": "891bf61685addc418cfe026605a7ef770d803ce6",
+      "source_sha256": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "equal": true
+    }
+  ],
+  "prior_evidence_preserved": {
+    "count": 27,
+    "all_equal": true,
+    "changed": []
+  },
+  "missing_result_semantics": "completion is set only after work() resolves; a resolved undefined (void) result returns normally; a rejection is captured as original and rethrown after cleanup; cleanup failures still aggregate with original; 938_fixture_missing_result now fires only if work never completed without a defined error (e.g. throw undefined)",
+  "not_claimed": [
+    "#938 ticket PASS",
+    "runtime PASS",
+    "Milestone A acceptance"
+  ],
+  "runtime_db_storage_services": "not started; held"
+}
