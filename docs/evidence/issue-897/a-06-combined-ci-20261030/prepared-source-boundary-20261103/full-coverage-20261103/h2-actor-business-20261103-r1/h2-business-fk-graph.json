@@ -1,0 +1,65 @@
+{
+  "kind": "issue940-h2-lawful-business-fk-graph",
+  "source_checkpoint": "cec5d51aa633d2ed84d01d0f1d93baad511e5d9d",
+  "schema_path": "packages/db/prisma/schema.prisma",
+  "schema_sha256_at_checkpoint": "21cdc52efb2fb1a9cabdfe0955cfe8d75e60147f9e6dd14f83f9e45bf3df4c45",
+  "fk_checks": {
+    "dealership_members.dealershipId -> dealerships.id": true,
+    "dealership_members.userId -> users.id (unique: one membership per User)": true,
+    "dealership_invitations.dealershipId -> dealerships.id": true,
+    "dealership_invitations.recipientUserId -> users.id": true,
+    "listings.businessId -> dealerships.id (Restrict)": true,
+    "diagnostic_ownership_components.grantId -> diagnostic_ownership_grants.id": true,
+    "diagnostic_ownership_components.businessId/membershipId (copied tuple, no FK)": true,
+    "diagnostic_ownership_grants.listingId/businessId/membershipId/grantorId/grantorMembershipId": true
+  },
+  "nodes": [
+    {
+      "node": "users founder/owner/staffManager/admin",
+      "producer": "PrismaUserRepository.create + PrismaSessionRepository.create + updateAdminTotpExpiresAt (same as the seven fixture actors); not added to `people`"
+    },
+    {
+      "node": "staff_grants founder.admission (founder), staff.manage (staffManager)",
+      "producer": "pnpm --filter @auto-tm/db staff:bootstrap (bootstrap audit) as the restricted role"
+    },
+    {
+      "node": "dealerships (synthetic, recovery -> active)",
+      "producer": "AdmitBusiness -> PrismaBusinessRepository.admit (founder.admission + elevated Session, campaign preparation); owner redeem sets active"
+    },
+    {
+      "node": "dealership_invitations owner, sales",
+      "producer": "AdmitBusiness (owner, 48h); InviteBusinessMember by the active owner (sales, 48h); NodeBusinessInvitationTokens"
+    },
+    {
+      "node": "dealership_members owner, sales(commissionerB)",
+      "producer": "RedeemBusinessInvitation -> businessSourceCommand member_create"
+    },
+    {
+      "node": "dealership_members sales status suspended | deleted",
+      "producer": "ChangeBusinessMembership by the owner -> member_eligibility | member_remove source command (F05 | F06)"
+    },
+    {
+      "node": "listings.businessId, sellerId commissionerB",
+      "producer": "PrismaListingRepository.save(Listing.create({... businessId }))"
+    },
+    {
+      "node": "inspection_orders (listing_public, commissioner commissionerB)",
+      "producer": "POST diagnostics/orders; intake authorizes the Business member (CheckBusinessAuthority)"
+    },
+    {
+      "node": "diagnostic_ownership_grants (F04)",
+      "producer": "POST orders/:id/ownership-grant by the owner; Business source requires the commissioner's active membership"
+    },
+    {
+      "node": "diagnostic_ownership_components",
+      "producer": "POST orders/:id/vehicle (technicianB) -> DiagnosticOwnershipCapture.append; available only with a compatible grant"
+    }
+  ],
+  "case_graphs": {
+    "F04": "membership active; owner grant; component available with grant.businessId/membershipId",
+    "F05": "membership suspended after arrival; no grant (grant source refuses non-active membership); component unavailable",
+    "F06": "membership removed after arrival; Listing.businessId retained (Restrict FK); no grant; component unavailable"
+  },
+  "fabricated_rows": [],
+  "row_rewrites": []
+}
