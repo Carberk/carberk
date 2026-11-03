@@ -1,0 +1,171 @@
+{
+  "candidate": {
+    "commit": "5b60645bae20e416781cda66b98123635f209341",
+    "sourcePathsUnchanged": true,
+    "tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6"
+  },
+  "cleanup": [
+    "existing fixture receipts from human console",
+    "existing owned source/campaign check",
+    "owned DB/role cleanup",
+    "Redis DB1 flush and DBSIZE=0",
+    "MinIO ListObjectsV2 empty",
+    "Compose down --volumes --remove-orphans",
+    "final listener/container/volume/network checks",
+    "release slot before next slice"
+  ],
+  "contract": "One evidence-only fresh run to capture missing fixture cleanup receipts; no source/test/assertion/reporter edits and no other selector.",
+  "createdAt": "2026-11-03T21:44:14Z",
+  "issue": "https://github.com/Carberk/carberk/issues/944",
+  "kind": "issue944-f16-f17-evidence-recovery-manifest/v1",
+  "next": "After independent manifest readback and explicit reservation, execute this one exact selector, audit both raw receipt hashes, update #944/#939/#897 and Parent. Keep #942/F43 held until #944 terminal.",
+  "outOfScope": [
+    "#942",
+    "F43/#941",
+    "#940",
+    "#943",
+    "PR904",
+    "source/test/reporter edits",
+    "broad suite",
+    "overlapping resources"
+  ],
+  "owner": {
+    "coordinator": {
+      "model": "gpt-6.1-sol",
+      "provider": "codex_work",
+      "reasoningEffort": "xhigh",
+      "runtime": "full-access",
+      "serviceTier": "default",
+      "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029"
+    },
+    "issueUpdateOwner": "existing coordinator",
+    "writer": {
+      "branch": "t3/2d375913",
+      "effort": "high",
+      "fastMode": false,
+      "head": "ecbdeca12db40e3496d8a089b9c6ef2756712200",
+      "model": "claude-opus-5-5",
+      "provider": "claudeAgent",
+      "runtime": "full-access",
+      "thread": "issue939-f16f17-amended-run51",
+      "tree": "8b8cd7afdef0d666ce4ea35109805142703b8ea2",
+      "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913"
+    }
+  },
+  "prerequisites": [
+    "pnpm install --frozen-lockfile",
+    "DATABASE_URL=... pnpm --filter @auto-tm/db build",
+    "DATABASE_URL=... pnpm --filter @auto-tm/api build",
+    "compose config validation",
+    "fresh base database creation and committed migrations"
+  ],
+  "receiptRequirements": {
+    "eachFixtureReceipt": [
+      "label F16",
+      "label F17",
+      "callers=0",
+      "sourceReceipts=0",
+      "campaignReceipts=0",
+      "objectsEmpty=true",
+      "roleAbsent=true",
+      "guardModesRestored=true",
+      "failures=[]"
+    ],
+    "external": [
+      "database/base/worker and role absence",
+      "Redis DB1=0 and DB0 preserved",
+      "MinIO empty",
+      "Compose down volumes/orphans",
+      "ports/listeners/containers/volumes/networks absent"
+    ]
+  },
+  "reservation": {
+    "composeProject": "auto_tm_ci_897_944_f16f17_20261103_r1",
+    "freshnessRequired": [
+      "ports 61171/61172/61173 idle",
+      "dedicated containers/volumes/networks absent",
+      "base/worker databases absent",
+      "fixture roles absent",
+      "Redis DB1 empty",
+      "MinIO bucket absent or empty"
+    ],
+    "overlay": {
+      "path": "/tmp/issue944-f16f17-recovery-20261103/compose-overlay.yml",
+      "sha256": "1fe1c2d2b7b982e4b11a7705946ad5cc325916ab68fc70b465fc03977d507d47"
+    },
+    "reserved": false,
+    "resources": {
+      "maxWorkers": 1,
+      "minio": {
+        "bucket": "diagnostic-test-private",
+        "endpoint": "http://127.0.0.1:61173"
+      },
+      "postgres": {
+        "baseDatabase": "auto_tm_897_939_r1",
+        "host": "127.0.0.1",
+        "port": 61172,
+        "workerPattern": "^auto_tm_897_939_r1_t[a-f0-9]{6}_(template|w1)$"
+      },
+      "redis": {
+        "baseDatabase": 0,
+        "host": "127.0.0.1",
+        "port": 61171,
+        "workerDatabase": 1
+      }
+    },
+    "windowUtc": {
+      "durationMinutes": 90,
+      "end": "2026-11-03T23:20:00Z",
+      "exclusive": true,
+      "start": "2026-11-03T21:50:00Z"
+    }
+  },
+  "reviewProvenance": {
+    "spec": "PASS at 5b60645b/tree5621d4bb, prior exact context",
+    "standards": "PASS at 5b60645b/tree5621d4bb, prior exact context"
+  },
+  "selector": {
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "exec",
+      "vitest",
+      "run",
+      "src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "--maxWorkers=1",
+      "--bail=1",
+      "--retry=0",
+      "-t",
+      "issue939 H1 lawful case clocks and rights.*(A rights expiry|B rights expiry)",
+      "--reporter=default",
+      "--reporter=json",
+      "--outputFile.json=/tmp/issue944-f16f17-recovery-20261103/f16-f17-vitest.json",
+      "--silent=false"
+    ],
+    "capture": [
+      "human/default console stdout containing both 938_cleanup_receipt blocks",
+      "machine JSON report"
+    ],
+    "cases": [
+      "F16",
+      "F17"
+    ],
+    "envKeys": [
+      "DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61172/auto_tm_897_939_r1",
+      "REDIS_URL=redis://127.0.0.1:61171/0 (globalSetup -> worker DB1)",
+      "MINIO_ENDPOINT=http://127.0.0.1:61173",
+      "MINIO_PUBLIC_URL=http://127.0.0.1:61173",
+      "MINIO_ACCESS_KEY=minioadmin",
+      "MINIO_SECRET_KEY=minioadmin",
+      "MINIO_REGION=us-east-1",
+      "DIAGNOSTIC_PRIVATE_BUCKET=diagnostic-test-private",
+      "APP_ENV=test",
+      "NODE_OPTIONS=--import=tsx"
+    ],
+    "regex": "issue939 H1 lawful case clocks and rights.*(A rights expiry|B rights expiry)",
+    "zeroSelectedSkips": true
+  },
+  "status": "PLANNED_UNRESERVED",
+  "stopPolicy": "Stop at first setup, selection, behavior, receipt, timeout or cleanup failure; preserve raw argv/env/timestamps/stdout/stderr/hashes; no rerun of any other selector."
+}
