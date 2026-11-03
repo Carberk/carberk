@@ -22,6 +22,7 @@ expect(caseNames.length === 7 && caseNames.every(name => selectorMatch.test(`iss
 expect(setupNames.includes("compose-up-owned-project") && setupNames.includes("postgres-port") && setupNames.includes("redis-port") && setupNames.includes("minio-port") && setupNames.includes("create-base-database"), "executable Compose/port/base setup is incomplete");
 expect(setupNames.includes("capture-applied-migration-identity") && stage.migrationIdentity.expectedMigrationCount === 102, "applied migration identity capture is missing");
 expect(stage.environment.NO_COLOR === "1", "Vitest NO_COLOR environment is missing");
+expect(stage.environment.NODE_OPTIONS === "--import=tsx", "Vitest TypeScript loader environment is missing");
 const pins = JSON.parse(readFileSync(stage.migrationIdentity.inputPinsPath, "utf8"));
 const migrationNames = Object.keys(pins.migrations);
 expect(migrationNames.length === 102 && new Set(migrationNames).size === 102, "migration pin names are not 102 distinct entries");
@@ -40,6 +41,6 @@ for (const script of scripts) {
   execFileSync(process.execPath, ["--check", path], { stdio: "pipe" });
 }
 const hashes = Object.fromEntries([...scripts, "stage-command.json", "cleanup-command-packet.json"].map(name => [name, createHash("sha256").update(readFileSync(join(packet, name))).digest("hex")]));
-const receipt = { recordedAt: new Date().toISOString(), argv: [process.execPath, join(packet, "packet-validation.mjs")], exit: 0, checks: { selectorMatches: caseNames.length, setupNames, cleanupNames, fallbackNames, scriptsSyntaxChecked: scripts.length, explicitWorkingDirectories: true, noColor: true, migrationNamesChecked: migrationNames.length, appliedMigrationPlan: stage.migrationIdentity }, hashes };
+const receipt = { recordedAt: new Date().toISOString(), argv: [process.execPath, join(packet, "packet-validation.mjs")], exit: 0, checks: { selectorMatches: caseNames.length, setupNames, cleanupNames, fallbackNames, scriptsSyntaxChecked: scripts.length, explicitWorkingDirectories: true, noColor: true, nodeOptions: stage.environment.NODE_OPTIONS, migrationNamesChecked: migrationNames.length, appliedMigrationPlan: stage.migrationIdentity }, hashes };
 writeFileSync(join(packet, "packet-validation-receipt.json"), JSON.stringify(receipt, null, 2) + "\n");
 process.stdout.write(JSON.stringify(receipt) + "\n");

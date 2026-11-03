@@ -54,7 +54,8 @@
     "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private",
     "APP_ENV": "test",
     "AUTO_TM_TEST_DATABASES": "unset",
-    "NO_COLOR": "1"
+    "NO_COLOR": "1",
+    "NODE_OPTIONS": "--import=tsx"
   },
   "composeFiles": [
     "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
@@ -295,6 +296,8 @@
   },
   "environmentPolicy": {
     "NO_COLOR": "1",
-    "reason": "Vitest cleanup receipts are parsed after the stage; ANSI output must be disabled at the command boundary."
+    "reason": "Vitest cleanup receipts are parsed after the stage; ANSI output must be disabled at the command boundary.",
+    "NODE_OPTIONS": "--import=tsx",
+    "nodeOptionsReason": "The API package resolves TypeScript-only identity infrastructure through the approved tsx loader; this is required before Vitest module loading."
   }
 }

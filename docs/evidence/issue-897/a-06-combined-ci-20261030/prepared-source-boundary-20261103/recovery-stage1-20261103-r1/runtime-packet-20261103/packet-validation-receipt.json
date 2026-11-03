@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-03T05:57:13.790Z",
+  "recordedAt": "2026-11-03T06:32:28.896Z",
   "argv": [
     "/usr/local/bin/node",
     "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/packet-validation.mjs"
@@ -45,6 +45,7 @@
     "scriptsSyntaxChecked": 6,
     "explicitWorkingDirectories": true,
     "noColor": true,
+    "nodeOptions": "--import=tsx",
     "migrationNamesChecked": 102,
     "appliedMigrationPlan": {
       "inputPinsPath": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/input-pins.json",
@@ -63,7 +64,7 @@
     "owned-s3-inventory.mjs": "8097dfdf56da0c495f0a981cf941230a40ca4d8b76a81118576eb08d46712f0b",
     "read-cleanup-receipts.mjs": "6d5c109c5dfa33cc503ddb3bfa4aad7426d2e2d3d5dbfa1e4051669541ae4348",
     "capture-applied-migrations.mjs": "529dee8e43db814778b3db1074ad9d4dd37f2ed37f4356e30f3d1c0b460dbad2",
-    "stage-command.json": "bbff4d6efa52323f4e02b71cf7a93eaa548677821a3ccb17907a20a96e36a376",
+    "stage-command.json": "1ee2ce40701b180e30809ec6c9319da756a15ba485cd9839a9d06ac0a5462a07",
     "cleanup-command-packet.json": "7bf67643c0b32193d134324aa04a628a2ceceb12da9720422a075562d2550d9c"
   }
 }
