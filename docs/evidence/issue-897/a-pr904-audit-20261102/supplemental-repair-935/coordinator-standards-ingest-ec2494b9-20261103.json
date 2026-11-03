@@ -1,0 +1,37 @@
+{
+  "recordedAt": "2026-11-03T01:58:03.428463+00:00",
+  "governingIssue": "https://github.com/Carberk/carberk/issues/924",
+  "reviewedCommit": "ec2494b909c8438a6479f2b62c94a42e1f7900b4",
+  "reviewedTree": "c2acada0b6ad3d83bededdddf9320b5d7ce51848",
+  "reviewerWorktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-0f82a06e",
+  "reviewerBranch": "t3/issue-924-audit-s2-s3-standards-review",
+  "reviewerThread": "<t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/thread:delegated-task:command%3Amcp%3A6985d3b1-7279-441b-9911-57bc5619ebe0%3Adelegate-task%3Ab352f75c-70cd-4403-9833-85d8f924eaca>",
+  "settings": {
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh",
+    "serviceTier": "default",
+    "runtimeMode": "full-access"
+  },
+  "receiptPath": "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/independent-standards-ec2494b9-20261103.md",
+  "receiptSHA256": "fcb728bc964f26005696d824379141819f45c23f58bdbaa036d4644ed7d309c9",
+  "receiptCopiedByteForByte": true,
+  "sourceReadiness": "PASS for bounded AUDIT-S2/S3; both resolved in source",
+  "limits": [
+    "No whole affected-verification PASS",
+    "No SQL/lock/runtime/cleanup/hosted/protected-delivery proof",
+    "No ticket closure or milestone acceptance"
+  ],
+  "cleanup": {
+    "phase": "terminal review handoff",
+    "owner": "A coordinator",
+    "action": "preserve",
+    "reason": "candidate unmerged; review checkout and original receipt retained",
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-0f82a06e",
+    "ref": "t3/issue-924-audit-s2-s3-standards-review",
+    "head": "ec2494b909c8438a6479f2b62c94a42e1f7900b4",
+    "remotePR": null
+  },
+  "nextOwner": "A coordinator after pending independent Spec completion and executable lifecycle audit",
+  "issueUpdateOwner": "A coordinator"
+}
