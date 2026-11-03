@@ -475,6 +475,36 @@ export class DiagnosticPreparedReaderFixture {
     this.dependency(proof.rightsUntil.valueOf() === earliestBound.valueOf() && proof.rightsUntil > this.now, "proof_rights_deadline", { proof: proof.rightsUntil, earliestBound });
     this.at(proof.rightsUntil);
   }
+  /** #939 F16/F17 supplemental, read-only: the persisted deadlines of one issued pair. These are the A/B provenance
+   * and evidence rights, the reviewer/technician qualifications, current assignments and Sessions, and the proof. */
+  async pairDeadlines(a: Visit, b: Visit, proofId: string) {
+    const material = async (visit: Visit) => {
+      this.dependency(visit.provenanceId && visit.evidence, "rights_material");
+      const provenance = await this.db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: visit.provenanceId } });
+      const evidence = await this.db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: visit.evidence.id } });
+      return { provenance: provenance.rightsUntil, evidence: evidence.rightsUntil };
+    };
+    const qualification = async (person: Person, capability: string) => (await this.db.diagnosticCenterAssignment.findUniqueOrThrow({
+      where: { centerId_userId_capability: { centerId: this.centerId, userId: this.actors[person].userId, capability } } }));
+    const assignment = async (visit: Visit, person: Person, capability: string) => (await this.db.diagnosticOrderAssignment.findUniqueOrThrow({
+      where: { orderId_userId_capability: { orderId: visit.order.id, userId: this.actors[person].userId, capability } } })).revokedAt;
+    const session = async (person: Person) => {
+      const row = await this.db.session.findUniqueOrThrow({ where: { id: this.actors[person].sessionId } });
+      return { expiresAt: row.expiresAt, elevatedUntil: row.adminTotpExpiresAt };
+    };
+    const proof = await this.db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    const reviewer = await qualification("reviewer", "diagnostics.reviewer"), technicianA = await qualification("technicianA", "diagnostics.technician"),
+      technicianB = await qualification("technicianB", "diagnostics.technician");
+    return {
+      now: this.clock, a: await material(a), b: await material(b),
+      qualifications: { reviewer: reviewer.qualifiedUntil, technicianA: technicianA.qualifiedUntil, technicianB: technicianB.qualifiedUntil },
+      qualificationRevocations: [reviewer.revokedAt, technicianA.revokedAt, technicianB.revokedAt],
+      assignmentRevocations: [await assignment(a, "reviewer", "diagnostics.reviewer"), await assignment(b, "reviewer", "diagnostics.reviewer"),
+        await assignment(a, "technicianA", "diagnostics.technician"), await assignment(b, "technicianB", "diagnostics.technician")],
+      sessions: { reviewer: await session("reviewer"), technicianB: await session("technicianB") },
+      proof: { rightsUntil: proof.rightsUntil, invalidatedAt: proof.invalidatedAt, consumedAt: proof.consumedAt, erasedAt: proof.erasedAt },
+    };
+  }
   /** Lawful invalidation: an issuer Identity change fires the continuity source trigger for every unconsumed proof. */
   async invalidateIssuedProofs(visit: Visit, expected: number): Promise<void> {
     await new PrismaUserRepository(this.db).updateDisplayName(this.actors.reviewer.userId, `reviewer-invalidation-${randomUUID()}`);

@@ -45,6 +45,9 @@ describe("issue938 recovery stage1", () => {
 type Handoffs = { handoffs: { proofId: string }[]; result: unknown; nextCursor: string | null; scope: string };
 type Requests = { requests: { requestId: string }[]; nextCursor: string | null };
 type Transition = { a: Visit; b: Visit; proofId: string; deadline: Date };
+type Predecessors = { candidates: { reportId: string; observedAt: string; mileageKm: number }[]; nextCursor: string | null; exhausted: boolean; scope: string };
+/** #939 F16/F17 supplemental: the one predeclared material deadline this row reaches. */
+type Selected = { visit: "a" | "b"; kind: "provenance" | "evidence" };
 const HOUR = 60 * 60_000;
 
 // #939 H1: real-PostgreSQL replacements driven by explicit case clocks, predeclared
@@ -52,19 +55,45 @@ const HOUR = 60 * 60_000;
 describe("issue939 H1 lawful case clocks and rights", () => {
   it.each([
     ["issuer qualification loss", { qualificationOrder: "reviewer-first" }, () => ({}), (f: DiagnosticPreparedReaderFixture) => f.expireReviewerQualification()],
-    ["A rights expiry", {}, (deadline: Date) => ({ a: { provenance: deadline } }), (f: DiagnosticPreparedReaderFixture, t: Transition) => f.expireVisitRights(t.a, "provenance", t.deadline)],
-    ["B rights expiry", {}, (deadline: Date) => ({ b: { evidence: deadline } }), (f: DiagnosticPreparedReaderFixture, t: Transition) => f.expireVisitRights(t.b, "evidence", t.deadline)],
+    ["A rights expiry", {}, (deadline: Date) => ({ a: { provenance: deadline } }), (f: DiagnosticPreparedReaderFixture, t: Transition) => f.expireVisitRights(t.a, "provenance", t.deadline), { visit: "a", kind: "provenance" }],
+    ["B rights expiry", {}, (deadline: Date) => ({ b: { evidence: deadline } }), (f: DiagnosticPreparedReaderFixture, t: Transition) => f.expireVisitRights(t.b, "evidence", t.deadline), { visit: "b", kind: "evidence" }],
     // A proof's rightsUntil is its earliest bound material deadline (coordinator-accepted coincidence).
     ["proof rights expiry", {}, (deadline: Date) => ({ a: { evidence: deadline } }), (f: DiagnosticPreparedReaderFixture, t: Transition) => f.expireProofRights(t.proofId, t.deadline)],
-  ] as [string, PreparedReaderSetup, (deadline: Date) => { a?: MaterialRights; b?: MaterialRights }, (f: DiagnosticPreparedReaderFixture, t: Transition) => Promise<void>][])(
-    "uniformly omits and refuses %s at read and again at action", async (name, setup, rights, transition) => {
+  ] as [string, PreparedReaderSetup, (deadline: Date) => { a?: MaterialRights; b?: MaterialRights }, (f: DiagnosticPreparedReaderFixture, t: Transition) => Promise<void>, Selected?][])(
+    "uniformly omits and refuses %s at read and again at action", async (name, setup, rights, transition, selected) => {
     await withPreparedReaderFixture("handoff", `h1-${name.replace(/ /g, "-")}`, async f => {
       const deadline = new Date(f.clock.valueOf() + HOUR);
       const { a, b, report } = await f.pair(false, undefined, rights(deadline));
       const proofId = await f.issue(a, b, report, 7);
       expect((await f.send("reviewer", "GET", `orders/${b.order.id}/continuity-proofs/${proofId}`)).status).toBe(200);
       expect((await f.send<Handoffs>("technicianB", "GET", `orders/${b.order.id}/continuity-handoffs`)).body.handoffs).toHaveLength(1);
+      // #939 F16/F17 supplemental: the real predecessor route before and at the selected material deadline.
+      const predecessors = `orders/${b.order.id}/predecessor-candidates`;
+      if (selected) {
+        const before = await f.send<Predecessors>("reviewer", "GET", predecessors);
+        expect(before.status).toBe(200);
+        expect(before.headers["cache-control"]).toBe("no-store, private");
+        expect(before.body).toEqual({ candidates: [{ reportId: report.id, observedAt: "2026-10-21T12:00:00.000Z", mileageKm: 123000 }], nextCursor: null, exhausted: true, scope: "currently_authorized_retained_predecessors" });
+      }
       await transition(f, { a, b, proofId, deadline });
+      if (selected) {
+        const d = await f.pairDeadlines(a, b, proofId);
+        expect(d.now).toEqual(deadline);
+        expect(d[selected.visit][selected.kind]).toEqual(deadline);
+        const others = (["a", "b"] as const).flatMap(visit => (["provenance", "evidence"] as const).filter(kind => visit !== selected.visit || kind !== selected.kind).map(kind => d[visit][kind]));
+        expect(others).toHaveLength(3);
+        for (const later of [...others, ...Object.values(d.qualifications), ...Object.values(d.sessions).flatMap(s => [s.expiresAt, s.elevatedUntil])]) {
+          expect(later?.valueOf()).toBeGreaterThan(deadline.valueOf());
+        }
+        expect([...d.qualificationRevocations, ...d.assignmentRevocations]).toEqual([null, null, null, null, null, null, null]);
+        // The proof is issued and not invalidated, consumed or erased. Its rightsUntil is the earliest bound material deadline
+        // (PrivateContinuityAttestation), so it coincides with the selected deadline; the predecessor route reads no proof.
+        expect(d.proof).toEqual({ rightsUntil: deadline, invalidatedAt: null, consumedAt: null, erasedAt: null });
+        const at = await f.send<Predecessors>("reviewer", "GET", predecessors);
+        expect(at.status).toBe(200);
+        expect(at.headers["cache-control"]).toBe("no-store, private");
+        expect(at.body).toEqual({ candidates: [], nextCursor: null, exhausted: true, scope: "currently_authorized_retained_predecessors" });
+      }
       expect((await f.send<Handoffs>("technicianB", "GET", `orders/${b.order.id}/continuity-handoffs`)).body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: "current_b_owned_handoffs" });
       const denied = await f.send("technicianB", "POST", `orders/${b.order.id}/continuity-handoffs/${proofId}/consume`, { reportId: f.id("report-9000"), expectedOrderVersion: 7, reason: "B follow-up" });
       expect(denied).toMatchObject({ status: 403, body: { code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection request could not be completed" } });
