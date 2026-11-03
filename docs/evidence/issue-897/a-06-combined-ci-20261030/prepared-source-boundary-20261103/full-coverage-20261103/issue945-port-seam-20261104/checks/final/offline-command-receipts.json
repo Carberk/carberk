@@ -1,0 +1,258 @@
+{
+  "receipt_version": 2,
+  "kind": "issue945-port-seam-offline-serial-checks-final",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "source_checkpoint": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+  "source_tree": "2ee8e9ee3940eb9b3678c3aa33a6ec6bfe804e98",
+  "commands": [
+    {
+      "name": "focused-boundary-green",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off",
+        "NODE_OPTIONS": "--import=tsx"
+      },
+      "started_at_utc": "2026-11-03T22:13:21.142649+00:00",
+      "ended_at_utc": "2026-11-03T22:13:22.748452+00:00",
+      "started_monotonic_ns": 28436166,
+      "ended_monotonic_ns": 1634135583,
+      "elapsed_ns": 1605699417,
+      "elapsed_seconds": "1.605699417",
+      "exit": 0,
+      "stdout": "focused-boundary-green.stdout",
+      "stderr": "focused-boundary-green.stderr",
+      "stdout_sha256": "c105878bf82ccad9f0f60a41537197304155f2049b9e19ac7a73fc4288817c53",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 220,
+      "stderr_bytes": 0,
+      "head_role": "execution HEAD only; checked working inputs are pinned by checked_source_files",
+      "checked_source_files": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+          "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+          "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+        }
+      },
+      "subsequently_committed_source": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc"
+    },
+    {
+      "name": "api-typecheck",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T22:13:22.769782+00:00",
+      "ended_at_utc": "2026-11-03T22:13:25.318077+00:00",
+      "started_monotonic_ns": 1655480416,
+      "ended_monotonic_ns": 4203755333,
+      "elapsed_ns": 2548274917,
+      "elapsed_seconds": "2.548274917",
+      "exit": 0,
+      "stdout": "api-typecheck.stdout",
+      "stderr": "api-typecheck.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "stdout_bytes": 0,
+      "stderr_bytes": 15,
+      "head_role": "execution HEAD only; checked working inputs are pinned by checked_source_files",
+      "checked_source_files": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+          "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+          "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+        }
+      },
+      "subsequently_committed_source": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc"
+    },
+    {
+      "name": "api-tsc6",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T22:13:25.338403+00:00",
+      "ended_at_utc": "2026-11-03T22:13:33.613506+00:00",
+      "started_monotonic_ns": 4224101416,
+      "ended_monotonic_ns": 12499173083,
+      "elapsed_ns": 8275071667,
+      "elapsed_seconds": "8.275071667",
+      "exit": 0,
+      "stdout": "api-tsc6.stdout",
+      "stderr": "api-tsc6.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "head_role": "execution HEAD only; checked working inputs are pinned by checked_source_files",
+      "checked_source_files": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+          "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+          "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+        }
+      },
+      "subsequently_committed_source": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc"
+    },
+    {
+      "name": "api-lint",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T22:13:33.631627+00:00",
+      "ended_at_utc": "2026-11-03T22:13:39.168554+00:00",
+      "started_monotonic_ns": 12517337958,
+      "ended_monotonic_ns": 18054256541,
+      "elapsed_ns": 5536918583,
+      "elapsed_seconds": "5.536918583",
+      "exit": 0,
+      "stdout": "api-lint.stdout",
+      "stderr": "api-lint.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "stdout_bytes": 0,
+      "stderr_bytes": 28,
+      "head_role": "execution HEAD only; checked working inputs are pinned by checked_source_files",
+      "checked_source_files": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+          "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+          "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+        }
+      },
+      "subsequently_committed_source": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc"
+    },
+    {
+      "name": "api-build",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "build"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T22:13:39.185660+00:00",
+      "ended_at_utc": "2026-11-03T22:13:46.372235+00:00",
+      "started_monotonic_ns": 18071373500,
+      "ended_monotonic_ns": 25257938541,
+      "elapsed_ns": 7186565041,
+      "elapsed_seconds": "7.186565041",
+      "exit": 0,
+      "stdout": "api-build.stdout",
+      "stderr": "api-build.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "stdout_bytes": 0,
+      "stderr_bytes": 13,
+      "head_role": "execution HEAD only; checked working inputs are pinned by checked_source_files",
+      "checked_source_files": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+          "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+          "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+        }
+      },
+      "subsequently_committed_source": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc"
+    },
+    {
+      "name": "git-diff-check",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+      "tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T22:13:46.392292+00:00",
+      "ended_at_utc": "2026-11-03T22:13:46.409178+00:00",
+      "started_monotonic_ns": 25278015708,
+      "ended_monotonic_ns": 25294886666,
+      "elapsed_ns": 16870958,
+      "elapsed_seconds": "0.016870958",
+      "exit": 0,
+      "stdout": "git-diff-check.stdout",
+      "stderr": "git-diff-check.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "head_role": "execution HEAD only; checked working inputs are pinned by checked_source_files",
+      "checked_source_files": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+          "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+          "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+        }
+      },
+      "subsequently_committed_source": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc"
+    }
+  ],
+  "execution_head": "785aaef5da83ec69ae12d03f0f119337001ddae0",
+  "execution_head_tree": "b81dd163ea46ccbbd84a869a03b6c4bfddc0a979",
+  "source_identity_note": "Commands ran with HEAD at the preserved red checkpoint and both final source files in the working tree. This metadata now distinguishes that execution HEAD from the subsequently committed, byte-identical checked input. Original metadata is retained alongside this file.",
+  "checked_source_files": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+      "sha256": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+      "git_blob_sha1": "05f119a5b04386dc76e92846041e6534847b52bb"
+    },
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+      "sha256": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995",
+      "git_blob_sha1": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+    }
+  }
+}

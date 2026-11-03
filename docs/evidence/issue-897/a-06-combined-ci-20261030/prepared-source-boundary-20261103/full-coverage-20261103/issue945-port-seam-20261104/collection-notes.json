@@ -1,0 +1,93 @@
+{
+  "kind": "issue945-collection-and-recovery-notes",
+  "setup_attempts_before_captured_red": [
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "outcome": "setup failure resolving missing @auto-tm/db dist; zero behavior assertions",
+      "raw_file": "not captured; session tool output only"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/contracts",
+        "build"
+      ],
+      "outcome": "exit 0; ignored build artifacts only",
+      "raw_file": "not captured; session tool output only"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "outcome": "setup failure because Prisma config requires DATABASE_URL",
+      "raw_file": "not captured; session tool output only"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "environment_overrides": {
+        "DATABASE_URL": "postgresql://fixture:fixture@127.0.0.1:1/fixture"
+      },
+      "outcome": "exit 0; client generation/compilation only, no services or database connection",
+      "raw_file": "not captured; session tool output only"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off"
+      },
+      "outcome": "setup failure at existing createRequire TypeScript imports; established NODE_OPTIONS=--import=tsx resolved it",
+      "raw_file": "not captured; session tool output only"
+    }
+  ],
+  "host_guard_refusal": {
+    "operation": "Initial /tmp evidence wrapper included rm -rf cleanup",
+    "error": "rm -f style commands are not permitted. Use a safer approach",
+    "result": "The wrapper did not execute; no deletion occurred. The next wrapper omitted deletion and used a fresh /tmp directory."
+  },
+  "source_capture_notes": [
+    "Red raw was captured at the committed test-only checkpoint with the original helper temporarily restored; the original helper patch was then reapplied.",
+    "Final green commands ran on dirty working inputs at red HEAD. Final input hashes and the subsequent source commit identify the checked source accurately.",
+    "No earlier failed receipt or raw stream was overwritten; final metadata correction retains offline-command-receipts.original.json."
+  ],
+  "skill_use": [
+    "Repository run-issue skill used for bounded implementer handoff; no reviewer or child dispatched.",
+    "Unslop writing skill applied during final evidence editing."
+  ],
+  "independent_reviews": "Not run by implementation writer. Coordinator owns assembly and exact-SHA Standards/Spec review.",
+  "evidence_whitespace_recovery": {
+    "first_evidence_commit": "abe8c53f1e89ed8498eee3b4eb43c7f92b66921e",
+    "pushed": false,
+    "result": "Final evidence whitespace gate reported eight raw streams ending with blank lines. The shell sequence did not stop the later commit as intended. The unpushed evidence commit is amended after lossless base64 storage, preserving every decoded raw stream and the source/red commits.",
+    "storage_map": "raw-stream-encoding.json"
+  }
+}

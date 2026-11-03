@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "git",
+    "push",
+    "origin",
+    "HEAD:agent/issue-945-diagnostic-postgres-port-seam"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "head": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+  "started_at_utc": "2026-11-03T22:20:40.165297+00:00",
+  "ended_at_utc": "2026-11-03T22:20:44.145720+00:00",
+  "elapsed_ns": 3980325125,
+  "exit": 0,
+  "stdout": "source-push.stdout",
+  "stderr": "source-push.stderr",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "c4c292f93c3bd04016c1095b99e3187220ae016b4628d56d1a70eb1e49c992a3"
+}

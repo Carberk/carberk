@@ -1,0 +1,18 @@
+{
+  "kind": "issue945-evidence-integrity-verification",
+  "recorded_at_utc": "2026-11-03T22:23:26.035145+00:00",
+  "raw_stream_hash_verifications": 46,
+  "unique_raw_streams": 34,
+  "all_raw_stream_hashes_match": true,
+  "all_required_commands_exit_zero": true,
+  "source_inputs_match_committed_source": true,
+  "source_commit": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+  "source_tree": "2ee8e9ee3940eb9b3678c3aa33a6ec6bfe804e98",
+  "final_serial_interval_utc": [
+    "2026-11-03T22:13:21.142649+00:00",
+    "2026-11-03T22:13:46.409178+00:00"
+  ],
+  "runtime_not_executed": true,
+  "base64_stored_streams": 8,
+  "raw_hash_rule": "Hash decoded bytes for streams in raw-stream-encoding.json; hash verbatim bytes otherwise."
+}

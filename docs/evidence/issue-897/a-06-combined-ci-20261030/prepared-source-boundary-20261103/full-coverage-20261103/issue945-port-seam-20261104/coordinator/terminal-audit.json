@@ -1,0 +1,59 @@
+{
+  "kind": "issue945-independent-coordinator-terminal-audit",
+  "recorded_at_utc": "2026-11-03T22:27:30.043022+00:00",
+  "base": "39c63fad462885846840149b15771654980bdaa7",
+  "base_tree": "ea4f2d4b3b397a0e6cfd1e72064b5e0421b4e35d",
+  "source": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+  "source_tree": "2ee8e9ee3940eb9b3678c3aa33a6ec6bfe804e98",
+  "evidence_head": "b425fe1800514f4253872463eb0db7c35556302d",
+  "evidence_tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+  "writer_remote_matches_clean_worktree": true,
+  "source_paths": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts"
+  ],
+  "source_blobs": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": "05f119a5b04386dc76e92846041e6534847b52bb",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": "6cdd5d158414f6f1d2779afedf241d450b87a1d3"
+  },
+  "source_sha256": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": "78e52371c1219d985e6fc9a78facafc79f16766ea9b99924a8902f96aeb138aa",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": "1cac05badba67aea087cf786b5980fb86b686cf47c8103512241c33cd4259995"
+  },
+  "selective_source_patch_sha256": "a0adbd47d24b5581658aaf28271c9f55e32836410e0282762d993ad8e94141ad",
+  "prior_docs_preserved": 2802,
+  "prior_evidence_preserved": 2346,
+  "new_writer_evidence_files": 53,
+  "sha256sums_verified": 52,
+  "artifact_entries_verified": 51,
+  "raw_stream_verifications": 46,
+  "all_six_serial_final_checks_exit_zero": true,
+  "focused_boundary_cases_passed": 10,
+  "final_check_source_inputs_match_source_commit": true,
+  "full_range_diff_check_exit": 0,
+  "original_F16_F17_e2e_and_production_unchanged": true,
+  "issue945_audit_result": "PASS within its PG-only contract; reviews required",
+  "issue944_runtime_readiness": "BLOCKED before reservation/services: preserved Redis and MinIO guards conflict with mandatory fresh tuple",
+  "issue944_exact_source_boundary": [
+    {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "line": 216,
+      "text": "    this.dependency(new URL(expected.redisUrl).host === \"127.0.0.1:61168\" && new URL(expected.redisUrl).pathname === \"/1\", \"owned_redis_db1\");"
+    },
+    {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "line": 217,
+      "text": "    this.dependency(process.env[\"MINIO_ENDPOINT\"] === \"http://127.0.0.1:61170\" && process.env[\"DIAGNOSTIC_PRIVATE_BUCKET\"] === bucket, \"owned_storage\");"
+    }
+  ],
+  "required_next_bounded_contract": "Strict explicit test-only expected Redis/MinIO endpoint seams, preserving default historical guards and fresh-tuple ownership; requires actual amended/separate issue authority, unchanged production/cases/assertions and review. Do not widen #945 unasked.",
+  "runtime_started": false,
+  "resources_reserved": false,
+  "executor_settings": {
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh",
+    "serviceTier": "default",
+    "runtimeMode": "full-access"
+  }
+}

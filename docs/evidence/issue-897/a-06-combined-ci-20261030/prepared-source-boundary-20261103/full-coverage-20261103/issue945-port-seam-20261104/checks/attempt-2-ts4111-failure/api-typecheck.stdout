@@ -1,0 +1,6 @@
+test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts(5,34): error TS4111: Property 'DIAGNOSTIC_EXPECTED_POSTGRES_PORT' comes from an index signature, so it must be accessed with ['DIAGNOSTIC_EXPECTED_POSTGRES_PORT'].
+test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts(8,54): error TS4111: Property 'DIAGNOSTIC_EXPECTED_POSTGRES_PORT' comes from an index signature, so it must be accessed with ['DIAGNOSTIC_EXPECTED_POSTGRES_PORT'].
+test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts(9,20): error TS4111: Property 'DIAGNOSTIC_EXPECTED_POSTGRES_PORT' comes from an index signature, so it must be accessed with ['DIAGNOSTIC_EXPECTED_POSTGRES_PORT'].
+test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts(14,24): error TS4111: Property 'DIAGNOSTIC_EXPECTED_POSTGRES_PORT' comes from an index signature, so it must be accessed with ['DIAGNOSTIC_EXPECTED_POSTGRES_PORT'].
+test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts(20,17): error TS4111: Property 'DIAGNOSTIC_EXPECTED_POSTGRES_PORT' comes from an index signature, so it must be accessed with ['DIAGNOSTIC_EXPECTED_POSTGRES_PORT'].
+test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts(28,19): error TS4111: Property 'DIAGNOSTIC_EXPECTED_POSTGRES_PORT' comes from an index signature, so it must be accessed with ['DIAGNOSTIC_EXPECTED_POSTGRES_PORT'].
