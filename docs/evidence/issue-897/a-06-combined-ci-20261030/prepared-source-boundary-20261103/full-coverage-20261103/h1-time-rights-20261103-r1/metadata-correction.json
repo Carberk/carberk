@@ -1,0 +1,21 @@
+{
+  "kind": "issue939-h1-metadata-correction",
+  "recorded_at": "2026-11-03T17:30:55.778190Z",
+  "preserve_original_records": true,
+  "correct_values": {
+    "executor_tree": "bc40df98d6a5e081dc927be2696e3706f594c",
+    "slot_exhaustion_receipt_sha256": "850d15feb2a7fd47cefbe9a291e3ce0ae5dce1720cdfabc1e3aef7f759e72a43",
+    "slot_exhaustion_commit_tree": "30e284026eda3b68d8a9af3b92d9b847e72f6fd2"
+  },
+  "observed_transcription_errors": [
+    "One prior coordinator comment abbreviated the executor tree and is superseded by the full value above.",
+    "One coordinator disposition stored the receipt SHA with an extra '02' after the first eight hex characters; the full file hash above is authoritative."
+  ],
+  "source_equality": {
+    "base": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+    "coordinator_head": "2c0cf3b83583bea54224c827b0ced28377fa099d",
+    "non_documentation_diff_exit": 0
+  },
+  "runtime": "held",
+  "next_action": "Use the corrected values in the active H1 writer handoff and final audit; do not rewrite historical comments or evidence."
+}
