@@ -1,0 +1,31 @@
+{
+  "at": "2026-11-03T02:43:03.048718+00:00",
+  "argv": [
+    "docker",
+    "compose",
+    "--file",
+    "infra/compose/docker-compose.ci.yml",
+    "--file",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+    "--project-name",
+    "auto_tm_ci_897_938_s1_20261103_r1",
+    "config",
+    "--format",
+    "json"
+  ],
+  "exit": 0,
+  "sha256": "195168eb0fd52bd3e998ad5b2333c51a2eb59ab9ebd4859b163c1c08d4c99414",
+  "resourcesStarted": false,
+  "preparationFailures": [
+    {
+      "stage": "isolated DOCKER_CONFIG",
+      "error": "unknown flag: --file",
+      "resolution": "use the existing configured Docker CLI plugin; no credential change or service launch"
+    },
+    {
+      "stage": "output pathname typo",
+      "error": "no such file or directory",
+      "resolution": "capture config via structured subprocess and exact Path"
+    }
+  ]
+}

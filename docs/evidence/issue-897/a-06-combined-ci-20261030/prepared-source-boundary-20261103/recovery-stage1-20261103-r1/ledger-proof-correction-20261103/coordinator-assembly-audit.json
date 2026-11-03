@@ -1,0 +1,40 @@
+{
+  "at": "2026-11-03T02:38:02.609694+00:00",
+  "candidate": "6f231c86b026a062b0d831b7bb56c986f9c690f0",
+  "tree": "211c7fcff2ea3264ce3cafdfbf73f86475882727",
+  "writerSource": "94ad0134a5d5ec03beb70a69746054637f0e937b",
+  "writerEvidence": "045f249ef9d44bb72cf8d390cc9a31911c6d7985",
+  "sourceEqualityExit": 0,
+  "allowedSourcePaths": [
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "rawHashesVerified": 10,
+  "originalInputHashesVerified": 10,
+  "completionFixUnchanged": true,
+  "reviewFindings": {
+    "P1": "resolved by earlier helper completion fix",
+    "P2Ledger": "corrected source; runtime unproved",
+    "P2ProofDetail": "restored reviewer literal HTTP200; runtime unproved",
+    "Packet": "open; coordinator preparation next"
+  },
+  "notRun": [
+    "runtime",
+    "DB",
+    "Redis",
+    "S3",
+    "services",
+    "hosted",
+    "native",
+    "PR"
+  ],
+  "cleanupTuple": {
+    "owner": "A coordinator",
+    "writerWorktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "ref": "t3/2d375913",
+    "head": "045f249ef9d44bb72cf8d390cc9a31911c6d7985",
+    "disposition": "preserve: unmerged candidate and future same-writer runtime"
+  }
+}

@@ -1,0 +1,10 @@
+services:
+  postgres:
+    ports: !override
+      - {target: 5432, published: "61169", host_ip: "127.0.0.1", protocol: tcp}
+  redis:
+    ports: !override
+      - {target: 6379, published: "61168", host_ip: "127.0.0.1", protocol: tcp}
+  minio:
+    ports: !override
+      - {target: 9000, published: "61170", host_ip: "127.0.0.1", protocol: tcp}

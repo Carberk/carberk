@@ -1,0 +1,85 @@
+{
+  "phase": "prepared, not executed",
+  "project": "auto_tm_ci_897_938_s1_20261103_r1",
+  "workerWorktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "sourceCheckpoint": "94ad0134a5d5ec03beb70a69746054637f0e937b",
+  "expectedWorkerHead": "045f249ef9d44bb72cf8d390cc9a31911c6d7985",
+  "baseDatabase": "auto_tm_897_938_s1r1",
+  "databasePattern": "^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$",
+  "ports": {
+    "postgres": 61169,
+    "redis": 61168,
+    "minio": 61170
+  },
+  "redisLogicalDatabase": 1,
+  "roles": [
+    "r938_s1_capture",
+    "r938_s1_handoff",
+    "r938_s1_discovery",
+    "r938_s1_readers"
+  ],
+  "bucket": "diagnostic-test-private",
+  "exactCaseNames": [
+    "accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1",
+    "lets only the selected current B technician reload a minimal usable handle without A access",
+    "returns only named currently eligible distinct B technicians to a non-reception reviewer",
+    "projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source",
+    "omits malformed required retained evidence without a partial candidate or protected error",
+    "[938 control] rejects persisted provenance rewrite without changing stored evidence",
+    "[938 control] cleans partial fixture initialization before returning failure"
+  ],
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "--maxWorkers=1",
+    "--passWithNoTests=false",
+    "-t",
+    "^issue938 recovery stage1 (accepts\\ a\\ separate\\ synthetic\\ classification\\ without\\ adding\\ it\\ to\\ observedVehicle\\ or\\ changing\\ observation\\ hash\\ v1|lets\\ only\\ the\\ selected\\ current\\ B\\ technician\\ reload\\ a\\ minimal\\ usable\\ handle\\ without\\ A\\ access|returns\\ only\\ named\\ currently\\ eligible\\ distinct\\ B\\ technicians\\ to\\ a\\ non\\-reception\\ reviewer|projects\\ commissioner\\ and\\ currently\\ assigned\\ staff\\ reads,\\ preserving\\ the\\ exact\\ technician\\ mutation\\ receipt\\ and\\ B\\ source|omits\\ malformed\\ required\\ retained\\ evidence\\ without\\ a\\ partial\\ candidate\\ or\\ protected\\ error|\\[938\\ control\\]\\ rejects\\ persisted\\ provenance\\ rewrite\\ without\\ changing\\ stored\\ evidence|\\[938\\ control\\]\\ cleans\\ partial\\ fixture\\ initialization\\ before\\ returning\\ failure)$"
+  ],
+  "environment": {
+    "DATABASE_URL": "postgresql://auto_tm_ci:<checked-in disposable CI password>@127.0.0.1:61169/auto_tm_897_938_s1r1",
+    "REDIS_URL": "redis://127.0.0.1:61168/0 (globalSetup derives DB1)",
+    "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+    "MINIO_REGION": "us-east-1",
+    "MINIO_ACCESS_KEY": "<checked-in disposable MinIO user>",
+    "MINIO_SECRET_KEY": "<checked-in disposable MinIO password>",
+    "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private",
+    "APP_ENV": "test",
+    "AUTO_TM_TEST_DATABASES": "unset, never off"
+  },
+  "composeFiles": [
+    "infra/compose/docker-compose.ci.yml",
+    "PACKET/compose-overlay.yml"
+  ],
+  "assertions": {
+    "totalDeclaredCases": 7,
+    "allPassed": 7,
+    "skippedOrPending": 0,
+    "maxWorkers": 1,
+    "testTimeoutMs": 120000,
+    "hookTimeoutMs": 60000
+  },
+  "cleanup": [
+    "read helper lifecycle receipts; require seven receipts and no failures",
+    "discover only anchored run databases, snapshot applied migration checksums and graph/keys before teardown",
+    "after Vitest exit require no task role backend; normal globalSetup database teardown first",
+    "bounded fallback only anchored fresh run databases/roles after marking residuals as failure",
+    "Redis DB1 FLUSHDB and literal DBSIZE 0; preserve DB0 baseline",
+    "S3 registry keys only; unknown residuals remain failures",
+    "exact Compose project down --volumes --remove-orphans after identity checks",
+    "zero owned containers/volumes/networks/listeners; preserve all foreign resources"
+  ],
+  "capture": {
+    "stdout": "OWNED_OUTPUT/stage-vitest.stdout",
+    "stderr": "OWNED_OUTPUT/stage-vitest.stderr",
+    "rawCommandHash": "record sha256 of argv/environment/stdout/stderr"
+  }
+}

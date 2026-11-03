@@ -1,0 +1,24 @@
+{
+  "recordedAt": "2026-11-03T02:44:55.722358+00:00",
+  "candidate": "6f231c86b026a062b0d831b7bb56c986f9c690f0",
+  "sourceWriter": "94ad0134a5d5ec03beb70a69746054637f0e937b",
+  "composeConfigSha256": "195168eb0fd52bd3e998ad5b2333c51a2eb59ab9ebd4859b163c1c08d4c99414",
+  "composePreparationExit": 0,
+  "resourceInventory": {
+    "composePs": "empty",
+    "containers": "empty",
+    "volumes": "empty",
+    "networks": "empty",
+    "listeners": "empty"
+  },
+  "runtimeStarted": false,
+  "packetFiles": [
+    "stage-command.json",
+    "input-pins.json",
+    "compose-overlay.yml",
+    "resolved-compose.json",
+    "compose-preparation-receipt.json",
+    "cleanup-command-packet.json"
+  ],
+  "nextGate": "coordinator revalidates actual fresh resources, settings and slot before releasing same writer runtime"
+}
