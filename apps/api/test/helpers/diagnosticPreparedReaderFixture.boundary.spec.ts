@@ -2,23 +2,23 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { expectedDiagnosticPostgresPort } from "./diagnosticPreparedReaderFixture";
 
-const PORT_ENV = "DIAGNOSTIC_EXPECTED_POSTGRES_PORT";
-const originalPort = process.env[PORT_ENV];
+const originalPort = process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"];
 
 afterEach(() => {
-  if (originalPort === undefined) delete process.env[PORT_ENV];
-  else process.env[PORT_ENV] = originalPort;
+  if (originalPort === undefined) {
+    delete (process.env as { DIAGNOSTIC_EXPECTED_POSTGRES_PORT?: string }).DIAGNOSTIC_EXPECTED_POSTGRES_PORT;
+  } else process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"] = originalPort;
 });
 
 describe("diagnostic prepared reader expected PostgreSQL port", () => {
   it("keeps the historical port when no override is configured", () => {
-    delete process.env[PORT_ENV];
+    delete (process.env as { DIAGNOSTIC_EXPECTED_POSTGRES_PORT?: string }).DIAGNOSTIC_EXPECTED_POSTGRES_PORT;
 
     expect(expectedDiagnosticPostgresPort()).toBe(61169);
   });
 
   it("accepts a strict decimal TCP port override", () => {
-    process.env[PORT_ENV] = "61172";
+    process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"] = "61172";
 
     expect(expectedDiagnosticPostgresPort()).toBe(61172);
   });
@@ -26,7 +26,7 @@ describe("diagnostic prepared reader expected PostgreSQL port", () => {
   it.each(["", "61169.0", " 61169", "+61169", "1e4", "0", "65536", "-1"])(
     "rejects malformed or out-of-range override %j",
     value => {
-      process.env[PORT_ENV] = value;
+      process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"] = value;
 
       expect(expectedDiagnosticPostgresPort()).toBeUndefined();
     },

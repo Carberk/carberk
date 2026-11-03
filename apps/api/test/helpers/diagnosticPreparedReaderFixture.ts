@@ -75,6 +75,7 @@ const { PrismaIdentityReadAdapter } = appRequire("./src/modules/identity/infrast
 const { PrismaIdentityAdminRepository } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityAdminRepository") as { PrismaIdentityAdminRepository: new (db: PrismaService) => IdentityAdminPort };
 const { PrismaIdentityCheckAdapter } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityCheckAdapter") as { PrismaIdentityCheckAdapter: new (db: PrismaService) => IdentityCheckPort };
 const bucket = "diagnostic-test-private";
+const historicalDiagnosticPostgresPort = 61169;
 const people: Person[] = ["commissionerA", "commissionerB", "reception", "technicianA", "technicianB", "reviewer", "foreign"];
 const operators: Operator[] = ["founder", "owner", "staffManager", "admin"];
 const capabilities: Partial<Record<Person, string>> = {
@@ -82,6 +83,12 @@ const capabilities: Partial<Record<Person, string>> = {
   reviewer: "diagnostics.reviewer", foreign: "diagnostics.technician",
 };
 const localized = { tk: "Synthetic", ru: "Synthetic", en: "Synthetic" };
+export function expectedDiagnosticPostgresPort(value = process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"]): number | undefined {
+  if (value === undefined) return historicalDiagnosticPostgresPort;
+  if (!/^[1-9][0-9]{0,4}$/.test(value)) return undefined;
+  const port = Number(value);
+  return port <= 65535 ? port : undefined;
+}
 export const preparedReaderRights = {
   category: "vehicle_observation", purpose: "Synthetic discovery", basis: "Owned synthetic fixture",
   provenance: "Generated fixture", identifiability: "pseudonymous", use: ["service"],
@@ -202,8 +209,10 @@ export class DiagnosticPreparedReaderFixture {
     const expected = workerUrls(configured, Number(process.env["VITEST_POOL_ID"]));
     const databaseUrl = process.env["DATABASE_URL"];
     this.dependency(databaseUrl === expected.databaseUrl && process.env["REDIS_URL"] === expected.redisUrl, "worker_urls");
+    const expectedPostgresPort = expectedDiagnosticPostgresPort();
+    this.dependency(expectedPostgresPort !== undefined, "expected_postgres_port", process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"]);
     const url = new URL(expected.databaseUrl);
-    this.dependency(url.hostname === "127.0.0.1" && url.port === "61169" && /^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$/.test(url.pathname.slice(1)), "owned_worker_database");
+    this.dependency(url.hostname === "127.0.0.1" && url.port === String(expectedPostgresPort) && /^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$/.test(url.pathname.slice(1)), "owned_worker_database");
     this.dependency(new URL(expected.redisUrl).host === "127.0.0.1:61168" && new URL(expected.redisUrl).pathname === "/1", "owned_redis_db1");
     this.dependency(process.env["MINIO_ENDPOINT"] === "http://127.0.0.1:61170" && process.env["DIAGNOSTIC_PRIVATE_BUCKET"] === bucket, "owned_storage");
     this.cleanupReceipt.database = url.pathname.slice(1);
