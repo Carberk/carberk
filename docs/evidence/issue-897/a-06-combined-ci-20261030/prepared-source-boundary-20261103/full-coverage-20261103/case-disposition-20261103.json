@@ -1,0 +1,542 @@
+{
+  "kind": "issue938-full-coverage-case-disposition",
+  "recorded_at": "2026-11-03T09:30:00Z",
+  "release": "https://github.com/Carberk/carberk/issues/938#issuecomment-6599367078",
+  "input": {
+    "coordinator": "54e18b140b446a52749264435106922245f1b554",
+    "executor": "4b869f12829f59b18361bd37ba3cc5dc675cc879",
+    "executor_tree": "bc40df98d6a5e081dc927be2696e3706f594694c",
+    "source_input": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+    "inventory_sha256": "324669d09c6d66115a703c300ead0c673eca4974b73493c45d7f6821fb86c5d3"
+  },
+  "current_contract": {
+    "allowed_paths": [
+      "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    ],
+    "scope": "resource identity parameterization only",
+    "within_current_contract_case_count": 0
+  },
+  "counts": {
+    "blocked_cases": 28,
+    "H1_CLOCK_RIGHTS": 10,
+    "H2_ACTOR_GRAPH": 7,
+    "H3_PRODUCTION_BOUNDARY": 7,
+    "H4_PARENT_EQUIVALENCE": 4
+  },
+  "decision": "No blocked case is executable under the current resource-identity-only contract. H1/H2 can retain the existing #938 paths only after Parent creates and releases separate bounded issue contracts. H3 needs a separate production/test-boundary issue. H4 needs explicit Parent equivalence disposition before any issue.",
+  "groups": {
+    "H1_CLOCK_RIGHTS": {
+      "kind": "new_issue_required_helper_extension",
+      "ready": "smallest ready bounded repair after Parent issue creation",
+      "cases": [
+        "F11",
+        "F16",
+        "F17",
+        "F20",
+        "F27",
+        "F33",
+        "F39",
+        "F44",
+        "F46",
+        "P06"
+      ],
+      "missing": [
+        "CLOCK",
+        "RIGHTS",
+        "REVIEWER_QUALIFICATION",
+        "LATER_ARRIVAL_FENCE"
+      ],
+      "recommendation": "Add explicit case clock/deadline inputs, independent predeclared per-visit rights and qualification deadlines, and lawful later-arrival timestamps in the existing helper/e2e paths. Preserve literal Session-expiry, privacy, guard and cleanup oracles. No production edits."
+    },
+    "H2_ACTOR_GRAPH": {
+      "kind": "new_issue_required_helper_extension",
+      "ready": "follow-on helper contract after H1 or independently after Parent review",
+      "cases": [
+        "F04",
+        "F05",
+        "F06",
+        "F10",
+        "F23",
+        "F40",
+        "F41"
+      ],
+      "missing": [
+        "BUSINESS_GRAPH",
+        "STAFF_MANAGE_ACTOR",
+        "ADMIN_ACTOR"
+      ],
+      "recommendation": "Provision ordinary Business graph, staff.manage/founder.control and admin actors through bounded test setup with explicit restricted-role grants. Preserve production routes and all original actor-loss assertions. No production edits."
+    },
+    "H3_PRODUCTION_BOUNDARY": {
+      "kind": "separate_issue_required_production_or_new_test_boundary",
+      "ready": "not ready for source; Parent must choose supported production/test boundary",
+      "cases": [
+        "F08",
+        "F14",
+        "F15",
+        "F30",
+        "F37",
+        "F43",
+        "F45"
+      ],
+      "missing": [
+        "SHARED_PRIVATE_COMMISSIONER",
+        "ISOLATED_REPORT_ERASURE",
+        "RAW_IMMUTABLE",
+        "EVIDENCE_GUARD",
+        "NULL_DISPLAY_NAME"
+      ],
+      "recommendation": "Do not fake or weaken these states. Parent must either authorize a production-supported path/new bounded test boundary or explicitly leave these cases open. Any implementation needs a separate issue and fresh exact-SHA review."
+    },
+    "H4_PARENT_EQUIVALENCE": {
+      "kind": "parent_decision_required_before_issue",
+      "ready": "no implementation until explicit disposition",
+      "cases": [
+        "F09",
+        "F22",
+        "F38",
+        "P08"
+      ],
+      "missing": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "recommendation": "Decide whether lawful Session revocation can stand for the literal Session-expiry scenarios. Recommendation: preserve literal expiry and release explicit predeclared Session deadlines plus clock in H1; do not substitute revocation silently."
+    }
+  },
+  "cases": [
+    {
+      "id": "F04",
+      "scenario": "records Business source membership as active without adding publisher admission to observation",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ],
+      "category": "H2_ACTOR_GRAPH",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F05",
+      "scenario": "records Business source membership as suspended without adding publisher admission to observation",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ],
+      "category": "H2_ACTOR_GRAPH",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F06",
+      "scenario": "records Business source membership as missing without adding publisher admission to observation",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ],
+      "category": "H2_ACTOR_GRAPH",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F08",
+      "scenario": "uses only B command fields and recovers B after proof payload loss and later A erasure",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER",
+        "ISOLATED_REPORT_ERASURE"
+      ],
+      "category": "H3_PRODUCTION_BOUNDARY",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": true,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F09",
+      "scenario": "uniformly omits and refuses issuer Session expiry at read and again at action",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "category": "H4_PARENT_EQUIVALENCE",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": false,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F10",
+      "scenario": "uniformly omits and refuses issuer grant loss at read and again at action",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ],
+      "category": "H2_ACTOR_GRAPH",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F11",
+      "scenario": "uniformly omits and refuses issuer qualification loss at read and again at action",
+      "dependencies": [
+        "REVIEWER_QUALIFICATION",
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F14",
+      "scenario": "uniformly omits and refuses A erasure at read and again at action",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER"
+      ],
+      "category": "H3_PRODUCTION_BOUNDARY",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": true,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F15",
+      "scenario": "uniformly omits and refuses A raw erasure at read and again at action",
+      "dependencies": [
+        "RAW_IMMUTABLE",
+        "SHARED_PRIVATE_COMMISSIONER"
+      ],
+      "category": "H3_PRODUCTION_BOUNDARY",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": true,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F16",
+      "scenario": "uniformly omits and refuses A rights expiry at read and again at action",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F17",
+      "scenario": "uniformly omits and refuses B rights expiry at read and again at action",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F20",
+      "scenario": "uniformly omits and refuses proof rights expiry at read and again at action",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F22",
+      "scenario": "fences B Session changes even on empty pages and consumed result recovery",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "category": "H4_PARENT_EQUIVALENCE",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": false,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F23",
+      "scenario": "fences B grant changes even on empty pages and consumed result recovery",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ],
+      "category": "H2_ACTOR_GRAPH",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F27",
+      "scenario": "binds continuation to the query, actor, Session, B and expiry, without inherited authority",
+      "dependencies": [
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F30",
+      "scenario": "recovers a B-only committed request after proof disposal and A erasure without its command",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER"
+      ],
+      "category": "H3_PRODUCTION_BOUNDARY",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": true,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F33",
+      "scenario": "bounds request discovery, binds continuations to Session/B/query and stages linkage only",
+      "dependencies": [
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F37",
+      "scenario": "uses scoped empty semantics and omits inaccessible or incomplete retained material",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK",
+        "RAW_IMMUTABLE"
+      ],
+      "category": "H3_PRODUCTION_BOUNDARY",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": true,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F38",
+      "scenario": "binds continuation to B, actor, Session and strict query scope",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "category": "H4_PARENT_EQUIVALENCE",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": false,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F39",
+      "scenario": "replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments",
+      "dependencies": [
+        "LATER_ARRIVAL_FENCE",
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F40",
+      "scenario": "omits a B technician after current Identity or assignment grant loss",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ],
+      "category": "H2_ACTOR_GRAPH",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F41",
+      "scenario": "omits a B technician after current Identity or assignment inactive loss",
+      "dependencies": [
+        "ADMIN_ACTOR"
+      ],
+      "category": "H2_ACTOR_GRAPH",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F43",
+      "scenario": "omits a B technician after current Identity or assignment unnamed loss",
+      "dependencies": [
+        "NULL_DISPLAY_NAME"
+      ],
+      "category": "H3_PRODUCTION_BOUNDARY",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": true,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F44",
+      "scenario": "rejects a second current Session, cursor tampering without retaining pair data",
+      "dependencies": [
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F45",
+      "scenario": "omits disconnected retained identity claims, expired B material and inconsistent raw history",
+      "dependencies": [
+        "EVIDENCE_GUARD",
+        "RAW_IMMUTABLE",
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "category": "H3_PRODUCTION_BOUNDARY",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": true,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "F46",
+      "scenario": "allows an empty bounded page to continue without claiming absence",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "P06",
+      "scenario": "normalizes current B qualification loss and unknown B",
+      "dependencies": [
+        "REVIEWER_QUALIFICATION",
+        "CLOCK"
+      ],
+      "category": "H1_CLOCK_RIGHTS",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": true,
+      "requires_new_issue": true,
+      "requires_parent_disposition": false,
+      "source_path": null,
+      "target_path": null
+    },
+    {
+      "id": "P08",
+      "scenario": "normalizes current B session loss and unknown B",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "category": "H4_PARENT_EQUIVALENCE",
+      "contract_status": "outside-current-938-resource-identity-only-scope",
+      "same_allowed_paths_after_new_contract": false,
+      "requires_new_issue": false,
+      "requires_parent_disposition": true,
+      "source_path": null,
+      "target_path": null
+    }
+  ],
+  "next_action": "Parent reviews H1-H4 draft bodies; no issue creation, source edit, resource reservation or runtime until a real issue contract exists.",
+  "draft_contracts": {
+    "draft-H1-clock-rights.md": {
+      "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/draft-H1-clock-rights.md",
+      "sha256": "dcd83f57665faf9c3c8087946ab92b458edfb045415e8328d3797ad048ecc000",
+      "github_issue_created": false
+    },
+    "draft-H2-actor-graph.md": {
+      "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/draft-H2-actor-graph.md",
+      "sha256": "f30edff602ee0cb36471b86ea7cef05656d19a55a03c582d2e1bd8310d59a661",
+      "github_issue_created": false
+    },
+    "draft-H3-production-boundary.md": {
+      "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/draft-H3-production-boundary.md",
+      "sha256": "a205feab3fea3af486779f1e3e8ee132b2bee74140adbf98e8ef2c4410fb3175",
+      "github_issue_created": false
+    },
+    "draft-H4-session-equivalence.md": {
+      "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/draft-H4-session-equivalence.md",
+      "sha256": "86dd710d4d0a2e3628cd0002b66155c0cd67c792f17f0d74c249733bb52e4b59",
+      "github_issue_created": false
+    }
+  }
+}
