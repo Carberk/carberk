@@ -1,0 +1,40 @@
+{
+  "phase": "stage",
+  "name": "seven-case-vitest",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "--maxWorkers=1",
+    "--passWithNoTests=false",
+    "-t",
+    "^issue938 recovery stage1 > (accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1|lets only the selected current B technician reload a minimal usable handle without A access|returns only named currently eligible distinct B technicians to a non-reception reviewer|projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source|omits malformed required retained evidence without a partial candidate or protected error|\\[938 control\\] rejects persisted provenance rewrite without changing stored evidence|\\[938 control\\] cleans partial fixture initialization before returning failure)$"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {
+    "DATABASE_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1",
+    "REDIS_URL": "redis://127.0.0.1:61168/0",
+    "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+    "MINIO_REGION": "us-east-1",
+    "MINIO_ACCESS_KEY": "minioadmin",
+    "MINIO_SECRET_KEY": "minioadmin",
+    "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private",
+    "APP_ENV": "test",
+    "AUTO_TM_TEST_DATABASES": "unset",
+    "NO_COLOR": "1",
+    "NODE_OPTIONS": "--import=tsx"
+  },
+  "startedAt": "2026-11-03T06:49:26.310Z",
+  "endedAt": "2026-11-03T06:50:41.941Z",
+  "durationMs": 75631,
+  "exit": 1,
+  "stdoutPath": "/tmp/issue938-runtime-packet-20261103/run-20261103T0645Z/raw/stage-seven-case-vitest.stdout",
+  "stderrPath": "/tmp/issue938-runtime-packet-20261103/run-20261103T0645Z/raw/stage-seven-case-vitest.stderr"
+}

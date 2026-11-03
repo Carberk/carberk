@@ -1,0 +1,139 @@
+{
+  "at": "2026-11-03T06:49:07.686673+00:00",
+  "worker": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "expectedWorkerHead": "045f249ef9d44bb72cf8d390cc9a31911c6d7985",
+  "pinCounts": {
+    "trackedFiles": {
+      "total": 1636,
+      "mismatches": []
+    },
+    "compiledFiles": {
+      "total": 3457,
+      "mismatches": []
+    },
+    "migrations": {
+      "total": 102,
+      "mismatches": []
+    }
+  },
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "exit": 0,
+      "stdout": "045f249ef9d44bb72cf8d390cc9a31911c6d7985\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "--all",
+        "--filter",
+        "label=com.docker.compose.project=auto_tm_ci_897_938_s1_20261103_r1",
+        "--format",
+        "{{.ID}} {{.Names}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "ls",
+        "--filter",
+        "label=com.docker.compose.project=auto_tm_ci_897_938_s1_20261103_r1",
+        "--format",
+        "{{.Name}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "network",
+        "ls",
+        "--filter",
+        "label=com.docker.compose.project=auto_tm_ci_897_938_s1_20261103_r1",
+        "--format",
+        "{{.Name}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "lsof",
+        "-nP",
+        "-iTCP:61168",
+        "-iTCP:61169",
+        "-iTCP:61170",
+        "-sTCP:LISTEN"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "config",
+        "--format",
+        "json"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "exit": 0,
+      "stdout": "{\n  \"name\": \"auto_tm_ci_897_938_s1_20261103_r1\",\n  \"networks\": {\n    \"default\": {\n      \"name\": \"auto_tm_ci_897_938_s1_20261103_r1_default\",\n      \"ipam\": {}\n    }\n  },\n  \"services\": {\n    \"minio\": {\n      \"command\": [\n        \"server\",\n        \"/data\"\n      ],\n      \"entrypoint\": null,\n      \"environment\": {\n        \"MINIO_ROOT_PASSWORD\": \"minioadmin\",\n        \"MINIO_ROOT_USER\": \"minioadmin\"\n      },\n      \"healthcheck\": {\n        \"test\": [\n          \"CMD-SHELL\",\n          \"wget -q -O /dev/null http://localhost:9000/minio/health/live\"\n        ],\n        \"timeout\": \"5s\",\n        \"interval\": \"5s\",\n        \"retries\": 12\n      },\n      \"image\": \"cgr.dev/chainguard/minio@sha256:8d5a0265f0e18fb3b29f95598147f1cc2a86b782181668bad176b0e90cce9569\",\n      \"networks\": {\n        \"default\": null\n      },\n      \"ports\": [\n        {\n          \"mode\": \"ingress\",\n          \"host_ip\": \"127.0.0.1\",\n          \"target\": 9000,\n          \"published\": \"61170\",\n          \"protocol\": \"tcp\"\n        }\n      ],\n      \"user\": \"0:0\",\n      \"volumes\": [\n        {\n          \"type\": \"volume\",\n          \"source\": \"minio-data\",\n          \"target\": \"/data\",\n          \"volume\": {}\n        }\n      ]\n    },\n    \"postgres\": {\n      \"command\": null,\n      \"entrypoint\": null,\n      \"environment\": {\n        \"POSTGRES_DB\": \"auto_tm_ci\",\n        \"POSTGRES_PASSWORD\": \"auto_tm_ci_pass\",\n        \"POSTGRES_USER\": \"auto_tm_ci\"\n      },\n      \"healthcheck\": {\n        \"test\": [\n          \"CMD-SHELL\",\n          \"pg_isready -U auto_tm_ci -d auto_tm_ci\"\n        ],\n        \"timeout\": \"5s\",\n        \"interval\": \"5s\",\n        \"retries\": 12\n      },\n      \"image\": \"postgres:16-alpine\",\n      \"networks\": {\n        \"default\": null\n      },\n      \"ports\": [\n        {\n          \"mode\": \"ingress\",\n          \"host_ip\": \"127.0.0.1\",\n          \"target\": 5432,\n          \"published\": \"61169\",\n          \"protocol\": \"tcp\"\n        }\n      ],\n      \"volumes\": [\n        {\n          \"type\": \"volume\",\n          \"source\": \"postgres-data\",\n          \"target\": \"/var/lib/postgresql/data\",\n          \"volume\": {}\n        }\n      ]\n    },\n    \"redis\": {\n      \"command\": null,\n      \"entrypoint\": null,\n      \"healthcheck\": {\n        \"test\": [\n          \"CMD\",\n          \"redis-cli\",\n          \"ping\"\n        ],\n        \"timeout\": \"5s\",\n        \"interval\": \"5s\",\n        \"retries\": 12\n      },\n      \"image\": \"redis:7-alpine\",\n      \"networks\": {\n        \"default\": null\n      },\n      \"ports\": [\n        {\n          \"mode\": \"ingress\",\n          \"host_ip\": \"127.0.0.1\",\n          \"target\": 6379,\n          \"published\": \"61168\",\n          \"protocol\": \"tcp\"\n        }\n      ],\n      \"volumes\": [\n        {\n          \"type\": \"volume\",\n          \"source\": \"redis-data\",\n          \"target\": \"/data\",\n          \"volume\": {}\n        }\n      ]\n    }\n  },\n  \"volumes\": {\n    \"minio-data\": {\n      \"name\": \"auto_tm_ci_897_938_s1_20261103_r1_minio-data\"\n    },\n    \"postgres-data\": {\n      \"name\": \"auto_tm_ci_897_938_s1_20261103_r1_postgres-data\"\n    },\n    \"redis-data\": {\n      \"name\": \"auto_tm_ci_897_938_s1_20261103_r1_redis-data\"\n    }\n  }\n}",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "postgres:16-alpine",
+        "redis:7-alpine",
+        "cgr.dev/chainguard/minio@sha256:8d5a0265f0e18fb3b29f95598147f1cc2a86b782181668bad176b0e90cce9569",
+        "--format",
+        "{{.RepoTags}} {{.RepoDigests}}"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "exit": 0,
+      "stdout": "[postgres:16-alpine] [postgres@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36]\n[redis:7-alpine] [redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499]\n[cgr.dev/chainguard/minio@sha256:8d5a0265f0e18fb3b29f95598147f1cc2a86b782181668bad176b0e90cce9569] [cgr.dev/chainguard/minio@sha256:8d5a0265f0e18fb3b29f95598147f1cc2a86b782181668bad176b0e90cce9569]\n",
+      "stderr": ""
+    }
+  ],
+  "resolvedComposeSha256": "195168eb0fd52bd3e998ad5b2333c51a2eb59ab9ebd4859b163c1c08d4c99414",
+  "pass": true
+}

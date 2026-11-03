@@ -1,0 +1,25 @@
+{
+  "phase": "cleanup",
+  "name": "compose-down-owned-project",
+  "argv": [
+    "docker",
+    "compose",
+    "--file",
+    "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "--file",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+    "--project-name",
+    "auto_tm_ci_897_938_s1_20261103_r1",
+    "down",
+    "--volumes",
+    "--remove-orphans"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {},
+  "startedAt": "2026-11-03T06:50:43.375Z",
+  "endedAt": "2026-11-03T06:50:44.009Z",
+  "durationMs": 634,
+  "exit": 0,
+  "stdoutPath": "/tmp/issue938-runtime-packet-20261103/run-20261103T0645Z/raw/cleanup-compose-down-owned-project.stdout",
+  "stderrPath": "/tmp/issue938-runtime-packet-20261103/run-20261103T0645Z/raw/cleanup-compose-down-owned-project.stderr"
+}

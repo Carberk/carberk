@@ -1,0 +1,113 @@
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts > issue938 recovery stage1 > accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1
+Unknown Error: prisma_close:Error: Called end on pool more than once
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts > issue938 recovery stage1 > lets only the selected current B technician reload a minimal usable handle without A access
+Unknown Error: prisma_close:Error: Called end on pool more than once
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts > issue938 recovery stage1 > projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source
+PrismaClientKnownRequestError: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `42501`. Message: `permission denied for table measurement_state`
+ ❯ zr.handleRequestError ../../node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13
+ ❯ zr.handleAndLogRequestError ../../node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12
+ ❯ zr.request ../../node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12
+ ❯ a ../../node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:963:24
+ ❯ withDiagnosticSourceCommand ../../packages/db/src/diagnostic-source-command.ts:69:17
+ ❯ Proxy._transactionWithCallback ../../node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:810:18
+ ❯ DiagnosticPreparedReaderFixture.purgeA test/helpers/diagnosticPreparedReaderFixture.ts:429:5
+    427|     // account, then the actual worker. It does not fake DELETE /me's …
+    428|     await new PrismaSessionRepository(this.db, new BcryptHasherAdapter…
+    429|     await new PrismaAccountDeletionUnitOfWork(this.db).run({ userId, d…
+       |     ^
+    430|       await writes.scheduleDeletion(userId, due); await writes.archive…
+    431|     });
+ ❯ src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts:43:7
+ ❯ withPreparedReaderFixture test/helpers/diagnosticPreparedReaderFixture.ts:511:81
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts > issue938 recovery stage1 > projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source
+Unknown Error: prisma_close:Error: Called end on pool more than once
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts > issue938 recovery stage1 > [938 control] cleans partial fixture initialization before returning failure
+AssertionError: expected [Function] to throw error including '938_partial_initialization_sentinel' but got '938_fixture_cleanup_failed'
+
+Expected: "938_partial_initialization_sentinel"
+Received: "938_fixture_cleanup_failed"
+
+ ❯ src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts:71:77
+     69|     let cleanup: PreparedReaderCleanup | undefined;
+     70|     await expect(withPreparedReaderFixture("readers", "partial-initial…
+     71|       { partialFailure: true, cleanup: receipt => { cleanup = receipt;…
+       |                                                                             ^
+     72|     expect(cleanup).toMatchObject({ role: "r938_s1_readers", callers: …
+     73|       roleBackends: 0, roleAbsent: true, objectsEmpty: true, controlPr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts > issue938 recovery stage1 > returns only named currently eligible distinct B technicians to a non-reception reviewer
+Unknown Error: prisma_close:Error: Called end on pool more than once
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts > issue938 recovery stage1 > omits malformed required retained evidence without a partial candidate or protected error
+Unknown Error: prisma_close:Error: Called end on pool more than once
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts > issue938 recovery stage1 > [938 control] rejects persisted provenance rewrite without changing stored evidence
+AssertionError: expected DriverAdapterError: diagnostic_identity_e… { clientVersion: '…' } to match object { meta: { …(1) } }
+(12 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "meta": {
+-     "driverAdapterError": {
++ DriverAdapterError {
++   "message": "diagnostic_identity_evidence_immutable",
+    "cause": {
++     "code": "P0001",
++     "column": undefined,
++     "detail": undefined,
++     "hint": undefined,
++     "kind": "postgres",
++     "message": "diagnostic_identity_evidence_immutable",
+      "originalCode": "P0001",
+      "originalMessage": "diagnostic_identity_evidence_immutable",
++     "severity": "ERROR",
+    },
+-     },
+-   },
++   "name": "DriverAdapterError",
++   "clientVersion": "7.8.0",
+  }
+
+ ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts:52:29
+     50|       const refused = await f.illegalProvenanceRewrite(a);
+     51|       expect(refused.reached).toBe(true);
+     52|       expect(refused.error).toMatchObject({ meta: { driverAdapterError…
+       |                             ^
+     53|         originalCode: "P0001", originalMessage: "diagnostic_identity_e…
+     54|       } } } });
+ ❯ withPreparedReaderFixture test/helpers/diagnosticPreparedReaderFixture.ts:511:81
+ ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts:47:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts > issue938 recovery stage1 > [938 control] rejects persisted provenance rewrite without changing stored evidence
+Unknown Error: prisma_close:Error: Called end on pool more than once
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 2d375913/apps/api
+
