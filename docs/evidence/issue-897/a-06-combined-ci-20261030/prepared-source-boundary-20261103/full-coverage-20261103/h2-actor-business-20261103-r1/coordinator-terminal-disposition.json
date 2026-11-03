@@ -1,0 +1,106 @@
+{
+  "kind": "issue940-h2-terminal-disposition",
+  "recorded_at": "2026-11-03T18:45:00Z",
+  "status": "STATIC_ASSEMBLY_ALLOWED_RUNTIME_OPEN",
+  "base_candidate": {
+    "commit": "323049c5c1ef310d9b40ad83ab8e29804d57c68a",
+    "tree": "4447976eca19ba3e5cdbcea155133f8568fbc682"
+  },
+  "draft_source": {
+    "commit": "cec5d51aa633d2ed84d01d0f1d93baad511e5d9d",
+    "tree": "5e9dca01ad5f2423b44d42246b4e6ca1a2edaed7",
+    "parent": "a860052d8f0896f701999eb012819b6e7e7a8442",
+    "patch_sha256": "9f73b4ccc8eda73406ab880912d5318531e31b02ac1cdbbd3f024eecd2aeeda4"
+  },
+  "draft_evidence": {
+    "commit": "b43831f3bf038c0bb0a0acae913b28091c57a765",
+    "tree": "660bc9c0314e63a2aa66e341eac86f316f10b5c2",
+    "path_prefix": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h2-actor-business-20261103-r1/"
+  },
+  "changed_source_paths": [
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "evidence_files": [
+    "checks/api-build.stderr",
+    "checks/api-build.stdout",
+    "checks/api-lint.stderr",
+    "checks/api-lint.stdout",
+    "checks/api-tsc6.stderr",
+    "checks/api-tsc6.stdout",
+    "checks/api-typecheck.stderr",
+    "checks/api-typecheck.stdout",
+    "checks/git-diff-check.stderr",
+    "checks/git-diff-check.stdout",
+    "checks/offline-command-receipts.json",
+    "h2-business-fk-graph.json",
+    "h2-case-map-and-audit.json",
+    "h2-packet.md",
+    "next-action.json",
+    "sha256sums.txt"
+  ],
+  "static_receipts": {
+    "commands": 5,
+    "all_exit_zero": true,
+    "runtime_started": false,
+    "resources_reserved": false,
+    "coverage": {"stage1": 5, "h1": 10, "h2": 7, "implemented": 22, "original": 56, "companions": 168, "full224_executable": false}
+  },
+  "replacement_inventory": {
+    "F04_F05_F06": "memory dealershipMember/listing seed replaced by AdmitBusiness, owner/member invitation redemption, Listing businessId, and owner ChangeBusinessMembership routes; F04 adds the production-required owner grant",
+    "F10_F23_F40": "direct grant mutation replaced by staffManager bootstrap and ChangeStaffGrant revocation",
+    "F41": "direct user suspension mutation replaced by admin promotion plus direct SuspendUser use case",
+    "capture_component_assertion": "memory proxy capture replaced by an observation-only Prisma create query extension that records args.data before the unchanged write"
+  },
+  "open_contract_gaps": [
+    {
+      "id": "H2-F41-ADMIN-BOUNDARY",
+      "cases": ["F41"],
+      "finding": "The replacement calls SuspendUser directly. It does not execute the admin HTTP route, AdminGuard TOTP check, or ADMIN_MODERATION_ACTIONS_ENABLED gate.",
+      "required_contract": "Either add an allowed-path route-level adapter that exercises those existing production gates, or explicitly leave F41 open under a separate admin-boundary issue. No source or assertion weakening is authorized."
+    },
+    {
+      "id": "H2-BUSINESS-OBSERVATION",
+      "cases": ["F05", "F06"],
+      "finding": "The source has no runtime proof that observation remains accepted after owner suspension or removal of the Business membership.",
+      "required_contract": "Run the exact focused cases on real PostgreSQL and retain the first behavioral result. A failure requires a bounded contract, not a fallback seed or direct row write."
+    },
+    {
+      "id": "H2-FIRST-CONSUME",
+      "cases": ["F23"],
+      "finding": "The first consume is asserted as HTTP 201 in source but has no runtime receipt.",
+      "required_contract": "The focused real-PostgreSQL probe must prove the first consume is 201 before the grant-loss assertion; otherwise leave F23 open."
+    },
+    {
+      "id": "H2-NONOWNER-GRANT-BOUNDARY",
+      "cases": ["F04", "F05", "F06"],
+      "finding": "taskGrants issues SELECT/INSERT/UPDATE from the environment Pool. The source does not prove a lawful non-owner grantor boundary, the effective privilege set, or that the temporary grants are revoked before teardown.",
+      "required_contract": "Runtime evidence must identify the non-owner restricted role, effective grants, grantor/owner boundary, and post-case revocation/role absence. Broad role elevation is prohibited."
+    },
+    {
+      "id": "H2-ACTOR-CLEANUP",
+      "cases": ["F04", "F05", "F06", "F10", "F23", "F40", "F41"],
+      "finding": "close() proves the existing runtime role, source/campaign receipts, storage and guards, but the H2 packet has no explicit residual proof for operator users/sessions, Business/invitation/membership/audit rows, staff grants, or admin promotion artifacts.",
+      "required_contract": "Add bounded cleanup receipts for H2-created actor and Business rows, or document and prove an equivalent database teardown boundary before any runtime PASS."
+    },
+    {
+      "id": "H2-CACHE-COVERAGE",
+      "cases": ["F10", "F23", "F40", "F41"],
+      "finding": "No existing cache-control assertion was deleted, but the new H2 handoff and linking-technicians responses do not assert the original no-store, private header on their new paths.",
+      "required_contract": "Preserve the original cache assertions and add the same literal header assertions to each new protected response before treating those selectors as complete."
+    }
+  ],
+  "assembly_guard": {
+    "mode": "selective",
+    "allowed_source_paths": "changed_source_paths",
+    "allowed_evidence_prefix": "draft_evidence.path_prefix",
+    "preserve_prior_evidence": true,
+    "forbid_unrelated_deletions": true,
+    "h1_candidate_unchanged": true,
+    "runtime_resources_reserved": false,
+    "h2_ticket_pass": false
+  },
+  "next_action": "Selectively assemble the four source paths and 16 H2 evidence files onto the H1 candidate, verify exact source/evidence hashes and zero unrelated deletions, push the static assembly, then obtain fresh exact-SHA #924/#934 reviews. Keep runtime and #942 held until those reviews and the listed H2 contract gaps are resolved."
+}
