@@ -1,134 +1,71 @@
-import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
-import {
-  MAX_VIDEO_DURATION_SECONDS,
-  createInitialVideoPrototypeState,
-  selectedDurationSeconds,
-  videoPrototypeReducer,
-} from "../../src/video-prototype/state";
+import { describe, expect, it, vi } from "vitest";
+
+import { SYNTHETIC_CLIPS } from "../../src/video-prototype/fixtures";
 import { createDeterministicLocalVideoAdapter } from "../../src/video-prototype/localAdapter";
+import { createInitialVideoPrototypeState, selectionError, videoPrototypeReducer } from "../../src/video-prototype/state";
 
-function run(...actions: Parameters<typeof videoPrototypeReducer>[1][]) {
-  return actions.reduce(videoPrototypeReducer, createInitialVideoPrototypeState());
+// expo-crypto's native digest is replaced at the native boundary only.
+vi.mock("expo-crypto", () => ({ CryptoDigestAlgorithm: { SHA256: "SHA-256" }, digestStringAsync: async (_algorithm: string, data: string) => createHash("sha256").update(data).digest("hex") }));
+
+const source = (() => {
+  const clip = SYNTHETIC_CLIPS[2];
+  if (!clip) throw new Error("Missing long synthetic fixture");
+  return clip;
+})();
+
+function selected() {
+  return videoPrototypeReducer(videoPrototypeReducer(createInitialVideoPrototypeState(), { type: "library", open: true }), { type: "select", source });
 }
 
-function readyForUpload() {
-  return run(
-    { type: "open-selection" },
-    { type: "select-clip", durationSeconds: 120 },
-    { type: "open-trim" },
-    { type: "set-trim", startSeconds: 0, endSeconds: MAX_VIDEO_DURATION_SECONDS },
-    { type: "continue-to-poster" },
-    { type: "begin-preparing" },
-    { type: "finish-preparing" },
-  );
-}
-
-describe("Listing video prototype state machine", () => {
-  it("starts with an empty optional video slot and required photos", () => {
-    const state = createInitialVideoPrototypeState();
-
-    expect(state.phase).toBe("empty");
-    expect(state.photos).toHaveLength(3);
-    expect(state.source).toBeNull();
+describe("prototype interval invariants", () => {
+  it("starts long sources at the first 90 seconds and requires the trim screen", () => {
+    const state = selected();
+    expect(state.pending?.selection).toEqual({ startSeconds: 0, endSeconds: 90, posterSeconds: 5 });
+    expect(videoPrototypeReducer(state, { type: "edit", phase: "poster" }).pending?.phase).toBe("preview");
   });
-
-  it("walks from library selection through preview and exposes a 90-second trim limit", () => {
-    const preview = run(
-      { type: "open-selection" },
-      { type: "select-clip", durationSeconds: 120 },
-    );
-    expect(preview.phase).toBe("preview");
-    expect(preview.source?.durationSeconds).toBe(120);
-
-    const trim = videoPrototypeReducer(preview, { type: "open-trim" });
-    expect(trim.phase).toBe("trim");
-    expect(trim.validationMessage).toBe("Selection exceeds the 90-second maximum.");
-    expect(selectedDurationSeconds(trim)).toBe(120);
-
-    const rejected = videoPrototypeReducer(trim, { type: "set-trim", startSeconds: 0, endSeconds: 91 });
-    expect(selectedDurationSeconds(rejected)).toBe(91);
-    expect(rejected.validationMessage).toBe("Selection exceeds the 90-second maximum.");
-
-    const accepted = videoPrototypeReducer(rejected, { type: "set-trim", startSeconds: 0, endSeconds: 90 });
-    expect(selectedDurationSeconds(accepted)).toBe(90);
-    expect(accepted.validationMessage).toBeNull();
-    expect(videoPrototypeReducer(accepted, { type: "continue-to-poster" }).phase).toBe("poster");
+  it("accepts exactly 90 seconds, rejects 91 seconds and validates poster bounds", () => {
+    expect(selectionError(source, { startSeconds: 0, endSeconds: 90, posterSeconds: 5 })).toBeNull();
+    expect(selectionError(source, { startSeconds: 0, endSeconds: 91, posterSeconds: 5 })).toBe("tooLong");
+    expect(selectionError(source, { startSeconds: 0, endSeconds: 90, posterSeconds: 91 })).toBe("poster");
+    expect(selectionError(source, { startSeconds: 0, endSeconds: 121, posterSeconds: 5 })).toBe("interval");
   });
-
-  it("retains the poster inside the selected interval and enters preparing", () => {
-    const poster = run(
-      { type: "open-selection" },
-      { type: "select-clip", durationSeconds: 90 },
-      { type: "open-trim" },
-      { type: "continue-to-poster" },
-      { type: "adjust-poster", deltaSeconds: 10 },
-    );
-
-    expect(poster.phase).toBe("poster");
-    expect(poster.selection?.posterSeconds).toBe(15);
-    expect(videoPrototypeReducer(poster, { type: "begin-preparing" }).phase).toBe("preparing");
+  it("clamps poster after either trim handle and refuses preparation with an invalid poster", () => {
+    let state = videoPrototypeReducer(selected(), { type: "edit", phase: "trim" });
+    state = videoPrototypeReducer(state, { type: "trim", handle: "start", seconds: 20 });
+    expect(state.pending?.selection.posterSeconds).toBe(20);
+    state = videoPrototypeReducer(state, { type: "trim", handle: "end", seconds: 30 });
+    state = videoPrototypeReducer(state, { type: "edit", phase: "poster" });
+    state = videoPrototypeReducer(state, { type: "poster", seconds: 28 });
+    state = videoPrototypeReducer(state, { type: "edit", phase: "trim" });
+    state = videoPrototypeReducer(state, { type: "trim", handle: "end", seconds: 25 });
+    expect(state.pending?.selection.posterSeconds).toBe(25);
+    if (!state.pending) throw new Error("Expected pending selection");
+    const forged = { ...state, pending: { ...state.pending, phase: "poster" as const, selection: { ...state.pending.selection, posterSeconds: 99 } } };
+    expect(videoPrototypeReducer(forged, { type: "prepare" }).pending?.phase).toBe("poster");
   });
+});
 
-  it("moves through preparing, uploading progress, pause, processing and ready", () => {
-    let state = readyForUpload();
-    expect(state.phase).toBe("uploading");
-    expect(state.prepared?.id).toBe("prepared-synthetic-clip-v1");
-
-    state = videoPrototypeReducer(state, { type: "upload-chunk" });
-    state = videoPrototypeReducer(state, { type: "pause-upload" });
-    expect(state.phase).toBe("paused");
-    expect(state.uploadProgress).toBe(25);
-    state = videoPrototypeReducer(state, { type: "resume-upload" });
-    state = videoPrototypeReducer(state, { type: "upload-chunk" });
-    state = videoPrototypeReducer(state, { type: "upload-chunk" });
-    state = videoPrototypeReducer(state, { type: "upload-chunk" });
-    expect(state.uploadProgress).toBe(100);
-    state = videoPrototypeReducer(state, { type: "begin-processing" });
-    expect(state.phase).toBe("processing");
-    expect(videoPrototypeReducer(state, { type: "finish-processing" }).phase).toBe("ready");
+describe("deterministic descriptor adapter", () => {
+  it.each(SYNTHETIC_CLIPS)("hashes the exact committed UTF-8 bytes of $id", (clip) => {
+    const bytes = readFileSync(new URL(`../../src/video-prototype/fixtures/${clip.id}.json`, import.meta.url));
+    expect(createHash("sha256").update(bytes).digest("hex")).toBe(clip.sha256);
   });
-
-  it("fails and retries without changing trim or poster choices", () => {
-    const uploading = readyForUpload();
-    const selectionBeforeFailure = uploading.selection;
-    const failed = videoPrototypeReducer(uploading, { type: "fail", message: "Synthetic upload interruption" });
-    expect(failed.phase).toBe("failed");
-    const retried = videoPrototypeReducer(failed, { type: "retry" });
-    expect(retried.phase).toBe("uploading");
-    expect(retried.selection).toEqual(selectionBeforeFailure);
-    expect(retried.prepared?.id).toBe("prepared-synthetic-clip-v1");
-  });
-
-  it("keeps photos publishable while optional video is pending", () => {
-    const pending = videoPrototypeReducer(readyForUpload(), { type: "continue-with-photos" });
-
-    expect(pending.phase).toBe("optional-video-pending");
-    expect(pending.photos).toEqual(["photo-1", "photo-2", "photo-3"]);
-    expect(pending.selection?.endSeconds).toBe(90);
-    expect(videoPrototypeReducer(pending, { type: "resume-video" }).phase).toBe("uploading");
-  });
-
-  it("removes all staged output while preserving photos", () => {
-    const state = videoPrototypeReducer(readyForUpload(), { type: "remove-video" });
-
-    expect(state.phase).toBe("empty");
-    expect(state.source).toBeNull();
-    expect(state.selection).toBeNull();
-    expect(state.prepared).toBeNull();
-    expect(state.photos).toHaveLength(3);
-  });
-
-  it("has no original-source upload operation in the local adapter", () => {
+  it("returns actual prepared descriptor bytes/hash and refuses original or discarded output", async () => {
     const adapter = createDeterministicLocalVideoAdapter();
-    const state = readyForUpload();
-    if (!state.source || !state.selection) throw new Error("expected prepared state");
-    const prepared = adapter.prepare(state.source, state.selection);
-
-    expect(prepared.id).toBe("prepared-synthetic-clip-v1");
-    expect(adapter.uploadChunk(prepared, 0)).toBe(25);
-    expect(() => adapter.uploadChunk({ ...prepared, id: "source" as never }, 0)).toThrow(
-      "VIDEO_PROTOTYPE_PREPARED_OUTPUT_REQUIRED",
-    );
+    const output = await adapter.prepare(source, { startSeconds: 10, endSeconds: 90, posterSeconds: 20 });
+    expect(JSON.parse(output.descriptorUtf8)).toEqual({ kind: "prepared-descriptor-v1", sourceSha256: "157bef55c50343fbef57d6cde6c4cdf9a85c709e5e6b51b0a0edbf20745fff5e", startSeconds: 10, endSeconds: 90, posterSeconds: 20 });
+    expect(output.sizeBytes).toBe(169);
+    expect(output.sha256).toBe("e8725c2c470b9a3a8cc5768089c0565a22b73de10a6103ddac1bfe325cfb0736");
+    expect(adapter.uploadChunk(output, 25)).toBe(50);
+    expect(() => adapter.uploadChunk(source as never, 0)).toThrow("PREPARED_OUTPUT_REQUIRED");
+    adapter.discard(output);
+    expect(() => adapter.uploadChunk(output, 0)).toThrow("PREPARED_OUTPUT_REQUIRED");
+  });
+  it("rejects an out-of-interval poster before producing staged data", async () => {
+    const adapter = createDeterministicLocalVideoAdapter();
+    await expect(adapter.prepare(source, { startSeconds: 10, endSeconds: 90, posterSeconds: 5 })).rejects.toThrow("INVALID_SELECTION");
   });
 });

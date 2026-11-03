@@ -1,441 +1,256 @@
-import { useMemo, useReducer } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type PressableProps,
-} from "react-native";
+import { useEffect, useReducer, useRef, useState } from "react";
+import { ScrollView, View } from "react-native";
 
+import { usePrototypeCopy } from "./copy";
+import { SYNTHETIC_CLIPS, type SyntheticClip } from "./fixtures";
+import type { LocalVideoAdapter } from "./localAdapter";
 import {
-  MAX_VIDEO_DURATION_SECONDS,
-  createInitialVideoPrototypeState,
-  selectedDurationSeconds,
-  videoPrototypeReducer,
-  type PrototypePhase,
-  type VideoPrototypeAction,
-  type VideoPrototypeState,
+  createInitialVideoPrototypeState, selectionError, videoPrototypeReducer,
+  type JobPhase, type PreparedClip,
 } from "./state";
-import { createDeterministicLocalVideoAdapter } from "./localAdapter";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
+import { Button, type ButtonProps } from "@/components/ui/button";
+import { Text } from "@/components/ui/text";
 
-const phaseLabels: Record<PrototypePhase, string> = {
-  empty: "Empty slot",
-  selection: "Library selection",
-  preview: "Preview",
-  trim: "Trim",
-  poster: "Poster",
-  preparing: "Preparing",
-  uploading: "Uploading",
-  paused: "Paused",
-  processing: "Processing",
-  failed: "Failed",
-  ready: "Ready",
-  "optional-video-pending": "Optional video pending",
-};
-
-function seconds(value: number): string {
-  return `${value}s`;
+function Action({ label, ...props }: ButtonProps & { label: string }) {
+  return <Button variant="secondary" accessibilityLabel={label} {...props}><Text>{label}</Text></Button>;
 }
 
-function ActionButton({
-  label,
-  onPress,
-  disabled = false,
-  tone = "secondary",
-  ...props
-}: PressableProps & {
-  label: string;
-  tone?: "primary" | "secondary" | "danger";
-}) {
-  const isDisabled = disabled === true;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: isDisabled }}
-      disabled={isDisabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        tone === "primary" ? styles.primaryButton : null,
-        tone === "danger" ? styles.dangerButton : null,
-        isDisabled ? styles.disabledButton : null,
-        pressed && !isDisabled ? styles.pressedButton : null,
-      ]}
-      {...props}
-    >
-      <Text style={[styles.buttonText, tone === "primary" ? styles.primaryButtonText : null]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function StateBadge({ phase }: { phase: PrototypePhase }) {
-  return (
-    <View style={styles.stateBadge} accessibilityRole="text">
-      <View style={styles.stateDot} />
-      <Text style={styles.stateBadgeText}>{phaseLabels[phase]}</Text>
-    </View>
-  );
-}
-
-function TrimHandle({
-  label,
-  value,
-  onAdjust,
-}: {
-  label: string;
-  value: number;
-  onAdjust: (deltaSeconds: number) => void;
-}) {
-  return (
-    <View style={styles.handleCard}>
-      <Text style={styles.handleLabel}>{label}</Text>
-      <Text style={styles.handleValue}>{seconds(value)}</Text>
-      <View style={styles.inlineActions}>
-        <ActionButton label={`${label} -5 seconds`} onPress={() => onAdjust(-5)} />
-        <ActionButton label={`${label} +5 seconds`} onPress={() => onAdjust(5)} />
+/** Local storyboard shapes, never images fetched from a media host. */
+function Frame({ atSeconds, carX, label }: { atSeconds: number; carX: number; label: string }) {
+  return <View accessible accessibilityLabel={label} className="flex-1 overflow-hidden rounded-md bg-secondary p-2">
+    <View className="h-10 justify-end border-b border-foreground/50">
+      <View style={{ transform: [{ translateX: carX / 4 }] }}>
+        <View className="ml-2 h-2 w-5 rounded-t-md bg-foreground/50" />
+        <View className="h-3 w-9 rounded-md bg-foreground/70" />
       </View>
     </View>
-  );
+    <Text className="text-center font-mono text-caption">{atSeconds}s</Text>
+  </View>;
 }
 
-function ProgressBar({ progress }: { progress: number }) {
-  return (
-    <View
-      accessibilityRole="progressbar"
-      accessibilityLabel="Upload progress"
-      accessibilityValue={{ min: 0, max: 100, now: progress }}
-      style={styles.progressTrack}
-    >
-      <View style={[styles.progressFill, { width: `${progress}%` }]} />
+function Timeline({ source, onPoster, start, end }: {
+  source: SyntheticClip; start: number; end: number; onPoster?: (seconds: number) => void;
+}) {
+  const t = usePrototypeCopy();
+  return <View className="gap-2">
+    <Text variant="label">{t("timeline")}</Text>
+    <View className="flex-row gap-1">
+      {source.frames.map((frame) => onPoster ? (
+        <Button key={frame.atSeconds} variant="outline" className="flex-1 p-0"
+          disabled={frame.atSeconds < start || frame.atSeconds > end}
+          accessibilityLabel={t("chooseFrame", { seconds: frame.atSeconds })}
+          onPress={() => onPoster(frame.atSeconds)}>
+          <Frame {...frame} label={t("frame", { seconds: frame.atSeconds })} />
+        </Button>
+      ) : <Frame key={frame.atSeconds} {...frame} label={t("frame", { seconds: frame.atSeconds })} />)}
     </View>
-  );
+  </View>;
 }
 
-function VideoDetails({ state }: { state: VideoPrototypeState }) {
-  const duration = selectedDurationSeconds(state);
-  if (!state.source || !state.selection) return null;
+export function VideoUploadPrototype({ adapter }: { adapter: LocalVideoAdapter }) {
+  const t = usePrototypeCopy();
+  const [state, dispatch] = useReducer(videoPrototypeReducer, undefined, createInitialVideoPrototypeState);
+  const [preparingBusy, setPreparingBusy] = useState(false);
+  const epoch = useRef(0);
+  const latest = useRef(state);
+  latest.current = state;
+  useEffect(() => () => {
+    epoch.current += 1;
+    const { pending, active } = latest.current;
+    if (pending?.prepared) adapter.discard(pending.prepared);
+    if (active) adapter.discard(active.prepared);
+  }, [adapter]);
 
-  return (
-    <View style={styles.detailsCard}>
-      <Text style={styles.cardTitle}>Synthetic local clip</Text>
-      <Text style={styles.cardLine}>Source: {state.source.id}</Text>
-      <Text style={styles.cardLine}>Source duration: {seconds(state.source.durationSeconds)}</Text>
-      <Text style={styles.cardLine} selectable>
-        Source hash: {state.source.sha256}
-      </Text>
-      <Text style={styles.cardLine}>
-        Selected: {seconds(state.selection.startSeconds)}–{seconds(state.selection.endSeconds)}
-        {duration === null ? "" : ` (${seconds(duration)})`}
-      </Text>
-      <Text style={styles.cardLine}>Poster: {seconds(state.selection.posterSeconds)}</Text>
-      {state.prepared ? (
-        <Text style={styles.cardLine} selectable>
-          Prepared upload: {state.prepared.sizeBytes.toLocaleString()} bytes · {state.prepared.sha256}
-        </Text>
-      ) : null}
-      <Text style={styles.localOnly}>Original source is never an upload fallback.</Text>
-    </View>
-  );
-}
+  const pending = state.pending;
+  const phase = state.libraryOpen ? "selection" : pending?.phase ?? (state.active ? "ready" : "empty");
+  const error = pending ? selectionError(pending.source, pending.selection) : null;
+  const canEdit = pending && ["preview", "trim", "poster", "failed"].includes(pending.phase);
 
-export function VideoUploadPrototype() {
-  const [state, dispatch] = useReducer(
-    videoPrototypeReducer,
-    undefined,
-    createInitialVideoPrototypeState,
-  );
-  const adapter = useMemo(() => createDeterministicLocalVideoAdapter(), []);
-
-  function send(action: VideoPrototypeAction) {
-    dispatch(action);
+  function discardPending() {
+    epoch.current += 1;
+    setPreparingBusy(false);
+    if (pending?.prepared) adapter.discard(pending.prepared);
+    dispatch({ type: "remove-pending" });
   }
-
-  function finishPreparing() {
-    if (state.source && state.selection) {
-      // The call proves the local adapter seam. The reducer stores the same
-      // deterministic prepared metadata and never accepts the source itself.
-      adapter.prepare(state.source, state.selection);
-    }
-    send({ type: "finish-preparing" });
+  function select(source: SyntheticClip) {
+    if (state.access !== "eligible") return;
+    discardPending();
+    // Removing staged data must not close this selection transaction.
+    dispatch({ type: "library", open: true });
+    dispatch({ type: "select", source });
   }
-
-  function uploadChunk() {
-    if (state.prepared) {
-      adapter.uploadChunk(state.prepared, state.uploadProgress / 25 - 1);
-    }
-    send({ type: "upload-chunk" });
-  }
-
-  function renderPhase() {
-    switch (state.phase) {
-      case "empty":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.emptyIcon} accessibilityLabel="Empty video slot">
-              +
-            </Text>
-            <Text style={styles.phaseTitle}>Add an optional walkaround video</Text>
-            <Text style={styles.bodyText}>
-              Photos stay required for publishing. This local reviewer flow never contacts a service.
-            </Text>
-            <ActionButton label="Add video from library" onPress={() => send({ type: "open-selection" })} tone="primary" />
-          </View>
-        );
-
-      case "selection":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Choose a deterministic library sample</Text>
-            <Text style={styles.bodyText}>
-              These clips stand in for the phone library. The source hash is fixed for every run.
-            </Text>
-            <ActionButton label="Choose 45-second clip" onPress={() => send({ type: "select-clip", durationSeconds: 45 })} tone="primary" />
-            <ActionButton label="Choose exact 90-second clip" onPress={() => send({ type: "select-clip", durationSeconds: 90 })} />
-            <ActionButton label="Choose 120-second clip" onPress={() => send({ type: "select-clip", durationSeconds: 120 })} />
-            <ActionButton label="Cancel selection" onPress={() => send({ type: "remove-video" })} />
-          </View>
-        );
-
-      case "preview":
-        return (
-          <View style={styles.phaseContent}>
-            <View style={styles.previewFrame} accessibilityLabel="Synthetic video preview">
-              <Text style={styles.previewPlay}>▶</Text>
-              <Text style={styles.previewText}>Preview frame · local only</Text>
-            </View>
-            <Text style={styles.phaseTitle}>Preview the selected source</Text>
-            <Text style={styles.bodyText}>
-              {state.source && state.source.durationSeconds > MAX_VIDEO_DURATION_SECONDS
-                ? "This source is longer than 90 seconds. Trim an interval before preparing."
-                : "The selected source fits the 90-second maximum; trimming is still available."}
-            </Text>
-            <ActionButton label="Trim video" onPress={() => send({ type: "open-trim" })} tone="primary" />
-            <ActionButton label="Choose another video" onPress={() => send({ type: "open-selection" })} />
-          </View>
-        );
-
-      case "trim": {
-        const selection = state.selection;
-        const duration = selectedDurationSeconds(state);
-        if (!selection) return null;
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Trim the interval</Text>
-            <Text style={styles.bodyText}>
-              Both handles are accessible adjustable controls. The selected interval must be at most 90 seconds.
-            </Text>
-            <View style={styles.handleRow}>
-              <TrimHandle
-                label="Video start"
-                value={selection.startSeconds}
-                onAdjust={(deltaSeconds) => send({ type: "adjust-trim", handle: "start", deltaSeconds })}
-              />
-              <TrimHandle
-                label="Video end"
-                value={selection.endSeconds}
-                onAdjust={(deltaSeconds) => send({ type: "adjust-trim", handle: "end", deltaSeconds })}
-              />
-            </View>
-            <Text style={styles.selectionDuration} accessibilityRole="text">
-              Selected duration: {duration === null ? "—" : seconds(duration)} / {MAX_VIDEO_DURATION_SECONDS}s maximum
-            </Text>
-            {state.validationMessage ? <Text style={styles.errorText}>{state.validationMessage}</Text> : null}
-            <ActionButton
-              label="Use first 90 seconds"
-              onPress={() => send({ type: "set-trim", startSeconds: 0, endSeconds: MAX_VIDEO_DURATION_SECONDS })}
-            />
-            <ActionButton
-              label="Continue to poster"
-              onPress={() => send({ type: "continue-to-poster" })}
-              disabled={duration === null || duration > MAX_VIDEO_DURATION_SECONDS}
-              tone="primary"
-            />
-            <ActionButton label="Remove video" onPress={() => send({ type: "remove-video" })} tone="danger" />
-          </View>
-        );
+  function fail(stage: JobPhase) { dispatch({ type: "fail", stage }); }
+  async function prepare() {
+    if (!pending || pending.phase !== "preparing" || preparingBusy) return;
+    if (selectionError(pending.source, pending.selection)) { fail("preparing"); return; }
+    const operation = ++epoch.current;
+    setPreparingBusy(true);
+    let output: PreparedClip | undefined;
+    try {
+      output = await adapter.prepare(pending.source, pending.selection);
+      if (operation !== epoch.current) { adapter.discard(output); return; }
+      if (output.kind !== "prepared-descriptor-v1" || !/^[a-f0-9]{64}$/.test(output.sha256) || output.sizeBytes <= 0 || output.sha256 === pending.source.sha256) {
+        adapter.discard(output);
+        fail("preparing");
+        return;
       }
-
-      case "poster":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Choose the poster frame</Text>
-            <View style={styles.posterFrame} accessibilityLabel="Poster frame preview">
-              <Text style={styles.posterText}>Poster at {seconds(state.selection?.posterSeconds ?? 0)}</Text>
-            </View>
-            <Text style={styles.bodyText}>The poster stays inside the selected interval.</Text>
-            <View style={styles.inlineActions}>
-              <ActionButton label="Poster -5 seconds" onPress={() => send({ type: "adjust-poster", deltaSeconds: -5 })} />
-              <ActionButton label="Poster +5 seconds" onPress={() => send({ type: "adjust-poster", deltaSeconds: 5 })} />
-            </View>
-            <ActionButton label="Use video and prepare locally" onPress={() => send({ type: "begin-preparing" })} tone="primary" />
-            <ActionButton label="Remove video" onPress={() => send({ type: "remove-video" })} tone="danger" />
-          </View>
-        );
-
-      case "preparing":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Preparing</Text>
-            <Text style={styles.bodyText}>
-              The local adapter trims only the selected interval and creates prepared output. No original bytes leave the device.
-            </Text>
-            <ActionButton label="Finish local preparation" onPress={finishPreparing} tone="primary" />
-            <ActionButton label="Simulate preparation failure" onPress={() => send({ type: "fail", message: "Synthetic preparation failed" })} tone="danger" />
-            <ActionButton label="Cancel and remove staged output" onPress={() => send({ type: "remove-video" })} tone="danger" />
-            <ActionButton label="Continue with photos" onPress={() => send({ type: "continue-with-photos" })} />
-          </View>
-        );
-
-      case "uploading":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Uploading · {state.uploadProgress}%</Text>
-            <Text style={styles.bodyText}>Foreground local simulation of prepared output upload.</Text>
-            <ProgressBar progress={state.uploadProgress} />
-            <Text style={styles.cardLine}>Prepared size: {state.prepared?.sizeBytes.toLocaleString()} bytes</Text>
-            <ActionButton label="Upload next chunk" onPress={uploadChunk} disabled={state.uploadProgress >= 100} tone="primary" />
-            <ActionButton label="Pause upload" onPress={() => send({ type: "pause-upload" })} disabled={state.uploadProgress >= 100} />
-            <ActionButton label="Simulate upload failure" onPress={() => send({ type: "fail", message: "Synthetic upload interruption" })} tone="danger" />
-            <ActionButton label="Cancel and remove staged output" onPress={() => send({ type: "remove-video" })} tone="danger" />
-            <ActionButton label="Start processing" onPress={() => send({ type: "begin-processing" })} disabled={state.uploadProgress < 100} tone="primary" />
-            <ActionButton label="Continue with photos" onPress={() => send({ type: "continue-with-photos" })} />
-          </View>
-        );
-
-      case "paused":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Paused</Text>
-            <Text style={styles.bodyText}>The prepared output and confirmed progress are retained locally.</Text>
-            <Text style={styles.cardLine}>Confirmed progress: {state.uploadProgress}%</Text>
-            <ActionButton label="Resume upload" onPress={() => send({ type: "resume-upload" })} tone="primary" />
-            <ActionButton label="Cancel and remove staged output" onPress={() => send({ type: "remove-video" })} tone="danger" />
-            <ActionButton label="Continue with photos" onPress={() => send({ type: "continue-with-photos" })} />
-          </View>
-        );
-
-      case "processing":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Processing</Text>
-            <Text style={styles.bodyText}>The prepared clip is being represented as a local processing job.</Text>
-            <ActionButton label="Finish processing" onPress={() => send({ type: "finish-processing" })} tone="primary" />
-            <ActionButton label="Simulate processing failure" onPress={() => send({ type: "fail", message: "Synthetic processing failed" })} tone="danger" />
-            <ActionButton label="Cancel and remove staged output" onPress={() => send({ type: "remove-video" })} tone="danger" />
-            <ActionButton label="Continue with photos" onPress={() => send({ type: "continue-with-photos" })} />
-          </View>
-        );
-
-      case "failed":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Failed</Text>
-            <Text style={styles.errorText}>{state.failureMessage}</Text>
-            <Text style={styles.bodyText}>
-              Retry keeps the trim interval and poster frame. Remove clears all staged video output.
-            </Text>
-            <ActionButton label="Retry" onPress={() => send({ type: "retry" })} tone="primary" />
-            <ActionButton label="Remove video" onPress={() => send({ type: "remove-video" })} tone="danger" />
-            <ActionButton label="Continue with photos" onPress={() => send({ type: "continue-with-photos" })} />
-          </View>
-        );
-
-      case "ready":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Video ready</Text>
-            <Text style={styles.bodyText}>The prepared clip is ready locally. Photos remain required and publishable.</Text>
-            <ActionButton label="Continue with photos" onPress={() => send({ type: "continue-with-photos" })} />
-            <ActionButton label="Remove video" onPress={() => send({ type: "remove-video" })} tone="danger" />
-          </View>
-        );
-
-      case "optional-video-pending":
-        return (
-          <View style={styles.phaseContent}>
-            <Text style={styles.phaseTitle}>Optional video pending</Text>
-            <Text style={styles.bodyText}>
-              Photos remain publishable while this optional video is pending. Resume keeps trim and poster choices.
-            </Text>
-            <ActionButton label="Resume video" onPress={() => send({ type: "resume-video" })} tone="primary" />
-            <ActionButton label="Remove video and keep photos" onPress={() => send({ type: "remove-video" })} tone="danger" />
-          </View>
-        );
+      dispatch({ type: "prepared", output });
+    } catch {
+      if (operation === epoch.current) fail("preparing");
+    } finally {
+      if (operation === epoch.current) setPreparingBusy(false);
     }
   }
+  function upload() {
+    if (pending?.phase !== "uploading" || !pending.prepared) return;
+    try {
+      const value = adapter.uploadChunk(pending.prepared, pending.progress);
+      if (!Number.isFinite(value) || value < pending.progress || value > 100) throw new Error("INVALID_PROGRESS");
+      dispatch({ type: "progress", value });
+    } catch { fail("uploading"); }
+  }
+  function finish() {
+    if (state.active) adapter.discard(state.active.prepared);
+    dispatch({ type: "ready" });
+  }
 
-  return (
-    <SafeScreen>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>DEV / REVIEWER BUILD · LOCAL ONLY</Text>
-        <Text style={styles.title} accessibilityRole="header">Listing video upload prototype</Text>
-        <Text style={styles.subtitle}>Deep link: /video-upload-prototype</Text>
-        <Text style={styles.subtitle}>Synthetic adapter · no API, storage, queue, or external provider</Text>
-
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <Text style={styles.cardTitle} accessibilityLabel={`Video state: ${phaseLabels[state.phase]}`}>
-              Video state
-            </Text>
-            <StateBadge phase={state.phase} />
-          </View>
-          <Text style={styles.cardLine}>Photos preserved: {state.photos.length} required photos</Text>
-          <Text style={styles.cardLine}>Maximum selected duration: {MAX_VIDEO_DURATION_SECONDS}s</Text>
+  function editor() {
+    if (!pending) return null;
+    const { startSeconds: start, endSeconds: end, posterSeconds: poster } = pending.selection;
+    const editable = ["preview", "trim", "poster"].includes(pending.phase);
+    return <View className="gap-4 rounded-xl border border-border bg-card p-4">
+      <Text variant="h3">{t(pending.phase)}</Text>
+      <Text testID="selected-interval" className="font-mono text-callout">{t("duration", { start, end, duration: end - start })}</Text>
+      <Text testID="selected-poster" variant="muted">{t("posterAt", { seconds: poster })}</Text>
+      {editable ? <Timeline source={pending.source} start={start} end={end}
+        onPoster={pending.phase === "poster" ? (seconds) => dispatch({ type: "poster", seconds }) : undefined} /> : null}
+      {error ? <Text className="text-destructive" accessibilityRole="alert">{t(error === "poster" ? "invalidPoster" : error)}</Text> : null}
+      {pending.phase === "preview" ? <>
+        <Text variant="muted">{t(pending.source.durationSeconds <= 90 ? "trimOptional" : "trimRequired")}</Text>
+        {pending.source.durationSeconds <= 90 ? <Action label={t("posterAction")} variant="default" onPress={() => dispatch({ type: "edit", phase: "poster" })} /> : null}
+        <Action label={t("trimAction")} onPress={() => dispatch({ type: "edit", phase: "trim" })} />
+      </> : null}
+      {pending.phase === "trim" ? <>
+        {(["start", "end"] as const).map((handle) => {
+          const value = handle === "start" ? start : end;
+          const adjust = (seconds: number) => dispatch({ type: "trim", handle, seconds });
+          return <View key={handle} className="gap-2 rounded-lg bg-secondary p-3">
+            <Button variant="outline" role={undefined} accessibilityRole="adjustable"
+              accessibilityLabel={t(handle)} accessibilityValue={{ min: handle === "start" ? 0 : start + 1, max: handle === "start" ? end - 1 : pending.source.durationSeconds, now: value, text: `${value}s` }}
+              accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === "increment") adjust(value + 1);
+                if (event.nativeEvent.actionName === "decrement") adjust(value - 1);
+              }}>
+              <Text>{t(handle)}: {value}s</Text>
+            </Button>
+            <View className="flex-row gap-2">
+              <Action className="flex-1" label={t("decrease", { handle: t(handle) })} onPress={() => adjust(value - 1)} />
+              <Action className="flex-1" label={t("increase", { handle: t(handle) })} onPress={() => adjust(value + 1)} />
+            </View>
+          </View>;
+        })}
+        <Action label={t("posterAction")} variant="default" disabled={error !== null} onPress={() => dispatch({ type: "edit", phase: "poster" })} />
+      </> : null}
+      {pending.phase === "poster" ? <>
+        <View className="aspect-[4/3] justify-center rounded-lg bg-secondary p-4" accessibilityLabel={t("posterAt", { seconds: poster })}>
+          <Frame atSeconds={poster} carX={poster} label={t("frame", { seconds: poster })} />
         </View>
+        <Action label={t("posterEarlier")} onPress={() => dispatch({ type: "poster", seconds: poster - 1 })} />
+        <Action label={t("posterLater")} onPress={() => dispatch({ type: "poster", seconds: poster + 1 })} />
+        <Action label={t("editTrim")} onPress={() => dispatch({ type: "edit", phase: "trim" })} />
+        <Action label={t("use")} variant="default" disabled={error !== null} onPress={() => dispatch({ type: "prepare" })} />
+      </> : null}
+      {pending.phase === "preparing" ? <>
+        <Text variant="muted">{t("prepareHelp")}</Text>
+        <Action label={t("finishPrepare")} disabled={preparingBusy} variant="default" onPress={() => { void prepare(); }} />
+        <Action label={t("failPrepare")} disabled={preparingBusy} onPress={() => fail("preparing")} />
+      </> : null}
+      {pending.prepared ? <View className="gap-2">
+        <Text testID="prepared-size">{t("prepared", { bytes: pending.prepared.sizeBytes })}</Text>
+        <Text selectable variant="caption">{t("descriptor", { hash: pending.prepared.sha256 })}</Text>
+      </View> : null}
+      {["uploading", "paused"].includes(pending.phase) ? <>
+        <Text>{t("progress", { percent: pending.progress })}</Text>
+        <View accessible accessibilityRole="progressbar" accessibilityLabel={t("uploading")} accessibilityValue={{ min: 0, max: 100, now: pending.progress }} className="h-2 overflow-hidden rounded-full bg-secondary">
+          <View className="h-full bg-foreground" style={{ width: `${pending.progress}%` }} />
+        </View>
+      </> : null}
+      {pending.phase === "uploading" ? <>
+        <Action label={t("upload")} variant="default" disabled={pending.progress === 100} onPress={upload} />
+        <Action label={t("pause")} onPress={() => dispatch({ type: "pause" })} />
+        <Action label={t("failUpload")} onPress={() => fail("uploading")} />
+        <Action label={t("process")} disabled={pending.progress !== 100} onPress={() => dispatch({ type: "process" })} />
+      </> : null}
+      {pending.phase === "paused" ? <>
+        <Text variant="muted">{t("pausedHelp")}</Text>
+        <Action label={t("resume")} variant="default" onPress={() => dispatch({ type: "resume" })} />
+      </> : null}
+      {pending.phase === "processing" ? <>
+        <Action label={t("finish")} variant="default" onPress={finish} />
+        <Action label={t("failProcess")} onPress={() => fail("processing")} />
+      </> : null}
+      {pending.phase === "failed" ? <>
+        <Text accessibilityRole="alert" className="text-destructive">{t(`${pending.failure}Error`)}</Text>
+        <Action label={t("retry")} variant="default" onPress={() => dispatch({ type: "retry" })} />
+      </> : null}
+      {canEdit ? <Action label={t("another")} onPress={() => dispatch({ type: "library", open: true })} /> : null}
+      <Action label={t(editable || pending.phase === "failed" ? "remove" : "cancel")} variant="destructive" onPress={discardPending} />
+      <Action label={t("continue")} onPress={() => dispatch({ type: "view", value: "photos" })} />
+    </View>;
+  }
 
-        <VideoDetails state={state} />
-        {state.validationMessage && state.phase !== "trim" ? <Text style={styles.errorText}>{state.validationMessage}</Text> : null}
-        {renderPhase()}
-
-        {state.phase !== "empty" ? <ActionButton label="Reset prototype" onPress={() => send({ type: "reset" })} /> : null}
-      </ScrollView>
-    </SafeScreen>
-  );
+  return <SafeScreen>
+    <ScrollView contentContainerClassName="gap-4 p-5 pb-10">
+      <Text variant="caption">{t("dev")}</Text>
+      <Text variant="h1">{t("title")}</Text>
+      <Text variant="muted">{t("intro")}</Text>
+      <View className="gap-2 rounded-xl bg-card p-4">
+        <Text testID="video-state" accessibilityLiveRegion="polite" variant="label">{t("state", { state: t(phase) })}</Text>
+        <Text>{t("photos", { count: state.photos.length })}</Text>
+        <Text variant="muted">{t("fields", { value: t("description") })}</Text>
+        <Text>{t("publishable")}</Text>
+        {state.active ? <View className="gap-2 border-t border-border pt-3">
+          <Text testID="active-status">{t("active")}: {t("ready")}</Text>
+          <Text variant="muted">{t("duration", {
+            start: state.active.selection.startSeconds, end: state.active.selection.endSeconds,
+            duration: state.active.selection.endSeconds - state.active.selection.startSeconds,
+          })}</Text>
+          <Text variant="muted">{t("posterAt", { seconds: state.active.selection.posterSeconds })}</Text>
+        </View> : null}
+        {state.active && pending ? <Text>{t("replacement")}: {t(pending.phase)}</Text> : null}
+      </View>
+      {state.view === "photos" ? <View className="gap-3 rounded-xl bg-card p-4">
+        <Text variant="h3">{t("review")}</Text>
+        <Text testID="optional-status">{t(pending ? pending.phase === "failed" ? "failedOptional" : "pending" : state.active ? "readyOptional" : "noVideo")}</Text>
+        {pending ? <Text>{t("state", { state: t(pending.phase) })}</Text> : null}
+        <Action label={t("returnVideo")} onPress={() => dispatch({ type: "view", value: "video" })} />
+      </View> : state.libraryOpen ? <View className="gap-3 rounded-xl bg-card p-4">
+        <Text variant="h3">{t("library")}</Text>
+        <Text accessibilityLiveRegion="polite">{t("scenario", { state: t(state.access === "permission-denied" ? "permission" : state.access) })}</Text>
+        {state.access !== "eligible" ? <>
+          <Text accessibilityRole="alert">{t(state.access === "ineligible" ? "ineligibleHelp" : "permissionHelp")}</Text>
+          <Action label={t("restore")} onPress={() => dispatch({ type: "access", value: "eligible" })} />
+        </> : null}
+        {SYNTHETIC_CLIPS.map((source) => <Action key={source.id} label={t("choose", { seconds: source.durationSeconds })} disabled={state.access !== "eligible"} onPress={() => select(source)} />)}
+        <Action label={t("setEligible")} onPress={() => dispatch({ type: "access", value: "eligible" })} />
+        <Action label={t("setIneligible")} onPress={() => dispatch({ type: "access", value: "ineligible" })} />
+        <Action label={t("setPermission")} onPress={() => dispatch({ type: "access", value: "permission-denied" })} />
+        <Action label={t("closeLibrary")} onPress={() => dispatch({ type: "library", open: false })} />
+      </View> : pending ? editor() : <View className="gap-3 rounded-xl bg-card p-4">
+        <Text variant="h3">{t(state.active ? "ready" : "empty")}</Text>
+        <Action label={t(state.active ? "replace" : "add")} variant="default" onPress={() => dispatch({ type: "library", open: true })} />
+        <Action label={t("continue")} onPress={() => dispatch({ type: "view", value: "photos" })} />
+      </View>}
+      {pending ? <Text selectable variant="caption">{t("sourceHash", { hash: pending.source.sha256 })}</Text> : null}
+      {state.active ? <Action label={t("removeActive")} variant="destructive" onPress={() => { if (state.active) adapter.discard(state.active.prepared); dispatch({ type: "remove-active" }); }} /> : null}
+      <Action label={t("reset")} onPress={() => {
+        discardPending();
+        if (state.active) adapter.discard(state.active.prepared);
+        dispatch({ type: "reset" });
+      }} />
+    </ScrollView>
+  </SafeScreen>;
 }
-
-const styles = StyleSheet.create({
-  content: { padding: 20, gap: 14, paddingBottom: 40 },
-  eyebrow: { color: "#8b1e3f", fontSize: 12, fontWeight: "700", letterSpacing: 1 },
-  title: { color: "#17171a", fontSize: 28, fontWeight: "800", lineHeight: 34 },
-  subtitle: { color: "#62636a", fontSize: 14, lineHeight: 20 },
-  summaryCard: { backgroundColor: "#f3f4f6", borderRadius: 16, padding: 16, gap: 8 },
-  summaryHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", gap: 10 },
-  stateBadge: { alignItems: "center", backgroundColor: "#ffffff", borderRadius: 999, flexDirection: "row", gap: 7, paddingHorizontal: 10, paddingVertical: 6 },
-  stateDot: { backgroundColor: "#8b1e3f", borderRadius: 5, height: 10, width: 10 },
-  stateBadgeText: { color: "#34353a", fontSize: 13, fontWeight: "700" },
-  cardTitle: { color: "#202126", fontSize: 16, fontWeight: "700" },
-  cardLine: { color: "#4e4f55", fontSize: 14, lineHeight: 20 },
-  localOnly: { color: "#8b1e3f", fontSize: 13, fontWeight: "600", lineHeight: 18 },
-  detailsCard: { borderColor: "#e3e4e8", borderRadius: 16, borderWidth: 1, gap: 6, padding: 16 },
-  phaseContent: { backgroundColor: "#ffffff", borderColor: "#e3e4e8", borderRadius: 16, borderWidth: 1, gap: 12, padding: 16 },
-  emptyIcon: { alignItems: "center", alignSelf: "flex-start", backgroundColor: "#f3f4f6", borderRadius: 16, color: "#8b1e3f", fontSize: 34, height: 64, lineHeight: 60, overflow: "hidden", textAlign: "center", width: 64 },
-  phaseTitle: { color: "#202126", fontSize: 20, fontWeight: "700", lineHeight: 26 },
-  bodyText: { color: "#55565d", fontSize: 15, lineHeight: 22 },
-  button: { alignItems: "center", backgroundColor: "#f1f2f4", borderRadius: 12, minHeight: 48, justifyContent: "center", paddingHorizontal: 16, paddingVertical: 10 },
-  primaryButton: { backgroundColor: "#8b1e3f" },
-  dangerButton: { backgroundColor: "#fff0f2", borderColor: "#d54159", borderWidth: 1 },
-  disabledButton: { backgroundColor: "#e3e4e8" },
-  pressedButton: { opacity: 0.75 },
-  buttonText: { color: "#202126", fontSize: 15, fontWeight: "700", textAlign: "center" },
-  primaryButtonText: { color: "#ffffff" },
-  previewFrame: { alignItems: "center", backgroundColor: "#25262a", borderRadius: 12, height: 150, justifyContent: "center", gap: 6 },
-  previewPlay: { color: "#ffffff", fontSize: 36 },
-  previewText: { color: "#d7d8dc", fontSize: 13 },
-  handleRow: { flexDirection: "row", gap: 10 },
-  handleCard: { backgroundColor: "#f7f7f8", borderRadius: 12, flex: 1, gap: 5, padding: 10 },
-  handleLabel: { color: "#5d5e64", fontSize: 13, fontWeight: "700" },
-  handleValue: { color: "#202126", fontSize: 22, fontWeight: "800" },
-  inlineActions: { flexDirection: "row", gap: 8 },
-  selectionDuration: { color: "#202126", fontSize: 15, fontWeight: "700" },
-  errorText: { color: "#b4233a", fontSize: 15, fontWeight: "700", lineHeight: 21 },
-  posterFrame: { alignItems: "center", backgroundColor: "#dfe3e9", borderRadius: 12, height: 150, justifyContent: "center" },
-  posterText: { color: "#34353a", fontSize: 16, fontWeight: "700" },
-  progressTrack: { backgroundColor: "#e3e4e8", borderRadius: 8, height: 14, overflow: "hidden", width: "100%" },
-  progressFill: { backgroundColor: "#8b1e3f", height: "100%" },
-});

@@ -1,331 +1,130 @@
+import type { SyntheticClip } from "./fixtures";
+
 export const MAX_VIDEO_DURATION_SECONDS = 90;
-export const SYNTHETIC_CLIP_SHA256 =
-  "sha256:listing-video-prototype-synthetic-clip-v1";
-
-export const DEFAULT_PHOTOS = ["photo-1", "photo-2", "photo-3"] as const;
-
-export type PrototypePhase =
-  | "empty"
-  | "selection"
-  | "preview"
-  | "trim"
-  | "poster"
-  | "preparing"
-  | "uploading"
-  | "paused"
-  | "processing"
-  | "failed"
-  | "ready"
-  | "optional-video-pending";
-
-export type SyntheticClip = {
-  id: "synthetic-45s" | "synthetic-90s" | "synthetic-120s";
-  durationSeconds: number;
-  sha256: string;
-};
-
-export type VideoSelection = {
-  startSeconds: number;
-  endSeconds: number;
-  posterSeconds: number;
-};
-
+export type EditorPhase = "preview" | "trim" | "poster";
+export type JobPhase = "preparing" | "uploading" | "paused" | "processing";
+export type PendingPhase = EditorPhase | JobPhase | "failed";
+export type VideoSelection = { startSeconds: number; endSeconds: number; posterSeconds: number };
 export type PreparedClip = {
-  id: "prepared-synthetic-clip-v1";
+  kind: "prepared-descriptor-v1";
+  descriptorUtf8: string;
   sizeBytes: number;
   sha256: string;
 };
-
-export type VideoPrototypeState = {
-  phase: PrototypePhase;
-  photos: readonly string[];
-  source: SyntheticClip | null;
-  selection: VideoSelection | null;
+export type PendingVideo = {
+  source: SyntheticClip;
+  selection: VideoSelection;
+  phase: PendingPhase;
   prepared: PreparedClip | null;
-  uploadProgress: number;
-  failureMessage: string | null;
-  failedFrom: Exclude<PrototypePhase, "empty" | "selection" | "preview" | "trim" | "poster" | "failed" | "ready" | "optional-video-pending"> | null;
-  validationMessage: string | null;
+  progress: number;
+  failedAt: JobPhase | null;
+  failure: "preparation" | "upload" | "processing" | null;
 };
-
+export type ReadyVideo = { source: SyntheticClip; selection: VideoSelection; prepared: PreparedClip };
+export type VideoPrototypeState = {
+  view: "video" | "photos";
+  libraryOpen: boolean;
+  access: "eligible" | "ineligible" | "permission-denied";
+  pending: PendingVideo | null;
+  active: ReadyVideo | null;
+  photos: readonly string[];
+  fields: { description: string };
+};
 export type VideoPrototypeAction =
-  | { type: "open-selection" }
-  | { type: "select-clip"; durationSeconds: 45 | 90 | 120 }
-  | { type: "open-trim" }
-  | { type: "adjust-trim"; handle: "start" | "end"; deltaSeconds: number }
-  | { type: "set-trim"; startSeconds: number; endSeconds: number }
-  | { type: "continue-to-poster" }
-  | { type: "adjust-poster"; deltaSeconds: number }
-  | { type: "begin-preparing" }
-  | { type: "finish-preparing" }
-  | { type: "upload-chunk" }
-  | { type: "pause-upload" }
-  | { type: "resume-upload" }
-  | { type: "begin-processing" }
-  | { type: "finish-processing" }
-  | { type: "fail"; message: string }
+  | { type: "library"; open: boolean }
+  | { type: "access"; value: VideoPrototypeState["access"] }
+  | { type: "select"; source: SyntheticClip }
+  | { type: "edit"; phase: EditorPhase }
+  | { type: "trim"; handle: "start" | "end"; seconds: number }
+  | { type: "poster"; seconds: number }
+  | { type: "prepare" }
+  | { type: "prepared"; output: PreparedClip }
+  | { type: "progress"; value: number }
+  | { type: "pause" }
+  | { type: "resume" }
+  | { type: "process" }
+  | { type: "ready" }
+  | { type: "fail"; stage: JobPhase }
   | { type: "retry" }
-  | { type: "continue-with-photos" }
-  | { type: "resume-video" }
-  | { type: "remove-video" }
+  | { type: "view"; value: VideoPrototypeState["view"] }
+  | { type: "remove-pending" }
+  | { type: "remove-active" }
   | { type: "reset" };
 
-export function createInitialVideoPrototypeState(
-  photos: readonly string[] = DEFAULT_PHOTOS,
-): VideoPrototypeState {
+export function createInitialVideoPrototypeState(): VideoPrototypeState {
   return {
-    phase: "empty",
-    photos,
-    source: null,
-    selection: null,
-    prepared: null,
-    uploadProgress: 0,
-    failureMessage: null,
-    failedFrom: null,
-    validationMessage: null,
+    view: "video", libraryOpen: false, access: "eligible", pending: null, active: null,
+    photos: ["photo-1", "photo-2", "photo-3"], fields: { description: "Synthetic Listing" },
   };
 }
 
-function sourceForDuration(durationSeconds: 45 | 90 | 120): SyntheticClip {
-  return {
-    id:
-      durationSeconds === 45
-        ? "synthetic-45s"
-        : durationSeconds === 90
-          ? "synthetic-90s"
-          : "synthetic-120s",
-    durationSeconds,
-    sha256: SYNTHETIC_CLIP_SHA256,
-  };
-}
-
-function withValidation(
-  state: VideoPrototypeState,
-  message: string | null,
-): VideoPrototypeState {
-  return { ...state, validationMessage: message };
-}
-
-function isValidSelection(selection: VideoSelection | null): boolean {
-  return (
-    selection !== null &&
-    selection.startSeconds >= 0 &&
-    selection.endSeconds > selection.startSeconds &&
-    selection.endSeconds - selection.startSeconds <= MAX_VIDEO_DURATION_SECONDS
-  );
-}
-
-function selectionError(selection: VideoSelection): string | null {
-  if (selection.endSeconds <= selection.startSeconds) {
-    return "The end handle must be after the start handle.";
-  }
-  if (selection.endSeconds - selection.startSeconds > MAX_VIDEO_DURATION_SECONDS) {
-    return "Selection exceeds the 90-second maximum.";
-  }
+export function selectionError(source: SyntheticClip, selection: VideoSelection): "interval" | "tooLong" | "poster" | null {
+  const { startSeconds: start, endSeconds: end, posterSeconds: poster } = selection;
+  if (![start, end, poster].every(Number.isFinite) || start < 0 || end <= start || end > source.durationSeconds) return "interval";
+  if (end - start > MAX_VIDEO_DURATION_SECONDS) return "tooLong";
+  if (poster < start || poster > end) return "poster";
   return null;
 }
 
-function clearVideo(state: VideoPrototypeState, phase: "empty" | "optional-video-pending") {
-  return {
-    ...state,
-    phase,
-    source: null,
-    selection: null,
-    prepared: null,
-    uploadProgress: 0,
-    failureMessage: null,
-    failedFrom: null,
-    validationMessage: null,
-  } satisfies VideoPrototypeState;
+function boundPoster(selection: VideoSelection): VideoSelection {
+  return { ...selection, posterSeconds: Math.max(selection.startSeconds, Math.min(selection.endSeconds, selection.posterSeconds)) };
 }
 
-export function videoPrototypeReducer(
-  state: VideoPrototypeState,
-  action: VideoPrototypeAction,
-): VideoPrototypeState {
+export function videoPrototypeReducer(state: VideoPrototypeState, action: VideoPrototypeAction): VideoPrototypeState {
+  const pending = state.pending;
+  const update = (change: Partial<PendingVideo>): VideoPrototypeState => pending ? { ...state, pending: { ...pending, ...change } } : state;
   switch (action.type) {
-    case "open-selection":
-      return ["empty", "optional-video-pending", "preview", "trim", "poster", "failed", "ready"].includes(state.phase)
-        ? { ...state, phase: "selection", validationMessage: null }
-        : state;
-
-    case "select-clip": {
-      if (state.phase !== "selection") return state;
-      const source = sourceForDuration(action.durationSeconds);
-      return {
-        ...state,
-        phase: "preview",
-        source,
-        selection: {
-          startSeconds: 0,
-          endSeconds: source.durationSeconds,
-          posterSeconds: Math.min(5, source.durationSeconds),
-        },
-        prepared: null,
-        uploadProgress: 0,
-        failureMessage: null,
-        failedFrom: null,
-        validationMessage: null,
-      };
+    case "library": return { ...state, libraryOpen: action.open };
+    case "access": return { ...state, access: action.value };
+    case "select": {
+      if (!state.libraryOpen || state.access !== "eligible") return state;
+      const endSeconds = Math.min(90, action.source.durationSeconds);
+      return { ...state, libraryOpen: false, pending: {
+        source: action.source,
+        selection: { startSeconds: 0, endSeconds, posterSeconds: Math.min(5, endSeconds) },
+        phase: "preview", prepared: null, progress: 0, failedAt: null, failure: null,
+      } };
     }
-
-    case "open-trim":
-      return state.phase === "preview" && state.selection
-        ? { ...state, phase: "trim", validationMessage: selectionError(state.selection) }
-        : state;
-
-    case "adjust-trim": {
-      if ((state.phase !== "trim" && state.phase !== "preview") || !state.source || !state.selection) {
-        return state;
-      }
-      const selection = { ...state.selection };
-      if (action.handle === "start") {
-        selection.startSeconds = Math.max(
-          0,
-          Math.min(selection.endSeconds - 1, selection.startSeconds + action.deltaSeconds),
-        );
-      } else {
-        selection.endSeconds = Math.max(
-          selection.startSeconds + 1,
-          Math.min(state.source.durationSeconds, selection.endSeconds + action.deltaSeconds),
-        );
-      }
-      return withValidation({ ...state, phase: "trim", selection }, selectionError(selection));
+    case "edit": {
+      if (!pending || !["preview", "trim", "poster"].includes(pending.phase)) return state;
+      if (action.phase === "poster" && selectionError(pending.source, pending.selection)) return state;
+      // A long source always visits the trim screen before its poster picker.
+      if (action.phase === "poster" && pending.phase === "preview" && pending.source.durationSeconds > 90) return state;
+      return update({ phase: action.phase });
     }
-
-    case "set-trim": {
-      if (!state.source || !state.selection || (state.phase !== "trim" && state.phase !== "preview")) {
-        return state;
-      }
-      const selection = {
-        ...state.selection,
-        startSeconds: Math.max(0, Math.min(action.startSeconds, state.source.durationSeconds - 1)),
-        endSeconds: Math.max(1, Math.min(action.endSeconds, state.source.durationSeconds)),
-      };
-      return withValidation({ ...state, phase: "trim", selection }, selectionError(selection));
+    case "trim": {
+      if (!pending || pending.phase !== "trim" || !Number.isFinite(action.seconds)) return state;
+      const selection = { ...pending.selection };
+      if (action.handle === "start") selection.startSeconds = Math.max(0, Math.min(selection.endSeconds - 1, action.seconds));
+      else selection.endSeconds = Math.min(pending.source.durationSeconds, Math.max(selection.startSeconds + 1, action.seconds));
+      return update({ selection: boundPoster(selection) });
     }
-
-    case "continue-to-poster":
-      if (!state.selection || !isValidSelection(state.selection)) {
-        return withValidation(
-          { ...state, phase: "trim" },
-          state.selection ? selectionError(state.selection) : "Choose a video interval first.",
-        );
-      }
-      return { ...state, phase: "poster", validationMessage: null };
-
-    case "adjust-poster": {
-      if (!state.selection) return state;
-      const next = Math.max(
-        state.selection.startSeconds,
-        Math.min(state.selection.endSeconds, state.selection.posterSeconds + action.deltaSeconds),
-      );
-      return {
-        ...state,
-        selection: { ...state.selection, posterSeconds: next },
-        validationMessage: null,
-      };
-    }
-
-    case "begin-preparing":
-      if (state.phase !== "poster" || !isValidSelection(state.selection)) {
-        return withValidation(state, "Choose a valid interval before preparing.");
-      }
-      return {
-        ...state,
-        phase: "preparing",
-        prepared: null,
-        uploadProgress: 0,
-        failureMessage: null,
-        failedFrom: null,
-        validationMessage: null,
-      };
-
-    case "finish-preparing":
-      if (state.phase !== "preparing" || !state.source || !state.selection) return state;
-      return {
-        ...state,
-        phase: "uploading",
-        prepared: {
-          id: "prepared-synthetic-clip-v1",
-          sizeBytes: 8_400_000,
-          sha256: "sha256:prepared-synthetic-clip-v1",
-        },
-        uploadProgress: 0,
-        validationMessage: null,
-      };
-
-    case "upload-chunk":
-      if (state.phase !== "uploading" || !state.prepared) return state;
-      return { ...state, uploadProgress: Math.min(100, state.uploadProgress + 25), validationMessage: null };
-
-    case "pause-upload":
-      return state.phase === "uploading" ? { ...state, phase: "paused" } : state;
-
-    case "resume-upload":
-      return state.phase === "paused" && state.prepared
-        ? { ...state, phase: "uploading", validationMessage: null }
-        : state;
-
-    case "begin-processing":
-      return state.phase === "uploading" && state.uploadProgress === 100 && state.prepared
-        ? { ...state, phase: "processing", validationMessage: null }
-        : state;
-
-    case "finish-processing":
-      return state.phase === "processing" ? { ...state, phase: "ready", validationMessage: null } : state;
-
+    case "poster":
+      return pending && pending.phase === "poster" && Number.isFinite(action.seconds)
+        ? update({ selection: boundPoster({ ...pending.selection, posterSeconds: action.seconds }) }) : state;
+    case "prepare":
+      return pending?.phase === "poster" && !selectionError(pending.source, pending.selection)
+        ? update({ phase: "preparing", prepared: null, progress: 0, failure: null, failedAt: null }) : state;
+    case "prepared":
+      return pending?.phase === "preparing" ? update({ phase: "uploading", prepared: action.output, progress: 0 }) : state;
+    case "progress":
+      return pending?.phase === "uploading" && pending.prepared && Number.isFinite(action.value) && action.value >= pending.progress && action.value <= 100
+        ? update({ progress: action.value }) : state;
+    case "pause": return pending?.phase === "uploading" ? update({ phase: "paused" }) : state;
+    case "resume": return pending?.phase === "paused" ? update({ phase: "uploading" }) : state;
+    case "process": return pending?.phase === "uploading" && pending.progress === 100 ? update({ phase: "processing" }) : state;
+    case "ready":
+      return pending?.phase === "processing" && pending.prepared
+        ? { ...state, pending: null, active: { source: pending.source, selection: pending.selection, prepared: pending.prepared } } : state;
     case "fail":
-      if (
-        state.phase !== "preparing" &&
-        state.phase !== "uploading" &&
-        state.phase !== "paused" &&
-        state.phase !== "processing"
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        phase: "failed",
-        failureMessage: action.message,
-        failedFrom: state.phase,
-      };
-
+      return pending && ["preparing", "uploading", "paused", "processing"].includes(pending.phase)
+        ? update({ phase: "failed", failedAt: action.stage, failure: action.stage === "preparing" ? "preparation" : action.stage === "processing" ? "processing" : "upload" }) : state;
     case "retry":
-      if (state.phase !== "failed" || !state.failedFrom) return state;
-      return {
-        ...state,
-        phase: state.prepared ? "uploading" : "preparing",
-        uploadProgress: state.prepared ? state.uploadProgress : 0,
-        failureMessage: null,
-        failedFrom: null,
-        validationMessage: null,
-      };
-
-    case "continue-with-photos":
-      if (state.phase === "empty" || state.phase === "optional-video-pending") return state;
-      return { ...state, phase: "optional-video-pending", validationMessage: null };
-
-    case "resume-video":
-      if (state.phase !== "optional-video-pending") return state;
-      return {
-        ...state,
-        phase: state.prepared ? "uploading" : state.source ? "preparing" : "selection",
-        validationMessage: null,
-      };
-
-    case "remove-video":
-      return clearVideo(state, "empty");
-
-    case "reset":
-      return createInitialVideoPrototypeState(state.photos);
-
-    default:
-      return state;
+      return pending?.phase === "failed" && pending.failedAt
+        ? update({ phase: pending.failedAt === "preparing" ? "preparing" : pending.failedAt === "processing" ? "processing" : "uploading", failure: null, failedAt: null }) : state;
+    case "view": return { ...state, view: action.value };
+    case "remove-pending": return { ...state, pending: null, libraryOpen: false };
+    case "remove-active": return { ...state, active: null };
+    case "reset": return createInitialVideoPrototypeState();
   }
-}
-
-export function selectedDurationSeconds(state: VideoPrototypeState): number | null {
-  if (!state.selection) return null;
-  return state.selection.endSeconds - state.selection.startSeconds;
 }
