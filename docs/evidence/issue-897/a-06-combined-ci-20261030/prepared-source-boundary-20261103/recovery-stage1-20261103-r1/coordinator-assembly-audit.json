@@ -1,0 +1,47 @@
+{
+  "audit_version": 1,
+  "audited_at_utc": "2026-11-03T01:20:52Z",
+  "issue": 938,
+  "parent": 897,
+  "writer_source_checkpoint": "6bc5196958c58611328c09eb7a3dfa6fdc8c4f11",
+  "writer_source_tree": "594e24d1a45dc1223b544c467ba071a09b626e9b",
+  "writer_evidence_checkpoint": "3378a787627650c3e442f6c0e98be0c5592bebd2",
+  "writer_evidence_tree": "c6420365757043df387aef656fe2b516517b9cf1",
+  "assembled_candidate": "2b3fc0deb73bbde41c585d060ca84fcf62acf6b7",
+  "assembled_tree": "a45f1088bcc32f893767ea9d947a5138d74ec3f8",
+  "candidate_before_assembly": "7dc251d550cae7ab977810a41b61dd60416c52b6",
+  "source_base": "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+  "source_to_assembled_non_doc_diff_exit": 0,
+  "allowed_source_paths": [
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "source_scope_audit": {
+    "paths_added_from_candidate": 5,
+    "forbidden_source_paths_edited": [],
+    "rejected_draft_assembled": false,
+    "original_suites_unchanged": true,
+    "unchanged_selected_cases": 168,
+    "original_equivalence_audit": "all_equal",
+    "memory_refusal_preserved": true
+  },
+  "offline_checks": {
+    "api_typecheck": 0,
+    "api_tsc6": 0,
+    "api_lint": 0,
+    "api_build": 0,
+    "git_diff_check": 0,
+    "receipt": "offline-command-receipts.json"
+  },
+  "runtime": {
+    "resources_started": false,
+    "real_db_probe": "held",
+    "cleanup_evidence": "not_run",
+    "foreign_65379_touched": false,
+    "next_gate": "coordinator final executable/lifecycle audit, then a separately released small real-DB stage"
+  },
+  "disposition": "ASSEMBLED_OFFLINE_ONLY; #938 OPEN; no ticket PASS; A remains 1 PASS / 10 OPEN and unaccepted"
+}
