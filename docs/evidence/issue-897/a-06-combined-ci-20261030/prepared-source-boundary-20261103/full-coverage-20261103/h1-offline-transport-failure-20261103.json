@@ -1,0 +1,46 @@
+{
+  "kind": "issue939-h1-offline-transport-failure",
+  "recorded_at": "2026-11-03T17:16:11Z",
+  "issue": 939,
+  "run_id": "run:thread:thread%3Adelegated-task%3Acommand%253Amcp%253A6985d3b1-7279-441b-9911-57bc5619ebe0%253Adelegate-task%253Aeecba4b0-1abf-4f7e-8a1f-77ab1841738e:ordinal:7",
+  "task_id": "node:delegated-task:command%3Amcp%3A02fb8109-0de1-4383-a1f0-8999ce3de3ac%3Athread-send%3Aissue939-h1-offline-release-run48",
+  "failure": {
+    "class": "provider_transport",
+    "error": "API Error: Connection dropped (ECONNRESET). Check the gateway set in ANTHROPIC_BASE_URL, then try again.",
+    "behavioral_verdict": null,
+    "permission_refusal": false
+  },
+  "coordinator": {
+    "head": "bf7c959053fc9b5e7d42a3c9cf3570018ed85569",
+    "tree": "2342f83b789ea824d85391aca4b560ca3eafb09a",
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "xhigh",
+    "serviceTier": "default",
+    "runtime": "full-access"
+  },
+  "executor": {
+    "thread": "<t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/thread:delegated-task:command%3Amcp%3A6985d3b1-7279-441b-9911-57bc5619ebe0%3Adelegate-task%3Aeecba4b0-1abf-4f7e-8a1f-77ab1841738e>",
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "head": "4b869f12829f59b18361bd37ba3cc5dc675cc879",
+    "tree": "bc40df98d6a5e081dc927be2696e3706f594c",
+    "porcelain": "clean",
+    "provider": "claudeAgent",
+    "model": "claude-opus-5-5",
+    "effort": "high",
+    "fastMode": false,
+    "runtime": "full-access"
+  },
+  "source_input": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+  "evidence_checkpoint": "bf7c959053fc9b5e7d42a3c9cf3570018ed85569",
+  "checks": {
+    "ten_case_map": "not run",
+    "typecheck": "not run",
+    "ts6": "not run",
+    "lint": "not run",
+    "build": "not run",
+    "diff_check": "not run",
+    "runtime_resources": "unreserved"
+  },
+  "next_action": "Parent registers the host-managed completion wait and resumes the same executor thread after transport recovery; do not create a replacement writer or switch provider."
+}
