@@ -385,11 +385,11 @@
   },
   "runtimeAttempt": {
     "classification": "setup/import failure; no behavior verdict",
-    "cleanup": "PASS; no listeners, containers, volumes or networks remain",
+    "cleanup": "PASS; base/anchored DBs removed, Redis DB1 empty, MinIO empty, Compose down, listeners/containers/volumes/networks absent",
     "endedAt": "2026-11-03T21:12:05Z",
     "error": "Cannot find module './src/modules/identity/infrastructure/PrismaUserRepository' (require stack: apps/api/package.json)",
     "exit": 1,
-    "next": "read-only diagnose module-resolution/build-artifact mismatch; no runtime retry until corrected setup contract",
+    "next": "read-only diagnose module-resolution prerequisites; likely NODE_OPTIONS=--import=tsx is required for appRequire(.ts). Amend manifest and obtain fresh receipt before any retry; do not alter source/assertions.",
     "rawReceipt": "/tmp/issue939-runtime-f16f17-20261103/terminal-import-stop.json",
     "rawReceiptSha256": "98b3fba10b3e538d507e360ef0fb2a5e8c783ed9d62d2c4e7e347a99ff749a83",
     "selectedCasesRun": 0,
