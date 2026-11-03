@@ -163,6 +163,44 @@
   },
   "issue": "https://github.com/Carberk/carberk/issues/939",
   "next": "After independent manifest verification and explicit reservation only, run the owned F16/F17 probe. #942 and F43 remain held; no runtime overlap; no #939/A acceptance until runtime and restoration receipts pass.",
+  "prerequisiteRun": {
+    "commands": [
+      {
+        "argv": [
+          "pnpm",
+          "--filter",
+          "@auto-tm/db",
+          "build"
+        ],
+        "exit": 0,
+        "name": "build-db-corrected",
+        "stderr": "/tmp/issue939-runtime-f16f17-20261103/logs/amended/db.stderr",
+        "stderrSha256": "774ef7bff46b7ec7b9248bae0a63f5cd597e36dcbc4adfb59af8241c6b9e93d0",
+        "stdout": "/tmp/issue939-runtime-f16f17-20261103/logs/amended/db.stdout",
+        "stdoutSha256": "aa3b699de49a18df99b2e422b3542aa40713be962d6469b20d4d134bf3dd8095"
+      },
+      {
+        "argv": [
+          "pnpm",
+          "--filter",
+          "@auto-tm/api",
+          "build"
+        ],
+        "exit": 0,
+        "name": "build-api-corrected",
+        "stderr": "/tmp/issue939-runtime-f16f17-20261103/logs/amended/api.stderr",
+        "stderrSha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+        "stdout": "/tmp/issue939-runtime-f16f17-20261103/logs/amended/api.stdout",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "endedAt": "2026-11-03T21:07:16Z",
+    "environment": {
+      "DATABASE_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1"
+    },
+    "result": "both corrected prerequisite builds passed; Compose/database/runtime remains unstarted and unreserved",
+    "startedAt": "2026-11-03T21:07:08Z"
+  },
   "prerequisites": [
     {
       "argv": [
@@ -360,7 +398,7 @@
     ],
     "sourceUnchanged": true
   },
-  "status": "PREREQUISITES_CORRECTION_PENDING",
+  "status": "PREREQUISITES_PASS_RUNTIME_HELD",
   "stopPolicy": "Stop immediately at first setup, build, migration, selection, semantic/test, timeout, cleanup or restoration failure. Preserve raw argv, environment-key names, UTC start/end, exit, stdout/stderr and hashes. Do not rerun a completed successful case or broaden the selector; cleanup is mandatory after any started service.",
   "test": {
     "argv": [
@@ -415,5 +453,5 @@
       "sha256": "ad7080454434586c0ae88ca672189cc6573ef9ab206726685d39ab57c1a779e2"
     }
   },
-  "updatedAt": "2026-11-03T21:05:23Z"
+  "updatedAt": "2026-11-03T21:07:16Z"
 }
