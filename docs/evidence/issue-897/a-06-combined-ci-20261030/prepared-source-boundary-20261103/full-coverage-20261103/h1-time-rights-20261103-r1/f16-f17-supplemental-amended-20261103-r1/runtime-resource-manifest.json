@@ -1,0 +1,402 @@
+{
+  "candidate": {
+    "branch": "agent/release897-candidate-a-20261029",
+    "commit": "5b60645bae20e416781cda66b98123635f209341",
+    "tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6",
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029"
+  },
+  "cleanup": [
+    {
+      "command": "parse STAGE stdout for exactly two 938_cleanup_receipt blocks, labels F16/F17, callers=0, sourceReceipts=0, campaignReceipts=0, objectsEmpty=true, roleAbsent=true, guardModesRestored=true, failures=[]",
+      "name": "read-two-fixture-receipts"
+    },
+    {
+      "command": "node <owned drain script> with COMPOSE_PROJECT and COMPOSE_OVERLAY set; require remaining=0",
+      "name": "drain-owned-role-backends"
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/tmp/issue939-runtime-f16f17-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_939_f16f17_20261103_r1",
+        "exec",
+        "-T",
+        "redis",
+        "redis-cli",
+        "-n",
+        "1",
+        "FLUSHDB",
+        "SYNC"
+      ],
+      "expected": "OK",
+      "name": "flush-redis-db1"
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/tmp/issue939-runtime-f16f17-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_939_f16f17_20261103_r1",
+        "exec",
+        "-T",
+        "redis",
+        "redis-cli",
+        "-n",
+        "1",
+        "DBSIZE"
+      ],
+      "expected": "0",
+      "name": "redis-db1-empty"
+    },
+    {
+      "command": "ListObjectsV2 diagnostic-test-private; require IsTruncated=false and keys=[]",
+      "name": "minio-empty"
+    },
+    {
+      "command": "drop only base auto_tm_897_938_s1r1, anchored template/w1 names and r938_s1_* roles; require no remaining names",
+      "name": "drop-owned-databases-and-roles"
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/tmp/issue939-runtime-f16f17-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_939_f16f17_20261103_r1",
+        "down",
+        "--volumes",
+        "--remove-orphans"
+      ],
+      "expected": "exit 0",
+      "name": "compose-down"
+    },
+    {
+      "argv": [
+        "lsof",
+        "-nP",
+        "-iTCP:61168",
+        "-iTCP:61169",
+        "-iTCP:61170",
+        "-sTCP:LISTEN"
+      ],
+      "expected": "empty",
+      "name": "final-listener-check"
+    },
+    {
+      "command": "docker ps/volume ls/network ls filtered to auto_tm_ci_897_939_f16f17_20261103_r1; require empty",
+      "name": "final-compose-residual-check"
+    },
+    {
+      "command": "preserve DB0 baseline; verify no foreign listeners/resources touched; release slot before next slice",
+      "name": "restoration"
+    }
+  ],
+  "createdAt": "2026-11-03T20:56:01Z",
+  "identities": {
+    "coordinator": {
+      "model": "gpt-6.1-sol",
+      "provider": "codex_work",
+      "reasoningEffort": "xhigh",
+      "runtime": "full-access",
+      "serviceTier": "default"
+    },
+    "specReviewer": {
+      "branch": "t3/issue939-f16-f17-amended-review",
+      "fastMode": "not exposed; dispatch contract fastMode=false",
+      "head": "5b60645bae20e416781cda66b98123635f209341",
+      "model": "claude-opus-5-5",
+      "provider": "claudeAgent",
+      "reportedEffort": "default/no override",
+      "scope": "read-only",
+      "thread": "<t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/thread:delegated-task:command%3Amcp%3A02fb8109-0de1-4383-a1f0-8999ce3de3ac%3Adelegate-task%3Aissue939-spec-review-5b60645b-run51>",
+      "tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6",
+      "verdict": "PASS",
+      "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-340d9746"
+    },
+    "standardsReviewer": {
+      "branch": "t3/issue939-f16-f17-contract-review",
+      "fastMode": "not exposed; dispatch contract fastMode=false",
+      "head": "5b60645bae20e416781cda66b98123635f209341",
+      "model": "claude-opus-5-5",
+      "provider": "claudeAgent",
+      "reportedEffort": "no effort override reported",
+      "scope": "read-only",
+      "thread": "<t3-thread://v2/ce9be202-17c9-4f76-8357-807251606a41/thread:delegated-task:command%3Amcp%3A02fb8109-0de1-4383-a1f0-8999ce3de3ac%3Adelegate-task%3Aissue939-standards-review-5b60645b-run51>",
+      "tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6",
+      "verdict": "PASS",
+      "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-d1f1d340"
+    },
+    "writer": {
+      "branch": "t3/2d375913",
+      "head": "ecbdeca12db40e3496d8a089b9c6ef2756712200",
+      "model": "claude-opus-5-5",
+      "provider": "claudeAgent",
+      "reportedFastMode": false,
+      "requestedEffort": "high",
+      "runtime": "full-access",
+      "thread": "issue939-f16f17-amended-run51",
+      "tree": "8b8cd7afdef0d666ce4ea35109805142703b8ea2",
+      "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913"
+    }
+  },
+  "issue": "https://github.com/Carberk/carberk/issues/939",
+  "next": "After independent manifest verification and explicit reservation only, run the owned F16/F17 probe. #942 and F43 remain held; no runtime overlap; no #939/A acceptance until runtime and restoration receipts pass.",
+  "prerequisites": [
+    {
+      "argv": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "gate": "exit 0; lockfile unchanged; failure stops before services",
+      "name": "dependency-restore"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/contracts",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "gate": "exit 0",
+      "name": "build-contracts"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "gate": "exit 0",
+      "name": "build-db"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "gate": "exit 0",
+      "name": "build-api"
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/tmp/issue939-runtime-f16f17-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_939_f16f17_20261103_r1",
+        "config",
+        "--quiet"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "gate": "exit 0; no service started",
+      "name": "compose-config"
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/tmp/issue939-runtime-f16f17-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_939_f16f17_20261103_r1",
+        "up",
+        "--detach",
+        "--wait",
+        "--wait-timeout",
+        "120"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "gate": "exit 0 and all healthchecks ready",
+      "name": "compose-up"
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/tmp/issue939-runtime-f16f17-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_939_f16f17_20261103_r1",
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "auto_tm_ci",
+        "-d",
+        "auto_tm_ci",
+        "-X",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        "CREATE DATABASE \"auto_tm_897_938_s1r1\";"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "gate": "base absent before create and exact base exists",
+      "name": "create-base"
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+      "envKeys": [
+        "DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1"
+      ],
+      "gate": "exit 0; applied migration identity captured",
+      "name": "migrate-base"
+    }
+  ],
+  "purpose": "Dedicated real-PostgreSQL F16/F17 probe; source/static review PASS does not imply runtime or issue acceptance.",
+  "reservation": {
+    "freshnessChecks": [
+      "ports 61168/61169/61170 have no listener before reservation",
+      "no containers/volumes/networks labeled for this compose project",
+      "base database and anchored worker/template databases absent",
+      "r938_s1_* roles absent",
+      "Redis DB1 empty and DB0 baseline preserved",
+      "MinIO bucket absent or empty before run"
+    ],
+    "overlay": {
+      "path": "/tmp/issue939-runtime-f16f17-20261103/compose-overlay.yml",
+      "sha256": "2a685cf3ba0cbbb138c6a13c60b72c75cde2fb481d765bee1cabb76e6041ebfe"
+    },
+    "resources": {
+      "composeProject": "auto_tm_ci_897_939_f16f17_20261103_r1",
+      "maxWorkers": 1,
+      "minio": {
+        "bucket": "diagnostic-test-private",
+        "endpoint": "http://127.0.0.1:61170"
+      },
+      "postgres": {
+        "baseDatabase": "auto_tm_897_938_s1r1",
+        "host": "127.0.0.1",
+        "port": 61169,
+        "workerPattern": "^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$"
+      },
+      "redis": {
+        "database": 1,
+        "host": "127.0.0.1",
+        "port": 61168
+      }
+    },
+    "runtimeReserved": false,
+    "windowUtc": {
+      "durationMinutes": 90,
+      "end": "2026-11-03T22:30:00Z",
+      "exclusive": true,
+      "owner": "existing coordinator and same executor only",
+      "start": "2026-11-03T21:00:00Z"
+    }
+  },
+  "schema": "issue939-f16-f17-runtime-manifest/v1",
+  "sourceEvidenceContract": {
+    "amendment": "#939 comments 6614404848 and 6614560976: proof rightsUntil may equal selected material deadline; authority/session deadlines later; identity graph/projectIdentity refuses selected expired material before proof-expiry evaluation; exact before/at predecessor DTO and cache header plus original handoff/403/zero-report/zero-audit assertions.",
+    "cases": [
+      {
+        "id": "F16",
+        "material": "A provenance",
+        "selector": "A rights expiry"
+      },
+      {
+        "id": "F17",
+        "material": "B evidence",
+        "selector": "B rights expiry"
+      }
+    ],
+    "evidencePrefix": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/f16-f17-supplemental-amended-20261103-r1/",
+    "sourcePaths": [
+      "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    ],
+    "sourceUnchanged": true
+  },
+  "status": "PLANNED_UNRESERVED",
+  "stopPolicy": "Stop immediately at first setup, build, migration, selection, semantic/test, timeout, cleanup or restoration failure. Preserve raw argv, environment-key names, UTC start/end, exit, stdout/stderr and hashes. Do not rerun a completed successful case or broaden the selector; cleanup is mandatory after any started service.",
+  "test": {
+    "argv": [
+      "pnpm",
+      "--filter",
+      "@auto-tm/api",
+      "exec",
+      "vitest",
+      "run",
+      "src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "--maxWorkers=1",
+      "--bail=1",
+      "--retry=0",
+      "-t",
+      "issue939 H1 lawful case clocks and rights.*(A rights expiry|B rights expiry)",
+      "--reporter=json",
+      "--outputFile=/tmp/issue939-runtime-f16f17-20261103/f16-f17-vitest.json"
+    ],
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029",
+    "envKeys": [
+      "DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1",
+      "REDIS_URL=redis://127.0.0.1:61168/1",
+      "MINIO_ENDPOINT=http://127.0.0.1:61170",
+      "MINIO_PUBLIC_URL=http://127.0.0.1:61170",
+      "MINIO_ACCESS_KEY=minioadmin",
+      "MINIO_SECRET_KEY=minioadmin",
+      "MINIO_REGION=us-east-1",
+      "DIAGNOSTIC_PRIVATE_BUCKET=diagnostic-test-private",
+      "APP_ENV=test",
+      "DIAGNOSTIC_SYNTHETIC_ENABLED=true",
+      "AUTO_TM_TEST_DATABASES=unset"
+    ],
+    "requiredRuntimeAssertions": [
+      "before-deadline exact one-candidate DTO",
+      "before and at-deadline cache-control no-store, private",
+      "at-deadline exact empty DTO",
+      "identity graph/projectIdentity refusal before proof expiry evaluation",
+      "proof rightsUntil equals selected material deadline and remains uninvalidated/unconsumed/unerased",
+      "later qualifications, Sessions and authority deadlines",
+      "original handoff empty/403/zero-report/zero-audit oracles"
+    ],
+    "selectionVerifier": {
+      "argv": [
+        "node",
+        "/tmp/issue939-runtime-f16f17-20261103/verify-f16-f17-selection.mjs"
+      ],
+      "envKeys": [
+        "STAGE_JSON_PATH=/tmp/issue939-runtime-f16f17-20261103/f16-f17-vitest.json"
+      ],
+      "gate": "exactly F16 and F17 selected, both passed, selected skips=0; excluded rows do not count as selected skips",
+      "script": "/tmp/issue939-runtime-f16f17-20261103/verify-f16-f17-selection.mjs",
+      "sha256": "ad7080454434586c0ae88ca672189cc6573ef9ab206726685d39ab57c1a779e2"
+    }
+  }
+}
