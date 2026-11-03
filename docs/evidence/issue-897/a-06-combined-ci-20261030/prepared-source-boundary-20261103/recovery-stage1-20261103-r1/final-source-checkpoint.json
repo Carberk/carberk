@@ -1,0 +1,24 @@
+{
+  "captured_at": "2026-11-03T01:06:32.942501+00:00",
+  "source_checkpoint": "6bc5196958c58611328c09eb7a3dfa6fdc8c4f11",
+  "source_tree": "594e24d1a45dc1223b544c467ba071a09b626e9b",
+  "paths": {
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts": "d7e20cf8f9aade8a213a7c005ca83eff7a8318bf561abd09b2e43594f288e99e",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts": "dd0a34ba6891ef68ad6465291be61f2f2314b05e3dae5f5cd3c7edec8b40e0fc",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts": "13b76bb92cbf502c03ad2cc572bed87bcc6c53ec87ba5cd4154e8c1b1073d050",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts": "95cfbad07a0702f4e5a145a88ec59ce2220ffde32d94e39b20c3b322d3043734",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": "046e0a78da033562904a6ff3a2b995421156ec4db38cc73ae8df63b778776d73"
+  },
+  "input_manifest": "d6bf64f4828f89a0060fd8f0f24d0e3f94346961237a183a1246bba9293a3c5d",
+  "version7_identity": "a2fd79faa7bd07cd7aa3296f4e2c5f15e84ae896e538c073c713fb7e669ad464",
+  "env_names": [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "MINIO_ENDPOINT",
+    "MINIO_REGION",
+    "MINIO_ACCESS_KEY",
+    "MINIO_SECRET_KEY",
+    "DIAGNOSTIC_PRIVATE_BUCKET",
+    "AUTO_TM_TEST_DATABASES"
+  ]
+}
