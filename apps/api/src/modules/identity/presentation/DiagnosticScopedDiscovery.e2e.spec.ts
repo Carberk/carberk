@@ -49,9 +49,9 @@ describe("issue938 recovery stage1", () => {
       const stored = await f.storedEvidence(a);
       const refused = await f.illegalProvenanceRewrite(a);
       expect(refused.reached).toBe(true);
-      expect(refused.error).toMatchObject({ meta: { driverAdapterError: { cause: {
+      expect(refused.error).toMatchObject({ name: "DriverAdapterError", cause: {
         originalCode: "P0001", originalMessage: "diagnostic_identity_evidence_immutable",
-      } } } });
+      } });
       expect(await f.storedEvidence(a)).toEqual(stored);
     });
   });
