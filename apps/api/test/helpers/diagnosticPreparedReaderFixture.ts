@@ -496,12 +496,13 @@ export async function withPreparedReaderFixture<T>(kind: Suite, scenario: string
   options: { partialFailure?: boolean; cleanup?: (receipt: PreparedReaderCleanup) => void } = {}): Promise<T> {
   const fixture = new DiagnosticPreparedReaderFixture(kind, scenario);
   let original: unknown;
-  let result: T | undefined;
-  try { await fixture.initialize(options.partialFailure); result = await work(fixture); }
+  // Successful completion is tracked explicitly: stage1 callbacks resolve with `void`, so `undefined` is a valid result.
+  let completion: { readonly value: T } | undefined;
+  try { await fixture.initialize(options.partialFailure); completion = { value: await work(fixture) }; }
   catch (error) { original = error; }
   const cleanup = await fixture.close(); options.cleanup?.(cleanup);
   if (cleanup.failures.length) throw new AggregateError([...(original === undefined ? [] : [original]), ...cleanup.failures], "938_fixture_cleanup_failed");
   if (original !== undefined) throw original;
-  if (result === undefined) throw new Error("938_fixture_missing_result");
-  return result;
+  if (completion === undefined) throw new Error("938_fixture_missing_result");
+  return completion.value;
 }
