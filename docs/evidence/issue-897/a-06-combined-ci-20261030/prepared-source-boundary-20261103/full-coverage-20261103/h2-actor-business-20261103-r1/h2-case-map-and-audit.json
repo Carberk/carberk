@@ -1,0 +1,526 @@
+{
+  "kind": "issue940-h2-seven-case-map-and-audit",
+  "recorded_at": "2026-11-03T18:36:15.583212+00:00",
+  "inventory": {
+    "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/lawful-feasibility-stop.json",
+    "sha256": "324669d09c6d66115a703c300ead0c673eca4974b73493c45d7f6821fb86c5d3"
+  },
+  "source_base": "a860052d8f0896f701999eb012819b6e7e7a8442",
+  "coordinator_candidate": {
+    "commit": "323049c5c1ef310d9b40ad83ab8e29804d57c68a",
+    "tree": "4447976eca19ba3e5cdbcea155133f8568fbc682"
+  },
+  "source_checkpoint": "cec5d51aa633d2ed84d01d0f1d93baad511e5d9d",
+  "source_tree": "5e9dca01ad5f2423b44d42246b4e6ca1a2edaed7",
+  "h2_cases": [
+    {
+      "id": "F04",
+      "scenario": "records Business source membership as active without adding publisher admission to observation",
+      "dependency": "BUSINESS_GRAPH",
+      "original_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "original_selector_line_at_87456f4f": 94,
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "target_selector_line": 49,
+      "target_rows": [
+        "active",
+        "suspended",
+        "missing"
+      ],
+      "name_equal": true,
+      "lawful_producer": "f.businessMember(\"commissionerB\"): founder (staff:bootstrap founder.admission) -> AdmitBusiness (synthetic; dealership status recovery, owner invitation) -> owner RedeemBusinessInvitation (owner member, dealership active) -> owner InviteBusinessMember(commissionerB, sales) -> commissionerB RedeemBusinessInvitation (sales member active); f.arrived(\"B\", true, true): public Listing with businessId and seller commissionerB, order created by commissionerB under Business authorization; owner issues the ownership grant through POST orders/:id/ownership-grant",
+      "assertions": [
+        {
+          "original": "listing.update({ businessId: id(50) }) (memory row write)",
+          "replacement": "Listing created with businessId of the lawful Business through PrismaListingRepository.save(Listing.create)"
+        },
+        {
+          "original": "memory.seed(dealershipMember { id: id(51), userId: id(7), dealershipId: id(50), status, role: \"sales\" }) / no seed for missing",
+          "replacement": "redeemed sales membership for commissionerB (seller = commissioner, as id(7)); suspended/missing produced by owner ChangeBusinessMembership suspend/remove"
+        },
+        {
+          "original": "f.observe({ ownershipClassification: { rights: syntheticOwnershipRights } })",
+          "replacement": "f.observeBusiness(visit, observed, syntheticOwnershipRights, active ? \"owner\" : null): same classification; the active case adds the owner-issued ownership grant required by the production component path"
+        },
+        {
+          "original": "expect(f.components[0]).toMatchObject(active ? { state: \"available\", businessId: id(50), membershipId: id(51) } : { state: \"unavailable\" })",
+          "replacement": "identical literal with the lawful businessId/membershipId; f.components is the recorded create data (capture-only query extension; write unchanged)"
+        },
+        {
+          "original": "if (status !== \"active\") expect(f.components[0]).not.toHaveProperty(\"sellerId\")",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "(none)",
+          "replacement": "added: result.observedVehicle toEqual(observed); f.components toHaveLength(1)"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "scenario": "records Business source membership as suspended without adding publisher admission to observation",
+      "dependency": "BUSINESS_GRAPH",
+      "original_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "original_selector_line_at_87456f4f": 94,
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "target_selector_line": 49,
+      "target_rows": [
+        "active",
+        "suspended",
+        "missing"
+      ],
+      "name_equal": true,
+      "lawful_producer": "f.businessMember(\"commissionerB\"): founder (staff:bootstrap founder.admission) -> AdmitBusiness (synthetic; dealership status recovery, owner invitation) -> owner RedeemBusinessInvitation (owner member, dealership active) -> owner InviteBusinessMember(commissionerB, sales) -> commissionerB RedeemBusinessInvitation (sales member active); f.arrived(\"B\", true, true): public Listing with businessId and seller commissionerB, order created by commissionerB under Business authorization; after arrival the owner suspends the membership (ChangeBusinessMembership suspend, member_eligibility source command); no grant is issued",
+      "assertions": [
+        {
+          "original": "listing.update({ businessId: id(50) }) (memory row write)",
+          "replacement": "Listing created with businessId of the lawful Business through PrismaListingRepository.save(Listing.create)"
+        },
+        {
+          "original": "memory.seed(dealershipMember { id: id(51), userId: id(7), dealershipId: id(50), status, role: \"sales\" }) / no seed for missing",
+          "replacement": "redeemed sales membership for commissionerB (seller = commissioner, as id(7)); suspended/missing produced by owner ChangeBusinessMembership suspend/remove"
+        },
+        {
+          "original": "f.observe({ ownershipClassification: { rights: syntheticOwnershipRights } })",
+          "replacement": "f.observeBusiness(visit, observed, syntheticOwnershipRights, active ? \"owner\" : null): same classification; the active case adds the owner-issued ownership grant required by the production component path"
+        },
+        {
+          "original": "expect(f.components[0]).toMatchObject(active ? { state: \"available\", businessId: id(50), membershipId: id(51) } : { state: \"unavailable\" })",
+          "replacement": "identical literal with the lawful businessId/membershipId; f.components is the recorded create data (capture-only query extension; write unchanged)"
+        },
+        {
+          "original": "if (status !== \"active\") expect(f.components[0]).not.toHaveProperty(\"sellerId\")",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "(none)",
+          "replacement": "added: result.observedVehicle toEqual(observed); f.components toHaveLength(1)"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "scenario": "records Business source membership as missing without adding publisher admission to observation",
+      "dependency": "BUSINESS_GRAPH",
+      "original_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "original_selector_line_at_87456f4f": 94,
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "target_selector_line": 49,
+      "target_rows": [
+        "active",
+        "suspended",
+        "missing"
+      ],
+      "name_equal": true,
+      "lawful_producer": "f.businessMember(\"commissionerB\"): founder (staff:bootstrap founder.admission) -> AdmitBusiness (synthetic; dealership status recovery, owner invitation) -> owner RedeemBusinessInvitation (owner member, dealership active) -> owner InviteBusinessMember(commissionerB, sales) -> commissionerB RedeemBusinessInvitation (sales member active); f.arrived(\"B\", true, true): public Listing with businessId and seller commissionerB, order created by commissionerB under Business authorization; after arrival the owner removes the membership (ChangeBusinessMembership remove, member_remove source command); Listing keeps businessId; no grant",
+      "assertions": [
+        {
+          "original": "listing.update({ businessId: id(50) }) (memory row write)",
+          "replacement": "Listing created with businessId of the lawful Business through PrismaListingRepository.save(Listing.create)"
+        },
+        {
+          "original": "memory.seed(dealershipMember { id: id(51), userId: id(7), dealershipId: id(50), status, role: \"sales\" }) / no seed for missing",
+          "replacement": "redeemed sales membership for commissionerB (seller = commissioner, as id(7)); suspended/missing produced by owner ChangeBusinessMembership suspend/remove"
+        },
+        {
+          "original": "f.observe({ ownershipClassification: { rights: syntheticOwnershipRights } })",
+          "replacement": "f.observeBusiness(visit, observed, syntheticOwnershipRights, active ? \"owner\" : null): same classification; the active case adds the owner-issued ownership grant required by the production component path"
+        },
+        {
+          "original": "expect(f.components[0]).toMatchObject(active ? { state: \"available\", businessId: id(50), membershipId: id(51) } : { state: \"unavailable\" })",
+          "replacement": "identical literal with the lawful businessId/membershipId; f.components is the recorded create data (capture-only query extension; write unchanged)"
+        },
+        {
+          "original": "if (status !== \"active\") expect(f.components[0]).not.toHaveProperty(\"sellerId\")",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "(none)",
+          "replacement": "added: result.observedVehicle toEqual(observed); f.components toHaveLength(1)"
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "scenario": "uniformly omits and refuses issuer grant loss at read and again at action",
+      "dependency": "STAFF_MANAGE_ACTOR",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 127,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 127,
+      "target_rows": [
+        "issuer grant loss"
+      ],
+      "name_equal": true,
+      "lawful_producer": "staffManager actor (ordinary User/Session, elevated) + staff:bootstrap staff.manage; ChangeStaffGrant(PrismaStaffAuthority) revokes the reviewer's diagnostics.reviewer grant at the fixture clock",
+      "assertions": [
+        {
+          "original": "issue(): 201 and reviewer proof detail 200",
+          "replacement": "f.issue() 201 dependency; reviewer GET continuity-proofs/:proofId toBe(200)"
+        },
+        {
+          "original": "handoffs (technician) .body.handoffs toHaveLength(1)",
+          "replacement": "identical"
+        },
+        {
+          "original": "db.staffGrant.updateMany({ userId: id(1) }, { revokedAt: now }) (memory transition)",
+          "replacement": "f.revokeStaffGrant(\"reviewer\", \"diagnostics.reviewer\"): ChangeStaffGrant by a bootstrapped staff.manage actor with an elevated Session; persisted revokedAt asserted"
+        },
+        {
+          "original": "handoffs body toEqual({ handoffs: [], result: null, nextCursor: null, scope: \"current_b_owned_handoffs\" })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "consume { reportId: id(9000), expectedOrderVersion: 1, reason: \"B follow-up\" } -> toMatchObject({ status: 403, body: { code: \"DIAGNOSTIC_NO_ACCESS\", message: \"Inspection request could not be completed\" } })",
+          "replacement": "{ reportId: f.id(\"report-9000\"), expectedOrderVersion: 7, ... } (fixture B version 7, as H1); identical literal"
+        },
+        {
+          "original": "diagnosticReportRecord.count({ orderId: b }) toBe(0)",
+          "replacement": "identical"
+        },
+        {
+          "original": "diagnosticAudit.count({ action: \"CONTINUITY_PROOF_CONSUMED\" }) toBe(0)",
+          "replacement": "same, scoped orderId in [A, B] (coordinator-accepted isolation equivalent)"
+        }
+      ]
+    },
+    {
+      "id": "F23",
+      "scenario": "fences B grant changes even on empty pages and consumed result recovery",
+      "dependency": "STAFF_MANAGE_ACTOR",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 152,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 143,
+      "target_rows": [
+        "grant"
+      ],
+      "name_equal": true,
+      "lawful_producer": "as F10, revoking technicianB's diagnostics.technician grant after the first consume",
+      "assertions": [
+        {
+          "original": "issue(); consume { reportId: id(9000), expectedOrderVersion: 1, reason } toBe(201)",
+          "replacement": "f.issue(); consume { reportId: f.id(\"report-9000\"), expectedOrderVersion: 7, reason: \"B follow-up\" } toBe(201)"
+        },
+        {
+          "original": "db.staffGrant.updateMany({ userId: id(2) }, { revokedAt: now })",
+          "replacement": "f.revokeStaffGrant(\"technicianB\", \"diagnostics.technician\") (ChangeStaffGrant)"
+        },
+        {
+          "original": "GET continuity-handoffs (technician) toBe(403)",
+          "replacement": "identical"
+        },
+        {
+          "original": "consume retry (technician) toBe(403)",
+          "replacement": "identical"
+        }
+      ]
+    },
+    {
+      "id": "F40",
+      "scenario": "omits a B technician after current Identity or assignment grant loss",
+      "dependency": "STAFF_MANAGE_ACTOR",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "original_selector_line_at_87456f4f": 160,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "target_selector_line": 147,
+      "target_rows": [
+        "grant",
+        "inactive"
+      ],
+      "name_equal": true,
+      "lawful_producer": "as F10, revoking technicianB's diagnostics.technician grant",
+      "assertions": [
+        {
+          "original": "db.staffGrant.updateMany({ userId: id(2) }, { revokedAt: now })",
+          "replacement": "f.revokeStaffGrant(\"technicianB\", \"diagnostics.technician\")"
+        },
+        {
+          "original": "GET linking-technicians status toBe(200); body toEqual({ technicians: [] })",
+          "replacement": "identical literals (reviewer)"
+        },
+        {
+          "original": "(none)",
+          "replacement": "added precondition: before the loss the body is { technicians: [{ userId: technicianB, name: \"B technician\" }] }"
+        }
+      ]
+    },
+    {
+      "id": "F41",
+      "scenario": "omits a B technician after current Identity or assignment inactive loss",
+      "dependency": "ADMIN_ACTOR",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "original_selector_line_at_87456f4f": 160,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "target_selector_line": 147,
+      "target_rows": [
+        "grant",
+        "inactive"
+      ],
+      "name_equal": true,
+      "lawful_producer": "admin actor (ordinary User/Session, elevated) promoted by the repository operator command pnpm --filter @auto-tm/db admin:promote --phone; AdminGuard's isAdmin check repeated through PrismaIdentityCheckAdapter; SuspendUser use case (userEligibilitySourceCommand + PrismaIdentityAdminRepository.suspendUser + audit) suspends technicianB",
+      "assertions": [
+        {
+          "original": "db.user.update({ id: id(2) }, { suspendedAt: now })",
+          "replacement": "f.suspendUser(\"technicianB\") through SuspendUser; result.targetId and suspendedById asserted"
+        },
+        {
+          "original": "GET linking-technicians status toBe(200); body toEqual({ technicians: [] })",
+          "replacement": "identical literals (reviewer)"
+        },
+        {
+          "original": "(none)",
+          "replacement": "added precondition as F40"
+        }
+      ]
+    }
+  ],
+  "role_grant_audit": {
+    "runtime_role": "r938_s1_<kind>, NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT, non-owner, no membership (enforcement query unchanged)",
+    "role_checks_kept": true,
+    "initialize_permission_table_unchanged": true,
+    "task_local_grants": [
+      {
+        "purpose": "business-admission-and-membership",
+        "grants": {
+          "INSERT,UPDATE": [
+            "dealerships",
+            "dealership_invitations",
+            "dealership_members"
+          ]
+        },
+        "issued_by": "environment connection inside businessMember() only (F04/F05/F06)",
+        "revoked_by": "DROP OWNED BY + DROP ROLE at close"
+      }
+    ],
+    "staff_capabilities_bootstrapped": {
+      "founder.admission": "founder (Business admission only)",
+      "staff.manage": "staffManager (grant revocation only)"
+    },
+    "roles": {
+      "admin": "admin actor only, via admin:promote (F41)"
+    },
+    "broad_role_elevation": false,
+    "actor_sets": "DIAGNOSTIC_RUNTIME.syntheticAllowed covers every created fixture actor (Object.values(actors)); identical for cases that create no operator actor"
+  },
+  "accounting": {
+    "original_four_suite_cases": 56,
+    "unchanged_companion_cases": 168,
+    "frozen_original_selection": 224,
+    "original_suites_and_memory_refusal_unchanged": true,
+    "e2e_one_for_one_replacements_in_source": 22,
+    "h1_open_held": [
+      "F16",
+      "F17"
+    ],
+    "e2e_extra_controls": 2,
+    "e2e_declarations_total": 24,
+    "status_counts": {
+      "IMPLEMENTED_STAGE1": 5,
+      "HELD_REPRESENTABLE_NOT_IMPLEMENTED": 23,
+      "IMPLEMENTED_H2": 7,
+      "HELD_STOP_DEPENDENCY": 11,
+      "IMPLEMENTED_H1": 10
+    },
+    "status_ids": {
+      "IMPLEMENTED_STAGE1": [
+        "F01",
+        "F07",
+        "F34",
+        "F36",
+        "F47"
+      ],
+      "HELD_REPRESENTABLE_NOT_IMPLEMENTED": [
+        "F02",
+        "F03",
+        "F12",
+        "F13",
+        "F18",
+        "F19",
+        "F21",
+        "F24",
+        "F25",
+        "F26",
+        "F28",
+        "F29",
+        "F31",
+        "F32",
+        "F35",
+        "F42",
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P07",
+        "P09"
+      ],
+      "IMPLEMENTED_H2": [
+        "F04",
+        "F05",
+        "F06",
+        "F10",
+        "F23",
+        "F40",
+        "F41"
+      ],
+      "HELD_STOP_DEPENDENCY": [
+        "F08",
+        "F09",
+        "F14",
+        "F15",
+        "F22",
+        "F30",
+        "F37",
+        "F38",
+        "F43",
+        "F45",
+        "P08"
+      ],
+      "IMPLEMENTED_H1": [
+        "F11",
+        "F16",
+        "F17",
+        "F20",
+        "F27",
+        "F33",
+        "F39",
+        "F44",
+        "F46",
+        "P06"
+      ]
+    },
+    "full_224_replacement_executable": false,
+    "note": "22 of 56 original scenarios now have e2e replacements in source; F16/F17 stay OPEN (parent hold, unchanged). 34 remain held: 11 stop-dependency, 23 representable but unimplemented."
+  },
+  "allow_list": {
+    "changed_non_doc_paths_from_source_base": [
+      "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    ],
+    "within_allow_list": true,
+    "production_migration_config_dependency_workflow_unchanged": true,
+    "vitest_timeouts_unchanged": {
+      "testTimeout_120000": true,
+      "hookTimeout_60000": true
+    }
+  },
+  "prior_e2e_bytes_preserved_as_prefix": {
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts": true,
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts": true,
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts": true
+  },
+  "readers_e2e_unchanged": true,
+  "helper_replaced_lines": [
+    "import { DiagnosticSchemas as D } from \"@auto-tm/contracts\";",
+    "import { IDENTITY_CLOCK_PORT } from \"../../src/modules/identity/identity.public\";",
+    "type Person = \"commissionerA\" | \"commissionerB\" | \"reception\" | \"technicianA\" | \"technicianB\" | \"reviewer\" | \"foreign\";",
+    "        syntheticAllowed: ({ userId }: { userId: string }) => people.some(p => this.actors[p]?.userId === userId) });",
+    "  async arrived(alias: string, publicVisit = false): Promise<Visit> {",
+    "        priceAmount: 100000, priceCurrency: \"TMT\", allowCalls: false, allowChat: true, publishedAt: this.now }));"
+  ],
+  "helper_added_line_count": 148,
+  "forbidden_markers": {
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts": [],
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts": [],
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts": [],
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts": [],
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": []
+  },
+  "original_nine_plus_memory": [
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "expected": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "current": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "expected": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "current": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "expected": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "current": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "expected": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "current": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+      "expected": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "current": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+      "expected": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "current": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+      "expected": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "current": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+      "expected": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "current": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+      "expected": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "current": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "equal": true
+    },
+    {
+      "path": "packages/db/src/testing/DiagnosticMemoryDatabase.ts",
+      "expected": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "current": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "equal": true
+    }
+  ],
+  "prior_evidence_preserved": {
+    "count": 2374,
+    "all_equal": true
+  },
+  "session_expiry": "No H2 case expires or revokes a Session to stand in for another loss. F41's SuspendUser deletes the target's Sessions as production suspension does; the reviewer reads.",
+  "reviewer_attention": [
+    "Capture suites install an observation-only Prisma query extension on diagnosticOwnershipComponent.create so the literal not.toHaveProperty(\"sellerId\") assertion keeps its create-data subject; persisted rows carry the column as null.",
+    "F04 adds the owner-issued ownership grant: the production component path is available only with a compatible grant (the memory fixture asserted availability without one).",
+    "F41 runs the SuspendUser use case directly; the AdminGuard role check is repeated but its TOTP/route and ADMIN_MODERATION_ACTIONS_ENABLED gate are not exercised (admin routes are outside the diagnostics test module).",
+    "SuspendUser stamps suspendedAt with wall-clock new Date(); the fixture clock is not advanced in F41."
+  ],
+  "runtime_risks_unproven": [
+    "Business admission/redeem/change source commands (campaign preparation, businessSourceCommand, inventory invalidation) under the restricted role with only the listed task-local grants.",
+    "admin:promote (adminPromotionSourceCommand, maintenance audit) and SuspendUser (userEligibilitySourceCommand) under the restricted role.",
+    "F05/F06 technician observation after the commissioner's membership is suspended/removed (intake may refuse rather than record unavailable).",
+    "F23 first consume 201 against PostgreSQL; ChangeStaffGrant revocation with retained diagnostic graphs."
+  ],
+  "not_run": [
+    "tests",
+    "PostgreSQL",
+    "Redis",
+    "MinIO",
+    "runtime",
+    "review",
+    "package install/restore"
+  ],
+  "not_claimed": [
+    "#940 PASS",
+    "#938 PASS",
+    "#939 PASS",
+    "Milestone A acceptance",
+    "full 224 executable"
+  ]
+}

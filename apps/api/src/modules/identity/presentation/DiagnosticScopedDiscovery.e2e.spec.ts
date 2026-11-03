@@ -140,3 +140,19 @@ describe("issue939 H1 lawful case clocks and rights", () => {
     });
   });
 });
+
+// #940 H2: grant loss is a staff.manage revocation through ChangeStaffGrant; inactivity is an
+// operator-promoted admin's suspension through the SuspendUser use case. No row is rewritten.
+describe("issue940 H2 lawful actors and Business graph", () => {
+  it.each(["grant", "inactive"])("omits a B technician after current Identity or assignment %s loss", async loss => {
+    await withPreparedReaderFixture("discovery", `h2-technician-${loss}`, async f => {
+      const b = await f.arrived("B");
+      const before = await f.send("reviewer", "GET", `orders/${b.order.id}/linking-technicians`);
+      expect(before.body).toEqual({ technicians: [{ userId: f.actors.technicianB.userId, name: "B technician" }] });
+      if (loss === "grant") await f.revokeStaffGrant("technicianB", "diagnostics.technician");
+      if (loss === "inactive") await f.suspendUser("technicianB");
+      const response = await f.send("reviewer", "GET", `orders/${b.order.id}/linking-technicians`);
+      expect(response.status).toBe(200); expect(response.body).toEqual({ technicians: [] });
+    });
+  });
+});

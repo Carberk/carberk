@@ -1,0 +1,38 @@
+{
+  "kind": "issue940-selective-assembly-audit",
+  "base_coordinator": "85a8a50c19090363759bd5fb11f8d31bd1f1a26f",
+  "base_h1_candidate": "323049c5c1ef310d9b40ad83ab8e29804d57c68a",
+  "base_h1_tree": "4447976eca19ba3e5cdbcea155133f8568fbc682",
+  "draft_source": "cec5d51aa633d2ed84d01d0f1d93baad511e5d9d",
+  "draft_source_tree": "5e9dca01ad5f2423b44d42246b4e6ca1a2edaed7",
+  "draft_source_patch_sha256": "9f73b4ccc8eda73406ab880912d5318531e31b02ac1cdbbd3f024eecd2aeeda4",
+  "draft_evidence": "b43831f3bf038c0bb0a0acae913b28091c57a765",
+  "draft_evidence_tree": "660bc9c0314e63a2aa66e341eac86f316f10b5c2",
+  "source_paths": [
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "source_blob_sha256": {
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts": "c55d48b75ae8576121a1f148e64112cc1553272c7669632c1855495d55542f1a",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts": "103f6ff16a12e8f831934c72d95101fa59f87067e1b632a09ccd2b79d073aeca",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts": "650799d67aa3c5b1fb59906fb9b14f705ad521635459daad168571402fb6f975",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": "fb2c84a3d29d70c0310b92dd2218a41d3aa28880262a8579ef86ff1872fc6046"
+  },
+  "evidence_prefix": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h2-actor-business-20261103-r1/",
+  "imported_child_evidence_files": 16,
+  "historical_evidence_files_checked_unchanged": 2310,
+  "deletion_guard": {
+    "historical_deletions": 0,
+    "historical_modifications": 0,
+    "unrelated_source_paths": 0,
+    "prior_h1_h938_h939_preserved": true,
+    "whitespace_errors": 0
+  },
+  "static_receipts": {"commands": 5, "all_exit_zero": true, "hash_set_verified": true},
+  "coverage": {"h2_cases": ["F04", "F05", "F06", "F10", "F23", "F40", "F41"], "implemented": 22, "original": 56, "companions": 168, "full224_executable": false},
+  "runtime_reserved": false,
+  "ticket_pass": false,
+  "next_gate": "commit and push this selective assembly, then repin #924/#934 and #939 to its exact SHA/tree for one fresh read-only Standards/Spec pair; keep runtime and #942 held"
+}
