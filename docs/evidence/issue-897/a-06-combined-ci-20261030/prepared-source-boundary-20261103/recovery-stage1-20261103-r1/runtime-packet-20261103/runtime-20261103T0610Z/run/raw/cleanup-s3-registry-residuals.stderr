@@ -1,0 +1,33 @@
+/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@aws-sdk+core@3.974.11/node_modules/@aws-sdk/core/dist-cjs/submodules/protocols/index.js:1864
+        const exception = new ErrorCtor({});
+                          ^
+
+NoSuchBucket: The specified bucket does not exist
+    at S3RestXmlProtocol.handleError (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@aws-sdk+core@3.974.11/node_modules/@aws-sdk/core/dist-cjs/submodules/protocols/index.js:1864:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async S3RestXmlProtocol.deserializeResponse (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@smithy+core@3.24.3/node_modules/@smithy/core/dist-cjs/submodules/protocols/index.js:424:13)
+    at async /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@smithy+core@3.24.3/node_modules/@smithy/core/dist-cjs/submodules/schema/index.js:27:24
+    at async /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@aws-sdk+middleware-sdk-s3@3.972.40/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:350:20
+    at async /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@smithy+core@3.24.3/node_modules/@smithy/core/dist-cjs/submodules/retry/index.js:172:50
+    at async /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@aws-sdk+middleware-sdk-s3@3.972.40/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:64:28
+    at async /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@aws-sdk+middleware-sdk-s3@3.972.40/node_modules/@aws-sdk/middleware-sdk-s3/dist-cjs/index.js:91:20
+    at async /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@aws-sdk+core@3.974.11/node_modules/@aws-sdk/core/dist-cjs/submodules/client/index.js:119:26
+    at async file:///Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs:12:19 {
+  '$fault': 'client',
+  '$retryable': undefined,
+  '$metadata': {
+    httpStatusCode: 404,
+    requestId: '18E47446A20FCBE8',
+    extendedRequestId: 'dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8',
+    cfId: undefined,
+    attempts: 1,
+    totalRetryDelay: 0
+  },
+  Code: 'NoSuchBucket',
+  BucketName: 'diagnostic-test-private',
+  Resource: '/diagnostic-test-private/',
+  RequestId: '18E47446A20FCBE8',
+  HostId: 'dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8'
+}
+
+Node.js v24.13.0

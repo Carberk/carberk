@@ -1,0 +1,13 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/apps/api
+
+ ❯ src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts (0 test)
+ ❯ src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts (0 test)
+ ❯ src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts (0 test)
+ ❯ src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts (0 test)
+
+ Test Files  4 failed (4)
+      Tests  no tests
+   Start at  14:13:12
+   Duration  4.93s (setup 47%, transform 32%, worker 21%, environment 1%)
+

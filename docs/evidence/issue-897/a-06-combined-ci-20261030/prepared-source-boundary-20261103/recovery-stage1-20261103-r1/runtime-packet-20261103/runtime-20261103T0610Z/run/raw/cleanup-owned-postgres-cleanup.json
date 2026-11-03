@@ -1,0 +1,21 @@
+{
+  "phase": "cleanup",
+  "name": "owned-postgres-cleanup",
+  "argv": [
+    "node",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {
+    "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+    "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml"
+  },
+  "startedAt": "2026-11-03T06:13:18.326Z",
+  "endedAt": "2026-11-03T06:13:19.194Z",
+  "durationMs": 868,
+  "exit": 0,
+  "stdoutPath": "/tmp/issue938-runtime-packet-20261103/run-20261103T0610Z/raw/cleanup-owned-postgres-cleanup.stdout",
+  "stderrPath": "/tmp/issue938-runtime-packet-20261103/run-20261103T0610Z/raw/cleanup-owned-postgres-cleanup.stderr"
+}

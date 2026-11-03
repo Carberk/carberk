@@ -1,0 +1,20 @@
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts [ src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts ]
+ FAIL  src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts [ src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts ]
+ FAIL  src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts [ src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts ]
+ FAIL  src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts [ src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts ]
+Error: Cannot find module './src/modules/identity/infrastructure/PrismaUserRepository'
+Require stack:
+- /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/apps/api/package.json
+ ❯ test/helpers/diagnosticPreparedReaderFixture.ts:47:34
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /Users/bagtyyar/.t3/worktrees/carberk/t3-
+  │ 2d375913/apps/api
+
