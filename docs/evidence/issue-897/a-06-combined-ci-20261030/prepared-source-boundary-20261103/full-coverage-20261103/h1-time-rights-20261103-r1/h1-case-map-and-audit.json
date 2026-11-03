@@ -1,0 +1,581 @@
+{
+  "kind": "issue939-h1-ten-case-map-and-audit",
+  "recorded_at": "2026-11-03T17:39:53.007512+00:00",
+  "contract": [
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6609661944",
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6610869517"
+  ],
+  "inventory": {
+    "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/lawful-feasibility-stop.json",
+    "sha256": "324669d09c6d66115a703c300ead0c673eca4974b73493c45d7f6821fb86c5d3"
+  },
+  "source_base": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+  "evidence_base": "17e20ae68730de74e506e3fddb490c036d01ce41",
+  "source_checkpoint": "2225819a878e055f73fc34738a8403cc71fa4d32",
+  "source_tree": "bd2415772683f7ca53cb47fe3404d79e73e6737f",
+  "h1_cases": [
+    {
+      "id": "F11",
+      "scenario": "uniformly omits and refuses issuer qualification loss at read and again at action",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 128,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 60,
+      "target_row_line": 54,
+      "name_equal": true,
+      "transition": "original: diagnosticCenterAssignment.updateMany({ userId: reviewer }, { qualifiedUntil: now }) -> e2e: reviewer-first bootstrap (ordinary +2h deadlines) and expireReviewerQualification() moves the clock to the reviewer's persisted qualifiedUntil while technicianB/technicianA stay qualified",
+      "assertions": [
+        {
+          "original": "issue(): expect(issued.status).toBe(201)",
+          "replacement": "f.issue(): admitted() 201 dependency"
+        },
+        {
+          "original": "issue(): expect((await get(`${b}/continuity-proofs/${proofId}`)).status).toBe(200)",
+          "replacement": "reviewer GET continuity-proofs/:proofId toBe(200)"
+        },
+        {
+          "original": "expect(handoffs technician .body.handoffs).toHaveLength(1)",
+          "replacement": "same, literal 1"
+        },
+        {
+          "original": "db[table].updateMany({ where, data }) (memory transition)",
+          "replacement": "explicit case clock reaches the persisted deadline (no row rewrite)"
+        },
+        {
+          "original": "expect(body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: \"current_b_owned_handoffs\" })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "consume { reportId: id(9000), expectedOrderVersion: 1, reason: \"B follow-up\" }",
+          "replacement": "{ reportId: f.id(\"report-9000\"), expectedOrderVersion: 7, reason: \"B follow-up\" } (fixture B version literal 7, as approved for stage1)"
+        },
+        {
+          "original": "expect(denied).toMatchObject({ status: 403, body: { code: \"DIAGNOSTIC_NO_ACCESS\", message: \"Inspection request could not be completed\" } })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "expect(diagnosticReportRecord.count({ orderId: b })).toBe(0)",
+          "replacement": "identical literal, B order"
+        },
+        {
+          "original": "expect(diagnosticAudit.count({ action: \"CONTINUITY_PROOF_CONSUMED\" })).toBe(0)",
+          "replacement": "same action and literal 0, scoped orderId in [A, B] (coordinator-accepted isolation equivalent for per-case database)"
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "scenario": "uniformly omits and refuses A rights expiry at read and again at action",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 133,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 60,
+      "target_row_line": 55,
+      "name_equal": true,
+      "transition": "original: diagnosticIdentityProvenance.updateMany({ orderId: A }, { rightsUntil: now }) -> e2e: A provenance rights predeclared until start+1h; expireVisitRights(a, provenance) moves the clock to the persisted deadline. The proof's rightsUntil is the same earliest bound deadline (coincidence).",
+      "assertions": [
+        {
+          "original": "issue(): expect(issued.status).toBe(201)",
+          "replacement": "f.issue(): admitted() 201 dependency"
+        },
+        {
+          "original": "issue(): expect((await get(`${b}/continuity-proofs/${proofId}`)).status).toBe(200)",
+          "replacement": "reviewer GET continuity-proofs/:proofId toBe(200)"
+        },
+        {
+          "original": "expect(handoffs technician .body.handoffs).toHaveLength(1)",
+          "replacement": "same, literal 1"
+        },
+        {
+          "original": "db[table].updateMany({ where, data }) (memory transition)",
+          "replacement": "explicit case clock reaches the persisted deadline (no row rewrite)"
+        },
+        {
+          "original": "expect(body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: \"current_b_owned_handoffs\" })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "consume { reportId: id(9000), expectedOrderVersion: 1, reason: \"B follow-up\" }",
+          "replacement": "{ reportId: f.id(\"report-9000\"), expectedOrderVersion: 7, reason: \"B follow-up\" } (fixture B version literal 7, as approved for stage1)"
+        },
+        {
+          "original": "expect(denied).toMatchObject({ status: 403, body: { code: \"DIAGNOSTIC_NO_ACCESS\", message: \"Inspection request could not be completed\" } })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "expect(diagnosticReportRecord.count({ orderId: b })).toBe(0)",
+          "replacement": "identical literal, B order"
+        },
+        {
+          "original": "expect(diagnosticAudit.count({ action: \"CONTINUITY_PROOF_CONSUMED\" })).toBe(0)",
+          "replacement": "same action and literal 0, scoped orderId in [A, B] (coordinator-accepted isolation equivalent for per-case database)"
+        }
+      ]
+    },
+    {
+      "id": "F17",
+      "scenario": "uniformly omits and refuses B rights expiry at read and again at action",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 134,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 60,
+      "target_row_line": 56,
+      "name_equal": true,
+      "transition": "original: diagnosticIdentityEvidence.updateMany({ orderId: B }, { rightsUntil: now }) -> e2e: B evidence rights predeclared until start+1h; expireVisitRights(b, evidence) to the persisted deadline (proof deadline coincides)",
+      "assertions": [
+        {
+          "original": "issue(): expect(issued.status).toBe(201)",
+          "replacement": "f.issue(): admitted() 201 dependency"
+        },
+        {
+          "original": "issue(): expect((await get(`${b}/continuity-proofs/${proofId}`)).status).toBe(200)",
+          "replacement": "reviewer GET continuity-proofs/:proofId toBe(200)"
+        },
+        {
+          "original": "expect(handoffs technician .body.handoffs).toHaveLength(1)",
+          "replacement": "same, literal 1"
+        },
+        {
+          "original": "db[table].updateMany({ where, data }) (memory transition)",
+          "replacement": "explicit case clock reaches the persisted deadline (no row rewrite)"
+        },
+        {
+          "original": "expect(body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: \"current_b_owned_handoffs\" })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "consume { reportId: id(9000), expectedOrderVersion: 1, reason: \"B follow-up\" }",
+          "replacement": "{ reportId: f.id(\"report-9000\"), expectedOrderVersion: 7, reason: \"B follow-up\" } (fixture B version literal 7, as approved for stage1)"
+        },
+        {
+          "original": "expect(denied).toMatchObject({ status: 403, body: { code: \"DIAGNOSTIC_NO_ACCESS\", message: \"Inspection request could not be completed\" } })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "expect(diagnosticReportRecord.count({ orderId: b })).toBe(0)",
+          "replacement": "identical literal, B order"
+        },
+        {
+          "original": "expect(diagnosticAudit.count({ action: \"CONTINUITY_PROOF_CONSUMED\" })).toBe(0)",
+          "replacement": "same action and literal 0, scoped orderId in [A, B] (coordinator-accepted isolation equivalent for per-case database)"
+        }
+      ]
+    },
+    {
+      "id": "F20",
+      "scenario": "uniformly omits and refuses proof rights expiry at read and again at action",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 137,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 60,
+      "target_row_line": 58,
+      "name_equal": true,
+      "transition": "original: diagnosticContinuityProof.updateMany({}, { rightsUntil: now }) -> e2e: A evidence rights predeclared until start+1h (earliest bound material); expireProofRights asserts the persisted proof rightsUntil equals it and moves the clock there. Coordinator-accepted coincidence; no proof row rewritten.",
+      "assertions": [
+        {
+          "original": "issue(): expect(issued.status).toBe(201)",
+          "replacement": "f.issue(): admitted() 201 dependency"
+        },
+        {
+          "original": "issue(): expect((await get(`${b}/continuity-proofs/${proofId}`)).status).toBe(200)",
+          "replacement": "reviewer GET continuity-proofs/:proofId toBe(200)"
+        },
+        {
+          "original": "expect(handoffs technician .body.handoffs).toHaveLength(1)",
+          "replacement": "same, literal 1"
+        },
+        {
+          "original": "db[table].updateMany({ where, data }) (memory transition)",
+          "replacement": "explicit case clock reaches the persisted deadline (no row rewrite)"
+        },
+        {
+          "original": "expect(body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: \"current_b_owned_handoffs\" })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "consume { reportId: id(9000), expectedOrderVersion: 1, reason: \"B follow-up\" }",
+          "replacement": "{ reportId: f.id(\"report-9000\"), expectedOrderVersion: 7, reason: \"B follow-up\" } (fixture B version literal 7, as approved for stage1)"
+        },
+        {
+          "original": "expect(denied).toMatchObject({ status: 403, body: { code: \"DIAGNOSTIC_NO_ACCESS\", message: \"Inspection request could not be completed\" } })",
+          "replacement": "identical literal"
+        },
+        {
+          "original": "expect(diagnosticReportRecord.count({ orderId: b })).toBe(0)",
+          "replacement": "identical literal, B order"
+        },
+        {
+          "original": "expect(diagnosticAudit.count({ action: \"CONTINUITY_PROOF_CONSUMED\" })).toBe(0)",
+          "replacement": "same action and literal 0, scoped orderId in [A, B] (coordinator-accepted isolation equivalent for per-case database)"
+        }
+      ]
+    },
+    {
+      "id": "F27",
+      "scenario": "binds continuation to the query, actor, Session, B and expiry, without inherited authority",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 179,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 77,
+      "target_row_line": null,
+      "name_equal": true,
+      "transition": "original: issue() then seed 21 invalidated copies of the proof JSON -> e2e: 21 independently issued proofs, lawful invalidation by issuer display-name change (diagnostic_continuity_source_changed users trigger, asserted), then the current proof (order reversed because the trigger would invalidate it). Clock +15min via advance().",
+      "assertions": [
+        {
+          "original": "issue(): 201 and reviewer proof detail 200",
+          "replacement": "f.issue() 201 dependency; reviewer GET toBe(200)"
+        },
+        {
+          "original": "cursor = handoffs(technician).body.nextCursor",
+          "replacement": "same"
+        },
+        {
+          "original": "expect(get predecessor-candidates?cursor (reviewer)).status).toBe(403)",
+          "replacement": "identical"
+        },
+        {
+          "original": "expect(get handoffs?cursor=slice(0,-1)+\"!\" (technician)).status).toBe(403)",
+          "replacement": "identical"
+        },
+        {
+          "original": "currentTime = now + 15min; expect(get handoffs?cursor).status).toBe(403)",
+          "replacement": "f.advance(15 * 60_000); identical 403"
+        }
+      ]
+    },
+    {
+      "id": "F33",
+      "scenario": "bounds request discovery, binds continuations to Session/B/query and stages linkage only",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "original_selector_line_at_87456f4f": 279,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "target_selector_line": 93,
+      "target_row_line": null,
+      "name_equal": true,
+      "transition": "21 prepare(consume, technician) through POST continuity-requests; clock +15min via advance()",
+      "assertions": [
+        {
+          "original": "prepare(): status 201, cache-control \"no-store, private\"",
+          "replacement": "identical per request"
+        },
+        {
+          "original": "first.body.requests toHaveLength(20); cursor toHaveLength(1062)",
+          "replacement": "identical"
+        },
+        {
+          "original": "next requests toHaveLength(1); nextCursor toBeNull()",
+          "replacement": "identical"
+        },
+        {
+          "original": "Set(requestIds).size toBe(21)",
+          "replacement": "identical"
+        },
+        {
+          "original": "handoffs?cursor (technician) 403",
+          "replacement": "identical"
+        },
+        {
+          "original": "rows not.toHaveProperty command/reason/commandHash; toMatchObject { actorId, sessionId, kind: \"consume\", orderId: b }",
+          "replacement": "identical, real persisted rows for B"
+        },
+        {
+          "original": "currentTime = now + 15min; list?cursor 403",
+          "replacement": "f.advance(15 * 60_000); identical 403"
+        }
+      ]
+    },
+    {
+      "id": "F39",
+      "scenario": "replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "original_selector_line_at_87456f4f": 134,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "target_selector_line": 68,
+      "target_row_line": null,
+      "name_equal": true,
+      "transition": "visits 30..71 as finalized private predecessors with report id orderedId(\"predecessor\", n) for id(4000+n); later arrival visit 25 created after advance(1) so createdAt is past the fence (original: createdAt now+1); visit 50 provenance rights predeclared start+1min and reached by expireVisitRights; visit 51 reviewer assignment revoked by reception POST assignments active:false",
+      "assertions": [
+        {
+          "original": "first 200; candidates toHaveLength(20)",
+          "replacement": "identical"
+        },
+        {
+          "original": "page 200",
+          "replacement": "identical"
+        },
+        {
+          "original": "replay candidates toEqual(page candidates)",
+          "replacement": "identical"
+        },
+        {
+          "original": "changed 200; ids toEqual(id(4052+index) x19)",
+          "replacement": "toEqual(f.orderedId(\"predecessor\", 52+index) x19)"
+        },
+        {
+          "original": "not.toContain id(4050), id(4051), id(4025)",
+          "replacement": "not.toContain orderedId 50, 51, 25"
+        }
+      ]
+    },
+    {
+      "id": "F44",
+      "scenario": "rejects a second current Session, cursor tampering without retaining pair data",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "original_selector_line_at_87456f4f": 168,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "target_selector_line": 108,
+      "target_row_line": null,
+      "name_equal": true,
+      "transition": "visits 30..50 predecessors; second reviewer Session through PrismaSessionRepository.create (original: memory seed); clock +15min via advance()",
+      "assertions": [
+        {
+          "original": "first 200; cursor toHaveLength(1062)",
+          "replacement": "identical"
+        },
+        {
+          "original": "second Session ?cursor 403",
+          "replacement": "identical"
+        },
+        {
+          "original": "tampered first char 403",
+          "replacement": "identical"
+        },
+        {
+          "original": "now+15min ?cursor 403",
+          "replacement": "identical"
+        }
+      ]
+    },
+    {
+      "id": "F46",
+      "scenario": "allows an empty bounded page to continue without claiming absence",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "original_selector_line_at_87456f4f": 195,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "target_selector_line": 125,
+      "target_row_line": null,
+      "name_equal": true,
+      "transition": "visits 30..50 predecessors; provenance of 30..49 predeclared until start+1min (original: updateMany rightsUntil now), reached via expireVisitRights on the first",
+      "assertions": [
+        {
+          "original": "first 200; candidates toEqual([]); exhausted false; nextCursor toHaveLength(1062)",
+          "replacement": "identical"
+        },
+        {
+          "original": "second toEqual({ candidates: [{ reportId: id(4050), observedAt: observation.observedAt, mileageKm: 100 }], nextCursor: null, exhausted: true, scope })",
+          "replacement": "identical with reportId orderedId(\"predecessor\", 50); observedAt and mileageKm 100 literal from preparedPredecessorObservation"
+        }
+      ]
+    },
+    {
+      "id": "P06",
+      "scenario": "normalizes current B qualification loss and unknown B",
+      "original_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "original_selector_line_at_87456f4f": 123,
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "target_selector_line": 96,
+      "target_row_line": 96,
+      "name_equal": true,
+      "transition": "original: diagnosticCenterAssignment.updateMany({ userId: reviewer }, { qualifiedUntil: now }) -> e2e: reviewer-first bootstrap and expireReviewerQualification()",
+      "assertions": [
+        {
+          "original": "for both endpoints: denied 403; denied.body toEqual(unknown-B body); cache-control \"no-store, private\"",
+          "replacement": "identical; unknown B is f.id(\"unknown-B\") for id(999)"
+        }
+      ]
+    }
+  ],
+  "accounting": {
+    "original_four_suite_cases": 56,
+    "unchanged_companion_cases": 168,
+    "frozen_original_selection": 224,
+    "original_suites_and_memory_refusal_unchanged": true,
+    "e2e_one_for_one_replacements": 15,
+    "e2e_extra_controls": [
+      "[938 control] cleans partial fixture initialization before returning failure (Readers)",
+      "illegal provenance rewrite immutable-guard control (Discovery)"
+    ],
+    "e2e_declarations_total": 17,
+    "status_counts": {
+      "IMPLEMENTED_STAGE1": 5,
+      "HELD_REPRESENTABLE_NOT_IMPLEMENTED": 23,
+      "HELD_STOP_DEPENDENCY": 18,
+      "IMPLEMENTED_H1": 10
+    },
+    "status_ids": {
+      "IMPLEMENTED_STAGE1": [
+        "F01",
+        "F07",
+        "F34",
+        "F36",
+        "F47"
+      ],
+      "HELD_REPRESENTABLE_NOT_IMPLEMENTED": [
+        "F02",
+        "F03",
+        "F12",
+        "F13",
+        "F18",
+        "F19",
+        "F21",
+        "F24",
+        "F25",
+        "F26",
+        "F28",
+        "F29",
+        "F31",
+        "F32",
+        "F35",
+        "F42",
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P07",
+        "P09"
+      ],
+      "HELD_STOP_DEPENDENCY": [
+        "F04",
+        "F05",
+        "F06",
+        "F08",
+        "F09",
+        "F10",
+        "F14",
+        "F15",
+        "F22",
+        "F23",
+        "F30",
+        "F37",
+        "F38",
+        "F40",
+        "F41",
+        "F43",
+        "F45",
+        "P08"
+      ],
+      "IMPLEMENTED_H1": [
+        "F11",
+        "F16",
+        "F17",
+        "F20",
+        "F27",
+        "F33",
+        "F39",
+        "F44",
+        "F46",
+        "P06"
+      ]
+    },
+    "full_224_replacement_executable": false,
+    "note": "Only 15 of the 56 original scenarios have e2e replacements. 41 remain held (18 stop-dependency, 23 representable but unimplemented). The 224-case original selection is unchanged and still contains the memory suites' deliberate real-PostgreSQL refusal."
+  },
+  "allow_list": {
+    "changed_non_doc_paths_from_source_base": [
+      "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    ],
+    "within_allow_list": true,
+    "production_migration_config_dependency_workflow_unchanged": true
+  },
+  "stage1_e2e_bytes_preserved_except_import": {
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts": true,
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts": true
+  },
+  "forbidden_markers": {
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts": [],
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts": [],
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts": [],
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts": [],
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": []
+  },
+  "original_nine_plus_memory": [
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "expected": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "current": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "expected": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "current": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "expected": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "current": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "expected": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "current": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+      "expected": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "current": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+      "expected": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "current": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+      "expected": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "current": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+      "expected": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "current": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+      "expected": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "current": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "equal": true
+    },
+    {
+      "path": "packages/db/src/testing/DiagnosticMemoryDatabase.ts",
+      "expected": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "current": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "equal": true
+    }
+  ],
+  "prior_evidence_preserved": {
+    "count": 2359,
+    "all_equal": true
+  },
+  "session_expiry": "No H1 case expires or revokes a Session. Sessions keep 2027-01-01 expiry; all clock moves stay far below it.",
+  "runtime_risks_unproven": [
+    "F39 creates 44 visits (B + 43 finalized predecessors) and F44/F46 22 each under the unchanged 120s testTimeout; duration has not been measured.",
+    "Reviewer assignment revocation on a finalized predecessor order (F39) and repeated direct proof issuance for one pair (F27) are lawful routes not yet exercised against PostgreSQL.",
+    "Error-response cache-control and the 403 message literal pass through GlobalErrorFilter in the e2e composition."
+  ],
+  "not_run": [
+    "tests",
+    "PostgreSQL",
+    "Redis",
+    "MinIO",
+    "runtime",
+    "review",
+    "package install/restore"
+  ],
+  "not_claimed": [
+    "#939 PASS",
+    "#938 PASS",
+    "Milestone A acceptance",
+    "full 224 executable"
+  ]
+}
