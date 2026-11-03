@@ -9,7 +9,9 @@ This charter governs milestones A, B and C for the Carberk release. The mileston
 - **C** verifies the combined A and B candidate, including native, deployed and signing evidence.
 - **C-Activation** is a later gate for real analytics and operations. C does not grant that approval.
 
-The parent release thread owns program scope, dependency decisions, milestone exits and escalation. GitHub Issues record live contracts, assignments, status and dependencies. Only the parent may declare A, B or C complete. All release roles use `codex_work/gpt-6.1-sol`, service tier `default`: `xhigh` for demanding work and independent review, `medium` for routine work. Never Fast/priority or another reasoning level or provider.
+The parent release thread owns program scope, dependency decisions, milestone exits and escalation. GitHub Issues record live contracts, assignments, status and dependencies. Only the parent may declare A, B or C complete.
+
+The [Founder override of 3 November 2026](https://github.com/Carberk/carberk/issues/897#issuecomment-6593511709) supersedes the Sol-only restriction for release subagents while Opus quota is available. Use `claudeAgent/claude-opus-5-5`, `effort=medium` for routine implementation and `effort=high` for difficult implementation, diagnosis and independent review; set `fastMode=false`. Parent and coordinators retain `codex_work/gpt-6.1-sol`, service tier `default`, with `xhigh` for demanding work and `medium` for routine work. Read back actual settings at dispatch. Move existing subagents only at a durable idle handoff while preserving their worktree; let active work finish safely and retain completed valid reviews. On quota or model unavailability, preserve the handoff and report the mismatch without silent substitution or retry loops. No Fast/priority service is authorized.
 
 ## Current authority
 

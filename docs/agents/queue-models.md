@@ -2,6 +2,8 @@
 
 Choose the profile for the actual host. [ADR-0071](../adr/0071-codex-queue-models-and-owned-worktrees.md) records the founder's Codex approval on 2026-09-30; [ADR-0069](../adr/0069-queue-implementers-run-in-host-created-worktrees.md) records the first Claude profile. On 2026-10-04 the founder replaced its Sonnet implementer with Opus 5.5 at medium effort, because Sonnet was too slow on long-scoped queue work; reviewers stay on Opus 5.5 at high effort.
 
+For release #897 and its A/B/C streams, the [release charter's current model policy](../prd/ops/91-release-program-charter.md#purpose) takes precedence over this general table. Its temporary Founder override selects Opus 5.5 subagents at medium or high effort with Fast mode off while quota is available, and preserves active attempts and independent-review gates.
+
 | Host | Role | Model | Effort |
 |---|---|---|---|
 | Codex | Implementer, bug fixer, review-finding fixer, other writing subagent | `gpt-6.1-sol` | medium |
