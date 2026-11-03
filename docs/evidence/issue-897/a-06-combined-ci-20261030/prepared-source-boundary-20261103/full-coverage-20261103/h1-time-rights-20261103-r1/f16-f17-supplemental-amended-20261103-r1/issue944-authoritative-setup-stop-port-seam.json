@@ -1,0 +1,72 @@
+{
+  "attempt": {
+    "NODE_OPTIONS": "--import=tsx",
+    "VITEST_POOL_ID": "omitted",
+    "bail": 1,
+    "end": "2026-11-03T21:51:13Z",
+    "exit": 1,
+    "maxWorkers": 1,
+    "retry": 0,
+    "selector": "issue939 H1 lawful case clocks and rights.*(A rights expiry|B rights expiry)",
+    "start": "2026-11-03T21:50:53Z"
+  },
+  "behavior": {
+    "classification": "setup failure, not behavior verdict",
+    "f16Ran": false,
+    "f17Ran": false,
+    "selectedSkips": 0
+  },
+  "candidate": {
+    "commit": "5b60645bae20e416781cda66b98123635f209341",
+    "tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6"
+  },
+  "cleanup": {
+    "composeProject": "auto_tm_ci_897_944_f16f17_20261103_r1",
+    "listenersContainersVolumesNetworks": "absent after teardown",
+    "minio": "no behavior objects; project removed",
+    "pg": "Compose down completed; base auto_tm_897_939_r1 removed",
+    "redis": "DB1 flush attempted; project removed",
+    "status": "PASS"
+  },
+  "kind": "issue944-evidence-recovery-authoritative-setup-stop",
+  "nextAction": "Parent must create/repin a separate bounded test-only port-seam issue, allowed only in fixture/harness with explicit expected-port value; no production paths, no #944 retry before corrected source and VITEST_POOL_ID=1; then rerun #944 exact selector only.",
+  "outOfScope": [
+    "source change in #944",
+    "production paths",
+    "reporter edits",
+    "broad suite",
+    "#942",
+    "F43",
+    "overlapping resources"
+  ],
+  "rawHashes": {
+    "attempt.json": "97a21b1125eeb45cbc7b121969cf85e07c7daba7b0ccda8c1f31586a2e089ef0",
+    "compose-overlay.yml": "1fe1c2d2b7b982e4b11a7705946ad5cc325916ab68fc70b465fc03977d507d47",
+    "f16-f17-vitest.json": "61ffc0d149e8d64c0310f9eb2930b939273b0255e2774db8bfb367a2dc3f21d4",
+    "logs/api-build.stderr": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+    "logs/api-build.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "logs/cleanup-drop-dbs.stderr": "f7832c2ebeba9f8478512a23b6cbea2f8a1b2441ae77c027ac3c0898cc44460b",
+    "logs/cleanup-drop-dbs.stdout": "c14aee5b62ffd744902b84a24398e930998597dda300e71334862f0ef148e50a",
+    "logs/compose-up.stderr": "5fb145012516841650f9cf94f50a45caa906b82c90828ce025d8663967cfc8a3",
+    "logs/compose-up.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "logs/create-base.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "logs/create-base.stdout": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7",
+    "logs/f16-f17-human.stderr": "ecd7e71f762fb399507e6cdfa373743585f2bea780fa2807b7b53f10592742e1",
+    "logs/f16-f17-human.stdout": "b151791cc3d519111bc13d9507f06f0a1f42e2cf9d95fbd0fd253a7d2f79584e",
+    "logs/migrate.stderr": "e40df379b3ca806791529144da53b048cf1a232201fdfc817692665ba9ad0093",
+    "logs/migrate.stdout": "84be21c0135901cf4f528981935f5b9ff0e8b740a6e75c34e85b2fb7799e6408",
+    "terminal-setup-stop.json": "600b9ba604bb048ca2f6d5d178f2344edb0745ac28aa850537e702e9b57f8760"
+  },
+  "result": "NO_RETRY_PORT_SEAM_REQUIRED",
+  "setupFailures": [
+    {
+      "effect": "globalSetup did not derive/create worker database; fixture reported owned_worker_database:undefined",
+      "fact": "VITEST_POOL_ID=1 omitted"
+    },
+    {
+      "effect": "fresh #944 PG61172 cannot satisfy unchanged fixture worker URL validation",
+      "fact": "fixture hard-codes expected PostgreSQL port 61169",
+      "source": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:206"
+    }
+  ]
+}
