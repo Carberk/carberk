@@ -1,10 +1,11 @@
 {
   "kind": "issue939-f16-f17-supplemental-two-case-map",
-  "recorded_at": "2026-11-03T20:22:52.417443+00:00",
+  "recorded_at": "2026-11-03T20:26:57.246682+00:00",
   "contract": [
     "https://github.com/Carberk/carberk/issues/939#issuecomment-6612779049",
     "https://github.com/Carberk/carberk/issues/939#issuecomment-6614404848",
-    "https://github.com/Carberk/carberk/issues/939#issuecomment-6614443867"
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6614443867",
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6614560976"
   ],
   "inventory": {
     "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/lawful-feasibility-stop.json",
@@ -14,6 +15,8 @@
   "candidate": "3ee5cdb8bf56114268240e401498e84372554fd7",
   "source_checkpoint": "b52b1f0660d7dac8b26ad9c3c31029d7a07733f5",
   "source_tree": "89148c4aee6eebb4b3afd34917a5796743862b3c",
+  "evidence_parent": "c15de55a90f9b998303a60a91a5813491400b9b9",
+  "current_head_non_doc_equals_source": true,
   "cases": [
     {
       "id": "F16",
@@ -200,7 +203,40 @@
       "reviewer and technicianB Session expiry and elevation (2027-01-01)"
     ],
     "active": "reviewer/technician qualification and order-assignment revocations all null",
-    "proof": "issued, not invalidated, consumed or erased; rightsUntil equals the selected deadline by construction (min of bound material ends, PrivateContinuityAttestation.ts). The coincidence is asserted explicitly, not claimed later. The route reads no proof, so the proof deadline is not the cause. No live-proof/expired-material state is claimed."
+    "proof": "issued, not invalidated, consumed or erased; rightsUntil equals the selected deadline (comparisonRights binds it to the earliest bound material: PrivateContinuityAttestation.ts min of ends). Parent correction 6614560976 permits this equality. The route reads no proof, so the proof deadline is not the cause. No live-proof/expired-material state is claimed."
+  },
+  "corrected_rule_6614560976": {
+    "proof_rightsUntil_equal_to_selected_deadline": {
+      "asserted": "expect(d.proof).toEqual({ rightsUntil: deadline, invalidatedAt: null, consumedAt: null, erasedAt: null });",
+      "permitted": true
+    },
+    "strictly_later": {
+      "qualifications": [
+        "reviewer diagnostics.reviewer",
+        "technicianA diagnostics.technician",
+        "technicianB diagnostics.technician"
+      ],
+      "acting_sessions": {
+        "actors": [
+          "reviewer",
+          "technicianB"
+        ],
+        "fields": [
+          "expiresAt",
+          "adminTotpExpiresAt"
+        ]
+      },
+      "other_material": "the three non-selected A/B provenance/evidence deadlines (retained from the base contract)",
+      "assertion": "for (const later of [...others, ...Object.values(d.qualifications), ...Object.values(d.sessions).flatMap(s => [s.expiresAt, s.elevatedUntil])]) { expect(later?.valueOf()).toBeGreaterThan(deadline.valueOf()); }",
+      "other_authority_valid": "expect([...d.qualificationRevocations, ...d.assignmentRevocations]).toEqual([null, null, null, null, null, null, null]);"
+    },
+    "refusal_before_proof_expiry_evaluation": {
+      "source": "retainedCandidate calls reports.compared (identity graph/projectIdentity liveness) at line 271 before comparisonRights at line 277; predecessors/retainedCandidate/compared/IdentityEvidence read no continuity proof",
+      "route_proof_independent": true,
+      "test_order": "at-deadline predecessor read (identity-material refusal, exact empty page) precedes the original post-transition handoff read, the first read at the deadline that evaluates proof expiry",
+      "test_order_holds": true
+    },
+    "source_matches_without_change": true
   },
   "session_expiry": "No Session is expired or revoked; Sessions are read back as later than the deadline.",
   "allow_list": {
