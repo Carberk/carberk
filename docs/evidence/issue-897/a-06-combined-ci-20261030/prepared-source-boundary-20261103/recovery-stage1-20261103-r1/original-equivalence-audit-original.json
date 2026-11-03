@@ -1,0 +1,60 @@
+{
+  "captured_at": "2026-11-03T00:55:08.149907+00:00",
+  "candidate": "7dc251d550cae7ab977810a41b61dd60416c52b6",
+  "writer_source_checkpoint": "6bc5196958c58611328c09eb7a3dfa6fdc8c4f11",
+  "source": "87456f4fe6b564d2edbc40ef807d6a75ef37f452",
+  "non_doc_equality_exit": 0,
+  "original_nine_plus_memory": {
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts": {
+      "expected": null,
+      "current": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts": {
+      "expected": null,
+      "current": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts": {
+      "expected": null,
+      "current": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts": {
+      "expected": null,
+      "current": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts": {
+      "expected": null,
+      "current": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/presentation/StaffAuthorityHttp.spec.ts": {
+      "expected": null,
+      "current": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts": {
+      "expected": null,
+      "current": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts": {
+      "expected": null,
+      "current": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "equal": false
+    },
+    "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts": {
+      "expected": null,
+      "current": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "equal": false
+    },
+    "packages/db/src/testing/DiagnosticMemoryDatabase.ts": {
+      "expected": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "current": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "equal": true
+    }
+  },
+  "forbidden_paths_edited": []
+}

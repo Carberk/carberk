@@ -1,0 +1,14 @@
+{
+  "name": "git-diff-check-final",
+  "argv": [
+    "git",
+    "diff",
+    "--check"
+  ],
+  "started_at": "2026-11-03T00:54:01.028+00:00",
+  "ended_at": "2026-11-03T00:54:01.043+00:00",
+  "elapsed_seconds": 0.014975292000000001,
+  "exit": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

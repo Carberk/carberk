@@ -1,0 +1,15 @@
+{
+  "utc": "2026-11-03T00:36:42.443062+00:00",
+  "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "branch": "t3/2d375913",
+  "head": "ea76125d390896447b7f78961c3110a2bf2ec5cd",
+  "tree": "0d7753a31a91540adfd0a74680e75dffde0b8b65",
+  "porcelain": "?? apps/api/test/helpers/diagnosticPreparedReaderFixture.ts\n?? docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/recovery-stage1-input-audit.json\n",
+  "base_non_doc_equality": 0,
+  "original_nine_plus_memory_equal": true,
+  "working_changes_within_stage1_allowlist": true,
+  "current_stage1_files": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": "ee8e3cd66c8d7e73b67e92e8cd9a22dda809060d41a2f4657f1054d93112d449"
+  },
+  "offline_slot": "2026-11-03T00:15:00Z/2026-11-03T02:15:00Z"
+}

@@ -1,0 +1,46 @@
+{
+  "captured_at": "2026-11-03T00:55:08.150996+00:00",
+  "configured_offline_store": "/Users/bagtyyar/Library/pnpm/store/v11",
+  "previous_input_manifest": "a173545075bceba64f7d80270302ef205591e5431d09106e02a871e1ed8bdec0",
+  "tracked_input_sha256_equal": false,
+  "compiled_outputs": {
+    "packages/contracts/dist/index.js": {
+      "expected": "5f928c529c3e9bd27a3eb81b24902cdee1f48e08a03787f6044ea622e5a39b94",
+      "current": "5f928c529c3e9bd27a3eb81b24902cdee1f48e08a03787f6044ea622e5a39b94",
+      "equal": true
+    },
+    "packages/db/dist/src/index.js": {
+      "expected": "914daa81026d2410cbf3192ba80d45b8027dba6ed75aa6073539d1ff609717f5",
+      "current": "914daa81026d2410cbf3192ba80d45b8027dba6ed75aa6073539d1ff609717f5",
+      "equal": true
+    },
+    "apps/worker/dist/jobs/PurgeExpiredAccounts.js": {
+      "expected": "9de9a833bed53c9cd91e9b522c47adb4329fe7236d9c6674d53ce5cdcf374958",
+      "current": "9de9a833bed53c9cd91e9b522c47adb4329fe7236d9c6674d53ce5cdcf374958",
+      "equal": true
+    },
+    "apps/worker/dist/jobs/diagnostics/DiagnosticArtifactWorker.js": {
+      "expected": "9feced21b2c27afe2ffb005f683b0a03c866387dd6f9db6f7fea7cb95ec17399",
+      "current": "9feced21b2c27afe2ffb005f683b0a03c866387dd6f9db6f7fea7cb95ec17399",
+      "equal": true
+    },
+    "apps/worker/dist/jobs/diagnostics/S3DiagnosticArtifactObjects.js": {
+      "expected": "2199ed414fded02b9fd12d41cefb38ecd119de3c8d859dd6f280ccfd601ebade",
+      "current": "2199ed414fded02b9fd12d41cefb38ecd119de3c8d859dd6f280ccfd601ebade",
+      "equal": true
+    },
+    "apps/api/dist/src/main.js": {
+      "expected": "61ac8de032436db4a4c62ec1ec98bec93c7a48b7838e366a2c332cf7e8b0fbf0",
+      "current": "61ac8de032436db4a4c62ec1ec98bec93c7a48b7838e366a2c332cf7e8b0fbf0",
+      "equal": true
+    }
+  },
+  "actions": {
+    "install_offline": "reused matching existing node_modules and lockfile; no install rerun",
+    "contracts_build": "reused matching output; no source/package input changed",
+    "db_build": "reused matching output; no source/package input changed",
+    "worker_build": "reused matching output; no source/package input changed",
+    "runtime_import_smokes": "reused prior matching evidence; no package boundary changed",
+    "api_affected_checks": "rerun against final source checkpoint; see offline-command-receipts.json"
+  }
+}
