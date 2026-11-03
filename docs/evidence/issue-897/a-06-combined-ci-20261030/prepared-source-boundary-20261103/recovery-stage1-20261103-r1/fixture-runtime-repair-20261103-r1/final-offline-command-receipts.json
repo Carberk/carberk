@@ -1,0 +1,126 @@
+{
+  "sourceCommit": "ae9c01f6593e48c9375da192ee1794171bb2f6de",
+  "commands": [
+    {
+      "name": "api-typecheck",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "startedAt": "2026-11-03T07:23:58.136279+00:00",
+      "endedAt": "2026-11-03T07:24:00.792578+00:00",
+      "durationSeconds": 2.656254459,
+      "exit": 0,
+      "stdout": {
+        "path": "final-api-typecheck.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "final-api-typecheck.stderr",
+        "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+        "bytes": 15
+      }
+    },
+    {
+      "name": "api-tsc6",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "startedAt": "2026-11-03T07:24:00.804855+00:00",
+      "endedAt": "2026-11-03T07:24:08.846129+00:00",
+      "durationSeconds": 8.041302625,
+      "exit": 0,
+      "stdout": {
+        "path": "final-api-tsc6.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "final-api-tsc6.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "name": "api-lint",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "startedAt": "2026-11-03T07:24:08.856017+00:00",
+      "endedAt": "2026-11-03T07:24:14.435364+00:00",
+      "durationSeconds": 5.579350583000002,
+      "exit": 0,
+      "stdout": {
+        "path": "final-api-lint.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "final-api-lint.stderr",
+        "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+        "bytes": 28
+      }
+    },
+    {
+      "name": "api-build",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "build"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "startedAt": "2026-11-03T07:24:14.444592+00:00",
+      "endedAt": "2026-11-03T07:24:20.877435+00:00",
+      "durationSeconds": 6.432867082999998,
+      "exit": 0,
+      "stdout": {
+        "path": "final-api-build.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "final-api-build.stderr",
+        "sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+        "bytes": 13
+      }
+    },
+    {
+      "name": "git-diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "startedAt": "2026-11-03T07:24:20.889315+00:00",
+      "endedAt": "2026-11-03T07:24:20.902177+00:00",
+      "durationSeconds": 0.012869000000002018,
+      "exit": 0,
+      "stdout": {
+        "path": "final-git-diff-check.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "final-git-diff-check.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    }
+  ]
+}
