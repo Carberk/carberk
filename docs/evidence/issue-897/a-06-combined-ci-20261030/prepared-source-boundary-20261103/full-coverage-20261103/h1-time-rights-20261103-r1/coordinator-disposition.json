@@ -1,0 +1,29 @@
+{
+  "kind": "issue939-h1-coordinator-disposition",
+  "recorded_at": "2026-11-03T17:22:17Z",
+  "source_input": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+  "prior_evidence": {
+    "slot_exhaustion_commit": "17e20ae68730de74e506e3fddb490c036d01ce41",
+    "slot_exhaustion_tree": "30e284026eda3b68d8a9af3b92d9b847e72f6fd2",
+    "slot_exhaustion_sha256": "850d15fe02a7fd47cefbe9a291e3ce0ae5dce1720cdfabc1e3aef7f759e72a43"
+  },
+  "f20": {
+    "decision": "accepted_as_lawful_coincidence",
+    "basis": "PrivateContinuityAttestation pins proof rightsUntil to the minimum of bound A/B material rights and provenance rights. Production cannot create an isolated proof-only expiry. Expiring the earliest bound material reaches the same literal observable outcome: empty handoffs, HTTP 403 on consume, zero report and audit writes.",
+    "oracle": "unchanged",
+    "prohibited": ["direct proof-row rewrite", "rights oracle weakening", "revocation substitution"]
+  },
+  "audit_counts": {
+    "decision": "case_order_scoped_equivalence",
+    "basis": "Original tests run with one database per test, so global diagnosticAudit.count is case-local. The shared e2e worker database requires where.orderId equal to the case order to preserve the same zero/one/two expected counts without cross-case contamination.",
+    "oracle": "expected values unchanged",
+    "evidence_required": "mapping records each scoped count and the corresponding original global assertion"
+  },
+  "slot": {
+    "previous": "2026-11-03T16:35Z-17:35Z",
+    "new_reserved": "2026-11-03T17:30Z-19:15Z",
+    "duration_minutes": 105,
+    "runtime": "unreserved"
+  },
+  "next_action": "Resume the same executor in the fresh offline slot; implement the ten H1 cases and helper inputs, record the one-to-one map and run the five serial static checks. Stop on the first real semantic or setup failure."
+}
