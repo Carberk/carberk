@@ -12,12 +12,16 @@ import { JwtModule, JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { Test, type TestingModule } from "@nestjs/testing";
 import { PrismaService, type Prisma } from "@auto-tm/db";
-import { DiagnosticSchemas as D } from "@auto-tm/contracts";
+import { DiagnosticSchemas as D, type BusinessSchemas } from "@auto-tm/contracts";
 import { Pool } from "pg";
 import { inject } from "vitest";
 import { GlobalErrorFilter } from "../../src/common/error.filter";
 import { JwtAuthGuard } from "../../src/common/jwt-auth.guard";
-import { IDENTITY_CLOCK_PORT } from "../../src/modules/identity/identity.public";
+import { IDENTITY_CLOCK_PORT, type IdentityAdminPort, type IdentityCheckPort, type IdentityReadPort } from "../../src/modules/identity/identity.public";
+import { SuspendUser } from "../../src/modules/admin/application/SuspendUser";
+import { PrismaAuditLogRepository } from "../../src/modules/admin/infrastructure/PrismaAuditLogRepository";
+import { PrismaContentReportRepository } from "../../src/modules/admin/infrastructure/PrismaContentReportRepository";
+import { PrismaConversationRepository } from "../../src/modules/conversations/infrastructure/PrismaConversationRepository";
 import { Listing } from "../../src/modules/listings/domain/Listing";
 import { PrismaListingRepository } from "../../src/modules/listings/infrastructure/PrismaListingRepository";
 import { DiagnosticsModule } from "../../src/modules/diagnostics/diagnostics.module";
@@ -28,7 +32,9 @@ import { defineE2eSuite, seedSuiteCatalog } from "./e2eSuite";
 import { workerUrls } from "./testDatabases";
 
 type Suite = "capture" | "handoff" | "discovery" | "readers";
-type Person = "commissionerA" | "commissionerB" | "reception" | "technicianA" | "technicianB" | "reviewer" | "foreign";
+type Person = "commissionerA" | "commissionerB" | "reception" | "technicianA" | "technicianB" | "reviewer" | "foreign" | Operator;
+/** #940 H2 actors created on demand through the ordinary User/Session repositories; never part of `people`. */
+type Operator = "founder" | "owner" | "staffManager" | "admin";
 type Response<T> = { status: number; body: T; headers: Record<string, string | string[] | number | undefined> };
 type Evidence = Prisma.DiagnosticIdentityEvidenceGetPayload<{ include: { identityRecord: true } }>;
 type Guard = { table: string; name: string; enabled: "D" | "O" | "A" | "R" };
@@ -52,8 +58,25 @@ const { PrismaUserRepository } = appRequire("./src/modules/identity/infrastructu
 const { PrismaSessionRepository } = appRequire("./src/modules/identity/infrastructure/PrismaSessionRepository") as { PrismaSessionRepository: new (db: PrismaService, hasher: HasherLike) => SessionRepositoryLike };
 const { PrismaAccountDeletionUnitOfWork } = appRequire("./src/modules/identity/infrastructure/PrismaAccountDeletionUnitOfWork") as { PrismaAccountDeletionUnitOfWork: new (db: PrismaService) => AccountUnitOfWorkLike };
 const { BcryptHasherAdapter } = appRequire("./src/modules/identity/infrastructure/BcryptHasherAdapter") as { BcryptHasherAdapter: new () => HasherLike };
+// #940 H2: the production identity adapters and use cases for staff, Business and moderation actors.
+type ClockLike = { now: () => Date };
+type SubjectLike = { userId: string; sessionId: string };
+type InvitationReceiptLike = { businessId: string; invitationId: string; token: string; expiresAt: string };
+type StaffGrantChangeLike = SubjectLike & { targetUserId: string; capability: string; reason: string; grant: boolean };
+const { PrismaStaffAuthority } = appRequire("./src/modules/identity/infrastructure/PrismaStaffAuthority") as { PrismaStaffAuthority: new (db: PrismaService, clock: ClockLike) => object };
+const { ChangeStaffGrant } = appRequire("./src/modules/identity/application/ChangeStaffGrant") as { ChangeStaffGrant: new (repository: object, clock: ClockLike) => { execute: (input: StaffGrantChangeLike) => Promise<void> } };
+const { PrismaBusinessRepository } = appRequire("./src/modules/identity/infrastructure/PrismaBusinessRepository") as { PrismaBusinessRepository: new (db: PrismaService) => object };
+const { NodeBusinessInvitationTokens } = appRequire("./src/modules/identity/infrastructure/NodeBusinessInvitationTokens") as { NodeBusinessInvitationTokens: new () => object };
+const { AdmitBusiness } = appRequire("./src/modules/identity/application/AdmitBusiness") as { AdmitBusiness: new (repository: object, clock: ClockLike, tokens: object) => { execute: (input: SubjectLike & BusinessSchemas.AdmitBusinessInput) => Promise<InvitationReceiptLike> } };
+const { InviteBusinessMember } = appRequire("./src/modules/identity/application/InviteBusinessMember") as { InviteBusinessMember: new (repository: object, clock: ClockLike, tokens: object) => { execute: (input: SubjectLike & { businessId: string; recipientUserId: string }) => Promise<InvitationReceiptLike> } };
+const { RedeemBusinessInvitation } = appRequire("./src/modules/identity/application/RedeemBusinessInvitation") as { RedeemBusinessInvitation: new (repository: object, clock: ClockLike, tokens: object) => { execute: (input: SubjectLike & { token: string }) => Promise<{ businessId: string }> } };
+const { ChangeBusinessMembership } = appRequire("./src/modules/identity/application/ChangeBusinessMembership") as { ChangeBusinessMembership: new (repository: object, clock: ClockLike) => { execute: (input: SubjectLike & BusinessSchemas.BusinessMembershipChangeInput & { businessId: string }) => Promise<void> } };
+const { PrismaIdentityReadAdapter } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityReadAdapter") as { PrismaIdentityReadAdapter: new (db: PrismaService) => IdentityReadPort };
+const { PrismaIdentityAdminRepository } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityAdminRepository") as { PrismaIdentityAdminRepository: new (db: PrismaService) => IdentityAdminPort };
+const { PrismaIdentityCheckAdapter } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityCheckAdapter") as { PrismaIdentityCheckAdapter: new (db: PrismaService) => IdentityCheckPort };
 const bucket = "diagnostic-test-private";
 const people: Person[] = ["commissionerA", "commissionerB", "reception", "technicianA", "technicianB", "reviewer", "foreign"];
+const operators: Operator[] = ["founder", "owner", "staffManager", "admin"];
 const capabilities: Partial<Record<Person, string>> = {
   reception: "diagnostics.reception", technicianA: "diagnostics.technician", technicianB: "diagnostics.technician",
   reviewer: "diagnostics.reviewer", foreign: "diagnostics.technician",
@@ -93,6 +116,9 @@ export class DiagnosticPreparedReaderFixture {
   readonly actors = {} as Record<Person, { userId: string; sessionId: string }>;
   readonly ledger: { orderId: string; event: string; version: number }[] = [];
   readonly objects = new Map<string, { sha256: string | null; sizeBytes: number | null }>();
+  /** Capture suites only: the exact ownership component create data, recorded before the unchanged write. */
+  readonly components: Record<string, unknown>[] = [];
+  private business?: { businessId: string; membershipId: string; member: Person };
   db!: PrismaService;
   private environment?: Pool;
   private client?: PrismaService;
@@ -240,6 +266,9 @@ export class DiagnosticPreparedReaderFixture {
           return copy;
         });
       },
+    } } }) as unknown as PrismaService : this.kind === "capture" ? client.$extends({ query: { diagnosticOwnershipComponent: {
+      // Observation only: records the create data the original suite asserted, then performs the identical write.
+      create: async ({ args, query }) => { this.components.push(structuredClone(args.data) as Record<string, unknown>); return query(args); },
     } } }) as unknown as PrismaService : this.client;
     const enforcement = (await this.db.$queryRaw<{ role: string; superuser: boolean; owner: boolean; inherit: boolean; membership: boolean }[]>`
       SELECT current_user AS role,r.rolsuper AS superuser,r.rolinherit AS inherit,
@@ -252,7 +281,7 @@ export class DiagnosticPreparedReaderFixture {
       .overrideProvider(PrismaService).useValue(this.db)
       .overrideProvider(IDENTITY_CLOCK_PORT).useValue({ now: () => new Date(this.now) })
       .overrideProvider(DIAGNOSTIC_RUNTIME).useValue({ now: () => new Date(this.now), id: randomUUID, publicSyntheticAllowed: () => true,
-        syntheticAllowed: ({ userId }: { userId: string }) => people.some(p => this.actors[p]?.userId === userId) });
+        syntheticAllowed: ({ userId }: { userId: string }) => Object.values(this.actors).some(actor => actor.userId === userId) });
     this.module = await testing.compile();
     this.app = this.module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     this.jwt = this.app.get(JwtService);
@@ -297,7 +326,8 @@ export class DiagnosticPreparedReaderFixture {
     console.info("938_fixture_registry", { label: this.label, actors: this.actors, centerId: this.centerId, templateId: this.templateId, guards: this.guards, controlKey: this.controlKey });
   }
 
-  async arrived(alias: string, publicVisit = false): Promise<Visit> {
+  /** `business` (#940 H2) publishes the public Listing for the current Business graph, with commissionerB as its seller. */
+  async arrived(alias: string, publicVisit = false, business = false): Promise<Visit> {
     const commissioner: Person = publicVisit && alias === "A" ? "commissionerA" : "commissionerB";
     // B is the candidate visit; A and every other predecessor alias use the distinct A technician.
     const technician: Person = alias === "B" ? "technicianB" : "technicianA";
@@ -307,7 +337,7 @@ export class DiagnosticPreparedReaderFixture {
       listingId = this.id(`listing-${alias}`);
       await new PrismaListingRepository(this.db).save(Listing.create({ id: listingId, publicNumber: 0, sellerId: this.actors[commissioner].userId,
         status: "active", brandId: this.suite.catalog.brandId, modelId: this.suite.catalog.modelId, cityId: this.suite.catalog.cityId, year: 2020, vin: "SYN-123",
-        priceAmount: 100000, priceCurrency: "TMT", allowCalls: false, allowChat: true, publishedAt: this.now }));
+        priceAmount: 100000, priceCurrency: "TMT", allowCalls: false, allowChat: true, publishedAt: this.now, ...(business ? { businessId: this.currentBusiness(commissioner).businessId } : {}) }));
     }
     let order = await this.admitted<D.DiagnosticOrder>(commissioner, "orders", { requestKey: this.id(`request-${alias}`), centerId: this.centerId,
       templateVersionId: this.templateId, audience: publicVisit ? "listing_public" : "buyer_private", ...(listingId ? { listingId } : {}), synthetic: true });
@@ -450,6 +480,118 @@ export class DiagnosticPreparedReaderFixture {
     await new PrismaUserRepository(this.db).updateDisplayName(this.actors.reviewer.userId, `reviewer-invalidation-${randomUUID()}`);
     const proofs = await this.db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: visit.order.id } });
     this.dependency(proofs.length === expected && proofs.every(proof => proof.invalidatedAt !== null), "proof_invalidation", proofs.map(p => ({ id: p.id, invalidatedAt: p.invalidatedAt })));
+  }
+  /** #940 H2 public Business observation. `grantor` issues the ownership grant through the ordinary route;
+   * null observes with the separate classification only (no grant), as the original suite does. */
+  async observeBusiness(visit: Visit, observation: Omit<D.DiagnosticObservedVehicle, "expectedVersion">, ownershipRights: object, grantor: Person | null): Promise<D.DiagnosticOrder> {
+    this.dependency(visit.order.audience === "listing_public" && this.business, "business_public_visit");
+    this.dependency(await this.db.diagnosticIdentityRecord.count({ where: { orderId: visit.order.id } }) === 0, "grant_before_first_raw");
+    let grant: { id: string } | undefined;
+    if (grantor) {
+      grant = await this.admitted(grantor, `orders/${visit.order.id}/ownership-grant`, { rights: ownershipRights });
+      this.record(await this.persisted(visit.order.id), "grant before first raw", 6);
+    } else {
+      this.dependency(await this.db.diagnosticOwnershipGrant.count({ where: { orderId: visit.order.id } }) === 0, "business_no_ownership_grant");
+      this.record(await this.persisted(visit.order.id), "no ownership grant", 6);
+    }
+    visit.order = await this.admitted(visit.technician, `orders/${visit.order.id}/vehicle`, { expectedVersion: visit.order.version, ...observation,
+      ...(grant ? { ownershipGrantId: grant.id } : {}), ownershipClassification: { rights: ownershipRights } });
+    this.record(visit.order, "first raw", 7);
+    return visit.order;
+  }
+  /** On-demand operator/Business actor: an ordinary verified User with an elevated current Session. */
+  private async operator(person: Operator): Promise<{ userId: string; sessionId: string }> {
+    const existing = this.actors[person] as { userId: string; sessionId: string } | undefined;
+    if (existing) return existing;
+    const index = people.length + operators.indexOf(person);
+    const users = new PrismaUserRepository(this.db), sessions = new PrismaSessionRepository(this.db, new BcryptHasherAdapter());
+    const user = await users.create({ phone: this.suite.phone(person), phoneVerifiedAt: this.now, email: null, emailVerifiedAt: null }, { nameNumber: 1000 + index, avatarIndex: index });
+    const session = await sessions.create({ userId: user.id, refreshTokenHash: this.id(`${person}-refresh`), deviceLabel: this.label, userAgent: this.label, expiresAt: new Date("2027-01-01T00:00:00.000Z") });
+    await sessions.updateAdminTotpExpiresAt(session.id, new Date("2027-01-01T00:00:00.000Z"));
+    await users.updateDisplayName(user.id, person);
+    const actor = { userId: user.id, sessionId: session.id };
+    this.actors[person] = actor;
+    console.info("940_operator_actor", { person, ...actor });
+    return actor;
+  }
+  /** Repository operator commands, run as the restricted runtime role exactly like the staff bootstrap. */
+  private async operatorCommand(argv: string[]): Promise<void> {
+    const env = { ...process.env, DATABASE_URL: this.runtimeUrl, APP_ENV: "test", DIAGNOSTIC_SYNTHETIC_ENABLED: "true",
+      DIAGNOSTIC_SYNTHETIC_USER_IDS: JSON.stringify(people.map(p => this.actors[p].userId)) };
+    const startedAt = new Date().toISOString();
+    const result = await run("pnpm", argv, { cwd: resolve(process.cwd(), "../.."), env, maxBuffer: 1024 * 1024 });
+    console.info("940_operator_command", { argv, startedAt, endedAt: new Date().toISOString(), stdout: result.stdout, stderr: result.stderr });
+  }
+  /** Task-local table privileges for one named lawful producer; DROP OWNED at close removes them with the role. */
+  private async taskGrants(purpose: string, grants: Record<string, string[]>): Promise<void> {
+    const environment = this.environment;
+    this.dependency(environment, "environment_connection");
+    for (const [verbs, tables] of Object.entries(grants)) for (const table of tables) {
+      await environment.query(`GRANT SELECT,${verbs} ON public.${quote(table)} TO ${quote(this.role)}`);
+    }
+    console.info("940_task_grants", { role: this.role, purpose, grants });
+  }
+  private get identityClock(): ClockLike { return { now: () => new Date(this.now) }; }
+  private currentBusiness(member: Person): { businessId: string; membershipId: string } {
+    this.dependency(this.business && this.business.member === member, "business_graph_required", { member });
+    return this.business;
+  }
+  /** #940 H2 lawful Business graph: a bootstrapped founder.admission founder admits a synthetic Business, its
+   * owner redeems the owner invitation, then invites `member` as sales and that member redeems it. */
+  async businessMember(member: Person = "commissionerB"): Promise<{ businessId: string; membershipId: string }> {
+    this.dependency(!this.business, "business_graph_exists");
+    await this.taskGrants("business-admission-and-membership", { "INSERT,UPDATE": ["dealerships", "dealership_invitations", "dealership_members"] });
+    const founder = await this.operator("founder"), owner = await this.operator("owner");
+    await this.operatorCommand(["--filter", "@auto-tm/db", "staff:bootstrap", "--user-id", founder.userId, "--capability", "founder.admission", "--reason", "Issue 940 owned synthetic fixture"]);
+    const repository = new PrismaBusinessRepository(this.db), tokens = new NodeBusinessInvitationTokens(), clock = this.identityClock;
+    const admitted = await new AdmitBusiness(repository, clock, tokens).execute({ ...founder, name: "Synthetic Business", slug: `synthetic-${this.id("business")}`,
+      ownerUserId: owner.userId, mode: "synthetic", evidence: "SYNTHETIC fixture Business; no real business verified", reason: "Issue 940 owned synthetic fixture" });
+    const redeemOwner = await new RedeemBusinessInvitation(repository, clock, tokens).execute({ ...owner, token: admitted.token });
+    this.dependency(redeemOwner.businessId === admitted.businessId, "business_owner_redeem", redeemOwner);
+    const invited = await new InviteBusinessMember(repository, clock, tokens).execute({ ...owner, businessId: admitted.businessId, recipientUserId: this.actors[member].userId });
+    const redeemMember = await new RedeemBusinessInvitation(repository, clock, tokens).execute({ ...this.actors[member], token: invited.token });
+    this.dependency(redeemMember.businessId === admitted.businessId, "business_member_redeem", redeemMember);
+    const business = await this.db.dealership.findUniqueOrThrow({ where: { id: admitted.businessId }, include: { members: true } });
+    const membership = business.members.find(row => row.userId === this.actors[member].userId);
+    this.dependency(business.status === "active" && business.admissionMode === "synthetic" && membership?.role === "sales" && membership.status === "active"
+      && business.members.some(row => row.userId === owner.userId && row.role === "owner" && row.status === "active"), "business_graph", business);
+    this.business = { businessId: business.id, membershipId: membership.id, member };
+    console.info("940_business_graph", { businessId: business.id, founder: founder.userId, owner: owner.userId, member: this.actors[member].userId, membershipId: membership.id,
+      ownerInvitationId: admitted.invitationId, memberInvitationId: invited.invitationId });
+    return { businessId: business.id, membershipId: membership.id };
+  }
+  /** The Business owner suspends or removes the member through the ordinary membership change. */
+  async changeBusinessMember(action: "suspend" | "remove"): Promise<void> {
+    const business = this.business;
+    this.dependency(business, "business_graph_required");
+    const owner = await this.operator("owner");
+    await new ChangeBusinessMembership(new PrismaBusinessRepository(this.db), this.identityClock).execute({ ...owner, businessId: business.businessId, targetUserId: this.actors[business.member].userId, action });
+    const current = await this.db.dealershipMember.findUnique({ where: { userId: this.actors[business.member].userId } });
+    this.dependency(action === "remove" ? current === null : current?.id === business.membershipId && current.status === "suspended", "business_member_change", { action, current });
+    console.info("940_business_member_change", { action, businessId: business.businessId, membershipId: business.membershipId });
+  }
+  /** Current staff grant loss through ChangeStaffGrant, by a bootstrapped staff.manage actor with an elevated Session. */
+  async revokeStaffGrant(target: Person, capability: string): Promise<void> {
+    const manager = await this.operator("staffManager");
+    if (await this.db.staffGrant.count({ where: { userId: manager.userId, capability: "staff.manage", revokedAt: null } }) === 0) {
+      await this.operatorCommand(["--filter", "@auto-tm/db", "staff:bootstrap", "--user-id", manager.userId, "--capability", "staff.manage", "--reason", "Issue 940 owned synthetic fixture"]);
+    }
+    const clock = this.identityClock;
+    await new ChangeStaffGrant(new PrismaStaffAuthority(this.db, clock), clock).execute({ ...manager, targetUserId: this.actors[target].userId, capability, reason: "Issue 940 synthetic current grant loss", grant: false });
+    const grant = await this.db.staffGrant.findUnique({ where: { userId_capability: { userId: this.actors[target].userId, capability } } });
+    this.dependency(grant?.revokedAt, "staff_grant_revoked", grant);
+    console.info("940_staff_grant_revoked", { target: this.actors[target].userId, capability, revokedAt: grant.revokedAt, by: manager.userId });
+  }
+  /** Current Identity inactivity: an operator-promoted admin suspends the user through the SuspendUser use case.
+   * The AdminGuard role check is repeated; its HTTP route is outside the diagnostics test module. */
+  async suspendUser(target: Person): Promise<void> {
+    const admin = await this.operator("admin");
+    await this.operatorCommand(["--filter", "@auto-tm/db", "admin:promote", "--phone", this.suite.phone("admin"), "--reason", "Issue 940 owned synthetic moderator"]);
+    this.dependency(await new PrismaIdentityCheckAdapter(this.db).isAdmin(admin.userId), "admin_role");
+    const result = await new SuspendUser(this.db, new PrismaIdentityReadAdapter(this.db), new PrismaIdentityAdminRepository(this.db), new PrismaContentReportRepository(this.db),
+      new PrismaAuditLogRepository(this.db), new PrismaConversationRepository(this.db)).execute({ userId: this.actors[target].userId, adminUserId: admin.userId, reason: "Issue 940 synthetic inactive Identity" });
+    this.dependency(result.targetId === this.actors[target].userId && result.targetState.suspendedById === admin.userId, "user_suspended", result);
+    console.info("940_user_suspended", { target: result.targetId, suspendedAt: result.targetState.suspendedAt, by: admin.userId, auditLogId: result.auditLogId });
   }
   /** A second current Session for the same actor, through the ordinary Session repository. */
   async secondSession(person: Person): Promise<string> {

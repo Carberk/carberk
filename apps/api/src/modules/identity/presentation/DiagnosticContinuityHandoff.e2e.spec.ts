@@ -119,3 +119,37 @@ describe("issue939 H1 lawful case clocks and rights", () => {
     });
   });
 });
+
+// #940 H2: current grant loss is a lawful staff.manage revocation through ChangeStaffGrant; no row is rewritten.
+describe("issue940 H2 lawful actors and Business graph", () => {
+  it.each([
+    ["issuer grant loss", (f: DiagnosticPreparedReaderFixture) => f.revokeStaffGrant("reviewer", "diagnostics.reviewer")],
+  ] as [string, (f: DiagnosticPreparedReaderFixture) => Promise<void>][])("uniformly omits and refuses %s at read and again at action", async (name, transition) => {
+    await withPreparedReaderFixture("handoff", `h2-${name.replace(/ /g, "-")}`, async f => {
+      const { a, b, report } = await f.pair();
+      const proofId = await f.issue(a, b, report, 7);
+      expect((await f.send("reviewer", "GET", `orders/${b.order.id}/continuity-proofs/${proofId}`)).status).toBe(200);
+      expect((await f.send<Handoffs>("technicianB", "GET", `orders/${b.order.id}/continuity-handoffs`)).body.handoffs).toHaveLength(1);
+      await transition(f);
+      expect((await f.send<Handoffs>("technicianB", "GET", `orders/${b.order.id}/continuity-handoffs`)).body).toEqual({ handoffs: [], result: null, nextCursor: null, scope: "current_b_owned_handoffs" });
+      const denied = await f.send("technicianB", "POST", `orders/${b.order.id}/continuity-handoffs/${proofId}/consume`, { reportId: f.id("report-9000"), expectedOrderVersion: 7, reason: "B follow-up" });
+      expect(denied).toMatchObject({ status: 403, body: { code: "DIAGNOSTIC_NO_ACCESS", message: "Inspection request could not be completed" } });
+      expect(await f.db.diagnosticReportRecord.count({ where: { orderId: b.order.id } })).toBe(0);
+      // Original per-case database; shared-worker count is scoped to this case's orders.
+      expect(await f.db.diagnosticAudit.count({ where: { action: "CONTINUITY_PROOF_CONSUMED", orderId: { in: [a.order.id, b.order.id] } } })).toBe(0);
+    });
+  });
+
+  it.each(["grant"])("fences B %s changes even on empty pages and consumed result recovery", async loss => {
+    await withPreparedReaderFixture("handoff", `h2-fence-${loss}`, async f => {
+      const { b, report, a } = await f.pair();
+      const proofId = await f.issue(a, b, report, 7);
+      const consume = `orders/${b.order.id}/continuity-handoffs/${proofId}/consume`;
+      const command = { reportId: f.id("report-9000"), expectedOrderVersion: 7, reason: "B follow-up" };
+      expect((await f.send("technicianB", "POST", consume, command)).status).toBe(201);
+      if (loss === "grant") await f.revokeStaffGrant("technicianB", "diagnostics.technician");
+      expect((await f.send("technicianB", "GET", `orders/${b.order.id}/continuity-handoffs`)).status).toBe(403);
+      expect((await f.send("technicianB", "POST", consume, command)).status).toBe(403);
+    });
+  });
+});

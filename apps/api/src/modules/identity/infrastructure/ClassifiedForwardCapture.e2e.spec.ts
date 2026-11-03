@@ -41,3 +41,22 @@ describe("issue938 recovery stage1", () => {
     });
   });
 });
+
+// #940 H2: the lawful Business graph through the production Business use cases. The source membership
+// state is produced after arrival by the owner's ordinary membership change; only the current active
+// membership has an owner-issued ownership grant. Component create data is recorded before the write.
+describe("issue940 H2 lawful actors and Business graph", () => {
+  it.each(["active", "suspended", "missing"])("records Business source membership as %s without adding publisher admission to observation", async status => {
+    await withPreparedReaderFixture("capture", `h2-business-${status}`, async f => {
+      const business = await f.businessMember("commissionerB");
+      const visit = await f.arrived("B", true, true);
+      if (status === "suspended") await f.changeBusinessMember("suspend");
+      if (status === "missing") await f.changeBusinessMember("remove");
+      const result = await f.observeBusiness(visit, observed, syntheticOwnershipRights, status === "active" ? "owner" : null);
+      expect(result.observedVehicle).toEqual(observed);
+      expect(f.components).toHaveLength(1);
+      expect(f.components[0]).toMatchObject(status === "active" ? { state: "available", businessId: business.businessId, membershipId: business.membershipId } : { state: "unavailable" });
+      if (status !== "active") expect(f.components[0]).not.toHaveProperty("sellerId");
+    });
+  });
+});
