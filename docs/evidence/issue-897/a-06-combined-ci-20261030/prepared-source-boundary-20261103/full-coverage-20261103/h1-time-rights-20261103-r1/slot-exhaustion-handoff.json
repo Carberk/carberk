@@ -1,0 +1,53 @@
+{
+  "kind": "issue939-h1-slot-exhaustion-handoff",
+  "recorded_at": "2026-11-03T17:21:10.922893+00:00",
+  "contract": [
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6609661944",
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6609542407",
+    "https://github.com/Carberk/carberk/issues/897#issuecomment-6609566799"
+  ],
+  "slot": "2026-11-03T16:35Z-17:35Z",
+  "attempt_1": {
+    "started_utc": "2026-11-03T16:35:07Z",
+    "outcome": "transport-only: API Error: Connection dropped (ECONNRESET)",
+    "not": [
+      "test verdict",
+      "cleanup result",
+      "permission refusal"
+    ],
+    "source_edits": "none",
+    "commands_run": "read-only git/gh/grep/sed reads only; no checks, tests or resources"
+  },
+  "retry_1": {
+    "started_utc": "2026-11-03T17:20:23Z",
+    "source_edits": "none",
+    "checks_run": "none",
+    "stop_reason": "Retry began with 15 minutes left in the exclusive slot. The H1 implementation (helper clock/deadline/rights/ordered-id inputs plus ten replacement cases) and five serial checks tied to final committed bytes cannot be completed lawfully inside the slot. The contract forbids partial candidates and placeholder cases, so no source was edited."
+  },
+  "identity": {
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "branch": "t3/2d375913",
+    "head": "4b869f12829f59b18361bd37ba3cc5dc675cc879",
+    "tree": "bc40df98d6a5e081dc927be2696e3706f594694c",
+    "porcelain_clean_at_retry_start": true,
+    "non_doc_equal_d131c600": true,
+    "note": "Retry message tree 'bc40df98d6a5e081dc927be2696e3706f594c' is truncated; actual tree is bc40df98d6a5e081dc927be2696e3706f594694c",
+    "settings": "claudeAgent/claude-opus-5-5, effort=high, fastMode=false, full-access"
+  },
+  "inventory_sha256_verified": "324669d09c6d66115a703c300ead0c673eca4974b73493c45d7f6821fb86c5d3",
+  "static_design_findings": {
+    "qualification_deadlines": "Bootstrap qualifiedUntil = DB at_time + interval '2 hours' (packages/db/prisma/migrations/20261024040000_diagnostic_intake_effects/migration.sql:98). Deadlines follow serial bootstrap order (helper:265-268), seconds apart. Reviewer-first bootstrap order per case gives reviewer < technician deadlines (F11, P06); clock set to the persisted deadline, as expireSelectedQualification does (helper:376-384).",
+    "fixture_clock": "DIAGNOSTIC_RUNTIME and IDENTITY_CLOCK read the private fixture now (helper:101,227-229). Reader authority uses runtime.now (PrismaDiagnosticDiscovery.ts:28,76; PrismaDiagnosticIdentityEvidence.ts:47-48). Session expiry stays 2027-01-01 (helper:258); no H1 case expires a Session.",
+    "cursor": "until=now, expires=now+15min (DiagnosticDiscoveryCursor.ts:14). F27/F33/F44 need +15min clock advance only.",
+    "discovery_scan": "orderBy id asc, take 21, page 20, fence createdAt <= cursor.until (PrismaDiagnosticDiscovery.ts:31-54). Report createdAt = runtime.now (PrismaDiagnosticReports.ts:44). Report ids are client-supplied UUIDs (contracts diagnostics.ts:105), so fixture-ordered ids reproduce the original id(4030+n) ordering for F39/F44/F46, and the later-arrival report gets an earlier-sorting id with a later clock.",
+    "rights": "Provenance/evidence rights are live while schedule.until > runtime.now (PrismaDiagnosticIdentityEvidence.ts:47-48,107-119,279-295). The evidence guard has no provenance/evidence rights cross-constraint (20261029190000:434-467). Per-visit provenance and evidence rights inputs isolate A provenance (F16), B evidence (F17), first-20 provenance (F46) and visit-50 provenance (F39).",
+    "f20_semantic_note": "Proof rightsUntil = min(A/B evidence rights, provenance rights) (PrivateContinuityAttestation.ts:133-135; PrismaDiagnosticContinuityProofs.ts:258-266). A proof-rights expiry is therefore always simultaneous with its earliest bound material expiry; there is no producer for an isolated proof-only expiry. Observable F20 outcome (empty handoffs, literal 403, zero reports/audits) is reachable; coordinator should confirm this coincidence is acceptable before implementation, or route F20 to disposition.",
+    "audit_count_isolation": "Original global diagnosticAudit.count oracles (F11/F16/F17/F20) assume per-test databases; e2e shares the worker DB, so the count needs per-case order scoping, to be recorded as isolation-equivalent in the map."
+  },
+  "next_action": {
+    "owner": "coordinator",
+    "action": "reserve a fresh exclusive offline slot of at least 90 minutes for the same executor and resume H1 implementation from these findings; decide the F20 coincidence note",
+    "runtime": "held",
+    "pass_claims": "none"
+  }
+}
