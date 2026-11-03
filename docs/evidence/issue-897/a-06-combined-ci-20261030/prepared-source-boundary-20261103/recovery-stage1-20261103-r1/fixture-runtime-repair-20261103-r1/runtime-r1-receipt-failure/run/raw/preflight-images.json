@@ -1,0 +1,30 @@
+{
+  "phase": "preflight",
+  "name": "images",
+  "argv": [
+    "docker",
+    "image",
+    "inspect",
+    "postgres:16-alpine",
+    "redis:7-alpine",
+    "cgr.dev/chainguard/minio@sha256:8d5a0265f0e18fb3b29f95598147f1cc2a86b782181668bad176b0e90cce9569",
+    "--format",
+    "{{.RepoTags}} {{.RepoDigests}}"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {},
+  "startedAt": "2026-11-03T07:34:41.906207+00:00",
+  "endedAt": "2026-11-03T07:34:41.966797+00:00",
+  "durationSeconds": 0.06060479200000002,
+  "exit": 0,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/preflight-images.stdout",
+    "sha256": "20583727fb7834523321bc2a39c061c55d563a857bf90b3350686c5f3b64ddfc",
+    "bytes": 399
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/preflight-images.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

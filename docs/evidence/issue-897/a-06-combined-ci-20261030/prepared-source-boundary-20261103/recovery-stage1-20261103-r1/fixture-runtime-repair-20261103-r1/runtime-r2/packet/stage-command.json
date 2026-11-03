@@ -1,0 +1,304 @@
+{
+  "phase": "prepared, not executed",
+  "project": "auto_tm_ci_897_938_s1_20261103_r1",
+  "workerWorktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "sourceCheckpoint": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+  "expectedWorkerHead": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+  "baseDatabase": "auto_tm_897_938_s1r1",
+  "databasePattern": "^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$",
+  "ports": {
+    "postgres": 61169,
+    "redis": 61168,
+    "minio": 61170
+  },
+  "redisLogicalDatabase": 1,
+  "roles": [
+    "r938_s1_capture",
+    "r938_s1_handoff",
+    "r938_s1_discovery",
+    "r938_s1_readers"
+  ],
+  "bucket": "diagnostic-test-private",
+  "exactCaseNames": [
+    "accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1",
+    "lets only the selected current B technician reload a minimal usable handle without A access",
+    "returns only named currently eligible distinct B technicians to a non-reception reviewer",
+    "projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source",
+    "omits malformed required retained evidence without a partial candidate or protected error",
+    "[938 control] rejects persisted provenance rewrite without changing stored evidence",
+    "[938 control] cleans partial fixture initialization before returning failure"
+  ],
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "--maxWorkers=1",
+    "--passWithNoTests=false",
+    "--disableConsoleIntercept",
+    "-t",
+    "^issue938 recovery stage1 > (accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1|lets only the selected current B technician reload a minimal usable handle without A access|returns only named currently eligible distinct B technicians to a non-reception reviewer|projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source|omits malformed required retained evidence without a partial candidate or protected error|\\[938 control\\] rejects persisted provenance rewrite without changing stored evidence|\\[938 control\\] cleans partial fixture initialization before returning failure)$"
+  ],
+  "environment": {
+    "DATABASE_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1",
+    "REDIS_URL": "redis://127.0.0.1:61168/0",
+    "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+    "MINIO_REGION": "us-east-1",
+    "MINIO_ACCESS_KEY": "minioadmin",
+    "MINIO_SECRET_KEY": "minioadmin",
+    "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private",
+    "APP_ENV": "test",
+    "AUTO_TM_TEST_DATABASES": "unset",
+    "NO_COLOR": "1",
+    "NODE_OPTIONS": "--import=tsx"
+  },
+  "composeFiles": [
+    "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml"
+  ],
+  "assertions": {
+    "totalDeclaredCases": 7,
+    "allPassed": 7,
+    "skippedOrPending": 0,
+    "maxWorkers": 1,
+    "testTimeoutMs": 120000,
+    "hookTimeoutMs": 60000
+  },
+  "cleanup": [
+    "read helper lifecycle receipts; require exactly seven machine-readable receipts and no failures/residuals",
+    "drain exact four task-role backends before residual queries or teardown",
+    "query source/campaign receipts in every still-existing anchored worker database before database cleanup; normal teardown may yield an explicit empty database list",
+    "query MinIO registry bucket and require no objects before Compose teardown",
+    "drop only exact anchored worker/template and base databases and exact four roles; verify database/role absence",
+    "Redis DB1 FLUSHDB and literal DBSIZE 0 via the owned Redis container; preserve DB0 baseline",
+    "exact Compose project down --volumes --remove-orphans after identity checks",
+    "zero owned containers/volumes/networks/listeners; preserve all foreign resources"
+  ],
+  "capture": {
+    "stdout": "/tmp/issue938-runtime-repair-20261103-r1/owned-output-r2/stage-vitest.stdout",
+    "stderr": "/tmp/issue938-runtime-repair-20261103-r1/owned-output-r2/stage-vitest.stderr",
+    "rawCommandHash": "record sha256 of argv/environment/stdout/stderr",
+    "cleanupReceiptInput": "/tmp/issue938-runtime-repair-20261103-r1/owned-output-r2/stage-vitest.stdout"
+  },
+  "setup": [
+    {
+      "name": "compose-up-owned-project",
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "up",
+        "--detach",
+        "--wait",
+        "--wait-timeout",
+        "120"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; all three healthchecks ready"
+    },
+    {
+      "name": "postgres-port",
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "port",
+        "postgres",
+        "5432"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "127.0.0.1:61169"
+    },
+    {
+      "name": "redis-port",
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "port",
+        "redis",
+        "6379"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "127.0.0.1:61168"
+    },
+    {
+      "name": "minio-port",
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "port",
+        "minio",
+        "9000"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "127.0.0.1:61170"
+    },
+    {
+      "name": "create-base-database",
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "auto_tm_ci",
+        "-d",
+        "auto_tm_ci",
+        "-X",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        "CREATE DATABASE \"auto_tm_897_938_s1r1\";"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "created exact fresh base database auto_tm_897_938_s1r1"
+    },
+    {
+      "name": "verify-base-database",
+      "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "auto_tm_ci",
+        "-d",
+        "auto_tm_ci",
+        "-X",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-At",
+        "-c",
+        "SELECT datname FROM pg_database WHERE datname = 'auto_tm_897_938_s1r1';"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "auto_tm_897_938_s1r1"
+    },
+    {
+      "name": "apply-migrations-to-base",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/db",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; all committed migrations applied to fresh base",
+      "environment": {
+        "DATABASE_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1"
+      }
+    },
+    {
+      "name": "capture-applied-migration-identity",
+      "argv": [
+        "node",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/capture-applied-migrations.mjs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; exactly 102 finished rows matching input migration pins",
+      "environment": {
+        "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+        "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+        "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "INPUT_PINS_PATH": "/tmp/issue938-runtime-repair-20261103-r1/runtime-packet-r2/input-pins-repair-r1.json",
+        "MIGRATION_CAPTURE_PATH": "/tmp/issue938-runtime-repair-20261103-r1/run/applied-migrations.json"
+      }
+    }
+  ],
+  "setupEnvironment": {
+    "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+    "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+    "BOOTSTRAP_ADMIN_URL": "compose-exec://postgres/auto_tm_ci",
+    "DATABASE_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1",
+    "REDIS_URL": "redis://127.0.0.1:61168/0",
+    "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+    "MINIO_ACCESS_KEY": "minioadmin",
+    "MINIO_SECRET_KEY": "minioadmin",
+    "MINIO_REGION": "us-east-1",
+    "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private"
+  },
+  "packetScripts": {
+    "drainOwnedRoleBackends": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs",
+    "ownedPostgresCleanup": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs",
+    "ownedSourceCampaignCheck": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs",
+    "ownedS3Inventory": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs",
+    "readCleanupReceipts": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/read-cleanup-receipts.mjs",
+    "captureAppliedMigrations": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/capture-applied-migrations.mjs",
+    "packetValidation": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/packet-validation.mjs"
+  },
+  "setupPassFail": {
+    "setupMustPass": true,
+    "baseDatabaseMustBeFresh": true,
+    "selectorMustMatch": 7,
+    "skipsOrPendingMustEqual": 0,
+    "appliedMigrationCount": 102,
+    "runtimeNotReleasedByPreparation": true
+  },
+  "workingDirectory": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "packetRoot": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103",
+  "migrationIdentity": {
+    "inputPinsPath": "/tmp/issue938-runtime-repair-20261103-r1/runtime-packet-r2/input-pins-repair-r1.json",
+    "expectedMigrationCount": 102,
+    "capturePath": "/tmp/issue938-runtime-packet-20261103/applied-migrations.json",
+    "captureCommand": "capture-applied-migrations.mjs",
+    "requiresAllFinished": true,
+    "requiresChecksumEquality": true,
+    "captureDatabaseRole": "base-database stand-in: the same pinned migration deploy is captured before Vitest; globalSetup drops its template/worker before process exit"
+  },
+  "environmentPolicy": {
+    "NO_COLOR": "1",
+    "reason": "Vitest cleanup receipts are parsed after the stage; ANSI output must be disabled at the command boundary.",
+    "NODE_OPTIONS": "--import=tsx",
+    "nodeOptionsReason": "The API package resolves TypeScript-only identity infrastructure through the approved tsx loader; this is required before Vitest module loading."
+  }
+}

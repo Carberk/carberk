@@ -1,0 +1,30 @@
+{
+  "phase": "cleanup",
+  "name": "postgres-source-campaign-residuals",
+  "argv": [
+    "node",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {
+    "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+    "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+    "EXPECT_EMPTY_DATABASES": "1"
+  },
+  "startedAt": "2026-11-03T07:36:03.358690+00:00",
+  "endedAt": "2026-11-03T07:36:03.459926+00:00",
+  "durationSeconds": 0.10124937499999476,
+  "exit": 0,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-postgres-source-campaign-residuals.stdout",
+    "sha256": "54f1af924b31a4199577c9204725cdbd4a413637e28e59022d204dd177bb5294",
+    "bytes": 49
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-postgres-source-campaign-residuals.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

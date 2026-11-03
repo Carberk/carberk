@@ -1,0 +1,44 @@
+{
+  "phase": "cleanup",
+  "name": "postgres-database-role-absence",
+  "argv": [
+    "docker",
+    "compose",
+    "--file",
+    "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "--file",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+    "--project-name",
+    "auto_tm_ci_897_938_s1_20261103_r1",
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "auto_tm_ci",
+    "-d",
+    "auto_tm_ci",
+    "-X",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-At",
+    "-c",
+    "SELECT (SELECT count(*) FROM pg_database WHERE datname = 'auto_tm_897_938_s1r1' OR datname ~ '^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$'),(SELECT count(*) FROM pg_roles WHERE rolname IN ('r938_s1_capture','r938_s1_handoff','r938_s1_discovery','r938_s1_readers'));"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {},
+  "startedAt": "2026-11-03T07:36:04.406403+00:00",
+  "endedAt": "2026-11-03T07:36:04.491738+00:00",
+  "durationSeconds": 0.08534758300000078,
+  "exit": 0,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-postgres-database-role-absence.stdout",
+    "sha256": "2ce220d8d046f85fd648a70bc8e4b330562a745e56a371ee36e2596a39f56a37",
+    "bytes": 4
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-postgres-database-role-absence.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

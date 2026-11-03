@@ -1,0 +1,12 @@
+{
+  "createdAt": "2026-11-03T07:31:24.780693+00:00",
+  "sourceCommit": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+  "sourceBase": "94ad0134a5d5ec03beb70a69746054637f0e937b",
+  "worker": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "derivedInputPins": "/tmp/issue938-runtime-repair-20261103-r1/runtime-packet-r2/input-pins-repair-r1.json",
+  "originalInputPins": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/input-pins.json",
+  "changedPinnedPaths": [
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ]
+}

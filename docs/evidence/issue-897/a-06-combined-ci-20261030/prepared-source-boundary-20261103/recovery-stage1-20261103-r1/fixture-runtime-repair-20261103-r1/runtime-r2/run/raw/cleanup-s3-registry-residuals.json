@@ -1,0 +1,30 @@
+{
+  "phase": "cleanup",
+  "name": "s3-registry-residuals",
+  "argv": [
+    "node",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {
+    "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+    "MINIO_REGION": "us-east-1",
+    "MINIO_ACCESS_KEY": "minioadmin",
+    "MINIO_SECRET_KEY": "minioadmin",
+    "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private"
+  },
+  "startedAt": "2026-11-03T07:45:32.080658+00:00",
+  "endedAt": "2026-11-03T07:45:32.173824+00:00",
+  "durationSeconds": 0.09318258300000082,
+  "exit": 0,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run-r2/raw/cleanup-s3-registry-residuals.stdout",
+    "sha256": "9d818b038f5962c191fa4af94c0bc16b0b110eeb077b31df01ce0e15d490bb20",
+    "bytes": 78
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run-r2/raw/cleanup-s3-registry-residuals.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

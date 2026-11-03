@@ -1,0 +1,28 @@
+{
+  "phase": "cleanup",
+  "name": "owned-port-residuals",
+  "argv": [
+    "lsof",
+    "-nP",
+    "-iTCP:61168",
+    "-iTCP:61169",
+    "-iTCP:61170",
+    "-sTCP:LISTEN"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {},
+  "startedAt": "2026-11-03T07:36:05.195435+00:00",
+  "endedAt": "2026-11-03T07:36:05.243562+00:00",
+  "durationSeconds": 0.048146083999995426,
+  "exit": 1,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-owned-port-residuals.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-owned-port-residuals.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

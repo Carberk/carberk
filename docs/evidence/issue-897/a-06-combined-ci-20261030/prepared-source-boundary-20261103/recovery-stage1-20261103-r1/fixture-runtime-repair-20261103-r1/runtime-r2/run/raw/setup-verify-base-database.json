@@ -1,0 +1,57 @@
+{
+  "phase": "setup",
+  "name": "verify-base-database",
+  "argv": [
+    "docker",
+    "compose",
+    "--file",
+    "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "--file",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+    "--project-name",
+    "auto_tm_ci_897_938_s1_20261103_r1",
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "auto_tm_ci",
+    "-d",
+    "auto_tm_ci",
+    "-X",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-At",
+    "-c",
+    "SELECT datname FROM pg_database WHERE datname = 'auto_tm_897_938_s1r1';"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {
+    "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+    "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+    "BOOTSTRAP_ADMIN_URL": "compose-exec://postgres/auto_tm_ci",
+    "DATABASE_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1",
+    "REDIS_URL": "redis://127.0.0.1:61168/0",
+    "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+    "MINIO_ACCESS_KEY": "minioadmin",
+    "MINIO_SECRET_KEY": "minioadmin",
+    "MINIO_REGION": "us-east-1",
+    "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private"
+  },
+  "startedAt": "2026-11-03T07:44:16.575382+00:00",
+  "endedAt": "2026-11-03T07:44:16.650664+00:00",
+  "durationSeconds": 0.07529858400000045,
+  "exit": 0,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run-r2/raw/setup-verify-base-database.stdout",
+    "sha256": "ef079025e692e3db045f9c9c15abcf41a56994e164dd08a9b9fa187e616ad39c",
+    "bytes": 21
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run-r2/raw/setup-verify-base-database.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

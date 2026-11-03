@@ -1,0 +1,31 @@
+{
+  "phase": "setup",
+  "name": "apply-migrations-to-base",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/db",
+    "exec",
+    "prisma",
+    "migrate",
+    "deploy"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {
+    "DATABASE_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_897_938_s1r1"
+  },
+  "startedAt": "2026-11-03T07:34:48.444674+00:00",
+  "endedAt": "2026-11-03T07:34:50.127001+00:00",
+  "durationSeconds": 1.6823595830000002,
+  "exit": 0,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/setup-apply-migrations-to-base.stdout",
+    "sha256": "b91c4ed847d6399159c5c73bc92f88c6765e42307d84761084602f04cee87112",
+    "bytes": 14892
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/setup-apply-migrations-to-base.stderr",
+    "sha256": "e40df379b3ca806791529144da53b048cf1a232201fdfc817692665ba9ad0093",
+    "bytes": 93
+  }
+}

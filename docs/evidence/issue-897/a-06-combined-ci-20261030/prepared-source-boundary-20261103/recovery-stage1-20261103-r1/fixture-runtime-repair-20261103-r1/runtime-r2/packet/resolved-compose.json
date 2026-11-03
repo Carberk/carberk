@@ -1,0 +1,138 @@
+{
+  "name": "auto_tm_ci_897_938_s1_20261103_r1",
+  "networks": {
+    "default": {
+      "name": "auto_tm_ci_897_938_s1_20261103_r1_default",
+      "ipam": {}
+    }
+  },
+  "services": {
+    "minio": {
+      "command": [
+        "server",
+        "/data"
+      ],
+      "entrypoint": null,
+      "environment": {
+        "MINIO_ROOT_PASSWORD": "minioadmin",
+        "MINIO_ROOT_USER": "minioadmin"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://localhost:9000/minio/health/live"
+        ],
+        "timeout": "5s",
+        "interval": "5s",
+        "retries": 12
+      },
+      "image": "cgr.dev/chainguard/minio@sha256:8d5a0265f0e18fb3b29f95598147f1cc2a86b782181668bad176b0e90cce9569",
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 9000,
+          "published": "61170",
+          "protocol": "tcp"
+        }
+      ],
+      "user": "0:0",
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "minio-data",
+          "target": "/data",
+          "volume": {}
+        }
+      ]
+    },
+    "postgres": {
+      "command": null,
+      "entrypoint": null,
+      "environment": {
+        "POSTGRES_DB": "auto_tm_ci",
+        "POSTGRES_PASSWORD": "auto_tm_ci_pass",
+        "POSTGRES_USER": "auto_tm_ci"
+      },
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "pg_isready -U auto_tm_ci -d auto_tm_ci"
+        ],
+        "timeout": "5s",
+        "interval": "5s",
+        "retries": 12
+      },
+      "image": "postgres:16-alpine",
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 5432,
+          "published": "61169",
+          "protocol": "tcp"
+        }
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "postgres-data",
+          "target": "/var/lib/postgresql/data",
+          "volume": {}
+        }
+      ]
+    },
+    "redis": {
+      "command": null,
+      "entrypoint": null,
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ],
+        "timeout": "5s",
+        "interval": "5s",
+        "retries": 12
+      },
+      "image": "redis:7-alpine",
+      "networks": {
+        "default": null
+      },
+      "ports": [
+        {
+          "mode": "ingress",
+          "host_ip": "127.0.0.1",
+          "target": 6379,
+          "published": "61168",
+          "protocol": "tcp"
+        }
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "redis-data",
+          "target": "/data",
+          "volume": {}
+        }
+      ]
+    }
+  },
+  "volumes": {
+    "minio-data": {
+      "name": "auto_tm_ci_897_938_s1_20261103_r1_minio-data"
+    },
+    "postgres-data": {
+      "name": "auto_tm_ci_897_938_s1_20261103_r1_postgres-data"
+    },
+    "redis-data": {
+      "name": "auto_tm_ci_897_938_s1_20261103_r1_redis-data"
+    }
+  }
+}

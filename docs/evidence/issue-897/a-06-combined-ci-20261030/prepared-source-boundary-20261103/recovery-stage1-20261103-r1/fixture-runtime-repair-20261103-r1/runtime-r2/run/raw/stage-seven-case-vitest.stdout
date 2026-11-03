@@ -1,0 +1,6752 @@
+
+ RUN  v5.0.4 /Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/apps/api
+
+938_role_grants {
+  role: 'r938_s1_capture',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  permissions: {
+    SELECT: [
+      'users',
+      'dealerships',
+      'dealership_members',
+      'listings',
+      'listing_drafts',
+      'inspection_orders',
+      'diagnostic_reports',
+      'diagnostic_centers',
+      'diagnostic_template_versions',
+      'diagnostic_center_assignments',
+      'diagnostic_order_assignments',
+      'staff_grants',
+      'sessions',
+      'totp_enrollments',
+      'totp_backup_codes',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_identity_records',
+      'diagnostic_identity_evidence',
+      'diagnostic_identity_provenance',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_source_anchors',
+      'support_cases',
+      'vehicle_history_requests',
+      'service_conversations',
+      'history_quotes',
+      'history_orders',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_bookings',
+      'history_artifacts',
+      'history_deliveries',
+      'history_artifact_cleanup',
+      'service_attachments',
+      'service_messages',
+      'service_read_states',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_erasure_fences',
+      'media_uploads',
+      'video_upload_sessions',
+      'video_generations',
+      'video_process_work',
+      'video_grants',
+      'video_cleanup_work',
+      'media_upload_cleanups',
+      'listing_media',
+      'diagnostic_evidence',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'measurement_principals',
+      'measurement_visits',
+      'measurement_records',
+      'measurement_outbox',
+      'measurement_investigation_exports',
+      'measurement_rollups',
+      'diagnostic_audits',
+      'service_audits',
+      'audit_logs',
+      'dealership_invitations',
+      'owned_vehicles',
+      'blocked_users',
+      'favorites',
+      'saved_searches',
+      'conversations',
+      'conversation_participants',
+      'messages',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'verified_contact_phones',
+      'otp_requests',
+      'content_reports',
+      'inspection_interests',
+      'business_enquiry_audits',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'dealership_invitations'
+    ],
+    'INSERT,UPDATE,DELETE': [
+      'users',
+      'sessions',
+      'staff_grants',
+      'audit_logs',
+      'diagnostic_centers',
+      'diagnostic_center_assignments',
+      'diagnostic_template_versions',
+      'inspection_orders',
+      'diagnostic_order_assignments',
+      'diagnostic_identity_records',
+      'diagnostic_reports',
+      'diagnostic_identity_provenance',
+      'diagnostic_identity_evidence',
+      'diagnostic_evidence',
+      'diagnostic_audits',
+      'diagnostic_source_anchors',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_pdf_artifacts',
+      'listings',
+      'brands',
+      'models',
+      'regions',
+      'cities'
+    ],
+    DELETE: [
+      'otp_requests',
+      'measurement_investigation_exports',
+      'measurement_principals',
+      'measurement_state',
+      'totp_enrollments',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'saved_searches',
+      'favorites',
+      'owned_vehicles',
+      'blocked_users',
+      'dealership_members',
+      'dealership_invitations',
+      'listing_drafts',
+      'verified_contact_phones',
+      'service_messages',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_read_states'
+    ],
+    UPDATE: [
+      'measurement_state',
+      'media_uploads',
+      'service_conversations',
+      'service_attachments',
+      'service_messages',
+      'service_audits',
+      'support_cases',
+      'history_deliveries',
+      'history_artifacts',
+      'history_bookings',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_orders',
+      'history_quotes',
+      'vehicle_history_requests',
+      'video_grants',
+      'video_process_work',
+      'video_generations',
+      'video_upload_sessions',
+      'service_erasure_fences',
+      'video_cleanup_work',
+      'dealerships',
+      'listing_drafts'
+    ],
+    INSERT: [
+      'media_upload_cleanups',
+      'video_cleanup_work',
+      'service_erasure_fences'
+    ]
+  },
+  sequence: 'listings_publicNumber_seq',
+  environmentOwner: 'auto_tm_ci'
+}
+938_role_enforcement {
+  role: 'r938_s1_capture',
+  superuser: false,
+  inherit: false,
+  owner: false,
+  membership: false
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '68dcb3b5-8c9f-467c-8dce-906215ccff66',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:22.466Z',
+  endedAt: '2026-11-03T07:44:23.099Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 68dcb3b5-8c9f-467c-8dce-906215ccff66 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5',
+    '--user-id',
+    '68dcb3b5-8c9f-467c-8dce-906215ccff66',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:23.099Z',
+  endedAt: '2026-11-03T07:44:23.564Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5 --user-id 68dcb3b5-8c9f-467c-8dce-906215ccff66 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '254ef743-21d5-402d-a726-ad82651bbccf',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:23.564Z',
+  endedAt: '2026-11-03T07:44:24.105Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 254ef743-21d5-402d-a726-ad82651bbccf --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5',
+    '--user-id',
+    '254ef743-21d5-402d-a726-ad82651bbccf',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:24.105Z',
+  endedAt: '2026-11-03T07:44:24.596Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5 --user-id 254ef743-21d5-402d-a726-ad82651bbccf --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'f6500dc0-5a59-4190-bb2d-1c5a01e21277',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:24.596Z',
+  endedAt: '2026-11-03T07:44:25.136Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id f6500dc0-5a59-4190-bb2d-1c5a01e21277 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5',
+    '--user-id',
+    'f6500dc0-5a59-4190-bb2d-1c5a01e21277',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:25.136Z',
+  endedAt: '2026-11-03T07:44:25.621Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5 --user-id f6500dc0-5a59-4190-bb2d-1c5a01e21277 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '32e7a490-ce53-4ded-a426-719cfd029293',
+    '--capability',
+    'diagnostics.reviewer',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:25.621Z',
+  endedAt: '2026-11-03T07:44:26.165Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 32e7a490-ce53-4ded-a426-719cfd029293 --capability diagnostics.reviewer --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5',
+    '--user-id',
+    '32e7a490-ce53-4ded-a426-719cfd029293',
+    '--capability',
+    'diagnostics.reviewer'
+  ],
+  startedAt: '2026-11-03T07:44:26.165Z',
+  endedAt: '2026-11-03T07:44:26.664Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5 --user-id 32e7a490-ce53-4ded-a426-719cfd029293 --capability diagnostics.reviewer\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '20475466-52e9-494b-afd1-1d4add9fadc4',
+    '--capability',
+    'diagnostics.reception',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:26.664Z',
+  endedAt: '2026-11-03T07:44:27.210Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 20475466-52e9-494b-afd1-1d4add9fadc4 --capability diagnostics.reception --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5',
+    '--user-id',
+    '20475466-52e9-494b-afd1-1d4add9fadc4',
+    '--capability',
+    'diagnostics.reception'
+  ],
+  startedAt: '2026-11-03T07:44:27.210Z',
+  endedAt: '2026-11-03T07:44:27.721Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5 --user-id 20475466-52e9-494b-afd1-1d4add9fadc4 --capability diagnostics.reception\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '20475466-52e9-494b-afd1-1d4add9fadc4',
+    '--capability',
+    'diagnostics.templates',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:27.721Z',
+  endedAt: '2026-11-03T07:44:28.245Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 20475466-52e9-494b-afd1-1d4add9fadc4 --capability diagnostics.templates --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5',
+    '--user-id',
+    '20475466-52e9-494b-afd1-1d4add9fadc4',
+    '--capability',
+    'diagnostics.templates'
+  ],
+  startedAt: '2026-11-03T07:44:28.246Z',
+  endedAt: '2026-11-03T07:44:28.760Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-cea97152-dd7b-4ccf-9ce4-ba934628a8b5 --user-id 20475466-52e9-494b-afd1-1d4add9fadc4 --capability diagnostics.templates\n'
+}
+938_fixture_registry {
+  label: 'issue938/recovery-stage1/capture/classified-forward',
+  actors: {
+    commissionerA: {
+      userId: '6c660de7-0ac5-4262-b960-99461380646e',
+      sessionId: '588199ee-7f51-41a5-a4a0-f3535b3e2881'
+    },
+    commissionerB: {
+      userId: 'fff03050-7af7-4a2c-879d-444fb562f334',
+      sessionId: 'c5685e8e-32d4-4279-bebb-f2c6a4a353d9'
+    },
+    reception: {
+      userId: '20475466-52e9-494b-afd1-1d4add9fadc4',
+      sessionId: '9c234324-c5f1-4891-b328-1ab6583b3389'
+    },
+    technicianA: {
+      userId: '254ef743-21d5-402d-a726-ad82651bbccf',
+      sessionId: 'b5e26ad3-2ff4-48ee-9b71-2a100a62393b'
+    },
+    technicianB: {
+      userId: '68dcb3b5-8c9f-467c-8dce-906215ccff66',
+      sessionId: '39da2921-c530-4ba6-b147-c718dd4ec581'
+    },
+    reviewer: {
+      userId: '32e7a490-ce53-4ded-a426-719cfd029293',
+      sessionId: '1ce155a7-97e6-44ae-bdb0-d9d273a4d0a0'
+    },
+    foreign: {
+      userId: 'f6500dc0-5a59-4190-bb2d-1c5a01e21277',
+      sessionId: 'd18699aa-0cbd-45a4-8623-8530d8382357'
+    }
+  },
+  centerId: '29a3345b-43de-4a42-89fc-a8fd4a5a8d03',
+  templateId: '90167582-c29a-4cf4-a79b-0777cf145ecd',
+  guards: [
+    {
+      table: 'audit_logs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_publication',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_assignment_fence',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    ... 184 more items
+  ],
+  controlKey: 'diagnostic-evidence/bb55ab67-f290-47b2-ab3c-145809231e46/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+}
+938_cleanup_receipt {
+  label: 'issue938/recovery-stage1/capture/classified-forward',
+  role: 'r938_s1_capture',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  keys: [],
+  callers: 0,
+  sourceReceipts: 0,
+  campaignReceipts: 0,
+  roleBackends: 0,
+  roleAbsent: true,
+  objectsEmpty: true,
+  controlPreserved: true,
+  guardModesRestored: true,
+  failures: [],
+  controlKey: 'diagnostic-evidence/bb55ab67-f290-47b2-ab3c-145809231e46/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+} order_version_ledger [
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'publication authorization',
+    version: 2
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'reviewer assignment',
+    version: 3
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'technician assignment',
+    version: 4
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'confirmed',
+    version: 5
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'arrived',
+    version: 6
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'grant before first raw',
+    version: 6
+  },
+  {
+    orderId: '5c259188-15dc-485c-848a-e8632d2764e6',
+    event: 'first raw',
+    version: 7
+  }
+]
+938_role_grants {
+  role: 'r938_s1_handoff',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  permissions: {
+    SELECT: [
+      'users',
+      'dealerships',
+      'dealership_members',
+      'listings',
+      'listing_drafts',
+      'inspection_orders',
+      'diagnostic_reports',
+      'diagnostic_centers',
+      'diagnostic_template_versions',
+      'diagnostic_center_assignments',
+      'diagnostic_order_assignments',
+      'staff_grants',
+      'sessions',
+      'totp_enrollments',
+      'totp_backup_codes',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_identity_records',
+      'diagnostic_identity_evidence',
+      'diagnostic_identity_provenance',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_source_anchors',
+      'support_cases',
+      'vehicle_history_requests',
+      'service_conversations',
+      'history_quotes',
+      'history_orders',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_bookings',
+      'history_artifacts',
+      'history_deliveries',
+      'history_artifact_cleanup',
+      'service_attachments',
+      'service_messages',
+      'service_read_states',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_erasure_fences',
+      'media_uploads',
+      'video_upload_sessions',
+      'video_generations',
+      'video_process_work',
+      'video_grants',
+      'video_cleanup_work',
+      'media_upload_cleanups',
+      'listing_media',
+      'diagnostic_evidence',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'measurement_principals',
+      'measurement_visits',
+      'measurement_records',
+      'measurement_outbox',
+      'measurement_investigation_exports',
+      'measurement_rollups',
+      'diagnostic_audits',
+      'service_audits',
+      'audit_logs',
+      'dealership_invitations',
+      'owned_vehicles',
+      'blocked_users',
+      'favorites',
+      'saved_searches',
+      'conversations',
+      'conversation_participants',
+      'messages',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'verified_contact_phones',
+      'otp_requests',
+      'content_reports',
+      'inspection_interests',
+      'business_enquiry_audits',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'dealership_invitations'
+    ],
+    'INSERT,UPDATE,DELETE': [
+      'users',
+      'sessions',
+      'staff_grants',
+      'audit_logs',
+      'diagnostic_centers',
+      'diagnostic_center_assignments',
+      'diagnostic_template_versions',
+      'inspection_orders',
+      'diagnostic_order_assignments',
+      'diagnostic_identity_records',
+      'diagnostic_reports',
+      'diagnostic_identity_provenance',
+      'diagnostic_identity_evidence',
+      'diagnostic_evidence',
+      'diagnostic_audits',
+      'diagnostic_source_anchors',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_pdf_artifacts',
+      'listings',
+      'brands',
+      'models',
+      'regions',
+      'cities'
+    ],
+    DELETE: [
+      'otp_requests',
+      'measurement_investigation_exports',
+      'measurement_principals',
+      'measurement_state',
+      'totp_enrollments',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'saved_searches',
+      'favorites',
+      'owned_vehicles',
+      'blocked_users',
+      'dealership_members',
+      'dealership_invitations',
+      'listing_drafts',
+      'verified_contact_phones',
+      'service_messages',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_read_states'
+    ],
+    UPDATE: [
+      'measurement_state',
+      'media_uploads',
+      'service_conversations',
+      'service_attachments',
+      'service_messages',
+      'service_audits',
+      'support_cases',
+      'history_deliveries',
+      'history_artifacts',
+      'history_bookings',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_orders',
+      'history_quotes',
+      'vehicle_history_requests',
+      'video_grants',
+      'video_process_work',
+      'video_generations',
+      'video_upload_sessions',
+      'service_erasure_fences',
+      'video_cleanup_work',
+      'dealerships',
+      'listing_drafts'
+    ],
+    INSERT: [
+      'media_upload_cleanups',
+      'video_cleanup_work',
+      'service_erasure_fences'
+    ]
+  },
+  sequence: 'listings_publicNumber_seq',
+  environmentOwner: 'auto_tm_ci'
+}
+938_role_enforcement {
+  role: 'r938_s1_handoff',
+  superuser: false,
+  inherit: false,
+  owner: false,
+  membership: false
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'b962c319-eca4-4099-a0b4-044b548487d1',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:31.151Z',
+  endedAt: '2026-11-03T07:44:31.735Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id b962c319-eca4-4099-a0b4-044b548487d1 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982',
+    '--user-id',
+    'b962c319-eca4-4099-a0b4-044b548487d1',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:31.735Z',
+  endedAt: '2026-11-03T07:44:32.215Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982 --user-id b962c319-eca4-4099-a0b4-044b548487d1 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'e4bec0ca-23c4-42dd-81c3-d9be5f3524a4',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:32.216Z',
+  endedAt: '2026-11-03T07:44:32.749Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id e4bec0ca-23c4-42dd-81c3-d9be5f3524a4 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982',
+    '--user-id',
+    'e4bec0ca-23c4-42dd-81c3-d9be5f3524a4',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:32.749Z',
+  endedAt: '2026-11-03T07:44:33.288Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982 --user-id e4bec0ca-23c4-42dd-81c3-d9be5f3524a4 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'e9d6f74c-5521-439d-aa1b-e064aa5bcec8',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:33.288Z',
+  endedAt: '2026-11-03T07:44:33.827Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id e9d6f74c-5521-439d-aa1b-e064aa5bcec8 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982',
+    '--user-id',
+    'e9d6f74c-5521-439d-aa1b-e064aa5bcec8',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:33.827Z',
+  endedAt: '2026-11-03T07:44:34.321Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982 --user-id e9d6f74c-5521-439d-aa1b-e064aa5bcec8 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '3924a96e-8235-4d19-8e44-3eacd6f479e6',
+    '--capability',
+    'diagnostics.reviewer',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:34.321Z',
+  endedAt: '2026-11-03T07:44:34.857Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 3924a96e-8235-4d19-8e44-3eacd6f479e6 --capability diagnostics.reviewer --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982',
+    '--user-id',
+    '3924a96e-8235-4d19-8e44-3eacd6f479e6',
+    '--capability',
+    'diagnostics.reviewer'
+  ],
+  startedAt: '2026-11-03T07:44:34.857Z',
+  endedAt: '2026-11-03T07:44:35.354Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982 --user-id 3924a96e-8235-4d19-8e44-3eacd6f479e6 --capability diagnostics.reviewer\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'bff44a64-8939-49ea-b896-78ddf54c6db1',
+    '--capability',
+    'diagnostics.reception',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:35.355Z',
+  endedAt: '2026-11-03T07:44:35.888Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id bff44a64-8939-49ea-b896-78ddf54c6db1 --capability diagnostics.reception --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982',
+    '--user-id',
+    'bff44a64-8939-49ea-b896-78ddf54c6db1',
+    '--capability',
+    'diagnostics.reception'
+  ],
+  startedAt: '2026-11-03T07:44:35.888Z',
+  endedAt: '2026-11-03T07:44:36.397Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982 --user-id bff44a64-8939-49ea-b896-78ddf54c6db1 --capability diagnostics.reception\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'bff44a64-8939-49ea-b896-78ddf54c6db1',
+    '--capability',
+    'diagnostics.templates',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:36.397Z',
+  endedAt: '2026-11-03T07:44:36.938Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id bff44a64-8939-49ea-b896-78ddf54c6db1 --capability diagnostics.templates --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982',
+    '--user-id',
+    'bff44a64-8939-49ea-b896-78ddf54c6db1',
+    '--capability',
+    'diagnostics.templates'
+  ],
+  startedAt: '2026-11-03T07:44:36.938Z',
+  endedAt: '2026-11-03T07:44:37.455Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d1364c0f-2a3d-452a-8d46-0cab7d81c982 --user-id bff44a64-8939-49ea-b896-78ddf54c6db1 --capability diagnostics.templates\n'
+}
+938_fixture_registry {
+  label: 'issue938/recovery-stage1/handoff/current-technician',
+  actors: {
+    commissionerA: {
+      userId: '975528e1-3c25-4eaa-afb7-a9032657e6c7',
+      sessionId: '51e81964-691d-46d6-abd5-f5d4ecfed8f4'
+    },
+    commissionerB: {
+      userId: '4a01d3ea-f31d-4487-9e24-c640b65a6903',
+      sessionId: '9b8c4a41-3fb2-46d9-809c-6d450131c758'
+    },
+    reception: {
+      userId: 'bff44a64-8939-49ea-b896-78ddf54c6db1',
+      sessionId: '34ff5b21-348e-41c0-8326-1c65762c126a'
+    },
+    technicianA: {
+      userId: 'e4bec0ca-23c4-42dd-81c3-d9be5f3524a4',
+      sessionId: '0a87ced2-6c78-4f25-bcfa-313eab4a88af'
+    },
+    technicianB: {
+      userId: 'b962c319-eca4-4099-a0b4-044b548487d1',
+      sessionId: 'fd07b7f7-39ab-4fac-837b-2441719f6f99'
+    },
+    reviewer: {
+      userId: '3924a96e-8235-4d19-8e44-3eacd6f479e6',
+      sessionId: '857403b3-24e6-4739-bbea-5271f5ea463a'
+    },
+    foreign: {
+      userId: 'e9d6f74c-5521-439d-aa1b-e064aa5bcec8',
+      sessionId: 'eb1c3a9a-5259-43e2-82b7-7af17dec3222'
+    }
+  },
+  centerId: 'b623527b-d86e-4821-8ae3-983a9e8c3c47',
+  templateId: 'cf951bf0-976b-45aa-9e9f-f502d4567337',
+  guards: [
+    {
+      table: 'audit_logs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_publication',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_assignment_fence',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    ... 184 more items
+  ],
+  controlKey: 'diagnostic-evidence/cfe20fea-13fe-4bda-8a2e-88f1ea9dd3f8/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+}
+938_pdf_intents [
+  {
+    id: '52a68aed-cc60-46ac-8968-d20e3b625db9',
+    reportId: '60ecf1c8-c566-459d-adfb-37ca3cc0a260',
+    snapshotHash: '843daf4931ec66023096b242cbeb6927f753f2a7839532418262231849cf63a3',
+    locale: 'en',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '1d6a3081-7887-4e43-9c02-a63ab7fcbbc5',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/60ecf1c8-c566-459d-adfb-37ca3cc0a260/52a68aed-cc60-46ac-8968-d20e3b625db9.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:30.480Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '80f6e267-2c07-4996-9e7e-397a430a9ff9',
+    reportId: '60ecf1c8-c566-459d-adfb-37ca3cc0a260',
+    snapshotHash: '843daf4931ec66023096b242cbeb6927f753f2a7839532418262231849cf63a3',
+    locale: 'ru',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '863d38fa-8283-4584-9a76-46e4e545c9cc',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/60ecf1c8-c566-459d-adfb-37ca3cc0a260/80f6e267-2c07-4996-9e7e-397a430a9ff9.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:30.480Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '37e5cac2-b920-4674-ba44-83c92fa262e9',
+    reportId: '60ecf1c8-c566-459d-adfb-37ca3cc0a260',
+    snapshotHash: '843daf4931ec66023096b242cbeb6927f753f2a7839532418262231849cf63a3',
+    locale: 'tk',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '7b9a9e5a-5272-484a-a5f1-87e29ae537e7',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/60ecf1c8-c566-459d-adfb-37ca3cc0a260/37e5cac2-b920-4674-ba44-83c92fa262e9.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:30.480Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  }
+]
+938_cleanup_receipt {
+  label: 'issue938/recovery-stage1/handoff/current-technician',
+  role: 'r938_s1_handoff',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  keys: [
+    'diagnostic-evidence/f5ee67e9-6a56-48fa-af35-55053c8ab0bb/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1',
+    'diagnostic-pdf/60ecf1c8-c566-459d-adfb-37ca3cc0a260/52a68aed-cc60-46ac-8968-d20e3b625db9.pdf',
+    'diagnostic-pdf/60ecf1c8-c566-459d-adfb-37ca3cc0a260/80f6e267-2c07-4996-9e7e-397a430a9ff9.pdf',
+    'diagnostic-pdf/60ecf1c8-c566-459d-adfb-37ca3cc0a260/37e5cac2-b920-4674-ba44-83c92fa262e9.pdf',
+    'diagnostic-evidence/dba4061d-037a-410b-b0de-fc32c81ce09b/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+  ],
+  callers: 0,
+  sourceReceipts: 0,
+  campaignReceipts: 0,
+  roleBackends: 0,
+  roleAbsent: true,
+  objectsEmpty: true,
+  controlPreserved: true,
+  guardModesRestored: true,
+  failures: [],
+  controlKey: 'diagnostic-evidence/cfe20fea-13fe-4bda-8a2e-88f1ea9dd3f8/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+} order_version_ledger [
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'reviewer assignment',
+    version: 2
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'technician assignment',
+    version: 3
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'confirmed',
+    version: 4
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'arrived',
+    version: 5
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'no ownership grant',
+    version: 5
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'first raw',
+    version: 6
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'provenance stage-upload',
+    version: 6
+  },
+  {
+    orderId: 'd38847ff-40b9-4f44-83e0-d11f375a9864',
+    event: 'retained evidence append',
+    version: 7
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'reviewer assignment',
+    version: 2
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'technician assignment',
+    version: 3
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'confirmed',
+    version: 4
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'arrived',
+    version: 5
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'no ownership grant',
+    version: 5
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'first raw',
+    version: 6
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'provenance stage-upload',
+    version: 6
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'retained evidence append',
+    version: 7
+  },
+  {
+    orderId: 'ed6f5faa-0c9e-48ed-8f7c-aa54803228d9',
+    event: 'proof issue-read',
+    version: 7
+  }
+]
+938_role_grants {
+  role: 'r938_s1_readers',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  permissions: {
+    SELECT: [
+      'users',
+      'dealerships',
+      'dealership_members',
+      'listings',
+      'listing_drafts',
+      'inspection_orders',
+      'diagnostic_reports',
+      'diagnostic_centers',
+      'diagnostic_template_versions',
+      'diagnostic_center_assignments',
+      'diagnostic_order_assignments',
+      'staff_grants',
+      'sessions',
+      'totp_enrollments',
+      'totp_backup_codes',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_identity_records',
+      'diagnostic_identity_evidence',
+      'diagnostic_identity_provenance',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_source_anchors',
+      'support_cases',
+      'vehicle_history_requests',
+      'service_conversations',
+      'history_quotes',
+      'history_orders',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_bookings',
+      'history_artifacts',
+      'history_deliveries',
+      'history_artifact_cleanup',
+      'service_attachments',
+      'service_messages',
+      'service_read_states',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_erasure_fences',
+      'media_uploads',
+      'video_upload_sessions',
+      'video_generations',
+      'video_process_work',
+      'video_grants',
+      'video_cleanup_work',
+      'media_upload_cleanups',
+      'listing_media',
+      'diagnostic_evidence',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'measurement_principals',
+      'measurement_visits',
+      'measurement_records',
+      'measurement_outbox',
+      'measurement_investigation_exports',
+      'measurement_rollups',
+      'diagnostic_audits',
+      'service_audits',
+      'audit_logs',
+      'dealership_invitations',
+      'owned_vehicles',
+      'blocked_users',
+      'favorites',
+      'saved_searches',
+      'conversations',
+      'conversation_participants',
+      'messages',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'verified_contact_phones',
+      'otp_requests',
+      'content_reports',
+      'inspection_interests',
+      'business_enquiry_audits',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'dealership_invitations'
+    ],
+    'INSERT,UPDATE,DELETE': [
+      'users',
+      'sessions',
+      'staff_grants',
+      'audit_logs',
+      'diagnostic_centers',
+      'diagnostic_center_assignments',
+      'diagnostic_template_versions',
+      'inspection_orders',
+      'diagnostic_order_assignments',
+      'diagnostic_identity_records',
+      'diagnostic_reports',
+      'diagnostic_identity_provenance',
+      'diagnostic_identity_evidence',
+      'diagnostic_evidence',
+      'diagnostic_audits',
+      'diagnostic_source_anchors',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_pdf_artifacts',
+      'listings',
+      'brands',
+      'models',
+      'regions',
+      'cities'
+    ],
+    DELETE: [
+      'otp_requests',
+      'measurement_investigation_exports',
+      'measurement_principals',
+      'measurement_state',
+      'totp_enrollments',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'saved_searches',
+      'favorites',
+      'owned_vehicles',
+      'blocked_users',
+      'dealership_members',
+      'dealership_invitations',
+      'listing_drafts',
+      'verified_contact_phones',
+      'service_messages',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_read_states'
+    ],
+    UPDATE: [
+      'measurement_state',
+      'media_uploads',
+      'service_conversations',
+      'service_attachments',
+      'service_messages',
+      'service_audits',
+      'support_cases',
+      'history_deliveries',
+      'history_artifacts',
+      'history_bookings',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_orders',
+      'history_quotes',
+      'vehicle_history_requests',
+      'video_grants',
+      'video_process_work',
+      'video_generations',
+      'video_upload_sessions',
+      'service_erasure_fences',
+      'video_cleanup_work',
+      'dealerships',
+      'listing_drafts'
+    ],
+    INSERT: [
+      'media_upload_cleanups',
+      'video_cleanup_work',
+      'service_erasure_fences'
+    ]
+  },
+  sequence: 'listings_publicNumber_seq',
+  environmentOwner: 'auto_tm_ci'
+}
+938_role_enforcement {
+  role: 'r938_s1_readers',
+  superuser: false,
+  inherit: false,
+  owner: false,
+  membership: false
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '6a94eba1-1027-4c47-be99-69e54c360cf4',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:44.457Z',
+  endedAt: '2026-11-03T07:44:45.099Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 6a94eba1-1027-4c47-be99-69e54c360cf4 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a',
+    '--user-id',
+    '6a94eba1-1027-4c47-be99-69e54c360cf4',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:45.099Z',
+  endedAt: '2026-11-03T07:44:45.576Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a --user-id 6a94eba1-1027-4c47-be99-69e54c360cf4 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'bd0269f3-2a64-4f06-8977-c4a18273c354',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:45.576Z',
+  endedAt: '2026-11-03T07:44:46.106Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id bd0269f3-2a64-4f06-8977-c4a18273c354 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a',
+    '--user-id',
+    'bd0269f3-2a64-4f06-8977-c4a18273c354',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:46.106Z',
+  endedAt: '2026-11-03T07:44:46.629Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a --user-id bd0269f3-2a64-4f06-8977-c4a18273c354 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '45164b39-3a88-4809-81f4-1f55c71f61b9',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:46.629Z',
+  endedAt: '2026-11-03T07:44:47.170Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 45164b39-3a88-4809-81f4-1f55c71f61b9 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a',
+    '--user-id',
+    '45164b39-3a88-4809-81f4-1f55c71f61b9',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:44:47.170Z',
+  endedAt: '2026-11-03T07:44:47.680Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a --user-id 45164b39-3a88-4809-81f4-1f55c71f61b9 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '82479515-72a1-4744-bf30-ec21721f213c',
+    '--capability',
+    'diagnostics.reviewer',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:47.680Z',
+  endedAt: '2026-11-03T07:44:48.204Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 82479515-72a1-4744-bf30-ec21721f213c --capability diagnostics.reviewer --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a',
+    '--user-id',
+    '82479515-72a1-4744-bf30-ec21721f213c',
+    '--capability',
+    'diagnostics.reviewer'
+  ],
+  startedAt: '2026-11-03T07:44:48.205Z',
+  endedAt: '2026-11-03T07:44:48.717Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a --user-id 82479515-72a1-4744-bf30-ec21721f213c --capability diagnostics.reviewer\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'd3c96361-00f7-4373-b8c5-88c999497163',
+    '--capability',
+    'diagnostics.reception',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:48.717Z',
+  endedAt: '2026-11-03T07:44:49.243Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id d3c96361-00f7-4373-b8c5-88c999497163 --capability diagnostics.reception --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a',
+    '--user-id',
+    'd3c96361-00f7-4373-b8c5-88c999497163',
+    '--capability',
+    'diagnostics.reception'
+  ],
+  startedAt: '2026-11-03T07:44:49.243Z',
+  endedAt: '2026-11-03T07:44:49.763Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a --user-id d3c96361-00f7-4373-b8c5-88c999497163 --capability diagnostics.reception\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'd3c96361-00f7-4373-b8c5-88c999497163',
+    '--capability',
+    'diagnostics.templates',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:44:49.763Z',
+  endedAt: '2026-11-03T07:44:50.296Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id d3c96361-00f7-4373-b8c5-88c999497163 --capability diagnostics.templates --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a',
+    '--user-id',
+    'd3c96361-00f7-4373-b8c5-88c999497163',
+    '--capability',
+    'diagnostics.templates'
+  ],
+  startedAt: '2026-11-03T07:44:50.296Z',
+  endedAt: '2026-11-03T07:44:50.820Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-2b712f7c-6e53-478e-b68a-62d5c7fb618a --user-id d3c96361-00f7-4373-b8c5-88c999497163 --capability diagnostics.templates\n'
+}
+938_fixture_registry {
+  label: 'issue938/recovery-stage1/readers/erased-predecessor',
+  actors: {
+    commissionerA: {
+      userId: '0ad92921-6728-4eeb-b739-d26d8de56844',
+      sessionId: '07e133e8-5bdc-4faf-9904-a6e299eb322d'
+    },
+    commissionerB: {
+      userId: 'bf661a29-b773-4cf1-83be-d645104e11c9',
+      sessionId: '783be382-2a65-4fba-80e6-14abba6642ac'
+    },
+    reception: {
+      userId: 'd3c96361-00f7-4373-b8c5-88c999497163',
+      sessionId: '18e8850c-a4e7-45ba-a23d-47566a7cfc14'
+    },
+    technicianA: {
+      userId: 'bd0269f3-2a64-4f06-8977-c4a18273c354',
+      sessionId: '11b327ca-a02d-4683-8705-1e246b56b059'
+    },
+    technicianB: {
+      userId: '6a94eba1-1027-4c47-be99-69e54c360cf4',
+      sessionId: '686bb429-4d53-4f29-b8e0-957b1dc466d0'
+    },
+    reviewer: {
+      userId: '82479515-72a1-4744-bf30-ec21721f213c',
+      sessionId: '4efda987-d5de-4b6d-ad18-f24a0ee2e571'
+    },
+    foreign: {
+      userId: '45164b39-3a88-4809-81f4-1f55c71f61b9',
+      sessionId: '81c71592-9cb7-4b42-a5be-83455466cf2a'
+    }
+  },
+  centerId: '52981fb3-c460-4239-a55d-80129e0b7b1e',
+  templateId: '4ef2fdb8-fb12-47ef-a4a3-b3c59c6c6dba',
+  guards: [
+    {
+      table: 'audit_logs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_publication',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_assignment_fence',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    ... 184 more items
+  ],
+  controlKey: 'diagnostic-evidence/f28c5282-fd6c-41b4-877f-4951d6296d59/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+}
+938_pdf_intents [
+  {
+    id: 'c1236be4-edd4-4042-b74d-c33b1d5f3ee3',
+    reportId: '5a772de1-2187-4bdf-a846-4c582d669462',
+    snapshotHash: 'f955dffc13d95048c937b366bf0726b387a327aebcc852b85d1e3de84028c45a',
+    locale: 'en',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '242829a5-9c02-4e3d-a703-aeec0ff493ee',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/5a772de1-2187-4bdf-a846-4c582d669462/c1236be4-edd4-4042-b74d-c33b1d5f3ee3.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:43.659Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '4a2dacb4-ec50-4c99-be2e-ae92bc1ce734',
+    reportId: '5a772de1-2187-4bdf-a846-4c582d669462',
+    snapshotHash: 'f955dffc13d95048c937b366bf0726b387a327aebcc852b85d1e3de84028c45a',
+    locale: 'ru',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '533d4045-aa20-423f-ac23-3f2ce6f86abc',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/5a772de1-2187-4bdf-a846-4c582d669462/4a2dacb4-ec50-4c99-be2e-ae92bc1ce734.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:43.659Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: 'a64f9c92-1541-4985-807c-53780d0ceb06',
+    reportId: '5a772de1-2187-4bdf-a846-4c582d669462',
+    snapshotHash: 'f955dffc13d95048c937b366bf0726b387a327aebcc852b85d1e3de84028c45a',
+    locale: 'tk',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '231b15b1-8447-496c-ac65-24239a71e22f',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/5a772de1-2187-4bdf-a846-4c582d669462/a64f9c92-1541-4985-807c-53780d0ceb06.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:43.659Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  }
+]
+938_pdf_intents [
+  {
+    id: 'eadeff46-e72a-40e1-b75b-7f527f56a772',
+    reportId: 'eb977661-3dd9-4c17-bfed-a640ca0d45ac',
+    snapshotHash: 'b7aee806e022e9c4bf78f98f07ce16dc4692d669e78d3c2d0ad705606940bbbc',
+    locale: 'en',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: 'fca87e81-8036-42ec-932f-5996edc49d79',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/eb977661-3dd9-4c17-bfed-a640ca0d45ac/eadeff46-e72a-40e1-b75b-7f527f56a772.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:43.659Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '6ac86f58-1cdf-42c1-8711-d4a37b622ef7',
+    reportId: 'eb977661-3dd9-4c17-bfed-a640ca0d45ac',
+    snapshotHash: 'b7aee806e022e9c4bf78f98f07ce16dc4692d669e78d3c2d0ad705606940bbbc',
+    locale: 'ru',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '8c8b83d1-c3ce-46bb-894d-220153f19f75',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/eb977661-3dd9-4c17-bfed-a640ca0d45ac/6ac86f58-1cdf-42c1-8711-d4a37b622ef7.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:43.659Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '72261c7a-2cf9-418e-be2d-14b03264fd32',
+    reportId: 'eb977661-3dd9-4c17-bfed-a640ca0d45ac',
+    snapshotHash: 'b7aee806e022e9c4bf78f98f07ce16dc4692d669e78d3c2d0ad705606940bbbc',
+    locale: 'tk',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: 'fcbea611-d9cc-4952-893f-afe23ebac7f5',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/eb977661-3dd9-4c17-bfed-a640ca0d45ac/72261c7a-2cf9-418e-be2d-14b03264fd32.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:44:43.659Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  }
+]
+938_actual_A_erasure {
+  userId: '0ad92921-6728-4eeb-b739-d26d8de56844',
+  orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+  erasedAt: 2026-11-03T07:44:56.841Z,
+  cutoff: '2026-11-03T07:44:56.541Z',
+  result: { purgedCount: 1 }
+}
+938_cleanup_receipt {
+  label: 'issue938/recovery-stage1/readers/erased-predecessor',
+  role: 'r938_s1_readers',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  keys: [
+    'diagnostic-evidence/5f4d32a5-5986-4073-9b8d-07024e25faf7/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1',
+    'diagnostic-pdf/5a772de1-2187-4bdf-a846-4c582d669462/c1236be4-edd4-4042-b74d-c33b1d5f3ee3.pdf',
+    'diagnostic-pdf/5a772de1-2187-4bdf-a846-4c582d669462/4a2dacb4-ec50-4c99-be2e-ae92bc1ce734.pdf',
+    'diagnostic-pdf/5a772de1-2187-4bdf-a846-4c582d669462/a64f9c92-1541-4985-807c-53780d0ceb06.pdf',
+    'diagnostic-evidence/d6bfd77a-a029-42cc-9d6d-a9517ef7afba/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1',
+    'diagnostic-pdf/eb977661-3dd9-4c17-bfed-a640ca0d45ac/eadeff46-e72a-40e1-b75b-7f527f56a772.pdf',
+    'diagnostic-pdf/eb977661-3dd9-4c17-bfed-a640ca0d45ac/6ac86f58-1cdf-42c1-8711-d4a37b622ef7.pdf',
+    'diagnostic-pdf/eb977661-3dd9-4c17-bfed-a640ca0d45ac/72261c7a-2cf9-418e-be2d-14b03264fd32.pdf'
+  ],
+  callers: 0,
+  sourceReceipts: 0,
+  campaignReceipts: 0,
+  roleBackends: 0,
+  roleAbsent: true,
+  objectsEmpty: true,
+  controlPreserved: true,
+  guardModesRestored: true,
+  failures: [],
+  controlKey: 'diagnostic-evidence/f28c5282-fd6c-41b4-877f-4951d6296d59/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+} order_version_ledger [
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'publication authorization',
+    version: 2
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'reviewer assignment',
+    version: 3
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'technician assignment',
+    version: 4
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'confirmed',
+    version: 5
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'arrived',
+    version: 6
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'grant before first raw',
+    version: 6
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'first raw',
+    version: 7
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'provenance stage-upload',
+    version: 7
+  },
+  {
+    orderId: 'a2e020ca-46d0-4546-be66-33969e14d039',
+    event: 'retained evidence append',
+    version: 8
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'publication authorization',
+    version: 2
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'reviewer assignment',
+    version: 3
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'technician assignment',
+    version: 4
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'confirmed',
+    version: 5
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'arrived',
+    version: 6
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'grant before first raw',
+    version: 6
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'first raw',
+    version: 7
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'provenance stage-upload',
+    version: 7
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'retained evidence append',
+    version: 8
+  },
+  {
+    orderId: '7831361d-5921-4c29-b3be-553318aabec8',
+    event: 'proof issue-read',
+    version: 8
+  }
+]
+938_role_grants {
+  role: 'r938_s1_readers',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  permissions: {
+    SELECT: [
+      'users',
+      'dealerships',
+      'dealership_members',
+      'listings',
+      'listing_drafts',
+      'inspection_orders',
+      'diagnostic_reports',
+      'diagnostic_centers',
+      'diagnostic_template_versions',
+      'diagnostic_center_assignments',
+      'diagnostic_order_assignments',
+      'staff_grants',
+      'sessions',
+      'totp_enrollments',
+      'totp_backup_codes',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_identity_records',
+      'diagnostic_identity_evidence',
+      'diagnostic_identity_provenance',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_source_anchors',
+      'support_cases',
+      'vehicle_history_requests',
+      'service_conversations',
+      'history_quotes',
+      'history_orders',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_bookings',
+      'history_artifacts',
+      'history_deliveries',
+      'history_artifact_cleanup',
+      'service_attachments',
+      'service_messages',
+      'service_read_states',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_erasure_fences',
+      'media_uploads',
+      'video_upload_sessions',
+      'video_generations',
+      'video_process_work',
+      'video_grants',
+      'video_cleanup_work',
+      'media_upload_cleanups',
+      'listing_media',
+      'diagnostic_evidence',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'measurement_principals',
+      'measurement_visits',
+      'measurement_records',
+      'measurement_outbox',
+      'measurement_investigation_exports',
+      'measurement_rollups',
+      'diagnostic_audits',
+      'service_audits',
+      'audit_logs',
+      'dealership_invitations',
+      'owned_vehicles',
+      'blocked_users',
+      'favorites',
+      'saved_searches',
+      'conversations',
+      'conversation_participants',
+      'messages',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'verified_contact_phones',
+      'otp_requests',
+      'content_reports',
+      'inspection_interests',
+      'business_enquiry_audits',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'dealership_invitations'
+    ],
+    'INSERT,UPDATE,DELETE': [
+      'users',
+      'sessions',
+      'staff_grants',
+      'audit_logs',
+      'diagnostic_centers',
+      'diagnostic_center_assignments',
+      'diagnostic_template_versions',
+      'inspection_orders',
+      'diagnostic_order_assignments',
+      'diagnostic_identity_records',
+      'diagnostic_reports',
+      'diagnostic_identity_provenance',
+      'diagnostic_identity_evidence',
+      'diagnostic_evidence',
+      'diagnostic_audits',
+      'diagnostic_source_anchors',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_pdf_artifacts',
+      'listings',
+      'brands',
+      'models',
+      'regions',
+      'cities'
+    ],
+    DELETE: [
+      'otp_requests',
+      'measurement_investigation_exports',
+      'measurement_principals',
+      'measurement_state',
+      'totp_enrollments',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'saved_searches',
+      'favorites',
+      'owned_vehicles',
+      'blocked_users',
+      'dealership_members',
+      'dealership_invitations',
+      'listing_drafts',
+      'verified_contact_phones',
+      'service_messages',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_read_states'
+    ],
+    UPDATE: [
+      'measurement_state',
+      'media_uploads',
+      'service_conversations',
+      'service_attachments',
+      'service_messages',
+      'service_audits',
+      'support_cases',
+      'history_deliveries',
+      'history_artifacts',
+      'history_bookings',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_orders',
+      'history_quotes',
+      'vehicle_history_requests',
+      'video_grants',
+      'video_process_work',
+      'video_generations',
+      'video_upload_sessions',
+      'service_erasure_fences',
+      'video_cleanup_work',
+      'dealerships',
+      'listing_drafts'
+    ],
+    INSERT: [
+      'media_upload_cleanups',
+      'video_cleanup_work',
+      'service_erasure_fences'
+    ]
+  },
+  sequence: 'listings_publicNumber_seq',
+  environmentOwner: 'auto_tm_ci'
+}
+938_role_enforcement {
+  role: 'r938_s1_readers',
+  superuser: false,
+  inherit: false,
+  owner: false,
+  membership: false
+}
+938_cleanup_receipt {
+  label: 'issue938/recovery-stage1/readers/partial-initialization',
+  role: 'r938_s1_readers',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  keys: [],
+  callers: 0,
+  sourceReceipts: 0,
+  campaignReceipts: 0,
+  roleBackends: 0,
+  roleAbsent: true,
+  objectsEmpty: true,
+  controlPreserved: true,
+  guardModesRestored: true,
+  failures: [],
+  controlKey: 'diagnostic-evidence/bf3f9cdf-0430-4a7f-8d44-5f48474b2c82/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+} order_version_ledger []
+938_role_grants {
+  role: 'r938_s1_discovery',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  permissions: {
+    SELECT: [
+      'users',
+      'dealerships',
+      'dealership_members',
+      'listings',
+      'listing_drafts',
+      'inspection_orders',
+      'diagnostic_reports',
+      'diagnostic_centers',
+      'diagnostic_template_versions',
+      'diagnostic_center_assignments',
+      'diagnostic_order_assignments',
+      'staff_grants',
+      'sessions',
+      'totp_enrollments',
+      'totp_backup_codes',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_identity_records',
+      'diagnostic_identity_evidence',
+      'diagnostic_identity_provenance',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_source_anchors',
+      'support_cases',
+      'vehicle_history_requests',
+      'service_conversations',
+      'history_quotes',
+      'history_orders',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_bookings',
+      'history_artifacts',
+      'history_deliveries',
+      'history_artifact_cleanup',
+      'service_attachments',
+      'service_messages',
+      'service_read_states',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_erasure_fences',
+      'media_uploads',
+      'video_upload_sessions',
+      'video_generations',
+      'video_process_work',
+      'video_grants',
+      'video_cleanup_work',
+      'media_upload_cleanups',
+      'listing_media',
+      'diagnostic_evidence',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'measurement_principals',
+      'measurement_visits',
+      'measurement_records',
+      'measurement_outbox',
+      'measurement_investigation_exports',
+      'measurement_rollups',
+      'diagnostic_audits',
+      'service_audits',
+      'audit_logs',
+      'dealership_invitations',
+      'owned_vehicles',
+      'blocked_users',
+      'favorites',
+      'saved_searches',
+      'conversations',
+      'conversation_participants',
+      'messages',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'verified_contact_phones',
+      'otp_requests',
+      'content_reports',
+      'inspection_interests',
+      'business_enquiry_audits',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'dealership_invitations'
+    ],
+    'INSERT,UPDATE,DELETE': [
+      'users',
+      'sessions',
+      'staff_grants',
+      'audit_logs',
+      'diagnostic_centers',
+      'diagnostic_center_assignments',
+      'diagnostic_template_versions',
+      'inspection_orders',
+      'diagnostic_order_assignments',
+      'diagnostic_identity_records',
+      'diagnostic_reports',
+      'diagnostic_identity_provenance',
+      'diagnostic_identity_evidence',
+      'diagnostic_evidence',
+      'diagnostic_audits',
+      'diagnostic_source_anchors',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_pdf_artifacts',
+      'listings',
+      'brands',
+      'models',
+      'regions',
+      'cities'
+    ],
+    DELETE: [
+      'otp_requests',
+      'measurement_investigation_exports',
+      'measurement_principals',
+      'measurement_state',
+      'totp_enrollments',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'saved_searches',
+      'favorites',
+      'owned_vehicles',
+      'blocked_users',
+      'dealership_members',
+      'dealership_invitations',
+      'listing_drafts',
+      'verified_contact_phones',
+      'service_messages',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_read_states'
+    ],
+    UPDATE: [
+      'measurement_state',
+      'media_uploads',
+      'service_conversations',
+      'service_attachments',
+      'service_messages',
+      'service_audits',
+      'support_cases',
+      'history_deliveries',
+      'history_artifacts',
+      'history_bookings',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_orders',
+      'history_quotes',
+      'vehicle_history_requests',
+      'video_grants',
+      'video_process_work',
+      'video_generations',
+      'video_upload_sessions',
+      'service_erasure_fences',
+      'video_cleanup_work',
+      'dealerships',
+      'listing_drafts'
+    ],
+    INSERT: [
+      'media_upload_cleanups',
+      'video_cleanup_work',
+      'service_erasure_fences'
+    ]
+  },
+  sequence: 'listings_publicNumber_seq',
+  environmentOwner: 'auto_tm_ci'
+}
+938_role_enforcement {
+  role: 'r938_s1_discovery',
+  superuser: false,
+  inherit: false,
+  owner: false,
+  membership: false
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '98ec7ec6-3458-45ce-8e4e-d1ced644e737',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:01.312Z',
+  endedAt: '2026-11-03T07:45:01.904Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 98ec7ec6-3458-45ce-8e4e-d1ced644e737 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5',
+    '--user-id',
+    '98ec7ec6-3458-45ce-8e4e-d1ced644e737',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:01.904Z',
+  endedAt: '2026-11-03T07:45:02.408Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5 --user-id 98ec7ec6-3458-45ce-8e4e-d1ced644e737 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '4ff17213-1d6f-4a29-8763-dd5c3dc7df16',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:02.409Z',
+  endedAt: '2026-11-03T07:45:02.958Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 4ff17213-1d6f-4a29-8763-dd5c3dc7df16 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5',
+    '--user-id',
+    '4ff17213-1d6f-4a29-8763-dd5c3dc7df16',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:02.959Z',
+  endedAt: '2026-11-03T07:45:03.496Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5 --user-id 4ff17213-1d6f-4a29-8763-dd5c3dc7df16 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '0f8e6614-0206-4a21-b4c4-468b17a56288',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:03.496Z',
+  endedAt: '2026-11-03T07:45:04.033Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 0f8e6614-0206-4a21-b4c4-468b17a56288 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5',
+    '--user-id',
+    '0f8e6614-0206-4a21-b4c4-468b17a56288',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:04.033Z',
+  endedAt: '2026-11-03T07:45:04.518Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5 --user-id 0f8e6614-0206-4a21-b4c4-468b17a56288 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '8fa8301a-f46a-4016-9503-e3a4c157ba26',
+    '--capability',
+    'diagnostics.reviewer',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:04.518Z',
+  endedAt: '2026-11-03T07:45:05.064Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 8fa8301a-f46a-4016-9503-e3a4c157ba26 --capability diagnostics.reviewer --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5',
+    '--user-id',
+    '8fa8301a-f46a-4016-9503-e3a4c157ba26',
+    '--capability',
+    'diagnostics.reviewer'
+  ],
+  startedAt: '2026-11-03T07:45:05.064Z',
+  endedAt: '2026-11-03T07:45:05.553Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5 --user-id 8fa8301a-f46a-4016-9503-e3a4c157ba26 --capability diagnostics.reviewer\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '79c266f3-b8af-4415-b01d-be6f7b00ddc7',
+    '--capability',
+    'diagnostics.reception',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:05.554Z',
+  endedAt: '2026-11-03T07:45:06.110Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 79c266f3-b8af-4415-b01d-be6f7b00ddc7 --capability diagnostics.reception --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5',
+    '--user-id',
+    '79c266f3-b8af-4415-b01d-be6f7b00ddc7',
+    '--capability',
+    'diagnostics.reception'
+  ],
+  startedAt: '2026-11-03T07:45:06.110Z',
+  endedAt: '2026-11-03T07:45:06.630Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5 --user-id 79c266f3-b8af-4415-b01d-be6f7b00ddc7 --capability diagnostics.reception\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '79c266f3-b8af-4415-b01d-be6f7b00ddc7',
+    '--capability',
+    'diagnostics.templates',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:06.630Z',
+  endedAt: '2026-11-03T07:45:07.159Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 79c266f3-b8af-4415-b01d-be6f7b00ddc7 --capability diagnostics.templates --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5',
+    '--user-id',
+    '79c266f3-b8af-4415-b01d-be6f7b00ddc7',
+    '--capability',
+    'diagnostics.templates'
+  ],
+  startedAt: '2026-11-03T07:45:07.159Z',
+  endedAt: '2026-11-03T07:45:07.662Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-a49fcd84-5819-49bf-a858-9ef07f2f37c5 --user-id 79c266f3-b8af-4415-b01d-be6f7b00ddc7 --capability diagnostics.templates\n'
+}
+938_fixture_registry {
+  label: 'issue938/recovery-stage1/discovery/eligible-technicians',
+  actors: {
+    commissionerA: {
+      userId: '4895a385-f968-4a23-978a-8286a4582fcf',
+      sessionId: '926cd531-a75a-4dfd-8b7b-a03eec916ab7'
+    },
+    commissionerB: {
+      userId: 'ff77e507-046b-4738-b4eb-849ea78fbd7b',
+      sessionId: '4479b5db-1f52-4dc0-9be0-31acafb68f9b'
+    },
+    reception: {
+      userId: '79c266f3-b8af-4415-b01d-be6f7b00ddc7',
+      sessionId: '608877f4-26ed-4737-9337-e4e2c29f15d6'
+    },
+    technicianA: {
+      userId: '4ff17213-1d6f-4a29-8763-dd5c3dc7df16',
+      sessionId: '19cbbe56-9361-4305-9615-f59534b0c058'
+    },
+    technicianB: {
+      userId: '98ec7ec6-3458-45ce-8e4e-d1ced644e737',
+      sessionId: '8ef12081-cda1-47b0-96db-b840d7b1fba8'
+    },
+    reviewer: {
+      userId: '8fa8301a-f46a-4016-9503-e3a4c157ba26',
+      sessionId: '96386cb2-4948-4c68-9155-df2d72084a82'
+    },
+    foreign: {
+      userId: '0f8e6614-0206-4a21-b4c4-468b17a56288',
+      sessionId: '5e22d240-9d80-4b45-9c39-20a3f7cd94e0'
+    }
+  },
+  centerId: 'f2fcdfad-aeda-4e41-aaf6-d858f4d8bf63',
+  templateId: 'c822d16a-0365-4751-b8d8-e99708a7162d',
+  guards: [
+    {
+      table: 'audit_logs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_publication',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_assignment_fence',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    ... 184 more items
+  ],
+  controlKey: 'diagnostic-evidence/1d4719cf-3b29-403b-8b51-3f555066f952/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+}
+938_cleanup_receipt {
+  label: 'issue938/recovery-stage1/discovery/eligible-technicians',
+  role: 'r938_s1_discovery',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  keys: [],
+  callers: 0,
+  sourceReceipts: 0,
+  campaignReceipts: 0,
+  roleBackends: 0,
+  roleAbsent: true,
+  objectsEmpty: true,
+  controlPreserved: true,
+  guardModesRestored: true,
+  failures: [],
+  controlKey: 'diagnostic-evidence/1d4719cf-3b29-403b-8b51-3f555066f952/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+} order_version_ledger [
+  {
+    orderId: 'b07426b1-b0f7-4e35-9232-7c215fc6e03d',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: 'b07426b1-b0f7-4e35-9232-7c215fc6e03d',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: 'b07426b1-b0f7-4e35-9232-7c215fc6e03d',
+    event: 'reviewer assignment',
+    version: 2
+  },
+  {
+    orderId: 'b07426b1-b0f7-4e35-9232-7c215fc6e03d',
+    event: 'technician assignment',
+    version: 3
+  },
+  {
+    orderId: 'b07426b1-b0f7-4e35-9232-7c215fc6e03d',
+    event: 'confirmed',
+    version: 4
+  },
+  {
+    orderId: 'b07426b1-b0f7-4e35-9232-7c215fc6e03d',
+    event: 'arrived',
+    version: 5
+  }
+]
+938_role_grants {
+  role: 'r938_s1_discovery',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  permissions: {
+    SELECT: [
+      'users',
+      'dealerships',
+      'dealership_members',
+      'listings',
+      'listing_drafts',
+      'inspection_orders',
+      'diagnostic_reports',
+      'diagnostic_centers',
+      'diagnostic_template_versions',
+      'diagnostic_center_assignments',
+      'diagnostic_order_assignments',
+      'staff_grants',
+      'sessions',
+      'totp_enrollments',
+      'totp_backup_codes',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_identity_records',
+      'diagnostic_identity_evidence',
+      'diagnostic_identity_provenance',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_source_anchors',
+      'support_cases',
+      'vehicle_history_requests',
+      'service_conversations',
+      'history_quotes',
+      'history_orders',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_bookings',
+      'history_artifacts',
+      'history_deliveries',
+      'history_artifact_cleanup',
+      'service_attachments',
+      'service_messages',
+      'service_read_states',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_erasure_fences',
+      'media_uploads',
+      'video_upload_sessions',
+      'video_generations',
+      'video_process_work',
+      'video_grants',
+      'video_cleanup_work',
+      'media_upload_cleanups',
+      'listing_media',
+      'diagnostic_evidence',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'measurement_principals',
+      'measurement_visits',
+      'measurement_records',
+      'measurement_outbox',
+      'measurement_investigation_exports',
+      'measurement_rollups',
+      'diagnostic_audits',
+      'service_audits',
+      'audit_logs',
+      'dealership_invitations',
+      'owned_vehicles',
+      'blocked_users',
+      'favorites',
+      'saved_searches',
+      'conversations',
+      'conversation_participants',
+      'messages',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'verified_contact_phones',
+      'otp_requests',
+      'content_reports',
+      'inspection_interests',
+      'business_enquiry_audits',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'dealership_invitations'
+    ],
+    'INSERT,UPDATE,DELETE': [
+      'users',
+      'sessions',
+      'staff_grants',
+      'audit_logs',
+      'diagnostic_centers',
+      'diagnostic_center_assignments',
+      'diagnostic_template_versions',
+      'inspection_orders',
+      'diagnostic_order_assignments',
+      'diagnostic_identity_records',
+      'diagnostic_reports',
+      'diagnostic_identity_provenance',
+      'diagnostic_identity_evidence',
+      'diagnostic_evidence',
+      'diagnostic_audits',
+      'diagnostic_source_anchors',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_pdf_artifacts',
+      'listings',
+      'brands',
+      'models',
+      'regions',
+      'cities'
+    ],
+    DELETE: [
+      'otp_requests',
+      'measurement_investigation_exports',
+      'measurement_principals',
+      'measurement_state',
+      'totp_enrollments',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'saved_searches',
+      'favorites',
+      'owned_vehicles',
+      'blocked_users',
+      'dealership_members',
+      'dealership_invitations',
+      'listing_drafts',
+      'verified_contact_phones',
+      'service_messages',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_read_states'
+    ],
+    UPDATE: [
+      'measurement_state',
+      'media_uploads',
+      'service_conversations',
+      'service_attachments',
+      'service_messages',
+      'service_audits',
+      'support_cases',
+      'history_deliveries',
+      'history_artifacts',
+      'history_bookings',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_orders',
+      'history_quotes',
+      'vehicle_history_requests',
+      'video_grants',
+      'video_process_work',
+      'video_generations',
+      'video_upload_sessions',
+      'service_erasure_fences',
+      'video_cleanup_work',
+      'dealerships',
+      'listing_drafts'
+    ],
+    INSERT: [
+      'media_upload_cleanups',
+      'video_cleanup_work',
+      'service_erasure_fences'
+    ]
+  },
+  sequence: 'listings_publicNumber_seq',
+  environmentOwner: 'auto_tm_ci'
+}
+938_role_enforcement {
+  role: 'r938_s1_discovery',
+  superuser: false,
+  inherit: false,
+  owner: false,
+  membership: false
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '2ceeac6d-ab92-438c-84a9-68181b4df967',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:09.381Z',
+  endedAt: '2026-11-03T07:45:09.958Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 2ceeac6d-ab92-438c-84a9-68181b4df967 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1',
+    '--user-id',
+    '2ceeac6d-ab92-438c-84a9-68181b4df967',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:09.958Z',
+  endedAt: '2026-11-03T07:45:10.430Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1 --user-id 2ceeac6d-ab92-438c-84a9-68181b4df967 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '7b77affb-19c5-42b7-a3ee-d0018d66ce52',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:10.430Z',
+  endedAt: '2026-11-03T07:45:10.966Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 7b77affb-19c5-42b7-a3ee-d0018d66ce52 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1',
+    '--user-id',
+    '7b77affb-19c5-42b7-a3ee-d0018d66ce52',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:10.966Z',
+  endedAt: '2026-11-03T07:45:11.492Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1 --user-id 7b77affb-19c5-42b7-a3ee-d0018d66ce52 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '26428e36-38dc-4a1f-bd2c-02ac0aa340e5',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:11.492Z',
+  endedAt: '2026-11-03T07:45:12.030Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 26428e36-38dc-4a1f-bd2c-02ac0aa340e5 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1',
+    '--user-id',
+    '26428e36-38dc-4a1f-bd2c-02ac0aa340e5',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:12.030Z',
+  endedAt: '2026-11-03T07:45:12.524Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1 --user-id 26428e36-38dc-4a1f-bd2c-02ac0aa340e5 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '500a79d8-5f24-44a3-be4f-9416ccb29a7e',
+    '--capability',
+    'diagnostics.reviewer',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:12.524Z',
+  endedAt: '2026-11-03T07:45:13.068Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 500a79d8-5f24-44a3-be4f-9416ccb29a7e --capability diagnostics.reviewer --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1',
+    '--user-id',
+    '500a79d8-5f24-44a3-be4f-9416ccb29a7e',
+    '--capability',
+    'diagnostics.reviewer'
+  ],
+  startedAt: '2026-11-03T07:45:13.068Z',
+  endedAt: '2026-11-03T07:45:13.588Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1 --user-id 500a79d8-5f24-44a3-be4f-9416ccb29a7e --capability diagnostics.reviewer\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '2fc661fe-a5dc-4a29-a82c-7b870dab7d20',
+    '--capability',
+    'diagnostics.reception',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:13.588Z',
+  endedAt: '2026-11-03T07:45:14.121Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 2fc661fe-a5dc-4a29-a82c-7b870dab7d20 --capability diagnostics.reception --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1',
+    '--user-id',
+    '2fc661fe-a5dc-4a29-a82c-7b870dab7d20',
+    '--capability',
+    'diagnostics.reception'
+  ],
+  startedAt: '2026-11-03T07:45:14.121Z',
+  endedAt: '2026-11-03T07:45:14.617Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1 --user-id 2fc661fe-a5dc-4a29-a82c-7b870dab7d20 --capability diagnostics.reception\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '2fc661fe-a5dc-4a29-a82c-7b870dab7d20',
+    '--capability',
+    'diagnostics.templates',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:14.617Z',
+  endedAt: '2026-11-03T07:45:15.160Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 2fc661fe-a5dc-4a29-a82c-7b870dab7d20 --capability diagnostics.templates --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1',
+    '--user-id',
+    '2fc661fe-a5dc-4a29-a82c-7b870dab7d20',
+    '--capability',
+    'diagnostics.templates'
+  ],
+  startedAt: '2026-11-03T07:45:15.161Z',
+  endedAt: '2026-11-03T07:45:15.675Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-ea9c8abc-a810-4b8a-b19f-56bfc98e5ab1 --user-id 2fc661fe-a5dc-4a29-a82c-7b870dab7d20 --capability diagnostics.templates\n'
+}
+938_fixture_registry {
+  label: 'issue938/recovery-stage1/discovery/malformed-retained-read',
+  actors: {
+    commissionerA: {
+      userId: '82940d43-7ba3-49d1-93b6-10beed931b0a',
+      sessionId: '097d3db7-e392-4424-8249-15956c94b0cf'
+    },
+    commissionerB: {
+      userId: '230ba905-4083-4058-8fb1-b59586430489',
+      sessionId: '9457041a-0bd2-43c4-b4f6-acee8c59b859'
+    },
+    reception: {
+      userId: '2fc661fe-a5dc-4a29-a82c-7b870dab7d20',
+      sessionId: '85f76a24-e537-41cd-aec3-a5e7e2d9f4c0'
+    },
+    technicianA: {
+      userId: '7b77affb-19c5-42b7-a3ee-d0018d66ce52',
+      sessionId: 'a380f7a7-07b8-402c-b958-cca0bc82e69b'
+    },
+    technicianB: {
+      userId: '2ceeac6d-ab92-438c-84a9-68181b4df967',
+      sessionId: 'd5398296-7d36-4099-b20e-2a350a602ee7'
+    },
+    reviewer: {
+      userId: '500a79d8-5f24-44a3-be4f-9416ccb29a7e',
+      sessionId: '876df7b3-2041-4655-b112-03f0c848ffde'
+    },
+    foreign: {
+      userId: '26428e36-38dc-4a1f-bd2c-02ac0aa340e5',
+      sessionId: '98d215e3-aa0d-467f-a0ba-64a2794b4511'
+    }
+  },
+  centerId: '87eca490-8e3c-400e-96bc-08b81cce6d40',
+  templateId: 'f3ab6d44-d21b-41c1-a5eb-2d9dcfe0c720',
+  guards: [
+    {
+      table: 'audit_logs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_publication',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_assignment_fence',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    ... 184 more items
+  ],
+  controlKey: 'diagnostic-evidence/bf1897ea-3c5c-4989-b579-056062524c91/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+}
+938_pdf_intents [
+  {
+    id: 'df3b2d68-f04d-4ce9-8032-993237b42ff6',
+    reportId: '90c20d34-5853-46ac-a730-fb32d43ca947',
+    snapshotHash: 'cc8b2b7bff7ae748fe580ea91b1131bc99a9b2d2300427e9373d552d59ff4431',
+    locale: 'en',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '826b7036-c5bc-4b13-8195-85face96f446',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/90c20d34-5853-46ac-a730-fb32d43ca947/df3b2d68-f04d-4ce9-8032-993237b42ff6.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:45:08.897Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: 'a0656da9-ddc6-4b71-b4a0-0ab38a6f1234',
+    reportId: '90c20d34-5853-46ac-a730-fb32d43ca947',
+    snapshotHash: 'cc8b2b7bff7ae748fe580ea91b1131bc99a9b2d2300427e9373d552d59ff4431',
+    locale: 'ru',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: 'a338a074-d21e-4a0a-bd09-f0b014ebb7f3',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/90c20d34-5853-46ac-a730-fb32d43ca947/a0656da9-ddc6-4b71-b4a0-0ab38a6f1234.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:45:08.897Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '834be6a2-e5bc-4bae-9929-bad8bbb92355',
+    reportId: '90c20d34-5853-46ac-a730-fb32d43ca947',
+    snapshotHash: 'cc8b2b7bff7ae748fe580ea91b1131bc99a9b2d2300427e9373d552d59ff4431',
+    locale: 'tk',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: '2618f952-7ca1-44d4-9610-262804f392f6',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/90c20d34-5853-46ac-a730-fb32d43ca947/834be6a2-e5bc-4bae-9929-bad8bbb92355.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:45:08.897Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  }
+]
+938_f47_pin {
+  orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+  evidenceId: '1448417d-e180-4753-a664-e131a578b5ec',
+  provenanceId: 'e4420eac-3482-4814-bd99-7874e96d6b57',
+  enabled: true,
+  reads: 0,
+  query: {
+    where: { orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2' },
+    include: { identityRecord: true },
+    orderBy: { orderVersion: 'asc' }
+  }
+}
+938_cleanup_receipt {
+  label: 'issue938/recovery-stage1/discovery/malformed-retained-read',
+  role: 'r938_s1_discovery',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  keys: [
+    'diagnostic-evidence/e4420eac-3482-4814-bd99-7874e96d6b57/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1',
+    'diagnostic-pdf/90c20d34-5853-46ac-a730-fb32d43ca947/df3b2d68-f04d-4ce9-8032-993237b42ff6.pdf',
+    'diagnostic-pdf/90c20d34-5853-46ac-a730-fb32d43ca947/a0656da9-ddc6-4b71-b4a0-0ab38a6f1234.pdf',
+    'diagnostic-pdf/90c20d34-5853-46ac-a730-fb32d43ca947/834be6a2-e5bc-4bae-9929-bad8bbb92355.pdf',
+    'diagnostic-evidence/8cd7173b-2920-45c3-92a6-a233703e974d/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+  ],
+  callers: 0,
+  sourceReceipts: 0,
+  campaignReceipts: 0,
+  roleBackends: 0,
+  roleAbsent: true,
+  objectsEmpty: true,
+  controlPreserved: true,
+  guardModesRestored: true,
+  failures: [],
+  controlKey: 'diagnostic-evidence/bf1897ea-3c5c-4989-b579-056062524c91/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+} order_version_ledger [
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'reviewer assignment',
+    version: 2
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'technician assignment',
+    version: 3
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'confirmed',
+    version: 4
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'arrived',
+    version: 5
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'no ownership grant',
+    version: 5
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'first raw',
+    version: 6
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'provenance stage-upload',
+    version: 6
+  },
+  {
+    orderId: '09c010e8-55a0-4c06-8401-a19b51415bc2',
+    event: 'retained evidence append',
+    version: 7
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'reviewer assignment',
+    version: 2
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'technician assignment',
+    version: 3
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'confirmed',
+    version: 4
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'arrived',
+    version: 5
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'no ownership grant',
+    version: 5
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'first raw',
+    version: 6
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'provenance stage-upload',
+    version: 6
+  },
+  {
+    orderId: '06f66350-8081-4325-87e8-266a0154892c',
+    event: 'retained evidence append',
+    version: 7
+  }
+]
+938_role_grants {
+  role: 'r938_s1_discovery',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  permissions: {
+    SELECT: [
+      'users',
+      'dealerships',
+      'dealership_members',
+      'listings',
+      'listing_drafts',
+      'inspection_orders',
+      'diagnostic_reports',
+      'diagnostic_centers',
+      'diagnostic_template_versions',
+      'diagnostic_center_assignments',
+      'diagnostic_order_assignments',
+      'staff_grants',
+      'sessions',
+      'totp_enrollments',
+      'totp_backup_codes',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_identity_records',
+      'diagnostic_identity_evidence',
+      'diagnostic_identity_provenance',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_source_anchors',
+      'support_cases',
+      'vehicle_history_requests',
+      'service_conversations',
+      'history_quotes',
+      'history_orders',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_bookings',
+      'history_artifacts',
+      'history_deliveries',
+      'history_artifact_cleanup',
+      'service_attachments',
+      'service_messages',
+      'service_read_states',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_erasure_fences',
+      'media_uploads',
+      'video_upload_sessions',
+      'video_generations',
+      'video_process_work',
+      'video_grants',
+      'video_cleanup_work',
+      'media_upload_cleanups',
+      'listing_media',
+      'diagnostic_evidence',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'measurement_principals',
+      'measurement_visits',
+      'measurement_records',
+      'measurement_outbox',
+      'measurement_investigation_exports',
+      'measurement_rollups',
+      'diagnostic_audits',
+      'service_audits',
+      'audit_logs',
+      'dealership_invitations',
+      'owned_vehicles',
+      'blocked_users',
+      'favorites',
+      'saved_searches',
+      'conversations',
+      'conversation_participants',
+      'messages',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'verified_contact_phones',
+      'otp_requests',
+      'content_reports',
+      'inspection_interests',
+      'business_enquiry_audits',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_pdf_artifacts',
+      'measurement_state',
+      'dealership_invitations'
+    ],
+    'INSERT,UPDATE,DELETE': [
+      'users',
+      'sessions',
+      'staff_grants',
+      'audit_logs',
+      'diagnostic_centers',
+      'diagnostic_center_assignments',
+      'diagnostic_template_versions',
+      'inspection_orders',
+      'diagnostic_order_assignments',
+      'diagnostic_identity_records',
+      'diagnostic_reports',
+      'diagnostic_identity_provenance',
+      'diagnostic_identity_evidence',
+      'diagnostic_evidence',
+      'diagnostic_audits',
+      'diagnostic_source_anchors',
+      'diagnostic_source_commands',
+      'campaign_preparations',
+      'diagnostic_continuity_proofs',
+      'diagnostic_continuity_requests',
+      'diagnostic_ownership_grants',
+      'diagnostic_ownership_components',
+      'diagnostic_pdf_artifacts',
+      'listings',
+      'brands',
+      'models',
+      'regions',
+      'cities'
+    ],
+    DELETE: [
+      'otp_requests',
+      'measurement_investigation_exports',
+      'measurement_principals',
+      'measurement_state',
+      'totp_enrollments',
+      'fcm_devices',
+      'notification_history',
+      'notification_preferences',
+      'saved_searches',
+      'favorites',
+      'owned_vehicles',
+      'blocked_users',
+      'dealership_members',
+      'dealership_invitations',
+      'listing_drafts',
+      'verified_contact_phones',
+      'service_messages',
+      'service_push_subscriptions',
+      'service_outbox',
+      'service_read_states'
+    ],
+    UPDATE: [
+      'measurement_state',
+      'media_uploads',
+      'service_conversations',
+      'service_attachments',
+      'service_messages',
+      'service_audits',
+      'support_cases',
+      'history_deliveries',
+      'history_artifacts',
+      'history_bookings',
+      'history_payments',
+      'history_purchase_intents',
+      'history_refunds',
+      'history_orders',
+      'history_quotes',
+      'vehicle_history_requests',
+      'video_grants',
+      'video_process_work',
+      'video_generations',
+      'video_upload_sessions',
+      'service_erasure_fences',
+      'video_cleanup_work',
+      'dealerships',
+      'listing_drafts'
+    ],
+    INSERT: [
+      'media_upload_cleanups',
+      'video_cleanup_work',
+      'service_erasure_fences'
+    ]
+  },
+  sequence: 'listings_publicNumber_seq',
+  environmentOwner: 'auto_tm_ci'
+}
+938_role_enforcement {
+  role: 'r938_s1_discovery',
+  superuser: false,
+  inherit: false,
+  owner: false,
+  membership: false
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'ef94d991-f2fe-4238-882e-3486775c2da8',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:21.050Z',
+  endedAt: '2026-11-03T07:45:21.644Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id ef94d991-f2fe-4238-882e-3486775c2da8 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953',
+    '--user-id',
+    'ef94d991-f2fe-4238-882e-3486775c2da8',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:21.644Z',
+  endedAt: '2026-11-03T07:45:22.127Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953 --user-id ef94d991-f2fe-4238-882e-3486775c2da8 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '00e17239-88bc-4613-9b32-8852f4786e2b',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:22.128Z',
+  endedAt: '2026-11-03T07:45:22.654Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 00e17239-88bc-4613-9b32-8852f4786e2b --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953',
+    '--user-id',
+    '00e17239-88bc-4613-9b32-8852f4786e2b',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:22.654Z',
+  endedAt: '2026-11-03T07:45:23.146Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953 --user-id 00e17239-88bc-4613-9b32-8852f4786e2b --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    '875e9505-2736-40ef-86a6-681cb32cb9e1',
+    '--capability',
+    'diagnostics.technician',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:23.146Z',
+  endedAt: '2026-11-03T07:45:23.716Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id 875e9505-2736-40ef-86a6-681cb32cb9e1 --capability diagnostics.technician --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953',
+    '--user-id',
+    '875e9505-2736-40ef-86a6-681cb32cb9e1',
+    '--capability',
+    'diagnostics.technician'
+  ],
+  startedAt: '2026-11-03T07:45:23.716Z',
+  endedAt: '2026-11-03T07:45:24.216Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953 --user-id 875e9505-2736-40ef-86a6-681cb32cb9e1 --capability diagnostics.technician\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'db559687-713d-4aa7-9563-bd945f0a8859',
+    '--capability',
+    'diagnostics.reviewer',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:24.216Z',
+  endedAt: '2026-11-03T07:45:24.750Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id db559687-713d-4aa7-9563-bd945f0a8859 --capability diagnostics.reviewer --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953',
+    '--user-id',
+    'db559687-713d-4aa7-9563-bd945f0a8859',
+    '--capability',
+    'diagnostics.reviewer'
+  ],
+  startedAt: '2026-11-03T07:45:24.750Z',
+  endedAt: '2026-11-03T07:45:25.254Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953 --user-id db559687-713d-4aa7-9563-bd945f0a8859 --capability diagnostics.reviewer\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'f9128f65-9684-4ef5-931f-c663a9860aa2',
+    '--capability',
+    'diagnostics.reception',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:25.254Z',
+  endedAt: '2026-11-03T07:45:25.767Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id f9128f65-9684-4ef5-931f-c663a9860aa2 --capability diagnostics.reception --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953',
+    '--user-id',
+    'f9128f65-9684-4ef5-931f-c663a9860aa2',
+    '--capability',
+    'diagnostics.reception'
+  ],
+  startedAt: '2026-11-03T07:45:25.768Z',
+  endedAt: '2026-11-03T07:45:26.315Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953 --user-id f9128f65-9684-4ef5-931f-c663a9860aa2 --capability diagnostics.reception\n'
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'staff:bootstrap',
+    '--user-id',
+    'f9128f65-9684-4ef5-931f-c663a9860aa2',
+    '--capability',
+    'diagnostics.templates',
+    '--reason',
+    'Issue 938 owned synthetic fixture'
+  ],
+  startedAt: '2026-11-03T07:45:26.315Z',
+  endedAt: '2026-11-03T07:45:26.865Z',
+  stdout: 'Named capability granted with bootstrap audit\n',
+  stderr: "$ tsx scripts/bootstrap-staff.ts --user-id f9128f65-9684-4ef5-931f-c663a9860aa2 --capability diagnostics.templates --reason 'Issue 938 owned synthetic fixture'\n"
+}
+938_bootstrap {
+  argv: [
+    '--filter',
+    '@auto-tm/db',
+    'diagnostics:bootstrap-synthetic',
+    '--center-code',
+    'synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953',
+    '--user-id',
+    'f9128f65-9684-4ef5-931f-c663a9860aa2',
+    '--capability',
+    'diagnostics.templates'
+  ],
+  startedAt: '2026-11-03T07:45:26.865Z',
+  endedAt: '2026-11-03T07:45:27.382Z',
+  stdout: 'Synthetic center and qualification created\n',
+  stderr: '$ tsx scripts/bootstrap-synthetic-diagnostic-center.ts --center-code synthetic-d9ffa365-6cb0-4ce4-b6c0-b23ce227b953 --user-id f9128f65-9684-4ef5-931f-c663a9860aa2 --capability diagnostics.templates\n'
+}
+938_fixture_registry {
+  label: 'issue938/recovery-stage1/discovery/immutable-write-control',
+  actors: {
+    commissionerA: {
+      userId: '660ff654-c747-44e7-b764-2cce287f8224',
+      sessionId: 'ec050773-e4e5-4056-835e-30cfdb23ea9a'
+    },
+    commissionerB: {
+      userId: '33bd9f0a-38db-4ca7-9195-3513381e0b72',
+      sessionId: 'b76ec6ad-8bcc-424d-821a-eaa472585fa4'
+    },
+    reception: {
+      userId: 'f9128f65-9684-4ef5-931f-c663a9860aa2',
+      sessionId: 'e1f2ab1f-b164-4ed5-bee9-e4460134828f'
+    },
+    technicianA: {
+      userId: '00e17239-88bc-4613-9b32-8852f4786e2b',
+      sessionId: '28259cce-5e7c-4a3e-ae26-8296306127c0'
+    },
+    technicianB: {
+      userId: 'ef94d991-f2fe-4238-882e-3486775c2da8',
+      sessionId: '05080f8b-1bed-489c-9586-78be05c43cec'
+    },
+    reviewer: {
+      userId: 'db559687-713d-4aa7-9563-bd945f0a8859',
+      sessionId: '117bdb46-23ea-4ee9-b8de-689829992a72'
+    },
+    foreign: {
+      userId: '875e9505-2736-40ef-86a6-681cb32cb9e1',
+      sessionId: '260664e7-c538-4ac4-b4c3-f74195591ea2'
+    }
+  },
+  centerId: 'a1ab3d38-87fd-481b-8b89-0379011b75fe',
+  templateId: 'd48358d7-5252-4cb3-9556-289193caf5d8',
+  guards: [
+    {
+      table: 'audit_logs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_publication',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'audit_logs',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'blocked_users',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'business_enquiry_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'content_reports',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversation_participants',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_assignment_fence',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_enquiry_effect',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'conversations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_invitations',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealership_members',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'dealerships',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_audits',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_center_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_centers',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_proofs',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_continuity_requests',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_evidence',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_evidence',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_provenance',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_identity_records',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_order_assignments',
+      name: 'zzzz_campaign_preparation_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_components',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_effective',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_presence',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_ownership_grants',
+      name: 'zz_diagnostic_source_target',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'diagnostic_source_no_truncate',
+      enabled: 'D'
+    },
+    {
+      table: 'diagnostic_pdf_artifacts',
+      name: 'zz_diagnostic_source_purge',
+      enabled: 'D'
+    },
+    ... 184 more items
+  ],
+  controlKey: 'diagnostic-evidence/2380afa6-6293-4d9d-8c23-6ff910da157a/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+}
+938_pdf_intents [
+  {
+    id: '8b2c7e4e-4a57-4be0-8e1f-f71a8c813302',
+    reportId: '98756348-1e7f-4cf4-875c-49d83e47ed94',
+    snapshotHash: 'ccfc9e607f7489005c868d2dc518e032f2fe28746b38fb9704eff44f917178cb',
+    locale: 'en',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: 'c6d4944a-95f7-4d7f-ab89-48f7f6ba3ad8',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/98756348-1e7f-4cf4-875c-49d83e47ed94/8b2c7e4e-4a57-4be0-8e1f-f71a8c813302.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:45:20.564Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '72edd6a2-8ce4-4690-a9ad-618ef9c55d3e',
+    reportId: '98756348-1e7f-4cf4-875c-49d83e47ed94',
+    snapshotHash: 'ccfc9e607f7489005c868d2dc518e032f2fe28746b38fb9704eff44f917178cb',
+    locale: 'ru',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: 'cf739929-af69-434c-a8e1-0fc1de7509b1',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/98756348-1e7f-4cf4-875c-49d83e47ed94/72edd6a2-8ce4-4690-a9ad-618ef9c55d3e.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:45:20.564Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  },
+  {
+    id: '40da54df-7703-4ccc-818a-8c609a5f0c9c',
+    reportId: '98756348-1e7f-4cf4-875c-49d83e47ed94',
+    snapshotHash: 'ccfc9e607f7489005c868d2dc518e032f2fe28746b38fb9704eff44f917178cb',
+    locale: 'tk',
+    rendererVersion: 'v1',
+    generation: 1,
+    epoch: 'b2c79d1f-381c-459b-8bf7-857bf5cd2c28',
+    state: 'pending',
+    objectKey: 'diagnostic-pdf/98756348-1e7f-4cf4-875c-49d83e47ed94/40da54df-7703-4ccc-818a-8c609a5f0c9c.pdf',
+    sha256: null,
+    sizeBytes: null,
+    attempts: 0,
+    retryAt: null,
+    failureCode: null,
+    leaseUntil: null,
+    createdAt: 2026-11-03T07:45:20.564Z,
+    verifiedAt: null,
+    cleanupRequestedAt: null,
+    cleanupCompletedAt: null
+  }
+]
+938_immutable_control_error {
+  reached: true,
+  error: 'DriverAdapterError: diagnostic_identity_evidence_immutable\n' +
+    '    at PgTransaction.onError (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+adapter-pg@7.8.0/node_modules/@prisma/adapter-pg/dist/index.js:678:11)\n' +
+    '    at PgTransaction.performIO (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+adapter-pg@7.8.0/node_modules/@prisma/adapter-pg/dist/index.js:673:12)\n' +
+    '    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n' +
+    '    at async PgTransaction.queryRaw (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+adapter-pg@7.8.0/node_modules/@prisma/adapter-pg/dist/index.js:604:30)\n' +
+    '    at async e.interpretNode (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/runtime/client.js:11:44621)\n' +
+    '    at async e.interpretNode (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/runtime/client.js:11:45065)\n' +
+    '    at async e.interpretNode (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/runtime/client.js:11:43744)\n' +
+    '    at async e.interpretNode (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/runtime/client.js:11:46285)\n' +
+    '    at async e.run (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/runtime/client.js:11:43335)\n' +
+    '    at async e.execute (/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/node_modules/.pnpm/@prisma+client@7.8.0_@typescript+typescript6@6.0.2_prisma@7.8.0_@types+react-dom@19.2.3_a6da919609b3601a640c20f26e6ab73b/node_modules/@prisma/client/runtime/client.js:57:815) {\n' +
+    '  cause: {\n' +
+    "    originalCode: 'P0001',\n" +
+    "    originalMessage: 'diagnostic_identity_evidence_immutable',\n" +
+    "    kind: 'postgres',\n" +
+    "    code: 'P0001',\n" +
+    "    severity: 'ERROR',\n" +
+    "    message: 'diagnostic_identity_evidence_immutable',\n" +
+    '    detail: undefined,\n' +
+    '    column: undefined,\n' +
+    '    hint: undefined\n' +
+    '  },\n' +
+    "  clientVersion: '7.8.0'\n" +
+    '}'
+}
+938_cleanup_receipt {
+  label: 'issue938/recovery-stage1/discovery/immutable-write-control',
+  role: 'r938_s1_discovery',
+  database: 'auto_tm_897_938_s1r1_t22fdc8_w1',
+  keys: [
+    'diagnostic-evidence/8535f61d-0ee8-4646-a27a-08053fea2b72/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1',
+    'diagnostic-pdf/98756348-1e7f-4cf4-875c-49d83e47ed94/8b2c7e4e-4a57-4be0-8e1f-f71a8c813302.pdf',
+    'diagnostic-pdf/98756348-1e7f-4cf4-875c-49d83e47ed94/72edd6a2-8ce4-4690-a9ad-618ef9c55d3e.pdf',
+    'diagnostic-pdf/98756348-1e7f-4cf4-875c-49d83e47ed94/40da54df-7703-4ccc-818a-8c609a5f0c9c.pdf',
+    'diagnostic-evidence/98dff0ea-7038-4998-855d-1283442ba87c/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+  ],
+  callers: 0,
+  sourceReceipts: 0,
+  campaignReceipts: 0,
+  roleBackends: 0,
+  roleAbsent: true,
+  objectsEmpty: true,
+  controlPreserved: true,
+  guardModesRestored: true,
+  failures: [],
+  controlKey: 'diagnostic-evidence/2380afa6-6293-4d9d-8c23-6ff910da157a/2639253ab66f01c5c4121c41b648a4d492d71527101073024166d926a0be22c1'
+} order_version_ledger [
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'reviewer assignment',
+    version: 2
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'technician assignment',
+    version: 3
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'confirmed',
+    version: 4
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'arrived',
+    version: 5
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'no ownership grant',
+    version: 5
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'first raw',
+    version: 6
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'provenance stage-upload',
+    version: 6
+  },
+  {
+    orderId: '68caa3fa-eb44-476d-8b47-58080a714584',
+    event: 'retained evidence append',
+    version: 7
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'create',
+    version: 0
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'physical authorization',
+    version: 1
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'reviewer assignment',
+    version: 2
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'technician assignment',
+    version: 3
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'confirmed',
+    version: 4
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'arrived',
+    version: 5
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'no ownership grant',
+    version: 5
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'first raw',
+    version: 6
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'provenance stage-upload',
+    version: 6
+  },
+  {
+    orderId: 'b746c1f8-688a-48f1-82ef-7059fd1a3b9b',
+    event: 'retained evidence append',
+    version: 7
+  }
+]
+
+ Test Files  4 passed (4)
+      Tests  7 passed (7)
+   Start at  15:44:18
+   Duration  72.48s (tests 97%, import 3%)
+

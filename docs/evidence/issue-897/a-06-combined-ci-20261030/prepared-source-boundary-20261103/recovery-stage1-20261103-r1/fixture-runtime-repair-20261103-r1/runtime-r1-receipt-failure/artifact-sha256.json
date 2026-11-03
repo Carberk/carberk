@@ -1,0 +1,480 @@
+{
+  "recordedAt": "2026-11-03T07:46:52.283451+00:00",
+  "files": [
+    {
+      "path": "owned-output/stage-vitest.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "owned-output/stage-vitest.stdout",
+      "sha256": "3fd1b621aa0362ff86b1430d22519c46f4668250f2652364801c634626da650e",
+      "bytes": 193
+    },
+    {
+      "path": "result.md",
+      "sha256": "b55380eb535a2d6145493ec528a3525f8c617bfe403fdfa9b8df40c6f2bfb1f4",
+      "bytes": 543
+    },
+    {
+      "path": "run/applied-migrations.json",
+      "sha256": "99f4efdbde66724779dc8e75909663aef55227f3ff82cec06c7d3a6db20eb39b",
+      "bytes": 19790
+    },
+    {
+      "path": "run/raw/cleanup-compose-down-owned-project.json",
+      "sha256": "75d15a71a560eb6ce5ca89ae32353b472d0af5af28dd95800efbbc84848f0710",
+      "bytes": 1270
+    },
+    {
+      "path": "run/raw/cleanup-compose-down-owned-project.stderr",
+      "sha256": "0f3ee688fe4d2f6691d7039173261c2512f063838802950e56f3b6ffa6be7c61",
+      "bytes": 1264
+    },
+    {
+      "path": "run/raw/cleanup-compose-down-owned-project.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-drain-owned-role-backends.json",
+      "sha256": "98fdb9416b6e3b7ad4ed8dddb9ded32f52dc9e2d5e97e2c5fb2b83c6ce92945a",
+      "bytes": 1574
+    },
+    {
+      "path": "run/raw/cleanup-drain-owned-role-backends.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-drain-owned-role-backends.stdout",
+      "sha256": "3251b04123103845f2a7527a61d21839810092ce32fd925f0239d61f5336579f",
+      "bytes": 48
+    },
+    {
+      "path": "run/raw/cleanup-owned-docker-residuals.json",
+      "sha256": "0013e327216d16b3417d5190785c1ebd6df55715cee3477d6acc95962312d0e2",
+      "bytes": 933
+    },
+    {
+      "path": "run/raw/cleanup-owned-docker-residuals.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-owned-docker-residuals.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-owned-network-residuals.json",
+      "sha256": "0b9f205894f5b8e5cb84513380d60f3392f105e9c632f52839591d9ca0fe5f2d",
+      "bytes": 888
+    },
+    {
+      "path": "run/raw/cleanup-owned-network-residuals.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-owned-network-residuals.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-owned-port-residuals.json",
+      "sha256": "e81856eb074e2e65ffab14bdb676f9c1dfafb9f91d7275a9dc19f244893e2ff2",
+      "bytes": 846
+    },
+    {
+      "path": "run/raw/cleanup-owned-port-residuals.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-owned-port-residuals.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-owned-postgres-cleanup.json",
+      "sha256": "40d8123f4ca8a604d497429e36904e01487e2edc6f9203342d8c1d30efa49ee9",
+      "bytes": 1529
+    },
+    {
+      "path": "run/raw/cleanup-owned-postgres-cleanup.stderr",
+      "sha256": "caf53e181365119db951037c83e279bed44cc376892510044e0e44bf6adc65c6",
+      "bytes": 230
+    },
+    {
+      "path": "run/raw/cleanup-owned-postgres-cleanup.stdout",
+      "sha256": "a41878d1bcee8d4108f2e06e9f4fdd6eeaa3b9f8ae0bb1fd5b7d597269f1c9aa",
+      "bytes": 197
+    },
+    {
+      "path": "run/raw/cleanup-owned-volumes-residuals.json",
+      "sha256": "01d51c4c92b2f02fb6d67fbf4e615746322f404d1c36893cb95c62d413572a4d",
+      "bytes": 886
+    },
+    {
+      "path": "run/raw/cleanup-owned-volumes-residuals.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-owned-volumes-residuals.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-postgres-database-role-absence.json",
+      "sha256": "91dda30c8b3903d71495e3aa03b72b0b501ccdab7877e5f291ae21012cc84a15",
+      "bytes": 1676
+    },
+    {
+      "path": "run/raw/cleanup-postgres-database-role-absence.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-postgres-database-role-absence.stdout",
+      "sha256": "2ce220d8d046f85fd648a70bc8e4b330562a745e56a371ee36e2596a39f56a37",
+      "bytes": 4
+    },
+    {
+      "path": "run/raw/cleanup-postgres-source-campaign-residuals.json",
+      "sha256": "55be653eba408923aa231511aff6d92d2d8f8e5a7e47643da2301dedbf588934",
+      "bytes": 1603
+    },
+    {
+      "path": "run/raw/cleanup-postgres-source-campaign-residuals.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-postgres-source-campaign-residuals.stdout",
+      "sha256": "54f1af924b31a4199577c9204725cdbd4a413637e28e59022d204dd177bb5294",
+      "bytes": 49
+    },
+    {
+      "path": "run/raw/cleanup-read-cleanup-receipts.json",
+      "sha256": "b580059653a85c29b4846be2ebe875be1f5f44c3765a324d35722fb5ffbbfc2a",
+      "bytes": 1112
+    },
+    {
+      "path": "run/raw/cleanup-read-cleanup-receipts.stderr",
+      "sha256": "5370b01f31f38febb618e82de566a6f46555120171efa921bb80a9f304d02242",
+      "bytes": 965
+    },
+    {
+      "path": "run/raw/cleanup-read-cleanup-receipts.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-redis-db0-preserved.json",
+      "sha256": "ce6772d1f5b072f9bb36e9b77ee457c71f05285e5517373c53a021b4ce32a74f",
+      "bytes": 1292
+    },
+    {
+      "path": "run/raw/cleanup-redis-db0-preserved.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-redis-db0-preserved.stdout",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    {
+      "path": "run/raw/cleanup-redis-dbsize-db1.json",
+      "sha256": "f597f733329ea2583a95ad3ffecee6f8b1dc36f478ffa16588c1d56b99b9ffa7",
+      "bytes": 1270
+    },
+    {
+      "path": "run/raw/cleanup-redis-dbsize-db1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-redis-dbsize-db1.stdout",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    {
+      "path": "run/raw/cleanup-redis-flush-db1.json",
+      "sha256": "f776320df9fae3ce3bada2ea4a45a161cc22994f41a83c66f89de586f70a93ff",
+      "bytes": 1280
+    },
+    {
+      "path": "run/raw/cleanup-redis-flush-db1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-redis-flush-db1.stdout",
+      "sha256": "a12b7cb43c9d9134b5bb1b35e9096b66775d9e92e7611d1cc92b02edd6782a87",
+      "bytes": 3
+    },
+    {
+      "path": "run/raw/cleanup-s3-registry-residuals.json",
+      "sha256": "71ebeb8cd01cb28910102b67b239700b1fd3fc89a6768cfb6be3c9a2258fd5b5",
+      "bytes": 1222
+    },
+    {
+      "path": "run/raw/cleanup-s3-registry-residuals.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/cleanup-s3-registry-residuals.stdout",
+      "sha256": "9d818b038f5962c191fa4af94c0bc16b0b110eeb077b31df01ce0e15d490bb20",
+      "bytes": 78
+    },
+    {
+      "path": "run/raw/preflight-containers.json",
+      "sha256": "0309d1fc550260ed636cac0ddc112b07b27ac229df9dd214eeb252fb6925f289",
+      "bytes": 880
+    },
+    {
+      "path": "run/raw/preflight-containers.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-containers.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-images.json",
+      "sha256": "614d34d4814224e80fdcdf02c414d2061efcfcbd013e245008f530b75f181b71",
+      "bytes": 959
+    },
+    {
+      "path": "run/raw/preflight-images.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-images.stdout",
+      "sha256": "20583727fb7834523321bc2a39c061c55d563a857bf90b3350686c5f3b64ddfc",
+      "bytes": 399
+    },
+    {
+      "path": "run/raw/preflight-listeners.json",
+      "sha256": "02266ca9544d9278745ad843ba75125b694fa242d75387b8410c872fc69a2e50",
+      "bytes": 819
+    },
+    {
+      "path": "run/raw/preflight-listeners.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-listeners.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-networks.json",
+      "sha256": "0d93003e89b8be9a530f65453f334e6c32f904a970925b0dd2e1e8def8b88206",
+      "bytes": 878
+    },
+    {
+      "path": "run/raw/preflight-networks.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-networks.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-resolved-compose.json",
+      "sha256": "98cdb04bc129654b0d84f3c82e41feda90c18a4e9d8f7a4be6ce68d1181af554",
+      "bytes": 1236
+    },
+    {
+      "path": "run/raw/preflight-resolved-compose.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-resolved-compose.stdout",
+      "sha256": "195168eb0fd52bd3e998ad5b2333c51a2eb59ab9ebd4859b163c1c08d4c99414",
+      "bytes": 3089
+    },
+    {
+      "path": "run/raw/preflight-volumes.json",
+      "sha256": "ebf403939430ed64cfae7b66454acbb50bfcb70255665ff95497089d88cf5c76",
+      "bytes": 873
+    },
+    {
+      "path": "run/raw/preflight-volumes.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/preflight-volumes.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-apply-migrations-to-base.json",
+      "sha256": "4432572782c6c11208c9be1e504b8f8a24e0824d69247adf94f59dbe5a3803ee",
+      "bytes": 959
+    },
+    {
+      "path": "run/raw/setup-apply-migrations-to-base.stderr",
+      "sha256": "e40df379b3ca806791529144da53b048cf1a232201fdfc817692665ba9ad0093",
+      "bytes": 93
+    },
+    {
+      "path": "run/raw/setup-apply-migrations-to-base.stdout",
+      "sha256": "b91c4ed847d6399159c5c73bc92f88c6765e42307d84761084602f04cee87112",
+      "bytes": 14892
+    },
+    {
+      "path": "run/raw/setup-capture-applied-migration-identity.json",
+      "sha256": "d3be21c2b7e49fc54765bbf3e86e4c52d1ac4c88626061bc3cd9e4131bf02c3a",
+      "bytes": 1777
+    },
+    {
+      "path": "run/raw/setup-capture-applied-migration-identity.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-capture-applied-migration-identity.stdout",
+      "sha256": "f21487794c6713b923f3006236b185f3d68bfcf1259966476c8aa92107893513",
+      "bytes": 16294
+    },
+    {
+      "path": "run/raw/setup-compose-up-owned-project.json",
+      "sha256": "1bc69a5289a7baba7ca7e4165ace874ac9cf0ce3947ad8110195529732cd8c68",
+      "bytes": 2216
+    },
+    {
+      "path": "run/raw/setup-compose-up-owned-project.stderr",
+      "sha256": "3d0f1c9c46c9bbbc313e2749362b133dbc61e66ef770113ba1b02f960c69a001",
+      "bytes": 1642
+    },
+    {
+      "path": "run/raw/setup-compose-up-owned-project.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-create-base-database.json",
+      "sha256": "3a3f12bd22a7fd79e87ef2fe4da9678cf55ee73b251319bc8223b23a4542f324",
+      "bytes": 2345
+    },
+    {
+      "path": "run/raw/setup-create-base-database.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-create-base-database.stdout",
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7",
+      "bytes": 16
+    },
+    {
+      "path": "run/raw/setup-minio-port.json",
+      "sha256": "809dda7f154ab568e1c614e413d6f5539e4b25b4a43bada96b3f70162890e1eb",
+      "bytes": 2144
+    },
+    {
+      "path": "run/raw/setup-minio-port.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-minio-port.stdout",
+      "sha256": "14ba55f4f5311b93c8eed49c4817d960278180b501da145e528c7d1a2864dca5",
+      "bytes": 16
+    },
+    {
+      "path": "run/raw/setup-postgres-port.json",
+      "sha256": "d7d42077479e724d1bec070dfed48627a9feb0b70274a3fd91d0ed5621ef01b9",
+      "bytes": 2157
+    },
+    {
+      "path": "run/raw/setup-postgres-port.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-postgres-port.stdout",
+      "sha256": "5ef054a11830f51b9b687cc7ba65b2e0631f1d8e295ce2e24a8ba9d41535e520",
+      "bytes": 16
+    },
+    {
+      "path": "run/raw/setup-redis-db0-baseline.json",
+      "sha256": "6ccc9b5d1621efa818b939af7f52b4d72255040e32bdca884bd43a13fccd67e3",
+      "bytes": 1283
+    },
+    {
+      "path": "run/raw/setup-redis-db0-baseline.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-redis-db0-baseline.stdout",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    {
+      "path": "run/raw/setup-redis-port.json",
+      "sha256": "50ddbb3e8ae477312a697c1d4363356054dc243843b7dfe7cd6630336c906738",
+      "bytes": 2144
+    },
+    {
+      "path": "run/raw/setup-redis-port.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-redis-port.stdout",
+      "sha256": "c1f8d56c01194af84ab7e6dc24af81affd7cb48ee0b681bdc632e7c9bf3fb002",
+      "bytes": 16
+    },
+    {
+      "path": "run/raw/setup-verify-base-database.json",
+      "sha256": "705c7c6f155fea804ad2c27dda318e4adde0d4172682ee165fb878e90173c0d6",
+      "bytes": 2386
+    },
+    {
+      "path": "run/raw/setup-verify-base-database.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/setup-verify-base-database.stdout",
+      "sha256": "ef079025e692e3db045f9c9c15abcf41a56994e164dd08a9b9fa187e616ad39c",
+      "bytes": 21
+    },
+    {
+      "path": "run/raw/stage-seven-case-vitest.json",
+      "sha256": "c67022e32c6ff71a2e0afa1a78ed7aee0b92b3063a5a92788bc643c98d5b8cf8",
+      "bytes": 2396
+    },
+    {
+      "path": "run/raw/stage-seven-case-vitest.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "run/raw/stage-seven-case-vitest.stdout",
+      "sha256": "3fd1b621aa0362ff86b1430d22519c46f4668250f2652364801c634626da650e",
+      "bytes": 193
+    },
+    {
+      "path": "run/run-summary.json",
+      "sha256": "bf312bf97d45fec80b90f8ace91fbea00e0590b510b80d0178ff976ce166a8b4",
+      "bytes": 47483
+    }
+  ]
+}

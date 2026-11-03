@@ -1,0 +1,26 @@
+{
+  "phase": "cleanup",
+  "name": "read-cleanup-receipts",
+  "argv": [
+    "node",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/read-cleanup-receipts.mjs"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {
+    "STAGE_STDOUT_PATH": "/tmp/issue938-runtime-repair-20261103-r1/owned-output/stage-vitest.stdout"
+  },
+  "startedAt": "2026-11-03T07:36:02.955803+00:00",
+  "endedAt": "2026-11-03T07:36:02.981371+00:00",
+  "durationSeconds": 0.025584499999993682,
+  "exit": 1,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-read-cleanup-receipts.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/cleanup-read-cleanup-receipts.stderr",
+    "sha256": "5370b01f31f38febb618e82de566a6f46555120171efa921bb80a9f304d02242",
+    "bytes": 965
+  }
+}

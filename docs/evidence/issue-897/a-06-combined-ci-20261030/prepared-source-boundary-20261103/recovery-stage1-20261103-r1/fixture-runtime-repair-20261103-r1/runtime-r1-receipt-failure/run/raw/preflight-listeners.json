@@ -1,0 +1,28 @@
+{
+  "phase": "preflight",
+  "name": "listeners",
+  "argv": [
+    "lsof",
+    "-nP",
+    "-iTCP:61168",
+    "-iTCP:61169",
+    "-iTCP:61170",
+    "-sTCP:LISTEN"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {},
+  "startedAt": "2026-11-03T07:34:41.763658+00:00",
+  "endedAt": "2026-11-03T07:34:41.790708+00:00",
+  "durationSeconds": 0.027062749999999913,
+  "exit": 1,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/preflight-listeners.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run/raw/preflight-listeners.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "phase": "preflight",
+  "name": "networks",
+  "argv": [
+    "docker",
+    "network",
+    "ls",
+    "--filter",
+    "label=com.docker.compose.project=auto_tm_ci_897_938_s1_20261103_r1",
+    "--format",
+    "{{.Name}}"
+  ],
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "environment": {},
+  "startedAt": "2026-11-03T07:44:10.031037+00:00",
+  "endedAt": "2026-11-03T07:44:10.044046+00:00",
+  "durationSeconds": 0.013021041999999983,
+  "exit": 0,
+  "stdout": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run-r2/raw/preflight-networks.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "stderr": {
+    "path": "/tmp/issue938-runtime-repair-20261103-r1/run-r2/raw/preflight-networks.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}
