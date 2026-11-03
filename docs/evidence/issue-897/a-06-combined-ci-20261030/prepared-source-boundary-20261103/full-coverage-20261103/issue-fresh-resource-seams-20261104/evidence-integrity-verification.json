@@ -1,0 +1,10 @@
+{
+  "kind": "issue946-evidence-integrity",
+  "recorded_at_utc": "2026-11-03T23:52:12.274538+00:00",
+  "final_commands": 6,
+  "all_final_exit_zero": true,
+  "decoded_streams_verified": 14,
+  "all_decoded_raw_hashes_match": true,
+  "source_inputs_match_source_commit": true,
+  "runtime_not_started": true
+}

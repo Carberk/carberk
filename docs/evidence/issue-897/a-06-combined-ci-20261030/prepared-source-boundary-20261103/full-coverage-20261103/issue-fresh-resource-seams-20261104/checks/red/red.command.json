@@ -1,0 +1,26 @@
+{
+  "kind": "issue946-boundary-red",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "head": "b425fe1800514f4253872463eb0db7c35556302d",
+  "argv": [
+    "pnpm",
+    "--filter",
+    "@auto-tm/api",
+    "exec",
+    "vitest",
+    "run",
+    "test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "--maxWorkers=1"
+  ],
+  "environment_overrides": {
+    "AUTO_TM_TEST_DATABASES": "off",
+    "NODE_OPTIONS": "--import=tsx"
+  },
+  "exit": 1,
+  "stdout": "checks/red/red.stdout",
+  "stderr": "checks/red/red.stderr",
+  "stdout_sha256": "a51bcdee64532c0ba6505cba02a4b97d608023af53b4e5b0e375b533fedbf989",
+  "stderr_sha256": "ac347fc64062def24ac9c10351a399fca9efef52b675e9f84fef3e3c2204a17f",
+  "source_state": "clean #945 helper at retained HEAD; new boundary test was applied temporarily; source was restored immediately after capture; no commit/reset/checkout replacement.",
+  "captured_at_file_mtime_utc": "2026-11-03T23:49:37.378083+00:00"
+}

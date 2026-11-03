@@ -1,0 +1,248 @@
+{
+  "receipt_version": 2,
+  "kind": "issue946-fresh-resource-seams-offline-serial-checks",
+  "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+  "head": "b425fe1800514f4253872463eb0db7c35556302d",
+  "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+  "source_inputs": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+      "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+      "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+    },
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+      "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+      "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+    }
+  },
+  "commands": [
+    {
+      "name": "focused-boundary-green",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "b425fe1800514f4253872463eb0db7c35556302d",
+      "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "vitest",
+        "run",
+        "test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+        "--maxWorkers=1"
+      ],
+      "environment_overrides": {
+        "AUTO_TM_TEST_DATABASES": "off",
+        "NODE_OPTIONS": "--import=tsx"
+      },
+      "started_at_utc": "2026-11-03T23:46:47.243559+00:00",
+      "ended_at_utc": "2026-11-03T23:46:48.734942+00:00",
+      "started_monotonic_ns": 73837541,
+      "ended_monotonic_ns": 1564870916,
+      "elapsed_ns": 1491033375,
+      "elapsed_seconds": "1.491033375",
+      "exit": 0,
+      "stdout": "focused-boundary-green.stdout",
+      "stderr": "focused-boundary-green.stderr",
+      "stdout_sha256": "efd81e390bdb304887441e67c458049a34cf4e79ff71168f16701e037e8b9da8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 220,
+      "stderr_bytes": 0,
+      "source_inputs": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+          "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+          "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+        }
+      }
+    },
+    {
+      "name": "api-typecheck",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "b425fe1800514f4253872463eb0db7c35556302d",
+      "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T23:46:48.735239+00:00",
+      "ended_at_utc": "2026-11-03T23:46:51.344108+00:00",
+      "started_monotonic_ns": 1565174041,
+      "ended_monotonic_ns": 4174029500,
+      "elapsed_ns": 2608855459,
+      "elapsed_seconds": "2.608855459",
+      "exit": 0,
+      "stdout": "api-typecheck.stdout",
+      "stderr": "api-typecheck.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "stdout_bytes": 0,
+      "stderr_bytes": 15,
+      "source_inputs": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+          "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+          "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+        }
+      }
+    },
+    {
+      "name": "api-tsc6",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "b425fe1800514f4253872463eb0db7c35556302d",
+      "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T23:46:51.344458+00:00",
+      "ended_at_utc": "2026-11-03T23:46:58.900530+00:00",
+      "started_monotonic_ns": 4174395083,
+      "ended_monotonic_ns": 11730461708,
+      "elapsed_ns": 7556066625,
+      "elapsed_seconds": "7.556066625",
+      "exit": 0,
+      "stdout": "api-tsc6.stdout",
+      "stderr": "api-tsc6.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "source_inputs": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+          "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+          "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+        }
+      }
+    },
+    {
+      "name": "api-lint",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "b425fe1800514f4253872463eb0db7c35556302d",
+      "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T23:46:58.900910+00:00",
+      "ended_at_utc": "2026-11-03T23:47:04.380944+00:00",
+      "started_monotonic_ns": 11730855041,
+      "ended_monotonic_ns": 17210889000,
+      "elapsed_ns": 5480033959,
+      "elapsed_seconds": "5.480033959",
+      "exit": 0,
+      "stdout": "api-lint.stdout",
+      "stderr": "api-lint.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "stdout_bytes": 0,
+      "stderr_bytes": 28,
+      "source_inputs": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+          "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+          "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+        }
+      }
+    },
+    {
+      "name": "api-build",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "b425fe1800514f4253872463eb0db7c35556302d",
+      "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "build"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T23:47:04.381335+00:00",
+      "ended_at_utc": "2026-11-03T23:47:10.682148+00:00",
+      "started_monotonic_ns": 17211286166,
+      "ended_monotonic_ns": 23512099541,
+      "elapsed_ns": 6300813375,
+      "elapsed_seconds": "6.300813375",
+      "exit": 0,
+      "stdout": "api-build.stdout",
+      "stderr": "api-build.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "stdout_bytes": 0,
+      "stderr_bytes": 13,
+      "source_inputs": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+          "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+          "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+        }
+      }
+    },
+    {
+      "name": "git-diff-check",
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+      "head": "b425fe1800514f4253872463eb0db7c35556302d",
+      "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "environment_overrides": {},
+      "started_at_utc": "2026-11-03T23:47:10.682443+00:00",
+      "ended_at_utc": "2026-11-03T23:47:10.704603+00:00",
+      "started_monotonic_ns": 23512399625,
+      "ended_monotonic_ns": 23534554916,
+      "elapsed_ns": 22155291,
+      "elapsed_seconds": "0.022155291",
+      "exit": 0,
+      "stdout": "git-diff-check.stdout",
+      "stderr": "git-diff-check.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_bytes": 0,
+      "source_inputs": {
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+          "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+          "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+        },
+        "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+          "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+          "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+        }
+      }
+    }
+  ],
+  "slot_utc": {
+    "start": "2026-11-03T22:32:32Z",
+    "end": "2026-11-04T00:02:32Z",
+    "executor": "same retained executor"
+  }
+}

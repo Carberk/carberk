@@ -1,0 +1,2 @@
+a51bcdee64532c0ba6505cba02a4b97d608023af53b4e5b0e375b533fedbf989  /tmp/issue946-fresh-resource-seams-20261104/red.stdout
+ac347fc64062def24ac9c10351a399fca9efef52b675e9f84fef3e3c2204a17f  /tmp/issue946-fresh-resource-seams-20261104/red.stderr

@@ -1,0 +1,87 @@
+{
+  "kind": "issue946-final-allow-list-audit",
+  "recorded_at_utc": "2026-11-03T23:52:12.187141+00:00",
+  "base": {
+    "commit": "b425fe1800514f4253872463eb0db7c35556302d",
+    "tree": "fb1675cbcab211571632617c52adb04563bb7ba6"
+  },
+  "assembled_coordinator": {
+    "commit": "007b27c488a70bb74b646b044d5c572681d9bd89",
+    "tree": "31b6ca07d1365f26faf88b74c5a93c2a1bbe9fd8"
+  },
+  "prior_source": {
+    "commit": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+    "tree": "2ee8e9ee3940eb9b3678c3aa33a6ec6bfe804e98"
+  },
+  "source_commit": {
+    "commit": "362aab7523a329ed8c8208efcd4b0b973a16e04d",
+    "tree": "a4e6b2aa552352ea171dc5e1a32f872b16b944c1"
+  },
+  "allowed_source_paths": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts"
+  ],
+  "allowed_evidence_prefix": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/**",
+  "changed_source_paths_base_to_source": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "source_hashes": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": {
+      "sha256": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+      "git_blob_sha1": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3"
+    },
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": {
+      "sha256": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849",
+      "git_blob_sha1": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+    }
+  },
+  "source_diff_sha256": "f69ddb897a1c8746d7cbdab992bf86dda2e29bdfd0962ea0ea26f95d558a867c",
+  "forbidden_changed_paths": [],
+  "production_config_dependency_migration_workflow_changes": [],
+  "original_f16_f17_selector_assertion_bytes_changed": false,
+  "prior_evidence_changed": [],
+  "prior_tracked_paths_preserved": true,
+  "prior_tracked_entry_count": 5982,
+  "runtime_resources_started": false,
+  "runtime_orchestration": false,
+  "issue944_run": false,
+  "issue942_f43_943_pr904_actions": false,
+  "VITEST_POOL_ID_1_prerequisite_changed": false,
+  "worktree_before_evidence": {
+    "tracked_diff_after_source_commit": "",
+    "untracked_before_evidence": [
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-build.stderr.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-build.stdout.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-lint.stderr.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-lint.stdout.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-tsc6.stderr.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-tsc6.stdout.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-typecheck.stderr.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/api-typecheck.stdout.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/focused-boundary-green.stderr.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/focused-boundary-green.stdout.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/git-diff-check.stderr.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/git-diff-check.stdout.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/offline-command-receipts.json",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/final/offline-command-receipts.json.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/red/raw-sha256.txt",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/red/red.command.json",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/red/red.stderr.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/checks/red/red.stdout.base64",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/identity-base-settings.json",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/provenance/coordinator-release-6617201630.json",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/provenance/issue946-full-read.json",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/provenance/parent944-amendment-6617119322.json",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/raw-stream-encoding.json",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/source.diff",
+      "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/issue-fresh-resource-seams-20261104/static-compatibility-table.json"
+    ]
+  },
+  "source_diff": {
+    "logical_path": "source.diff",
+    "stored_path": "source.diff.base64",
+    "encoding": "base64",
+    "sha256": "f69ddb897a1c8746d7cbdab992bf86dda2e29bdfd0962ea0ea26f95d558a867c"
+  }
+}
