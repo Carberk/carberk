@@ -1,0 +1,282 @@
+{
+  "kind": "ledger-proof-correction-final-source-audit",
+  "contract": "https://github.com/Carberk/carberk/issues/938#issuecomment-6593883585",
+  "candidate_base": "dfb84ee85d8e064af41c3fb55efd1ca84edc313b",
+  "candidate_base_tree": "2172c853c3265ceb1fe21ee1bb0c27aae3867e7f",
+  "prior_clean_handoff": "163af4b293d3fac47385069d09eb85d3ad3e7dae",
+  "source_checkpoint": "94ad0134a5d5ec03beb70a69746054637f0e937b",
+  "source_tree": "d12ade3deddcb50fcd6a8ab1312d5ddd2a4ae0c6",
+  "lineage_note": "candidate_base is the coordinator's separate assembly lineage; its docs-only commits are not on the writer branch, so base-to-source docs differences are coordinator files absent here, not writer edits",
+  "non_doc_paths_base_to_source": [
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "non_doc_paths_within_allow_list": true,
+  "doc_paths_base_to_source_coordinator_lineage": [
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/coordinator-terminal-audit.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/coordinator-terminal-disposition.md",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/coordinator-assembly-audit.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/coordinator-assembly-audit.md",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/helper-completion-repair-20261103/coordinator-assembly-audit.json",
+    "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/coordinator-standards-ingest-ec2494b9-20261103.json",
+    "docs/evidence/issue-897/a-pr904-audit-20261102/supplemental-repair-935/independent-standards-ec2494b9-20261103.md"
+  ],
+  "writer_doc_paths_prior_handoff_to_source": [
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-build.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-build.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-lint.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-lint.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-tsc6.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-tsc6.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-typecheck.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/api-typecheck.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/final-source-audit.json",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/git-diff-check.stderr",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/git-diff-check.stdout",
+    "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/ledger-proof-correction-20261103/offline-command-receipts.json"
+  ],
+  "writer_doc_paths_within_evidence_dir": true,
+  "non_doc_paths_prior_handoff_to_source": [
+    "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "changed": [
+    {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "base_blob": "48053c66e5a7a88520f1373a1d0662211f965fec",
+      "source_blob": "584fa51278ea596476d0634430421713014bde0f",
+      "source_sha256": "e91fc6851300867c037842b29a62eeb245acca7972185f85c454d8cf823b9616",
+      "numstat": "12\t2\tapps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "base_blob": "b37804dd30f4e39ff03ae962e43de5b696c0a39b",
+      "source_blob": "c41d491cb65e1f72b3c3be200de95de0c317bc59",
+      "source_sha256": "4bb54bf55b9fc9671b048735b330f4e0293edfff5726d8e7230d2bf27d6b0b80",
+      "numstat": "14\t0\tapps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts"
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "base_blob": "c45a3cf7a7356ccd8dc8310abbd8d8b4e7d1b540",
+      "source_blob": "60f57bd8a59c19421002dc370c400d55ed57269f",
+      "source_sha256": "3c7910787890d18775edfd7685e9a1860df238573800277b49d9f24771efc7eb",
+      "numstat": "11\t0\tapps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts"
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "base_blob": "31cd86c86978e5daeeb48723be91e3c643a94af2",
+      "source_blob": "d444304d075ce1d2450a8139fca22859edca5667",
+      "source_sha256": "d7fb63faca52308b5708844dce1e1a46a86cc407c2c0b2b5365121a7e60825b5",
+      "numstat": "14\t0\tapps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts"
+    }
+  ],
+  "diff_sha256": "69400abbdfa6a5617128c1fc74f6b3a83c0a6828f0a29358397ea3dc31e0484b",
+  "completion_fix_unchanged": true,
+  "original_nine_plus_memory": [
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "expected": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "current": "5c34a9422a3a661c2f700f9fb24c6bd1cbbed2414a281fe71217cf86692f7a38",
+      "source_87456f4f_blob": "7e6559cac6520e615512751e4ad5eb6ba9453e90",
+      "source_blob": "7e6559cac6520e615512751e4ad5eb6ba9453e90",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "expected": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "current": "82ceb0ab56f6f9737af7fa0ba1c905f48bb4bd1d38a030fd574faf77752560b2",
+      "source_87456f4f_blob": "209493d3a530ff54ec0d81c61643001d2ac4bee0",
+      "source_blob": "209493d3a530ff54ec0d81c61643001d2ac4bee0",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "expected": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "current": "f00a56ec54efac488123886f460666bb253b62a48316cc1d4efbb8eab7fb4e14",
+      "source_87456f4f_blob": "ccd2c4ec15705efd9be3d01d4b034d347378daa3",
+      "source_blob": "ccd2c4ec15705efd9be3d01d4b034d347378daa3",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "expected": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "current": "911661047bbadf3cd10965fe38214c9a56aa9af74344272538b03ee47b1a84bf",
+      "source_87456f4f_blob": "cbc2d257e6be970ec8cf85775b927fbe82f850af",
+      "source_blob": "cbc2d257e6be970ec8cf85775b927fbe82f850af",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.spec.ts",
+      "expected": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "current": "8dcaacecb4192eb951ac093e2e3ac6c7280e16804d554af0652551eb4deeda98",
+      "source_87456f4f_blob": "3d3cb6ab9f144656962660e2d6c4d96e5e2413c6",
+      "source_blob": "3d3cb6ab9f144656962660e2d6c4d96e5e2413c6",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/StaffAuthorityHttp.spec.ts",
+      "expected": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "current": "f5834343d668c46b827ac1f0da0b750bd532410bb7659f21fa768da5ec06e2b9",
+      "source_87456f4f_blob": "c244b5eaf0b76d20340f82eae7312771c5871992",
+      "source_blob": "c244b5eaf0b76d20340f82eae7312771c5871992",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/IdentityAuthorityPrepared.spec.ts",
+      "expected": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "current": "d9f3970a25666bf8cc4b41939e3747bae9d159e0d965b0ed7bfbdac7a848ed0c",
+      "source_87456f4f_blob": "6465e452055125b8d78e1daf4f62422773ff40a0",
+      "source_blob": "6465e452055125b8d78e1daf4f62422773ff40a0",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticMaterialPrepared.spec.ts",
+      "expected": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "current": "3f05c27a3a4c5195e4dd918cdc3e84c04ba28494532114a3f8696e72f4b18916",
+      "source_87456f4f_blob": "fcaaa429f8c03e0550b4e76422b5936bdf62f1c4",
+      "source_blob": "fcaaa429f8c03e0550b4e76422b5936bdf62f1c4",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/DiagnosticReportsPrepared.spec.ts",
+      "expected": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "current": "b40cd7c50e8934aacab3399e34c73bf0da21e293824f309d8ee890107992dbde",
+      "source_87456f4f_blob": "c646fe7b8e736c9b70d7b905a6b6eb3aaf1275c4",
+      "source_blob": "c646fe7b8e736c9b70d7b905a6b6eb3aaf1275c4",
+      "equal": true
+    },
+    {
+      "path": "packages/db/src/testing/DiagnosticMemoryDatabase.ts",
+      "expected": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "current": "16d70417b0155edf56e940fcf912fd93255a73ce38c7b00a6e0910ddf3e8ce1c",
+      "source_87456f4f_blob": "891bf61685addc418cfe026605a7ef770d803ce6",
+      "source_blob": "891bf61685addc418cfe026605a7ef770d803ce6",
+      "equal": true
+    }
+  ],
+  "discovery_e2e_unchanged": true,
+  "prior_evidence_preserved": {
+    "count": 40,
+    "all_equal": true
+  },
+  "assertion_map": {
+    "helper_no_ownership_grant_5": {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "lines": [
+        319,
+        320
+      ]
+    },
+    "helper_first_raw_6_or_public_7": {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "lines": [
+        324
+      ]
+    },
+    "helper_provenance_stage_upload_6_or_public_7": {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "lines": [
+        340
+      ]
+    },
+    "helper_proof_issue_read_7_or_public_8": {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "lines": [
+        375
+      ]
+    },
+    "helper_persisted_version_read": {
+      "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+      "lines": [
+        307
+      ]
+    },
+    "handoff_reviewer_proof_detail_200": {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "lines": [
+        9
+      ]
+    },
+    "handoff_private_B_literal_ledger_0_1_2_3_4_5_5_6_6_7_7": {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "lines": [
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ]
+    },
+    "handoff_persisted_B_version_7_and_proof_pin_7": {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "lines": [
+        14,
+        15
+      ]
+    },
+    "handoff_retained_controls_technician_proof_403_reviewer_foreign_403_reassign_empty": {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "lines": [
+        34,
+        35,
+        36,
+        37,
+        40
+      ]
+    },
+    "capture_public_literal_ledger_0_1_2_3_4_5_6_6_7": {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "lines": [
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ]
+    },
+    "readers_public_B_literal_ledger_0_1_2_3_4_5_6_6_7_7_8_8": {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "lines": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33
+      ]
+    }
+  },
+  "open_items": [
+    "Redis DB1 flush/zero, Compose resolved-config hash and globalSetup failed-setup fallback (Spec review finding 4) remain an open pre-runtime packet item; not addressed by this source correction"
+  ],
+  "not_claimed": [
+    "#938 ticket PASS",
+    "runtime PASS",
+    "#934 PASS",
+    "Milestone A acceptance"
+  ],
+  "runtime_db_storage_services": "not started; held"
+}
