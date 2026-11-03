@@ -33,6 +33,7 @@ No simulator screenshot or recording was captured because the device remained he
 
 - `pnpm --filter @auto-tm/contracts build` (required clean-base package build; generated output is ignored)
 - `pnpm --filter @auto-tm/mobile exec vitest run test/video-prototype` — 2 files, 14 tests passed
+- The issue's literal `pnpm --filter @auto-tm/mobile test -- test/video-prototype` was also run. The package script expanded this to the full mobile suite (358 files / 3,834 tests); it reached 3,833 passed and one unrelated pre-existing Cabinet ordering failure (`test/screens/cabinet.spec.tsx`, expected Language before Your services). The explicitly scoped command above is the passing prototype gate.
 - `pnpm --filter @auto-tm/mobile typecheck` — passed
 - `pnpm --filter @auto-tm/mobile lint` — passed
 - `git diff --check` — passed
