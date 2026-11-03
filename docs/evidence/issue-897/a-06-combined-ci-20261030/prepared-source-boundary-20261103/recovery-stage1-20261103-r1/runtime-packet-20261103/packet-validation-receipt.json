@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-11-03T04:16:07.785Z",
+  "recordedAt": "2026-11-03T05:36:56.621Z",
   "argv": [
     "/usr/local/bin/node",
     "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/packet-validation.mjs"
@@ -13,9 +13,12 @@
       "redis-port",
       "minio-port",
       "create-base-database",
-      "verify-base-database"
+      "verify-base-database",
+      "apply-migrations-to-base",
+      "capture-applied-migration-identity"
     ],
     "cleanupNames": [
+      "read-cleanup-receipts",
       "drain-owned-role-backends",
       "redis-flush-db1",
       "redis-dbsize-db1",
@@ -39,14 +42,25 @@
       "s3-fallback-residuals",
       "fallback-compose-down"
     ],
-    "scriptsSyntaxChecked": 4
+    "scriptsSyntaxChecked": 6,
+    "explicitWorkingDirectories": true,
+    "appliedMigrationPlan": {
+      "inputPinsPath": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/input-pins.json",
+      "expectedMigrationCount": 102,
+      "capturePath": "/tmp/issue938-runtime-packet-20261103/applied-migrations.json",
+      "captureCommand": "capture-applied-migrations.mjs",
+      "requiresAllFinished": true,
+      "requiresChecksumEquality": true
+    }
   },
   "hashes": {
-    "drain-owned-role-backends.mjs": "9026bbfbf1d77021c34572b284bf990cc35e6f17abb576c08b4917ad3f7fef9a",
-    "owned-postgres-cleanup.mjs": "6cfcfb1fa2ad5e42d5b25d1d3eb514be70e5ec699832ba06f362e4db985b2692",
-    "owned-source-campaign-check.mjs": "ceac4e5875a65e840d3d553953d3d153ed9c9f9f1748c89b81f022c6aadbfbc0",
+    "drain-owned-role-backends.mjs": "59a0b05f97eee43781552edde0473a325263af528d569a52c17b777c6e4e5a2e",
+    "owned-postgres-cleanup.mjs": "90800e369ff9919bae0afcab8f0182772b464cffe6593366f9b888e452231602",
+    "owned-source-campaign-check.mjs": "f25c38cff0d1c7945c4dfdf8a45b55e64f6f4270de8275d97d52ba69bc46e77f",
     "owned-s3-inventory.mjs": "8097dfdf56da0c495f0a981cf941230a40ca4d8b76a81118576eb08d46712f0b",
-    "stage-command.json": "4345650d7130f6fc8411f4bee4780b03ac1dc61b19e3ba8b19aa91867022faab",
-    "cleanup-command-packet.json": "0b42f5cf272b711c081b2f7a7e561c2667008f4d576c53fa9d6009cf0b06cd3b"
+    "read-cleanup-receipts.mjs": "b74afc58f3d68f7f161f8f7959fa8f905cbdfffd69ecdcb6608c11520359ba15",
+    "capture-applied-migrations.mjs": "626ea38403d5d9839041f06a3944810da4425728dddea92511360a6b23fa3678",
+    "stage-command.json": "24c110041acedf8ac662f514bd707887b948c32a127b4d943c7b2e6fe88e0f7b",
+    "cleanup-command-packet.json": "2ef56c620fc11f80889ddb366a4e36321713b955fdda0c97fa80dad8ef1cd21a"
   }
 }

@@ -24,88 +24,144 @@
   },
   "normalCleanup": [
     {
+      "name": "read-cleanup-receipts",
+      "argv": [
+        "node",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/read-cleanup-receipts.mjs"
+      ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; exactly seven receipts, zero failures and zero residual counters",
+      "environment": {
+        "STAGE_STDOUT_PATH": "/tmp/issue938-runtime-packet-20261103/owned-output/stage-vitest.stdout"
+      }
+    },
+    {
       "name": "drain-owned-role-backends",
       "argv": [
         "node",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs"
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; every sample reports remaining=0",
       "environment": {
-        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+        "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+        "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
         "DRAIN_TIMEOUT_SECONDS": "30"
-      },
-      "expected": "exit 0; every sample reports remaining=0"
+      }
     },
     {
       "name": "redis-flush-db1",
       "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "redis",
         "redis-cli",
-        "-h",
-        "127.0.0.1",
-        "-p",
-        "61168",
         "-n",
         "1",
         "FLUSHDB",
         "SYNC"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "OK"
     },
     {
       "name": "redis-dbsize-db1",
       "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "redis",
         "redis-cli",
-        "-h",
-        "127.0.0.1",
-        "-p",
-        "61168",
         "-n",
         "1",
         "DBSIZE"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "0"
     },
     {
       "name": "postgres-source-campaign-residuals",
       "argv": [
         "node",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs"
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; databases [] after globalSetup teardown, with seven in-process receipt proof already read",
       "environment": {
-        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci"
-      },
-      "expected": "exit 0; every existing anchored worker database reports 0|0 before cleanup"
+        "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+        "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+        "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "EXPECT_EMPTY_DATABASES": "1"
+      }
     },
     {
       "name": "s3-registry-residuals",
       "argv": [
         "node",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs"
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; bucket exists, untruncated and empty",
       "environment": {
         "MINIO_ENDPOINT": "http://127.0.0.1:61170",
         "MINIO_REGION": "us-east-1",
         "MINIO_ACCESS_KEY": "minioadmin",
         "MINIO_SECRET_KEY": "minioadmin",
         "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private"
-      },
-      "expected": "exit 0; bucket exists, untruncated and empty"
+      }
     },
     {
       "name": "owned-postgres-cleanup",
       "argv": [
         "node",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs"
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; only anchored worker/template plus exact base and roles are dropped",
       "environment": {
-        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci"
-      },
-      "expected": "exit 0; only anchored worker/template plus exact base and roles are dropped"
+        "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+        "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+        "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml"
+      }
     },
     {
       "name": "postgres-database-role-absence",
       "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "postgres",
         "psql",
-        "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "-U",
+        "auto_tm_ci",
+        "-d",
+        "auto_tm_ci",
         "-X",
         "-v",
         "ON_ERROR_STOP=1",
@@ -113,6 +169,7 @@
         "-c",
         "SELECT (SELECT count(*) FROM pg_database WHERE datname = 'auto_tm_897_938_s1r1' OR datname ~ '^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$'),(SELECT count(*) FROM pg_roles WHERE rolname IN ('r938_s1_capture','r938_s1_handoff','r938_s1_discovery','r938_s1_readers'));"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "0|0"
     },
     {
@@ -121,15 +178,16 @@
         "docker",
         "compose",
         "--file",
-        "infra/compose/docker-compose.ci.yml",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
         "--file",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
         "--project-name",
         "auto_tm_ci_897_938_s1_20261103_r1",
         "down",
         "--volumes",
         "--remove-orphans"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "exit 0"
     },
     {
@@ -143,6 +201,7 @@
         "--format",
         "{{.ID}} {{.Names}} {{.Status}}"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "empty"
     },
     {
@@ -156,6 +215,7 @@
         "--format",
         "{{.Name}}"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "empty"
     },
     {
@@ -169,6 +229,7 @@
         "--format",
         "{{.Name}}"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "empty"
     },
     {
@@ -181,6 +242,7 @@
         "-iTCP:61170",
         "-sTCP:LISTEN"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "empty"
     }
   ],
@@ -188,8 +250,22 @@
     {
       "name": "discover-anchored-databases",
       "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "postgres",
         "psql",
-        "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "-U",
+        "auto_tm_ci",
+        "-d",
+        "auto_tm_ci",
         "-X",
         "-v",
         "ON_ERROR_STOP=1",
@@ -197,36 +273,59 @@
         "-c",
         "SELECT datname FROM pg_database WHERE datname ~ '^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$' ORDER BY datname;"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "only current owned run names; any other name is a hard failure"
     },
     {
       "name": "drain-owned-role-backends",
       "argv": [
         "node",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs"
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; no exact-role backend remains",
       "environment": {
-        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+        "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+        "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
         "DRAIN_TIMEOUT_SECONDS": "30"
-      },
-      "expected": "exit 0; no exact-role backend remains"
+      }
     },
     {
       "name": "execute-anchored-postgres-cleanup",
       "argv": [
         "node",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs"
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; execute and verify drops, never print-only SQL",
       "environment": {
-        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci"
-      },
-      "expected": "execute and verify drops, never print-only SQL"
+        "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+        "COMPOSE_PROJECT": "auto_tm_ci_897_938_s1_20261103_r1",
+        "COMPOSE_BASE_FILE": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "COMPOSE_OVERLAY": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml"
+      }
     },
     {
       "name": "postgres-database-role-absence",
       "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "postgres",
         "psql",
-        "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "-U",
+        "auto_tm_ci",
+        "-d",
+        "auto_tm_ci",
         "-X",
         "-v",
         "ON_ERROR_STOP=1",
@@ -234,52 +333,71 @@
         "-c",
         "SELECT (SELECT count(*) FROM pg_database WHERE datname = 'auto_tm_897_938_s1r1' OR datname ~ '^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$'),(SELECT count(*) FROM pg_roles WHERE rolname IN ('r938_s1_capture','r938_s1_handoff','r938_s1_discovery','r938_s1_readers'));"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "0|0"
     },
     {
       "name": "redis-fallback-flush-and-zero",
       "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "redis",
         "redis-cli",
-        "-h",
-        "127.0.0.1",
-        "-p",
-        "61168",
         "-n",
         "1",
         "FLUSHDB",
         "SYNC"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "OK then DBSIZE 0; DB0 is untouched"
     },
     {
       "name": "redis-fallback-dbsize",
       "argv": [
+        "docker",
+        "compose",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+        "--file",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "--project-name",
+        "auto_tm_ci_897_938_s1_20261103_r1",
+        "exec",
+        "-T",
+        "redis",
         "redis-cli",
-        "-h",
-        "127.0.0.1",
-        "-p",
-        "61168",
         "-n",
         "1",
         "DBSIZE"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "0"
     },
     {
       "name": "s3-fallback-residuals",
       "argv": [
         "node",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs"
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+      "expected": "exit 0; bucket absent or empty; any objects fail",
       "environment": {
+        "RUNTIME_PACKET_WORKDIR": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
         "MINIO_ENDPOINT": "http://127.0.0.1:61170",
         "MINIO_REGION": "us-east-1",
         "MINIO_ACCESS_KEY": "minioadmin",
         "MINIO_SECRET_KEY": "minioadmin",
         "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private",
         "ALLOW_MISSING_BUCKET": "1"
-      },
-      "expected": "exit 0; bucket absent or empty; any objects fail"
+      }
     },
     {
       "name": "fallback-compose-down",
@@ -287,15 +405,16 @@
         "docker",
         "compose",
         "--file",
-        "infra/compose/docker-compose.ci.yml",
+        "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
         "--file",
-        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
+        "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
         "--project-name",
         "auto_tm_ci_897_938_s1_20261103_r1",
         "down",
         "--volumes",
         "--remove-orphans"
       ],
+      "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
       "expected": "exit 0"
     }
   ],
@@ -318,9 +437,11 @@
     }
   },
   "cleanupEvidenceRequired": [
-    "raw argv/environment/timestamps/exits for setup, stage, residual checks and cleanup",
+    "raw argv/environment/working-directory/timestamps/exits for setup, migration capture, stage, residual checks and cleanup",
+    "exact applied migration rows/checksums and equality to the 102 input migration pins",
+    "machine-readable seven cleanup receipts with zero failures/source/campaign/object/role/guard residuals",
     "Redis DB1 FLUSHDB result and DBSIZE 0 with DB0 baseline preserved",
-    "named-database source/campaign residual output before owned database cleanup",
+    "named-database source/campaign residual output before owned database cleanup (or explicit empty list after globalSetup teardown)",
     "MinIO registry inventory output before Compose teardown",
     "executed anchored database/role cleanup plus explicit 0|0 absence query",
     "compose down output and empty owned container/volume/network/port inventories",
@@ -343,10 +464,26 @@
     }
   ],
   "scripts": {
-    "drainOwnedRoleBackends": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs",
-    "ownedPostgresCleanup": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs",
-    "ownedSourceCampaignCheck": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs",
-    "ownedS3Inventory": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs",
-    "packetValidation": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/packet-validation.mjs"
+    "drainOwnedRoleBackends": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs",
+    "ownedPostgresCleanup": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs",
+    "ownedSourceCampaignCheck": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs",
+    "ownedS3Inventory": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs",
+    "readCleanupReceipts": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/read-cleanup-receipts.mjs",
+    "captureAppliedMigrations": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/capture-applied-migrations.mjs",
+    "packetValidation": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/packet-validation.mjs"
+  },
+  "workingDirectory": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+  "packetRoot": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103",
+  "composeFiles": [
+    "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913/infra/compose/docker-compose.ci.yml",
+    "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml"
+  ],
+  "migrationIdentity": {
+    "inputPinsPath": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/input-pins.json",
+    "expectedMigrationCount": 102,
+    "capturePath": "/tmp/issue938-runtime-packet-20261103/applied-migrations.json",
+    "captureCommand": "capture-applied-migrations.mjs",
+    "requiresAllFinished": true,
+    "requiresChecksumEquality": true
   }
 }
