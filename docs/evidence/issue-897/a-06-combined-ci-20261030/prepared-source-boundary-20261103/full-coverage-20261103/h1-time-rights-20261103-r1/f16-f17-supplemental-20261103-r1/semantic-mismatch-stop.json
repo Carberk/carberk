@@ -1,0 +1,124 @@
+{
+  "kind": "issue939-f16-f17-supplemental-semantic-mismatch-stop",
+  "recorded_at": "2026-11-03T20:09:47.709848+00:00",
+  "contract": [
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6612779049",
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6614174072"
+  ],
+  "slot": "2026-11-03T20:00:00Z/2026-11-03T22:00:00Z",
+  "executor_head": "b43831f3bf038c0bb0a0acae913b28091c57a765",
+  "executor_tree": "660bc9c0314e63a2aa66e341eac86f316f10b5c2",
+  "candidate": "3ee5cdb8bf56114268240e401498e84372554fd7",
+  "non_doc_source_equal_to_candidate": true,
+  "stopped_at": "contract criterion: 'The complementary path must use actual PrismaDiagnosticDiscovery.predecessors -> PrismaDiagnosticContinuityProofs.retainedCandidate -> comparisonRights with the injected case clock'",
+  "mismatch": "At each selected material deadline (F16 A provenance, F17 B evidence) the predecessor is excluded inside retainedCandidate's first call, PrismaDiagnosticReports.compared -> comparisonFacts -> PrismaDiagnosticIdentityEvidence.identity/projectIdentity, whose retained graph applies live(until > runtime.now()) and throws DIAGNOSTIC_NO_ACCESS. comparisonRights is never reached at the deadline. Its material predicate covers the same deadlines with the same strict comparison, so no lawful state lets comparisonRights be the deciding step. The HTTP oracle (200, candidates [] at the deadline) is expected to hold, but it cannot distinguish which step refused, and evidence claiming the comparisonRights path would be false.",
+  "path_checked": [
+    {
+      "step": "predecessors -> retainedCandidate per scanned row; DiagnosticRuleError is swallowed",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticDiscovery.ts",
+      "line": 50,
+      "text": "try { candidates.push(await this.proofs.retainedCandidate(tx, subject, orderId, row.id)); }",
+      "blob": "71160a4a8914a8d8d4747e1bc46595438521cdb1"
+    },
+    {
+      "step": "retainedCandidate first calls reports.compared (before comparisonRights)",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts",
+      "line": 271,
+      "text": "const pair = await this.reports.compared(tx, subject, orderId, predecessorId);",
+      "blob": "341dcf80f2b627c7a131a6ea51cd1d2978637d1e"
+    },
+    {
+      "step": "compared -> comparisonFacts loads the A identity through the locked retained graph",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts",
+      "line": 188,
+      "text": "const a = await (locked ? this.evidenceRecords.identity.bind(this.evidenceRecords)",
+      "blob": "30272ba82b266d323f36318c34c8bbc3cdce6ba5"
+    },
+    {
+      "step": "... and the B identity the same way (B pin = leaf(), which has no rights filter)",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticReports.ts",
+      "line": 189,
+      "text": "const b = await (locked ? this.evidenceRecords.identity.bind(this.evidenceRecords)",
+      "blob": "30272ba82b266d323f36318c34c8bbc3cdce6ba5"
+    },
+    {
+      "step": "leaf() selects the B pin without any rights predicate, so the pin exists after expiry",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 328,
+      "text": "return tx.diagnosticIdentityEvidence.findFirst({ where: { orderId, erasedAt: null, successor: { is: null } }",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "step": "live(): rights current only while until > injected runtime.now()",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 48,
+      "text": "return until > this.runtime.now() && D.DiagnosticIdentityRightsSchema.safeParse(rights).success;",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "step": "retained(provenance) requires live(row.rights, row.rightsUntil)  [F16: A provenance]",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 51,
+      "text": "return row.state === \"verified\" && !row.cleanupRequestedAt && !row.erasedAt && !!row.objectKey && this.live(row.rights, row.rightsUntil);",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "step": "graph(): an evidence record is unusable if !live(evidence) [F17: B evidence] or any provenance !retained [F16]",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 242,
+      "text": "if (record.erasedAt || !record.recordHash || record.identityRecord.erasedAt || !this.live(record.rights, record.rightsUntil) || !items.success || !items.data.length ||",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "step": "projectIdentity refuses the whole pinned chain -> compared throws DIAGNOSTIC_NO_ACCESS",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 358,
+      "text": "if (chain.some(record => !usable.has(record.id))) throw denied();",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    },
+    {
+      "step": "comparisonRights is called only after compared/pair succeed (not reached at the deadline)",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts",
+      "line": 277,
+      "text": "await this.comparisonRights(tx, pair, \"comparative_attestation\", provenance, this.runtime.now());",
+      "blob": "341dcf80f2b627c7a131a6ea51cd1d2978637d1e"
+    },
+    {
+      "step": "comparisonRights' material predicate is the same end set: evidence rights.schedule.until and provenance rightsUntil, value <= now",
+      "path": "apps/api/src/modules/diagnostics/domain/PrivateContinuityAttestation.ts",
+      "line": 134,
+      "text": "if (!ends.length || ends.some(value => Number.isNaN(value.valueOf()) || value <= now)) denied();",
+      "blob": "fccca9ef506674983f6bb047ab3fcecccb433aad"
+    },
+    {
+      "step": "evidence rightsUntil column is written from the same rights.schedule.until (so the two predicates cannot diverge lawfully)",
+      "path": "apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticIdentityEvidence.ts",
+      "line": 279,
+      "text": "const recordedAt = this.runtime.now(), auditId = this.runtime.id(), rightsUntil = new Date(input.rights.schedule.until);",
+      "blob": "17d3832462e2accdd29d4098ed2152412a8ef04c"
+    }
+  ],
+  "before_deadline": "Before the deadline the full chain predecessors -> retainedCandidate -> compared -> comparisonRights runs and returns { reportId, observedAt, mileageKm }; no mismatch found there.",
+  "no_other_blocker_found_before_stop": [
+    "The A report DTO literals (observedAt 2026-10-21T12:00:00.000Z, mileageKm 123000) match pair()'s A observation.",
+    "The A and B private visits share commissionerB, centre and reviewer assignment, so A is in the bounded scan.",
+    "The deadlines are reachable with the existing forward-only clock helper expireVisitRights."
+  ],
+  "recommendation": "Parent/coordinator to restate the criterion as 'predecessors -> retainedCandidate (compared/identity retained-graph live() at the injected clock; comparisonRights on the before-deadline read)'. Then the same F16/F17 enrichment can proceed unchanged. No source change is needed or proposed.",
+  "edits": "none (no source or helper edit made)",
+  "checks": "not run: no source changed since the verified H2 checkpoint cec5d51a, and the stop came before implementation",
+  "not_run": [
+    "tests",
+    "PostgreSQL",
+    "Redis",
+    "MinIO",
+    "runtime",
+    "review"
+  ],
+  "not_claimed": [
+    "F16/F17 supplemental coverage",
+    "#939 PASS",
+    "#938 PASS",
+    "Milestone A acceptance"
+  ]
+}
