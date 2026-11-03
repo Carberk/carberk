@@ -1,0 +1,970 @@
+{
+  "kind": "issue938-full-coverage-lawful-feasibility-stop",
+  "recorded_at": "2026-11-03T09:15:19.833173+00:00",
+  "release": [
+    "https://github.com/Carberk/carberk/issues/938#issuecomment-6599367078",
+    "https://github.com/Carberk/carberk/issues/938#issuecomment-6599591874"
+  ],
+  "stop_rule": "If any original case cannot be represented lawfully, stop with its exact case name and dependency instead of changing its oracle (6599367078).",
+  "identity": {
+    "writer": "issue938-prepared-reader-boundary-r1",
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "branch": "t3/2d375913",
+    "input_head": "d131c6003e6fdb4dd3df7b9acad0da529f121820",
+    "input_tree": "711e5218062469c48644fc1c11ad1f51721d0c7c",
+    "settings": "claudeAgent/claude-opus-5-5, effort=high, fastMode=false, full-access",
+    "slot_note": "dispatch message states 09:00-09:30Z; coordinator release 6599591874 records 09:00-11:30Z. Work stayed offline and static; no checks needed resources."
+  },
+  "inventory": {
+    "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/case-map.json",
+    "sha256": "38e8a578e38168f9c143337b8e6743aef07cbec50a51f5f0ae5e582a2b872fd7",
+    "counts": {
+      "fail": 47,
+      "already_passed_in_four_files": 9,
+      "four_file_total": 56,
+      "unchanged_five_file_total": 168,
+      "original_selection_total": 224
+    }
+  },
+  "cardinality": {
+    "original_56": 56,
+    "unchanged_companion_168": 168,
+    "frozen_selection_224": 224,
+    "e2e_replacement_declarations_current": 7,
+    "e2e_one_for_one_replacements_current": 5
+  },
+  "status_counts": {
+    "IMPLEMENTED_STAGE1": 5,
+    "REPRESENTABLE": 18,
+    "STOP_DEPENDENCY": 24,
+    "STOP_DISPOSITION_REQUIRED": 4,
+    "REPRESENTABLE_UNVERIFIED": 5
+  },
+  "stop_case_count": 28,
+  "stop_cases": [
+    {
+      "id": "F04",
+      "scenario": "records Business source membership as active without adding publisher admission to observation",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ]
+    },
+    {
+      "id": "F05",
+      "scenario": "records Business source membership as suspended without adding publisher admission to observation",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ]
+    },
+    {
+      "id": "F06",
+      "scenario": "records Business source membership as missing without adding publisher admission to observation",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ]
+    },
+    {
+      "id": "F08",
+      "scenario": "uses only B command fields and recovers B after proof payload loss and later A erasure",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER",
+        "ISOLATED_REPORT_ERASURE"
+      ]
+    },
+    {
+      "id": "F09",
+      "scenario": "uniformly omits and refuses issuer Session expiry at read and again at action",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ]
+    },
+    {
+      "id": "F10",
+      "scenario": "uniformly omits and refuses issuer grant loss at read and again at action",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ]
+    },
+    {
+      "id": "F11",
+      "scenario": "uniformly omits and refuses issuer qualification loss at read and again at action",
+      "dependencies": [
+        "REVIEWER_QUALIFICATION",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F14",
+      "scenario": "uniformly omits and refuses A erasure at read and again at action",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER"
+      ]
+    },
+    {
+      "id": "F15",
+      "scenario": "uniformly omits and refuses A raw erasure at read and again at action",
+      "dependencies": [
+        "RAW_IMMUTABLE",
+        "SHARED_PRIVATE_COMMISSIONER"
+      ]
+    },
+    {
+      "id": "F16",
+      "scenario": "uniformly omits and refuses A rights expiry at read and again at action",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F17",
+      "scenario": "uniformly omits and refuses B rights expiry at read and again at action",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F20",
+      "scenario": "uniformly omits and refuses proof rights expiry at read and again at action",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F22",
+      "scenario": "fences B Session changes even on empty pages and consumed result recovery",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ]
+    },
+    {
+      "id": "F23",
+      "scenario": "fences B grant changes even on empty pages and consumed result recovery",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ]
+    },
+    {
+      "id": "F27",
+      "scenario": "binds continuation to the query, actor, Session, B and expiry, without inherited authority",
+      "dependencies": [
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F30",
+      "scenario": "recovers a B-only committed request after proof disposal and A erasure without its command",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER"
+      ]
+    },
+    {
+      "id": "F33",
+      "scenario": "bounds request discovery, binds continuations to Session/B/query and stages linkage only",
+      "dependencies": [
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F37",
+      "scenario": "uses scoped empty semantics and omits inaccessible or incomplete retained material",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK",
+        "RAW_IMMUTABLE"
+      ]
+    },
+    {
+      "id": "F38",
+      "scenario": "binds continuation to B, actor, Session and strict query scope",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ]
+    },
+    {
+      "id": "F39",
+      "scenario": "replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments",
+      "dependencies": [
+        "LATER_ARRIVAL_FENCE",
+        "RIGHTS",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F40",
+      "scenario": "omits a B technician after current Identity or assignment grant loss",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ]
+    },
+    {
+      "id": "F41",
+      "scenario": "omits a B technician after current Identity or assignment inactive loss",
+      "dependencies": [
+        "ADMIN_ACTOR"
+      ]
+    },
+    {
+      "id": "F43",
+      "scenario": "omits a B technician after current Identity or assignment unnamed loss",
+      "dependencies": [
+        "NULL_DISPLAY_NAME"
+      ]
+    },
+    {
+      "id": "F44",
+      "scenario": "rejects a second current Session, cursor tampering without retaining pair data",
+      "dependencies": [
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F45",
+      "scenario": "omits disconnected retained identity claims, expired B material and inconsistent raw history",
+      "dependencies": [
+        "EVIDENCE_GUARD",
+        "RAW_IMMUTABLE",
+        "RIGHTS",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "F46",
+      "scenario": "allows an empty bounded page to continue without claiming absence",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "P06",
+      "scenario": "normalizes current B qualification loss and unknown B",
+      "dependencies": [
+        "REVIEWER_QUALIFICATION",
+        "CLOCK"
+      ]
+    },
+    {
+      "id": "P08",
+      "scenario": "normalizes current B session loss and unknown B",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ]
+    }
+  ],
+  "dependencies": {
+    "CLOCK": "No lawful clock control: injected DIAGNOSTIC_RUNTIME/IDENTITY_CLOCK read private `now` (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:101,227-229); its only mutator is expireSelectedQualification (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:383), fixed to the selected B technician deadline. Advancing the clock is a new helper capability outside the released helper scope (resource identities only).",
+    "RIGHTS": "No isolated per-visit rights expiry: every provenance/evidence uses fixed preparedReaderRights until 2027-01-01 (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:58-62,335,343), the same instant as every Session expiry (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:258); even with a clock, expiry is not isolatable to A, B, one visit or the proof. Per-visit rights input is a helper capability outside scope.",
+    "SHARED_PRIVATE_COMMISSIONER": "Private A and B share commissionerB (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:277); purgeA requires commissionerA (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:423). Lawful A erasure / raw erasure / proof disposal comes only from the commissioner purge (apps/worker/src/jobs/diagnosticAccountErasure.ts:37,88,93), which would also erase private B. Separate private commissioners are a helper capability outside scope.",
+    "ISOLATED_REPORT_ERASURE": "No producer erases a report while its order survives: report erasure is scoped to the commissioner's unerased orders and the same transaction erases the order (apps/worker/src/jobs/diagnosticAccountErasure.ts:37,93). handoffs() authorizes the live B order first (apps/api/src/modules/diagnostics/infrastructure/PrismaDiagnosticContinuityProofs.ts:704), so `body.result` cannot be null with a 200 body after B report erasure.",
+    "RAW_IMMUTABLE": "Raw identity records are append-only; observation changes on unerased rows raise diagnostic_identity_record_immutable (packages/db/prisma/migrations/20261029190000_operational_reset_row_admission/migration.sql:310-331). Raw erasure happens only through commissioner purge (apps/worker/src/jobs/diagnosticAccountErasure.ts:88).",
+    "EVIDENCE_GUARD": "A disconnected retained evidence copy requires an INSERT the evidence binding guard forbids (packages/db/prisma/migrations/20261029190000_operational_reset_row_admission/migration.sql:434-467).",
+    "STAFF_MANAGE_ACTOR": "Staff grant revocation (PrismaStaffAuthority.change, apps/api/src/modules/identity/infrastructure/PrismaStaffAuthority.ts:34-53) requires a staff.manage/founder.control actor Session; the fixture's bootstrap is private and provisions diagnostics capabilities only.",
+    "ADMIN_ACTOR": "User suspension (PrismaIdentityAdminRepository.suspendUser, apps/api/src/modules/identity/infrastructure/PrismaIdentityAdminRepository.ts:12-47) requires an admin actor user_eligibility source command; the fixture provisions no admin actor.",
+    "NULL_DISPLAY_NAME": "No producer sets displayName NULL except account purge, which also removes Sessions/assignments; PrismaUserRepository.updateDisplayName accepts a string (apps/api/src/modules/identity/infrastructure/PrismaUserRepository.ts:102-105).",
+    "BUSINESS_GRAPH": "Business source membership requires dealership and dealership_member INSERTs; the restricted role has only UPDATE on dealerships and only DELETE on dealership_members (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:179-188). The original's listing.update(businessId) / dealershipMember seed and the F04 Business OWNER grant actor have no producer within the released paths.",
+    "REVIEWER_QUALIFICATION": "Reviewer qualification outlives technician qualification (apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:263-266); any clock reaching the reviewer deadline also expires the selected technician, changing the technician's literal 200 body read to 403. No isolated producer.",
+    "SESSION_EXPIRY_EQUIVALENCE": "The original transition is Session expiry (expiresAt=now). Session expiry has no clock (see CLOCK) and coincides with rights expiry (see RIGHTS). The only lawful adapter is Session revocation (PrismaSessionRepository.deleteAllByUserId), a different named transition. Using it needs explicit Parent equivalence disposition.",
+    "LATER_ARRIVAL_FENCE": "A later arrival outside the cursor time fence needs a report created after the traversal fence; the fixture clock is constant and the original writes createdAt +1ms directly (see CLOCK)."
+  },
+  "cases": [
+    {
+      "id": "F01",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "accepts a separate synthetic classification without adding it to observedVehicle or changing observation hash v1",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "IMPLEMENTED_STAGE1",
+      "dependencies": [],
+      "lawful_producer": "existing ClassifiedForwardCapture.e2e.spec.ts probe",
+      "notes": null
+    },
+    {
+      "id": "F02",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "keeps existing observations without a classification working",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "public order vehicle POST without grant/classification; persisted component read selecting the original create-data keys",
+      "notes": null
+    },
+    {
+      "id": "F03",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "cannot classify a later raw to repair an earlier missing anchor",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "grant before first raw; first vehicle POST without grantId; second POST with the same grant and classification (e2e-local f.send)",
+      "notes": null
+    },
+    {
+      "id": "F04",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "records Business source membership as active without adding publisher admission to observation",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F05",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "records Business source membership as suspended without adding publisher admission to observation",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F06",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "records Business source membership as missing without adding publisher admission to observation",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "BUSINESS_GRAPH"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F07",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "lets only the selected current B technician reload a minimal usable handle without A access",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "IMPLEMENTED_STAGE1",
+      "dependencies": [],
+      "lawful_producer": "existing DiagnosticContinuityHandoff.e2e.spec.ts probe",
+      "notes": null
+    },
+    {
+      "id": "F08",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uses only B command fields and recovers B after proof payload loss and later A erasure",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER",
+        "ISOLATED_REPORT_ERASURE"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F09",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses issuer Session expiry at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DISPOSITION_REQUIRED",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F10",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses issuer grant loss at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F11",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses issuer qualification loss at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "REVIEWER_QUALIFICATION",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F12",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses issuer A assignment loss at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "reception POST orders/A/assignments {capability: diagnostics.reviewer, active: false}",
+      "notes": null
+    },
+    {
+      "id": "F13",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses issuer B assignment loss at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "reception POST orders/B/assignments {capability: diagnostics.reviewer, active: false}",
+      "notes": null
+    },
+    {
+      "id": "F14",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses A erasure at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F15",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses A raw erasure at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "RAW_IMMUTABLE",
+        "SHARED_PRIVATE_COMMISSIONER"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F16",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses A rights expiry at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F17",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses B rights expiry at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F18",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses changed B version at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "any lawful B mutation (e.g. foreign technician assignment) bumps B version; source trigger also invalidates",
+      "notes": null
+    },
+    {
+      "id": "F19",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses changed A version at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE_UNVERIFIED",
+      "dependencies": [],
+      "lawful_producer": "purge of A report author technicianA bumps A report version (diagnosticAccountErasure.ts:60-65) via e2e-local deletion scheduling + PurgeExpiredAccounts",
+      "notes": "purge also removes technicianA Sessions/assignments; runtime unproven"
+    },
+    {
+      "id": "F20",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses proof rights expiry at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F21",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "uniformly omits and refuses permanent invalidation at read and again at action",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "issuer users-row change via PrismaUserRepository.updateDisplayName fires diagnostic_continuity_source_changed (users trigger) and sets invalidatedAt",
+      "notes": null
+    },
+    {
+      "id": "F22",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "fences B Session changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DISPOSITION_REQUIRED",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F23",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "fences B grant changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F24",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "fences B qualification changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "existing expireSelectedQualification",
+      "notes": null
+    },
+    {
+      "id": "F25",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "fences B B assignment changes even on empty pages and consumed result recovery",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "existing f.assign(b, technicianB, false)",
+      "notes": null
+    },
+    {
+      "id": "F26",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "keeps readable historical proofs separate from current usability and traverses beyond 50",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE_UNVERIFIED",
+      "dependencies": [],
+      "lawful_producer": "61 independently issued proofs invalidated by issuer display-name change, then one usable proof; reviewer detail read of an invalidated proof",
+      "notes": "original final fresh-read `handoffs toEqual([])` was never observed passing (baseline FAIL); runtime unproven"
+    },
+    {
+      "id": "F27",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "binds continuation to the query, actor, Session, B and expiry, without inherited authority",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": "cross-query and tamper steps are representable; the 15-minute expiry step is not"
+    },
+    {
+      "id": "F28",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "rejects A bindings, protected fields and unrecognized query/command fields",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "strict-schema 400s through existing routes",
+      "notes": null
+    },
+    {
+      "id": "F29",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "recovers lost preparation and issuance replies without storing pending text or duplicating issuance",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "continuity-requests prepare/execute through existing routes",
+      "notes": "global diagnosticAudit.count oracle assumes per-case database isolation"
+    },
+    {
+      "id": "F30",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "recovers a B-only committed request after proof disposal and A erasure without its command",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "SHARED_PRIVATE_COMMISSIONER"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F31",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "refuses unknown identities, new Sessions, wrong actors/kinds and pending command fields",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "second technician Session via PrismaSessionRepository.create",
+      "notes": null
+    },
+    {
+      "id": "F32",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "keeps an invalidated issued request historical and refuses first consumption after authority loss",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "invalidation by issuer display-name change; technician qualification loss via expireSelectedQualification",
+      "notes": null
+    },
+    {
+      "id": "F33",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.spec.ts",
+      "scenario": "bounds request discovery, binds continuations to Session/B/query and stages linkage only",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": "bounded discovery and cross-query steps are representable; the 15-minute expiry step is not"
+    },
+    {
+      "id": "F34",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.spec.ts",
+      "scenario": "projects commissioner and currently assigned staff reads, preserving the exact technician mutation receipt and B source",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "status": "IMPLEMENTED_STAGE1",
+      "dependencies": [],
+      "lawful_producer": "existing DiagnosticErasedPredecessorReaders.e2e.spec.ts probe",
+      "notes": null
+    },
+    {
+      "id": "F35",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "traverses more than 50 with stable tie ordering and an anchored scan, without protected fields",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "REPRESENTABLE_UNVERIFIED",
+      "dependencies": [],
+      "lawful_producer": "61 e2e-local predecessor visits with finalized reports through existing routes (distinct request keys)",
+      "notes": "expected id list must come from fixture ids in the production tie order; constant clock gives equal createdAt"
+    },
+    {
+      "id": "F36",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "returns only named currently eligible distinct B technicians to a non-reception reviewer",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "IMPLEMENTED_STAGE1",
+      "dependencies": [],
+      "lawful_producer": "existing DiagnosticScopedDiscovery.e2e.spec.ts probe",
+      "notes": null
+    },
+    {
+      "id": "F37",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "uses scoped empty semantics and omits inaccessible or incomplete retained material",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK",
+        "RAW_IMMUTABLE"
+      ],
+      "lawful_producer": null,
+      "notes": "unassigned-A subscenario is representable; expired provenance and erased raw are not"
+    },
+    {
+      "id": "F38",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "binds continuation to B, actor, Session and strict query scope",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DISPOSITION_REQUIRED",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "lawful_producer": null,
+      "notes": "other steps are representable"
+    },
+    {
+      "id": "F39",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "replays a stable page, excludes later arrivals, and rechecks unseen A rights and assignments",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "LATER_ARRIVAL_FENCE",
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F40",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment grant loss",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "STAFF_MANAGE_ACTOR"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F41",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment inactive loss",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "ADMIN_ACTOR"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F42",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment assignment loss",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "existing f.assign(b, technicianB, false)",
+      "notes": null
+    },
+    {
+      "id": "F43",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "omits a B technician after current Identity or assignment unnamed loss",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "NULL_DISPLAY_NAME"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F44",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "rejects a second current Session, cursor tampering without retaining pair data",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": "second Session and tamper steps are representable"
+    },
+    {
+      "id": "F45",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "omits disconnected retained identity claims, expired B material and inconsistent raw history",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "EVIDENCE_GUARD",
+        "RAW_IMMUTABLE",
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F46",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "allows an empty bounded page to continue without claiming absence",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "RIGHTS",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "F47",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "omits malformed required retained evidence without a partial candidate or protected error",
+      "baseline": "FAIL",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "IMPLEMENTED_STAGE1",
+      "dependencies": [],
+      "lawful_producer": "existing approved F47 read decorator probe",
+      "notes": null
+    },
+    {
+      "id": "P01",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "refuses an expired classification atomically before ordinary observation writes",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "classification rights until in the past (fixture clock is private; input value only)",
+      "notes": null
+    },
+    {
+      "id": "P02",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "strictly refuses malformed classification before writes: %j [ownershipClassification=null]",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "strict 400",
+      "notes": null
+    },
+    {
+      "id": "P03",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "strictly refuses malformed classification before writes: %j [extra sellerId]",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "strict 400",
+      "notes": null
+    },
+    {
+      "id": "P04",
+      "source_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.spec.ts",
+      "scenario": "strictly refuses malformed classification before writes: %j [rights extra=true]",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "strict 400",
+      "notes": null
+    },
+    {
+      "id": "P05",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "normalizes current B assignment loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "REPRESENTABLE",
+      "dependencies": [],
+      "lawful_producer": "reception revokes reviewer B assignment",
+      "notes": null
+    },
+    {
+      "id": "P06",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "normalizes current B qualification loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DEPENDENCY",
+      "dependencies": [
+        "REVIEWER_QUALIFICATION",
+        "CLOCK"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "P07",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "normalizes current B erasure loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "REPRESENTABLE_UNVERIFIED",
+      "dependencies": [],
+      "lawful_producer": "e2e-local purge of B's commissioner with production adapters (helper purgeA is commissionerA-only)",
+      "notes": null
+    },
+    {
+      "id": "P08",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "normalizes current B session loss and unknown B",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "STOP_DISPOSITION_REQUIRED",
+      "dependencies": [
+        "SESSION_EXPIRY_EQUIVALENCE"
+      ],
+      "lawful_producer": null,
+      "notes": null
+    },
+    {
+      "id": "P09",
+      "source_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.spec.ts",
+      "scenario": "keeps many unassigned visits out of continuation and exhaustion semantics",
+      "baseline": "PASS (aggregate file count; names/parameter bindings reconstructed from pinned source)",
+      "target_path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "status": "REPRESENTABLE_UNVERIFIED",
+      "dependencies": [],
+      "lawful_producer": "62 e2e-local visits; 61 reviewer assignment revocations through the existing route",
+      "notes": null
+    }
+  ],
+  "source_edits": "none; stop precedes any helper/e2e change so no partial candidate is produced",
+  "helper_parameterization": "not started; independently representable (hard-coded stage1 identities at apps/api/test/helpers/diagnosticPreparedReaderFixture.ts:51,160-162)",
+  "affected_offline_checks": "not run: no source bytes changed",
+  "runtime": "not started; PG61179/Redis61178/MinIO61180 tuple remains unreserved",
+  "not_claimed": [
+    "#938 PASS",
+    "full-coverage PASS",
+    "Milestone A acceptance"
+  ]
+}
