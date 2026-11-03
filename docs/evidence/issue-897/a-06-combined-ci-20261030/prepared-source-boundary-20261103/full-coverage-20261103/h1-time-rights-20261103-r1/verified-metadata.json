@@ -1,0 +1,17 @@
+{
+  "kind": "issue939-verified-historical-pins",
+  "recorded_at": "2026-11-03T17:33:09.563465+00:00",
+  "executor_commit": "4b869f12829f59b18361bd37ba3cc5dc675cc879",
+  "executor_tree": "bc40df98d6a5e081dc927be2696e3706f594694c",
+  "slot_receipt_commit": "17e20ae68730de74e506e3fddb490c036d01ce41",
+  "slot_receipt_path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/slot-exhaustion-handoff.json",
+  "slot_receipt_sha256": "850d15feb2a7fd47cefbe9a291e3ce0ae5dce1720cdfabc1e3aef7f759e72a43",
+  "supersedes_incorrect_metadata": [
+    "h1-offline-transport-failure-20261103.json:executor.tree",
+    "h1-time-rights-20261103-r1/coordinator-disposition.json:prior_evidence.slot_exhaustion_sha256",
+    "h1-time-rights-20261103-r1/metadata-correction.json:correct_values.executor_tree"
+  ],
+  "correction_reason": "Manual transcription truncated the executor tree and replaced one hash character. This record derives both values directly from Git object contents and checks the tree against the child receipt. Original records remain preserved.",
+  "runtime": "held",
+  "next_action": "Await the existing H1 writer completion, then audit its final source and evidence using Git-derived pins."
+}
