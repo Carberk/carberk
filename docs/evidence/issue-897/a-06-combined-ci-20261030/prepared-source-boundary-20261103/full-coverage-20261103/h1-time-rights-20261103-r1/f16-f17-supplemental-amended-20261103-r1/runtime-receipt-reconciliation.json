@@ -1,0 +1,47 @@
+{
+  "blocker": "The two 938_cleanup_receipt console records were not persisted by the JSON reporter and are absent from every preserved raw file; they cannot be independently hashed or recovered.",
+  "independentGates": {
+    "F16": "PASS",
+    "F17": "PASS",
+    "fixtureCleanupReceipts": "MISSING",
+    "resourceCleanup": "PASS",
+    "selectedSkips": 0
+  },
+  "kind": "issue939-f16-f17-runtime-receipt-reconciliation",
+  "nextAction": "Keep #939 runtime acceptance closed; do not rerun successful F16/F17. Parent must record the missing-artifact disposition or authorize a separately contracted evidence-only recovery; #942/F43 remain held.",
+  "noRerun": true,
+  "preservedRoot": "/tmp/issue939-runtime-f16f17-20261103",
+  "rawFindings": [
+    {
+      "finding": "testResults[].console is null; no fixture console records",
+      "path": "f16-f17-vitest-retry.json"
+    },
+    {
+      "finding": "only JSON report written message",
+      "path": "logs/runtime/retry/f16-f17.stdout"
+    },
+    {
+      "finding": "empty",
+      "path": "logs/runtime/retry/f16-f17.stderr"
+    },
+    {
+      "finding": "explicit evidenceGap OPEN; no fixture receipt hashes",
+      "path": "terminal-runtime-receipt.json"
+    }
+  ],
+  "result": "NOT_RECOVERABLE",
+  "reviewedCandidate": {
+    "commit": "5b60645bae20e416781cda66b98123635f209341",
+    "tree": "5621d4bb2bbd47967132812d68ae5beb9f7172f6"
+  },
+  "search": {
+    "command": "rg -n -a \"938_cleanup_receipt|cleanupReceipt\" /tmp/issue939-runtime-f16f17-20261103",
+    "filesSearched": 81,
+    "matched": true,
+    "stdout": "/tmp/issue939-runtime-f16f17-20261103/terminal-runtime-receipt.json:24:    \"reason\": \"Vitest JSON reporter did not capture the fixture console 938_cleanup_receipt blocks; resource/DB/Redis/MinIO/Compose cleanup is independently proven\",\n"
+  },
+  "terminalReceipt": {
+    "path": "/tmp/issue939-runtime-f16f17-20261103/terminal-runtime-receipt.json",
+    "sha256": "5bdcc008b00161cf744c1fcf0ba1b7a7bddfd5bc3979839c474ba22b5d77ddac"
+  }
+}

@@ -121,6 +121,12 @@
     "reason": "pre-test manifest env correction; REDIS_URL=/1 would make globalSetup derive worker DB2"
   },
   "createdAt": "2026-11-03T20:56:01Z",
+  "fixtureReceiptReconciliation": {
+    "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/f16-f17-supplemental-amended-20261103-r1/runtime-receipt-reconciliation.json",
+    "result": "NOT_RECOVERABLE",
+    "runtimeAcceptance": "CLOSED",
+    "sha256": "239fdf8b5ca93f746f4913aa6569fed3b2d9f665dac725f4f3a811d6a6ed9976"
+  },
   "identities": {
     "coordinator": {
       "model": "gpt-6.1-sol",
@@ -491,5 +497,5 @@
       "sha256": "ad7080454434586c0ae88ca672189cc6573ef9ab206726685d39ab57c1a779e2"
     }
   },
-  "updatedAt": "2026-11-03T21:18:29Z"
+  "updatedAt": "2026-11-03T21:36:50Z"
 }
