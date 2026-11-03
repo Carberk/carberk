@@ -32,7 +32,11 @@ type Person = "commissionerA" | "commissionerB" | "reception" | "technicianA" | 
 type Response<T> = { status: number; body: T; headers: Record<string, string | string[] | number | undefined> };
 type Evidence = Prisma.DiagnosticIdentityEvidenceGetPayload<{ include: { identityRecord: true } }>;
 type Guard = { table: string; name: string; enabled: "D" | "O" | "A" | "R" };
-type Visit = { order: D.DiagnosticOrder; commissioner: Person; technician: Person; raw?: D.DiagnosticIdentityRecord; provenanceId?: string; evidence?: D.DiagnosticIdentityEvidence };
+export type Visit = { order: D.DiagnosticOrder; commissioner: Person; technician: Person; raw?: D.DiagnosticIdentityRecord; provenanceId?: string; evidence?: D.DiagnosticIdentityEvidence };
+/** Explicit per-visit rights deadlines; omitted parts keep preparedReaderRights. */
+export type MaterialRights = { provenance?: Date; evidence?: Date };
+/** Staff bootstrap order fixes the ordinary 2-hour qualification deadlines' relative order. */
+export type PreparedReaderSetup = { qualificationOrder?: "technician-first" | "reviewer-first" };
 export type PreparedReaderCleanup = {
   label: string; role: string; database: string; keys: string[]; controlKey?: string;
   callers: number; sourceReceipts: number; campaignReceipts: number; roleBackends: number; roleAbsent: boolean;
@@ -60,6 +64,9 @@ export const preparedReaderRights = {
   provenance: "Generated fixture", identifiability: "pseudonymous", use: ["service"],
   schedule: { kind: "until", until: "2027-01-01T00:00:00.000Z", reason: "Fixture permission" }, supplierRestrictions: "No export", hold: null,
 };
+// #939 predecessor visit observation: the original discovery literals (observedAt, mileageKm 100) with the fixture VIN.
+export const preparedPredecessorObservation = { observedAt: "2026-10-21T12:00:00.000Z", mileageKm: 100, method: "vin", vin: "SYN-123", manualReference: null } as const;
+const rightsUntil = (until?: Date) => until ? { ...preparedReaderRights, schedule: { ...preparedReaderRights.schedule, until: until.toISOString() } } : preparedReaderRights;
 // Literal synthetic image and sanitized descriptor from DiagnosticIdentityEvidence.e2e.spec.ts.
 const image = {
   input: "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVR4nGP4z8AARwgWXg4ArpMP8aaUSCMAAAAASUVORK5CYII=",
@@ -105,7 +112,7 @@ export class DiagnosticPreparedReaderFixture {
   private centerId = "";
   private templateId = "";
 
-  constructor(readonly kind: Suite, scenario: string) {
+  constructor(readonly kind: Suite, scenario: string, readonly setup: PreparedReaderSetup = {}) {
     this.label = `issue938/recovery-stage1/${kind}/${scenario}`;
     this.suite = defineE2eSuite(`r938-s1-${kind}-${scenario}-${randomUUID()}`);
     this.role = `r938_s1_${kind}`;
@@ -113,6 +120,19 @@ export class DiagnosticPreparedReaderFixture {
       roleBackends: 0, roleAbsent: false, objectsEmpty: false, controlPreserved: false, guardModesRestored: false, failures: [] };
   }
   id(alias: string): string { return this.suite.id(alias); }
+  /** Fixture-chosen ordered UUIDs: one case-unique prefix, zero-padded decimal index suffix. */
+  orderedId(series: string, index: number): string {
+    this.dependency(Number.isInteger(index) && index >= 0 && index < 1e12, "ordered_id_index", index);
+    return `${this.id(series).slice(0, 24)}${String(index).padStart(12, "0")}`;
+  }
+  /** The injected diagnostic/identity clock. It only moves forward, to explicit case instants. */
+  get clock(): Date { return new Date(this.now); }
+  at(instant: Date): void {
+    this.dependency(instant.valueOf() >= this.now.valueOf(), "clock_backwards", { from: this.now.toISOString(), to: instant.toISOString() });
+    console.info("938_clock", { from: this.now.toISOString(), to: instant.toISOString() });
+    this.now = new Date(instant);
+  }
+  advance(ms: number): void { this.dependency(Number.isInteger(ms) && ms > 0, "clock_advance", ms); this.at(new Date(this.now.valueOf() + ms)); }
   private dependency(condition: unknown, stage: string, detail?: unknown): asserts condition {
     if (!condition) throw new Error(`938_fixture_dependency:${stage}:${JSON.stringify(detail)}`);
   }
@@ -121,13 +141,13 @@ export class DiagnosticPreparedReaderFixture {
     const promise = work(); this.inFlight.add(promise);
     try { return await promise; } finally { this.inFlight.delete(promise); }
   }
-  async send<T = unknown>(who: Person, method: "GET" | "POST" | "PUT", path: string, payload?: object | Buffer): Promise<Response<T>> {
+  async send<T = unknown>(who: Person, method: "GET" | "POST" | "PUT", path: string, payload?: object | Buffer, sessionId?: string): Promise<Response<T>> {
     return this.caller(async () => {
       this.dependency(this.app && this.jwt, "http_not_initialized");
       const app = this.app, jwt = this.jwt;
       this.dependency(app && jwt, "http_not_initialized");
       const options = { method, url: `/api/v1/diagnostics/${path}`,
-        headers: { authorization: `Bearer ${jwt.sign({ sub: this.actors[who].userId, sid: this.actors[who].sessionId, role: "buyer" })}`,
+        headers: { authorization: `Bearer ${jwt.sign({ sub: this.actors[who].userId, sid: sessionId ?? this.actors[who].sessionId, role: "buyer" })}`,
           ...(Buffer.isBuffer(payload) ? { "content-type": "application/octet-stream", "x-evidence-type": "image/png" } : {}) } } as const;
       const response = payload === undefined ? await app.inject(options) : await app.inject({ ...options, payload });
       return { status: response.statusCode, body: response.json() as T, headers: response.headers };
@@ -262,7 +282,11 @@ export class DiagnosticPreparedReaderFixture {
     }
     // Independent technician expiry is earlier than reviewer/reception expiry.
     // Discovery advances only its injected authority clock to this actual deadline.
-    for (const person of ["technicianB", "technicianA", "foreign", "reviewer", "reception"] as const) {
+    // #939 reviewer-first cases give the reviewer the earliest deadline instead.
+    const order = this.setup.qualificationOrder === "reviewer-first"
+      ? ["reviewer", "technicianB", "technicianA", "foreign", "reception"] as const
+      : ["technicianB", "technicianA", "foreign", "reviewer", "reception"] as const;
+    for (const person of order) {
       const capability = capabilities[person]; this.dependency(capability, "capability_missing"); await this.bootstrap(person, capability);
     }
     await this.bootstrap("reception", "diagnostics.templates");
@@ -273,9 +297,10 @@ export class DiagnosticPreparedReaderFixture {
     console.info("938_fixture_registry", { label: this.label, actors: this.actors, centerId: this.centerId, templateId: this.templateId, guards: this.guards, controlKey: this.controlKey });
   }
 
-  async arrived(alias: "A" | "B", publicVisit = false): Promise<Visit> {
+  async arrived(alias: string, publicVisit = false): Promise<Visit> {
     const commissioner: Person = publicVisit && alias === "A" ? "commissionerA" : "commissionerB";
-    const technician: Person = alias === "A" ? "technicianA" : "technicianB";
+    // B is the candidate visit; A and every other predecessor alias use the distinct A technician.
+    const technician: Person = alias === "B" ? "technicianB" : "technicianA";
     let listingId: string | undefined;
     if (publicVisit) {
       if (await this.db.brand.count({ where: { id: this.suite.catalog.brandId } }) === 0) await seedSuiteCatalog(this.db, this.suite);
@@ -326,13 +351,13 @@ export class DiagnosticPreparedReaderFixture {
     this.dependency(history.status === 200 && history.body.length === 1, "first_raw_history", history);
     const raw = history.body[0]; this.dependency(raw, "first_raw_missing"); visit.raw = raw; return visit.order;
   }
-  async material(visit: Visit): Promise<void> {
+  async material(visit: Visit, rights: MaterialRights = {}): Promise<void> {
     this.dependency(visit.raw, "raw_before_material");
     const raw = visit.raw;
     const provenanceId = this.id(`provenance-${visit.order.id}`);
     const key = `diagnostic-evidence/${provenanceId}/${image.sha256}`;
     this.objects.set(key, { sha256: image.sha256, sizeBytes: image.sizeBytes });
-    await this.admitted(visit.technician, `orders/${visit.order.id}/identity-provenance`, { id: provenanceId, expectedOrderVersion: visit.order.version, contentType: "image/png", sizeBytes: 95, rights: preparedReaderRights });
+    await this.admitted(visit.technician, `orders/${visit.order.id}/identity-provenance`, { id: provenanceId, expectedOrderVersion: visit.order.version, contentType: "image/png", sizeBytes: 95, rights: rightsUntil(rights.provenance) });
     const uploaded = await this.send(visit.technician, "PUT", `orders/${visit.order.id}/identity-provenance/${provenanceId}?expectedOrderVersion=${visit.order.version}`, Buffer.from(image.input, "base64"));
     this.dependency(uploaded.status === 200, "provenance_upload", uploaded);
     const stored = await this.db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: provenanceId } });
@@ -340,7 +365,7 @@ export class DiagnosticPreparedReaderFixture {
     this.record(await this.persisted(visit.order.id), "provenance stage-upload", visit.order.audience === "listing_public" ? 7 : 6);
     const evidence = await this.admitted<D.DiagnosticIdentityEvidence>(visit.technician, `orders/${visit.order.id}/identity-evidence`, {
       id: this.id(`evidence-${visit.order.id}`), expectedOrderVersion: visit.order.version, identityRecordId: raw.id,
-      identifiers: [{ kind: "vin_stamp", location: "Synthetic plate", value: "SYN-123", provenanceIds: [provenanceId] }], rights: preparedReaderRights, correction: null,
+      identifiers: [{ kind: "vin_stamp", location: "Synthetic plate", value: "SYN-123", provenanceIds: [provenanceId] }], rights: rightsUntil(rights.evidence), correction: null,
     });
     visit.evidence = evidence; visit.provenanceId = provenanceId;
     visit.order = (await this.send<D.DiagnosticOrder>(visit.technician, "GET", `orders/${visit.order.id}`)).body;
@@ -358,14 +383,26 @@ export class DiagnosticPreparedReaderFixture {
     console.info("938_pdf_intents", artifacts);
     return report;
   }
-  async pair(publicVisit = false, ownershipRights?: object) {
+  async pair(publicVisit = false, ownershipRights?: object, rights: { a?: MaterialRights; b?: MaterialRights } = {}) {
     const a = await this.arrived("A", publicVisit);
     await this.observe(a, { observedAt: "2026-10-21T12:00:00.000Z", mileageKm: 123000, method: "vin", vin: "SYN-123", manualReference: null }, ownershipRights);
-    await this.material(a); const report = await this.release(a);
+    await this.material(a, rights.a); const report = await this.release(a);
+    const b = await this.candidate(publicVisit, ownershipRights, rights.b);
+    return { a, b, report };
+  }
+  /** The retained B visit used by pair(), alone. */
+  async candidate(publicVisit = false, ownershipRights?: object, rights?: MaterialRights): Promise<Visit> {
     const b = await this.arrived("B", publicVisit);
     await this.observe(b, { observedAt: "2026-10-22T12:00:00.000Z", mileageKm: 124100, method: "vin", vin: "SYN-123", manualReference: null }, ownershipRights);
-    await this.material(b);
-    return { a, b, report };
+    await this.material(b, rights);
+    return b;
+  }
+  /** A finalized private predecessor whose report id is orderedId("predecessor", index). */
+  async predecessor(index: number, rights?: MaterialRights): Promise<{ visit: Visit; report: D.DiagnosticReportRecord }> {
+    const visit = await this.arrived(`P${index}`);
+    await this.observe(visit, preparedPredecessorObservation);
+    await this.material(visit, rights);
+    return { visit, report: await this.release(visit, this.orderedId("predecessor", index)) };
   }
   async issue(a: Visit, b: Visit, report: D.DiagnosticReportRecord, expectedCandidateVersion: 7 | 8): Promise<string> {
     this.dependency(a.raw && b.raw && a.provenanceId && b.provenanceId, "proof_material");
@@ -381,6 +418,45 @@ export class DiagnosticPreparedReaderFixture {
     const selectedUntil = selected.qualifiedUntil, reviewerUntil = reviewer.qualifiedUntil;
     this.dependency(selectedUntil && reviewerUntil && selectedUntil < reviewerUntil, "independent_expiry_deadlines");
     this.now = selectedUntil;
+  }
+  /** Reviewer-first cases: move the clock to the reviewer's persisted deadline while both technicians stay qualified. */
+  async expireReviewerQualification(): Promise<void> {
+    this.dependency(this.setup.qualificationOrder === "reviewer-first", "reviewer_first_required");
+    const until = async (person: Person, capability: string) => (await this.db.diagnosticCenterAssignment.findUniqueOrThrow({
+      where: { centerId_userId_capability: { centerId: this.centerId, userId: this.actors[person].userId, capability } } })).qualifiedUntil;
+    const reviewerUntil = await until("reviewer", "diagnostics.reviewer");
+    const technicianUntil = [await until("technicianB", "diagnostics.technician"), await until("technicianA", "diagnostics.technician")];
+    this.dependency(reviewerUntil && technicianUntil.every(t => t && t > reviewerUntil), "reviewer_first_deadlines", { reviewerUntil, technicianUntil });
+    this.at(reviewerUntil);
+  }
+  /** Move the clock to one visit's persisted, predeclared material rights deadline. */
+  async expireVisitRights(visit: Visit, kind: "provenance" | "evidence", declared: Date): Promise<void> {
+    this.dependency(visit.provenanceId && visit.evidence, "rights_material");
+    const evidenceId = visit.evidence.id, provenanceId = visit.provenanceId;
+    const persisted = kind === "provenance"
+      ? (await this.db.diagnosticIdentityProvenance.findUniqueOrThrow({ where: { id: provenanceId } })).rightsUntil
+      : (await this.db.diagnosticIdentityEvidence.findUniqueOrThrow({ where: { id: evidenceId } })).rightsUntil;
+    this.dependency(persisted && persisted.valueOf() === declared.valueOf() && persisted > this.now, "visit_rights_deadline", { kind, persisted, declared });
+    this.at(persisted);
+  }
+  /** Proof rights end at their earliest bound material deadline; move the clock to the persisted proof deadline. */
+  async expireProofRights(proofId: string, earliestBound: Date): Promise<void> {
+    const proof = await this.db.diagnosticContinuityProof.findUniqueOrThrow({ where: { id: proofId } });
+    this.dependency(proof.rightsUntil.valueOf() === earliestBound.valueOf() && proof.rightsUntil > this.now, "proof_rights_deadline", { proof: proof.rightsUntil, earliestBound });
+    this.at(proof.rightsUntil);
+  }
+  /** Lawful invalidation: an issuer Identity change fires the continuity source trigger for every unconsumed proof. */
+  async invalidateIssuedProofs(visit: Visit, expected: number): Promise<void> {
+    await new PrismaUserRepository(this.db).updateDisplayName(this.actors.reviewer.userId, `reviewer-invalidation-${randomUUID()}`);
+    const proofs = await this.db.diagnosticContinuityProof.findMany({ where: { candidateOrderId: visit.order.id } });
+    this.dependency(proofs.length === expected && proofs.every(proof => proof.invalidatedAt !== null), "proof_invalidation", proofs.map(p => ({ id: p.id, invalidatedAt: p.invalidatedAt })));
+  }
+  /** A second current Session for the same actor, through the ordinary Session repository. */
+  async secondSession(person: Person): Promise<string> {
+    const sessions = new PrismaSessionRepository(this.db, new BcryptHasherAdapter());
+    const session = await sessions.create({ userId: this.actors[person].userId, refreshTokenHash: this.id(`${person}-second-refresh`), deviceLabel: this.label, userAgent: this.label, expiresAt: new Date("2027-01-01T00:00:00.000Z") });
+    await sessions.updateAdminTotpExpiresAt(session.id, new Date("2027-01-01T00:00:00.000Z"));
+    return session.id;
   }
   async storedEvidence(visit: Visit): Promise<Evidence> {
     this.dependency(visit.evidence, "evidence_required");
@@ -437,9 +513,9 @@ export class DiagnosticPreparedReaderFixture {
     this.dependency(order.erasedAt && user.phone === null && user.email === null && user.deletionScheduledAt === null, "A_purge_not_erased");
     console.info("938_actual_A_erasure", { userId, orderId: order.id, erasedAt: order.erasedAt, cutoff: due.toISOString(), result });
   }
-  async assign(visit: Visit, who: Person, active: boolean): Promise<D.DiagnosticOrder> {
+  async assign(visit: Visit, who: Person, active: boolean, capability = "diagnostics.technician"): Promise<D.DiagnosticOrder> {
     visit.order = await this.admitted("reception", `orders/${visit.order.id}/assignments`, { expectedVersion: visit.order.version,
-      userId: this.actors[who].userId, capability: "diagnostics.technician", active });
+      userId: this.actors[who].userId, capability, active });
     return visit.order;
   }
   async close(): Promise<PreparedReaderCleanup> {
@@ -503,8 +579,8 @@ export class DiagnosticPreparedReaderFixture {
 }
 
 export async function withPreparedReaderFixture<T>(kind: Suite, scenario: string, work: (fixture: DiagnosticPreparedReaderFixture) => Promise<T>,
-  options: { partialFailure?: boolean; cleanup?: (receipt: PreparedReaderCleanup) => void } = {}): Promise<T> {
-  const fixture = new DiagnosticPreparedReaderFixture(kind, scenario);
+  options: { partialFailure?: boolean; cleanup?: (receipt: PreparedReaderCleanup) => void } & PreparedReaderSetup = {}): Promise<T> {
+  const fixture = new DiagnosticPreparedReaderFixture(kind, scenario, options.qualificationOrder ? { qualificationOrder: options.qualificationOrder } : {});
   let original: unknown;
   // Successful completion is tracked explicitly: stage1 callbacks resolve with `void`, so `undefined` is a valid result.
   let completion: { readonly value: T } | undefined;
