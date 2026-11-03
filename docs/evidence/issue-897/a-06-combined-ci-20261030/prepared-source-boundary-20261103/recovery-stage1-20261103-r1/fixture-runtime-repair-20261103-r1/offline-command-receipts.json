@@ -1,0 +1,89 @@
+{
+  "recordedAt": "2026-11-03T07:22:24.646123+00:00",
+  "base": "045f249ef9d44bb72cf8d390cc9a31911c6d7985",
+  "source": "94ad0134a5d5ec03beb70a69746054637f0e937b",
+  "allowedSourcePaths": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts"
+  ],
+  "commands": [
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "typecheck"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "exec",
+        "tsc6",
+        "--noEmit"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "lint"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@auto-tm/api",
+        "build"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0
+    }
+  ],
+  "files": [
+    {
+      "path": "api-build.log",
+      "sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "bytes": 13
+    },
+    {
+      "path": "api-lint.log",
+      "sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "bytes": 28
+    },
+    {
+      "path": "api-tsc6.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "api-typecheck.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": "git-diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "repair-packet.md",
+      "sha256": "ee87ab714d029aac6c7d4d4a4953df1d354508eafff11e87f84f260497847a5c",
+      "bytes": 1044
+    }
+  ]
+}

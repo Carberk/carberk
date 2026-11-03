@@ -183,7 +183,7 @@ export class DiagnosticPreparedReaderFixture {
       DELETE: ["otp_requests", "measurement_investigation_exports", "measurement_principals", "measurement_state", "totp_enrollments", "fcm_devices", "notification_history",
         "notification_preferences", "saved_searches", "favorites", "owned_vehicles", "blocked_users", "dealership_members", "dealership_invitations", "listing_drafts", "verified_contact_phones",
         "service_messages", "service_push_subscriptions", "service_outbox", "service_read_states"],
-      UPDATE: ["media_uploads", "service_conversations", "service_attachments", "service_messages", "service_audits", "support_cases", "history_deliveries", "history_artifacts",
+      UPDATE: ["measurement_state", "media_uploads", "service_conversations", "service_attachments", "service_messages", "service_audits", "support_cases", "history_deliveries", "history_artifacts",
         "history_bookings", "history_payments", "history_purchase_intents", "history_refunds", "history_orders", "history_quotes", "vehicle_history_requests", "video_grants", "video_process_work",
         "video_generations", "video_upload_sessions", "service_erasure_fences", "video_cleanup_work", "dealerships", "listing_drafts"],
       INSERT: ["media_upload_cleanups", "video_cleanup_work", "service_erasure_fences"],
@@ -458,7 +458,7 @@ export class DiagnosticPreparedReaderFixture {
     const app = this.app, module = this.module;
     if (app) await attempt("app_close", () => app.close());
     else if (module) await attempt("module_close", () => module.close());
-    if (client) await attempt("prisma_close", () => client.onModuleDestroy());
+    else if (client) await attempt("prisma_close", () => client.onModuleDestroy());
     const s3 = this.s3;
     if (s3) {
       for (const key of this.objects.keys()) await attempt(`object:${key}`, () => s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })));
