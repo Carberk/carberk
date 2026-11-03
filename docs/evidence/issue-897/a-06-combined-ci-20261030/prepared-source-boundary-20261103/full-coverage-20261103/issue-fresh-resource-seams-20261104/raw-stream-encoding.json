@@ -1,0 +1,128 @@
+{
+  "kind": "issue946-lossless-raw-stream-map",
+  "rule": "Decode stored .base64 streams before comparing to receipt SHA-256; other evidence files are verbatim.",
+  "streams": [
+    {
+      "logical_path": "checks/final/focused-boundary-green.stdout",
+      "stored_path": "checks/final/focused-boundary-green.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 220,
+      "decoded_sha256": "efd81e390bdb304887441e67c458049a34cf4e79ff71168f16701e037e8b9da8",
+      "stored_sha256": "3bfebab26254fcbd21d7bf8e7f6cd5117dce47488e3466482adfa35fd268d24e"
+    },
+    {
+      "logical_path": "checks/final/focused-boundary-green.stderr",
+      "stored_path": "checks/final/focused-boundary-green.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/final/api-typecheck.stdout",
+      "stored_path": "checks/final/api-typecheck.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/final/api-typecheck.stderr",
+      "stored_path": "checks/final/api-typecheck.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 15,
+      "decoded_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "stored_sha256": "77ae717504618f5ec99ed6aa53e4a4c8c913ca0f3b8f02d78b166378c362a785"
+    },
+    {
+      "logical_path": "checks/final/api-tsc6.stdout",
+      "stored_path": "checks/final/api-tsc6.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/final/api-tsc6.stderr",
+      "stored_path": "checks/final/api-tsc6.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/final/api-lint.stdout",
+      "stored_path": "checks/final/api-lint.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/final/api-lint.stderr",
+      "stored_path": "checks/final/api-lint.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 28,
+      "decoded_sha256": "960f1eb37ac4d28430af9bef2c98f32333254854ffde619330f53d373ce0f632",
+      "stored_sha256": "f0fb1d83a8edb26f8e4f3b0100a996c2127aa85714c7e58c8333ae6908c08524"
+    },
+    {
+      "logical_path": "checks/final/api-build.stdout",
+      "stored_path": "checks/final/api-build.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/final/api-build.stderr",
+      "stored_path": "checks/final/api-build.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 13,
+      "decoded_sha256": "9aba080a04d36f3c5b3e64cf2e200d70a422c78297ff80bac5f5551def846538",
+      "stored_sha256": "ec49b09551ce409773a882164ce6f4e757ee942a923c8e8c085b5e084af127f9"
+    },
+    {
+      "logical_path": "checks/final/git-diff-check.stdout",
+      "stored_path": "checks/final/git-diff-check.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/final/git-diff-check.stderr",
+      "stored_path": "checks/final/git-diff-check.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 0,
+      "decoded_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "logical_path": "checks/red/red.stdout",
+      "stored_path": "checks/red/red.stdout.base64",
+      "encoding": "base64",
+      "decoded_bytes": 1271,
+      "decoded_sha256": "a51bcdee64532c0ba6505cba02a4b97d608023af53b4e5b0e375b533fedbf989",
+      "stored_sha256": "42255b4899212764674006e213af965a9cb3eaa4ccbe333a0f7e5a904b1a5c21"
+    },
+    {
+      "logical_path": "checks/red/red.stderr",
+      "stored_path": "checks/red/red.stderr.base64",
+      "encoding": "base64",
+      "decoded_bytes": 4290,
+      "decoded_sha256": "ac347fc64062def24ac9c10351a399fca9efef52b675e9f84fef3e3c2204a17f",
+      "stored_sha256": "099cabc5e7307b834a2e01acdaed55a900d308d2f6f98867a0ec9dc17a74849e"
+    }
+  ],
+  "non_stream_lossless_files": [
+    {
+      "logical_path": "source.diff",
+      "stored_path": "source.diff.base64",
+      "encoding": "base64",
+      "decoded_bytes": 11485,
+      "decoded_sha256": "f69ddb897a1c8746d7cbdab992bf86dda2e29bdfd0962ea0ea26f95d558a867c",
+      "stored_sha256": "72b05e7f669c40fa2752bda42e3b5775aa8d42267fbb0c08307e0c258f7748ed"
+    }
+  ]
+}

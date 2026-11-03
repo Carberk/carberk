@@ -1,0 +1,77 @@
+{
+  "kind": "issue946-static-944-compatibility-table",
+  "runtime_started": false,
+  "runtime_discovery": false,
+  "rows": [
+    {
+      "area": "Vitest worker",
+      "expected": "VITEST_POOL_ID=1; workers=1; globalSetup provides context; setup-env derives URLs",
+      "source": "apps/api/test/globalSetup.ts, apps/api/test/setup-env.ts, apps/api/test/helpers/testDatabases.ts",
+      "status": "preserved; no source/config edit"
+    },
+    {
+      "area": "Postgres",
+      "expected": "fresh planned port 61172; explicit expected port 61172; host 127.0.0.1; corrected base auto_tm_897_938_s1r1; derived random 6-hex template and _w1 pattern ^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$",
+      "source": "fixture ownership boundary and preserved #944 manifest correction",
+      "status": "pass static; default 61169 retained"
+    },
+    {
+      "area": "Redis",
+      "expected": "fresh planned port 61171; base DB0 -> worker DB1; loopback host and /1",
+      "source": "fixture ownership boundary; DIAGNOSTIC_EXPECTED_REDIS_PORT",
+      "status": "pass static; default 61168 retained"
+    },
+    {
+      "area": "MinIO",
+      "expected": "endpoint/public URL http://127.0.0.1:61173; exact private bucket diagnostic-test-private",
+      "source": "fixture ownership boundary; DIAGNOSTIC_EXPECTED_MINIO_PORT",
+      "status": "pass static; default 61170 retained"
+    },
+    {
+      "area": "Built imports",
+      "expected": "@auto-tm/db resolves to packages/db/dist/src/index.js; @auto-tm/contracts resolves to packages/contracts/dist/index.js; API source imports use NODE_OPTIONS=--import=tsx",
+      "source": "package exports and resolution inventory",
+      "status": "pass for focused path; worker dist absent and lazy purgeA path is not selected by F16/F17"
+    },
+    {
+      "area": "Reporter/selection",
+      "expected": "unchanged F16/F17 selector, maxWorkers=1, bail=1, retry=0, zero selected skips, default+JSON outputs distinct",
+      "source": "preserved #944 recovery manifest",
+      "status": "preserved; no reporter/test-case edits"
+    },
+    {
+      "area": "Cleanup",
+      "expected": "two 938_cleanup_receipt blocks plus DB/role, Redis DB1, MinIO, Compose/listener/container/volume/network cleanup",
+      "source": "fixture close and preserved #944 recovery manifest",
+      "status": "preserved; no resources started in this issue"
+    }
+  ],
+  "built_import_hashes": [
+    {
+      "path": "packages/db/dist/src/index.js",
+      "sha256": "914daa81026d2410cbf3192ba80d45b8027dba6ed75aa6073539d1ff609717f5",
+      "resolved": "@auto-tm/db"
+    },
+    {
+      "path": "packages/contracts/dist/index.js",
+      "sha256": "5f928c529c3e9bd27a3eb81b24902cdee1f48e08a03787f6044ea622e5a39b94",
+      "resolved": "@auto-tm/contracts"
+    },
+    {
+      "path": "apps/api/dist/src/modules/identity/infrastructure/PrismaUserRepository.js",
+      "sha256": "7a5b842ea8a76d491c672142032136096c91fd27b7bbfda005a726a95fe49b79",
+      "required_by": "existing appRequire with tsx"
+    },
+    {
+      "path": "apps/api/dist/src/modules/identity/infrastructure/PrismaSessionRepository.js",
+      "sha256": "3df6c4f36267d2fe2542c97fc8082ed89849967feeab956af274904aa85d2692",
+      "required_by": "existing appRequire with tsx"
+    },
+    {
+      "path": "apps/worker/dist/jobs/PurgeExpiredAccounts.js",
+      "status": "absent in offline worktree",
+      "required_by": "lazy purgeA only; not imported/exercised by F16/F17 selected path"
+    }
+  ],
+  "concrete_mismatch_for_coordinator": "Worker dist is absent in the offline worktree. It is not a blocker for the focused boundary test or the F16/F17 selector path because purgeA is not called, but coordinator must build/inventory it before any selector that exercises purgeA."
+}

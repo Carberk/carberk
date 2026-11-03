@@ -1,0 +1,35 @@
+{
+  "kind": "issue946-independent-coordinator-terminal-audit",
+  "base_candidate": "007b27c488a70bb74b646b044d5c572681d9bd89",
+  "base_tree": "31b6ca07d1365f26faf88b74c5a93c2a1bbe9fd8",
+  "retained_writer_base": "b425fe1800514f4253872463eb0db7c35556302d",
+  "retained_tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+  "source": "362aab7523a329ed8c8208efcd4b0b973a16e04d",
+  "source_tree": "a4e6b2aa552352ea171dc5e1a32f872b16b944c1",
+  "evidence": "3fa4c5a9a3f34a34d0746317cc8728c1c2980b4e",
+  "evidence_tree": "f5cc57fd1663853b1670cb9e63e1e5b769a6559f",
+  "remote_matches_clean_writer": true,
+  "allowed_source_paths": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "source_blobs": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": "ec0e4fa43d87aec9b10a157b44bc63e1d9e240d3",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": "88c2bc1c5ddb97d9e7612ca34b9b33cfa197b633"
+  },
+  "source_sha256": {
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts": "e444e580e26589462c9f4e715a137c72fef04fe13e1c09661bda5414e8e60d9f",
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.boundary.spec.ts": "9d7fdd16418b4578cb49fd4aa1bd50dbf4c6162535be3d74d6cdcbac9a3a5849"
+  },
+  "new_evidence_files": 30,
+  "artifact_entries_verified": 28,
+  "sha256sums_lines_verified": 29,
+  "raw_final_streams_verified": 12,
+  "final_receipt_sha256": "8f6c1c4d03be4658499042e06b03c8daf7dac778315ccd84ed35a91ccdadffbb",
+  "six_serial_checks_exit_zero": true,
+  "original_f16_f17_and_production_unchanged": true,
+  "historical_evidence_preservation_guard": "PASS when selectively assembling only this prefix; writer branch deletions of prior coordinator audit files are excluded",
+  "worker_dist_status": "apps/worker/dist absent in writer; must build/inventory before any later selector reaching purgeA; not exercised by F16/F17",
+  "no_runtime_resources": true,
+  "review_status": "not dispatched; combined #945+#946 exact-resulting-SHA pair required"
+}

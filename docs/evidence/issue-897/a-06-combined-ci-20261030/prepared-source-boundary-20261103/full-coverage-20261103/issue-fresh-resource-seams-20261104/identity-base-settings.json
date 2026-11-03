@@ -1,0 +1,47 @@
+{
+  "kind": "issue946-clean-identity-base-settings",
+  "recorded_at_utc": "2026-11-03T23:52:12.055741+00:00",
+  "before_edit_identity": {
+    "cwd": "/Users/bagtyyar/.t3/worktrees/carberk/t3-8df8a508",
+    "branch": "t3/issue-945-diagnostic-postgres-port-seam",
+    "head": "b425fe1800514f4253872463eb0db7c35556302d",
+    "tree": "fb1675cbcab211571632617c52adb04563bb7ba6",
+    "worktree_clean": true,
+    "remote": "agent/issue-945-diagnostic-postgres-port-seam",
+    "remote_equal_before_edits": true
+  },
+  "immutable_inputs": {
+    "assembled_coordinator": {
+      "commit": "007b27c488a70bb74b646b044d5c572681d9bd89",
+      "tree": "31b6ca07d1365f26faf88b74c5a93c2a1bbe9fd8"
+    },
+    "prior_source": {
+      "commit": "63766f9a3ad4b10562f19c874323e1b89e2ff1fc",
+      "tree": "2ee8e9ee3940eb9b3678c3aa33a6ec6bfe804e98"
+    },
+    "prior_evidence": {
+      "commit": "b425fe1800514f4253872463eb0db7c35556302d",
+      "tree": "fb1675cbcab211571632617c52adb04563bb7ba6"
+    },
+    "non_doc_source_equal_assembled_to_prior_source": true
+  },
+  "settings": {
+    "provider": "codex_work",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "xhigh",
+    "service_tier": "default",
+    "access": "full-access",
+    "same_executor": true,
+    "new_worker": false,
+    "new_checkout": false,
+    "slot_utc": {
+      "start": "2026-11-03T22:32:32Z",
+      "end": "2026-11-04T00:02:32Z"
+    }
+  },
+  "governing_readbacks": {
+    "issue946": "provenance/issue946-full-read.json",
+    "parent944_amendment": "provenance/parent944-amendment-6617119322.json",
+    "coordinator_release": "provenance/coordinator-release-6617201630.json"
+  }
+}

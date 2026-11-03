@@ -76,6 +76,8 @@ const { PrismaIdentityAdminRepository } = appRequire("./src/modules/identity/inf
 const { PrismaIdentityCheckAdapter } = appRequire("./src/modules/identity/infrastructure/PrismaIdentityCheckAdapter") as { PrismaIdentityCheckAdapter: new (db: PrismaService) => IdentityCheckPort };
 const bucket = "diagnostic-test-private";
 const historicalDiagnosticPostgresPort = 61169;
+const historicalDiagnosticRedisPort = 61168;
+const historicalDiagnosticMinioPort = 61170;
 const people: Person[] = ["commissionerA", "commissionerB", "reception", "technicianA", "technicianB", "reviewer", "foreign"];
 const operators: Operator[] = ["founder", "owner", "staffManager", "admin"];
 const capabilities: Partial<Record<Person, string>> = {
@@ -83,11 +85,46 @@ const capabilities: Partial<Record<Person, string>> = {
   reviewer: "diagnostics.reviewer", foreign: "diagnostics.technician",
 };
 const localized = { tk: "Synthetic", ru: "Synthetic", en: "Synthetic" };
-export function expectedDiagnosticPostgresPort(value = process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"]): number | undefined {
-  if (value === undefined) return historicalDiagnosticPostgresPort;
+function expectedDiagnosticPort(value: string | undefined, fallback: number): number | undefined {
+  if (value === undefined) return fallback;
   if (!/^[1-9][0-9]{0,4}$/.test(value)) return undefined;
   const port = Number(value);
   return port <= 65535 ? port : undefined;
+}
+export function expectedDiagnosticPostgresPort(value = process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"]): number | undefined {
+  return expectedDiagnosticPort(value, historicalDiagnosticPostgresPort);
+}
+export function expectedDiagnosticRedisPort(value = process.env["DIAGNOSTIC_EXPECTED_REDIS_PORT"]): number | undefined {
+  return expectedDiagnosticPort(value, historicalDiagnosticRedisPort);
+}
+export function expectedDiagnosticMinioPort(value = process.env["DIAGNOSTIC_EXPECTED_MINIO_PORT"]): number | undefined {
+  return expectedDiagnosticPort(value, historicalDiagnosticMinioPort);
+}
+export type DiagnosticPreparedReaderOwnership = {
+  workerUrls: boolean;
+  ownedWorkerDatabase: boolean;
+  ownedRedisDb1: boolean;
+  ownedStorage: boolean;
+};
+export function diagnosticPreparedReaderOwnership(input: {
+  databaseUrl: string | undefined;
+  expectedDatabaseUrl: string;
+  redisUrl: string | undefined;
+  expectedRedisUrl: string;
+  minioEndpoint: string | undefined;
+  bucket: string | undefined;
+  expectedPostgresPort: number | undefined;
+  expectedRedisPort: number | undefined;
+  expectedMinioPort: number | undefined;
+}): DiagnosticPreparedReaderOwnership {
+  const database = new URL(input.expectedDatabaseUrl);
+  const redis = input.redisUrl === undefined ? undefined : new URL(input.redisUrl);
+  return {
+    workerUrls: input.databaseUrl === input.expectedDatabaseUrl && input.redisUrl === input.expectedRedisUrl,
+    ownedWorkerDatabase: input.expectedPostgresPort !== undefined && database.hostname === "127.0.0.1" && database.port === String(input.expectedPostgresPort) && /^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$/.test(database.pathname.slice(1)),
+    ownedRedisDb1: input.expectedRedisPort !== undefined && redis?.hostname === "127.0.0.1" && redis.port === String(input.expectedRedisPort) && redis.pathname === "/1",
+  ownedStorage: input.expectedMinioPort !== undefined && input.minioEndpoint === `http://127.0.0.1:${input.expectedMinioPort}` && input.bucket === "diagnostic-test-private",
+  };
 }
 export const preparedReaderRights = {
   category: "vehicle_observation", purpose: "Synthetic discovery", basis: "Owned synthetic fixture",
@@ -208,13 +245,19 @@ export class DiagnosticPreparedReaderFixture {
     this.dependency(configured && configured.workers === 1, "global_setup_required");
     const expected = workerUrls(configured, Number(process.env["VITEST_POOL_ID"]));
     const databaseUrl = process.env["DATABASE_URL"];
-    this.dependency(databaseUrl === expected.databaseUrl && process.env["REDIS_URL"] === expected.redisUrl, "worker_urls");
     const expectedPostgresPort = expectedDiagnosticPostgresPort();
+    const expectedRedisPort = expectedDiagnosticRedisPort();
+    const expectedMinioPort = expectedDiagnosticMinioPort();
     this.dependency(expectedPostgresPort !== undefined, "expected_postgres_port", process.env["DIAGNOSTIC_EXPECTED_POSTGRES_PORT"]);
+    this.dependency(expectedRedisPort !== undefined, "expected_redis_port", process.env["DIAGNOSTIC_EXPECTED_REDIS_PORT"]);
+    this.dependency(expectedMinioPort !== undefined, "expected_minio_port", process.env["DIAGNOSTIC_EXPECTED_MINIO_PORT"]);
+    const ownership = diagnosticPreparedReaderOwnership({ databaseUrl, expectedDatabaseUrl: expected.databaseUrl, redisUrl: process.env["REDIS_URL"], expectedRedisUrl: expected.redisUrl,
+      minioEndpoint: process.env["MINIO_ENDPOINT"], bucket: process.env["DIAGNOSTIC_PRIVATE_BUCKET"], expectedPostgresPort, expectedRedisPort, expectedMinioPort });
+    this.dependency(ownership.workerUrls, "worker_urls");
+    this.dependency(ownership.ownedWorkerDatabase, "owned_worker_database");
+    this.dependency(ownership.ownedRedisDb1, "owned_redis_db1");
+    this.dependency(ownership.ownedStorage, "owned_storage");
     const url = new URL(expected.databaseUrl);
-    this.dependency(url.hostname === "127.0.0.1" && url.port === String(expectedPostgresPort) && /^auto_tm_897_938_s1r1_t[a-f0-9]{6}_w1$/.test(url.pathname.slice(1)), "owned_worker_database");
-    this.dependency(new URL(expected.redisUrl).host === "127.0.0.1:61168" && new URL(expected.redisUrl).pathname === "/1", "owned_redis_db1");
-    this.dependency(process.env["MINIO_ENDPOINT"] === "http://127.0.0.1:61170" && process.env["DIAGNOSTIC_PRIVATE_BUCKET"] === bucket, "owned_storage");
     this.cleanupReceipt.database = url.pathname.slice(1);
     this.environment = new Pool({ connectionString: databaseUrl });
     const observed = await this.environment.query<{ name: string; owner: string }>("SELECT current_database() AS name,current_user AS owner");
