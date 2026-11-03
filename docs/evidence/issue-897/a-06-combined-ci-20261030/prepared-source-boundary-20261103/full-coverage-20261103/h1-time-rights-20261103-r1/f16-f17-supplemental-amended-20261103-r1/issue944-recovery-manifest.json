@@ -15,6 +15,13 @@
     "release slot before next slice"
   ],
   "contract": "One evidence-only fresh run to capture missing fixture cleanup receipts; no source/test/assertion/reporter edits and no other selector.",
+  "correction": {
+    "next": "fresh idle tuple and slot readback, then one corrected exact attempt",
+    "rawStop": "/tmp/issue944-f16f17-recovery-20261103/terminal-setup-stop.json",
+    "rawStopSha256": "600b9ba604bb048ca2f6d5d178f2344edb0745ac28aa850537e702e9b57f8760",
+    "reason": "setup stop: missing VITEST_POOL_ID prevented globalSetup worker DB derivation",
+    "scope": "manifest/evidence only; source/assertions/reporter/selector unchanged"
+  },
   "createdAt": "2026-11-03T21:44:14Z",
   "issue": "https://github.com/Carberk/carberk/issues/944",
   "kind": "issue944-f16-f17-evidence-recovery-manifest/v1",
@@ -115,9 +122,9 @@
     },
     "windowUtc": {
       "durationMinutes": 90,
-      "end": "2026-11-03T23:20:00Z",
+      "end": "2026-11-03T23:30:00Z",
       "exclusive": true,
-      "start": "2026-11-03T21:50:00Z"
+      "start": "2026-11-03T22:00:00Z"
     }
   },
   "reviewProvenance": {
@@ -161,11 +168,13 @@
       "MINIO_REGION=us-east-1",
       "DIAGNOSTIC_PRIVATE_BUCKET=diagnostic-test-private",
       "APP_ENV=test",
-      "NODE_OPTIONS=--import=tsx"
+      "NODE_OPTIONS=--import=tsx",
+      "VITEST_POOL_ID=1"
     ],
     "regex": "issue939 H1 lawful case clocks and rights.*(A rights expiry|B rights expiry)",
     "zeroSelectedSkips": true
   },
-  "status": "PLANNED_UNRESERVED",
-  "stopPolicy": "Stop at first setup, selection, behavior, receipt, timeout or cleanup failure; preserve raw argv/env/timestamps/stdout/stderr/hashes; no rerun of any other selector."
+  "status": "CORRECTED_POOL_ID_PENDING_FRESH_SLOT",
+  "stopPolicy": "Stop at first setup, selection, behavior, receipt, timeout or cleanup failure; preserve raw argv/env/timestamps/stdout/stderr/hashes; no rerun of any other selector.",
+  "updatedAt": "2026-11-03T21:52:37Z"
 }
