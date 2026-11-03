@@ -24,12 +24,16 @@
   },
   "normalCleanup": [
     {
-      "name": "stop-and-drain-callers",
+      "name": "drain-owned-role-backends",
       "argv": [
         "node",
-        "OWNED_OUTPUT/stop-and-drain-callers.mjs"
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs"
       ],
-      "failure": "record nonzero and continue only to bounded residual collection"
+      "environment": {
+        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "DRAIN_TIMEOUT_SECONDS": "30"
+      },
+      "expected": "exit 0; every sample reports remaining=0"
     },
     {
       "name": "redis-flush-db1",
@@ -61,26 +65,53 @@
       "expected": "0"
     },
     {
-      "name": "postgres-role-backends",
-      "argv": [
-        "psql",
-        "<bootstrap-admin-url>",
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-Atc",
-        "SELECT usename,count(*) FROM pg_stat_activity WHERE usename IN ('r938_s1_capture','r938_s1_handoff','r938_s1_discovery','r938_s1_readers') GROUP BY usename ORDER BY usename;"
-      ],
-      "expected": "zero rows"
-    },
-    {
       "name": "postgres-source-campaign-residuals",
       "argv": [
+        "node",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs"
+      ],
+      "environment": {
+        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci"
+      },
+      "expected": "exit 0; every existing anchored worker database reports 0|0 before cleanup"
+    },
+    {
+      "name": "s3-registry-residuals",
+      "argv": [
+        "node",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs"
+      ],
+      "environment": {
+        "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+        "MINIO_REGION": "us-east-1",
+        "MINIO_ACCESS_KEY": "minioadmin",
+        "MINIO_SECRET_KEY": "minioadmin",
+        "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private"
+      },
+      "expected": "exit 0; bucket exists, untruncated and empty"
+    },
+    {
+      "name": "owned-postgres-cleanup",
+      "argv": [
+        "node",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs"
+      ],
+      "environment": {
+        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci"
+      },
+      "expected": "exit 0; only anchored worker/template plus exact base and roles are dropped"
+    },
+    {
+      "name": "postgres-database-role-absence",
+      "argv": [
         "psql",
-        "<restricted-or-bootstrap-url>",
+        "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "-X",
         "-v",
         "ON_ERROR_STOP=1",
-        "-Atc",
-        "SELECT (SELECT count(*) FROM diagnostic_source_commands),(SELECT count(*) FROM campaign_preparations);"
+        "-At",
+        "-c",
+        "SELECT (SELECT count(*) FROM pg_database WHERE datname = 'auto_tm_897_938_s1r1' OR datname ~ '^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$'),(SELECT count(*) FROM pg_roles WHERE rolname IN ('r938_s1_capture','r938_s1_handoff','r938_s1_discovery','r938_s1_readers'));"
       ],
       "expected": "0|0"
     },
@@ -92,7 +123,7 @@
         "--file",
         "infra/compose/docker-compose.ci.yml",
         "--file",
-        "PACKET/compose-overlay.yml",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
         "--project-name",
         "auto_tm_ci_897_938_s1_20261103_r1",
         "down",
@@ -158,37 +189,52 @@
       "name": "discover-anchored-databases",
       "argv": [
         "psql",
-        "<bootstrap-admin-url>",
+        "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "-X",
         "-v",
         "ON_ERROR_STOP=1",
-        "-Atc",
-        "SELECT datname FROM pg_database WHERE datname ~ '^auto_tm_897_938_s1r1_t[0-9a-f]{6}_(template|w1)$' ORDER BY datname;"
+        "-At",
+        "-c",
+        "SELECT datname FROM pg_database WHERE datname ~ '^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$' ORDER BY datname;"
       ],
-      "expected": "only current owned run names"
+      "expected": "only current owned run names; any other name is a hard failure"
     },
     {
-      "name": "drop-anchored-databases",
+      "name": "drain-owned-role-backends",
       "argv": [
-        "psql",
-        "<bootstrap-admin-url>",
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-Atc",
-        "SELECT format('DROP DATABASE IF EXISTS %I WITH (FORCE);',datname) FROM pg_database WHERE datname ~ '^auto_tm_897_938_s1r1_t[0-9a-f]{6}_(template|w1)$' ORDER BY datname;"
+        "node",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs"
       ],
-      "expected": "execute generated statements only after identity check"
+      "environment": {
+        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "DRAIN_TIMEOUT_SECONDS": "30"
+      },
+      "expected": "exit 0; no exact-role backend remains"
     },
     {
-      "name": "drop-anchored-roles",
+      "name": "execute-anchored-postgres-cleanup",
+      "argv": [
+        "node",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs"
+      ],
+      "environment": {
+        "BOOTSTRAP_ADMIN_URL": "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci"
+      },
+      "expected": "execute and verify drops, never print-only SQL"
+    },
+    {
+      "name": "postgres-database-role-absence",
       "argv": [
         "psql",
-        "<bootstrap-admin-url>",
+        "postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:61169/auto_tm_ci",
+        "-X",
         "-v",
         "ON_ERROR_STOP=1",
-        "-Atc",
-        "SELECT format('DROP ROLE IF EXISTS %I;',rolname) FROM pg_roles WHERE rolname IN ('r938_s1_capture','r938_s1_handoff','r938_s1_discovery','r938_s1_readers');"
+        "-At",
+        "-c",
+        "SELECT (SELECT count(*) FROM pg_database WHERE datname = 'auto_tm_897_938_s1r1' OR datname ~ '^auto_tm_897_938_s1r1_t[a-f0-9]{6}_(template|w1)$'),(SELECT count(*) FROM pg_roles WHERE rolname IN ('r938_s1_capture','r938_s1_handoff','r938_s1_discovery','r938_s1_readers'));"
       ],
-      "expected": "execute only exact roles after backend zero check"
+      "expected": "0|0"
     },
     {
       "name": "redis-fallback-flush-and-zero",
@@ -203,7 +249,37 @@
         "FLUSHDB",
         "SYNC"
       ],
-      "expected": "OK then DBSIZE 0"
+      "expected": "OK then DBSIZE 0; DB0 is untouched"
+    },
+    {
+      "name": "redis-fallback-dbsize",
+      "argv": [
+        "redis-cli",
+        "-h",
+        "127.0.0.1",
+        "-p",
+        "61168",
+        "-n",
+        "1",
+        "DBSIZE"
+      ],
+      "expected": "0"
+    },
+    {
+      "name": "s3-fallback-residuals",
+      "argv": [
+        "node",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs"
+      ],
+      "environment": {
+        "MINIO_ENDPOINT": "http://127.0.0.1:61170",
+        "MINIO_REGION": "us-east-1",
+        "MINIO_ACCESS_KEY": "minioadmin",
+        "MINIO_SECRET_KEY": "minioadmin",
+        "DIAGNOSTIC_PRIVATE_BUCKET": "diagnostic-test-private",
+        "ALLOW_MISSING_BUCKET": "1"
+      },
+      "expected": "exit 0; bucket absent or empty; any objects fail"
     },
     {
       "name": "fallback-compose-down",
@@ -213,7 +289,7 @@
         "--file",
         "infra/compose/docker-compose.ci.yml",
         "--file",
-        "PACKET/compose-overlay.yml",
+        "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/compose-overlay.yml",
         "--project-name",
         "auto_tm_ci_897_938_s1_20261103_r1",
         "down",
@@ -232,7 +308,7 @@
     "global docker volume/network prune"
   ],
   "composeConfig": {
-    "path": "/Users/bagtyyar/.t3/worktrees/carberk/agent-release897-candidate-a-20261029/docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/resolved-compose.json",
+    "path": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/resolved-compose.json",
     "sha256": "195168eb0fd52bd3e998ad5b2333c51a2eb59ab9ebd4859b163c1c08d4c99414",
     "serviceCount": 3,
     "ports": {
@@ -242,12 +318,13 @@
     }
   },
   "cleanupEvidenceRequired": [
-    "raw argv/timestamps/exits",
-    "Redis FLUSHDB result and DBSIZE 0",
-    "database/role residual query output",
-    "compose down output",
-    "empty owned container/volume/network/port inventories",
-    "unknown residuals recorded as failures"
+    "raw argv/environment/timestamps/exits for setup, stage, residual checks and cleanup",
+    "Redis DB1 FLUSHDB result and DBSIZE 0 with DB0 baseline preserved",
+    "named-database source/campaign residual output before owned database cleanup",
+    "MinIO registry inventory output before Compose teardown",
+    "executed anchored database/role cleanup plus explicit 0|0 absence query",
+    "compose down output and empty owned container/volume/network/port inventories",
+    "unknown or foreign residuals recorded as failures"
   ],
   "preflightImageCommands": [
     {
@@ -264,5 +341,12 @@
       ],
       "expected": "record exact images before up"
     }
-  ]
+  ],
+  "scripts": {
+    "drainOwnedRoleBackends": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/drain-owned-role-backends.mjs",
+    "ownedPostgresCleanup": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-postgres-cleanup.mjs",
+    "ownedSourceCampaignCheck": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-source-campaign-check.mjs",
+    "ownedS3Inventory": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/owned-s3-inventory.mjs",
+    "packetValidation": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/recovery-stage1-20261103-r1/runtime-packet-20261103/packet-validation.mjs"
+  }
 }
