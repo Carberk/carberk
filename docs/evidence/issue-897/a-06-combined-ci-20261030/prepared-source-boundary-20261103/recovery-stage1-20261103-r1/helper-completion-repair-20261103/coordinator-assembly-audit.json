@@ -1,0 +1,70 @@
+{
+  "recordedAt": "2026-11-03T02:19:11.612502+00:00",
+  "candidate": "8240adc3887d553f6c005367c5bd636753cfdaff",
+  "tree": "47a8a57d221d36be0c2ff2ab8987c10f2ed8551d",
+  "sourceBase": "ec2494b909c8438a6479f2b62c94a42e1f7900b4",
+  "workerSource": "ad4d182136dd3e5aa7573b31e7306ad7c2c15471",
+  "workerEvidence": "163af4b293d3fac47385069d09eb85d3ad3e7dae",
+  "changedNonDocPaths": [
+    "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts"
+  ],
+  "helper": {
+    "path": "apps/api/test/helpers/diagnosticPreparedReaderFixture.ts",
+    "sha256": "89dcb0be3a828f03ec1c1092284889f5ed7401e9dfa98d765f773674a2184287",
+    "expectedWriterSha256": "89dcb0be3a828f03ec1c1092284889f5ed7401e9dfa98d765f773674a2184287"
+  },
+  "unchangedPaths": [
+    {
+      "path": "apps/api/src/modules/identity/infrastructure/ClassifiedForwardCapture.e2e.spec.ts",
+      "blob": "c45a3cf7a7356ccd8dc8310abbd8d8b4e7d1b540",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticContinuityHandoff.e2e.spec.ts",
+      "blob": "b37804dd30f4e39ff03ae962e43de5b696c0a39b",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticScopedDiscovery.e2e.spec.ts",
+      "blob": "5aafbe4586eb7cdbca8b5721aa9e32c73afff981",
+      "equal": true
+    },
+    {
+      "path": "apps/api/src/modules/identity/presentation/DiagnosticErasedPredecessorReaders.e2e.spec.ts",
+      "blob": "31cd86c86978e5daeeb48723be91e3c643a94af2",
+      "equal": true
+    },
+    {
+      "path": "packages/db/src/testing/DiagnosticMemoryDatabase.ts",
+      "blob": "891bf61685addc418cfe026605a7ef770d803ce6",
+      "equal": true
+    }
+  ],
+  "writerChecks": [
+    "api-typecheck",
+    "api-tsc6",
+    "api-lint",
+    "api-build",
+    "git-diff-check"
+  ],
+  "runtime": {
+    "services": false,
+    "database": false,
+    "storage": false,
+    "cleanup": false,
+    "status": "held"
+  },
+  "review": {
+    "standards": "PASS for AUDIT-S2/S3 on ec2494b9; helper change is outside reviewed source scope",
+    "spec": "pending prior review on ec2494b9; fresh exact candidate reconciliation required"
+  },
+  "nextOwner": "A coordinator",
+  "cleanup": {
+    "worktree": "/Users/bagtyyar/.t3/worktrees/carberk/t3-2d375913",
+    "ref": "t3/2d375913",
+    "action": "preserve until runtime/release gate"
+  },
+  "rawCommandHashesVerified": 10,
+  "allOriginalNinePlusMemoryHashesVerified": true,
+  "workerSourceToAssembledNonDocumentationDiffExit": 0
+}
