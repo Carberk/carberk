@@ -1,0 +1,61 @@
+{
+  "kind": "h1-paired-review-terminal",
+  "recorded_at": "2026-11-03T18:09:46.885805+00:00",
+  "candidate": "323049c5c1ef310d9b40ad83ab8e29804d57c68a",
+  "candidate_tree": "4447976eca19ba3e5cdbcea155133f8568fbc682",
+  "source": "2225819a878e055f73fc34738a8403cc71fa4d32",
+  "source_tree": "bd2415772683f7ca53cb47fe3404d79e73e6737f",
+  "worker_evidence": "a860052d8f0896f701999eb012819b6e7e7a8442",
+  "reviews": [
+    {
+      "axis": "Standards",
+      "verdict": "FAIL",
+      "receipt": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/independent-standards-323049c5-20261103.md",
+      "sha256": "ca641a53d3f673adb5165365c0445c3fa8d499698c87fd520ebd799b6b4a1f59"
+    },
+    {
+      "axis": "Spec",
+      "verdict": "PASS",
+      "receipt": "docs/evidence/issue-897/a-06-combined-ci-20261030/prepared-source-boundary-20261103/full-coverage-20261103/h1-time-rights-20261103-r1/spec-review-323049c5-20261103.md",
+      "sha256": "f7bb510ea8ec415bf75b8254171c1f16b1d859824d49a1e93ddad972bdc1a41a"
+    }
+  ],
+  "settings": {
+    "coordinator": {
+      "provider": "codex_work",
+      "model": "gpt-6.1-sol",
+      "reasoningEffort": "xhigh",
+      "serviceTier": "default",
+      "runtime": "full-access"
+    },
+    "reviewers": {
+      "provider": "claudeAgent",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "fastMode": false,
+      "runtime": "full-access"
+    }
+  },
+  "blocker": "S1: F16/F17 material-expiry and proof-expiry coincide by production minimum-deadline binding; explicit equivalence disposition currently covers F20 only. Original memory cases independently mutated material rights.",
+  "recommendation": "Parent explicitly decide F16/F17 lawful outcome equivalence, retaining independent material-check coverage OPEN; do not fabricate rights state or claim deletion-test coverage. After disposition, only affected Standards recheck is required; preserve exact-SHA Spec PASS if source unchanged.",
+  "next_action": "Consume Parent F16/F17 disposition in #939 before runtime release.",
+  "coverage": {
+    "original": 56,
+    "companion": 168,
+    "original_total": 224,
+    "implemented": 15,
+    "held": 41,
+    "extra_controls": 2,
+    "full224_executable": false
+  },
+  "active_children": [],
+  "runtime_resources": [],
+  "runtime": "held",
+  "acceptance": "open",
+  "issues": [
+    "https://github.com/Carberk/carberk/issues/939#issuecomment-6611764535",
+    "https://github.com/Carberk/carberk/issues/938#issuecomment-6611765573",
+    "https://github.com/Carberk/carberk/issues/897#issuecomment-6611766703"
+  ],
+  "affected_assembled_checks": "not rerun; worker source-pinned checks audited PASS; final assembled checks remain required before runtime"
+}
