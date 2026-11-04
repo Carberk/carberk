@@ -1,7 +1,11 @@
+import { headers as requestHeaders } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { getAccessToken } from "./cookies";
 import { getApiBaseUrl } from "./api-config";
+import { forwardVisitorIp, readVisitorIpPolicy } from "./visitor-ip";
+
+const VISITOR_IP_POLICY = readVisitorIpPolicy();
 
 export class ApiError extends Error {
   constructor(
@@ -21,6 +25,7 @@ async function doFetch(
 ): Promise<Response> {
   const url = `${getApiBaseUrl()}${path}`;
   const headers = new Headers(options.headers);
+  forwardVisitorIp(headers, await requestHeaders(), VISITOR_IP_POLICY);
   if (!headers.has("Content-Type") && options.body != null) {
     headers.set("Content-Type", "application/json");
   }

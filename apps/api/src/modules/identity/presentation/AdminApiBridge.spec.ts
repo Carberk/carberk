@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Test } from "@nestjs/testing";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 
@@ -11,14 +11,15 @@ import { RefreshSession } from "../application/RefreshSession";
 import { Logout } from "../application/Logout";
 import { LogoutAll } from "../application/LogoutAll";
 import { GlobalErrorFilter } from "../../../common/error.filter";
+import { InMemoryOtpRequests } from "../application/testing/InMemoryOtpRequests";
 
-// There is no Next request context in this network test. Only cookie storage
-// is replaced; the admin API client, fetch, API router and controller are real.
-vi.mock("../../../../../admin/src/lib/cookies", () => ({
-  getAccessToken: async () => undefined,
-  getRefreshToken: async () => undefined,
-  setAuthCookies: vi.fn(),
-  clearAuthCookies: vi.fn(),
+const requestContext = vi.hoisted(() => ({ headers: new Headers() }));
+
+// Only Next's request context is replaced. The admin client, cookie reader,
+// network, API router, controller and Sign-in Code use case are real.
+vi.mock("next/headers", () => ({
+  headers: async () => requestContext.headers,
+  cookies: async () => ({ get: () => undefined }),
 }));
 
 // Loading the UI bridge as a test fixture must not pull its DOM/Next types
@@ -34,15 +35,25 @@ type AdminClient = {
 describe("real admin-to-API sign-in routing", () => {
   let app: NestFastifyApplication;
   let origin: string;
+  const now = () => new Date("2026-11-05T00:00:00Z");
+  const requests = new InMemoryOtpRequests(now);
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [AuthController],
-      // Invalid input is rejected by the real controller before any use case.
-      // These providers deliberately cannot execute business logic.
-      providers: [RequestOtp, VerifyOtp, RefreshSession, Logout, LogoutAll].map((provide) => ({
-        provide, useValue: {},
-      })),
+      providers: [
+        {
+          provide: RequestOtp,
+          useValue: new RequestOtp(
+            requests, { send: async () => undefined }, { now }, false,
+            { enqueue: async () => undefined }, { enabled: false, accounts: [] },
+            { compare: (candidate, expected) => candidate === expected },
+          ),
+        },
+        ...[VerifyOtp, RefreshSession, Logout, LogoutAll].map((provide) => ({
+          provide, useValue: {},
+        })),
+      ],
     }).compile();
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     app.useGlobalFilters(new GlobalErrorFilter());
@@ -52,6 +63,32 @@ describe("real admin-to-API sign-in routing", () => {
 
   afterAll(async () => { await app?.close(); });
   afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+  beforeEach(() => {
+    requests.records = [];
+    requestContext.headers = new Headers();
+    vi.stubEnv("CLIENT_IP_HEADER", "x-real-ip");
+    vi.stubEnv("CLIENT_IP_TRUSTED_HOPS", "1");
+    vi.stubEnv("API_CLIENT_IP_HEADER", "x-real-ip");
+  });
+
+  it("gives an operator on a second network a separate Sign-in Code budget", async () => {
+    vi.stubEnv("API_BASE_URL", origin);
+    const { apiFetch } = await import(adminClientPath) as AdminClient;
+    requestContext.headers = new Headers({ "x-real-ip": "203.0.113.7" });
+    for (let index = 0; index < 10; index++) {
+      await apiFetch("/auth/otp/request", {
+        method: "POST", body: { phone: `+993650000${String(index).padStart(2, "0")}` },
+      });
+    }
+    await expect(apiFetch("/auth/otp/request", {
+      method: "POST", body: { phone: "+99365000010" },
+    })).rejects.toMatchObject({ status: 400, code: "RATE_LIMITED" });
+
+    requestContext.headers = new Headers({ "x-real-ip": "203.0.113.8" });
+    await expect(apiFetch("/auth/otp/request", {
+      method: "POST", body: { phone: "+99365000011" },
+    })).resolves.toMatchObject({ resendInSeconds: 60 });
+  });
 
   it.each(["", "/", "/api/v1", "/api/v1/"])(
     "reaches the running API's real OTP controller with suffix '%s'", async (suffix) => {

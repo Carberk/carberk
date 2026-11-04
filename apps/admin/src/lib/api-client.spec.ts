@@ -10,10 +10,12 @@ const mockState = vi.hoisted(() => ({
     (err as Error & { digest?: string }).digest = `NEXT_REDIRECT;replace;${url};307;`;
     throw err;
   }),
+  requestHeaders: new Headers(),
 }));
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(() => Promise.resolve(mockState.cookieStore)),
+  headers: vi.fn(() => Promise.resolve(mockState.requestHeaders)),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -28,6 +30,7 @@ describe("apiFetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCookieStore.get.mockReturnValue(undefined);
+    mockState.requestHeaders = new Headers();
   });
 
   it("forwards Authorization: Bearer header from access cookie", async () => {
@@ -53,6 +56,26 @@ describe("apiFetch", () => {
 
     const [, init] = (global.fetch as Mock).mock.calls[0] ?? [null, { headers: new Headers() }];
     expect((init.headers as Headers).get("Authorization")).toBe("Bearer acc_tok");
+  });
+
+  it("forwards the sanitized operator IP in the API's trusted header", async () => {
+    mockState.requestHeaders = new Headers({ "x-real-ip": "203.0.113.7" });
+    global.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))) as Mock;
+
+    await apiFetch("/test", { headers: { "x-real-ip": "198.51.100.1" } });
+
+    const [, init] = (global.fetch as Mock).mock.calls[0] ?? [null, { headers: new Headers() }];
+    expect((init.headers as Headers).get("x-real-ip")).toBe("203.0.113.7");
+  });
+
+  it("removes an API IP header when the incoming value is unusable", async () => {
+    mockState.requestHeaders = new Headers({ "x-real-ip": "not-an-ip" });
+    global.fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))) as Mock;
+
+    await apiFetch("/test", { headers: { "x-real-ip": "198.51.100.1" } });
+
+    const [, init] = (global.fetch as Mock).mock.calls[0] ?? [null, { headers: new Headers() }];
+    expect((init.headers as Headers).has("x-real-ip")).toBe(false);
   });
 
   it("returns parsed JSON on success", async () => {
