@@ -8,7 +8,7 @@ What exists for Carberk, how to use it, and what an agent may change without ask
 | GitHub Actions CI | Proving every PR | Run and rerun checks | Changing workflows or branch protection |
 | Railway staging | Real phones, testers, a last check before release | Read status, logs and metrics | Deploys, variable or setting changes, data resets |
 | Railway production | Real users later | Read status | Everything else |
-| iOS Simulator / Android emulator | Running the app and taking screenshots | Boot, install development builds, drive, screenshot | Nothing |
+| iOS Simulator | Running the app and taking screenshots | Boot, install development builds, drive, screenshot | Nothing |
 
 ## Toolchain
 
@@ -44,9 +44,11 @@ Copy each app's `.env.template` to `.env` and keep secrets out of git. The templ
 
 `pnpm dev` starts all of them. The stack is shared by every agent on this Mac. Use your own database for destructive test runs, and never run `docker compose down -v` without asking. Schema changes are committed migrations; `db push` and `migrate dev` stay on localhost.
 
-## iOS Simulator and Android emulator
+[Local testing](local-testing.md) has the fast path: env files, the API log, sign-in codes, the local admin and its authenticator code, and the iOS Simulator steps.
 
-Expo Go cannot run this app. Use a development build. The [mobile/Expo checks](mobile-expo.md) cover builds, pitfalls and required gates.
+## iOS Simulator
+
+Test the app on the iOS Simulator. Android is not used for development testing on this Mac; use it only when a ticket is Android-only or the founder asks. Expo Go cannot run this app, so use a development build. The [mobile/Expo checks](mobile-expo.md) cover builds, pitfalls and required gates.
 
 **In T3 Code**, drive devices only through the device tools, so the founder can watch in the Device panel:
 
@@ -54,19 +56,19 @@ Expo Go cannot run this app. Use a development build. The [mobile/Expo checks](m
 2. `device_open` with the host and device id returns an `agent-device` command bound to that device.
 3. Run that command for every launch, deep link, tap, text entry and screenshot. `device_screenshot` shows the screen.
 
-Do not use `simctl`, `adb` or `idb` for taps, text or screenshots in T3. They stay fine for builds, installs, logs, Metro and port forwards. Outside T3, use the commands in the [mobile/Expo checks](mobile-expo.md).
+Do not use `simctl`, `adb` or `idb` for taps, text or screenshots in T3. They stay fine for builds, installs, logs, Metro and port forwards. If `open` reports `DEVICE_IN_USE`, another session holds the device: do not close or reuse it, tell the founder.
 
 Devices on the founder's Mac:
 
 | Device | Platform | Use |
 |---|---|---|
-| iPhone 17 | iOS 26.2 Simulator | Carberk |
-| `Carberk_Shots` | Android 16 emulator | Carberk |
+| iPhone 17 (`38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`) | iOS 26.2 Simulator | Carberk development testing; the Debug build is installed |
+| `Carberk_Shots` | Android 16 emulator | Only for Android-only tickets |
 | `Tayyn_Hyzmat_Test` | Android 16 emulator | Another project; do not use |
 
-Backends from a device:
+Backends from the Simulator:
 
-- **Local stack:** the iOS Simulator reaches the Mac's `localhost` directly. The Android emulator needs `adb reverse` for `8081`, `3006` and `9000`. Build with `pnpm --filter @auto-tm/mobile android` or `pnpm --filter @auto-tm/mobile ios`.
+- **Local stack:** the Simulator reaches the Mac's `localhost` directly. Start Metro from your worktree and open the installed build against it, as in [local testing](local-testing.md#4-run-the-app-on-the-ios-simulator).
 - **Staging:** run `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <simulator id> --port <port>`. These helpers refuse production. On this Mac's Xcode the `native:ios` route is the one known to work for iOS builds.
 
 Stop the Metro sessions you started and close the devices you opened before you finish.

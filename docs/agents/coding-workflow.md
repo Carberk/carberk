@@ -23,7 +23,7 @@ Proof is what you observed in this session:
 
 - the checks CI runs for the touched packages (typecheck, lint, tests);
 - one focused test that fails without the change, when behavior changed;
-- for UI or runtime behavior, the running app on the iOS Simulator or Android emulator, as described in the [environment guide](environment.md#ios-simulator-and-android-emulator).
+- for UI or runtime behavior, the running app on the iOS Simulator, as described in [local testing](local-testing.md).
 
 Put proof in the PR description. Screenshots go in the PR, never in the repository. Do not commit evidence, receipts or review files.
 
