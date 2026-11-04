@@ -31,7 +31,7 @@
     "db:generate": "pnpm --filter @auto-tm/db generate",
     "db:migrate:dev": "pnpm --filter @auto-tm/db migrate:dev",
     "db:migrate:deploy": "pnpm --filter @auto-tm/db migrate:deploy",
-    "db:seed": "pnpm --filter @auto-tm/db seed",
+    "db:seed": "pnpm --filter @auto-tm/db canonical:seed",
     "compose:up": "docker compose -f infra/compose/docker-compose.dev.yml up -d",
     "compose:down": "docker compose -f infra/compose/docker-compose.dev.yml down",
     "compose:logs": "docker compose -f infra/compose/docker-compose.dev.yml logs -f",

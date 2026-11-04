@@ -24,7 +24,7 @@ Start with [AGENTS.md](AGENTS.md) for task instructions. Use [CONTEXT-MAP.md](CO
 
 Use the Node/pnpm versions declared in [package.json](package.json). Install with `pnpm install --frozen-lockfile`. Configure each service from its checked-in `.env.template`; keep local credentials untracked. Database package commands also need a local `DATABASE_URL`.
 
-Start local data services with `pnpm compose:up`, generate the client with `pnpm db:generate`, and apply committed migrations to the local database with `pnpm db:migrate:deploy`. Seed local reference data when needed with `pnpm db:seed`. These commands are setup steps, not permission to mutate a deployed database.
+Start local data services with `pnpm compose:up` and `pnpm minio:bootstrap`, generate the client with `pnpm db:generate`, and apply committed migrations to the local database with `pnpm db:migrate:deploy`. Seed the local canonical reference baseline, including the catalog and logo manifest, with `pnpm db:seed`. These commands are setup steps, not permission to mutate a deployed database.
 
 `pnpm dev` starts workspace development processes after their dependencies and environment are ready. Mobile needs the [development-build setup and verification](docs/agents/mobile-expo.md); Expo Go cannot run the complete app.
 

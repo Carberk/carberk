@@ -29,7 +29,7 @@ pnpm compose:up            # start Postgres, Redis and MinIO
 pnpm minio:bootstrap       # create buckets and read policies
 pnpm db:generate           # Prisma client
 pnpm db:migrate:deploy     # apply committed migrations locally
-pnpm db:seed               # reference data, when needed
+pnpm db:seed               # canonical reference baseline and brand logos, when needed
 ```
 
 Copy each app's `.env.template` to `.env` and keep secrets out of git. The templates point everything at localhost:
