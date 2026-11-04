@@ -15,6 +15,31 @@ This repo has more than one TypeScript runtime. Do not apply one import-extensio
 
 `apps/api`, `apps/worker`, and `apps/mobile` run the needed package build before `dev`. For `build`, `test`, and `typecheck`, either use the root Turbo scripts or run the package builds listed below first.
 
+## Typecheck a fresh worktree
+
+After `pnpm install --frozen-lockfile`, run from the repository root:
+
+```bash
+DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci pnpm typecheck
+```
+
+Turbo builds runtime-shared dependencies before their consumers. The DB package's
+typecheck also depends on its own build, which generates Prisma first. Prisma
+loads `DATABASE_URL` while reading its config even for generation; the placeholder
+above uses unreachable port 1 because generation and typechecking need no running
+database. This command neither migrates nor seeds data.
+
+For a focused mobile and DB check with the same prerequisite ordering:
+
+```bash
+DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci pnpm typecheck --filter=@auto-tm/mobile --filter=@auto-tm/db
+```
+
+`pnpm --filter <package> typecheck` bypasses Turbo's prerequisite graph. Use it
+only after the shared packages have been built; missing contracts or generated
+Prisma types are setup failures to resolve before diagnosing consumer errors.
+Append `--force` to the root command when evidence must bypass cached tasks.
+
 ## Which compiler runs where
 
 Two TypeScript compilers are installed side by side, both from the pnpm default catalog. TypeScript 7 is the native compiler and ships no compiler API before 7.1, so tools that load the API keep TypeScript 6.
