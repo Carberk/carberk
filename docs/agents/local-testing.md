@@ -77,12 +77,12 @@ Use the iPhone 17 Simulator (iOS 26.2, id `38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`
 1. `device_list`, then `device_open` with the host `local` and that id. It returns an `agent-device` command bound to the device.
 2. Start Metro from your own worktree as a background command, on `8081` or any free port: `pnpm --filter @auto-tm/mobile dev --port 8081`. A Metro started by another worktree serves that worktree's code.
 3. Open the development build against your Metro: `<agent-device> open tm.auto.app --relaunch --metro-port 8081`.
-4. `<agent-device> snapshot -i` lists the screen's elements with `@eN` refs. Use `press @eN` and `fill @eN "text"`, and use `device_screenshot` to look.
-5. To sign in, open the phone screen, enter a local number, send the code, then fill in the code from the API log.
+4. `<agent-device> snapshot -i` lists the screen's elements with `@eN` refs. Use `press @eN` and `fill @eN "text"`, and use `device_screenshot` to look. Refs change after every screen change, so take a new snapshot before each press. If the first snapshot warns that the app was not in front, take it again.
+5. To sign in, go to the **Account** tab and press **Sign in, By phone or email**. The phone field already shows `+993`, so `fill` it with the eight digits only (`65000902`), then press **Get code**. Read the code from the API log (section 2). The code screen has the keyboard focused, so `<agent-device> type <code>` enters it, and the app signs in on the sixth digit.
 
 The Simulator reaches the Mac's `localhost`, so the app uses the local API, socket and MinIO from `apps/mobile/.env` with no port forwarding.
 
-If `open` fails with `DEVICE_IN_USE`, another session holds the Simulator. Do not close or reuse that session; tell the founder.
+If `open` fails with `DEVICE_IN_USE`, another session holds the Simulator. Do not close or reuse that session; tell the founder. Free it yourself when you finish: `device_close` ends your session so the next agent can open the Simulator.
 
 **When to rebuild the development build:** the Carberk Debug build is already installed on the iPhone 17 and loads JavaScript from whichever Metro it opens, so JavaScript and styling changes need no rebuild. Rebuild after a native change, such as a new native package, an Expo upgrade, or a change to app config or plugins. Use the route known to work on this Mac's Xcode: `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <id> --port <port>`, as in the [mobile/Expo checks](mobile-expo.md#guarded-native-development-sessions). The build is the same for every backend. Afterwards, reopen it against your local Metro with step 3.
 
