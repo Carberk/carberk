@@ -7,18 +7,26 @@ Interview the user relentlessly until you reach a shared understanding. Map this
 
 Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
 
+Present each round as ordinary Markdown text in the chat, including in T3 Code. The founder replies in free text using the question numbers. Do not use `request_user_input`, `request_user_input_async`, `AskUserQuestion`, questionnaires, or other interactive question forms for grilling.
+
+Batch independent questions together. Defer a question when it depends on an unanswered decision; do not default to one question per turn. A round with only one unblocked question is valid.
+
 Format a round like so:
 
 ```
-❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+**Q1. <question title>**
 
-➡️ <your recommended answer>
+<question body, might be multiple paragraphs, including multiple choices>
+
+Recommendation: <your recommended answer>
 
 ---
 
-❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+**Q2. <question title>**
 
-➡️ <your recommended answer>
+<question body, might be multiple paragraphs, including multiple choices>
+
+Recommendation: <your recommended answer>
 ```
 
 Word each question so "yes" accepts your recommended answer.

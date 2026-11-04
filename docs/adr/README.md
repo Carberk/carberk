@@ -4,7 +4,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 
 ## Effective documentation policy
 
-[ADR-0060](0060-source-first-agent-context-and-task-scoped-guidance.md) replaces ADR-0019's exhaustive implementation mirrors with source-first, task-scoped orientation. ADR-0042 still owns vocabulary; ADR-0020 still governs all other document roles and historical mutability. Older records below remain unchanged.
+[ADR-0109](0109-source-first-documentation-and-design-workflow.md) replaces ADR-0020's artifact hierarchy with source-first documentation, temporary specifications, and the current design workflow. [ADR-0060](0060-source-first-agent-context-and-task-scoped-guidance.md) defines short local overviews; ADR-0042 owns vocabulary. [ADR-0108](0108-small-prs-with-full-send-replace-integration-delivery.md) owns delivery. Older ADR text remains unchanged.
 
 ## Index
 
@@ -29,7 +29,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0017](0017-context7-as-canonical-doc-source.md) | Context7 MCP as the canonical doc source for AI agents | Superseded by ADR-0096 | 2026-05-17 |
 | [0018](0018-api-port-3006.md) | API runs on port 3006 in development | Accepted | 2026-05-17 |
 | [0019](0019-context-md-describes-current-state.md) | CONTEXT.md describes current state, not aspirational spec | Accepted | 2026-05-17 |
-| [0020](0020-document-hierarchy-and-mutability.md) | Document hierarchy and mutability rules | Accepted | 2026-05-17 |
+| [0020](0020-document-hierarchy-and-mutability.md) | Document hierarchy and mutability rules | Superseded by ADR-0109 | 2026-05-17 |
 | [0021](0021-feed-ranking-port.md) | Feed ranking via port abstraction | Accepted | 2026-05-18 |
 | [0022](0022-city-first-listing-location.md) | City-first listing location | Accepted | 2026-05-18 |
 | [0023](0023-first-party-product-analytics.md) | First-party product analytics for MVP | Accepted | 2026-05-18 |
@@ -105,21 +105,22 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0093](0093-carberk-is-the-public-product-name.md) | Carberk is the public product name; internal identifiers and domains keep their AutoTM names | Accepted | 2026-10-09 |
 | [0094](0094-one-orchestrator-implements-batched-pull-requests-trial.md) | One orchestrator session implements batched pull requests (trial), amends ADR-0058, ADR-0064, ADR-0069, ADR-0082, ADR-0084, ADR-0085, ADR-0091's docs push and the AGENTS.md quota rule for run-batch | Accepted | 2026-10-10 |
 | [0095](0095-listing-detail-drops-the-sms-verification-caption.md) | Listing detail drops the SMS verification caption, supersedes one line of ADR-0056 | Accepted | 2026-10-11 |
-| [0096](0096-webp-only-photos.md) | WebP-only photos, supersedes ADR-0008 photo formats and ADR-0088 image manifest count only | Accepted; Listing detail gallery framing sentence superseded by ADR-0097 | 2026-10-11 |
-| [0096](0096-agents-look-up-official-documentation-only-past-their-training-cutoff.md) | Agents look up official documentation only past their training cutoff (supersedes ADR-0017 and ADR-0068; amends ADR-0059's Context7 access requirement) | Accepted | 2026-10-12 |
+| [0096-webp](0096-webp-only-photos.md) | WebP-only photos, supersedes ADR-0008 photo formats and ADR-0088 image manifest count only | Accepted; Listing detail gallery framing sentence superseded by ADR-0097 | 2026-10-11 |
+| [0096-docs](0096-agents-look-up-official-documentation-only-past-their-training-cutoff.md) | Agents look up official documentation only past their training cutoff (supersedes ADR-0017 and ADR-0068; amends ADR-0059's Context7 access requirement) | Accepted | 2026-10-12 |
 | [0097](0097-listing-detail-photos-use-an-inset-4-3-cover-strip.md) | Listing detail photos use an inset 4:3 cover strip, supersedes ADR-0096's gallery framing sentence only | Accepted | 2026-10-14 |
-| [0098](0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) | Integration delivery with shared staging and concise agent guidance; replacement of PR environments and alternative batch delivery | Accepted | 2026-10-14 |
+| [0098](0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) | Integration delivery with shared staging and concise agent guidance; replacement of PR environments and alternative batch delivery | Superseded by ADR-0108 | 2026-10-14 |
 | [0099](0099-tester-only-listing-video-with-a-90-second-limit.md) | Tester-only Listing video with a 90-second limit (scoped supersession of ADR-0008 and ADR-0027) | Accepted | 2026-10-14 |
 
 | [0100](0100-google-play-first-tm-cutover-readiness.md) | Google Play approval and readiness gate the TM production cutover | Accepted | 2026-10-14 |
 | [0101](0101-app-pilot-separate-from-manual-inspections.md) | The Ashgabat app pilot can precede manual inspections | Accepted | 2026-10-14 |
-| [0102](0102-pilot-first-party-scorecard-and-investigation.md) | Pilot first-party scorecard and scoped diagnostic investigation | Accepted | 2026-10-14 |
+| [0102](0102-pilot-first-party-scorecard-and-investigation.md) | Pilot first-party scorecard and scoped diagnostic investigation | Accepted; delivery sequencing amended by ADR-0109 | 2026-10-14 |
 | [0103](0103-free-dealer-business-ownership-and-enquiries.md) | Free dealer workspaces own inventory and enquiries | Accepted | 2026-10-14 |
 | [0104](0104-center-diagnostics-with-private-and-public-reports.md) | Center diagnostics preserve report audience and observation history | Accepted | 2026-10-14 |
 | [0105](0105-listing-views-once-per-ashgabat-day.md) | Listing views count each viewer once per Ashgabat day, using an anonymous install id | Accepted | 2026-10-14 |
 | [0106](0106-service-owned-support-and-vehicle-history.md) | Service-owned Support and Vehicle History preserve separate policies | Accepted | 2026-10-14 |
 | [0107](0107-durable-permitted-vehicle-market-knowledge.md) | Durable permitted vehicle and market knowledge | Accepted | 2026-10-14 |
 | [0108](0108-small-prs-with-full-send-replace-integration-delivery.md) | Small PRs with full send replace integration delivery (supersedes ADR-0098) | Accepted | 2026-11-04 |
+| [0109](0109-source-first-documentation-and-design-workflow.md) | Source-first documentation and design workflow | Accepted | 2026-11-04 |
 
 ## Per-app ADRs
 

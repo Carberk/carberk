@@ -5,7 +5,7 @@ One issue is one small PR from current `main`. [ADR-0108](../adr/0108-small-prs-
 ## 1. Decide what to build
 
 - Unclear goal or design: interview the founder with [grilling](../../.claude/skills/grilling/SKILL.md), or [grill-with-docs](../../.claude/skills/grill-with-docs/SKILL.md) when decisions should become ADRs or glossary entries.
-- Open UI or state question: build a throwaway [prototype](../../.claude/skills/prototype/SKILL.md). For approved screens use [wireframe](../../.claude/skills/wireframe/SKILL.md) and [hifi-design](../../.claude/skills/hifi-design/SKILL.md).
+- Open UI or state question: build a throwaway [prototype](../../.claude/skills/prototype/SKILL.md). For user-facing UI, review the affected interaction with the installed `ux-heuristics`, `design-everyday-things`, and `impeccable` skills when available; record findings and limitations in the PR.
 - Write it down with [to-spec](../../.claude/skills/to-spec/SKILL.md), then split it with [to-tickets](../../.claude/skills/to-tickets/SKILL.md). Each ticket must fit one PR of about 500–1,000 changed lines, excluding lockfiles and generated files. Split anything bigger.
 - New bugs and requests go through [triage](../../.claude/skills/triage/SKILL.md). The [issue tracker](issue-tracker.md) guide has commands and the ticket format.
 

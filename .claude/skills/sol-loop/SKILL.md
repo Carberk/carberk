@@ -24,6 +24,9 @@ Standards and Spec reviewers, so one Sol reviewer covers three things:
   and the docs that [AGENTS.md](../../../AGENTS.md) routes for the touched
   areas. A documented-standard breach is a `should`, or a `blocker` when it
   hides a bug.
+- For user-facing UI changes, check the issue's design evidence and the
+  applicable `ux-heuristics`, `design-everyday-things`, and `impeccable` skill
+  findings (or the documented fallback when a skill was unavailable).
 
 Before round 1, run the checks CI runs for the touched packages (typecheck,
 lint, affected tests) and put the results in the brief. Use the latest Sol the
