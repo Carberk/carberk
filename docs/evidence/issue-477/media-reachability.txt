@@ -1,2 +1,0 @@
-listing-photos/fixture/camry-beige-0/original.jpg 200 image/jpeg 234887
-catalog-assets/brands/audi/imp-.../logo.png 200 image/png 1533

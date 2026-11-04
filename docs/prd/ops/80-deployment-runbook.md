@@ -5,7 +5,7 @@ The end-to-end procedure for shipping a new version of Carberk. There are two op
 1. **Railway era (ADR-0039):** staging + reviewer-only production until both stores approve and the TM cutover gates are met. GitHub Actions owns CI; Railway builds/deploys after CI.
 2. **TM era (ADR-0005):** permanent TM-serving production uses the air-gapped bundle procedure later in this document. Railway remains non-TM staging.
 
-The following foundation paragraph records the 2026-09-13 evidence, not current sprint or runtime status. Railway **staging** is live and its data plane, application deploys, and backup/restore path have been exercised — see the evidence files under [`evidence/`](evidence/). Railway **production** now exists, but is not ready for promotion. The duplication cleanup completed on 2026-09-13 — production Postgres and Redis are verified empty and reviewer flags read back correct — while production push credentials, migrations, the reviewer seed, and runtime readiness remain open and are deferred to #282. Application revisions did run in production during the duplication incident; that breach is recorded, not erased. See [production foundation evidence](evidence/issue-281-production-foundation.md) for the current gates; the release procedure below is not proof that they passed.
+The following foundation paragraph records the 2026-09-13 evidence, not current sprint or runtime status. Railway **staging** is live and its data plane, application deploys, and backup/restore path have been exercised — see the evidence files under `evidence/`. Railway **production** now exists, but is not ready for promotion. The duplication cleanup completed on 2026-09-13 — production Postgres and Redis are verified empty and reviewer flags read back correct — while production push credentials, migrations, the reviewer seed, and runtime readiness remain open and are deferred to #282. Application revisions did run in production during the duplication incident; that breach is recorded, not erased. See production foundation evidence for the current gates; the release procedure below is not proof that they passed.
 
 ## Integration acceptance transition
 
@@ -47,7 +47,7 @@ photo removal until the preview can be displayed.
 
 ### Production foundation: what duplication taught us
 
-**The recovery itself is complete** — see [#281 evidence](evidence/issue-281-production-foundation.md)
+**The recovery itself is complete** — see #281 evidence
 for the verified end state. The rules below are the durable lessons; they apply to
 any future environment duplication, not to an outstanding cleanup.
 
@@ -351,7 +351,7 @@ Removal checklist:
 
 - **Application rollback:** redeploy the last known-good Railway application revision and repeat health + focused smoke checks.
 - **Migration response:** forward-fix is preferred. Never assume application rollback undoes a schema migration.
-- **Data restore:** restore Postgres and media into an isolated/non-production target first, run current migrations, and verify auth/listing/chat/report/media reads before declaring the path usable. The executed Railway procedure is in [Restore drill](#restore-drill); the drill evidence is in [`evidence/issue-280-backup-restore-drill.md`](evidence/issue-280-backup-restore-drill.md).
+- **Data restore:** restore Postgres and media into an isolated/non-production target first, run current migrations, and verify auth/listing/chat/report/media reads before declaring the path usable. The executed Railway procedure is in [Restore drill](#restore-drill); the drill evidence is in `evidence/issue-280-backup-restore-drill.md`.
 - Record restore point, data scope, start/end time, operator, result, and any recovery gap.
 
 ### Step 6 — Cutover boundary
@@ -521,7 +521,7 @@ Minimum successful drill:
 6. Record backup timestamp, restore start/end time, operator, result, and any data gaps.
 
 Executed evidence for the Railway era lives in
-[`evidence/issue-280-backup-restore-drill.md`](evidence/issue-280-backup-restore-drill.md).
+`evidence/issue-280-backup-restore-drill.md`.
 
 ### Railway-era Postgres drill
 
@@ -639,6 +639,6 @@ If restore fails or takes too long for beta operations, private beta launch is b
 - [ADR-0004 — Migrations](../../adr/0004-migrations.md)
 - [ADR-0005 — Hosting](../../adr/0005-hosting.md)
 - [ADR-0039 — Phased cloud-first hosting](../../adr/0039-phased-cloud-first-hosting.md)
-- [Sprint 11 — Railway deployment](../sprints/sprint-11-railway-deployment.md)
+- Sprint 11 — Railway deployment
 - `infra/compose/docker-compose.prod.yml`
 - `infra/deploy.sh` (lives on TM server, not in repo)

@@ -1,6 +1,6 @@
 # Wireframe - Mobile Create Listing Wizard
 
-> **2026-05-19 closure note.** At sprint-4 closure two structural decisions diverged from this wireframe and are not reflected below: (1) Review is now its own step (Step 8 of 8), not an inline section at the bottom of Step 7; (2) field errors render inline directly under each input, not as a global stack at the top of the step body. See [sprint-04 retro](../../sprints/sprint-04-listings-crud-retro.md) for rationale. The rest of this document remains the authoritative shape for the wizard.
+> **2026-05-19 closure note.** At sprint-4 closure two structural decisions diverged from this wireframe and are not reflected below: (1) Review is now its own step (Step 8 of 8), not an inline section at the bottom of Step 7; (2) field errors render inline directly under each input, not as a global stack at the top of the step body. See sprint-04 retro for rationale. The rest of this document remains the authoritative shape for the wizard.
 
 Issue: GitHub #93, S4 mobile 7-step listing wizard + drafts + upload staging
 

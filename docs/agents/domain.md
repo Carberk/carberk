@@ -24,10 +24,10 @@ Commit schema changes as migrations; `db push` is localhost-only. Store timestam
 | What should a capability do? | Owning PRD feature or flow |
 | What must this task deliver? | Issue acceptance criteria and linked specification |
 | Why was this chosen? | Relevant ADR or charter decision |
-| What is scheduled? | Roadmap and relevant sprint plan |
+| What is scheduled? | Roadmap and open GitHub issues |
 | What did this change finish? | The PR description and its linked issue |
 
-For new PRDs, material capability revisions, or sprint changes, follow [ADR-0020](../adr/0020-document-hierarchy-and-mutability.md). Merged ADRs are immutable; write a superseding ADR. Started sprint plans stay locked and retros are append-only. Semantic vocabulary changes and ownership changes follow ADR-0042; routine definitions go into the glossary. User-facing copy belongs to approved designs and i18n resources.
+For new PRDs or material capability revisions, follow [ADR-0020](../adr/0020-document-hierarchy-and-mutability.md). Merged ADRs are immutable; write a superseding ADR. Semantic vocabulary changes and ownership changes follow ADR-0042; routine definitions go into the glossary. User-facing copy belongs to approved designs and i18n resources.
 
 ## Writing local overviews
 

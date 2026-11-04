@@ -1,3 +1,0 @@
-Using SSH key from file /Users/bagtyyar/.ssh/railway_debug.pub: railway-debug
-Local native:seed mode was removed because it could not be bound to the PR environment database. Run it inside the PR API container: railway ssh --project <project> --environment <environment> --service <api> node /app/scripts/native-pr-seed.mjs --remote
-exit=1

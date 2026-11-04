@@ -1,1 +1,0 @@
-minio-autotm-rewrite-pr-488.up.railway.app

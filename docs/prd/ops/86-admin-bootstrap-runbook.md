@@ -86,7 +86,7 @@ being able to state that public signup was never enabled. Locked in
 
 ## References
 
-- [Sprint 7 — Minimal admin + moderation](../sprints/sprint-07-minimal-admin.md)
+- Sprint 7 — Minimal admin + moderation
 - [Feature 30 — Identity](../features/30-identity.md)
 - [Feature 40 — Admin](../features/40-admin.md)
 - [ADR-0006 — Auth](../../adr/0006-auth.md)

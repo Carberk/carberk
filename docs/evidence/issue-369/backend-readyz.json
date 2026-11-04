@@ -1,1 +1,0 @@
-{"status":"ready","service":"api","checks":{"postgres":"ok","redis":"ok","minio":"ok"},"commitSha":"2ac525703300e99e183a108bde566c5ff6186a77","environment":"auto.tm-rewrite-pr-470"}

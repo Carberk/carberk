@@ -39,7 +39,7 @@ Temporary tester provisioning and removal live in `scripts/tester-accounts.ts`, 
 - [Runtime boundary guide](../../docs/agents/typescript-runtime.md)
 - [Migration deployment](../../docs/adr/0039-phased-cloud-first-hosting.md)
 
-The seed `_legacy/cars.brands.json` is retained as the source snapshot for the S3 brand/model import recorded in the locked [catalog sprint](../../docs/prd/sprints/sprint-03-catalog.md). It is provenance, not a runtime seed input; read it only when investigating that import.
+The seed `_legacy/cars.brands.json` is retained as the source snapshot for the S3 brand/model import recorded in the locked catalog sprint. It is provenance, not a runtime seed input; read it only when investigating that import.
 
 The Railway native-session demo data (buckets, reference data, UI fixtures and licensed logos) is prepared by `scripts/native-pr-seed.mjs`. Its only mode is `--remote`, run over Railway SSH inside the PR API container on private service connections: `node /app/scripts/native-pr-seed.mjs --remote`. It accepts only AutoTM PR environment names and mock SMS and rejects production. The root `pnpm native:seed` script points at the same entry point but, with no arguments, refuses: local (non-remote) mode was removed because it could not be bound to the PR environment's database. The entry point and the `ui:fixture` script's `--railway-pr` step share one pure guard, `packages/db/scripts/native-pr-seed-guard.cjs`, tested from `scripts/native-pr-seed.test.mjs`. PR environments are off, so this path is currently unused. See [staging native sessions](../../docs/agents/mobile-expo.md#staging-native-sessions). The ordinary `ui:fixture` command remains localhost-only.
 
