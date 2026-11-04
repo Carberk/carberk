@@ -5,7 +5,7 @@ Issue: GitHub #40, S2 mobile OTP flow
 References:
 - `docs/prd/features/30-identity.md`
 - `docs/prd/flows/60-first-time-user.md`
-- `docs/prd/sprints/sprint-02-identity.md`
+- `docs/prd/sprints/sprint-02-identity.md` (removed 2026-11-04; in git history)
 - `docs/prd/ops/83-legal.md`
 - `docs/prd/features/36-notifications.md`
 - `apps/mobile/assets/logos_color_red.svg`

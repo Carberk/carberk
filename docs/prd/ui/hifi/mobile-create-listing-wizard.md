@@ -16,8 +16,8 @@ References:
 - `docs/prd/ui/wireframes/mobile-create-listing-wizard.md`
 - `docs/prd/features/32-listings.md`
 - `docs/prd/flows/61-create-listing.md`
-- `docs/prd/sprints/sprint-04-listings-crud.md`
-- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md`
+- `docs/prd/sprints/sprint-04-listings-crud.md` (removed 2026-11-04; in git history)
+- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md` (removed 2026-11-04; in git history)
 - `docs/prd/features/31-catalog.md`
 - `docs/adr/0022-city-first-listing-location.md`
 - `docs/prd/ui/70-design-principles.md` through `docs/prd/ui/77-accessibility.md`

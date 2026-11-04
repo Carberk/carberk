@@ -2,7 +2,7 @@
 
 > **2026-11-04: sprint plans, research notes and committed evidence were removed from `main`** ([ADR-0108](../adr/0108-small-prs-with-full-send-replace-integration-delivery.md)). Work is now tracked as GitHub issues, one small PR each. The removed files remain in git history before that date. Sprint references below are historical text.
 
-> **The "where are we?" file.** Open this first in every session. It tells you which sprint is current, what shipped before it, and what comes next.
+> **The product trajectory.** Read it for scheduling context. Open GitHub issues say what is being built now; the sprint history below ends on 2026-11-04.
 >
 > Sister docs:
 > - **`GRILL-OUTCOME.md`** — locked original design charter
@@ -13,7 +13,7 @@
 >
 > **2026-06-11 — trust is the wedge ([ADR-0037](../adr/0037-trust-inspection-competitive-wedge.md)).** Real TM incumbents (TMCARS, ~254K users, already multi-category; Teklip) make a *generic* beta pointless — a tidy clone gives no one a reason to leave them. So **"what's next after S8a" is no longer a generic 10-50 beta — it is the trust pilot.** Inspection/trust is **pulled forward from Phase 2** as the differentiator the incumbents lack; multi-vertical breadth ([ADR-0035](../adr/0035-multi-vertical-platform-direction.md)) is demoted (TMCARS already holds it). Near-term (remote, from China): finish S8a substrate + software trust-signals + an inspection-**demand fake-door**. On the ground in TM: a 5-10-person **free concierge inspection pilot** (`business/inspection-program.md` Phase 0) replaces the generic invites.
 >
-> Historical sprint labels in shipped or locked artifacts are not canonical after ADR-0027. References such as "S9 admin", "S6 Garage + Dealership", or "S8 notifications" in older sprint docs should be read as historical labels unless this roadmap, a current pending sprint file, or a mutable feature PRD explicitly re-scopes the work. Do not rewrite shipped sprint plans just to rename old labels; update the active sprint/context doc when stale placement affects implementation.
+> Historical sprint labels in shipped or locked artifacts are not canonical after ADR-0027. References such as "S9 admin", "S6 Garage + Dealership", or "S8 notifications" in older sprint docs should be read as historical labels unless this roadmap, an open GitHub issue, or a mutable feature PRD explicitly re-scopes the work. Do not rename old labels in history; update the owning context doc when stale placement affects implementation.
 
 ---
 
@@ -29,7 +29,7 @@
 | **Sprint doc** | `sprint-11-railway-deployment.md` |
 | **Milestone** | M10 — Store-reviewable cloud production |
 
-> **Agents:** update this block at the start of every sprint. Sprint N's first PR sets `Status` to 🟡 in progress; the sprint-closing PR sets the previous sprint to 🟢 shipped and bumps Current to N+1.
+> **Historical:** this block records the last sprint before sprints were retired on 2026-11-04. Do not update it; current work is in GitHub issues.
 >
 > **2026-07-05 S8 closure decision:** S8 closes as the shipped S8a remote product-completeness slice; see `sprints/sprint-08-private-beta-polish-s8a-closeout.md`. The former S8b on-site distribution / real-OTP / ops cutover is deferred out of S8 and should be shaped later as a deployment/on-site cutover sprint when TM presence or a trusted helper is available.
 >
@@ -150,17 +150,7 @@ If a sprint slips, slide downstream rows by the same delta. Do not parallelize u
 
 ## How to update this file
 
-The per-sprint steps below are retired with the sprint files; record shipped capabilities in the Shipped log.
-
-Historical procedure:
-
-1. **Start of sprint N**: open `sprints/sprint-NN-<name>.md`; set the Current Sprint block at the top of this file to N + status 🟡; the row for N in the table to 🟡 with `Started` = today's date.
-
-2. **End of sprint N**: set the row for N to 🟢 with `Shipped` = today's date. Bump Current to N+1 with status ⚪ Pending. Add a one-line note under "Shipped log" below describing what landed.
-
-3. **If scope shifts between sprints**: follow the "How to propose a scope change" checklist in [`02-phases.md`](02-phases.md). Update the affected pending sprint file's DoD; do **not** silently move work.
-
-4. **If a material feature capability moves phase**: add an ADR per [ADR-0020](../adr/0020-document-hierarchy-and-mutability.md).
+Sprints are retired. Plan and track work as GitHub issues, one ticket per small PR ([issue tracker](../agents/issue-tracker.md), [delivery workflow](../agents/coding-workflow.md)). Do not update the sprint tables, the Current sprint block or the Shipped log; they are historical. Change this file only when the founder changes the product trajectory, and record a feature capability that moves phase with an ADR per [ADR-0020](../adr/0020-document-hierarchy-and-mutability.md).
 
 ## Shipped log
 

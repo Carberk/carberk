@@ -7,8 +7,8 @@ Issue: GitHub #93, S4 mobile 7-step listing wizard + drafts + upload staging
 References:
 - `docs/prd/features/32-listings.md`
 - `docs/prd/flows/61-create-listing.md`
-- `docs/prd/sprints/sprint-04-listings-crud.md`
-- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md`
+- `docs/prd/sprints/sprint-04-listings-crud.md` (removed 2026-11-04; in git history)
+- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md` (removed 2026-11-04; in git history)
 - `docs/prd/features/31-catalog.md`
 - `docs/adr/0022-city-first-listing-location.md`
 - `docs/agents/nativewind-v4.md` - mobile UI stack guide. Implementation agents must map each named primitive to React Native Reusables (RNR) and keep mobile components inside `apps/mobile`.
