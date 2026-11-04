@@ -16,11 +16,15 @@ for app in api admin mobile; do cp -n apps/$app/.env.template apps/$app/.env; do
 grep '^DATABASE_URL=' apps/api/.env > packages/db/.env
 ```
 
-Start the API as a background command, with its log in `/tmp/carberk-api.log` and higher local code limits. All local requests share one IP, so the default 10 codes an hour run out fast:
+Start the API in the background, with its log in `/tmp/carberk-api.log`. In Claude Code or Codex, use the tool's background mode instead of the trailing `&`:
 
 ```bash
-RATE_LIMIT_OTP_PHONE_DAILY=100 RATE_LIMIT_OTP_IP_HOURLY=100 \
-  pnpm --filter @auto-tm/api dev > /tmp/carberk-api.log 2>&1
+pnpm --filter @auto-tm/api dev > /tmp/carberk-api.log 2>&1 &
+```
+
+Then check it until it answers, usually within a few seconds:
+
+```bash
 curl -sf http://localhost:3006/readyz && echo ready
 ```
 
@@ -40,7 +44,14 @@ Read the newest code for a phone by its last four digits:
 grep -o '\[mock\] OTP for \*\*\*0901 (req [0-9a-f]*): [0-9]*' /tmp/carberk-api.log | tail -1 | grep -o '[0-9]*$'
 ```
 
-`req` is the first eight characters of the `requestId` that `POST /api/v1/auth/otp/request` returns, so a script can match its own request. The same phone gets a new code only after 60 seconds (`resendInSeconds`).
+`req` is the first eight characters of the `requestId` that `POST /api/v1/auth/otp/request` returns, so a script can match its own request.
+
+The code limits are fixed in the API (`SIGN_IN_CODE_RATE_POLICY`), and the `RATE_LIMIT_OTP_*` env variables do not change them:
+
+- **Per phone:** 5 codes a day. The wait between codes doubles each time: 60, 120, 240, then 480 seconds (`resendInSeconds`).
+- **Per IP:** 10 codes an hour. Every local request comes from the same IP, so all agents on this Mac share those 10.
+
+So use a new made-up number for each app sign-in, and stay signed in instead of signing in again. A refused request answers `RATE_LIMITED` with `details.reason` (`destination_limit`, `ip_limit` or `backoff`). For `ip_limit`, wait for the hour to pass.
 
 Use made-up local numbers in the form `+9936500XXXX`. The first sign-in creates the User. Codes, tokens and phone numbers never go into commits, PRs or screenshots.
 

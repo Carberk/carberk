@@ -64,6 +64,9 @@ describe("local admin authenticator code", () => {
   it.each([
     "postgresql://u:p@db.railway.internal:5432/railway",
     "postgresql://u:p@monorail.proxy.rlwy.net:41234/railway",
+    "postgresql://u:p@localhost:5432/db?host=db.railway.internal",
+    "postgresql://u:p@localhost:5432/db?hostaddr=10.0.0.5",
+    "postgresql://u:p@localhost,db.railway.internal:5432/db",
     "not a url",
     undefined,
   ])("refuses a database that is not on localhost (%s) without reading it", async (databaseUrl) => {

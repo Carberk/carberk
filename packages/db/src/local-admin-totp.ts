@@ -65,7 +65,9 @@ export async function runLocalAdminTotp(
 function isLocalDatabase(databaseUrl: string | undefined): boolean {
   if (!databaseUrl) return false;
   try {
-    return LOCAL_HOSTS.has(new URL(databaseUrl).hostname);
+    const url = new URL(databaseUrl);
+    // pg lets query parameters such as `?host=` replace the URL's host, so only a bare local URL passes.
+    return url.search === "" && LOCAL_HOSTS.has(url.hostname);
   } catch {
     return false;
   }
