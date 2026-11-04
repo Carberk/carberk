@@ -23,7 +23,7 @@
     "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/bullmq": "catalog:",
-    "@nestjs/platform-fastify": "^11.1.16",
+    "@nestjs/platform-fastify": "11.2.5",
     "@nestjs/platform-socket.io": "^11.1.16",
     "bullmq": "catalog:",
     "@nestjs/throttler": "^6.4.0",
