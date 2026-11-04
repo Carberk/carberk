@@ -46,4 +46,4 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 
 ## Maintenance
 
-Update links when ownership or locations change. Add an overview when a real area needs orientation, not speculatively for a future feature. Verify documented limitations against source; use the roadmap and owning PRD for delivery scope.
+Update links when ownership or locations change. Add an overview when a real area needs orientation, not speculatively for a future feature. Verify documented limitations against source; use the GitHub issue and any linked temporary specification for delivery scope. The roadmap is scheduling context only.

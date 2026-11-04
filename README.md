@@ -4,7 +4,7 @@ A mobile-first vehicle marketplace for Turkmenistan, with Russian, Turkmen, and 
 
 ## Find the right area
 
-Start with [AGENTS.md](AGENTS.md) for coding instructions, [CONTEXT-MAP.md](CONTEXT-MAP.md) for ownership and source entry points, or the [roadmap](docs/prd/03-roadmap.md) for product delivery scope. The [glossary](docs/domain/GLOSSARY.md) defines project terms; the [ADR index](docs/adr/README.md) records decisions and supersession.
+Start with [AGENTS.md](AGENTS.md) for task instructions. Use [CONTEXT-MAP.md](CONTEXT-MAP.md) to find ownership and source entry points, the [glossary](docs/domain/GLOSSARY.md) for terms, and the [ADR index](docs/adr/README.md) for durable decisions and supersession. Current delivery scope lives in the linked GitHub issue; the roadmap is scheduling context only.
 
 | Workspace | Responsibility |
 |---|---|
@@ -35,6 +35,8 @@ Run `pnpm lint`, `pnpm typecheck`, and `pnpm test`. Migration and some integrati
 Use the [deployment runbook](docs/prd/ops/80-deployment-runbook.md) and the effective hosting decision. The API pre-deploy command owns deployed schema migrations. Do not infer current hosting from the original air-gap charter.
 
 Work ships as small PRs through the [delivery workflow](docs/agents/coding-workflow.md). The [environment guide](docs/agents/environment.md) describes local Docker, simulators, CI, GitHub, Railway and EAS.
+
+Implemented behavior is established by source, types, tests, and runtime evidence. Planned work belongs in an issue or temporary prototype; durable tradeoffs belong in an ADR. Task-specific guidance is loaded from the routes in `AGENTS.md`.
 
 ## License
 

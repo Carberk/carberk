@@ -23,7 +23,7 @@ function createFixture(glossary) {
   mkdirSync(join(root, "docs", "domain"), { recursive: true });
   mkdirSync(join(root, "docs", "adr"), { recursive: true });
   mkdirSync(join(root, "docs", "agents"), { recursive: true });
-  for (const name of ["to-tickets", "full-send", "sol-loop", "wireframe", "hifi-design"]) {
+  for (const name of ["to-tickets", "full-send", "sol-loop"]) {
     mkdirSync(join(root, ".claude", "skills", name), { recursive: true });
   }
   mkdirSync(join(root, ".github", "workflows"), { recursive: true });
@@ -43,12 +43,13 @@ function createFixture(glossary) {
     writeFileSync(join(root, "docs", "adr", name), "fixture\n");
   }
   writeFileSync(join(root, "docs", "adr", "0060-source-first-agent-context-and-task-scoped-guidance.md"), "fixture\n");
-  writeFileSync(join(root, "docs", "adr", "README.md"), "[0042](0042-domain-glossary-authority-and-mutability.md)\n");
+  writeFileSync(join(root, "docs", "adr", "README.md"), [
+    "[0042](0042-domain-glossary-authority-and-mutability.md)",
+    "[0109](0109-source-first-documentation-and-design-workflow.md)",
+  ].join("\n"));
+  writeFileSync(join(root, "docs", "adr", "0109-source-first-documentation-and-design-workflow.md"), "fixture\n");
   for (const name of ["to-tickets", "full-send", "sol-loop"]) {
     writeFileSync(join(root, ".claude", "skills", name, "SKILL.md"), "fixture\n");
-  }
-  for (const name of ["wireframe", "hifi-design"]) {
-    writeFileSync(join(root, ".claude", "skills", name, "SKILL.md"), "[Glossary](../../../docs/domain/GLOSSARY.md)\n");
   }
   writeFileSync(join(root, "docs", "agents", "coding-workflow.md"), workflowLinks.join("\n"));
   writeFileSync(join(root, "docs", "agents", "domain.md"), "[Glossary](../domain/GLOSSARY.md)\n");
@@ -133,6 +134,10 @@ test("rejects a broken ADR index reference", () => withFixture(valid, (root) => 
   writeFileSync(join(root, "docs", "adr", "README.md"), "[0042-domain-glossary-authority-and-mutability.md](0042-wrong.md)\n");
   assert.match(failure(root), /docs\/adr\/README.md is missing the ADR-0042 link/);
 }));
+test("requires the source-first documentation ADR in the index", () => withFixture(valid, (root) => {
+  writeFileSync(join(root, "docs", "adr", "README.md"), "[0042](0042-domain-glossary-authority-and-mutability.md)\n");
+  assert.match(failure(root), /docs\/adr\/README.md is missing the ADR-0109 link/);
+}));
 test("rejects a broken glossary governance link", () => withFixture(valid.replace("(../adr/0042-domain-glossary-authority-and-mutability.md)", "(../adr/0042-wrong.md)"), (root) => {
   assert.match(failure(root), /docs\/domain\/GLOSSARY.md is missing its ADR-0042 link/);
 }));
@@ -155,8 +160,6 @@ for (const [label, source, target, diagnostic] of [
   ["ticket creation", "docs/agents/coding-workflow.md", "../../.claude/skills/to-tickets/SKILL.md", /coding workflow is missing its ticket-creation link/],
   ["review", "docs/agents/coding-workflow.md", "../../.claude/skills/sol-loop/SKILL.md", /coding workflow is missing its review link/],
   ["issue tracker", "docs/agents/issue-tracker.md", "../domain/GLOSSARY.md", /issue tracker guidance is missing its glossary link/],
-  ["wireframe", ".claude/skills/wireframe/SKILL.md", "../../../docs/domain/GLOSSARY.md", /wireframe is missing its glossary link/],
-  ["hi-fi design", ".claude/skills/hifi-design/SKILL.md", "../../../docs/domain/GLOSSARY.md", /hifi-design is missing its glossary link/],
 ]) {
   test(`rejects a broken ${label} link`, () => withFixture(valid, (root) => {
     const path = join(root, source);

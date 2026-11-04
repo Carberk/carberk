@@ -134,6 +134,7 @@ if (hasOtherShellOperator || !["pnpm test:agent-docs", "pnpm test:glossary", "tu
 requireMarkdownLink("docs/domain/GLOSSARY.md", "../adr/0042-domain-glossary-authority-and-mutability.md", "docs/domain/GLOSSARY.md is missing its ADR-0042 link");
 requireMarkdownLink("docs/adr/0042-domain-glossary-authority-and-mutability.md", "../domain/GLOSSARY.md", "ADR-0042 is missing or has a broken docs/domain/GLOSSARY.md link");
 requireMarkdownLink("docs/adr/README.md", "0042-domain-glossary-authority-and-mutability.md", "docs/adr/README.md is missing the ADR-0042 link");
+requireMarkdownLink("docs/adr/README.md", "0109-source-first-documentation-and-design-workflow.md", "docs/adr/README.md is missing the ADR-0109 link");
 for (const [number, target] of [
   ["0019", "0019-context-md-describes-current-state.md"],
   ["0020", "0020-document-hierarchy-and-mutability.md"],
@@ -155,8 +156,6 @@ for (const [source, target, diagnostic] of [
   ["AGENTS.md", "docs/agents/coding-workflow.md", "AGENTS.md is missing its workflow-router link"],
   ["CLAUDE.md", "AGENTS.md", "CLAUDE.md is missing its shared-policy link"],
   ["docs/agents/issue-tracker.md", "../domain/GLOSSARY.md", "issue tracker guidance is missing its glossary link"],
-  [".claude/skills/wireframe/SKILL.md", "../../../docs/domain/GLOSSARY.md", "wireframe is missing its glossary link"],
-  [".claude/skills/hifi-design/SKILL.md", "../../../docs/domain/GLOSSARY.md", "hifi-design is missing its glossary link"],
 ]) {
   requireMarkdownLink(source, target, diagnostic);
 }

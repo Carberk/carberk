@@ -4,7 +4,7 @@
 
 Use the [glossary](../domain/GLOSSARY.md) for project meanings and avoided synonyms. In particular, a Verified Contact Phone is not a Sign-in Method. A term can exist before its feature ships.
 
-Find the owning area in [CONTEXT-MAP.md](../../CONTEXT-MAP.md). Read that area's overview and follow its source/test links. Inspect callers and neighboring boundaries when the change crosses contexts. Use the issue and relevant PRD for expected behavior; do not infer capability from a table, glossary entry, or historical sprint label.
+Find the owning area in [CONTEXT-MAP.md](../../CONTEXT-MAP.md). Read that area's overview and follow its source/test links. Inspect callers and neighboring boundaries when the change crosses contexts. Use the issue and any linked temporary specification for expected behavior; do not infer capability from a table, glossary entry, roadmap, or historical sprint label.
 
 API contexts have framework-free `domain/` rules, `application/` use-cases, `infrastructure/` adapters, and `presentation/` transports. Keep Nest and Prisma out of domain code; map database rows at the infrastructure boundary. Cross-context calls go through injected ports or events rather than importing another context's internal domain/application code. Other modules import identity only through `identity/identity.public.ts` (plus `identity.module.ts` and `profile-photo.module.ts` for Nest composition); `apps/api` lint enforces this. Keep one use-case per file with one job, and verify business rules with domain/application tests.
 
@@ -14,20 +14,22 @@ Commit schema changes as migrations; `db push` is localhost-only. Store timestam
 
 ## Document authority
 
-[ADR-0060](../adr/0060-source-first-agent-context-and-task-scoped-guidance.md) supersedes ADR-0019's exhaustive implementation mirrors and amends the CONTEXT.md role in ADR-0020/0042. Historical ADRs retain their original text; consult the [ADR index](../adr/README.md) for supersession.
+[ADR-0109](../adr/0109-source-first-documentation-and-design-workflow.md) supersedes ADR-0020's document hierarchy. [ADR-0060](../adr/0060-source-first-agent-context-and-task-scoped-guidance.md) defines short local overviews; [ADR-0042](../adr/0042-domain-glossary-authority-and-mutability.md) governs vocabulary. Historical ADRs retain their original text; consult the [ADR index](../adr/README.md) for supersession.
 
 | Question | Read or update |
 |---|---|
 | What does a term mean? | [Glossary](../domain/GLOSSARY.md), governed by [ADR-0042](../adr/0042-domain-glossary-authority-and-mutability.md) |
 | What is implemented? | Source, schema, tests, and runtime evidence |
 | Where should I look and what boundary matters? | Map and owning CONTEXT.md |
-| What should a capability do? | Owning PRD feature or flow |
-| What must this task deliver? | Issue acceptance criteria and linked specification |
-| Why was this chosen? | Relevant ADR or charter decision |
+| What should a capability do? | GitHub issue and any linked temporary specification |
+| What must this task deliver? | GitHub issue acceptance criteria and any linked temporary specification |
+| Why was this chosen? | Relevant ADR or durable decision |
 | What is scheduled? | Roadmap and open GitHub issues |
 | What did this change finish? | The PR description and its linked issue |
 
-For new PRDs or material capability revisions, follow [ADR-0020](../adr/0020-document-hierarchy-and-mutability.md). Merged ADRs are immutable; write a superseding ADR. Semantic vocabulary changes and ownership changes follow ADR-0042; routine definitions go into the glossary. User-facing copy belongs to approved designs and i18n resources.
+For a new durable decision, write a superseding ADR; merged ADRs are immutable. Use an issue or disposable prototype for temporary planning. Semantic vocabulary changes and ownership changes follow ADR-0042; routine definitions go into the glossary. User-facing copy belongs to the issue, code, and i18n resources that ship it.
+
+For user-facing UI work, apply the installed `ux-heuristics`, `design-everyday-things`, and `impeccable` skills to the affected interaction. If a skill is unavailable, disclose that and review clarity, accessibility, state feedback, and error prevention/recovery without claiming the skill ran.
 
 ## Writing local overviews
 
