@@ -1,9 +1,0 @@
-Unmutated run
-Command (from the repository root): pnpm --filter @auto-tm/mobile test src/listings/search/SearchParametersForm.spec.tsx
-Spec under test: apps/mobile/src/listings/search/SearchParametersForm.spec.tsx at commit d52d8eeb87003391fb394f297f970ea14d6250f1
-Production code: apps/mobile/src/listings/search/PriceRangeFilterControl.tsx unmodified
-
-Run output, reduced to the file result and totals:
- ✓ src/listings/search/SearchParametersForm.spec.tsx (36 tests) 152ms
- Test Files  1 passed (1)
-      Tests  36 passed (36)

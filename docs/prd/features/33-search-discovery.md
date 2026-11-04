@@ -194,7 +194,7 @@ Each needs its own decision and evidence from the release:
 - [ADR-0022](../../adr/0022-city-first-listing-location.md) — city-first location search; explicit GPS only later
 - [ADR-0023](../../adr/0023-first-party-product-analytics.md) — first-party analytics only; search analytics stay in AutoTM-owned storage
 - [ADR-0027](../../adr/0027-mlp-beta-scope.md) — MLP beta scope; saved searches deferred
-- [Sprint 8](../sprints/sprint-08-private-beta-polish.md) — Favorites pulled into S8a and shipped as saved Listings
+- Sprint 8 — Favorites pulled into S8a and shipped as saved Listings
 
 ## Phase
 

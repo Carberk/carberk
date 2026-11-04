@@ -12,7 +12,7 @@ The proposed [ADR-0101](../../adr/0101-app-pilot-separate-from-manual-inspection
 
 ## Purpose
 
-This runbook makes the S9b on-ground trust pilot executable by a founder or trusted helper, using only a human mechanic, a printed/hand-filled rubric, and a simple PDF template. It is a follow-on to the S9a remote trust-signals work ([`sprints/sprint-09-trust-wedge.md`](../sprints/sprint-09-trust-wedge.md)) and to the Phase 0 pilot described in [`business/inspection-program.md`](../business/inspection-program.md).
+This runbook makes the S9b on-ground trust pilot executable by a founder or trusted helper, using only a human mechanic, a printed/hand-filled rubric, and a simple PDF template. It is a follow-on to the S9a remote trust-signals work (the S9 sprint plan, removed from `main` on 2026-11-04 and kept in git history; see [ADR-0037](../../adr/0037-trust-inspection-competitive-wedge.md)) and to the Phase 0 pilot described in [`business/inspection-program.md`](../business/inspection-program.md).
 
 The pilot tests the single biggest risk in the trust wedge: **does a real buyer, facing a real purchase decision, value a third-party inspection enough to use it and eventually pay for it?** ([ADR-0037](../../adr/0037-trust-inspection-competitive-wedge.md))
 
@@ -332,7 +332,7 @@ When S9b triggers, the coordinator follows this runbook and records outputs. The
 
 ## References
 
-- [`sprints/sprint-09-trust-wedge.md`](../sprints/sprint-09-trust-wedge.md) — S9a DoD + S9b outline
+- [ADR-0037](../../adr/0037-trust-inspection-competitive-wedge.md) — trust as the wedge; the S9 sprint plan with the S9a DoD and S9b outline was removed from `main` on 2026-11-04 and remains in git history
 - [`business/inspection-program.md`](../business/inspection-program.md) — Phase 0 pilot + full program strategy
 - [`business/README.md`](../business/README.md) — competitive context
 - [`../00-vision.md`](../00-vision.md) — anti-goals, especially no test-drive scheduling and no escrow

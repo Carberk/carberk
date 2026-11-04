@@ -1,8 +1,0 @@
-Sanitized observations from the preserved native session; route IDs omitted.
-First Search target mounted native handle 612; BlurView then bound handle 612.
-Accepted Favorites tap mounted target 1496; BlurView bound handle 1496.
-Repeated tap plus cross-tab slide sequence: 5 native invocations, 5 native-resolved events, 0 error events.
-Expected decomposition: 1 accepted unfocused tap plus 4 distinct slide crossings; repeated tap and release add 0.
-Target removal events observed when navigator was recreated and when the old-Android branch override removed wrappers.
-After restarting with transition_animation_scale=0, native useReducedMotion returned true.
-These are bridge/ref observations, not proof of physical haptic feel or animation speed.

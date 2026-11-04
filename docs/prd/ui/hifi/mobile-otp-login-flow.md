@@ -9,7 +9,7 @@ Structural baseline: `docs/prd/ui/wireframes/mobile-otp-login-flow.md`
 References:
 - `docs/prd/features/30-identity.md`
 - `docs/prd/flows/60-first-time-user.md`
-- `docs/prd/sprints/sprint-02-identity.md`
+- `docs/prd/sprints/sprint-02-identity.md` (removed 2026-11-04; in git history)
 - `docs/prd/features/36-notifications.md`
 - `docs/prd/ops/83-legal.md`
 - `apps/mobile/CONTEXT.md`

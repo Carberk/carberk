@@ -25,7 +25,7 @@ The saved Auto.ru first-login set is a red splash with the wordmark and a slogan
 
 ### When a fresh install saw onboarding before this change
 
-From source, **it did not**. PR 760 changed the root `initialRouteName` from `(onboarding)` to `(tabs)` and removed the `Stack.Protected` guard, the completion subscription and the readiness gate ([issue 757 record](../../../evidence/issue-757/verification.md), fix-round item 4). Nothing navigated to `/(onboarding)`: the only links into the group were inside it. This was not run on a device. `(onboarding)/index` and `(tabs)/(search)/index` both resolved to `/`; the implementation removed `(onboarding)/index.tsx`, so only Home answers `/`.
+From source, **it did not**. PR 760 changed the root `initialRouteName` from `(onboarding)` to `(tabs)` and removed the `Stack.Protected` guard, the completion subscription and the readiness gate (issue 757 record, fix-round item 4). Nothing navigated to `/(onboarding)`: the only links into the group were inside it. This was not run on a device. `(onboarding)/index` and `(tabs)/(search)/index` both resolved to `/`; the implementation removed `(onboarding)/index.tsx`, so only Home answers `/`.
 
 ### Problems in the screens this replaces
 
@@ -325,7 +325,7 @@ PR 760 removed the old gate for two reasons that this one respects: the storage 
 - A session the gate cannot read is not "no session": like every other storage failure it answers `skip` without storing anything, so a broken keychain never looks like a fresh install.
 - Skip and the final button write `true` and call `router.dismissTo(HOME_HREF)`, which pops back to the tabs already underneath. After that the root stack is the tabs alone.
 
-Defect 6 of the [release emulator pass](../../../evidence/release-emulator-pass/report.md) (Back after publishing a Listing landed on onboarding) came from onboarding being the first route, under everything else. Here it is only ever above Home, it is popped when it ends, and no route in the group answers `/` any more. `test/routes/onboarding-flow.spec.tsx` presses Skip and the final button on the production screens and expects `router.dismissTo(HOME_HREF)`, and the root's `initialRouteName` keeps the tabs the Back anchor for deep links.
+Defect 6 of the release emulator pass (Back after publishing a Listing landed on onboarding) came from onboarding being the first route, under everything else. Here it is only ever above Home, it is popped when it ends, and no route in the group answers `/` any more. `test/routes/onboarding-flow.spec.tsx` presses Skip and the final button on the production screens and expects `router.dismissTo(HOME_HREF)`, and the root's `initialRouteName` keeps the tabs the Back anchor for deep links.
 
 ## Alternatives considered
 

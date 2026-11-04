@@ -1,9 +1,0 @@
-== no paused half
-   × Results approved behavior > Retry also restarts a query that is paused behind the screen, not only failed ones 25ms
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-      Tests  1 failed | 27 passed (28)
-== no type active
-   × Results approved behavior > Retry reloads the failed queries a mounted screen uses (count, catalog names) and leaves other screens' failed queries alone 5ms
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-      Tests  1 failed | 27 passed (28)
-done

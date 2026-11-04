@@ -213,7 +213,7 @@ MLP flags are server-side environment/deployment config; API enforcement is auth
 ## References
 
 - [ADR-0039 — Phased cloud-first hosting](../../adr/0039-phased-cloud-first-hosting.md)
-- [Sprint 11 — Railway deployment](../sprints/sprint-11-railway-deployment.md)
+- Sprint 11 — Railway deployment
 - [Phase plan](../02-phases.md)
 - [Deployment runbook](80-deployment-runbook.md)
 - [Monitoring + alarms](81-monitoring-alarms.md)

@@ -280,7 +280,7 @@ describe("Search parameters: price inputs keep every digit typed or pasted", () 
   // These tests cover the React side of a burst: successive full-text events fired inside one `act`, so
   // React does not re-render between them. Outside `act` each event renders first, which is the
   // digit-by-digit case. They cannot reproduce native ordering between a native text view and a
-  // controlled `value`; the simulator capture in docs/evidence/issue-472 covers that.
+  // controlled `value`; a simulator check (issue #472) covered that.
   const fields = [
     { name: "Min", placeholder: "Min", key: "priceMin" },
     { name: "Max", placeholder: "Max", key: "priceMax" },

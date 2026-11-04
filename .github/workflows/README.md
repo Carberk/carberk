@@ -56,7 +56,7 @@ gh api repos/bagtyyarkovusov/auto.tm-rewrite/actions/runs/<run-id>/jobs \
 
 Subtract `started_at` from `completed_at` per step. The trial that led to the move measured a cold-cache hosted run at 3m33s against 2m42s self-hosted; see ADR-0073. Before the job split (#851) a full-lane PR Checks run took 8–10 minutes on one runner, of which `pnpm test` took 333–472 seconds. Timings after the split are recorded on PR #855.
 
-The turbo `test` tasks declare `outputs: []`: no workspace test writes coverage or another file worth caching. The research that preceded it, including the retired self-hosted store layout, is in [the runner performance research](../../docs/research/github-actions-self-hosted-performance.md) and is historical.
+The turbo `test` tasks declare `outputs: []`: no workspace test writes coverage or another file worth caching. The research that preceded it, including the retired self-hosted store layout, is in the runner performance research and is historical.
 
 ## Disposable CI services
 

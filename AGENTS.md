@@ -2,7 +2,7 @@
 
 Carberk is the public product name. AutoTM identifiers, packages and domains remain. Use pnpm workspaces; configuration owns commands and versions.
 
-Read the request and acceptance criteria, then [CONTEXT-MAP.md](CONTEXT-MAP.md), the owning overview, source and tests. Source and runtime evidence establish current behavior; the specification establishes intended behavior. Use the [glossary](docs/domain/GLOSSARY.md) for domain terms. Read roadmap and sprint plans only for scheduling or sprint scope.
+Read the request and acceptance criteria, then [CONTEXT-MAP.md](CONTEXT-MAP.md), the owning overview, source and tests. Source and runtime evidence establish current behavior; the specification establishes intended behavior. Use the [glossary](docs/domain/GLOSSARY.md) for domain terms. Read the roadmap only for scheduling.
 
 Every change follows the [delivery workflow](docs/agents/coding-workflow.md): one issue, one small PR from current `main`, reviewed by `sol-loop` and merged only on "full send" or founder approval ([ADR-0108](docs/adr/0108-small-prs-with-full-send-replace-integration-delivery.md)). The [environment guide](docs/agents/environment.md) says what exists (local Docker, simulators, CI, GitHub, Railway, EAS) and what you may change without asking. Repository skills live only in [.claude/skills](.claude/skills); open linked skills manually when the host cannot discover them.
 

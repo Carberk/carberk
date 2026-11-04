@@ -13,22 +13,22 @@ Read in order if you're new:
 
 ## Sprints
 
-Per-sprint detail (DoD, file list, tests, references) lives in [`sprints/`](sprints/):
+> **2026-11-04: sprint plans, research notes and committed evidence were removed from `main`** ([ADR-0108](../adr/0108-small-prs-with-full-send-replace-integration-delivery.md)). Work is now tracked as GitHub issues, one small PR each. The removed files remain in git history before that date. Sprint references below are historical text.
+
+The shipped Phase 1 sprints were:
 
 | # | Sprint | Phase | Milestone |
 |---|---|---|---|
-| [01](sprints/sprint-01-scaffold.md) | Scaffold | 1 | M1 |
-| [02](sprints/sprint-02-identity.md) | Identity (OTP) | 1 | M2 |
-| [03](sprints/sprint-03-catalog.md) | Catalog | 1 | — |
-| [04](sprints/sprint-04-listings-crud.md) | Listings CRUD | 1 | M3 |
-| [05](sprints/sprint-05-search-listing-detail.md) | Search + listing detail | 1 | M4 |
-| [06](sprints/sprint-06-contact-seller.md) | Contact seller | 1 | M5 |
-| [07](sprints/sprint-07-minimal-admin.md) | Minimal admin + moderation | 1 | M6 |
-| [08](sprints/sprint-08-private-beta-polish.md) | Private beta polish | 1 | M7 |
+| 01 | Scaffold | 1 | M1 |
+| 02 | Identity (OTP) | 1 | M2 |
+| 03 | Catalog | 1 | — |
+| 04 | Listings CRUD | 1 | M3 |
+| 05 | Search + listing detail | 1 | M4 |
+| 06 | Contact seller | 1 | M5 |
+| 07 | Minimal admin + moderation | 1 | M6 |
+| 08 | Private beta polish | 1 | M7 |
 
-Post-MLP sprint files get created from shaped bets after the Phase 1 beta retro (see [03-roadmap.md](03-roadmap.md) and [ADR-0027](../adr/0027-mlp-beta-scope.md)).
-
-Deferred features should not become orphan sprint files or loose issues. Put the target capability in the owning feature PRD or flow, add/keep a row in `03-roadmap.md` with a trigger to build, and create a sprint file only when the bet is shaped for execution. `CONTEXT.md` may mention the item only as a planned addition that points back to that PRD/sprint home.
+New work is shaped into a spec and small tickets with the `to-spec` and `to-tickets` skills (see the [delivery workflow](../agents/coding-workflow.md)). Deferred features keep their target capability in the owning feature PRD or flow, with a row in [03-roadmap.md](03-roadmap.md) saying what triggers building them.
 
 Then pick a feature:
 

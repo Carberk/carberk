@@ -1,1 +1,0 @@
-Native seed requires an auto.tm-rewrite-pr-<number> PR environment

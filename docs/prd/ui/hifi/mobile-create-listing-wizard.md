@@ -2,7 +2,7 @@
 
 > **Listing video target, 2026-10-14.** [Listing video UI](mobile-listing-video.md) defines the approved tester-only addition to this screen under #886. It changes optional video only; historical photo behavior below is not evidence of shipped video support.
 
-> **2026-05-19 closure note.** At sprint-4 closure two structural decisions diverged from this spec and are not reflected below: (1) Review is now its own step (Step 8 of 8), not an inline section at the bottom of Step 7; the header reads "Step N of 8" and progress is position-based. (2) Field errors render inline directly under each input via a `fieldErrors: Record<string,string>` map exposed on the wizard machine context, not as a global stack at the top of the step body. See [sprint-04 retro](../../sprints/sprint-04-listings-crud-retro.md) for rationale. The rest of this document remains the authoritative shape for the wizard, including the token map, motion table, and trilingual copy keys.
+> **2026-05-19 closure note.** At sprint-4 closure two structural decisions diverged from this spec and are not reflected below: (1) Review is now its own step (Step 8 of 8), not an inline section at the bottom of Step 7; the header reads "Step N of 8" and progress is position-based. (2) Field errors render inline directly under each input via a `fieldErrors: Record<string,string>` map exposed on the wizard machine context, not as a global stack at the top of the step body. See sprint-04 retro for rationale. The rest of this document remains the authoritative shape for the wizard, including the token map, motion table, and trilingual copy keys.
 
 > **2026-10-08 chrome note (founder-approved).** The footer below is superseded. Back is only the header's chevron (top left, hidden on the first step); the close ✕ is top right. The bottom holds one full-width action (Continue, Done or Publish) on the page background, below the scrolling step and above the system inset, with no bar, border or panel behind it. The footer sketches, `Back` footer button and footer border in this document no longer apply.
 
@@ -16,8 +16,8 @@ References:
 - `docs/prd/ui/wireframes/mobile-create-listing-wizard.md`
 - `docs/prd/features/32-listings.md`
 - `docs/prd/flows/61-create-listing.md`
-- `docs/prd/sprints/sprint-04-listings-crud.md`
-- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md`
+- `docs/prd/sprints/sprint-04-listings-crud.md` (removed 2026-11-04; in git history)
+- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md` (removed 2026-11-04; in git history)
 - `docs/prd/features/31-catalog.md`
 - `docs/adr/0022-city-first-listing-location.md`
 - `docs/prd/ui/70-design-principles.md` through `docs/prd/ui/77-accessibility.md`

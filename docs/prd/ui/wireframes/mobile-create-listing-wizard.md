@@ -1,14 +1,14 @@
 # Wireframe - Mobile Create Listing Wizard
 
-> **2026-05-19 closure note.** At sprint-4 closure two structural decisions diverged from this wireframe and are not reflected below: (1) Review is now its own step (Step 8 of 8), not an inline section at the bottom of Step 7; (2) field errors render inline directly under each input, not as a global stack at the top of the step body. See [sprint-04 retro](../../sprints/sprint-04-listings-crud-retro.md) for rationale. The rest of this document remains the authoritative shape for the wizard.
+> **2026-05-19 closure note.** At sprint-4 closure two structural decisions diverged from this wireframe and are not reflected below: (1) Review is now its own step (Step 8 of 8), not an inline section at the bottom of Step 7; (2) field errors render inline directly under each input, not as a global stack at the top of the step body. See sprint-04 retro for rationale. The rest of this document remains the authoritative shape for the wizard.
 
 Issue: GitHub #93, S4 mobile 7-step listing wizard + drafts + upload staging
 
 References:
 - `docs/prd/features/32-listings.md`
 - `docs/prd/flows/61-create-listing.md`
-- `docs/prd/sprints/sprint-04-listings-crud.md`
-- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md`
+- `docs/prd/sprints/sprint-04-listings-crud.md` (removed 2026-11-04; in git history)
+- `docs/prd/sprints/sprint-04-listings-crud-pre-retro.md` (removed 2026-11-04; in git history)
 - `docs/prd/features/31-catalog.md`
 - `docs/adr/0022-city-first-listing-location.md`
 - `docs/agents/nativewind-v4.md` - mobile UI stack guide. Implementation agents must map each named primitive to React Native Reusables (RNR) and keep mobile components inside `apps/mobile`.

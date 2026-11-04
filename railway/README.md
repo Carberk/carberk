@@ -34,7 +34,7 @@ reviewed change explicitly replaces it. Record provider readback per environment
 these files do not apply any settings automatically.
 
 Production foundation status and outstanding verification live in
-[#281 evidence](../docs/prd/ops/evidence/issue-281-production-foundation.md).
+#281 evidence.
 The existence of service instances does not establish readiness or authorize
 an application deployment. Production must have no branch deployment triggers.
 
@@ -88,8 +88,8 @@ provisioning (S11-07/S11-08) — listed here so drift stays auditable:
    idle detector never fires and the setting could not take effect. The
    declaration is `false` so it matches observed behaviour rather than
    asserting a sleep that cannot happen (ADR-0044 drift rule). Measured and
-   root-caused in
-   [`docs/prd/ops/evidence/issue-278-staging-applications.md`](../docs/prd/ops/evidence/issue-278-staging-applications.md).
+   root-caused under issue #278; that evidence file was removed from `main`
+   on 2026-11-04 and remains in git history.
 
 ## Environment matrix (names/references only — never values)
 
@@ -134,7 +134,7 @@ no dashboard setting can accidentally enable them.
 
 - [ADR-0039 — phased cloud-first hosting](../docs/adr/0039-phased-cloud-first-hosting.md)
 - [ADR-0004 — migrations](../docs/adr/0004-migrations.md)
-- [Sprint 11 — Railway deployment](../docs/prd/sprints/sprint-11-railway-deployment.md)
+- Sprint 11 — Railway deployment
 - [`infra/docker/`](../infra/docker/README.md)
 - [ADR-0044 — Railway deploy settings live provider-side](../docs/adr/0044-railway-deploy-settings-live-provider-side.md)
 - Railway docs: infrastructure as code (`https://docs.railway.com/infrastructure-as-code`)
