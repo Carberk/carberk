@@ -134,7 +134,10 @@ export function MessageList({
   useEffect(() => {
     if (sendCount > 0) listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [sendCount]);
-  const reported = reportedMessageIds ?? new Set<string>();
+  const reported = useMemo(
+    () => reportedMessageIds ?? new Set<string>(),
+    [reportedMessageIds],
+  );
   const [actionTargetId, setActionTargetId] = useState<string | null>(null);
   const rows = useMemo(
     () => buildMessageRows(messages, currentUserId),

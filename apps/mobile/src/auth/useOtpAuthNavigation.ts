@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePreventRemove } from "@react-navigation/native";
 import type { Router } from "expo-router";
 
@@ -74,12 +74,17 @@ export function useOtpAuthNavigation(router: Router) {
     router.back();
   }, [exit, router]);
 
-  return {
-    cancel: () => setExit("cancel"),
-    changeMethod: () => setExit("change-method"),
-    usePhoneInstead: () => setExit("use-phone"),
-    complete: () => setExit("complete"),
-    invalidDestination: (method: SignInMethod) =>
-      setExit({ invalidDestination: method }),
-  };
+  const cancel = useCallback(() => setExit("cancel"), []);
+  const changeMethod = useCallback(() => setExit("change-method"), []);
+  const usePhoneInstead = useCallback(() => setExit("use-phone"), []);
+  const complete = useCallback(() => setExit("complete"), []);
+  const invalidDestination = useCallback(
+    (method: SignInMethod) => setExit({ invalidDestination: method }),
+    [],
+  );
+
+  return useMemo(
+    () => ({ cancel, changeMethod, usePhoneInstead, complete, invalidDestination }),
+    [cancel, changeMethod, usePhoneInstead, complete, invalidDestination],
+  );
 }

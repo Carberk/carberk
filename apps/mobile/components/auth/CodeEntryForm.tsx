@@ -1,5 +1,5 @@
 import { AlertCircle } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useColorScheme } from "nativewind";
 import { useTranslation } from "react-i18next";
@@ -112,24 +112,13 @@ export function CodeEntryForm({
     return () => clearInterval(timer);
   }, [secondsRemaining]);
 
-  useEffect(() => {
-    if (
-      code.length === OTP_LENGTH &&
-      !isVerifying &&
-      lastSubmittedCode.current !== code
-    ) {
-      lastSubmittedCode.current = code;
-      void submitCode(code);
-    }
-  }, [code, isVerifying]);
-
   function handleCodeChange(value: string) {
     if (dailyLimit) return;
     setError(null);
     setCode(value);
   }
 
-  async function submitCode(nextCode: string) {
+  const submitCode = useCallback(async (nextCode: string) => {
     if (nextCode.length !== OTP_LENGTH || isVerifying) {
       return;
     }
@@ -153,7 +142,18 @@ export function CodeEntryForm({
     } finally {
       setIsVerifying(false);
     }
-  }
+  }, [isVerifying, method, t, verify]);
+
+  useEffect(() => {
+    if (
+      code.length === OTP_LENGTH &&
+      !isVerifying &&
+      lastSubmittedCode.current !== code
+    ) {
+      lastSubmittedCode.current = code;
+      void submitCode(code);
+    }
+  }, [code, isVerifying, submitCode]);
 
   async function resendCode() {
     if (secondsRemaining > 0 || isResending || dailyLimit) {

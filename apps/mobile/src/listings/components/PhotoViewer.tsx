@@ -139,7 +139,8 @@ function ViewerContent({
   const stripRef = useRef<FlatList<ListingMedia>>(null);
 
   const transition = usePhotoTransition({ ...transitionProps, onClose, indexRef, showRef, closeRef });
-  const close = useCallback(() => transition.close(), [transition.close]);
+  const { close: closePhoto } = transition;
+  const close = useCallback(() => closePhoto(), [closePhoto]);
 
   const sharpen = useCallback((id: string) => {
     setSharp((current) => (current.has(id) ? current : new Set(current).add(id)));

@@ -204,7 +204,7 @@ export default function SellScreen() {
         keepValidSteps: restoring,
       });
     }
-  }, [uploadQueue.photos, queueReady]);
+  }, [machineState.payload.photos, queueReady, uploadQueue.photos]);
 
   // The photos a save sends: the queue's keyed ones. Until the queue holds the open
   // draft's photos, the keyed ones the draft was opened with, so Back, Continue or
@@ -217,14 +217,13 @@ export default function SellScreen() {
     [queueReady, uploadQueue.photos, machineState.payload.photos],
   );
 
-  // Stable key for autosave trigger — avoids 25+ individual deps and reference churn
-  const payloadKey = useMemo(
-    () =>
-      JSON.stringify({
-        ...machineState.payload,
-        photos: photosToSave,
-        validatedSteps: machineState.validatedSteps,
-      }),
+  // Memoized payload for the autosave trigger, avoiding 25+ individual dependencies.
+  const fullPayload = useMemo<WizardSchemas.WizardDraftPayload>(
+    () => ({
+      ...machineState.payload,
+      photos: photosToSave,
+      validatedSteps: machineState.validatedSteps,
+    }),
     [machineState.payload, machineState.validatedSteps, photosToSave],
   );
 
@@ -232,27 +231,8 @@ export default function SellScreen() {
   // a save built from the queue until then would write the draft without them.
   useEffect(() => {
     if (!queueReady || machineState.status !== "step") return;
-    const fullPayload: WizardSchemas.WizardDraftPayload = {
-      ...machineState.payload,
-      photos: photosToSave,
-      validatedSteps: machineState.validatedSteps,
-    };
     save(fullPayload);
-  }, [machineState.draftId, queueReady, machineState.status, payloadKey, save]);
-
-  const handleStartListing = useCallback(() => {
-    if (!isAuthenticated) {
-      setShowSignIn(true);
-      return;
-    }
-
-    const existingDraft = draftsData?.items?.[0];
-    if (existingDraft) {
-      return;
-    }
-
-    handleCreateNewDraft();
-  }, [isAuthenticated, draftsData]);
+  }, [fullPayload, machineState.draftId, machineState.status, queueReady, save]);
 
   const handleCreateNewDraft = useCallback(() => {
     if (!isAuthenticated) {
@@ -285,7 +265,21 @@ export default function SellScreen() {
         show({ title: message, variant: "destructive" });
       },
     });
-  }, [isAuthenticated, createDraft, show, refetchDrafts]);
+  }, [isAuthenticated, createDraft, refetchDrafts, show, t]);
+
+  const handleStartListing = useCallback(() => {
+    if (!isAuthenticated) {
+      setShowSignIn(true);
+      return;
+    }
+
+    const existingDraft = draftsData?.items?.[0];
+    if (existingDraft) {
+      return;
+    }
+
+    handleCreateNewDraft();
+  }, [draftsData, handleCreateNewDraft, isAuthenticated]);
 
   const handleContinueDraft = useCallback(
     (draft: NonNullable<typeof draftsData>["items"][number]) => {
@@ -327,7 +321,7 @@ export default function SellScreen() {
         variant: "destructive",
       });
     }
-  }, [params.resumeDraftId, draftsData, machineState.status, handleContinueDraft, show]);
+  }, [params.resumeDraftId, draftsData, machineState.status, handleContinueDraft, show, t]);
 
   // The contact-phone code flow returns here with the confirmed number; put it
   // in the draft and clear the param so a rerender does not reapply it.
@@ -448,7 +442,7 @@ export default function SellScreen() {
     } finally {
       publishingRef.current = false;
     }
-  }, [machineState, photosToSave, flush, publishDraft, show]);
+  }, [machineState, photosToSave, flush, publishDraft, show, t]);
 
   const closeWizard = useCallback(() => {
     newDraftIdRef.current = null;

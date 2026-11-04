@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { AlertCircle } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -98,7 +98,7 @@ export default function ContactPhoneCodeScreen() {
     goBack();
   }, [phone, goBack]);
 
-  async function finishConfirmed(alreadyConfirmed = false) {
+  const finishConfirmed = useCallback(async (alreadyConfirmed = false) => {
     if (purpose === "relist" && listingId) {
       try {
         await republish.mutateAsync(listingId);
@@ -126,9 +126,9 @@ export default function ContactPhoneCodeScreen() {
         phone ? { confirmedContactPhone: phone } : {},
       ),
     );
-  }
+  }, [listingId, phone, purpose, republish, returnPathname, show, t]);
 
-  async function submitCode(nextCode: string) {
+  const submitCode = useCallback(async (nextCode: string) => {
     if (!phone || nextCode.length !== OTP_LENGTH || isVerifying) return;
 
     setError(null);
@@ -153,7 +153,7 @@ export default function ContactPhoneCodeScreen() {
     } finally {
       setIsVerifying(false);
     }
-  }
+  }, [confirm, finishConfirmed, isVerifying, phone, t]);
 
   useEffect(() => {
     if (
@@ -165,7 +165,7 @@ export default function ContactPhoneCodeScreen() {
       void submitCode(code);
     }
     // Runs when the code or the verifying flag changes; submitCode reads the rest live.
-  }, [code, isVerifying]);
+  }, [code, isVerifying, submitCode]);
 
   function handleCodeChange(value: string) {
     if (dailyLimit) return;
