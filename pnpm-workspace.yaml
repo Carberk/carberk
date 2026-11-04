@@ -9,6 +9,9 @@ shamefullyHoist: true
 # ADR-0048. pnpm 11+ ignores the `pnpm` field of package.json.
 overrides:
   react-native-css-interop: 0.2.4
+  # GHSA-p68q-wchp-6fh7: Nest 11 pins an affected Fastify release.
+  # Remove when the adapter itself depends on Fastify >=5.12.2.
+  "@nestjs/platform-fastify@11.2.5>fastify": 5.12.2
 
 # Official Android prefab backports, reviewed separately in PR #859.
 patchedDependencies:
@@ -44,12 +47,12 @@ catalog:
   clsx: ^2.1.1
   eslint: ^9.39.5
   eslint-plugin-react-hooks: 7.1.1
-  fastify: ^5.8.5
+  fastify: 5.12.2
   # happy-dom 21 is out of scope (#854); hold the 20.x line.
   happy-dom: ^20.14.6
   ioredis: ^5.4.2
   nestjs-pino: ^4.3.0
-  next: ~16.3.8
+  next: 16.4.1
   postcss: ^8.4.49
   react: ^19.0.0
   react-dom: ^19.0.0
