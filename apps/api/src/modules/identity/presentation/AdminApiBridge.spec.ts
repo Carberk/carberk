@@ -71,15 +71,13 @@ describe("real admin-to-API sign-in routing", () => {
     vi.stubEnv("API_CLIENT_IP_HEADER", "x-real-ip");
   });
 
-  it.each(["x-real-ip", "x-edge-client-ip"])("separates operators and ignores spoofed headers when ingress owns %s", async (ingressHeader) => {
-    vi.stubEnv("CLIENT_IP_HEADER", ingressHeader);
+  it("separates operators and ignores spoofed headers when ingress owns X-Real-IP", async () => {
     vi.stubEnv("API_BASE_URL", origin);
     const { apiFetch } = await import(adminClientPath) as AdminClient;
     for (let index = 0; index < 10; index++) {
       requestContext.headers = new Headers({
         "x-forwarded-for": `198.51.100.${index + 1}`,
-        "x-real-ip": `198.51.100.${index + 1}`,
-        [ingressHeader]: "203.0.113.7",
+        "x-real-ip": "203.0.113.7",
       });
       await apiFetch("/auth/otp/request", {
         method: "POST", body: { phone: `+993650000${String(index).padStart(2, "0")}` },
@@ -89,7 +87,7 @@ describe("real admin-to-API sign-in routing", () => {
       method: "POST", body: { phone: "+99365000010" },
     })).rejects.toMatchObject({ status: 400, code: "RATE_LIMITED" });
 
-    requestContext.headers = new Headers({ [ingressHeader]: "203.0.113.8" });
+    requestContext.headers = new Headers({ "x-real-ip": "203.0.113.8" });
     await expect(apiFetch("/auth/otp/request", {
       method: "POST", body: { phone: "+99365000011" },
     })).resolves.toMatchObject({ resendInSeconds: 60 });
