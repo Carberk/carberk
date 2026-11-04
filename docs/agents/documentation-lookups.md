@@ -34,4 +34,4 @@ Internal-only changes record `not applicable`.
 
 The issue and owning specification define intended behavior; source and runtime evidence establish current behavior. Documentation establishes neither. Use [the context map](../../CONTEXT-MAP.md) to find the owning area and the lockfile for resolved versions.
 
-Mobile dependency and runtime work also follows [mobile/Expo checks](mobile-expo.md); styling and data fetching follow [NativeWind](nativewind-v4.md) and [mobile data fetching](mobile-data-fetching.md). [Verification](../../.claude/skills/run-issue/VERIFICATION.md) owns evidence requirements.
+Mobile dependency and runtime work also follows [mobile/Expo checks](mobile-expo.md); styling and data fetching follow [NativeWind](nativewind-v4.md) and [mobile data fetching](mobile-data-fetching.md). The [delivery workflow](coding-workflow.md#3-prove-it) owns proof requirements.

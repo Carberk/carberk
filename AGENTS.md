@@ -4,7 +4,7 @@ Carberk is the public product name. AutoTM identifiers, packages and domains rem
 
 Read the request and acceptance criteria, then [CONTEXT-MAP.md](CONTEXT-MAP.md), the owning overview, source and tests. Source and runtime evidence establish current behavior; the specification establishes intended behavior. Use the [glossary](docs/domain/GLOSSARY.md) for domain terms. Read roadmap and sprint plans only for scheduling or sprint scope.
 
-Every delivery follows [coding workflow](docs/agents/coding-workflow.md). It owns roles, review, verification, recovery and the approved exception. Repository skills live only in [.claude/skills](.claude/skills); open linked skills manually when the host cannot discover them. [ADR-0098](docs/adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) establishes this workflow. Staging automation and direct promotion remain gated by operational readiness.
+Every change follows the [delivery workflow](docs/agents/coding-workflow.md): one issue, one small PR from current `main`, reviewed by `sol-loop` and merged only on "full send" or founder approval ([ADR-0108](docs/adr/0108-small-prs-with-full-send-replace-integration-delivery.md)). The [environment guide](docs/agents/environment.md) says what exists (local Docker, simulators, CI, GitHub, Railway, EAS) and what you may change without asking. Repository skills live only in [.claude/skills](.claude/skills); open linked skills manually when the host cannot discover them.
 
 | When changing | Read before editing |
 |---|---|
@@ -13,11 +13,11 @@ Every delivery follows [coding workflow](docs/agents/coding-workflow.md). It own
 | External dependency or service | [Documentation lookups](docs/agents/documentation-lookups.md) |
 | Mobile dependencies, native sessions or runtime | [Mobile/Expo checks](docs/agents/mobile-expo.md) |
 | Mobile styling/components or API/cache | [NativeWind](docs/agents/nativewind-v4.md) or [data fetching](docs/agents/mobile-data-fetching.md) |
-| Mobile screens/navigation/discovery | [UI readiness](.claude/skills/run-issue/UI-MODE.md) and the affected approved design |
+| Mobile screens/navigation/discovery | The affected approved design in [docs/prd/ui](docs/prd/ui), [wireframe](.claude/skills/wireframe/SKILL.md) or [hifi-design](.claude/skills/hifi-design/SKILL.md) |
 | TypeScript imports, exports or shared runtime | [Runtime boundaries](docs/agents/typescript-runtime.md) |
-| Deployed acceptance or staging mutation | [Deployment runbook](docs/prd/ops/80-deployment-runbook.md) and [staging reservation](docs/agents/shared-staging.md) |
+| Devices, CI, Railway, staging or deploys | [Environment guide](docs/agents/environment.md) and [deployment runbook](docs/prd/ops/80-deployment-runbook.md) |
 
-Write only in your owned worktree or `/tmp`; follow [worktree lifecycle](docs/agents/worktree-lifecycle.md). Preserve unrelated changes and report host guard refusals without retrying through another tool.
+Write only in your own worktree or `/tmp`, and remove your worktree after its PR merges. Preserve unrelated changes and report host guard refusals without retrying through another tool.
 
 ## Agent skills
 

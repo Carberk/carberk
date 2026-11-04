@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The worktree safe cleanup gate (docs/agents/worktree-lifecycle.md) as code.
+// A safe worktree cleanup gate as code (originally docs/agents/worktree-lifecycle.md, retired by ADR-0108).
 //
 // Default run is read-only: it lists every linked worktree with a verdict,
 // `remove` or `keep: <exact reason>`, plus stale local branches and Railway PR

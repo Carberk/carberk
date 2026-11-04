@@ -119,6 +119,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0105](0105-listing-views-once-per-ashgabat-day.md) | Listing views count each viewer once per Ashgabat day, using an anonymous install id | Accepted | 2026-10-14 |
 | [0106](0106-service-owned-support-and-vehicle-history.md) | Service-owned Support and Vehicle History preserve separate policies | Accepted | 2026-10-14 |
 | [0107](0107-durable-permitted-vehicle-market-knowledge.md) | Durable permitted vehicle and market knowledge | Accepted | 2026-10-14 |
+| [0108](0108-small-prs-with-full-send-replace-integration-delivery.md) | Small PRs with full send replace integration delivery (supersedes ADR-0098) | Accepted | 2026-11-04 |
 
 ## Per-app ADRs
 

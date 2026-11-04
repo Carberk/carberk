@@ -185,15 +185,13 @@ adb logcat -d | grep -c "finishDrawing of relaunch.*tm.auto.app"
 
 After each, the app must stay on the same screen, signed in, and Profile > Choose from library must open the picker. Module state survives a recreation and component state does not, so a screen that must not flash a loading state reads what the app already knows (`src/auth/sessionSnapshot.ts`).
 
-## Shared staging native sessions
+## Staging native sessions
 
-Follow [staging reservation](shared-staging.md) for ownership, identity, deployed SHA, fixtures and restoration. Final acceptance uses the reviewed/fixed integration candidate; earlier reservations may provide investigation or reviewer device proof. Hosted disposable services remain the container-backed repository test gate. Locally run unit tests, repository typecheck, affected lint and applicable exports; keep Docker stopped for native proof.
+Use the guarded `native:metro` and `native:ios` entrypoints above with `--env staging`. Confirm the API, socket and media origins in the served bundle, `/readyz`, and a loaded feed and Listing detail before claiming staging behavior. Login secrets and tokens never belong in screenshots or PRs. Read mock OTPs only from the staging API's logs, matching request ID and time. Deploys, data resets and fixture seeding on staging need the founder's approval ([environment guide](environment.md)).
 
-The coordinator assigns explicit simulator UUIDs and distinct Metro ports, serializes heavy local phases and shares only public backend origins with native agents. Use guarded `native:metro` and `native:ios` entrypoints above. Confirm API/socket/media origins in the served bundle, `/readyz`, loaded feed and detail/gallery before claiming API/media evidence. Login secrets and tokens never belong in screenshots or PR evidence. Read mock OTPs only from the verified staging API's logs, matching request ID and time.
+The `native-pr-seed` entrypoint only accepts PR environments, which are off, and refuses staging by design. Do not relax its guard to seed staging.
 
-The existing `native-pr-seed` entrypoint and shared database guard require a PR environment and reject staging before constructing clients or launching steps. Its fixture reset deletes/recreates users/listings and cascades to sessions and related records. Do not rename or relax the guard to seed staging. The transition must implement reservation-bound staging identity and fixture/reset safety first; fixture-dependent evidence is blocked until that operational path is verified. A local/public database proxy is not a substitute.
-
-Stop owned Metro/device sessions before restoration, retain exact deployment/device/artifact evidence and hand back to Chief of Staff. Failed restoration retains the reservation. Production binaries and promotion follow their separate release gates.
+Stop the Metro and device sessions you started before you finish.
 
 ## Android package per build profile
 

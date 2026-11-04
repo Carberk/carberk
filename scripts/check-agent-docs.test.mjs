@@ -37,5 +37,5 @@ test("ignores fenced examples and remote links, checks encoded local paths", () 
 test("reports missing root entry points", () => fixture((files) => { delete files["CLAUDE.md"]; }, (errors) => assert.match(errors.join("\n"), /missing entry point: CLAUDE.md/)));
 
 test("checks active host agent definition links", () => fixture((files) => {
-  files[".claude/agents/queue-reviewer.md"] = "[Review](../skills/missing/FINALIZATION.md)\n";
-}, (errors) => assert.match(errors.join("\n"), /\.claude\/agents\/queue-reviewer.md: missing link target/)));
+  files[".claude/agents/reviewer.md"] = "[Review](../skills/missing/FINALIZATION.md)\n";
+}, (errors) => assert.match(errors.join("\n"), /\.claude\/agents\/reviewer.md: missing link target/)));

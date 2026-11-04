@@ -9,7 +9,7 @@ The following foundation paragraph records the 2026-09-13 evidence, not current 
 
 ## Integration acceptance transition
 
-The [accepted ADR-0098](../../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md) prepares one shared staging acceptance lane. [Reservation operations](../../agents/shared-staging.md) own candidate identity, exclusive mutations, disposable data and restoration to latest `main`. Activation awaits guarded fixtures/resets and transition evidence. Repository tests retain hosted disposable services; production promotion stays a separate release action. Historical evidence below establishes only its dated claims; inspect current deployment IDs, SHAs and readiness for a new release.
+[ADR-0108](../../adr/0108-small-prs-with-full-send-replace-integration-delivery.md) retired ADR-0098's shared staging acceptance lane. Staging redeploys from `main` after CI; the [environment guide](../../agents/environment.md) says what agents may do there. Repository tests retain hosted disposable services; production promotion stays a separate release action. Historical evidence below establishes only its dated claims; inspect current deployment IDs, SHAs and readiness for a new release.
 
 ## Pre-flight checklist
 

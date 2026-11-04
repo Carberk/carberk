@@ -1,40 +1,47 @@
-# Integration delivery
+# Delivery workflow
 
-Active delivery policy under [ADR-0098](../adr/0098-integration-delivery-with-shared-staging-and-concise-agent-guidance.md). The [transition gates](../prd/ops/89-integration-delivery-transition.md) must precede activation of new operational capabilities. Existing executable safeguards remain effective; a written procedure does not enable staging fixtures or direct pushes.
+One issue is one small PR from current `main`. [ADR-0108](../adr/0108-small-prs-with-full-send-replace-integration-delivery.md) records this decision and retires the integration campaign workflow. Use the [glossary](../domain/GLOSSARY.md) for domain terms and the [environment guide](environment.md) for what you can run and touch.
 
-This file owns delivery roles, phases and gates. [AGENTS.md](../../AGENTS.md) routes task constraints. Specifications own intended behavior; source and runtime evidence own current behavior. Use the [glossary](../domain/GLOSSARY.md) when terminology matters.
+## 1. Decide what to build
 
-## Prepare
+- Unclear goal or design: interview the founder with [grilling](../../.claude/skills/grilling/SKILL.md), or [grill-with-docs](../../.claude/skills/grill-with-docs/SKILL.md) when decisions should become ADRs or glossary entries.
+- Open UI or state question: build a throwaway [prototype](../../.claude/skills/prototype/SKILL.md). For approved screens use [wireframe](../../.claude/skills/wireframe/SKILL.md) and [hifi-design](../../.claude/skills/hifi-design/SKILL.md).
+- Write it down with [to-spec](../../.claude/skills/to-spec/SKILL.md), then split it with [to-tickets](../../.claude/skills/to-tickets/SKILL.md). Each ticket must fit one PR of about 500–1,000 changed lines, excluding lockfiles and generated files. Split anything bigger.
+- New bugs and requests go through [triage](../../.claude/skills/triage/SKILL.md). The [issue tracker](issue-tracker.md) guide has commands and the ticket format.
 
-Shape unresolved intent with [shape-with-docs](../../.claude/skills/shape-with-docs/SKILL.md); material decisions use [new-adr](../../.claude/skills/new-adr/SKILL.md). After approved shaping merges, [create-sprint-issues](../../.claude/skills/create-sprint-issues/SKILL.md) prepares sprint tasks. [Issue tracker](issue-tracker.md) owns issue shape and [sprint transitions](sprint-transitions.md) owns scheduling bookkeeping.
+## 2. Build one ticket
 
-Chief of Staff uses [run-queue](../../.claude/skills/run-queue/SKILL.md) for one bounded parent specification, including a single-task delivery. Record founder authority, exclusions, selected issues, dependencies and completion evidence in the parent. Select within explicit delegation; product ambiguity, architecture decisions and material scope expansion return to the founder.
+1. Branch from current `origin/main` in your own worktree. Name it `t3/<issue>-<slug>` or `agent/issue-<issue>-<slug>`.
+2. Read the issue, [CONTEXT-MAP.md](../../CONTEXT-MAP.md), the owning code and its tests, and the guides [AGENTS.md](../../AGENTS.md) routes for the area.
+3. Work test-first with [tdd](../../.claude/skills/tdd/SKILL.md). Use [diagnosing-bugs](../../.claude/skills/diagnosing-bugs/SKILL.md) for hard failures.
+4. Hide unfinished user-visible features behind a feature flag or tester-only switch, so each PR can merge without exposing half a feature.
+5. Keep the PR to its ticket. Note follow-ups in the issue instead of growing the diff.
 
-## Implement and assemble
+## 3. Prove it
 
-1. Inspect existing branches, worktrees, PRs and durable state before assigning a writer. Resume existing attempts with [resume-issue](../../.claude/skills/resume-issue/SKILL.md).
-2. Reserve `agent/spec-<parent>-<slug>` from current `origin/main`. Open its one draft PR early, after the first checkpoint. Keep the parent and each issue's [Execution state](../../.claude/skills/run-issue/EXECUTION-STATE.md) current.
-3. Dispatch one isolated [run-issue](../../.claude/skills/run-issue/SKILL.md) writer per ready issue from a supplied integration SHA. Each owns `agent/issue-<N>`, pushes a reservation before edits and stops after verification. Writers open no issue PRs. Dependency work may proceed from a verified prerequisite incorporated into the integration candidate; dependencies close only through the final PR.
-4. One assembly writer merges verified issue checkpoints in dependency order, reconciles current `main`, inspects the combined diff and runs full candidate checks. Mechanical conflicts are implementation work; conflicts with multiple valid semantic resolutions need direction. Only one writer changes the integration branch at a time.
+Proof is what you observed in this session:
 
-Use the [worktree lifecycle](worktree-lifecycle.md) and host [model profile](queue-models.md). Chief of Staff owns dispatch and handoffs, never another writer's checkout. Stacking, unrelated per-issue PRs and the batch trial are retired delivery modes. Recover old attempts into the bounded parent without losing refs or evidence.
+- the checks CI runs for the touched packages (typecheck, lint, tests);
+- one focused test that fails without the change, when behavior changed;
+- for UI or runtime behavior, the running app on the iOS Simulator or Android emulator, as described in the [environment guide](environment.md#ios-simulator-and-android-emulator).
 
-## Review and accept
+Put proof in the PR description. Screenshots go in the PR, never in the repository. Do not commit evidence, receipts or review files.
 
-1. Run [verification](../../.claude/skills/run-issue/VERIFICATION.md) before pinning the assembled SHA. Missing required evidence blocks completion.
-2. Obtain one independent, read-only Standards and Spec review round on that SHA, then one fix round under [finalization](../../.claude/skills/run-issue/FINALIZATION.md). Reviewers did not implement the candidate. Fixes receive affected verification; material scope or architecture changes require another independent review.
-3. Reserve [shared staging](shared-staging.md) for final deployed acceptance after review/fixes. Earlier reservations support investigations and device evidence needed by review. A staging-found bug is fixed on the integration branch and affected checks and deployed evidence rerun; a material scope or architecture change returns to independent review.
-4. Require green applicable CI on the resulting candidate, complete acceptance evidence and staging restoration. Merge the integration PR by protected squash merge. Production promotion and store submission are separate release actions.
-5. Verify merge and issue closure, reconcile dependent labels, report missing evidence and run the safe cleanup phase. Checkpoint commits preserve work; they do not establish final verification.
+## 4. Review
 
-## Small changes (ADR-0065)
+Run [sol-loop](../../.claude/skills/sol-loop/SKILL.md) before filing or updating the PR. One Sol reviewer checks bugs, the issue's acceptance criteria and the [coding standards](coding-standards.md). It runs up to 3 rounds, or 5 for auth, permissions, data loss or concurrency.
 
-A focused, low-risk docs or code change may omit issue ceremony. Default delivery remains an integration PR. Direct push requires founder approval of the concrete diff and SHA, applicable independent review and hosted checks on that exact candidate before `main`. A changed candidate needs renewed approval and affected verification.
+## 5. File, watch and merge
 
-Migrations, authentication/permissions, API contracts, cross-context restructuring, deployment and CI policy changes always use integration PRs. Workflow policy cutover uses a PR. The direct-push path remains unavailable until exact-commit CI and an actor-specific PR-requirement exception are implemented and verified. Keep required checks and other protection intact; never disable protection globally.
+- File the PR with [file-pr](../../.claude/skills/file-pr/SKILL.md). The [PR template](../../.github/pull_request_template.md) has the shape: problem, change, proof, review, and `Closes #<issue>`.
+- Watch it with [babysit-pr](../../.claude/skills/babysit-pr/SKILL.md). Fix real CI failures and findings.
+- Merge only when the founder says "full send" for the task ([full-send](../../.claude/skills/full-send/SKILL.md)) or approves the PR. The merge gate is green required checks, finished review, an up-to-date branch and squash merge. Never bypass branch protection.
+- After merge, remove your worktree and local branch. GitHub deletes the remote branch.
 
-## Stop and recover
+## Always ask the founder first
 
-Preserve refs, local diffs and [durable state](../../.claude/skills/run-issue/BAIL-AND-RECOVERY.md) on interruption, unavailable authority/evidence or host refusal. Cap repairs of the same root failure at three focused attempts. Waiting is not an attempt. Resume from evidence rather than chat history; destructive recovery and ambiguous semantic conflicts need direction.
+Production deploys, Railway or EAS setting changes, store submissions, paid services, data deletion or resets outside your local stack, force-pushing a branch you do not own, and closing someone else's PR. Product decisions and scope growth go back to the founder too.
 
-Shared rules have one owner: [domain/document authority](domain.md), [module/test standards](coding-standards.md), [acceptance verification](../../.claude/skills/run-issue/VERIFICATION.md), [staging operations](shared-staging.md), and workspace/CI configuration for commands. For GitHub reads and writes use [bounded operations](github-operations.md); for sprint status/closeout use [sprint-status](../../.claude/skills/sprint-status/SKILL.md) or [close-sprint](../../.claude/skills/close-sprint/SKILL.md).
+## Not used any more
+
+Campaign or integration branches, coordinator or Chief of Staff agents, sprint queues, exact-SHA reviewer rounds and committed evidence folders are retired. Old campaign work lives in tags named `archive/2026-11-04/<old-branch>`. Copy useful code from there into new small PRs; never merge an archive branch.

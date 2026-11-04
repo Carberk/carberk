@@ -34,7 +34,7 @@ Run `pnpm lint`, `pnpm typecheck`, and `pnpm test`. Migration and some integrati
 
 Use the [deployment runbook](docs/prd/ops/80-deployment-runbook.md) and the effective hosting decision. The API pre-deploy command owns deployed schema migrations. Do not infer current hosting from the original air-gap charter.
 
-Use the [portable coding workflow](docs/agents/coding-workflow.md) for bounded integration delivery and recovery.
+Work ships as small PRs through the [delivery workflow](docs/agents/coding-workflow.md). The [environment guide](docs/agents/environment.md) describes local Docker, simulators, CI, GitHub, Railway and EAS.
 
 ## License
 

@@ -1,6 +1,6 @@
 # Meaningful behavior tests
 
-[Coding standards](coding-standards.md) owns requirements and [verification](../../.claude/skills/run-issue/VERIFICATION.md) owns red/green and acceptance evidence. Use this reference when choosing test boundaries or repairing an audit finding.
+[Coding standards](coding-standards.md) owns requirements and the [delivery workflow](coding-workflow.md#3-prove-it) owns proof. Use this reference when choosing test boundaries or repairing an audit finding.
 
 1. Exercise the real subject through its caller interface. Substitute external ports, HTTP, storage or native dependencies at the tested layer. A locally defined fake is not evidence for its production adapter; a fake that reimplements SQL predicates cannot prove storage selection.
 2. Assert independently observable outcomes, including exact identity/session/ownership, refusal state preservation, private cache removal and persisted readback where relevant. Expected values computed by the same algorithm can repeat its bug. Failure assertions must execute; use rejection assertions rather than assertions only inside a catch.
@@ -14,4 +14,4 @@ Inspect selected existing examples before copying their setup:
 - [VerifiedContactPhone](../../apps/api/src/modules/listings/domain/VerifiedContactPhone.spec.ts) establishes expiry behavior; [RedisDailySendCap](../../apps/worker/src/email/infrastructure/RedisDailySendCap.e2e.spec.ts) exercises real concurrent reservation.
 - [Rendered display name](../../apps/mobile/test/screens/display-name.spec.tsx) and [profile photo](../../apps/mobile/test/screens/profile-photo.spec.tsx) use real hooks and HTTP evidence; [OptionPickerSheet](../../apps/mobile/components/account/OptionPickerSheet.spec.tsx) exercises interactions.
 
-A strong case does not certify its whole suite. The [test audit transition](../prd/ops/89-integration-delivery-transition.md) owns separately scoped legacy repairs and runner discovery work.
+A strong case does not certify its whole suite. Repair weak legacy tests in their own small, separately scoped issues.
