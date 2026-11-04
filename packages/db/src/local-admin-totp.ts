@@ -66,8 +66,13 @@ function isLocalDatabase(databaseUrl: string | undefined): boolean {
   if (!databaseUrl) return false;
   try {
     const url = new URL(databaseUrl);
-    // pg lets query parameters such as `?host=` replace the URL's host, so only a bare local URL passes.
-    return url.search === "" && LOCAL_HOSTS.has(url.hostname);
+    // pg accepts socket URLs that can fall back to PGHOST. Query parameters
+    // can also override the host, so only a bare local Postgres URL passes.
+    return (
+      (url.protocol === "postgres:" || url.protocol === "postgresql:") &&
+      url.search === "" &&
+      LOCAL_HOSTS.has(url.hostname)
+    );
   } catch {
     return false;
   }

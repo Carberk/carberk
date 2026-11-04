@@ -1,6 +1,6 @@
 import { createCipheriv, randomBytes } from "node:crypto";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { runLocalAdminTotp, type LocalAdminTotpUser } from "./local-admin-totp";
 
@@ -41,6 +41,17 @@ function run(user: LocalAdminTotpUser | null, options: { databaseUrl?: string; k
 }
 
 describe("local admin authenticator code", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("refuses a socket URL before reading a database selected by PGHOST", async () => {
+    vi.stubEnv("PGHOST", "db.railway.internal");
+    const result = await runLocalAdminTotp(
+      { findUserByPhone: async () => { throw new Error("Database must not be read"); } },
+      { databaseUrl: "socket://localhost", keyBase64: KEY, phone: "+99365000001", now: new Date(59_000) },
+    );
+    expect(result).toMatchObject({ exitCode: 1, message: expect.stringContaining("localhost") });
+  });
+
   it.each([
     [59, "287082"],
     [1_111_111_109, "081804"],

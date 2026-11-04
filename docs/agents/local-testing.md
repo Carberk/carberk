@@ -4,7 +4,7 @@ How an agent runs Carberk on the local stack, signs in to the app and to Admin, 
 
 Test the app on the **iOS Simulator**. The Android emulator is not used for development testing on this Mac; use it only when a ticket is Android-only or the founder asks.
 
-## 1. Start the backend
+## 1. Start the backend and Admin
 
 The Docker stack usually runs already: `docker ps` lists `compose-postgres-1`, `compose-redis-1` and `compose-minio-1`. If not, run `pnpm compose:up`.
 
@@ -27,6 +27,20 @@ Then check it until it answers, usually within a few seconds:
 ```bash
 curl -sf http://localhost:3006/readyz && echo ready
 ```
+
+Start Admin in the background too, using the same tool background mode or trailing `&`:
+
+```bash
+pnpm --filter @auto-tm/admin dev > /tmp/carberk-admin.log 2>&1 &
+```
+
+Then check its login page until it answers:
+
+```bash
+curl -sf http://localhost:3001/login > /dev/null && echo ready
+```
+
+If port `3001` is taken, check the existing process before starting another. Stop only processes you started.
 
 Starting the API also builds `@auto-tm/db` and contracts, which the scripts below need. The API serves the code of the worktree that started it. If port `3006` is already taken, another session's API is running. Read its log in `/tmp/carberk-api.log` if it uses this convention, and ask before stopping it.
 
@@ -63,11 +77,11 @@ Admin (`http://localhost:3001`) accepts only Users with role `admin`, and asks f
 
 1. Sign in once as that phone: in the app, or with `POST /api/v1/auth/otp/request` and `POST /api/v1/auth/otp/verify`.
 2. Promote it: `pnpm --filter @auto-tm/db admin:promote --phone +99365000901 --reason "local agent admin"`.
-3. Sign in to Admin again. The role is read from the session, so a session from before the promotion stays non-admin. Admin then shows a QR code to set up the authenticator.
+3. Wait for the `resendInSeconds` returned by the first code request before requesting another code for this phone, at least 60 seconds on the first request. Then sign in to Admin again. The role is read from the session, so a session from before the promotion stays non-admin. Admin then shows a QR code to set up the authenticator.
 
 **Each sign-in:**
 
-1. Open `http://localhost:3001/login`, enter the phone and send the code.
+1. Open `http://localhost:3001/login`, enter the phone and send the code. If you just requested a code for this phone elsewhere, wait for that request's `resendInSeconds` first.
 2. Enter the code from the API log (section 2).
 3. Enter the authenticator code from the local helper:
 
@@ -77,7 +91,7 @@ pnpm -s --filter @auto-tm/db admin:totp --phone +99365000901
 
 It prints only the 6-digit code on stdout (status goes to stderr), so `CODE=$(...)` works. It also finishes a pending QR setup, and Admin then shows 10 backup codes that you can ignore locally. The helper reads the secret from the local database with the key in `apps/api/.env`, and refuses any `DATABASE_URL` that is not on localhost. A code lasts 30 seconds; rerun it if Admin rejects one. Admin stays unlocked for 12 hours.
 
-**Only the API?** Skip the browser. Verify the phone code, take `accessToken` from the response, then send `POST /api/v1/auth/admin/totp/verify` with `{"code":"<admin:totp code>"}` and that bearer token. Admin endpoints under `/api/v1/admin` then accept the same token.
+**Only the API?** Skip the browser. Verify a fresh phone code after promotion and take `accessToken` from the response. Use that bearer token for the following requests. Check `GET /api/v1/auth/admin/totp/status`; if `enrolled` is false, send `POST /api/v1/auth/admin/totp/enroll` with no body to create or recover the pending enrollment. Keep its secret and QR response private. Then run `admin:totp` and send `POST /api/v1/auth/admin/totp/verify` with `{"code":"<admin:totp code>"}`. Admin endpoints under `/api/v1/admin` then accept the same token. The same phone-code backoff applies to this path.
 
 In T3 Code, drive the Admin page with the preview browser tools and close the tab when you finish.
 
