@@ -15,6 +15,7 @@ Every change follows the [delivery workflow](docs/agents/coding-workflow.md): on
 | Mobile styling/components or API/cache | [NativeWind](docs/agents/nativewind-v4.md) or [data fetching](docs/agents/mobile-data-fetching.md) |
 | Mobile screens/navigation/discovery | The affected approved design in [docs/prd/ui](docs/prd/ui), [wireframe](.claude/skills/wireframe/SKILL.md) or [hifi-design](.claude/skills/hifi-design/SKILL.md) |
 | TypeScript imports, exports or shared runtime | [Runtime boundaries](docs/agents/typescript-runtime.md) |
+| Running the app, the iOS Simulator, or signing in to the app or Admin locally | [Local testing](docs/agents/local-testing.md) |
 | Devices, CI, Railway, staging or deploys | [Environment guide](docs/agents/environment.md) and [deployment runbook](docs/prd/ops/80-deployment-runbook.md) |
 
 Write only in your own worktree or `/tmp`, and remove your worktree after its PR merges. Preserve unrelated changes and report host guard refusals without retrying through another tool.

@@ -46,26 +46,7 @@ CI=1 pnpm --filter @auto-tm/mobile exec expo install --check
 pnpm --filter @auto-tm/mobile exec expo export -p ios --clear
 ```
 
-For runtime-only bugs or crashes, build and run a development build. Expo Go is
-not an option for this app (see the SDK 55 pitfalls below):
-
-```bash
-pnpm --filter @auto-tm/mobile exec expo run:android
-node scripts/expo-logs.js --once
-```
-
-Capture a screenshot for UI/runtime claims. On the Android emulator:
-
-```bash
-adb exec-out screencap -p > /tmp/auto-tm-android.png
-```
-
-The emulator also needs the host stack reachable, since `EXPO_PUBLIC_*` point at
-`localhost`:
-
-```bash
-for p in 8081 3006 9000; do adb reverse tcp:$p tcp:$p; done
-```
+For UI claims and runtime-only bugs or crashes, run the development build on the iOS Simulator against your own Metro, as in [local testing](local-testing.md#4-run-the-app-on-the-ios-simulator). Expo Go is not an option for this app (see the SDK 55 pitfalls below). Android is checked only for Android-only tickets and release builds; the Android sections below cover those.
 
 Stop Metro before handing back the task.
 

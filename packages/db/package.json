@@ -20,6 +20,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/seed.ts",
     "admin:promote": "tsx scripts/promote-admin.ts",
+    "admin:totp": "tsx scripts/local-admin-totp.ts",
     "listing-prices:recompute": "tsx scripts/recompute-listing-prices.ts",
     "reviewer:scenario": "tsx scripts/reviewer-scenario.ts",
     "demo-inventory": "tsx scripts/demo-inventory.ts",
