@@ -182,10 +182,10 @@ test('local mode is gone: no arguments is refused with the remote command to run
 });
 
 test('the PR seed runs one ordered list of steps on Node and the shipped tsx loader, without pnpm', () => {
-  assert.deepEqual(nativePrSeedSteps.map(step => step.name), ['buckets', 'catalog', 'native fixtures', 'brand logos']);
+  assert.deepEqual(nativePrSeedSteps.map(step => step.name), ['buckets', 'canonical baseline', 'native fixtures']);
   assert.ok(nativePrSeedSteps.every(step => step.command === process.execPath));
   assert.equal(nativePrSeedSteps[0].args[0], 'packages/db/scripts/native-minio/bootstrap.mjs');
-  assert.deepEqual(nativePrSeedSteps[1].args, ['--import', 'tsx', 'packages/db/src/seed.ts']);
+  assert.deepEqual(nativePrSeedSteps[1].args, ['--import', 'tsx', 'packages/db/src/canonical-seed.ts']);
   assert.ok(nativePrSeedSteps[2].args.includes('--railway-pr'));
 });
 
@@ -238,7 +238,7 @@ test('every bare import the seed steps load is declared by the db workspace', ()
   const db = JSON.parse(readFileSync(path.join(root, 'packages/db/package.json'), 'utf8'));
   const declared = new Set([...Object.keys(db.dependencies ?? {}), ...Object.keys(db.devDependencies ?? {})]);
   const brandLogos = readdirSync(path.join(root, 'packages/db/scripts/brand-logos')).map(name => `packages/db/scripts/brand-logos/${name}`);
-  const files = ['packages/db/src/seed.ts', 'packages/db/src/listing-prices.ts', 'packages/db/scripts/ui-fixture.ts', 'packages/db/scripts/ui-fixture-target.ts', 'packages/db/scripts/fixture-photos.ts', 'packages/db/scripts/import-brand-logos.ts', 'packages/db/scripts/native-pr-seed-guard.cjs','infra/minio/bootstrap.mjs', 'infra/minio/contract.mjs', ...brandLogos];
+  const files = ['packages/db/src/canonical-seed.ts', 'packages/db/src/catalog-seed.ts', 'packages/db/src/seed.ts', 'packages/db/src/listing-prices.ts', 'packages/db/scripts/ui-fixture.ts', 'packages/db/scripts/ui-fixture-target.ts', 'packages/db/scripts/fixture-photos.ts', 'packages/db/scripts/import-brand-logos.ts', 'packages/db/scripts/native-pr-seed-guard.cjs','infra/minio/bootstrap.mjs', 'infra/minio/contract.mjs', ...brandLogos];
   const bare = /(?:from\s+|import\s+|import\(|require\()\s*["']([^./"'][^"']*)["']/g;
   const missing = new Set();
   for (const file of files) {

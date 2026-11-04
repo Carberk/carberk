@@ -17,9 +17,8 @@ const USAGE = 'Usage: native-pr-seed.mjs --remote';
 // bucket step resolves its dependencies from the db workspace. In a source checkout that step fails.
 export const nativePrSeedSteps = [
   { name: 'buckets', command: process.execPath, args: ['packages/db/scripts/native-minio/bootstrap.mjs'] },
-  { name: 'catalog', command: process.execPath, args: ['--import', 'tsx', 'packages/db/src/seed.ts'] },
+  { name: 'canonical baseline', command: process.execPath, args: ['--import', 'tsx', 'packages/db/src/canonical-seed.ts'] },
   { name: 'native fixtures', command: process.execPath, args: ['--import', 'tsx', 'packages/db/scripts/ui-fixture.ts', '--railway-pr'] },
-  { name: 'brand logos', command: process.execPath, args: ['--import', 'tsx', 'packages/db/scripts/import-brand-logos.ts'] },
 ];
 
 /** The only supported invocation is `--remote`, inside the PR API container. */
