@@ -2,6 +2,7 @@ name: PR Checks
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled]
     branches: [main]
 
 permissions:
@@ -15,8 +16,9 @@ concurrency:
   cancel-in-progress: true
 
 # Job graph (see README.md): lane → docs | static + api + db + frontend → pr.
-# The work jobs run in parallel on separate runners; `pr` is the one required
-# check and passes only when every job it needs passed or the lane skipped it.
+# A draft PR runs lane only unless explicitly labeled run-full-ci. Its pr
+# check is skipped, so it cannot establish a green head for the docs shortcut.
+# Ready PRs run the selected work jobs and pr, the one required check.
 jobs:
   # Docs for an all-docs PR, or docs hand changes after its green previous
   # head. Missing or ambiguous evidence takes full.
@@ -40,11 +42,17 @@ jobs:
         id: lane
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/ci-lane.mjs HEAD^1
+          FORCE_FULL_CI: ${{ contains(github.event.pull_request.labels.*.name, 'run-full-ci') }}
+        run: |
+          if [[ "$FORCE_FULL_CI" == true ]]; then
+            echo 'lane=full' >> "$GITHUB_OUTPUT"
+          else
+            node scripts/ci-lane.mjs HEAD^1
+          fi
 
   docs:
     needs: lane
-    if: needs.lane.outputs.lane == 'docs'
+    if: (github.event.pull_request.draft != true || contains(github.event.pull_request.labels.*.name, 'run-full-ci')) && needs.lane.outputs.lane == 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -72,7 +80,7 @@ jobs:
   # Lint, typecheck and the admin build with its runtime smoke. No services.
   static:
     needs: lane
-    if: needs.lane.outputs.lane != 'docs'
+    if: (github.event.pull_request.draft != true || contains(github.event.pull_request.labels.*.name, 'run-full-ci')) && needs.lane.outputs.lane != 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -107,7 +115,7 @@ jobs:
   # api and worker tests against disposable Postgres, Redis and MinIO.
   api:
     needs: lane
-    if: needs.lane.outputs.lane != 'docs'
+    if: (github.event.pull_request.draft != true || contains(github.event.pull_request.labels.*.name, 'run-full-ci')) && needs.lane.outputs.lane != 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -166,7 +174,7 @@ jobs:
   # so this job starts no Compose services.
   db:
     needs: lane
-    if: needs.lane.outputs.lane != 'docs'
+    if: (github.event.pull_request.draft != true || contains(github.event.pull_request.labels.*.name, 'run-full-ci')) && needs.lane.outputs.lane != 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -198,7 +206,7 @@ jobs:
   # scripts' node --test files. No services.
   frontend:
     needs: lane
-    if: needs.lane.outputs.lane != 'docs'
+    if: (github.event.pull_request.draft != true || contains(github.event.pull_request.labels.*.name, 'run-full-ci')) && needs.lane.outputs.lane != 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -227,7 +235,7 @@ jobs:
   # this one, and a skipped required check counts as passing.
   pr:
     needs: [lane, docs, static, api, db, frontend]
-    if: always()
+    if: always() && (github.event.pull_request.draft != true || contains(github.event.pull_request.labels.*.name, 'run-full-ci'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

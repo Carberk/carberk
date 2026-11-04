@@ -27,6 +27,8 @@ Proof is what you observed in this session:
 
 Put proof in the PR description. Screenshots go in the PR, never in the repository. Do not commit evidence, receipts or review files.
 
+Draft pull requests run only the lane selector. Their required `pr` check is skipped, so a draft-only run cannot establish a green head for the docs shortcut. Mark a draft ready for review to run the selected docs or full lane; later pushes run it again. Adding the `run-full-ci` label forces the full matrix, including on a draft.
+
 ## 4. Review
 
 Run [sol-loop](../../.claude/skills/sol-loop/SKILL.md) before filing or updating the PR. One Sol reviewer checks bugs, the issue's acceptance criteria and the [coding standards](coding-standards.md). It runs up to 3 rounds, or 5 for auth, permissions, data loss or concurrency.
