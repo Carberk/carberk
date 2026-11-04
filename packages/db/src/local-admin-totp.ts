@@ -66,9 +66,11 @@ function isLocalDatabase(databaseUrl: string | undefined): boolean {
   if (!databaseUrl) return false;
   try {
     const url = new URL(databaseUrl);
-    // pg accepts socket URLs that can fall back to PGHOST. Query parameters
-    // can also override the host, so only a bare local Postgres URL passes.
+    // Require the exact canonical URL that pg receives: URL silently strips
+    // whitespace that pg can interpret as a different host. Query parameters
+    // and non-Postgres schemes can also override or omit the local host.
     return (
+      url.href === databaseUrl &&
       (url.protocol === "postgres:" || url.protocol === "postgresql:") &&
       url.search === "" &&
       LOCAL_HOSTS.has(url.hostname)

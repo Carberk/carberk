@@ -78,6 +78,9 @@ describe("local admin authenticator code", () => {
     "postgresql://u:p@localhost:5432/db?host=db.railway.internal",
     "postgresql://u:p@localhost:5432/db?hostaddr=10.0.0.5",
     "postgresql://u:p@localhost,db.railway.internal:5432/db",
+    " postgresql://u:p@localhost/db",
+    "postgresql://u:p@localhost/db\n",
+    "postgresql://u:p@local\thost/db",
     "not a url",
     undefined,
   ])("refuses a database that is not on localhost (%s) without reading it", async (databaseUrl) => {
