@@ -17,7 +17,10 @@ export const pickerRouter: PickerRouter = {
 export function useRoutePickerActions() {
   const params = useLocalSearchParams<{ returnToResults?: string; resultsState?: string }>();
   const resultsState = useMemo(() => {
-    const filters = readPickerResultsFilters(params);
+    const filters = readPickerResultsFilters({
+      returnToResults: params.returnToResults,
+      resultsState: params.resultsState,
+    });
     return filters ? writeResultsRouteState(filters) : undefined;
   }, [params.returnToResults, params.resultsState]);
   const record = useRecentChoicesStore((s) => s.record);

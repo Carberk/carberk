@@ -116,7 +116,7 @@ export default function OtpScreen() {
     if (!canonicalDestination || (method !== "phone" && method !== "email")) {
       authNavigation.invalidDestination(method === "email" ? "email" : "phone");
     }
-  }, [canonicalDestination, method]);
+  }, [authNavigation, canonicalDestination, method]);
 
   function cancelAuth() {
     authNavigation.cancel();

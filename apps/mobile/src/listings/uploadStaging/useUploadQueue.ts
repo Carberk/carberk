@@ -355,7 +355,7 @@ export function useUploadQueue(
         endUpload();
       }
     },
-    [stagingKey, presignMutation, transitionToFailed, transitionToPresigned, transitionToUploading, transitionToUploaded],
+    [endUpload, presignMutation, startUpload, stagingKey, t, transitionToFailed, transitionToPresigned, transitionToUploading, transitionToUploaded],
   );
 
   uploadPhotoRef.current = uploadPhoto;
