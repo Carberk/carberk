@@ -71,14 +71,14 @@ Stop Metro before handing back the task.
 
 ## Guarded native development sessions
 
-Use `native:metro` for a reserved staging backend. The executable helper also recognizes legacy PR environments during recovery. Pass an unused port explicitly. The helper reads the selected Railway api service's public API/socket domain and `MINIO_PUBLIC_URL`, refuses production, and checks API readiness, the media host and all three origins in the served bundle. Missing media configuration causes grey card Photos; a missing API configuration falls back to localhost. Railway variable output stays captured. Only public origins are printed.
+Use `native:metro` for the staging backend. PR environments are off, so its `pr-<N>` mode is unused. Pass an unused port explicitly. The helper reads the selected Railway api service's public API/socket domain and `MINIO_PUBLIC_URL`, refuses production, and checks API readiness, the media host and all three origins in the served bundle. Missing media configuration causes grey card Photos; a missing API configuration falls back to localhost. Railway variable output stays captured. Only public origins are printed.
 
 ```bash
-pnpm --filter @auto-tm/mobile native:metro -- --env pr-842 --port 8842
+pnpm --filter @auto-tm/mobile native:metro -- --env staging --port 8842
 pnpm --filter @auto-tm/mobile native:ios -- --udid <SIMULATOR_UUID> --port 8842
 ```
 
-`--env staging` selects staging. The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
+The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
 
 Run `native:ios` from the same worktree after Metro reports its guarded bundle is ready. It verifies the selected bundle against the public-origin receipt in gitignored `.expo/` before any native build. Select a simulator that this session owns; an install and launch replace the app on that selected simulator. Preserve other device and Metro sessions.
 
@@ -135,7 +135,7 @@ Local release builds fail in ways EAS never sees, because EAS starts from a clea
 pnpm --filter @auto-tm/mobile build:android:local
 ```
 
-`apps/mobile/scripts/local-android-release.mjs` rebuilds contracts, regenerates `android/` when branding assets changed, forces the JS bundle task to re-run, and verifies the APK embeds a Hermes bundle before it prints the `adb install -r` command. It defaults to the production backend; override `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WS_URL` / `EXPO_PUBLIC_MEDIA_URL` to point at reserved staging. The failure modes it guards, for when you must build by hand:
+`apps/mobile/scripts/local-android-release.mjs` rebuilds contracts, regenerates `android/` when branding assets changed, forces the JS bundle task to re-run, and verifies the APK embeds a Hermes bundle before it prints the `adb install -r` command. It defaults to the production backend; override `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WS_URL` / `EXPO_PUBLIC_MEDIA_URL` to point at staging. The failure modes it guards, for when you must build by hand:
 
 - **Stale `@auto-tm/contracts` dist crashes the app after sign-in.** Metro resolves the package to its gitignored `dist/` via package exports. If `dist/` is older than a source change, the bundle silently lacks the new exports and the app throws `TypeError: undefined is not a function` at the first caller (logcat's componentStack names the calling screen, not the missing function — a profile row crash can be a contracts miss, not a screen bug). Fix: `pnpm --filter @auto-tm/contracts build`, then re-bundle. EAS is immune; this is local-only and never a store bug.
 

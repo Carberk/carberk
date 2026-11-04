@@ -75,7 +75,7 @@ Stop the Metro sessions you started and close the devices you opened before you 
 
 [PR Checks](../../.github/workflows/pr-checks.yml) runs on every PR. A lane job decides between docs-only and full checks. The full lane runs `static`, `db`, `frontend` and `api`, and `api` gets its own disposable Postgres, Redis and MinIO. The `pr` job aggregates them. [CI](../../.github/workflows/ci.yml) runs on `main`.
 
-`main` requires only the `pr` check: no human approval, squash merge only, linear history, and branches deleted after merge. Admins follow the same rules. CI is the proof gate, so local Docker is never needed to prove a PR.
+Branch protection on `main` requires PRs to pass the `pr` check from PR Checks. It needs no human approval, allows only squash merges with linear history, and deletes branches after merge. Admins follow the same rules. The `ci.yml` run after a merge has no required check. CI is the proof gate, so local Docker is never needed to prove a PR.
 
 ## GitHub
 
