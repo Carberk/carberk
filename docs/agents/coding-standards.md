@@ -1,6 +1,6 @@
 # Coding standards: modules and tests
 
-These rules are mandatory for new or changed behavior and its code/tests under accepted ADR-0098. [Domain guidance](domain.md) owns layering, ports, migrations and secrets. [Verification](../../.claude/skills/run-issue/VERIFICATION.md) owns evidence collection; [testing guide](testing.md) provides selected examples.
+These rules are mandatory for new or changed behavior and its code/tests ([ADR-0108](../adr/0108-small-prs-with-full-send-replace-integration-delivery.md)); `sol-loop` reviews against them. [Domain guidance](domain.md) owns layering, ports, migrations and secrets. The [delivery workflow](coding-workflow.md#3-prove-it) says what proof a PR needs; the [testing guide](testing.md) provides selected examples.
 
 ## How this file is applied
 
@@ -45,4 +45,4 @@ Implementers satisfy these rules before handoff; Standards reviewers block viola
 
 ## Where this comes from
 
-The vocabulary and tests follow John Ousterhout's deep modules, Michael Feathers's seams, and the `codebase-design`, `improve-codebase-architecture` and `tdd` skills. Test-first evidence is governed by [VERIFICATION.md](../../.claude/skills/run-issue/VERIFICATION.md); mobile test mechanics by [Mobile component tests](mobile-testing.md).
+The vocabulary and tests follow John Ousterhout's deep modules, Michael Feathers's seams, and the `codebase-design`, `improve-codebase-architecture` and `tdd` skills. Test-first work follows the [tdd](../../.claude/skills/tdd/SKILL.md) skill; mobile test mechanics follow [Mobile component tests](mobile-testing.md).

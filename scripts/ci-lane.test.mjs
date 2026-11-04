@@ -10,7 +10,7 @@ import * as ci from "./ci-lane.mjs";
 const { chooseLane, laneFor } = ci;
 
 test("Markdown anywhere and any file under docs/ take the docs lane", () => {
-  assert.equal(laneFor(["docs/adr/0065-x.md", "AGENTS.md", ".claude/skills/run-issue/SKILL.md"]), "docs");
+  assert.equal(laneFor(["docs/adr/0065-x.md", "AGENTS.md", ".claude/skills/sol-loop/SKILL.md"]), "docs");
   assert.equal(laneFor(["docs/design/mockup.html", "docs/design/logo.png"]), "docs");
 });
 

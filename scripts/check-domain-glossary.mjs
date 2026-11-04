@@ -146,33 +146,17 @@ for (const workflow of ["ci.yml", "pr-checks.yml"]) {
 }
 
 for (const [source, target, diagnostic] of [
-  [".claude/skills/shape-with-docs/SKILL.md", "../../../docs/domain/GLOSSARY.md", "shape-with-docs is missing its glossary link"],
-  [".claude/skills/shape-with-docs/SKILL.md", "../../../docs/adr/0060-source-first-agent-context-and-task-scoped-guidance.md", "shape-with-docs is missing its ADR-0060 link"],
-  [".claude/skills/shape-with-docs/SKILL.md", "../../../docs/adr/0020-document-hierarchy-and-mutability.md", "shape-with-docs is missing its ADR-0020 link"],
-  [".claude/skills/shape-with-docs/SKILL.md", "../../../docs/adr/0042-domain-glossary-authority-and-mutability.md", "shape-with-docs is missing its ADR-0042 link"],
-  [".claude/skills/shape-with-docs/SKILL.md", "../../../docs/agents/coding-workflow.md", "shape-with-docs is missing its workflow-router link"],
-  [".claude/skills/shape-with-docs/SKILL.md", "../new-adr/SKILL.md", "shape-with-docs is missing its new-adr link"],
-  [".claude/skills/shape-with-docs/SKILL.md", "../create-sprint-issues/SKILL.md", "shape-with-docs is missing its create-sprint-issues link"],
-  [".claude/skills/shape-with-docs/SKILL.md", "../run-issue/SKILL.md", "shape-with-docs is missing its run-issue link"],
   ["docs/agents/coding-workflow.md", "../domain/GLOSSARY.md", "coding workflow is missing its glossary link"],
-  ["docs/agents/coding-workflow.md", "../../.claude/skills/shape-with-docs/SKILL.md", "coding workflow is missing its shaping-skill link"],
-  ["docs/agents/coding-workflow.md", "../../.claude/skills/create-sprint-issues/SKILL.md", "coding workflow is missing its sprint-issue-creation link"],
-  ["docs/agents/coding-workflow.md", "../../.claude/skills/run-issue/SKILL.md", "coding workflow is missing its issue-execution link"],
-  ["docs/agents/coding-workflow.md", "../../.claude/skills/run-queue/SKILL.md", "coding workflow is missing its Chief of Staff link"],
-  [".claude/skills/run-queue/SKILL.md", "../../../docs/agents/coding-workflow.md", "Chief of Staff is missing its authoritative workflow link"],
+  ["docs/agents/coding-workflow.md", "../../.claude/skills/to-tickets/SKILL.md", "coding workflow is missing its ticket-creation link"],
+  ["docs/agents/coding-workflow.md", "../../.claude/skills/full-send/SKILL.md", "coding workflow is missing its delivery link"],
+  ["docs/agents/coding-workflow.md", "../../.claude/skills/sol-loop/SKILL.md", "coding workflow is missing its review link"],
   ["docs/agents/domain.md", "../domain/GLOSSARY.md", "domain documentation is missing its glossary link"],
   ["AGENTS.md", "docs/domain/GLOSSARY.md", "AGENTS.md is missing its glossary link"],
   ["AGENTS.md", "docs/agents/coding-workflow.md", "AGENTS.md is missing its workflow-router link"],
   ["CLAUDE.md", "AGENTS.md", "CLAUDE.md is missing its shared-policy link"],
-  [".claude/skills/create-sprint-issues/SKILL.md", "../../../docs/domain/GLOSSARY.md", "create-sprint-issues is missing its glossary link"],
   ["docs/agents/issue-tracker.md", "../domain/GLOSSARY.md", "issue tracker guidance is missing its glossary link"],
-  [".claude/skills/run-issue/SKILL.md", "../../../docs/domain/GLOSSARY.md", "run-issue is missing its glossary link"],
-  [".claude/skills/resume-issue/SKILL.md", "../../../docs/domain/GLOSSARY.md", "resume-issue is missing its glossary link"],
-  [".claude/skills/design-grill/SKILL.md", "../../../docs/domain/GLOSSARY.md", "design-grill is missing its glossary link"],
   [".claude/skills/wireframe/SKILL.md", "../../../docs/domain/GLOSSARY.md", "wireframe is missing its glossary link"],
   [".claude/skills/hifi-design/SKILL.md", "../../../docs/domain/GLOSSARY.md", "hifi-design is missing its glossary link"],
-  [".claude/skills/run-issue/FINALIZATION.md", "../../../docs/domain/GLOSSARY.md", "run-issue finalization is missing its glossary link"],
-  [".claude/skills/resume-issue/SKILL.md", "../run-issue/FINALIZATION.md", "resume-issue is missing its fixed-commit finalization link"],
 ]) {
   requireMarkdownLink(source, target, diagnostic);
 }

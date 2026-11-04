@@ -25,7 +25,7 @@ Commit schema changes as migrations; `db push` is localhost-only. Store timestam
 | What must this task deliver? | Issue acceptance criteria and linked specification |
 | Why was this chosen? | Relevant ADR or charter decision |
 | What is scheduled? | Roadmap and relevant sprint plan |
-| What did this attempt finish? | The PR's Execution state |
+| What did this change finish? | The PR description and its linked issue |
 
 For new PRDs, material capability revisions, or sprint changes, follow [ADR-0020](../adr/0020-document-hierarchy-and-mutability.md). Merged ADRs are immutable; write a superseding ADR. Started sprint plans stay locked and retros are append-only. Semantic vocabulary changes and ownership changes follow ADR-0042; routine definitions go into the glossary. User-facing copy belongs to approved designs and i18n resources.
 

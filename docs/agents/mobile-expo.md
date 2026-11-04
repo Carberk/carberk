@@ -71,14 +71,14 @@ Stop Metro before handing back the task.
 
 ## Guarded native development sessions
 
-Use `native:metro` for a reserved staging backend. The executable helper also recognizes legacy PR environments during recovery. Pass an unused port explicitly. The helper reads the selected Railway api service's public API/socket domain and `MINIO_PUBLIC_URL`, refuses production, and checks API readiness, the media host and all three origins in the served bundle. Missing media configuration causes grey card Photos; a missing API configuration falls back to localhost. Railway variable output stays captured. Only public origins are printed.
+Use `native:metro` for the staging backend. PR environments are off, so its `pr-<N>` mode is unused. Pass an unused port explicitly. The helper reads the selected Railway api service's public API/socket domain and `MINIO_PUBLIC_URL`, refuses production, and checks API readiness, the media host and all three origins in the served bundle. Missing media configuration causes grey card Photos; a missing API configuration falls back to localhost. Railway variable output stays captured. Only public origins are printed.
 
 ```bash
-pnpm --filter @auto-tm/mobile native:metro -- --env pr-842 --port 8842
+pnpm --filter @auto-tm/mobile native:metro -- --env staging --port 8842
 pnpm --filter @auto-tm/mobile native:ios -- --udid <SIMULATOR_UUID> --port 8842
 ```
 
-`--env staging` selects staging. The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
+The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
 
 Run `native:ios` from the same worktree after Metro reports its guarded bundle is ready. It verifies the selected bundle against the public-origin receipt in gitignored `.expo/` before any native build. Select a simulator that this session owns; an install and launch replace the app on that selected simulator. Preserve other device and Metro sessions.
 
@@ -135,7 +135,7 @@ Local release builds fail in ways EAS never sees, because EAS starts from a clea
 pnpm --filter @auto-tm/mobile build:android:local
 ```
 
-`apps/mobile/scripts/local-android-release.mjs` rebuilds contracts, regenerates `android/` when branding assets changed, forces the JS bundle task to re-run, and verifies the APK embeds a Hermes bundle before it prints the `adb install -r` command. It defaults to the production backend; override `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WS_URL` / `EXPO_PUBLIC_MEDIA_URL` to point at reserved staging. The failure modes it guards, for when you must build by hand:
+`apps/mobile/scripts/local-android-release.mjs` rebuilds contracts, regenerates `android/` when branding assets changed, forces the JS bundle task to re-run, and verifies the APK embeds a Hermes bundle before it prints the `adb install -r` command. It defaults to the production backend; override `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WS_URL` / `EXPO_PUBLIC_MEDIA_URL` to point at staging. The failure modes it guards, for when you must build by hand:
 
 - **Stale `@auto-tm/contracts` dist crashes the app after sign-in.** Metro resolves the package to its gitignored `dist/` via package exports. If `dist/` is older than a source change, the bundle silently lacks the new exports and the app throws `TypeError: undefined is not a function` at the first caller (logcat's componentStack names the calling screen, not the missing function — a profile row crash can be a contracts miss, not a screen bug). Fix: `pnpm --filter @auto-tm/contracts build`, then re-bundle. EAS is immune; this is local-only and never a store bug.
 
@@ -185,15 +185,13 @@ adb logcat -d | grep -c "finishDrawing of relaunch.*tm.auto.app"
 
 After each, the app must stay on the same screen, signed in, and Profile > Choose from library must open the picker. Module state survives a recreation and component state does not, so a screen that must not flash a loading state reads what the app already knows (`src/auth/sessionSnapshot.ts`).
 
-## Shared staging native sessions
+## Staging native sessions
 
-Follow [staging reservation](shared-staging.md) for ownership, identity, deployed SHA, fixtures and restoration. Final acceptance uses the reviewed/fixed integration candidate; earlier reservations may provide investigation or reviewer device proof. Hosted disposable services remain the container-backed repository test gate. Locally run unit tests, repository typecheck, affected lint and applicable exports; keep Docker stopped for native proof.
+Use the guarded `native:metro` and `native:ios` entrypoints above with `--env staging`. Confirm the API, socket and media origins in the served bundle, `/readyz`, and a loaded feed and Listing detail before claiming staging behavior. Login secrets and tokens never belong in screenshots or PRs. Read mock OTPs only from the staging API's logs, matching request ID and time. Deploys, data resets and fixture seeding on staging need the founder's approval ([environment guide](environment.md)).
 
-The coordinator assigns explicit simulator UUIDs and distinct Metro ports, serializes heavy local phases and shares only public backend origins with native agents. Use guarded `native:metro` and `native:ios` entrypoints above. Confirm API/socket/media origins in the served bundle, `/readyz`, loaded feed and detail/gallery before claiming API/media evidence. Login secrets and tokens never belong in screenshots or PR evidence. Read mock OTPs only from the verified staging API's logs, matching request ID and time.
+The `native-pr-seed` entrypoint only accepts PR environments, which are off, and refuses staging by design. Do not relax its guard to seed staging.
 
-The existing `native-pr-seed` entrypoint and shared database guard require a PR environment and reject staging before constructing clients or launching steps. Its fixture reset deletes/recreates users/listings and cascades to sessions and related records. Do not rename or relax the guard to seed staging. The transition must implement reservation-bound staging identity and fixture/reset safety first; fixture-dependent evidence is blocked until that operational path is verified. A local/public database proxy is not a substitute.
-
-Stop owned Metro/device sessions before restoration, retain exact deployment/device/artifact evidence and hand back to Chief of Staff. Failed restoration retains the reservation. Production binaries and promotion follow their separate release gates.
+Stop the Metro and device sessions you started before you finish.
 
 ## Android package per build profile
 
