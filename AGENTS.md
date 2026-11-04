@@ -18,3 +18,19 @@ Every delivery follows [coding workflow](docs/agents/coding-workflow.md). It own
 | Deployed acceptance or staging mutation | [Deployment runbook](docs/prd/ops/80-deployment-runbook.md) and [staging reservation](docs/agents/shared-staging.md) |
 
 Write only in your owned worktree or `/tmp`; follow [worktree lifecycle](docs/agents/worktree-lifecycle.md). Preserve unrelated changes and report host guard refusals without retrying through another tool.
+
+## Agent skills
+
+Third-party skills and their pinned sources are listed in the [notices](.claude/skills/THIRD-PARTY-NOTICES.md).
+
+### Issue tracker
+
+Work lives in GitHub Issues on `Carberk/carberk`, read and written with `gh`. See [issue tracker](docs/agents/issue-tracker.md).
+
+### Triage labels
+
+`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human` and `wontfix`. See [triage labels](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single context: the [glossary](docs/domain/GLOSSARY.md) and the [ADRs](docs/adr/README.md). See [domain guidance](docs/agents/domain.md).
