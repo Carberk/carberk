@@ -6,10 +6,12 @@ import { fileURLToPath } from "node:url";
 
 import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, PutBucketPolicyCommand, S3Client } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import sharp from "sharp";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { createTestPool } from "../tests/testing/create-test-pool";
 
 const must = <T>(value: T | null | undefined): T => { if (value == null) throw new Error("Missing fixture value"); return value; };
 
@@ -35,7 +37,7 @@ describe("WebP operator conversion on real Postgres and conditional MinIO", () =
     ]);
     const databaseUrl = postgres.getConnectionUri();
     execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
-    pool = new Pool({ connectionString: databaseUrl });
+    pool = createTestPool(databaseUrl);
     endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
     s3 = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "minioadmin", secretAccessKey: "minioadmin" } });
     for (const Bucket of ["listing-photos", "chat-attachments"]) {

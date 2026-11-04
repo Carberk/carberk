@@ -11,7 +11,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import sharp from "sharp";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -30,6 +30,8 @@ import type * as PhotosModule from "../scripts/demo-inventory/photos";
 import { removeDemoInventory } from "../scripts/demo-inventory/remove";
 import { DEMO_UPLOAD_CONCURRENCY, seedDemoInventory } from "../scripts/demo-inventory/seed";
 import { createS3ObjectStore, type ObjectStore } from "../scripts/demo-inventory/storage";
+
+import { createTestPool } from "./testing/create-test-pool";
 
 // Every stub photo is the same buffer, so the real preparation runs once and each seed reuses its
 // files. Preparing about 300 photos per seed, four seeds a run, cost minutes of CPU on a CI runner
@@ -122,7 +124,7 @@ describe("demo inventory seed and removal — Testcontainers Postgres and MinIO"
         .start(),
     ]);
 
-    pool = new Pool({ connectionString: postgres.getConnectionUri() });
+    pool = createTestPool(postgres.getConnectionUri());
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
 
     const endpoint = `http://${minio.getHost()}:${minio.getMappedPort(9000)}`;
