@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined, set: vi.fn() }),
+  headers: async () => new Headers(),
 }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 

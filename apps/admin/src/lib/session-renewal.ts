@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 
 import { getApiBaseUrl } from "./api-config";
+import { forwardVisitorIp, readVisitorIpPolicy } from "./visitor-ip";
 
 const HANDOFF_MS = 5_000;
 const MAX_ENTRIES = 128;
 const REFRESH_TIMEOUT_MS = 10_000;
+const VISITOR_IP_POLICY = readVisitorIpPolicy();
 const handoffs = new Map<string, TokenPair>();
 let owner: { key: string; promise: Promise<RenewalResult> } | undefined;
 
@@ -26,7 +28,10 @@ export function hasCurrentAccessToken(token: string | undefined): boolean {
 }
 
 /** Only the Node proxy calls this; no render/action bundle owns a second cache. */
-export async function renewSession(refreshToken: string): Promise<RenewalResult> {
+export async function renewSession(
+  refreshToken: string,
+  incomingHeaders?: { get(name: string): string | null },
+): Promise<RenewalResult> {
   const key = createHash("sha256").update(refreshToken).digest("hex");
   const deadline = Date.now() + REFRESH_TIMEOUT_MS;
   for (;;) {
@@ -50,7 +55,7 @@ export async function renewSession(refreshToken: string): Promise<RenewalResult>
     // At most 128 retained handoffs plus in-flight owners combined. An active
     // owner is never evicted. Capacity is temporary, never an auth rejection.
     if (handoffs.size >= MAX_ENTRIES) return { kind: "unavailable" };
-    const pending = rotate(refreshToken).then((result) => {
+    const pending = rotate(refreshToken, incomingHeaders).then((result) => {
       if (result.kind === "tokens") {
         handoffs.set(key, result.tokens);
         setTimeout(() => { handoffs.delete(key); }, HANDOFF_MS).unref();
@@ -63,13 +68,18 @@ export async function renewSession(refreshToken: string): Promise<RenewalResult>
   }
 }
 
-async function rotate(refreshToken: string): Promise<RenewalResult> {
+async function rotate(
+  refreshToken: string,
+  incomingHeaders?: { get(name: string): string | null },
+): Promise<RenewalResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => { controller.abort(); }, REFRESH_TIMEOUT_MS);
   try {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    if (incomingHeaders) forwardVisitorIp(headers, incomingHeaders, VISITOR_IP_POLICY);
     const response = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
       method: "POST", cache: "no-store", signal: controller.signal,
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ refreshToken }),
     });
     if (response.status === 400 || response.status === 401) return { kind: "rejected" };

@@ -83,6 +83,23 @@ describe("admin session renewal before request dispatch", () => {
     expect(response.headers.get("x-middleware-request-cookie")).toContain(`auto_tm_admin_refresh=${rotatedRefresh}`);
     expect(response.headers.get("location")).toBeNull();
     expect(fetch).toHaveBeenCalledWith("http://api.example.test/api/v1/auth/refresh", expect.any(Object));
+    const [, init] = vi.mocked(fetch).mock.calls[0] ?? [null, { headers: new Headers() }];
+    expect((init?.headers as Headers).get("x-real-ip")).toBeNull();
+  });
+
+  it("forwards only the trusted operator address during renewal", async () => {
+    const access = jwt(Math.floor(Date.now() / 1000) + 900);
+    vi.mocked(fetch).mockResolvedValue(Response.json({ accessToken: access, refreshToken: rotatedRefresh }));
+    const { proxy } = await import("./proxy");
+    await proxy(new NextRequest("http://admin.auto.tm/reports", {
+      headers: {
+        cookie: `auto_tm_admin_refresh=${refresh}`,
+        "x-real-ip": "203.0.113.7",
+        "x-forwarded-for": "198.51.100.1",
+      },
+    }));
+    const [, init] = vi.mocked(fetch).mock.calls[0] ?? [null, { headers: new Headers() }];
+    expect((init?.headers as Headers).get("x-real-ip")).toBe("203.0.113.7");
   });
 
   it("renews before dispatching a Server Action and preserves its POST body", async () => {
