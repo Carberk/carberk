@@ -1,6 +1,7 @@
 import { Inject, Injectable, BadRequestException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
+import { LISTING_ERROR_CODES } from "../domain/types";
 import { UPLOAD_CAPS } from "../domain/MediaUpload";
 import { imageUploadObjectKeys } from "../domain/imageUploadObjectKeys";
 import {
@@ -38,6 +39,13 @@ export class PresignUpload {
   ) {}
 
   async execute(input: PresignUploadInput): Promise<PresignUploadResult> {
+    if (input.kind === "video") {
+      throw new BadRequestException({
+        code: LISTING_ERROR_CODES.LISTING_VIDEO_UNAVAILABLE,
+        message: "Listing video is not available",
+      });
+    }
+
     const cap = UPLOAD_CAPS[input.kind];
     if (!cap) {
       throw new BadRequestException("Invalid kind");
@@ -55,13 +63,8 @@ export class PresignUpload {
       );
     }
 
-    const ext = input.kind === "image" ? "webp" : "mp4";
+    const key = `pending/${randomUUID()}/original.webp`;
 
-    const key = `pending/${randomUUID()}/original.${ext}`;
-
-    if (input.writeProtocol && input.kind !== "image") {
-      throw new BadRequestException("Conditional protocol supports images only");
-    }
     const signed = await this.storage.presignUpload({
       key,
       contentType: input.contentType,

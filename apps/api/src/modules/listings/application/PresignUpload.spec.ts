@@ -67,19 +67,6 @@ describe("PresignUpload", () => {
     expect(result.maxSizeBytes).toBe(5 * 1024 * 1024);
   });
 
-  it("returns presigned URL for a valid video request", async () => {
-    const uc = makeUseCase(storage);
-    const result = await uc.execute({
-      userId: "user-1",
-      kind: "video",
-      contentType: "video/mp4",
-      sizeBytes: 1024,
-    });
-
-    expect(result.key).toMatch(/original\.mp4$/);
-    expect(result.maxSizeBytes).toBe(10 * 1024 * 1024);
-  });
-
   it("returns webp extension for image/webp", async () => {
     const uc = makeUseCase(storage);
     const result = await uc.execute({
@@ -107,18 +94,6 @@ describe("PresignUpload", () => {
         kind: "image",
         contentType: "image/webp",
         sizeBytes: 6 * 1024 * 1024,
-      }),
-    ).rejects.toThrow(BadRequestException);
-  });
-
-  it("rejects oversized video", async () => {
-    const uc = makeUseCase(storage);
-    await expect(
-      uc.execute({
-        userId: "user-1",
-        kind: "video",
-        contentType: "video/mp4",
-        sizeBytes: 11 * 1024 * 1024,
       }),
     ).rejects.toThrow(BadRequestException);
   });

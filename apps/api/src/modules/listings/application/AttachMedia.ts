@@ -87,23 +87,22 @@ export class AttachMedia {
     // adding a duplicate. This needs no new authority: the row is on the
     // caller's own Listing.
     const alreadyAttached = existingMedia.find((m) => m.key === input.key);
+    if (input.kind === "video" || alreadyAttached?.kind === "video") {
+      throw new BadRequestException({
+        code: LISTING_ERROR_CODES.LISTING_VIDEO_UNAVAILABLE,
+        message: "Listing video is not available",
+      });
+    }
     if (alreadyAttached) {
       return { media: alreadyAttached };
     }
 
     const photoCount = existingMedia.filter((m) => m.kind === "image").length;
-    const videoCount = existingMedia.filter((m) => m.kind === "video").length;
 
     if (input.kind === "image" && photoCount >= ListingsSchemas.MAX_LISTING_PHOTOS) {
       throw new BadRequestException({
         code: LISTING_ERROR_CODES.MEDIA_LIMIT_EXCEEDED,
         message: "Maximum 20 photos per listing",
-      });
-    }
-    if (input.kind === "video" && videoCount >= 1) {
-      throw new BadRequestException({
-        code: LISTING_ERROR_CODES.MEDIA_LIMIT_EXCEEDED,
-        message: "Maximum 1 video per listing",
       });
     }
 

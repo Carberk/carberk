@@ -179,6 +179,40 @@ describe("Listing media upload ownership e2e (#536)", () => {
       .set("Authorization", `Bearer ${tokens[alias]}`);
   }
 
+  it.each([
+    { alreadyAttached: false, kind: "video" },
+    { alreadyAttached: true, kind: "video" },
+    { alreadyAttached: true, kind: "image" },
+  ])("refuses legacy video attachment, already attached: $alreadyAttached, requested kind: $kind", async ({ alreadyAttached, kind }) => {
+    const listing = await createListing("user-a", "video-hold");
+    const key = `pending/${suite.id("video")}/original.mp4`;
+    const upload = await prisma.mediaUpload.create({ data: {
+      userId: suite.id("user-a"), key, kind: "video",
+      contentType: "video/mp4", sizeBytes: 1024,
+      state: alreadyAttached ? "ADOPTED" : "AVAILABLE",
+      ...(alreadyAttached ? { claimTargetType: "listing", claimTargetId: listing.id } : {}),
+    } });
+    store.put(key, "video/mp4", 1024);
+    if (alreadyAttached) {
+      await prisma.listingMedia.create({ data: {
+        listingId: listing.id, kind: "video", key, sortOrder: 0, uploadId: upload.id,
+      } });
+    }
+    const before = await request.get(`/api/v1/listings/${listing.id}`).expect(200);
+    const rejected = await request
+      .post(`/api/v1/listings/${listing.id}/media/attach`)
+      .set("Authorization", `Bearer ${tokens["user-a"]}`)
+      .send({ key, kind, sortOrder: 0 })
+      .expect(400);
+
+    expect(rejected.body.code).toBe("LISTING_VIDEO_UNAVAILABLE");
+    const after = await request.get(`/api/v1/listings/${listing.id}`).expect(200);
+    expect(after.body).toEqual(before.body);
+    expect(await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } })).toEqual(upload);
+    expect(store.objects.has(key)).toBe(true);
+    expect(store.deleted).toEqual([]);
+  });
+
   it("allows only one of two concurrent removals from a four-photo Listing", async () => {
     const listing = await createListing("user-a", "concurrent-floor");
     const key = await presignAndPut("user-a");
