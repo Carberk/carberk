@@ -88,8 +88,8 @@ provisioning (S11-07/S11-08) — listed here so drift stays auditable:
    idle detector never fires and the setting could not take effect. The
    declaration is `false` so it matches observed behaviour rather than
    asserting a sleep that cannot happen (ADR-0044 drift rule). Measured and
-   root-caused in
-   `docs/prd/ops/evidence/issue-278-staging-applications.md`.
+   root-caused under issue #278; that evidence file was removed from `main`
+   on 2026-11-04 and remains in git history.
 
 ## Environment matrix (names/references only — never values)
 

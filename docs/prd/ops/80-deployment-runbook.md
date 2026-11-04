@@ -351,7 +351,7 @@ Removal checklist:
 
 - **Application rollback:** redeploy the last known-good Railway application revision and repeat health + focused smoke checks.
 - **Migration response:** forward-fix is preferred. Never assume application rollback undoes a schema migration.
-- **Data restore:** restore Postgres and media into an isolated/non-production target first, run current migrations, and verify auth/listing/chat/report/media reads before declaring the path usable. The executed Railway procedure is in [Restore drill](#restore-drill); the drill evidence is in `evidence/issue-280-backup-restore-drill.md`.
+- **Data restore:** restore Postgres and media into an isolated/non-production target first, run current migrations, and verify auth/listing/chat/report/media reads before declaring the path usable. The executed Railway procedure is in [Restore drill](#restore-drill); its evidence file (issue #280) was removed from `main` on 2026-11-04 and remains in git history.
 - Record restore point, data scope, start/end time, operator, result, and any recovery gap.
 
 ### Step 6 — Cutover boundary
@@ -520,8 +520,7 @@ Minimum successful drill:
 5. Verify health, login with a test user, listing read, contact read/write if enabled, admin TOTP login, report list, audit list, and a sample media object reference.
 6. Record backup timestamp, restore start/end time, operator, result, and any data gaps.
 
-Executed evidence for the Railway era lives in
-`evidence/issue-280-backup-restore-drill.md`.
+The Railway-era drill was executed under issue #280; its evidence file was removed from `main` on 2026-11-04 and remains in git history.
 
 ### Railway-era Postgres drill
 

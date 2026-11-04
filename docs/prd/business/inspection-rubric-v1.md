@@ -7,7 +7,7 @@
 > **Owner:** Founder or trusted helper plus one pilot mechanic.
 > **Review required before S9b:** A founder and a consulting mechanic must sign off that the checks are realistic for a 45-75 minute used-car inspection in Turkmenistan.
 
-This document is the working rubric for the S9b concierge inspection pilot described in `sprint-09-trust-wedge.md` and [`87-concierge-pilot-runbook.md`](../ops/87-concierge-pilot-runbook.md). It exists to test whether real buyers value an independent AutoTM inspection before AutoTM builds the full Phase 2 reports product.
+This document is the working rubric for the S9b concierge inspection pilot described in [`87-concierge-pilot-runbook.md`](../ops/87-concierge-pilot-runbook.md) (the S9 sprint plan that first outlined it was removed from `main` on 2026-11-04 and remains in git history). It exists to test whether real buyers value an independent AutoTM inspection before AutoTM builds the full Phase 2 reports product.
 
 It is deliberately simple: print it, fill it by hand, take photos, and send the buyer a plain report. The later Phase 2 product may replace this with an inspector app, server-generated PDFs, QR verification, paid booking, tier badges, and report storage. None of that is promised here.
 
