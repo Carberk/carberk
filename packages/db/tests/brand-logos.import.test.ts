@@ -12,7 +12,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import sharp from "sharp";
 import { siBmw, siToyota } from "simple-icons";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
@@ -28,6 +28,8 @@ import {
 } from "../scripts/brand-logos/import";
 import type { BrandLogoManifest, ManifestEntry, SourcedLogoEntry } from "../scripts/brand-logos/manifest";
 import { sha256Hex, type MasterProvider } from "../scripts/brand-logos/sources";
+
+import { createTestPool } from "./testing/create-test-pool";
 
 const BUCKET = "catalog-assets";
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -136,7 +138,7 @@ describe("brand logo import — Testcontainers Postgres and MinIO", () => {
       env: { ...process.env, DATABASE_URL: url },
       stdio: "pipe",
     });
-    pool = new Pool({ connectionString: url });
+    pool = createTestPool(url);
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
 
     s3 = new S3Client({

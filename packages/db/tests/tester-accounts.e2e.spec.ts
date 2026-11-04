@@ -3,12 +3,14 @@ import { fileURLToPath } from "node:url";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
 import { PrismaTesterAccountStore } from "../src/PrismaTesterAccountStore";
 import { runTesterAccounts } from "../src/tester-accounts";
+
+import { createTestPool } from "./testing/create-test-pool";
 
 function must<T>(value: T | undefined): T {
   if (value === undefined) throw new Error("Expected fixture value");
@@ -29,7 +31,7 @@ describe("tester operator Prisma transaction integration", () => {
     container = await new PostgreSqlContainer("postgres:16-alpine").withUsername("auto_tm").withPassword("auto_tm_test").withDatabase("tester_accounts_test").start();
     const databaseUrl = container.getConnectionUri();
     execFileSync("pnpm", ["prisma", "migrate", "deploy"], { cwd: fileURLToPath(new URL("..", import.meta.url)), env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "pipe" });
-    pool = new Pool({ connectionString: databaseUrl });
+    pool = createTestPool(databaseUrl);
     db = new PrismaClient({ adapter: new PrismaPg(pool) });
     store = new PrismaTesterAccountStore(db);
   });

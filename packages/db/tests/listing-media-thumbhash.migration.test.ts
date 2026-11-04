@@ -4,10 +4,13 @@ import { join } from "node:path";
 
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Client, Pool } from "pg";
+import { Client } from "pg";
+import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "../generated/prisma/client/client";
+
+import { createTestPool } from "./testing/create-test-pool";
 
 const MIGRATION = "20261011140000_add_listing_media_thumb_hash";
 const migrationsDir = new URL("../prisma/migrations", import.meta.url).pathname;
@@ -51,7 +54,7 @@ describe(`${MIGRATION} PostgreSQL upgrade`, () => {
       .withUsername("auto_tm").withPassword("auto_tm_pass").withDatabase("auto_tm_test").start();
     db = new Client({ connectionString: container.getConnectionUri() });
     await db.connect();
-    pool = new Pool({ connectionString: container.getConnectionUri() });
+    pool = createTestPool(container.getConnectionUri());
     prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   }, 120_000);
 
