@@ -15,3 +15,7 @@ Inspect selected existing examples before copying their setup:
 - [Rendered display name](../../apps/mobile/test/screens/display-name.spec.tsx) and [profile photo](../../apps/mobile/test/screens/profile-photo.spec.tsx) use real hooks and HTTP evidence; [OptionPickerSheet](../../apps/mobile/components/account/OptionPickerSheet.spec.tsx) exercises interactions.
 
 A strong case does not certify its whole suite. Repair weak legacy tests in their own small, separately scoped issues.
+
+## Focused API unit tests
+
+Use `pnpm test:api:unit` when an agent needs the API unit lane without disposable services. The command first builds `@auto-tm/api` and its runtime dependencies, including `@auto-tm/contracts` and `@auto-tm/db`, with an unreachable build-only `DATABASE_URL`, then runs the API package's `test:unit` script. That script sets `AUTO_TM_TEST_DATABASES=off` and excludes `*.e2e.spec.ts`, so it does not create databases or require Compose.
