@@ -43,6 +43,9 @@ function AutosaveHarness({ draftId = DRAFT_ID, older = "Older description", newe
       setOlderDone(false);
       void autosave.forceSave({ description: older }).then(() => setOlderDone(true));
     }}><Text>Save older</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Save newer" onPress={() => {
+      void autosave.forceSave({ description: newer });
+    }}><Text>Save newer</Text></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Flush newer" onPress={() => {
       setFlushed(null);
       void autosave.flush({ description: newer }).then(setFlushed);
@@ -195,3 +198,33 @@ it("drops queued work and ignores old completion status after moving to another 
   await view.findByText("Flush saved");
   expect(written).toEqual({ [DRAFT_ID]: "Older description", [OTHER_DRAFT_ID]: "Newest description" });
 });
+
+it("gives a queued newer payload its full retry budget after an older request fails", async () => {
+  let payload = { description: "Initial description" };
+  let releaseOlder: (() => void) | undefined;
+  let newerWrites = 0;
+  const draft = () => ({ id: DRAFT_ID, userId: USER_ID, payload,
+    createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" });
+  server.use(
+    http.patch("*/listings/drafts/:id", async ({ request }) => {
+      const incoming = await request.json() as typeof payload;
+      if (incoming.description === "Older description") {
+        await new Promise<void>(resolve => { releaseOlder = resolve; });
+        return HttpResponse.json({ code: "INTERNAL" }, { status: 500 });
+      }
+      newerWrites += 1;
+      if (newerWrites <= 3) return HttpResponse.json({ code: "INTERNAL" }, { status: 500 });
+      payload = incoming;
+      return HttpResponse.json(draft());
+    }),
+    http.get("*/listings/drafts/:id", () => HttpResponse.json(draft())),
+  );
+  const view = await renderMobile(<AutosaveHarness />);
+  await fireEvent.press(view.getByRole("button", { name: "Save older" }));
+  await vi.waitFor(() => expect(releaseOlder).toBeDefined());
+  await fireEvent.press(view.getByRole("button", { name: "Save newer" }));
+  releaseOlder?.();
+  await view.findByText("saved", undefined, { timeout: 9000 });
+  const stored = await apiClient.get(`/listings/drafts/${DRAFT_ID}`, ListingsSchemas.ListingDraftSchema);
+  expect(stored.payload.description).toBe("Newest description");
+}, 12_000);

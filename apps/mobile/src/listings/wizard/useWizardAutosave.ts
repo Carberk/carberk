@@ -78,7 +78,6 @@ export function useWizardAutosave(draftId: string | undefined) {
       // If we came back online and have a pending save in error state, retry.
       // Go through the ref: this effect runs once, when there may be no draft yet.
       if (online && pendingPayloadRef.current && saveStatusRef.current === "error") {
-        retryCountRef.current = 0;
         void performSaveRef.current(pendingPayloadRef.current);
       }
     });
@@ -179,7 +178,7 @@ export function useWizardAutosave(draftId: string | undefined) {
           retryTimeoutRef.current = setTimeout(() => {
             retryTimeoutRef.current = null;
             if (isMountedRef.current && draftIdRef.current === draftId && pendingPayloadRef.current) {
-              void performSaveRef.current(pendingPayloadRef.current);
+              void performSaveRef.current(pendingPayloadRef.current, { retry: true });
             }
           }, delay);
         } else {
@@ -195,10 +194,11 @@ export function useWizardAutosave(draftId: string | undefined) {
 
   const performSave = useCallback((
     payload: WizardSchemas.WizardDraftPayload,
-    options: { once?: boolean } = {},
+    options: { once?: boolean; retry?: boolean } = {},
   ): Promise<boolean> => {
     const run = () => {
       if (!isMountedRef.current || draftIdRef.current !== draftId) return Promise.resolve(false);
+      if (!options.retry) retryCountRef.current = 0;
       return savePayload(payload, options);
     };
     const previous = saveQueueRef.current;
@@ -219,7 +219,6 @@ export function useWizardAutosave(draftId: string | undefined) {
   const debouncedSave = useMemo(
     () =>
       debounce((payload: WizardSchemas.WizardDraftPayload) => {
-        retryCountRef.current = 0;
         void performSaveRef.current(payload);
       }, 500),
     [], // never recreate — stable forever
@@ -253,7 +252,6 @@ export function useWizardAutosave(draftId: string | undefined) {
     async (payload: WizardSchemas.WizardDraftPayload): Promise<void> => {
       pendingPayloadRef.current = payload;
       debouncedSave.cancel?.();
-      retryCountRef.current = 0;
       await performSave(payload);
     },
     [debouncedSave, performSave],
@@ -267,7 +265,6 @@ export function useWizardAutosave(draftId: string | undefined) {
     (payload: WizardSchemas.WizardDraftPayload): Promise<boolean> => {
       pendingPayloadRef.current = payload;
       debouncedSave.cancel?.();
-      retryCountRef.current = 0;
       return performSave(payload, { once: true });
     },
     [debouncedSave, performSave],
@@ -282,7 +279,6 @@ export function useWizardAutosave(draftId: string | undefined) {
 
   const retrySave = useCallback(() => {
     if (pendingPayloadRef.current) {
-      retryCountRef.current = 0;
       void performSave(pendingPayloadRef.current);
     }
   }, [performSave]);
