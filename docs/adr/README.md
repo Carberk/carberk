@@ -122,6 +122,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0108](0108-small-prs-with-full-send-replace-integration-delivery.md) | Small PRs with full send replace integration delivery (supersedes ADR-0098) | Accepted | 2026-11-04 |
 | [0109](0109-source-first-documentation-and-design-workflow.md) | Source-first documentation and design workflow | Accepted | 2026-11-04 |
 | [0110](0110-draft-pull-request-ci-lane.md) | Draft pull requests use a short CI lane until ready | Accepted | 2026-11-05 |
+| [0111](0111-indexed-refresh-token-digests-and-one-time-reauthentication.md) | Indexed refresh-token digests and one-time reauthentication (supersedes ADR-0012 hashing/lookup only) | Accepted | 2026-11-05 |
 
 ## Per-app ADRs
 

@@ -4,7 +4,7 @@ import { JwtService } from "@nestjs/jwt";
 import type { Session } from "../domain/Session";
 import type { User } from "../domain/User";
 import type { SessionRepository, SessionLookupResult } from "../domain/ports/SessionRepository";
-import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
+import type { RefreshTokenHasherPort } from "../domain/ports/RefreshTokenHasherPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import { InMemoryIdentityCheck } from "./testing/InMemoryIdentityCheck";
 import { UserSuspendedError } from "../domain/UserSuspendedError";
@@ -125,7 +125,7 @@ class FakeSessionRepository implements SessionRepository {
   }
 }
 
-class FakePasswordHasher implements PasswordHasherPort {
+class FakePasswordHasher implements RefreshTokenHasherPort {
   async hash(plaintext: string): Promise<string> {
     return `hashed:${plaintext}`;
   }
@@ -148,7 +148,7 @@ const jwtService = new JwtService({
 
 interface MakeUseCaseOpts {
   sessionRepo?: SessionRepository;
-  hasher?: PasswordHasherPort;
+  hasher?: RefreshTokenHasherPort;
   clock?: ClockPort;
   identityCheck?: InMemoryIdentityCheck;
 }

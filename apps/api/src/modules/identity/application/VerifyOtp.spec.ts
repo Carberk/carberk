@@ -17,7 +17,7 @@ import type { Session } from "../domain/Session";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import type { UserRepository } from "../domain/ports/UserRepository";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
-import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
+import type { RefreshTokenHasherPort } from "../domain/ports/RefreshTokenHasherPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import type {
   ConstantTimeComparatorPort,
@@ -313,7 +313,7 @@ class FakeSessionRepository implements SessionRepository {
   }
 }
 
-class FakePasswordHasher implements PasswordHasherPort {
+class FakePasswordHasher implements RefreshTokenHasherPort {
   async hash(plaintext: string): Promise<string> {
     return `hashed:${plaintext}`;
   }
@@ -360,7 +360,7 @@ interface MakeUseCaseOpts {
   otpRepo?: OtpRequestRepository;
   userRepo?: UserRepository;
   sessionRepo?: SessionRepository;
-  hasher?: PasswordHasherPort;
+  hasher?: RefreshTokenHasherPort;
   clock?: ClockPort;
   eventBus?: { emit: Mock<(event: string, payload: unknown) => void> };
   reviewerBypassConfig?: ReviewerOtpBypassConfig;
@@ -666,7 +666,7 @@ describe("VerifyOtp", () => {
 
   // --- Session hash storage ---
 
-  it("stores bcrypt hash of refresh token, not plaintext", async () => {
+  it("stores a one-way digest of the refresh token, not plaintext", async () => {
     const otpRequest = makeOtpRequest();
     otpRepo.addRecord(otpRequest);
 

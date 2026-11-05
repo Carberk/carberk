@@ -763,6 +763,63 @@ describe("AuthController e2e — POST /api/v1/auth/logout", () => {
     };
   }
 
+  it("requires reauthentication for a pre-cutover bcrypt token without a legacy fallback", async () => {
+    await login("+99361234567");
+    // A real pre-cutover bcrypt verifier for the synthetic token `c` repeated
+    // 64 times. Kept literal so the fixture does not use the current hasher.
+    const legacyHash = "$2b$10$jjkDkrXhw4teuItuaa54D.9yZAMqC63VbwTxNGoGd.ah3owxvc/Sy";
+    const session = await prisma.session.findFirstOrThrow();
+    await prisma.session.update({ where: { id: session.id }, data: { refreshTokenHash: legacyHash } });
+
+    for (const action of ["refresh", "logout"]) {
+      const response = await request.post(`/api/v1/auth/${action}`)
+        .send({ refreshToken: "c".repeat(64) }).expect(401);
+      expect(response.body.code).toBe("INVALID_REFRESH_TOKEN");
+    }
+    expect((await prisma.session.findUniqueOrThrow({ where: { id: session.id } })).refreshTokenHash)
+      .toBe(legacyHash);
+  });
+
+  it("rotates one owner's session once among unrelated active and expired sessions", async () => {
+    await login("+99361111111");
+    const other = await prisma.user.findUniqueOrThrow({ where: { phone: "+99361111111" } });
+    await prisma.session.createMany({ data: Array.from({ length: 500 }, (_, index) => ({
+      userId: other.id,
+      refreshTokenHash: `unrelated-digest-${index}`,
+      expiresAt: new Date(index % 2 === 0 ? "2020-01-01T00:00:00Z" : "2099-01-01T00:00:00Z"),
+    })) });
+    const { refreshToken } = await login("+99361234567");
+    const owner = await prisma.user.findUniqueOrThrow({ where: { phone: "+99361234567" } });
+    const session = await prisma.session.findFirstOrThrow({ where: { userId: owner.id } });
+    const elevation = new Date("2099-01-01T00:00:00Z");
+    await prisma.user.update({ where: { id: owner.id }, data: { role: "admin" } });
+    await prisma.session.update({ where: { id: session.id }, data: { adminTotpExpiresAt: elevation } });
+
+    const results = await Promise.all([1, 2].map(() => request.post("/api/v1/auth/refresh").send({ refreshToken })));
+    expect(results.map((result) => result.status).sort()).toEqual([201, 401]);
+    const renewed = results.find((result) => result.status === 201)!;
+    const claims = app.get(JwtService).verify(renewed.body.accessToken);
+    expect(claims).toMatchObject({ sub: owner.id, sid: session.id, role: "admin" });
+    const stored = await prisma.session.findUniqueOrThrow({ where: { id: session.id } });
+    expect(stored.adminTotpExpiresAt).toEqual(elevation);
+    expect(stored.refreshTokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(stored.refreshTokenHash).not.toBe(renewed.body.refreshToken);
+    await request.post("/api/v1/auth/refresh").send({ refreshToken }).expect(401);
+    await request.post("/api/v1/auth/logout").send({ refreshToken: "a".repeat(64) }).expect(401);
+    await request.post("/api/v1/auth/logout").send({ refreshToken: renewed.body.refreshToken }).expect(204);
+    expect(await prisma.session.count({ where: { userId: other.id } })).toBe(501);
+  });
+
+  it("refuses expired refresh but still lets its owner log out that session", async () => {
+    const { refreshToken } = await login("+99361234567");
+    const session = await prisma.session.findFirstOrThrow();
+    await prisma.session.update({ where: { id: session.id }, data: { expiresAt: new Date("2020-01-01T00:00:00Z") } });
+    const expired = await request.post("/api/v1/auth/refresh").send({ refreshToken }).expect(401);
+    expect(expired.body.code).toBe("SESSION_EXPIRED");
+    await request.post("/api/v1/auth/logout").send({ refreshToken }).expect(204);
+    expect(await prisma.session.findUnique({ where: { id: session.id } })).toBeNull();
+  });
+
   it("returns 204 and deletes the session matching the supplied refresh token", async () => {
     const { refreshToken } = await login("+99361234567");
 

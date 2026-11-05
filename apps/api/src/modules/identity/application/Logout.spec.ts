@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import type { Session } from "../domain/Session";
 import type { SessionRepository, SessionLookupResult } from "../domain/ports/SessionRepository";
-import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
+import type { RefreshTokenHasherPort } from "../domain/ports/RefreshTokenHasherPort";
 import { Logout } from "./Logout";
 
 const NOW = new Date("2026-05-14T12:00:00Z");
@@ -72,7 +72,7 @@ class FakeSessionRepository implements SessionRepository {
   }
 }
 
-class FakePasswordHasher implements PasswordHasherPort {
+class FakePasswordHasher implements RefreshTokenHasherPort {
   async hash(plaintext: string): Promise<string> { return `hashed:${plaintext}`; }
   async compare(plaintext: string, hash: string): Promise<boolean> { return hash === `hashed:${plaintext}`; }
 }

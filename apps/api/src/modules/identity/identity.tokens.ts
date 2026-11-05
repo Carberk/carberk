@@ -5,7 +5,7 @@ export const IDENTITY_TOKENS = {
   OtpTestMode: "IDENTITY_OTP_TEST_MODE",
   UserRepository: "IDENTITY_USER_REPOSITORY",
   SessionRepository: "IDENTITY_SESSION_REPOSITORY",
-  PasswordHasherPort: "IDENTITY_PASSWORD_HASHER_PORT",
+  RefreshTokenHasherPort: "IDENTITY_REFRESH_TOKEN_HASHER_PORT",
   IdentityCheckPort: "IDENTITY_CHECK_PORT",
   ContactPhoneCodePort: "IDENTITY_CONTACT_PHONE_CODE_PORT",
   IdentityReadPort: "IDENTITY_READ_PORT",
