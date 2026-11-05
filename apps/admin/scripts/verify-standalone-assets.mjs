@@ -17,7 +17,9 @@ const layout = await mkdtemp("/tmp/issue-739-admin-layout-");
 const dockerfile = await readFile(path.join(repo, "infra/docker/admin.Dockerfile"), "utf8");
 const runtime = dockerfile.split("FROM base AS runtime")[1];
 assert.ok(runtime, "Admin runtime stage missing");
-for (const copy of runtime.matchAll(/^COPY --from=build (\/app\/\S+) (\/app\S*)$/gm)) {
+const copies = [...runtime.matchAll(/^COPY --from=build (?:--chown=\S+ )?(\/app\/\S+) (\/app\S*)$/gm)];
+assert.ok(copies.length > 0, "Admin runtime copies missing");
+for (const copy of copies) {
   const source = path.join(repo, copy[1].slice("/app/".length));
   const destination = path.join(layout, copy[2].slice("/app".length));
   await mkdir(path.dirname(destination), { recursive: true });

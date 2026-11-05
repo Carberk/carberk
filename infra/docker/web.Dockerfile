@@ -60,9 +60,9 @@ ENV AUTOTM_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
 # Standalone output excludes .next/static by design — copy it alongside the
 # traced server (Next.js monorepo standalone convention). apps/web has no
 # public/ directory today; add the COPY back if one is introduced.
-COPY --from=build /app/apps/web/.next/standalone /app
-COPY --from=build /app/apps/web/.next/static /app/apps/web/.next/static
-RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown -R auto-tm:auto-tm /app
+RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown auto-tm:auto-tm /app
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/web/.next/standalone /app
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/web/.next/static /app/apps/web/.next/static
 USER auto-tm
 WORKDIR /app
 ENV PORT=3002 HOSTNAME=0.0.0.0

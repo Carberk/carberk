@@ -59,10 +59,10 @@ ARG RAILWAY_GIT_COMMIT_SHA=unknown
 ENV AUTOTM_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
 # Standalone output excludes .next/static and public by design. Copy both
 # alongside the traced monorepo server so Assigned Avatars are served.
-COPY --from=build /app/apps/admin/.next/standalone /app
-COPY --from=build /app/apps/admin/.next/static /app/apps/admin/.next/static
-COPY --from=build /app/apps/admin/public /app/apps/admin/public
-RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown -R auto-tm:auto-tm /app
+RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown auto-tm:auto-tm /app
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/admin/.next/standalone /app
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/admin/.next/static /app/apps/admin/.next/static
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/admin/public /app/apps/admin/public
 USER auto-tm
 WORKDIR /app
 ENV PORT=3001 HOSTNAME=0.0.0.0
