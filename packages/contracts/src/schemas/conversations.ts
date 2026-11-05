@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { DateTimeSchema, z } from "../zod";
 import { ListingStatus, MessageKind } from "../enums";
 
 import { PublicIdentitySchema } from "./identity";
@@ -16,7 +15,7 @@ export type MessageKindType = z.infer<typeof MessageKindSchema>;
 // ── Request DTOs ──
 
 export const OpenConversationRequestSchema = z.object({
-  listingId: z.string().uuid(),
+  listingId: z.string().guid(),
 });
 export type OpenConversationRequest = z.infer<
   typeof OpenConversationRequestSchema
@@ -50,9 +49,9 @@ export const ImageMessageMetadataSchema = ImageMessageSendMetadataSchema.extend(
 export type ImageMessageMetadata = z.infer<typeof ImageMessageMetadataSchema>;
 
 export const PostRefMessageMetadataSchema = z.object({
-  listingId: z.string().uuid(),
-  brandId: z.string().uuid(),
-  modelId: z.string().uuid(),
+  listingId: z.string().guid(),
+  brandId: z.string().guid(),
+  modelId: z.string().guid(),
   year: z.number().int().min(1900).max(2100).optional(),
   displayPriceTmt: z.number().nonnegative(),
   priceCurrency: z.enum(["TMT", "USD", "AED"]),
@@ -90,13 +89,13 @@ export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
 
 export const SendMessageSocketRequestSchema = z.discriminatedUnion("kind", [
   z.object({
-    conversationId: z.string().uuid(),
+    conversationId: z.string().guid(),
     kind: z.literal(MessageKind.Text),
     text: z.string().min(1).max(1000),
     clientMessageId: z.string().optional(),
   }),
   z.object({
-    conversationId: z.string().uuid(),
+    conversationId: z.string().guid(),
     kind: z.literal(MessageKind.Image),
     metadata: ImageMessageSendMetadataSchema,
     clientMessageId: z.string().optional(),
@@ -110,7 +109,7 @@ export const SendPostRefMessageRequestSchema = z
   .object({
     metadata: z
       .object({
-        listingId: z.string().uuid(),
+        listingId: z.string().guid(),
       })
       .strict(),
     clientMessageId: z.string().optional(),
@@ -143,9 +142,9 @@ export type PresignChatAttachmentResponse = z.infer<
 // ── Listing card embedded in conversation responses ──
 
 export const ConversationListingCardSchema = z.object({
-  id: z.string().uuid(),
-  brandId: z.string().uuid(),
-  modelId: z.string().uuid(),
+  id: z.string().guid(),
+  brandId: z.string().guid(),
+  modelId: z.string().guid(),
   year: z.number().int().min(1900).max(2100).optional(),
   displayPriceTmt: z.number().nonnegative(),
   priceCurrency: z.enum(["TMT", "USD", "AED"]),
@@ -168,22 +167,22 @@ export type MessageDeliveryStatus = z.infer<
 >;
 
 export const MessageSummarySchema = z.object({
-  id: z.string().uuid(),
-  conversationId: z.string().uuid(),
-  senderId: z.string().uuid(),
+  id: z.string().guid(),
+  conversationId: z.string().guid(),
+  senderId: z.string().guid(),
   kind: MessageKindSchema.default(MessageKind.Text),
   text: z.string().nullable(),
   metadata: MessageMetadataSchema.optional(),
-  createdAt: z.string().datetime(),
-  deletedAt: z.string().datetime().optional(),
+  createdAt: DateTimeSchema,
+  deletedAt: DateTimeSchema.optional(),
   clientMessageId: z.string().optional(),
   deliveryStatus: MessageDeliveryStatusSchema.optional(),
 });
 export type MessageSummary = z.infer<typeof MessageSummarySchema>;
 
 export const DeleteMessageResponseSchema = z.object({
-  messageId: z.string().uuid(),
-  deletedAt: z.string().datetime(),
+  messageId: z.string().guid(),
+  deletedAt: DateTimeSchema,
 });
 export type DeleteMessageResponse = z.infer<typeof DeleteMessageResponseSchema>;
 
@@ -191,8 +190,8 @@ export type DeleteMessageResponse = z.infer<typeof DeleteMessageResponseSchema>;
 
 export const UpdateWatermarkRequestSchema = z
   .object({
-    lastReadAt: z.string().datetime().optional(),
-    lastDeliveredAt: z.string().datetime().optional(),
+    lastReadAt: DateTimeSchema.optional(),
+    lastDeliveredAt: DateTimeSchema.optional(),
   })
   .refine(
     (data) => data.lastReadAt !== undefined || data.lastDeliveredAt !== undefined,
@@ -206,9 +205,9 @@ export type UpdateWatermarkRequest = z.infer<
 >;
 
 export const UpdateWatermarkResponseSchema = z.object({
-  conversationId: z.string().uuid(),
-  lastReadAt: z.string().datetime().optional(),
-  lastDeliveredAt: z.string().datetime().optional(),
+  conversationId: z.string().guid(),
+  lastReadAt: DateTimeSchema.optional(),
+  lastDeliveredAt: DateTimeSchema.optional(),
 });
 export type UpdateWatermarkResponse = z.infer<
   typeof UpdateWatermarkResponseSchema
@@ -222,8 +221,8 @@ export type MuteConversationRequest = z.infer<
 >;
 
 export const MuteConversationResponseSchema = z.object({
-  conversationId: z.string().uuid(),
-  mutedAt: z.string().datetime().nullable(),
+  conversationId: z.string().guid(),
+  mutedAt: DateTimeSchema.nullable(),
 });
 export type MuteConversationResponse = z.infer<
   typeof MuteConversationResponseSchema
@@ -236,32 +235,32 @@ export type ParticipantRole = z.infer<typeof ParticipantRoleSchema>;
 
 /** The other participant: id and public identity; no Sign-in Method data. */
 export const ConversationPeerSchema = PublicIdentitySchema.extend({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 export type ConversationPeer = z.infer<typeof ConversationPeerSchema>;
 
 export const ConversationSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   listing: ConversationListingCardSchema.nullable(),
-  buyerId: z.string().uuid(),
-  sellerId: z.string().uuid(),
+  buyerId: z.string().guid(),
+  sellerId: z.string().guid(),
   myRole: ParticipantRoleSchema,
   peer: ConversationPeerSchema,
   /** True when the viewer blocked the other participant. The reverse is not exposed. */
   blockedByMe: z.boolean(),
   lastMessage: MessageSummarySchema.optional(),
-  updatedAt: z.string().datetime(),
+  updatedAt: DateTimeSchema,
   unreadCount: z.number().int().nonnegative().default(0),
-  peerLastReadAt: z.string().datetime().optional(),
-  peerLastDeliveredAt: z.string().datetime().optional(),
-  mutedAt: z.string().datetime().nullable().optional(),
+  peerLastReadAt: DateTimeSchema.optional(),
+  peerLastDeliveredAt: DateTimeSchema.optional(),
+  mutedAt: DateTimeSchema.nullable().optional(),
 });
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
 
 // ── One Conversation, with the viewer's send restriction ──
 
 export const ConversationIdParamSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 export type ConversationIdParam = z.infer<typeof ConversationIdParamSchema>;
 
@@ -351,57 +350,57 @@ export const ChatMessageEventSchema = z.object({
 export type ChatMessageEvent = z.infer<typeof ChatMessageEventSchema>;
 
 export const DeleteMessageSocketRequestSchema = z.object({
-  conversationId: z.string().uuid(),
-  messageId: z.string().uuid(),
+  conversationId: z.string().guid(),
+  messageId: z.string().guid(),
 });
 export type DeleteMessageSocketRequest = z.infer<
   typeof DeleteMessageSocketRequestSchema
 >;
 
 export const MessageDeletedEventSchema = z.object({
-  messageId: z.string().uuid(),
-  conversationId: z.string().uuid(),
-  deletedAt: z.string().datetime(),
+  messageId: z.string().guid(),
+  conversationId: z.string().guid(),
+  deletedAt: DateTimeSchema,
 });
 export type MessageDeletedEvent = z.infer<typeof MessageDeletedEventSchema>;
 
 export const TypingStartRequestSchema = z.object({
-  conversationId: z.string().uuid(),
+  conversationId: z.string().guid(),
 });
 export type TypingStartRequest = z.infer<typeof TypingStartRequestSchema>;
 
 export const TypingStopRequestSchema = z.object({
-  conversationId: z.string().uuid(),
+  conversationId: z.string().guid(),
 });
 export type TypingStopRequest = z.infer<typeof TypingStopRequestSchema>;
 
 export const TypingEventSchema = z.object({
-  conversationId: z.string().uuid(),
-  userId: z.string().uuid(),
+  conversationId: z.string().guid(),
+  userId: z.string().guid(),
   isTyping: z.boolean(),
 });
 export type TypingEvent = z.infer<typeof TypingEventSchema>;
 
 export const PresenceEventSchema = z.object({
-  conversationId: z.string().uuid(),
-  userId: z.string().uuid(),
+  conversationId: z.string().guid(),
+  userId: z.string().guid(),
   online: z.boolean(),
-  lastSeenAt: z.string().datetime().optional(),
+  lastSeenAt: DateTimeSchema.optional(),
 });
 export type PresenceEvent = z.infer<typeof PresenceEventSchema>;
 
 export const WatermarkEventSchema = z.object({
-  conversationId: z.string().uuid(),
-  userId: z.string().uuid(),
-  lastReadAt: z.string().datetime().optional(),
-  lastDeliveredAt: z.string().datetime().optional(),
+  conversationId: z.string().guid(),
+  userId: z.string().guid(),
+  lastReadAt: DateTimeSchema.optional(),
+  lastDeliveredAt: DateTimeSchema.optional(),
 });
 export type WatermarkEvent = z.infer<typeof WatermarkEventSchema>;
 
 // ── Socket room join/leave ──
 
 export const JoinConversationRequestSchema = z.object({
-  conversationId: z.string().uuid(),
+  conversationId: z.string().guid(),
 });
 export type JoinConversationRequest = z.infer<
   typeof JoinConversationRequestSchema
@@ -409,7 +408,7 @@ export type JoinConversationRequest = z.infer<
 
 export const JoinConversationResponseSchema = z.object({
   ok: z.literal(true),
-  conversationId: z.string().uuid(),
+  conversationId: z.string().guid(),
   room: z.string().min(1),
 });
 export type JoinConversationResponse = z.infer<
@@ -417,7 +416,7 @@ export type JoinConversationResponse = z.infer<
 >;
 
 export const LeaveConversationRequestSchema = z.object({
-  conversationId: z.string().uuid(),
+  conversationId: z.string().guid(),
 });
 export type LeaveConversationRequest = z.infer<
   typeof LeaveConversationRequestSchema
@@ -425,7 +424,7 @@ export type LeaveConversationRequest = z.infer<
 
 export const LeaveConversationResponseSchema = z.object({
   ok: z.literal(true),
-  conversationId: z.string().uuid(),
+  conversationId: z.string().guid(),
   room: z.string().min(1),
 });
 export type LeaveConversationResponse = z.infer<

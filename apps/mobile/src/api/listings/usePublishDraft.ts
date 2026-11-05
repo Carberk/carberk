@@ -5,11 +5,11 @@ import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
 const PublishDraftResponseSchema = z.object({
-  id: z.string().uuid(),
-  sellerId: z.string().uuid(),
+  id: z.string().guid(),
+  sellerId: z.string().guid(),
   status: z.string(),
-  brandId: z.string().uuid(),
-  modelId: z.string().uuid(),
+  brandId: z.string().guid(),
+  modelId: z.string().guid(),
   priceAmount: z.number(),
   priceCurrency: z.string(),
   publishedAt: z.string().datetime(),

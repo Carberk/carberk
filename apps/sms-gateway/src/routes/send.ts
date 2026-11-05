@@ -6,7 +6,7 @@ import type { OtpSenderPort } from "../ports/OtpSenderPort.js";
 export const sendRequestBody = z.object({
   phone: z.string().min(1),
   body: z.string().min(1),
-  requestId: z.string().uuid(),
+  requestId: z.string().guid(),
 });
 
 export function sendRoutes(sender: OtpSenderPort, gatewayToken: string): FastifyPluginAsync {

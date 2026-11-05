@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { DateTimeSchema, z } from "../zod";
 import { NotificationCategory, PushPlatform } from "../enums";
 
 export const NotificationCategorySchema = z.nativeEnum(NotificationCategory);
@@ -11,12 +10,12 @@ export const PushPlatformSchema = z.nativeEnum(PushPlatform);
 export type PushPlatformType = z.infer<typeof PushPlatformSchema>;
 
 export const NotificationSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   category: NotificationCategorySchema,
   title: z.string(),
   body: z.string(),
   read: z.boolean(),
-  createdAt: z.string().datetime(),
+  createdAt: DateTimeSchema,
 });
 export type NotificationSummary = z.infer<typeof NotificationSummarySchema>;
 
@@ -32,12 +31,12 @@ export type RegisterPushTokenRequest = z.infer<
 >;
 
 export const PushTokenSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   token: z.string(),
   platform: PushPlatformSchema,
   deviceId: z.string().optional(),
-  createdAt: z.string().datetime(),
-  lastSeenAt: z.string().datetime(),
+  createdAt: DateTimeSchema,
+  lastSeenAt: DateTimeSchema,
 });
 export type PushTokenSummary = z.infer<typeof PushTokenSummarySchema>;
 
@@ -70,12 +69,12 @@ export const DIRECT_MESSAGE_PUSH_JOB_NAME = "direct-message" as const;
 
 export const DirectMessagePushJobSchema = z.object({
   category: NotificationCategorySchema,
-  recipientUserId: z.string().uuid(),
-  historyId: z.string().uuid(),
+  recipientUserId: z.string().guid(),
+  historyId: z.string().guid(),
   title: z.string(),
   body: z.string(),
   deepLink: z.string(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 export type DirectMessagePushJob = z.infer<typeof DirectMessagePushJobSchema>;
 
@@ -100,7 +99,7 @@ export type NotificationPreferenceOptOutType = z.infer<
 >;
 
 export const NotificationPreferencesSchema = z.object({
-  optOuts: z.record(NotificationCategorySchema, NotificationPreferenceOptOutSchema),
+  optOuts: z.partialRecord(NotificationCategorySchema, NotificationPreferenceOptOutSchema),
 });
 export type NotificationPreferences = z.infer<
   typeof NotificationPreferencesSchema

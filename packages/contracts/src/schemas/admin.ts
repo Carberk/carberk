@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { DateTimeSchema, z } from "../zod";
 import { UserRole } from "../enums";
 
 // ── Constants ──
@@ -88,7 +87,7 @@ export const TargetSummarySchema = z.object({
 export type TargetSummary = z.infer<typeof TargetSummarySchema>;
 
 export const ActorSummarySchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().guid().optional(),
   label: z.string(),
 });
 export type ActorSummary = z.infer<typeof ActorSummarySchema>;
@@ -116,9 +115,9 @@ export const CreateReportRequestSchema = CreateReportBaseSchema.refine(
 export type CreateReportRequest = z.infer<typeof CreateReportRequestSchema>;
 
 export const CreateReportResponseSchema = z.object({
-  reportId: z.string().uuid(),
+  reportId: z.string().guid(),
   status: z.nativeEnum(ContentReportStatus),
-  createdAt: z.string().datetime(),
+  createdAt: DateTimeSchema,
   reusedExisting: z.boolean(),
 });
 export type CreateReportResponse = z.infer<typeof CreateReportResponseSchema>;
@@ -144,9 +143,9 @@ export type CreateMessageReportRequest = z.infer<
 // ── Report list ──
 
 export const ReportListItemSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   status: z.nativeEnum(ContentReportStatus),
-  createdAt: z.string().datetime(),
+  createdAt: DateTimeSchema,
   reason: z.nativeEnum(ReportReason),
   targetType: z.nativeEnum(ReportTargetType),
   targetId: z.string(),
@@ -168,7 +167,7 @@ export type ListReportsResponse = z.infer<typeof ListReportsResponseSchema>;
 export const ReporterSummarySchema = z.object({
   available: z.boolean(),
   label: z.string(),
-  userId: z.string().uuid().optional(),
+  userId: z.string().guid().optional(),
 });
 export type ReporterSummary = z.infer<typeof ReporterSummarySchema>;
 
@@ -185,37 +184,37 @@ export const ReportDetailTargetSchema = z.object({
   role: z.string().optional(),
   avatarKey: z.string().nullable().optional(),
   avatarIndex: z.number().int().nonnegative().optional(),
-  conversationId: z.string().uuid().optional(),
-  listingId: z.string().uuid().optional(),
-  senderId: z.string().uuid().optional(),
-  messageCreatedAt: z.string().datetime().optional(),
+  conversationId: z.string().guid().optional(),
+  listingId: z.string().guid().optional(),
+  senderId: z.string().guid().optional(),
+  messageCreatedAt: DateTimeSchema.optional(),
   messageBody: z.string().optional(),
-  messageDeletedAt: z.string().datetime().nullish(),
+  messageDeletedAt: DateTimeSchema.nullish(),
   messageHasAttachment: z.boolean().optional(),
   sender: z.object({
     available: z.boolean(),
     label: z.string(),
-    userId: z.string().uuid().optional(),
+    userId: z.string().guid().optional(),
     role: z.nativeEnum(UserRole).optional(),
   }).optional(),
 });
 export type ReportDetailTarget = z.infer<typeof ReportDetailTargetSchema>;
 
 export const GetReportDetailResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   status: z.nativeEnum(ContentReportStatus),
   reason: z.nativeEnum(ReportReason),
   details: z.string().optional(),
-  createdAt: z.string().datetime(),
-  reviewedAt: z.string().datetime().optional(),
+  createdAt: DateTimeSchema,
+  reviewedAt: DateTimeSchema.optional(),
   reporter: ReporterSummarySchema,
   reviewer: ReporterSummarySchema.optional(),
   target: ReportDetailTargetSchema,
   targetModerationState: z
     .object({
       status: z.string().optional(),
-      suspendedAt: z.string().datetime().nullable().optional(),
-      suspendedById: z.string().uuid().nullable().optional(),
+      suspendedAt: DateTimeSchema.nullable().optional(),
+      suspendedById: z.string().guid().nullable().optional(),
       suspensionReason: z.string().nullable().optional(),
     })
     .optional(),
@@ -236,30 +235,30 @@ export const DismissReportRequestSchema = z.object({
 export type DismissReportRequest = z.infer<typeof DismissReportRequestSchema>;
 
 export const DismissReportResponseSchema = z.object({
-  reportId: z.string().uuid(),
+  reportId: z.string().guid(),
   status: z.literal(ContentReportStatus.Dismissed),
-  reviewedAt: z.string().datetime(),
-  auditLogId: z.string().uuid(),
+  reviewedAt: DateTimeSchema,
+  auditLogId: z.string().guid(),
 });
 export type DismissReportResponse = z.infer<typeof DismissReportResponseSchema>;
 
 export const BanListingRequestSchema = z.object({
   reason: AdminActionReasonSchema,
-  reportId: z.string().uuid().optional(),
+  reportId: z.string().guid().optional(),
 });
 export type BanListingRequest = z.infer<typeof BanListingRequestSchema>;
 
 export const BanListingResponseSchema = z.object({
-  targetId: z.string().uuid(),
+  targetId: z.string().guid(),
   targetState: z.object({
     status: z.string().optional(),
-    suspendedAt: z.string().datetime().nullable().optional(),
-    suspendedById: z.string().uuid().nullable().optional(),
+    suspendedAt: DateTimeSchema.nullable().optional(),
+    suspendedById: z.string().guid().nullable().optional(),
     suspensionReason: z.string().nullable().optional(),
   }),
-  reportId: z.string().uuid().optional(),
+  reportId: z.string().guid().optional(),
   reportStatus: z.literal(ContentReportStatus.Actioned).optional(),
-  auditLogId: z.string().uuid(),
+  auditLogId: z.string().guid(),
 });
 export type BanListingResponse = z.infer<typeof BanListingResponseSchema>;
 
@@ -271,34 +270,34 @@ export const UnbanListingRequestSchema = z
 export type UnbanListingRequest = z.infer<typeof UnbanListingRequestSchema>;
 
 export const UnbanListingResponseSchema = z.object({
-  targetId: z.string().uuid(),
+  targetId: z.string().guid(),
   targetState: z.object({
     status: z.string().optional(),
-    suspendedAt: z.string().datetime().nullable().optional(),
-    suspendedById: z.string().uuid().nullable().optional(),
+    suspendedAt: DateTimeSchema.nullable().optional(),
+    suspendedById: z.string().guid().nullable().optional(),
     suspensionReason: z.string().nullable().optional(),
   }),
-  auditLogId: z.string().uuid(),
+  auditLogId: z.string().guid(),
 });
 export type UnbanListingResponse = z.infer<typeof UnbanListingResponseSchema>;
 
 export const SuspendUserRequestSchema = z.object({
   reason: AdminActionReasonSchema,
-  reportId: z.string().uuid().optional(),
+  reportId: z.string().guid().optional(),
 });
 export type SuspendUserRequest = z.infer<typeof SuspendUserRequestSchema>;
 
 export const SuspendUserResponseSchema = z.object({
-  targetId: z.string().uuid(),
+  targetId: z.string().guid(),
   targetState: z.object({
     status: z.string().optional(),
-    suspendedAt: z.string().datetime().nullable().optional(),
-    suspendedById: z.string().uuid().nullable().optional(),
+    suspendedAt: DateTimeSchema.nullable().optional(),
+    suspendedById: z.string().guid().nullable().optional(),
     suspensionReason: z.string().nullable().optional(),
   }),
-  reportId: z.string().uuid().optional(),
+  reportId: z.string().guid().optional(),
   reportStatus: z.literal(ContentReportStatus.Actioned).optional(),
-  auditLogId: z.string().uuid(),
+  auditLogId: z.string().guid(),
 });
 export type SuspendUserResponse = z.infer<typeof SuspendUserResponseSchema>;
 
@@ -310,14 +309,14 @@ export const UnsuspendUserRequestSchema = z
 export type UnsuspendUserRequest = z.infer<typeof UnsuspendUserRequestSchema>;
 
 export const UnsuspendUserResponseSchema = z.object({
-  targetId: z.string().uuid(),
+  targetId: z.string().guid(),
   targetState: z.object({
     status: z.string().optional(),
-    suspendedAt: z.string().datetime().nullable().optional(),
-    suspendedById: z.string().uuid().nullable().optional(),
+    suspendedAt: DateTimeSchema.nullable().optional(),
+    suspendedById: z.string().guid().nullable().optional(),
     suspensionReason: z.string().nullable().optional(),
   }),
-  auditLogId: z.string().uuid(),
+  auditLogId: z.string().guid(),
 });
 export type UnsuspendUserResponse = z.infer<typeof UnsuspendUserResponseSchema>;
 
@@ -329,27 +328,27 @@ export type UnsuspendUserResponse = z.infer<typeof UnsuspendUserResponseSchema>;
  */
 export const RemoveUserPhotoRequestSchema = z.object({
   reason: AdminActionReasonSchema,
-  reportId: z.string().uuid().optional(),
+  reportId: z.string().guid().optional(),
 });
 export type RemoveUserPhotoRequest = z.infer<typeof RemoveUserPhotoRequestSchema>;
 
 export const RemoveUserPhotoResponseSchema = z.object({
-  targetId: z.string().uuid(),
+  targetId: z.string().guid(),
   targetState: z.object({
     avatarKey: z.null(),
     avatarIndex: z.number().int().nonnegative(),
   }),
-  reportId: z.string().uuid().optional(),
+  reportId: z.string().guid().optional(),
   reportStatus: z.literal(ContentReportStatus.Actioned).optional(),
-  auditLogId: z.string().uuid(),
+  auditLogId: z.string().guid(),
 });
 export type RemoveUserPhotoResponse = z.infer<typeof RemoveUserPhotoResponseSchema>;
 
 // ── Audit ──
 
 export const AuditLogListItemSchema = z.object({
-  id: z.string().uuid(),
-  createdAt: z.string().datetime(),
+  id: z.string().guid(),
+  createdAt: DateTimeSchema,
   action: z.nativeEnum(AdminAuditAction),
   actorSummary: ActorSummarySchema,
   targetType: z.string(),

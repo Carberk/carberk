@@ -14,7 +14,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
-import type { ZodType, ZodTypeDef } from "zod";
+import type { z } from "zod";
 import { ErrorCode, ListingsSchemas, WizardSchemas, AdminSchemas } from "@auto-tm/contracts";
 
 import { IDENTITY_CHECK_PORT, type IdentityCheckPort } from "../../identity/identity.public";
@@ -52,7 +52,7 @@ export class DraftsController {
 
   // safeParse, not `instanceof ZodError`: contract schemas may come from another
   // zod instance, and a failed instanceof turned bad requests into a 500.
-  private parseOrThrow<T>(schema: ZodType<T, ZodTypeDef, unknown>, data: unknown): T {
+  private parseOrThrow<T extends z.ZodType>(schema: T, data: unknown): z.output<T> {
     const result = schema.safeParse(data);
     if (result.success) return result.data;
     // eslint-disable-next-line no-console

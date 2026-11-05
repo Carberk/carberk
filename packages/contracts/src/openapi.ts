@@ -1,12 +1,9 @@
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV3,
-  extendZodWithOpenApi,
 } from "@asteasolutions/zod-to-openapi";
-import { z } from "zod";
 
-extendZodWithOpenApi(z);
-
+import { DateTimeSchema, z } from "./zod";
 import {
   ErrorResponseSchema,
   UploadObjectInvalidDetailsSchema,
@@ -350,7 +347,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       "Shows the User's Assigned Avatar again. With reportId, a pending report on that User becomes actioned in the same transaction. Writes a USER_PHOTO_REMOVE audit entry.",
     tags: ["Admin"],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       body: {
         content: { "application/json": { schema: S(RemoveUserPhotoRequestSchema) } },
       },
@@ -471,7 +468,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     summary: "Read one conversation with the viewer's send restriction",
     tags: ["Conversations"],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
     },
     responses: {
       200: {
@@ -502,7 +499,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     summary: "List messages in a conversation",
     tags: ["Conversations"],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       query: ListMessagesQuerySchema,
     },
     responses: {
@@ -525,7 +522,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     summary: "Send a text message",
     tags: ["Conversations"],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       body: {
         content: {
           "application/json": { schema: S(SendTextMessageRequestSchema) },
@@ -950,7 +947,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     summary: "Register inspection interest (fake-door)",
     tags: ["Reports"],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       body: {
         content: {
           "application/json": {
@@ -1114,7 +1111,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     path: "/api/v1/listings/{id}/media/attach",
     tags: ["Listings"],
     request: {
-      params: z.object({ id: z.string().uuid() }),
+      params: z.object({ id: z.string().guid() }),
       body: { content: { "application/json": { schema: S(AttachMediaRequestSchema) } } },
     },
     responses: {
@@ -1127,12 +1124,12 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     method: "post",
     path: "/api/v1/listings/drafts/{id}/publish",
     tags: ["Listings"],
-    request: { params: z.object({ id: z.string().uuid() }) },
+    request: { params: z.object({ id: z.string().guid() }) },
     responses: {
       201: { description: "The published Listing", content: { "application/json": { schema: S(ListingSummaryBaseSchema.pick({
         id: true, sellerId: true, status: true, brandId: true, modelId: true,
         priceAmount: true, priceCurrency: true,
-      }).extend({ publishedAt: z.string().datetime() })) } } },
+      }).extend({ publishedAt: DateTimeSchema })) } } },
       400: uploadRefusal,
       409: { description: "UPLOAD_ALREADY_ATTACHED", content: { "application/json": { schema: S(ErrorResponseSchema) } } },
     },
@@ -1144,7 +1141,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
 export function generateOpenApiDocument(): object {
   const registry = buildOpenApiRegistry();
   const generator = new OpenApiGeneratorV3(registry.definitions);
-  return generator.generateDocument({
+  const document = generator.generateDocument({
     openapi: "3.0.3",
     info: {
       title: "Carberk API",
@@ -1153,4 +1150,52 @@ export function generateOpenApiDocument(): object {
     },
     servers: [{ url: "https://api.auto.tm" }],
   });
+
+  // OpenAPI 3.0 represents nullable string enums with `nullable: true` and a
+  // string-only enum. Zod 4's adapter also places `null` in the enum; remove
+  // that redundant value so generated clients see the same contract as before.
+  const normalizeNullableEnums = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(normalizeNullableEnums);
+      return;
+    }
+    if (value === null || typeof value !== "object") return;
+    const object = value as Record<string, unknown>;
+    if (object["nullable"] === true && Array.isArray(object["enum"])) {
+      object["enum"] = object["enum"].filter((entry) => entry !== null);
+    }
+    const isDateTimeBranch = (branch: unknown): boolean =>
+      branch !== null &&
+      typeof branch === "object" &&
+      JSON.stringify(branch) ===
+        JSON.stringify({ type: "string", format: "date-time" });
+    const isNullableBranch = (branch: unknown): boolean =>
+      branch !== null &&
+      typeof branch === "object" &&
+      JSON.stringify(branch) === JSON.stringify({ nullable: true });
+    if (
+      Array.isArray(object["anyOf"]) &&
+      object["anyOf"].length > 1 &&
+      object["anyOf"].every(
+        (branch) => isDateTimeBranch(branch) || isNullableBranch(branch),
+      ) &&
+      object["anyOf"].some(isDateTimeBranch)
+    ) {
+      const nullable = object["anyOf"].some(isNullableBranch);
+      delete object["type"];
+      delete object["format"];
+      delete object["nullable"];
+      delete object["anyOf"];
+      object["type"] = "string";
+      object["format"] = "date-time";
+      if (nullable) {
+        delete object["format"];
+        object["nullable"] = true;
+        object["format"] = "date-time";
+      }
+    }
+    Object.values(object).forEach(normalizeNullableEnums);
+  };
+  normalizeNullableEnums(document);
+  return document;
 }

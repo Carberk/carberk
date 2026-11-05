@@ -274,7 +274,7 @@ export class ListingsController {
   ) {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
-    let parsed: typeof ListingsSchemas.EditListingRequestSchema._type;
+    let parsed: z.infer<typeof ListingsSchemas.EditListingRequestSchema>;
     try {
       parsed = ListingsSchemas.EditListingRequestSchema.parse(body);
     } catch (err) {
@@ -315,7 +315,7 @@ export class ListingsController {
   ) {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
-    let parsed: typeof ListingsSchemas.AttachMediaRequestSchema._type;
+    let parsed: z.infer<typeof ListingsSchemas.AttachMediaRequestSchema>;
     try {
       parsed = ListingsSchemas.AttachMediaRequestSchema.parse(body);
     } catch (err) {
@@ -373,7 +373,7 @@ export class ListingsController {
   ) {
     const userId = (req as { user?: { sub: string } }).user?.sub as string;
     await this.assertNotSuspended(userId);
-    let parsed: typeof ListingsSchemas.ReorderMediaRequestSchema._type;
+    let parsed: z.infer<typeof ListingsSchemas.ReorderMediaRequestSchema>;
     try {
       parsed = ListingsSchemas.ReorderMediaRequestSchema.parse(body);
     } catch (err) {

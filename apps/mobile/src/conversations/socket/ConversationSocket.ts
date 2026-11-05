@@ -367,7 +367,7 @@ export class ConversationSocket {
           const parsed = z
             .object({
               ok: z.literal(true),
-              conversationId: z.string().uuid(),
+              conversationId: z.string().guid(),
             })
             .safeParse(ack);
           if (parsed.success) {
@@ -423,8 +423,8 @@ export class ConversationSocket {
           const wrapped = z
             .object({
               ok: z.literal(true),
-              messageId: z.string().uuid(),
-              conversationId: z.string().uuid(),
+              messageId: z.string().guid(),
+              conversationId: z.string().guid(),
               deletedAt: z.string().datetime(),
             })
             .safeParse(ack);
@@ -567,7 +567,7 @@ export class ConversationSocket {
           const parsed = z
             .object({
               ok: z.literal(true),
-              conversationId: z.string().uuid(),
+              conversationId: z.string().guid(),
             })
             .safeParse(ack);
           if (parsed.success) {

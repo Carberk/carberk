@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "zod": "catalog:",
-    "@asteasolutions/zod-to-openapi": "^7.3.0"
+    "@asteasolutions/zod-to-openapi": "^9.1.0"
   },
   "devDependencies": {
     "@auto-tm/tsconfig": "workspace:*",

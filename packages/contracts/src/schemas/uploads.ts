@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 
 export const PresignKindSchema = z.enum(["image", "video"]);
 export type PresignKind = z.infer<typeof PresignKindSchema>;

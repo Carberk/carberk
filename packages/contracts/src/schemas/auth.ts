@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { DateTimeSchema, z } from "../zod";
 import { Locale, SignInCodePurpose, UserRole } from "../enums";
 
 /** A Turkmenistan mobile number in E.164: `+993` then 6 or 7, then 7 digits. */
@@ -24,7 +23,7 @@ export const OtpRequestRequestSchema = z.union([
 export type OtpRequestRequest = z.infer<typeof OtpRequestRequestSchema>;
 
 export const OtpRequestResponseSchema = z.object({
-  requestId: z.string().uuid(),
+  requestId: z.string().guid(),
   resendInSeconds: z.number().int(),
   testCode: z.string().optional(),
 });
@@ -45,12 +44,12 @@ export const OtpVerifyResponseSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
   user: z.object({
-    id: z.string().uuid(),
+    id: z.string().guid(),
     phone: PhoneTm.nullable(),
     email: z.string().email().nullable(),
     displayName: z.string().nullable(),
     role: z.nativeEnum(UserRole),
-    deletionScheduledAt: z.string().datetime().nullable().optional(),
+    deletionScheduledAt: DateTimeSchema.nullable().optional(),
   }),
 });
 export type OtpVerifyResponse = z.infer<typeof OtpVerifyResponseSchema>;
@@ -104,7 +103,7 @@ export type LogoutRequest = z.infer<typeof LogoutRequestSchema>;
 export const LogoutAllResponseSchema = z.object({});
 
 export const MeResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   // Sign-in Methods (ADR-0054): each is optional; phoneVerified reflects a stored verified phone.
   phone: PhoneTm.nullable(),
   email: z.string().email().nullable(),
@@ -120,8 +119,8 @@ export const MeResponseSchema = z.object({
   role: z.nativeEnum(UserRole),
   avatarUrl: z.string().nullable(),
   locale: z.string().nullable(),
-  createdAt: z.string().datetime(),
-  deletionScheduledAt: z.string().datetime().nullable(),
+  createdAt: DateTimeSchema,
+  deletionScheduledAt: DateTimeSchema.nullable(),
 });
 export type MeResponse = z.infer<typeof MeResponseSchema>;
 
@@ -150,7 +149,7 @@ export const AdminTotpStatusResponseSchema = z
   .object({
     enrolled: z.boolean(),
     elevated: z.boolean(),
-    adminTotpExpiresAt: z.string().datetime().optional(),
+    adminTotpExpiresAt: DateTimeSchema.optional(),
   })
   .strict();
 export type AdminTotpStatusResponse = z.infer<
@@ -177,7 +176,7 @@ export type AdminTotpVerifyRequest = z.infer<
 // First enrollment verify returns backupCodes (exactly 10); later verify does not.
 export const AdminTotpVerifyResponseSchema = z
   .object({
-    adminTotpExpiresAt: z.string().datetime(),
+    adminTotpExpiresAt: DateTimeSchema,
     backupCodes: z.array(z.string()).length(10).optional(),
   })
   .strict();

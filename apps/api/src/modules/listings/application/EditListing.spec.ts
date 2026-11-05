@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 
@@ -326,7 +327,7 @@ describe("EditListing", () => {
       uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        patch: { brandId: "brand-2" } as typeof ListingsSchemas.EditListingRequestSchema._type,
+        patch: { brandId: "brand-2" } as z.infer<typeof ListingsSchemas.EditListingRequestSchema>,
       }),
     ).rejects.toThrow(BadRequestException);
 
@@ -334,7 +335,7 @@ describe("EditListing", () => {
       await uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        patch: { brandId: "brand-2" } as typeof ListingsSchemas.EditListingRequestSchema._type,
+        patch: { brandId: "brand-2" } as z.infer<typeof ListingsSchemas.EditListingRequestSchema>,
       });
     } catch (err) {
       const ex = err as BadRequestException;
@@ -352,7 +353,7 @@ describe("EditListing", () => {
       await uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        patch: { modelId: "model-2" } as typeof ListingsSchemas.EditListingRequestSchema._type,
+        patch: { modelId: "model-2" } as z.infer<typeof ListingsSchemas.EditListingRequestSchema>,
       });
       expect.fail("should have thrown");
     } catch (err) {
@@ -371,7 +372,7 @@ describe("EditListing", () => {
       await uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        patch: { generationId: "gen-2" } as typeof ListingsSchemas.EditListingRequestSchema._type,
+        patch: { generationId: "gen-2" } as z.infer<typeof ListingsSchemas.EditListingRequestSchema>,
       });
       expect.fail("should have thrown");
     } catch (err) {
@@ -390,7 +391,7 @@ describe("EditListing", () => {
       await uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        patch: { year: 2021 } as typeof ListingsSchemas.EditListingRequestSchema._type,
+        patch: { year: 2021 } as z.infer<typeof ListingsSchemas.EditListingRequestSchema>,
       });
       expect.fail("should have thrown");
     } catch (err) {
@@ -409,7 +410,7 @@ describe("EditListing", () => {
       await uc.execute({
         listingId: "listing-1",
         userId: "user-1",
-        patch: { vin: "VIN456" } as typeof ListingsSchemas.EditListingRequestSchema._type,
+        patch: { vin: "VIN456" } as z.infer<typeof ListingsSchemas.EditListingRequestSchema>,
       });
       expect.fail("should have thrown");
     } catch (err) {

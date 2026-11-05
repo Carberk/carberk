@@ -5,7 +5,7 @@ import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
 const ArchiveResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   status: z.string(),
 });
 

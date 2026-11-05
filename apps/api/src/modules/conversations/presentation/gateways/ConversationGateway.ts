@@ -80,7 +80,7 @@ function parseSendMessagePayload(
 }
 
 const WatermarkSocketPayloadSchema = z.object({
-  conversationId: z.string().uuid(),
+  conversationId: z.string().guid(),
   lastReadAt: z.string().datetime().optional(),
   lastDeliveredAt: z.string().datetime().optional(),
 }).refine(

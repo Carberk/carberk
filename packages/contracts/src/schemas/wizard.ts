@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 
 import {
   MIN_LISTING_PHOTOS,
@@ -109,7 +109,7 @@ const KEY = WIZARD_ERROR_KEYS;
 // draft, and Publish still requires three keyed photos.
 export const StepPhotosSchema = z.object({
   photos: z
-    .array(DraftPhotoSchema, { required_error: KEY.photosRequired })
+    .array(DraftPhotoSchema, { error: (issue) => issue.input === undefined ? KEY.photosRequired : undefined })
     .min(MIN_LISTING_PHOTOS, KEY.photosRequired)
     .max(MAX_LISTING_PHOTOS),
 });
@@ -129,11 +129,11 @@ export const VinSchema = z.string()
   .nullish();
 
 export const StepVehicleSchema = z.object({
-  brandId: z.string({ required_error: KEY.brandRequired }).uuid({ message: KEY.brandRequired }),
-  modelId: z.string({ required_error: KEY.modelRequired }).uuid({ message: KEY.modelRequired }),
-  generationId: z.string().uuid().optional(),
+  brandId: z.string({ error: (issue) => issue.input === undefined ? KEY.brandRequired : undefined }).guid({ message: KEY.brandRequired }),
+  modelId: z.string({ error: (issue) => issue.input === undefined ? KEY.modelRequired : undefined }).guid({ message: KEY.modelRequired }),
+  generationId: z.string().guid().optional(),
   year: z
-    .number({ required_error: KEY.yearRequired, invalid_type_error: KEY.yearRequired })
+    .number({ error: KEY.yearRequired })
     .int(KEY.yearWholeNumber)
     .min(WIZARD_LIMITS.yearMin, KEY.yearTooEarly)
     .max(WIZARD_LIMITS.yearMax, KEY.yearTooLate),
@@ -145,11 +145,11 @@ export const StepSpecsSchema = z
   .object({
     condition: ListingConditionSchema,
     mileageKm: z.number().int().nonnegative(KEY.mileageNegative).optional(),
-    colorId: z.string().uuid().optional(),
-    bodyTypeId: z.string().uuid().optional(),
-    transmissionId: z.string().uuid().optional(),
-    driveTypeId: z.string().uuid().optional(),
-    engineTypeId: z.string().uuid().optional(),
+    colorId: z.string().guid().optional(),
+    bodyTypeId: z.string().guid().optional(),
+    transmissionId: z.string().guid().optional(),
+    driveTypeId: z.string().guid().optional(),
+    engineTypeId: z.string().guid().optional(),
     enginePower: z.number().int().positive(KEY.enginePowerNotPositive).optional(),
     conditionDisclosure: DraftConditionDisclosureSchema.optional(),
   })
@@ -175,7 +175,7 @@ export type StepSpecsInput = z.infer<typeof StepSpecsSchema>;
 
 export const StepPriceSchema = z.object({
   priceAmount: z
-    .number({ required_error: KEY.priceRequired, invalid_type_error: KEY.priceRequired })
+    .number({ error: KEY.priceRequired })
     .positive(KEY.priceNotPositive)
     .max(WIZARD_LIMITS.priceMax, KEY.priceTooLarge),
   priceCurrency: CurrencySchema,
@@ -186,11 +186,11 @@ export type StepPriceInput = z.infer<typeof StepPriceSchema>;
 
 export const StepLocationSchema = z.object({
   description: z
-    .string({ required_error: KEY.descriptionRequired })
+    .string({ error: (issue) => issue.input === undefined ? KEY.descriptionRequired : undefined })
     .min(1, KEY.descriptionRequired)
     .max(WIZARD_LIMITS.descriptionMaxLength, KEY.descriptionTooLong),
-  regionId: z.string({ required_error: KEY.regionRequired }).uuid({ message: KEY.regionRequired }),
-  cityId: z.string({ required_error: KEY.cityRequired }).uuid({ message: KEY.cityRequired }),
+  regionId: z.string({ error: (issue) => issue.input === undefined ? KEY.regionRequired : undefined }).guid({ message: KEY.regionRequired }),
+  cityId: z.string({ error: (issue) => issue.input === undefined ? KEY.cityRequired : undefined }).guid({ message: KEY.cityRequired }),
   locationText: z
     .string()
     .max(WIZARD_LIMITS.locationTextMaxLength, KEY.locationTextTooLong)
@@ -204,7 +204,7 @@ export const StepContactSchema = z
     // translatable keys; whether the number is confirmed is the server's check
     // on publish, not this schema's (ADR-0081).
     contactPhone: z
-      .string({ required_error: KEY.required, invalid_type_error: KEY.required })
+      .string({ error: KEY.required })
       .regex(PHONE_TM_PATTERN, KEY.invalidValue),
     allowCalls: z.boolean(),
     allowChat: z.boolean(),
@@ -314,22 +314,14 @@ export interface StepValidationResult {
  * (a wrong type, a malformed uuid, a fractional number, an unknown enum
  * value) becomes `invalidValue`. Zod's English defaults never escape.
  */
-const wizardErrorMap: z.ZodErrorMap = (issue, ctx) => {
-  // A contextual error map runs last and outranks the schema, so hand back any
-  // message a step schema already spelled out rather than flattening it.
-  if (isWizardErrorKey(ctx.defaultError)) {
-    return { message: ctx.defaultError };
-  }
-  if (
-    issue.code === z.ZodIssueCode.invalid_type &&
-    issue.received === z.ZodParsedType.undefined
-  ) {
+const wizardErrorMap: z.ZodErrorMap = (issue) => {
+  if ((issue.code === "invalid_type" || issue.code === "invalid_value") && issue.input === undefined) {
     return { message: KEY.required };
   }
   return { message: KEY.invalidValue };
 };
 
-const parseOptions = { errorMap: wizardErrorMap };
+const parseOptions = { error: wizardErrorMap };
 
 /**
  * Validate a single wizard step against a draft payload.
@@ -343,7 +335,7 @@ export function validateStep(
   step: WizardStep,
   payload: z.infer<typeof ListingDraftPayloadSchema>,
 ): StepValidationResult {
-  let result: z.SafeParseReturnType<unknown, unknown>;
+  let result: z.ZodSafeParseResult<unknown>;
 
   switch (step) {
     case "photos":

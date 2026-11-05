@@ -1,5 +1,4 @@
-import { z } from "zod";
-
+import { z } from "../zod";
 import { Locale, UserRole } from "../enums";
 
 /**
@@ -181,7 +180,7 @@ export const PublicIdentitySchema = z.object({
 export type PublicIdentity = z.infer<typeof PublicIdentitySchema>;
 
 export const UserSummarySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   phone: z.string(),
   displayName: z.string().nullable(),
   role: z.nativeEnum(UserRole),
@@ -189,7 +188,7 @@ export const UserSummarySchema = z.object({
 export type UserSummary = z.infer<typeof UserSummarySchema>;
 
 export const BlockUserRequestSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().guid(),
 });
 export type BlockUserRequest = z.infer<typeof BlockUserRequestSchema>;
 

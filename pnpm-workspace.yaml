@@ -24,10 +24,36 @@ overrides:
   # GHSA-w7jw-789q-3m8p and subsequent shell-quote command-injection fixes.
   # Keep React Native's existing 1.x edge on the patched release.
   shell-quote: 1.12.0
+  # xmldom parser/serializer security backports. Preserve the plist callers'
+  # existing minor lines; remove when they resolve these versions themselves.
+  "@xmldom/xmldom@>=0.8.0 <0.8.15": 0.8.15
+  "@xmldom/xmldom@>=0.9.0 <0.9.12": 0.9.12
+  # Patched existing major lines; keep every transitive caller on its API.
+  "ws@>=7.0.0 <7.5.11": 7.5.11
+  "protobufjs@>=7.0.0 <7.6.1": 7.6.1
+  "brace-expansion@>=1.0.0 <1.1.20": 1.1.20
+  "brace-expansion@>=2.0.0 <2.1.6": 2.1.6
+  "brace-expansion@>=3.0.0 <5.0.11": 5.0.11
+  "js-yaml@>=3.0.0 <3.15.2": 3.15.2
+  "js-yaml@>=4.0.0 <4.3.2": 4.3.2
+  "nanoid@>=3.0.0 <3.3.18": 3.3.18
+  # Expo's Metro chain needs the patched PostCSS release; the workspace
+  # catalog also keeps web/admin on the patched 8.5.18+ type surface.
+  "@expo/metro-config@55.0.27>postcss": 8.5.18
+  "browserslist@>=4.0.0 <4.28.7": 4.28.7
+  "source-map-js@>=1.0.0 <1.2.2": 1.2.2
+  "compression@>=1.0.0 <1.8.2": 1.8.2
+  # The migration below updates application schemas and the OpenAPI adapter.
+  "zod@>=3.0.0 <4.6.7": 4.6.7
+  # Metro uses the default Buffer API retained by image-size 2.x.
+  "image-size@>=1.0.0 <2.0.3": 2.0.3
+  # query-string's CJS caller is adapted by the committed compatibility patch.
+  "decode-uri-component@<0.5.1": 0.5.1
 
 # Official Android prefab backports, reviewed separately in PR #859.
 patchedDependencies:
   "expo-modules-core@55.0.27": patches/expo-modules-core@55.0.27.patch
+  query-string@7.1.3: patches/query-string@7.1.3.patch
   "react-native-reanimated@4.2.1": patches/react-native-reanimated@4.2.1.patch
 
 # pnpm 12.11+ links agent skills that dependencies ship into the workspace's
@@ -65,7 +91,7 @@ catalog:
   ioredis: ^5.4.2
   nestjs-pino: ^4.3.0
   next: 16.4.1
-  postcss: ^8.4.49
+  postcss: ^8.5.18
   react: ^19.0.0
   react-dom: ^19.0.0
   reflect-metadata: ^0.2.2
@@ -86,7 +112,7 @@ catalog:
   # range (^6.4 || ^7 || ^8).
   vite: ^8.3.4
   vitest: ^5.0.4
-  zod: ^3.23.8
+  zod: ^4.6.7
 
 # Dependency install scripts. pnpm fails the install on any script not listed
 # here, so a new one has to be reviewed before it can run.

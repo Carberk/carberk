@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { DateTimeSchema, z } from "../zod";
 
 import { CurrencySchema } from "./listings";
 
@@ -6,7 +6,7 @@ export const ExchangeRateSchema = z.object({
   fromCurrency: CurrencySchema,
   toCurrency: CurrencySchema,
   rate: z.number().positive(),
-  updatedAt: z.string().datetime(),
+  updatedAt: DateTimeSchema,
 });
 export type ExchangeRate = z.infer<typeof ExchangeRateSchema>;
 
