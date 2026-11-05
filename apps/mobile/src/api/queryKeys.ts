@@ -51,6 +51,8 @@ export const queryKeys = {
     myListingsInfinite: () =>
       [...queryKeys.listings.all(), "my-listings-infinite"] as const,
     myDrafts: () => [...queryKeys.listings.all(), "my-drafts"] as const,
+    stagingOwners: (userId: string) =>
+      [...queryKeys.listings.all(), "staging-owners", userId] as const,
     myDraftsInfinite: () =>
       [...queryKeys.listings.all(), "my-drafts-infinite"] as const,
     myCountsAll: () => [...queryKeys.listings.all(), "my-counts"] as const,
