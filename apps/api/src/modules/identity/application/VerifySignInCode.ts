@@ -3,12 +3,11 @@ import { Inject, Injectable } from "@nestjs/common";
 
 import { InvalidSignInCodeError } from "../domain/InvalidSignInCodeError";
 import type { OtpRequest, SignInCodePurpose } from "../domain/OtpRequest";
+import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import type { SignInCodeDestination } from "../domain/SignInCodeDestination";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import { IDENTITY_TOKENS } from "../identity.tokens";
-
-const MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class VerifySignInCode {
@@ -44,17 +43,17 @@ export class VerifySignInCode {
     if (request.expiresAt < this.clock.now()) {
       throw new Error("OTP code has expired");
     }
-    if (request.attempts >= MAX_ATTEMPTS) {
+    if (request.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) {
       throw new Error("Too many attempts");
     }
 
     const codeHash = createHash("sha256").update(code).digest("hex");
     if (request.codeHash === codeHash) return request;
 
-    await this.otpRequestRepo.incrementAttempts(request.id);
-    if (request.attempts + 1 >= MAX_ATTEMPTS) {
+    const failed = await this.otpRequestRepo.incrementAttempts(request.id);
+    if (!failed || failed.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) {
       throw new Error("Too many attempts");
     }
-    throw new InvalidSignInCodeError(MAX_ATTEMPTS - (request.attempts + 1));
+    throw new InvalidSignInCodeError(MAX_SIGN_IN_CODE_ATTEMPTS - failed.attempts);
   }
 }

@@ -1,3 +1,4 @@
+import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import { UserSuspendedError } from "../domain/UserSuspendedError";
@@ -162,7 +163,7 @@ class FakeOtpRequestRepository implements OtpRequestRepository {
 
   async consumeIfUnused(id: string): Promise<boolean> {
     const record = this.records.find((r) => r.id === id);
-    if (!record || record.verifiedAt !== null) return false;
+    if (!record || record.verifiedAt !== null || record.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) return false;
     this.records = this.records.map((r) =>
       r.id === id ? { ...r, verifiedAt: NOW } : r);
     return true;
@@ -176,9 +177,9 @@ class FakeOtpRequestRepository implements OtpRequestRepository {
     return updated;
   }
 
-  async incrementAttempts(id: string): Promise<OtpRequest> {
+  async incrementAttempts(id: string): Promise<OtpRequest | null> {
     const record = this.records.find((r) => r.id === id);
-    if (!record) throw new Error("Not found");
+    if (!record || record.verifiedAt !== null || record.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) return null;
     const updated: OtpRequest = { ...record, attempts: record.attempts + 1 };
     this.records = this.records.map((r) => (r.id === id ? updated : r));
     return updated;

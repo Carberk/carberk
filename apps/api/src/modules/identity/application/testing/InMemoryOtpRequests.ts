@@ -1,4 +1,5 @@
 import type { OtpRequest, SignInCodePurpose } from "../../domain/OtpRequest";
+import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../../domain/OtpRequest";
 import type { OtpRequestRepository } from "../../domain/ports/OtpRequestRepository";
 import type { SignInCodeChannel } from "../../domain/types";
 
@@ -92,15 +93,16 @@ export class InMemoryOtpRequests implements OtpRequestRepository {
   }
 
   async consumeIfUnused(id: string): Promise<boolean> {
-    const record = await this.findById(id);
-    if (!record || record.verifiedAt !== null) return false;
+    const record = this.records.find((r) => r.id === id);
+    if (!record || record.verifiedAt !== null || record.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) return false;
     this.replace(id, { verifiedAt: this.now() });
     return true;
   }
 
-  async incrementAttempts(id: string): Promise<OtpRequest> {
-    const record = await this.findById(id);
-    return this.replace(id, { attempts: (record?.attempts ?? 0) + 1 });
+  async incrementAttempts(id: string): Promise<OtpRequest | null> {
+    const record = this.records.find((r) => r.id === id);
+    if (!record || record.verifiedAt !== null || record.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) return null;
+    return this.replace(id, { attempts: record.attempts + 1 });
   }
 
   private replace(id: string, changes: Partial<OtpRequest>): OtpRequest {

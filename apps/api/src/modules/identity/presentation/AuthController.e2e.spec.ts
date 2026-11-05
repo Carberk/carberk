@@ -384,6 +384,32 @@ describe("AuthController e2e — POST /api/v1/auth/otp/verify", () => {
     expect(res.body.code).toBe("INVALID_OTP");
   });
 
+  it("locks an ordinary Sign-in Code after five failures across concurrent requests", async () => {
+    const phone = "+99361234567";
+    const code = await requestOtp(phone);
+    const wrongCode = code === "000000" ? "111111" : "000000";
+    const responses = await Promise.all(Array.from({ length: 10 }, () =>
+      request.post("/api/v1/auth/otp/verify").send({ phone, code: wrongCode }).expect(400)));
+
+    expect(responses.filter(response => response.body.code === "INVALID_OTP")).toHaveLength(4);
+    expect(responses.filter(response => response.body.code === "OTP_LOCKED")).toHaveLength(6);
+    const locked = await request.post("/api/v1/auth/otp/verify").send({ phone, code }).expect(400);
+    expect(locked.body.code).toBe("OTP_LOCKED");
+  });
+
+  it("still signs in with an ordinary correct code after four wrong attempts", async () => {
+    const phone = "+99361234567";
+    const code = await requestOtp(phone);
+    const wrongCode = code === "000000" ? "111111" : "000000";
+    for (let index = 0; index < 4; index += 1) {
+      const refused = await request.post("/api/v1/auth/otp/verify").send({ phone, code: wrongCode }).expect(400);
+      expect(refused.body.code).toBe("INVALID_OTP");
+    }
+    const signedIn = await request.post("/api/v1/auth/otp/verify").send({ phone, code }).expect(201);
+    expect(signedIn.body.user.phone).toBe(phone);
+    expect(signedIn.body.refreshToken).toBeTypeOf("string");
+  });
+
   it("returns 400 OTP_ALREADY_USED when code is reused", async () => {
     const testCode = await requestOtp("+99361234567");
 

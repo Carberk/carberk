@@ -46,8 +46,9 @@ export interface OtpRequestRepository {
 
   markVerified(id: string, userId: string): Promise<OtpRequest>;
 
-  /** Atomically marks an unused request as used; false when another caller already used it. */
+  /** Atomically consumes an unused, unlocked request; false if consumed or locked. */
   consumeIfUnused(id: string): Promise<boolean>;
 
-  incrementAttempts(id: string): Promise<OtpRequest>;
+  /** Atomically spends a wrong attempt below the limit; null if locked or consumed. */
+  incrementAttempts(id: string): Promise<OtpRequest | null>;
 }

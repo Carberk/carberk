@@ -6,6 +6,7 @@ import type {
   SignInCodePurpose,
 } from "../domain/OtpRequest";
 import { SIGN_IN_CODE_CHANNELS } from "../domain/types";
+import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import { fromCodePurpose, toCodePurpose } from "./codePurpose";
 
@@ -97,18 +98,18 @@ export class PrismaOtpRequestRepository implements OtpRequestRepository {
 
   async consumeIfUnused(id: string): Promise<boolean> {
     const { count } = await this.prisma.otpRequest.updateMany({
-      where: { id, verifiedAt: null },
+      where: { id, verifiedAt: null, attempts: { lt: MAX_SIGN_IN_CODE_ATTEMPTS } },
       data: { verifiedAt: new Date() },
     });
     return count === 1;
   }
 
-  async incrementAttempts(id: string): Promise<OtpRequest> {
-    const row = await this.prisma.otpRequest.update({
-      where: { id },
+  async incrementAttempts(id: string): Promise<OtpRequest | null> {
+    const [row] = await this.prisma.otpRequest.updateManyAndReturn({
+      where: { id, verifiedAt: null, attempts: { lt: MAX_SIGN_IN_CODE_ATTEMPTS } },
       data: { attempts: { increment: 1 } },
     });
-    return this.toDomain(row);
+    return row ? this.toDomain(row) : null;
   }
 
   private toDomain(
