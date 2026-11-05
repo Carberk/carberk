@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { DateTimeSchema } from "@auto-tm/contracts";
 import { z } from "zod";
 
 import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
 
 const RepublishResponseSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   status: z.string(),
-  publishedAt: z.string().datetime(),
+  publishedAt: DateTimeSchema,
 });
 
 export function useRepublishListing() {

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { DateTimeSchema, z } from "./zod";
 
 export const ErrorCode = {
   ValidationFailed: "VALIDATION_FAILED",
@@ -52,15 +52,15 @@ export const ErrorResponseSchema = z.object({
   code: z.nativeEnum(ErrorCode),
   message: z.string(),
   details: z.unknown().optional(),
-  timestamp: z.string().datetime(),
-  requestId: z.string().uuid(),
+  timestamp: DateTimeSchema,
+  requestId: z.string().guid(),
 });
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 
 /** UPLOAD_OBJECT_INVALID identifies a client-known key, and the draft photo when publishing. */
 export const UploadObjectInvalidDetailsSchema = z.object({
   key: z.string().min(1),
-  photoId: z.string().uuid().optional(),
+  photoId: z.string().guid().optional(),
 }).strict();
 export type UploadObjectInvalidDetails = z.infer<typeof UploadObjectInvalidDetailsSchema>;
 

@@ -39,4 +39,5 @@ export * as ContentSchemas from "./schemas/content";
 export * as ReportsSchemas from "./schemas/reports";
 export * as AdminSchemas from "./schemas/admin";
 
+export { DateTimeSchema } from "./zod";
 export { generateOpenApiDocument } from "./openapi";

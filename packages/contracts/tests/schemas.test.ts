@@ -197,6 +197,16 @@ describe("Sign-in Method change schemas", () => {
     }).success).toBe(true);
   });
 
+  it("accepts minute-only UTC timestamps across response contracts", () => {
+    expect(ErrorResponseSchema.parse({
+      statusCode: 400,
+      code: "INVALID_OTP",
+      message: "The verification code could not be used.",
+      timestamp: "2026-11-05T00:00Z",
+      requestId: "550e8400-e29b-41d4-a716-446655440000",
+    }).timestamp).toBe("2026-11-05T00:00Z");
+  });
+
   it.each([
     "OTP_EXPIRED",
     "OTP_ALREADY_USED",
@@ -623,6 +633,15 @@ describe("Sort-aware feed cursor helpers", () => {
     for (const cursor of cursors) {
       expect(decodeFeedCursor(encodeFeedCursor(cursor))).toEqual(cursor);
     }
+  });
+
+  it("preserves minute-only UTC timestamps accepted by the legacy cursor contract", () => {
+    const cursor = {
+      sort: "newest" as const,
+      value: "2026-11-05T00:00Z",
+      id,
+    };
+    expect(decodeFeedCursor(encodeFeedCursor(cursor))).toEqual(cursor);
   });
 
   it("rejects a value that does not fit the cursor's order", () => {
@@ -1423,6 +1442,12 @@ describe("validateStep", () => {
     );
   });
 
+  it("keeps the collection-level photo error when an item is also malformed", () => {
+    expect(validateStep("photos", { photos: [{}] } as never).fieldErrors["photos"]).toBe(
+      "wizardErrors.photosRequired",
+    );
+  });
+
   it("reports a missing field as required and a wrong value as invalid", () => {
     expect(validateStep("specs", {}).fieldErrors["condition"]).toBe(
       "wizardErrors.required",
@@ -1655,6 +1680,26 @@ describe("OpenAPI document", () => {
     expect(doc.components.schemas).toHaveProperty("MyFavoritesResponse");
   });
 
+  it("keeps the legacy public number as an OpenAPI integer", () => {
+    const doc = generateOpenApiDocument() as {
+      components: {
+        schemas: {
+          ListingDetail: {
+            properties: {
+              publicNumber: {
+                type?: string;
+                minimum?: number;
+                exclusiveMinimum?: boolean;
+              };
+            };
+          };
+        };
+      };
+    };
+    expect(doc.components.schemas.ListingDetail.properties.publicNumber)
+      .toEqual({ type: "integer", minimum: 0, exclusiveMinimum: true });
+  });
+
   it("contains uploads and exchange-rates schemas", () => {
     const doc = generateOpenApiDocument() as {
       components: { schemas: Record<string, unknown> };
@@ -1678,6 +1723,24 @@ describe("OpenAPI document", () => {
     expect(doc.components.schemas).toHaveProperty("ListMessagesResponse");
     expect(doc.components.schemas).toHaveProperty("SendTextMessageRequest");
     expect(doc.components.schemas).toHaveProperty("SendTextMessageResponse");
+  });
+
+  it("keeps nullable enums consumable as OpenAPI 3 string enums", () => {
+    const doc = generateOpenApiDocument() as {
+      components: {
+        schemas: {
+          GetConversationResponse: {
+            properties: {
+              sendRestriction: { nullable?: boolean; enum?: unknown[] };
+            };
+          };
+        };
+      };
+    };
+    const restriction =
+      doc.components.schemas.GetConversationResponse.properties.sendRestriction;
+    expect(restriction.nullable).toBe(true);
+    expect(restriction.enum).not.toContain(null);
   });
 
   it("contains conversation paths", () => {

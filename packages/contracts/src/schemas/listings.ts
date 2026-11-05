@@ -1,14 +1,13 @@
-import { z } from "zod";
+import { DateTimeSchema, LegacyIntegerSchema, z } from "../zod";
+import { Currency, ListingCondition, ListingStatus } from "../enums";
+
+import { PhoneTm } from "./auth";
+import { PublicIdentitySchema } from "./identity";
 
 /** Publication floor, guidance target and hard cap shared by API and clients. */
 export const MIN_LISTING_PHOTOS = 3;
 export const RECOMMENDED_LISTING_PHOTOS = 8;
 export const MAX_LISTING_PHOTOS = 20;
-
-import { Currency, ListingCondition, ListingStatus } from "../enums";
-
-import { PhoneTm } from "./auth";
-import { PublicIdentitySchema } from "./identity";
 
 // ── Shared enums as Zod schemas ──
 
@@ -108,11 +107,11 @@ function checkParallel(
 
 /** The summary fields; `ListingSummarySchema` adds the parallel-array check. */
 export const ListingSummaryBaseSchema = z.object({
-  id: z.string().uuid(),
-  sellerId: z.string().uuid(),
+  id: z.string().guid(),
+  sellerId: z.string().guid(),
   status: ListingStatusSchema,
-  brandId: z.string().uuid(),
-  modelId: z.string().uuid(),
+  brandId: z.string().guid(),
+  modelId: z.string().guid(),
   year: z.number().int().optional(),
   priceAmount: z.number().positive(),
   priceCurrency: CurrencySchema,
@@ -125,19 +124,19 @@ export const ListingSummaryBaseSchema = z.object({
   photoCount: z.number().int().nonnegative(),
   mileageKm: z.number().int().nonnegative().optional(),
   condition: ListingConditionSchema.optional(),
-  transmissionId: z.string().uuid().optional(),
-  engineTypeId: z.string().uuid().optional(),
-  cityId: z.string().uuid(),
-  publishedAt: z.string().datetime(),
+  transmissionId: z.string().guid().optional(),
+  engineTypeId: z.string().guid().optional(),
+  cityId: z.string().guid(),
+  publishedAt: DateTimeSchema,
   /** Present only when the request carries a signed-in viewer. */
   isFavorited: z.boolean().optional(),
   // What Listing detail's card-seeded preview needs to place every field
   // before detail loads (#867). Absent from older APIs. The VIN itself and
   // the contact phone stay out: `hasVin` says only that a VIN row exists.
   enginePower: z.number().int().positive().optional(),
-  driveTypeId: z.string().uuid().optional(),
-  bodyTypeId: z.string().uuid().optional(),
-  colorId: z.string().uuid().optional(),
+  driveTypeId: z.string().guid().optional(),
+  bodyTypeId: z.string().guid().optional(),
+  colorId: z.string().guid().optional(),
   hasVin: z.boolean().optional(),
   acceptsExchange: z.boolean().optional(),
   installmentAvailable: z.boolean().optional(),
@@ -223,7 +222,7 @@ export const MediaVariantSchema = z.object({
 export type MediaVariant = z.infer<typeof MediaVariantSchema>;
 
 export const ListingMediaSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   kind: z.enum(["image", "video"]),
   key: z.string(),
   variants: MediaVariantSchema,
@@ -240,32 +239,36 @@ export type ListingMedia = z.infer<typeof ListingMediaSchema>;
 // ── ListingDetail ──
 
 export const ListingDetailSchema = z.object({
-  id: z.string().uuid(),
-  publicNumber: z.number().int().positive(),
-  sellerId: z.string().uuid(),
+  id: z.string().guid(),
+  publicNumber: LegacyIntegerSchema.positive().openapi({
+    type: "integer",
+    minimum: 0,
+    exclusiveMinimum: true,
+  }),
+  sellerId: z.string().guid(),
   seller: PublicIdentitySchema.extend({
-    memberSince: z.string().datetime(),
+    memberSince: DateTimeSchema,
   }),
   status: ListingStatusSchema,
-  brandId: z.string().uuid(),
-  modelId: z.string().uuid(),
-  generationId: z.string().uuid().optional(),
+  brandId: z.string().guid(),
+  modelId: z.string().guid(),
+  generationId: z.string().guid().optional(),
   year: z.number().int().min(1900).max(2100).optional(),
   vin: z.string().optional(),
   condition: ListingConditionSchema.optional(),
   mileageKm: z.number().int().nonnegative().optional(),
-  colorId: z.string().uuid().optional(),
-  bodyTypeId: z.string().uuid().optional(),
-  transmissionId: z.string().uuid().optional(),
-  driveTypeId: z.string().uuid().optional(),
-  engineTypeId: z.string().uuid().optional(),
+  colorId: z.string().guid().optional(),
+  bodyTypeId: z.string().guid().optional(),
+  transmissionId: z.string().guid().optional(),
+  driveTypeId: z.string().guid().optional(),
+  engineTypeId: z.string().guid().optional(),
   enginePower: z.number().int().positive().optional(),
   priceAmount: z.number().positive(),
   priceCurrency: CurrencySchema,
   displayPriceTmt: z.number().positive(),
   description: z.string().max(2000).optional(),
-  regionId: z.string().uuid(),
-  cityId: z.string().uuid(),
+  regionId: z.string().guid(),
+  cityId: z.string().guid(),
   locationText: z.string().optional(),
   contactPhone: z.string().optional(),
   allowCalls: z.boolean(),
@@ -278,17 +281,17 @@ export const ListingDetailSchema = z.object({
   isFavorited: z.boolean().optional(),
   conditionDisclosure: ConditionDisclosureSchema.optional(),
   vinHistory: VinHistorySchema.optional(),
-  publishedAt: z.string().datetime(),
-  soldAt: z.string().datetime().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  publishedAt: DateTimeSchema,
+  soldAt: DateTimeSchema.optional(),
+  createdAt: DateTimeSchema,
+  updatedAt: DateTimeSchema,
 });
 export type ListingDetail = z.infer<typeof ListingDetailSchema>;
 
 // ── ListingDraft payload (partial, any subset of step fields) ──
 
 export const DraftPhotoSchema = z.object({
-  photoId: z.string().uuid(),
+  photoId: z.string().guid(),
   key: z.string().optional(),
   sortOrder: z.number().int().nonnegative(),
 });
@@ -299,22 +302,22 @@ export const ListingDraftPayloadSchema = z.object({
   // null clears a stored VIN on update; omitting the key keeps it.
   vin: z.string().nullish(),
   photos: z.array(DraftPhotoSchema).optional(),
-  brandId: z.string().uuid().optional(),
-  modelId: z.string().uuid().optional(),
-  generationId: z.string().uuid().optional(),
+  brandId: z.string().guid().optional(),
+  modelId: z.string().guid().optional(),
+  generationId: z.string().guid().optional(),
   year: z.number().int().min(1900).max(2100).optional(),
   mileageKm: z.number().int().nonnegative().optional(),
   condition: ListingConditionSchema.optional(),
-  colorId: z.string().uuid().optional(),
-  bodyTypeId: z.string().uuid().optional(),
-  transmissionId: z.string().uuid().optional(),
-  driveTypeId: z.string().uuid().optional(),
-  engineTypeId: z.string().uuid().optional(),
+  colorId: z.string().guid().optional(),
+  bodyTypeId: z.string().guid().optional(),
+  transmissionId: z.string().guid().optional(),
+  driveTypeId: z.string().guid().optional(),
+  engineTypeId: z.string().guid().optional(),
   enginePower: z.number().int().positive().optional(),
   priceAmount: z.number().positive().optional(),
   priceCurrency: CurrencySchema.optional(),
-  regionId: z.string().uuid().optional(),
-  cityId: z.string().uuid().optional(),
+  regionId: z.string().guid().optional(),
+  cityId: z.string().guid().optional(),
   locationText: z.string().optional(),
   description: z.string().max(2000).optional(),
   contactPhone: z.string().optional(),
@@ -330,11 +333,11 @@ export type ListingDraftPayload = z.infer<typeof ListingDraftPayloadSchema>;
 // ── ListingDraft entity ──
 
 export const ListingDraftSchema = z.object({
-  id: z.string().uuid(),
-  userId: z.string().uuid(),
+  id: z.string().guid(),
+  userId: z.string().guid(),
   payload: ListingDraftPayloadSchema,
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: DateTimeSchema,
+  updatedAt: DateTimeSchema,
 });
 export type ListingDraft = z.infer<typeof ListingDraftSchema>;
 
@@ -360,14 +363,14 @@ export const EditListingRequestSchema = z
     description: z.string().max(2000).optional(),
     condition: ListingConditionSchema.optional(),
     mileageKm: z.number().int().nonnegative().optional(),
-    colorId: z.string().uuid().optional(),
-    bodyTypeId: z.string().uuid().optional(),
-    transmissionId: z.string().uuid().optional(),
-    driveTypeId: z.string().uuid().optional(),
-    engineTypeId: z.string().uuid().optional(),
+    colorId: z.string().guid().optional(),
+    bodyTypeId: z.string().guid().optional(),
+    transmissionId: z.string().guid().optional(),
+    driveTypeId: z.string().guid().optional(),
+    engineTypeId: z.string().guid().optional(),
     enginePower: z.number().int().positive().optional(),
-    regionId: z.string().uuid().optional(),
-    cityId: z.string().uuid().optional(),
+    regionId: z.string().guid().optional(),
+    cityId: z.string().guid().optional(),
     locationText: z.string().optional(),
     // Checked only when it changes the stored number (ADR-0081).
     contactPhone: PhoneTm.optional(),
@@ -404,8 +407,8 @@ export const AttachMediaRequestSchema = z.object({
 export type AttachMediaRequest = z.infer<typeof AttachMediaRequestSchema>;
 
 export const AttachMediaResponseSchema = z.object({
-  id: z.string().uuid(),
-  listingId: z.string().uuid(),
+  id: z.string().guid(),
+  listingId: z.string().guid(),
   kind: z.enum(["image", "video"]),
   key: z.string(),
   sortOrder: z.number().int().nonnegative(),
@@ -415,14 +418,14 @@ export const AttachMediaResponseSchema = z.object({
   posterKey: z.string().optional(),
   /** Server-computed; absent until the photo has one. */
   thumbHash: ThumbHashSchema.optional(),
-  createdAt: z.string().datetime(),
+  createdAt: DateTimeSchema,
 });
 export type AttachMediaResponse = z.infer<typeof AttachMediaResponseSchema>;
 
 export const ReorderMediaRequestSchema = z.object({
   ordering: z.array(
     z.object({
-      mediaId: z.string().uuid(),
+      mediaId: z.string().guid(),
       sortOrder: z.number().int().nonnegative(),
     }),
   ),
@@ -457,7 +460,7 @@ export function decodeCursor(token: string): {
 } {
   const json = Buffer.from(token, "base64url").toString("utf8");
   return z
-    .object({ timestamp: z.string().datetime(), id: z.string().uuid() })
+    .object({ timestamp: DateTimeSchema, id: z.string().guid() })
     .parse(JSON.parse(json));
 }
 
@@ -483,18 +486,18 @@ export type FeedSort = z.infer<typeof FeedSortSchema>;
 export const FeedCursorPayloadSchema = z.union([
   z.object({
     sort: z.literal("newest"),
-    value: z.string().datetime(),
-    id: z.string().uuid(),
+    value: DateTimeSchema,
+    id: z.string().guid(),
   }),
   z.object({
     sort: z.enum(["price_asc", "price_desc"]),
     value: z.number().finite().nullable(),
-    id: z.string().uuid(),
+    id: z.string().guid(),
   }),
   z.object({
     sort: z.enum(["year_desc", "year_asc", "mileage_asc"]),
     value: z.number().int().nullable(),
-    id: z.string().uuid(),
+    id: z.string().guid(),
   }),
 ]);
 export type FeedCursorPayload = z.infer<typeof FeedCursorPayloadSchema>;
@@ -515,16 +518,16 @@ const ModelIdsFilterSchema = z.preprocess(
     if (typeof val === "string") return [val];
     return val;
   },
-  z.array(z.string().uuid()).max(50).optional(),
+  z.array(z.string().guid()).max(50).optional(),
 );
 
 // ── Feed filters ──
 
 export const ListingFilterFieldsSchema = z.object({
-  brandId: z.string().uuid().optional(),
-  modelId: z.string().uuid().optional(),
+  brandId: z.string().guid().optional(),
+  modelId: z.string().guid().optional(),
   modelIds: ModelIdsFilterSchema,
-  cityId: z.string().uuid().optional(),
+  cityId: z.string().guid().optional(),
   priceMin: z.coerce.number().positive().optional(),
   priceMax: z.coerce.number().positive().optional(),
   yearMin: z.coerce.number().int().min(1900).max(2100).optional(),
@@ -532,7 +535,7 @@ export const ListingFilterFieldsSchema = z.object({
   condition: ListingConditionSchema.optional(),
 });
 
-function refineListingFilter<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+function refineListingFilter<T extends typeof ListingFilterFieldsSchema>(schema: T) {
   return schema
     .refine(
       (data) =>
@@ -607,14 +610,14 @@ export const ListingModelCountQuerySchema = ListingFilterFieldsSchema.omit({
 })
   .merge(
     z.object({
-      brandId: z.string().uuid(),
+      brandId: z.string().guid(),
     }),
   )
   .strict();
 export type ListingModelCountQuery = z.infer<typeof ListingModelCountQuerySchema>;
 
 export const ListingModelCountItemSchema = z.object({
-  modelId: z.string().uuid(),
+  modelId: z.string().guid(),
   totalMatching: z.number().int().nonnegative(),
 });
 export type ListingModelCountItem = z.infer<typeof ListingModelCountItemSchema>;
@@ -634,7 +637,7 @@ export const ListingBrandCountQuerySchema = ListingFilterFieldsSchema.omit({
 export type ListingBrandCountQuery = z.infer<typeof ListingBrandCountQuerySchema>;
 
 export const ListingBrandCountItemSchema = z.object({
-  brandId: z.string().uuid(),
+  brandId: z.string().guid(),
   totalMatching: z.number().int().nonnegative(),
 });
 export type ListingBrandCountItem = z.infer<typeof ListingBrandCountItemSchema>;
@@ -680,10 +683,10 @@ export type MyDraftsResponse = z.infer<typeof MyDraftsResponseSchema>;
 // ── Favorite request / response ──
 
 export const AddFavoriteResponseSchema = z.object({
-  id: z.string().uuid(),
-  userId: z.string().uuid(),
-  listingId: z.string().uuid(),
-  createdAt: z.string().datetime(),
+  id: z.string().guid(),
+  userId: z.string().guid(),
+  listingId: z.string().guid(),
+  createdAt: DateTimeSchema,
 });
 export type AddFavoriteResponse = z.infer<typeof AddFavoriteResponseSchema>;
 
@@ -722,16 +725,16 @@ export const VerifiedContactPhoneSchema = z.object({
   phone: PhoneTm,
   source: z.enum(["account", "confirmed"]),
   /** Null for the account phone. */
-  confirmedAt: z.string().datetime().nullable(),
+  confirmedAt: DateTimeSchema.nullable(),
   /** `confirmedAt` + 7 days; null for the account phone. */
-  reusableUntil: z.string().datetime().nullable(),
+  reusableUntil: DateTimeSchema.nullable(),
 });
 export type VerifiedContactPhone = z.infer<typeof VerifiedContactPhoneSchema>;
 
 const ConfirmedContactPhoneSchema = VerifiedContactPhoneSchema.extend({
   source: z.literal("confirmed"),
-  confirmedAt: z.string().datetime(),
-  reusableUntil: z.string().datetime(),
+  confirmedAt: DateTimeSchema,
+  reusableUntil: DateTimeSchema,
 });
 
 export const ContactPhoneCodeRequestSchema = z.object({ phone: PhoneTm }).strict();
@@ -745,7 +748,7 @@ export const ContactPhoneCodeRequestResponseSchema = z.discriminatedUnion("statu
   }),
   z.object({
     status: z.literal("code_sent"),
-    requestId: z.string().uuid(),
+    requestId: z.string().guid(),
     resendInSeconds: z.number().int(),
     /** Only under OTP_TEST_MODE, which is allowed only in CI. */
     testCode: z.string().optional(),

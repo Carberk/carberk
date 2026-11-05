@@ -37,6 +37,16 @@ describe("decodeCursor", () => {
     expect(() => decodeCursor(forged)).toThrow();
   });
 
+  it("keeps accepting legacy minute-precision cursor timestamps", () => {
+    const cursor = { timestamp: "2026-11-05T00:00Z", id: "00000000-0000-0000-0000-000000000001" };
+
+    expect(decodeCursor(encodeCursor(cursor))).toEqual(cursor);
+  });
+
+  it("keeps accepting legacy integral public numbers above the safe integer limit", () => {
+    expect(() => ListingDetailSchema.shape.publicNumber.parse(9007199254740992)).not.toThrow();
+  });
+
   it("rejects a forged cursor whose id is not a uuid", () => {
     const forged = Buffer.from(
       JSON.stringify({ timestamp: "2026-05-01T00:00:00.000Z", id: "l1" }),
@@ -163,6 +173,15 @@ describe("FeedListingSummarySchema for the Results card", () => {
     const nine = [...cardSummary.galleryKeys, "p9"];
 
     expect(FeedListingSummarySchema.safeParse({ ...cardSummary, galleryKeys: nine }).success).toBe(false);
+  });
+
+  it("reports one bounded-collection issue for a large invalid gallery", () => {
+    const result = FeedListingSummarySchema.shape.galleryKeys.safeParse(
+      Array.from({ length: 64 }, () => "photo"),
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues).toHaveLength(1);
   });
 
   it("keeps photoKeys at two keys for installed builds", () => {

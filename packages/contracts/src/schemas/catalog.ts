@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 
 export const LocaleQuerySchema = z.object({
   locale: z.enum(["tk", "ru", "en"]).optional(),
@@ -300,7 +300,7 @@ export const PresignBrandLogoResponseSchema = z.object({
   uploadUrl: z.string().url(),
   key: z.string(),
   expiresIn: z.number().int().positive(),
-  headers: z.record(z.string()),
+  headers: z.record(z.string(), z.string()),
 });
 export type PresignBrandLogoResponse = z.infer<typeof PresignBrandLogoResponseSchema>;
 
@@ -317,7 +317,7 @@ export const SetBrandLogoResponseSchema = z.object({
 export type SetBrandLogoResponse = z.infer<typeof SetBrandLogoResponseSchema>;
 
 export const DeleteBrandParamSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 export type DeleteBrandParam = z.infer<typeof DeleteBrandParamSchema>;
 
@@ -326,7 +326,7 @@ export const CreateModelRequestSchema = z.object({
   nameTk: z.string().min(1),
   nameEn: z.string().min(1),
   slug: z.string().min(1),
-  brandId: z.string().uuid(),
+  brandId: z.string().guid(),
 });
 export type CreateModelRequest = z.infer<typeof CreateModelRequestSchema>;
 
@@ -334,6 +334,6 @@ export const UpdateModelRequestSchema = CreateModelRequestSchema.partial();
 export type UpdateModelRequest = z.infer<typeof UpdateModelRequestSchema>;
 
 export const DeleteModelParamSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 export type DeleteModelParam = z.infer<typeof DeleteModelParamSchema>;

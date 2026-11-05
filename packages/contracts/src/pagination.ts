@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 
 // Catalog reads (brands, models, generations, cities, regions, etc.) are the
 // only consumers today and the lists are small, bounded reference data. The

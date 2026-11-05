@@ -1,11 +1,11 @@
-import { z } from "zod";
+import { DateTimeSchema, z } from "../zod";
 
 // Phase 2 stub — full schema lands in S11
 export const InspectionReportSummarySchema = z.object({
-  id: z.string().uuid(),
-  listingId: z.string().uuid(),
-  inspectorId: z.string().uuid(),
-  completedAt: z.string().datetime().nullable(),
+  id: z.string().guid(),
+  listingId: z.string().guid(),
+  inspectorId: z.string().guid(),
+  completedAt: DateTimeSchema.nullable(),
 });
 export type InspectionReportSummary = z.infer<
   typeof InspectionReportSummarySchema
@@ -28,13 +28,13 @@ export type CreateInspectionInterestRequest = z.infer<
 >;
 
 export const CreateInspectionInterestResponseSchema = z.object({
-  id: z.string().uuid(),
-  listingId: z.string().uuid(),
-  requesterUserId: z.string().uuid(),
+  id: z.string().guid(),
+  listingId: z.string().guid(),
+  requesterUserId: z.string().guid(),
   side: z.nativeEnum(InspectionInterestSide),
   willingnessToPayTmt: z.number().int().min(0).max(10000).nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: DateTimeSchema,
+  updatedAt: DateTimeSchema,
   reusedExisting: z.boolean(),
 });
 export type CreateInspectionInterestResponse = z.infer<
@@ -42,7 +42,7 @@ export type CreateInspectionInterestResponse = z.infer<
 >;
 
 export const InspectionInterestCountItemSchema = z.object({
-  listingId: z.string().uuid(),
+  listingId: z.string().guid(),
   totalInterest: z.number().int().nonnegative(),
   buyerInterest: z.number().int().nonnegative(),
   sellerInterest: z.number().int().nonnegative(),

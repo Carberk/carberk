@@ -4,8 +4,8 @@ import { clientIpEnvShape } from "./common/client-ip";
 
 const booleanFlag = z
   .string()
-  .transform((v) => v === "true")
-  .default("false");
+  .default("false")
+  .transform((v) => v === "true");
 
 const BaseSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -72,13 +72,13 @@ const BaseSchema = z.object({
 
   REPORT_ENTRY_ENABLED: z
     .string()
-    .transform((v) => v === "true")
-    .default("true"),
+    .default("true")
+    .transform((v) => v === "true"),
 
   ADMIN_MODERATION_ACTIONS_ENABLED: z
     .string()
-    .transform((v) => v === "true")
-    .default("true"),
+    .default("true")
+    .transform((v) => v === "true"),
 
   INSPECTION_INTEREST_ENABLED: booleanFlag,
 });

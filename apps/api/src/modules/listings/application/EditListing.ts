@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import { Inject, Injectable, NotFoundException, BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 
@@ -30,7 +31,7 @@ import { contactPhoneRejection } from "./contactPhoneRejection";
 export interface EditListingInput {
   listingId: string;
   userId: string;
-  patch: typeof ListingsSchemas.EditListingRequestSchema._type;
+  patch: z.infer<typeof ListingsSchemas.EditListingRequestSchema>;
 }
 
 export interface EditListingResult {
