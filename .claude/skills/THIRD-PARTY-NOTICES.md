@@ -5,7 +5,7 @@ These skills are copied from MIT-licensed repositories, pinned to one commit eac
 | Skills | Source | Commit |
 |---|---|---|
 | `grill-me`, `grilling`, `grill-with-docs`, `domain-modeling`, `prototype`, `to-spec`, `to-tickets`, `triage`, `tdd`, `diagnosing-bugs` | https://github.com/mattpocock/skills | `4ae2317ddb22b046e26455e4f9c9b3aaaf62212d` |
-| `full-send`, `sol-loop`, `file-pr`, `babysit-pr`, `leaving-pr-comments` | https://github.com/t3dotgg/tstack | `1085050f3baed1ac724caa4a8166145fb2ac88af` |
+| `full-send`, `full-stop`, `sol-loop`, `council`, `file-pr`, `babysit-pr`, `leaving-pr-comments`, `modernize`, `takeover` | https://github.com/t3dotgg/tstack | `1085050f3baed1ac724caa4a8166145fb2ac88af` |
 
 Carberk changes: `sol-loop` adds a Carberk section and two brief lines (Spec and Standards), because it is Carberk's only code review. `grilling` makes the batch format plain text and requires chat replies instead of interactive question forms, including in T3 Code. All other files are unchanged.
 
