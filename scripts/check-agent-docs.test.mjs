@@ -36,6 +36,15 @@ test("ignores fenced examples and remote links, checks encoded local paths", () 
 }, (errors) => assert.deepEqual(errors, [])));
 test("reports missing root entry points", () => fixture((files) => { delete files["CLAUDE.md"]; }, (errors) => assert.match(errors.join("\n"), /missing entry point: CLAUDE.md/)));
 
+test("rejects deprecated skills that still load a description", () => fixture((files) => {
+  files[".claude/skills/old/SKILL.md"] = "---\nname: old\ndescription: Deprecated route for a retired workflow.\n---\n";
+  files[".claude/skills/folded/SKILL.md"] = "---\nname: folded\ndescription: >-\n  Deprecated route.\n---\n";
+  files[".claude/skills/live/SKILL.md"] = "---\nname: live\ndescription: Use when replacing deprecated code.\n---\n";
+}, (errors) => assert.deepEqual(errors, [
+  ".claude/skills/old/SKILL.md: deprecated skill still loads its description; delete the skill",
+  ".claude/skills/folded/SKILL.md: deprecated skill still loads its description; delete the skill",
+])));
+
 test("checks active host agent definition links", () => fixture((files) => {
   files[".claude/agents/reviewer.md"] = "[Review](../skills/missing/FINALIZATION.md)\n";
 }, (errors) => assert.match(errors.join("\n"), /\.claude\/agents\/reviewer.md: missing link target/)));

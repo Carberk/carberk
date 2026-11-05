@@ -43,7 +43,13 @@ export function checkAgentDocs(root, files) {
   for (const file of current) {
     const source = resolve(root, file);
     if (!existsSync(source)) continue;
-    for (const link of links(readFileSync(source, "utf8"))) {
+    const text = readFileSync(source, "utf8");
+    // Every skill description loads into every agent session; delete retired skills.
+    if (/^\.claude\/skills\/[^/]+\/SKILL\.md$/.test(file) &&
+      /^---\n[\s\S]*?^description:\s*(?:[>|][-+]?\s*\n\s*)?["']?deprecated\b/im.test(text)) {
+      errors.push(`${file}: deprecated skill still loads its description; delete the skill`);
+    }
+    for (const link of links(text)) {
       if (/^[a-z][a-z\d+.-]*:/i.test(link) || link.startsWith("//")) continue;
       const [path, fragment] = link.split("#");
       let target;

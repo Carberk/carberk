@@ -38,7 +38,7 @@ Run [sol-loop](../../.claude/skills/sol-loop/SKILL.md) before filing or updating
 - File the PR with [file-pr](../../.claude/skills/file-pr/SKILL.md). The [PR template](../../.github/pull_request_template.md) has the shape: problem, change, proof, review, and `Closes #<issue>`.
 - Watch it with [babysit-pr](../../.claude/skills/babysit-pr/SKILL.md). Fix real CI failures and findings.
 - Merge only when the founder says "full send" for the task ([full-send](../../.claude/skills/full-send/SKILL.md)) or approves the PR. The merge gate is green required checks, finished review, an up-to-date branch and squash merge. Never bypass branch protection.
-- After merge, remove your worktree and local branch. GitHub deletes the remote branch.
+- After merge, remove your worktree and local branch; `node scripts/worktree-gc.mjs` reports which worktrees are safe to remove, and `--apply` removes only those. GitHub deletes the remote branch.
 
 ## Always ask the founder first
 
