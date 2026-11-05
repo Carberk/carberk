@@ -9,6 +9,9 @@ shamefullyHoist: true
 # ADR-0048. pnpm 11+ ignores the `pnpm` field of package.json.
 overrides:
   react-native-css-interop: 0.2.4
+  # GHSA-qw65-cvwx-89v3 and follow-up 3.x URI fixes. Keep fast-uri 4.x on
+  # its existing line; only the vulnerable 3.x dependency edges are pinned.
+  "fast-uri@>=3.0.0 <4.0.0": 3.1.9
   # GHSA-p68q-wchp-6fh7: Nest 11 pins an affected Fastify release.
   # Remove when the adapter itself depends on Fastify >=5.12.2.
   "@nestjs/platform-fastify@11.2.5>fastify": 5.12.2
