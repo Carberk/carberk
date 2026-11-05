@@ -58,12 +58,12 @@ FROM base AS runtime
 ARG RAILWAY_GIT_COMMIT_SHA=unknown
 ENV AUTOTM_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
 RUN apt-get update && apt-get install -y --no-install-recommends curl openssl postgresql-client && rm -rf /var/lib/apt/lists/*
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/apps/worker/node_modules /app/apps/worker/node_modules
-COPY --from=build /app/apps/worker/dist /app/apps/worker/dist
-COPY --from=build /app/apps/worker/package.json /app/apps/worker/package.json
-COPY --from=build /app/packages /app/packages
-RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown -R auto-tm:auto-tm /app
+RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown auto-tm:auto-tm /app
+COPY --from=build --chown=auto-tm:auto-tm /app/node_modules /app/node_modules
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/worker/node_modules /app/apps/worker/node_modules
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/worker/dist /app/apps/worker/dist
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/worker/package.json /app/apps/worker/package.json
+COPY --from=build --chown=auto-tm:auto-tm /app/packages /app/packages
 USER auto-tm
 WORKDIR /app/apps/worker
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/healthz" || exit 1

@@ -64,19 +64,19 @@ ENV pnpm_config_verify_deps_before_run=false
 ARG RAILWAY_GIT_COMMIT_SHA=unknown
 ENV AUTOTM_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
 RUN apt-get update && apt-get install -y --no-install-recommends curl openssl postgresql-client && rm -rf /var/lib/apt/lists/*
+RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown auto-tm:auto-tm /app
 # Root workspace files so the migration pre-deploy command can run
 # `pnpm --filter @auto-tm/db migrate:deploy` inside this image.
-COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/
-COPY --from=build /app/patches /app/patches
-COPY --from=build /app/node_modules /app/node_modules
-COPY --from=build /app/apps/api/node_modules /app/apps/api/node_modules
-COPY --from=build /app/apps/api/dist /app/apps/api/dist
-COPY --from=build /app/apps/api/package.json /app/apps/api/package.json
-COPY --from=build /app/packages /app/packages
+COPY --from=build --chown=auto-tm:auto-tm /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/
+COPY --from=build --chown=auto-tm:auto-tm /app/patches /app/patches
+COPY --from=build --chown=auto-tm:auto-tm /app/node_modules /app/node_modules
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/api/node_modules /app/apps/api/node_modules
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/api/dist /app/apps/api/dist
+COPY --from=build --chown=auto-tm:auto-tm /app/apps/api/package.json /app/apps/api/package.json
+COPY --from=build --chown=auto-tm:auto-tm /app/packages /app/packages
 # Guarded remote native fixtures reuse packaged db scripts and dependencies.
-COPY --from=build /app/scripts/native-pr-seed.mjs /app/scripts/native-pr-seed.mjs
-COPY --from=build /app/infra/minio/bootstrap.mjs /app/infra/minio/contract.mjs /app/packages/db/scripts/native-minio/
-RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown -R auto-tm:auto-tm /app
+COPY --from=build --chown=auto-tm:auto-tm /app/scripts/native-pr-seed.mjs /app/scripts/native-pr-seed.mjs
+COPY --from=build --chown=auto-tm:auto-tm /app/infra/minio/bootstrap.mjs /app/infra/minio/contract.mjs /app/packages/db/scripts/native-minio/
 USER auto-tm
 WORKDIR /app/apps/api
 EXPOSE 3006
