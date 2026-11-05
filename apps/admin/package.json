@@ -21,7 +21,6 @@
     "qrcode": "^1.5.4",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "shadcn": "catalog:",
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:"
   },
@@ -37,6 +36,7 @@
     "@typescript/native": "catalog:",
     "happy-dom": "catalog:",
     "postcss": "catalog:",
+    "shadcn": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
