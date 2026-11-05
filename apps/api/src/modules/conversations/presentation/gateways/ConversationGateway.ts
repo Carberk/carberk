@@ -8,7 +8,7 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import type { OnGatewayDisconnect } from "@nestjs/websockets";
-import { ConversationsSchemas, ErrorCode } from "@auto-tm/contracts";
+import { ConversationsSchemas, DateTimeSchema, ErrorCode } from "@auto-tm/contracts";
 import { z } from "zod";
 import type { Server, Socket } from "socket.io";
 
@@ -81,8 +81,8 @@ function parseSendMessagePayload(
 
 const WatermarkSocketPayloadSchema = z.object({
   conversationId: z.string().guid(),
-  lastReadAt: z.string().datetime().optional(),
-  lastDeliveredAt: z.string().datetime().optional(),
+  lastReadAt: DateTimeSchema.optional(),
+  lastDeliveredAt: DateTimeSchema.optional(),
 }).refine(
   (data) => data.lastReadAt !== undefined || data.lastDeliveredAt !== undefined,
   {

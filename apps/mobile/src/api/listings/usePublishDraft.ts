@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { DateTimeSchema } from "@auto-tm/contracts";
 import { z } from "zod";
 
 import { apiClient } from "../client";
@@ -12,7 +13,7 @@ const PublishDraftResponseSchema = z.object({
   modelId: z.string().guid(),
   priceAmount: z.number(),
   priceCurrency: z.string(),
-  publishedAt: z.string().datetime(),
+  publishedAt: DateTimeSchema,
 });
 
 export function usePublishDraft() {

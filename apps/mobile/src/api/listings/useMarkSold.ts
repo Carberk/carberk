@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { DateTimeSchema } from "@auto-tm/contracts";
 import { z } from "zod";
 
 import { apiClient } from "../client";
@@ -7,7 +8,7 @@ import { queryKeys } from "../queryKeys";
 const MarkSoldResponseSchema = z.object({
   id: z.string().guid(),
   status: z.string(),
-  soldAt: z.string().datetime().nullable().optional(),
+  soldAt: DateTimeSchema.nullable().optional(),
 });
 
 export function useMarkSold() {

@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { ConversationsSchemas } from "@auto-tm/contracts";
+import { ConversationsSchemas, DateTimeSchema } from "@auto-tm/contracts";
 import { z } from "zod";
 
 import { loadAuthSession } from "../../auth/session";
@@ -425,7 +425,7 @@ export class ConversationSocket {
               ok: z.literal(true),
               messageId: z.string().guid(),
               conversationId: z.string().guid(),
-              deletedAt: z.string().datetime(),
+              deletedAt: DateTimeSchema,
             })
             .safeParse(ack);
           if (wrapped.success) {

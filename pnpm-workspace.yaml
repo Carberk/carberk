@@ -45,7 +45,8 @@ overrides:
   "compression@>=1.0.0 <1.8.2": 1.8.2
   # The migration below updates application schemas and the OpenAPI adapter.
   "zod@>=3.0.0 <4.6.7": 4.6.7
-  # Metro uses the default Buffer API retained by image-size 2.x.
+  # Metro's React Native callers pass file paths; these patches read a Buffer
+  # before calling image-size 2.x, which no longer accepts paths.
   "image-size@>=1.0.0 <2.0.3": 2.0.3
   # query-string's CJS caller is adapted by the committed compatibility patch.
   "decode-uri-component@<0.5.1": 0.5.1
@@ -53,6 +54,8 @@ overrides:
 # Official Android prefab backports, reviewed separately in PR #859.
 patchedDependencies:
   "expo-modules-core@55.0.27": patches/expo-modules-core@55.0.27.patch
+  metro@0.83.7: patches/metro@0.83.7.patch
+  metro@0.84.4: patches/metro@0.84.4.patch
   query-string@7.1.3: patches/query-string@7.1.3.patch
   "react-native-reanimated@4.2.1": patches/react-native-reanimated@4.2.1.patch
 
