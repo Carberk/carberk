@@ -2,6 +2,14 @@
 
 The worker consumes queued work outside the API request path. Native direct-message push, sign-in email, expired-account purge and retired upload cleanup have implementations. Video transcoding and broad orphan cleanup are not implemented. Their registered processors reject jobs permanently and log an error instead of reporting success. They remain registered to reject queued or external work visibly; retries cannot supply the missing implementation. Failed-job retention follows the producer's BullMQ options, so operators must inspect failures/logs and explicitly requeue appropriate work after implementation.
 
+The normal worker process serves dependency-free `/healthz` and bounded
+`/readyz` endpoints for Railway liveness and readiness. Responses include only
+the deploy SHA, environment and per-dependency status; they never include
+connection strings or provider errors. `PHOTO_CONVERSION_MAINTENANCE=true`
+starts only a dependency-free maintenance health listener with no Nest or Bull
+consumers. It reports `status: "maintenance"` and `businessReady: false`, so
+Railway admits the paused replacement without keeping old consumers running.
+
 The API owns push eligibility and history creation. The worker delivers per token and updates delivery outcomes. Android uses FCM and iOS uses direct APNS behind the push port; preserve invalid-token classification and retry behavior. Provider code existing in Git does not prove deployed credentials or real-device delivery.
 
 Sign-in email uses Resend behind the email port and daily-send cap. Keep credential material and codes out of error/log payloads. Account purge is distinct from broad media orphan cleanup; do not remove its scheduler or privacy-preserving deletion behavior while cleaning scaffolds. The purge job is also the retention job for Sign-in Code records: at purge it deletes the User's `otp_requests` rows (theirs by User id, and signed-out requests to their phone or email) and clears `contactPhone` on the Listings it keeps, and on every daily run, even when a purge fails, it deletes every `otp_requests` row older than 30 days. The privacy policy states those 30 days. The purge also removes the User's Profile Photo: in the purge transaction, after taking the User row lock, one statement retires the photo's upload and records its deletion work, due at the purge's time, before the User row's photo link is cleared. That statement repeats the API claim's retirement because the purge runs here; a change to how the API retires an upload must be made in both places. The sweep below then deletes the bytes.

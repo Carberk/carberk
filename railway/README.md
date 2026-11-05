@@ -20,7 +20,7 @@ between the two is an operator finding — nothing reconciles it automatically.
 | File | Service | Build | Start command | Pre-deploy | Health gate |
 |---|---|---|---|---|---|
 | `api.json` | `api` | `infra/docker/api.Dockerfile` | `node dist/src/main.js` | `pnpm --filter @auto-tm/db migrate:deploy` | `/readyz` (bounded: Postgres + Redis + MinIO) |
-| `worker.json` | `worker` | `infra/docker/worker.Dockerfile` | `node dist/main.js` | — | none (no public route; boot failure exits non-zero) |
+| `worker.json` | `worker` | `infra/docker/worker.Dockerfile` | `node dist/main.js` | — | `/readyz` (bounded dependencies; `maintenance` in conversion mode) |
 | `admin.json` | `admin` | `infra/docker/admin.Dockerfile` | `node apps/admin/server.js` | — | `/healthz` (dependency-free) |
 | `web.json` | `web` | `infra/docker/web.Dockerfile` | `node apps/web/server.js` | — | `/healthz` (dependency-free) |
 
@@ -53,7 +53,7 @@ during provisioning, S11-08).
 
 Every Dockerfile declares `ARG RAILWAY_GIT_COMMIT_SHA` (Railway injects it as
 a build arg for Dockerfile builds) and bakes it as `ENV AUTOTM_COMMIT_SHA`.
-`/healthz` (all HTTP services) and `/readyz` (API) report `commitSha` +
+`/healthz` (all HTTP services) and `/readyz` (API and worker) report `commitSha` +
 `environment`, so deploy evidence identifies the exact `main` revision even
 when Railway rebuilds it. `environment` prefers the Railway-injected
 `RAILWAY_ENVIRONMENT_NAME`, falling back to `APP_ENV`.
@@ -117,7 +117,7 @@ generated per environment.
 | `NEXT_PUBLIC_API_URL` | — | — | yes | yes | R: API service public domain |
 | `NEXT_PUBLIC_MINIO_PUBLIC_URL` | — | — | yes | yes | R/G (S11-02) |
 | `SESSION_SECRET` | — | — | yes | — | G |
-| `PORT` | yes | — | yes | yes | F: must match the port the image listens on; Railway injects `PORT=8080` and it overrides the Dockerfile `ENV PORT` |
+| `PORT` | yes | yes | yes | yes | F: must match the port the image listens on; Railway injects `PORT=8080` and it overrides the Dockerfile `ENV PORT` |
 | `API_BASE_URL` | — | — | yes | yes | R: http(s) API private `*.railway.internal` origin, optionally ending in `/api/v1`, with or without a trailing slash. Required for admin in production, which validates it at startup. Used for server-side admin calls and web's account deletion Server Functions. Required for web: the fallback to `NEXT_PUBLIC_API_URL` sends web's calls through the public edge, which overwrites web's `X-Real-IP`, so every web visitor shares one Sign-in Code budget (ADR-0078) |
 | `ADMIN_ORIGIN` | — | — | yes | — | R: admin public origin |
 | `SIGNUPS_ENABLED` | yes | — | — | — | F: `false` in staging and production until public launch |

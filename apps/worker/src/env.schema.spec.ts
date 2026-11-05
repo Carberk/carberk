@@ -280,6 +280,11 @@ describe("worker EnvSchema deploy metadata", () => {
     const env = EnvSchema.parse(baseEnv);
     expect(env.APP_ENV).toBe("development");
     expect(env.AUTOTM_COMMIT_SHA).toBe("unknown");
+    expect(env.PORT).toBe(8080);
+  });
+
+  it("coerces Railway's listener port", () => {
+    expect(EnvSchema.parse({ ...baseEnv, PORT: "9000" }).PORT).toBe(9000);
   });
 });
 

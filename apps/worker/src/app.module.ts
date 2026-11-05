@@ -4,6 +4,7 @@ import { BullModule } from "@nestjs/bullmq";
 import { LoggerModule } from "nestjs-pino";
 import { S3Client } from "@aws-sdk/client-s3";
 import { AuthSchemas } from "@auto-tm/contracts";
+import { PrismaService } from "@auto-tm/db";
 
 import { PrismaModule } from "./common/prisma.module";
 import { parseEnv, type Env } from "./env.schema";
@@ -25,6 +26,11 @@ import { OrphanCleanupProcessor } from "./queues/orphan-cleanup.processor";
 import { AccountPurgeProcessor } from "./queues/account-purge.processor";
 import { AccountPurgeScheduler } from "./queues/account-purge.scheduler";
 import { PurgeExpiredAccounts } from "./jobs/PurgeExpiredAccounts";
+import {
+  createWorkerHealthDependencies,
+  WORKER_HEALTH_DEPENDENCIES,
+  WorkerHealthServer,
+} from "./health/worker-health-server";
 
 @Module({
   imports: [
@@ -81,6 +87,12 @@ import { PurgeExpiredAccounts } from "./jobs/PurgeExpiredAccounts";
     AccountPurgeProcessor,
     AccountPurgeScheduler,
     PurgeExpiredAccounts,
+    WorkerHealthServer,
+    {
+      provide: WORKER_HEALTH_DEPENDENCIES,
+      inject: [ConfigService, PrismaService],
+      useFactory: createWorkerHealthDependencies,
+    },
   ],
 })
 export class AppModule {}

@@ -1,7 +1,7 @@
 # apps/worker production image (NestJS standalone BullMQ consumer).
 #
-# Build context: repository root. The worker has no public route: an
-# incomplete runtime contract (env validation) fails boot with a non-zero
+# Build context: repository root. The worker exposes only its private health
+# listener. An incomplete runtime contract (env validation) fails boot with a non-zero
 # exit, which Railway surfaces as a crashed deploy. The worker never runs
 # migrations — the API pre-deploy command is the sole authority (ADR-0004).
 FROM node:22-bookworm-slim AS base
@@ -66,4 +66,5 @@ COPY --from=build /app/packages /app/packages
 RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown -R auto-tm:auto-tm /app
 USER auto-tm
 WORKDIR /app/apps/worker
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/healthz" || exit 1
 CMD ["node", "dist/main.js"]

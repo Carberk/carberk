@@ -17,6 +17,8 @@ const BaseSchema = z.object({
   /** Operator-only startup mode: no business request handlers or queue consumers run. */
   PHOTO_CONVERSION_MAINTENANCE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
+  /** Railway's injected listener port for the worker health contract. */
+  PORT: z.coerce.number().int().min(1).max(65535).default(8080),
 
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
