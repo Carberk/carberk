@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+const READ_ATTEMPTS = 3;
+const READ_RETRY_BASE_MS = 200;
+
 const help = `Compact GitHub operations (JSON output; writes require --apply):
   pnpm agent:github issue N | pr N | execution N
   pnpm agent:github queue [--limit 20]
@@ -129,8 +132,60 @@ function execute(program, args) {
   return result.stdout;
 }
 
-function repository(explicit) {
-  const value = explicit ?? execute("gh", ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).trim();
+export function isTransientGithubError(error) {
+  const text = `${error?.code ?? ""} ${error?.status ?? ""} ${error?.message ?? error ?? ""}`;
+  if ([429, 500, 502, 503, 504].includes(Number(error?.status))) return true;
+  const status = /(?:^|\b)(?:gh:\s*)?(?:HTTP(?:\/\d+(?:\.\d+)?)?\s*(?:error\s*)?|status(?:\s+code)?\s*[:=]?\s*|(?:returned|response)\s+)(429|500|502|503|504)\b/i;
+  const transport = /(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|failed to connect|could not resolve host|connection reset by peer|connection refused|network is unreachable|timed out|timeout|temporarily unavailable|service unavailable)/i;
+  return status.test(text) || transport.test(text);
+}
+
+function sleepSync(milliseconds) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function readGithub(gh, args, sleep = sleepSync) {
+  for (let attempt = 1; ; attempt += 1) {
+    try { return gh(args); }
+    catch (error) {
+      if (attempt >= READ_ATTEMPTS || !isTransientGithubError(error)) throw error;
+      sleep(READ_RETRY_BASE_MS * 2 ** (attempt - 1));
+    }
+  }
+}
+
+function writeResource(url) {
+  const match = String(url).match(/\/issues\/(\d+)(?:#issuecomment-(\d+))?\/?$/);
+  if (!match) return undefined;
+  return { issueNumber: Number(match[1]), commentId: match[2] ? Number(match[2]) : undefined };
+}
+
+function verifyWrite({ command, url, body, title, repo, gh, sleep }) {
+  const resource = writeResource(url);
+  if (!resource) throw new Error("GitHub returned an unrecognizable resource URL");
+  if (command === "create-issue") {
+    const item = JSON.parse(readGithub(gh, ["issue", "view", String(resource.issueNumber), "--repo", repo.name, "--json", "number,title,state,url"], sleep));
+    if (item.number !== resource.issueNumber || item.title !== title || item.state !== "OPEN") throw new Error("created issue read-back did not match");
+    return { status: "verified", resource: { number: item.number, title: item.title, state: item.state, url: item.url } };
+  }
+  const item = JSON.parse(readGithub(gh, ["api", `repos/${repo.owner}/${repo.repo}/issues/comments/${resource.commentId}`], sleep));
+  if (item.id !== resource.commentId || item.body !== body) throw new Error("created comment read-back did not match");
+  return { status: "verified", resource: { id: item.id, url: item.html_url ?? url } };
+}
+
+function applyWrite({ command, args, body, title, repo, gh, sleep }) {
+  let url;
+  try { url = gh(args).trim(); }
+  catch (error) { return { applied: false, uncertain: true, error: error.message }; }
+  try {
+    return { applied: true, url, verification: verifyWrite({ command, url, body, title, repo, gh, sleep }) };
+  } catch (error) {
+    return { applied: true, url, verification: { status: "uncertain", reason: error.message } };
+  }
+}
+
+function repository(explicit, gh, sleep) {
+  const value = explicit ?? readGithub(gh, ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], sleep).trim();
   const parts = value.split("/");
   if (![2, 3].includes(parts.length) || parts.some((part) => !/^[\w.-]+$/.test(part))) throw new Error("Invalid repository; use [HOST/]OWNER/REPO");
   return { name: value, host: parts.length === 3 ? parts[0] : "github.com", owner: parts.at(-2), repo: parts.at(-1) };
@@ -139,7 +194,8 @@ function repository(explicit) {
 export function runCommand(config, dependencies = {}) {
   if (config.command === "help") return { help };
   const gh = dependencies.gh ?? ((args) => execute("gh", args));
-  const repo = repository(config.repo ?? dependencies.repo);
+  const sleep = dependencies.sleep ?? sleepSync;
+  const repo = repository(config.repo ?? dependencies.repo, gh, sleep);
   const limit = config.full ? Number.MAX_SAFE_INTEGER : config.maxChars;
   if (["comment", "create-issue"].includes(config.command)) {
     const body = readFileSync(config.bodyFile, "utf8");
@@ -149,7 +205,7 @@ export function runCommand(config, dependencies = {}) {
       : ["issue", "create", "--title", config.title, ...config.labels.flatMap((label) => ["--label", label])];
     args.push("--repo", repo.name, "--body-file", config.bodyFile);
     if (!config.apply) return { dryRun: true, args, bodyCharacters: body.length };
-    return { applied: true, url: gh(args).trim() };
+    return applyWrite({ command: config.command, args, body, title: config.title, repo, gh, sleep });
   }
   if (["comments", "reviews", "review-threads", "thread-comments"].includes(config.command)) {
     const field = config.kind === "pr" ? "pullRequest" : "issue";
@@ -165,7 +221,7 @@ export function runCommand(config, dependencies = {}) {
     if (config.command === "thread-comments") args.push("-f", `id=${config.threadId}`);
     else args.push("-f", `owner=${repo.owner}`, "-f", `repo=${repo.repo}`, "-F", `number=${config.number}`);
     if (config.cursor) args.push("-f", `cursor=${config.cursor}`);
-    const data = JSON.parse(gh(args));
+    const data = JSON.parse(readGithub(gh, args, sleep));
     if (data.errors?.length) throw new Error("GitHub GraphQL returned errors");
     const item = data.data?.repository?.[field];
     const result = config.command === "thread-comments" ? data.data?.node?.comments : item?.[config.command === "comments" ? "comments" : config.command === "reviews" ? "reviews" : "reviewThreads"];
@@ -179,11 +235,11 @@ export function runCommand(config, dependencies = {}) {
   const issueFields = "number,title,state,url,labels,body";
   const prFields = "number,title,state,url,headRefName,headRefOid,isDraft,autoMergeRequest,statusCheckRollup,body";
   if (config.command === "queue") {
-    const items = JSON.parse(gh(["pr", "list", "--repo", repo.name, "--state", "open", "--limit", String(config.limit), "--json", prFields]));
+    const items = JSON.parse(readGithub(gh, ["pr", "list", "--repo", repo.name, "--state", "open", "--limit", String(config.limit), "--json", prFields], sleep));
     return { snapshot: true, limit: config.limit, possiblyMore: items.length === config.limit, omitted: ["full bodies", "comments", "formal reviews", "inline review threads"], prs: items.map((item) => compactItem(item, "pr", limit)) };
   }
   const kind = config.command === "issue" ? "issue" : "pr";
-  const item = JSON.parse(gh([kind, "view", String(config.number), "--repo", repo.name, "--json", kind === "issue" ? issueFields : prFields]));
+  const item = JSON.parse(readGithub(gh, [kind, "view", String(config.number), "--repo", repo.name, "--json", kind === "issue" ? issueFields : prFields], sleep));
   if (config.command === "execution") return { number: item.number, head: item.headRefOid, execution: compactItem(item, "pr", limit).execution };
   const compact = compactItem(item, kind, limit);
   const omitted = [
@@ -196,6 +252,10 @@ export function runCommand(config, dependencies = {}) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { console.log(JSON.stringify(runCommand(parseCommand(process.argv.slice(2))))); }
+  try {
+    const result = runCommand(parseCommand(process.argv.slice(2)));
+    console.log(JSON.stringify(result));
+    if (result.uncertain || result.verification?.status === "uncertain") process.exitCode = 2;
+  }
   catch (error) { console.error(error.message); process.exitCode = 1; }
 }
