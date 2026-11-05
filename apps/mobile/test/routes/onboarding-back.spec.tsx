@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 
+import { http, HttpResponse } from "msw";
 import type * as Native from "react-native";
 import * as React from "react";
 import { View } from "react-native";
@@ -8,6 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, renderMobile } from "../render";
+import { server } from "../msw";
 import RootLayout, { unstable_settings } from "../../app/_layout";
 import { themeStore } from "../../src/theme/themeStore";
 import { OnboardingLaunch } from "../../src/onboarding/OnboardingLaunch";
@@ -115,6 +117,10 @@ async function launchApp() {
 }
 
 beforeEach(() => {
+  server.use(
+    http.get("*/me/drafts", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })),
+    http.get("*/me/listings", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })),
+  );
   createRequire(import.meta.url).extensions[".ttf"] = (module) => { module.exports = {}; };
   appearance.current = "light";
   appearance.hold = false;

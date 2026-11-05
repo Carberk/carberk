@@ -89,6 +89,7 @@ function createListingApi() {
   server.use(
     // The Contact step picker reads the confirmed numbers; this seller has none.
     http.get("*/me/contact-phones", () => HttpResponse.json({ items: [] })),
+    http.get("*/catalog/models/:modelId/generations", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })),
     http.patch("*/listings/:id", async ({ request }) => {
       const patch = (await request.json()) as Record<string, unknown>;
       requests.edit.push(patch);

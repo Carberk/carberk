@@ -1,7 +1,9 @@
+import { http, HttpResponse } from "msw";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { act, fireEvent, renderMobile, routeParams, routerMock } from "../render";
 import EditListingScreen from "../../app/listings/[id]/edit";
+import { server } from "../msw";
 
 const fixture = vi.hoisted(() => {
   const id = "550e8400-e29b-41d4-a716-446655440000";
@@ -69,6 +71,7 @@ vi.mock("../../src/api/catalog/useRegions", () => ({ useRegions: () => ({ data: 
 vi.mock("../../src/api/catalog/useCities", () => ({ useCities: () => ({ data: { items: [] } }) }));
 
 beforeEach(() => {
+  server.use(http.get("*/catalog/models/:modelId/generations", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })));
   routeParams.id = fixture.id;
   fixture.save.mockReset().mockResolvedValue(true);
   fixture.retry.mockReset().mockResolvedValue(true);

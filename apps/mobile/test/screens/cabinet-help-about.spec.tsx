@@ -1,5 +1,7 @@
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { server } from "../msw";
 import CabinetScreen from "../../app/(tabs)/services";
 import { localeStore } from "../../src/locale/localeStore";
 import { themeStore } from "../../src/theme/themeStore";
@@ -24,6 +26,7 @@ vi.mock("../../src/api/identity/useMe", () => ({
 }));
 
 beforeEach(() => {
+  server.use(http.get("*/me/listings/counts", () => HttpResponse.json({ active: 0, sold: 0, archived: 0, banned: 0, drafts: 0, total: 0 })));
   localeStore.setState({ locale: "en" });
   themeStore.setState({ theme: "system" });
 });
