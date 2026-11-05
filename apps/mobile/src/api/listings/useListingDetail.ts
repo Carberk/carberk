@@ -20,6 +20,12 @@ export function listingDetailQueryOptions(id: string) {
 export function useListingDetail(id: string, options?: { enabled?: boolean }) {
   return useQuery({
     ...listingDetailQueryOptions(id),
+    // Select on read so cached responses from before the video hold are safe too.
+    select: photosOnly,
     enabled: !!id && (options?.enabled ?? true),
   });
+}
+
+function photosOnly(listing: ListingsSchemas.ListingDetail): ListingsSchemas.ListingDetail {
+  return { ...listing, media: listing.media.filter(media => media.kind === "image") };
 }

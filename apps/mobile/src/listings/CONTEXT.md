@@ -118,3 +118,5 @@ The shared `compressPhoto` helper accepts a target long side and source dimensio
 - [Brand and Model pickers](search/BrandPicker.tsx), [their actions](search/pickerActions.ts), and [Recent](search/recentSearches.ts)
 - [Discovery specification](../../../../docs/prd/features/33-search-discovery.md)
 - [Media decision](../../../../docs/adr/0008-media.md)
+
+While Listing video rollout is paused, `useListingDetail` selects photo-only media before detail and edit consumers see it, including older cached responses. This does not rewrite cached snapshots or revoke previously public object URLs.

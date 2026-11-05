@@ -99,8 +99,7 @@ export class PrismaListingsReadRepository
     const [card] = await this.toCards([row]);
     if (!card) return null;
     const summary = toListingSummary(card);
-    // The cover is the first media item; only a photo has a hash.
-    const cover = row.media[0];
+    const cover = row.media.find((media) => media.kind === "image");
     if (cover?.kind === "image" && cover.thumbHash !== null) summary.coverThumbHash = cover.thumbHash;
     return summary;
   }
@@ -111,7 +110,7 @@ export class PrismaListingsReadRepository
 
   /**
    * One bounded read for the whole page: per Listing only its first media
-   * item (the cover), its first `CARD_GALLERY_KEY_LIMIT` photos and its photo
+   * item (which may be a held legacy video), its first `CARD_GALLERY_KEY_LIMIT` photos and its photo
    * total, so the rows sent back stay small whatever a Listing holds. The
    * photo total needs every media row of the page's Listings (at most 21
    * each), and the plan reads exactly those, once, through the

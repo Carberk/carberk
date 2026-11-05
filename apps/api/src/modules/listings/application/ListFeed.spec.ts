@@ -204,17 +204,24 @@ describe("ListFeed", () => {
     expect(result.items[0]!.displayPriceTmt).toBe(100000);
   });
 
-  it("includes coverMediaKey when listing has media", async () => {
-    ranking.items = [seedListing({ id: "l1", coverMediaKey: "listings/l1/m1/original.webp" })];
+  it("uses the card photo cover instead of a legacy ranked video cover", async () => {
+    ranking.items = [seedListing({ id: "l1", coverMediaKey: "legacy/original.mp4" })];
+    const cards = new FakeListingCardReadPort();
+    cards.photos.set("l1", {
+      coverMediaKey: "listings/l1/m1/original.webp",
+      photoKeys: ["listings/l1/m1/original.webp"],
+      galleryKeys: ["listings/l1/m1/original.webp"],
+      photoCount: 1,
+    });
 
-    const uc = makeUseCase(ranking, exchangeRates);
+    const uc = makeUseCase(ranking, exchangeRates, undefined, undefined, cards);
     const result = await uc.execute({});
 
     expect(result.items[0]!.coverMediaKey).toBe("listings/l1/m1/original.webp");
   });
 
-  it("omits coverMediaKey when listing has no media", async () => {
-    ranking.items = [seedListing({ id: "l1" })];
+  it("omits coverMediaKey when listing has no photos, including a legacy video cover", async () => {
+    ranking.items = [seedListing({ id: "l1", coverMediaKey: "legacy/original.mp4" })];
 
     const uc = makeUseCase(ranking, exchangeRates);
     const result = await uc.execute({});

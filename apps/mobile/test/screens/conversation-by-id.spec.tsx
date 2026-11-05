@@ -175,7 +175,7 @@ function conversation(
 function listingDetail(
   updates: Partial<ListingsSchemas.ListingDetail> = {},
 ): Partial<ListingsSchemas.ListingDetail> {
-  return { id: LISTING_ID, status: "active", allowCalls: true, contactPhone: SELLER_PHONE, ...updates };
+  return { id: LISTING_ID, status: "active", allowCalls: true, contactPhone: SELLER_PHONE, media: [], ...updates };
 }
 
 /** Answers GET by path; anything unrouted stays pending, like a slow network. */

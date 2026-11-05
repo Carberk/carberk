@@ -23,13 +23,13 @@ describe("toCardPhotos", () => {
     expect(result.coverMediaKey).toBe("a");
   });
 
-  it("skips video media for photo keys and count but keeps it as the cover", () => {
+  it("uses the first photo for the cover and excludes video from photo keys and count", () => {
     const result = toCardPhotos([
       { key: "clip", kind: "video" },
       { key: "p1", kind: "image" },
     ]);
 
-    expect(result.coverMediaKey).toBe("clip");
+    expect(result.coverMediaKey).toBe("p1");
     expect(result.photoKeys).toEqual(["p1"]);
     expect(result.photoCount).toBe(1);
   });
@@ -64,7 +64,7 @@ describe("toCardPhotosFromFirstMedia", () => {
     const result = toCardPhotosFromFirstMedia([{ key: "clip", kind: "video" }, ...firstEight], 20);
 
     expect(result).toEqual({
-      coverMediaKey: "clip",
+      coverMediaKey: "p0",
       photoKeys: ["p0", "p1"],
       galleryKeys: ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"],
       photoCount: 20,
@@ -73,7 +73,6 @@ describe("toCardPhotosFromFirstMedia", () => {
 
   it("reports no photos for a Listing whose only media is a video", () => {
     expect(toCardPhotosFromFirstMedia([{ key: "clip", kind: "video" }], 0)).toEqual({
-      coverMediaKey: "clip",
       photoKeys: [],
       galleryKeys: [],
       photoCount: 0,
@@ -91,7 +90,7 @@ describe("card photo ThumbHashes", () => {
     ]);
 
     expect(result).toEqual({
-      coverMediaKey: "clip",
+      coverMediaKey: "p1",
       photoKeys: ["p1", "p2"],
       photoThumbHashes: ["1fsDBYCIiIiHiIdweIeHh4d4cIgH", null],
       galleryKeys: ["p1", "p2", "p3"],

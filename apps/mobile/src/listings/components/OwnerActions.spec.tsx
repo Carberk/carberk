@@ -109,7 +109,7 @@ it("opens the confirm sheet when a relist answer says the number needs a new cod
         })
       : Promise.reject(new ApiError("CONTACT_PHONE_NOT_CONFIRMED", 409)),
   );
-  api.get.mockResolvedValue({ contactPhone: "+99362000002" });
+  api.get.mockResolvedValue({ contactPhone: "+99362000002", media: [] });
   const screen = await renderMobile(
     <OwnerActions listingId="listing-373" status="archived" mode="menu" />,
   );

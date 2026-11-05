@@ -7,7 +7,7 @@ export const CARD_PHOTO_KEY_LIMIT = 2;
 export const CARD_GALLERY_KEY_LIMIT = 8;
 
 export interface CardPhotos {
-  /** First media key of any kind, kept for conversations and owner cards. */
+  /** First photo key; video reads stay held while their rollout is paused. */
   coverMediaKey?: string;
   /** Keys of the first photos (`image` media) in `sortOrder`, capped at `CARD_PHOTO_KEY_LIMIT`. */
   photoKeys: string[];
@@ -55,7 +55,7 @@ export function toCardPhotosFromFirstMedia(
   const galleryPhotos = photos.slice(0, CARD_GALLERY_KEY_LIMIT);
   const photoThumbHashes = thumbHashSlots(cardPhotos);
   const galleryThumbHashes = thumbHashSlots(galleryPhotos);
-  const cover = firstMedia[0]?.key;
+  const cover = photos[0]?.key;
 
   return {
     ...(cover ? { coverMediaKey: cover } : {}),
