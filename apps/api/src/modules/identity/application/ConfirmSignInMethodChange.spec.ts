@@ -1,3 +1,4 @@
+import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
@@ -90,14 +91,15 @@ class FakeOtpRepo implements OtpRequestRepository {
   }
 
   async consumeIfUnused(id: string): Promise<boolean> {
-    if (this.request.id !== id || this.request.verifiedAt !== null) return false;
+    if (this.request.id !== id || this.request.verifiedAt !== null || this.request.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) return false;
     this.request = { ...this.request, verifiedAt: NOW };
     return true;
   }
 
   async markVerified(): Promise<OtpRequest> { throw new Error("unused"); }
 
-  async incrementAttempts(): Promise<OtpRequest> {
+  async incrementAttempts(): Promise<OtpRequest | null> {
+    if (this.request.verifiedAt !== null || this.request.attempts >= MAX_SIGN_IN_CODE_ATTEMPTS) return null;
     this.request = { ...this.request, attempts: this.request.attempts + 1 };
     return this.request;
   }

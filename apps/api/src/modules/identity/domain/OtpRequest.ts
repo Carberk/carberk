@@ -5,6 +5,8 @@ import type { SignInCodeChannel } from "./types";
 /** Why a code was issued (ADR-0081). Each verify accepts only its own purpose. */
 export type SignInCodePurpose = Enums.SignInCodePurpose;
 
+export const MAX_SIGN_IN_CODE_ATTEMPTS = 5;
+
 export interface OtpRequest {
   readonly id: string;
   readonly purpose: SignInCodePurpose;
