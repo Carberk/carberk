@@ -42,6 +42,10 @@ class FakeS3Client {
       this.policies.set(input.Bucket, input.Policy);
       return {};
     }
+    if (name === "DeleteBucketPolicyCommand") {
+      this.policies.delete(input.Bucket);
+      return {};
+    }
     if (name === "GetBucketPolicyCommand") {
       if (!this.policies.has(input.Bucket)) {
         const error = new Error("No policy");
@@ -128,6 +132,28 @@ test("backup writes object bytes, bucket policy, and checksums", async () => {
     await readFile(join(dir, "policies/listing-photos.json"), "utf8"),
     "listing-photos",
   );
+});
+
+test("video bootstrap removes an old public grant and backup records private access", async () => {
+  const client = new FakeS3Client();
+  await bootstrapBuckets(client, ["listing-videos"]);
+  client.buckets.get("listing-videos").set("legacy/original.mp4", Buffer.from("video"));
+  client.policies.set("listing-videos", JSON.stringify(publicReadPolicy("listing-videos")));
+  const dir = await mkdtemp(join(tmpdir(), "autotm-private-video-backup-"));
+  await assert.rejects(() => backupBuckets(client, dir, ["listing-videos"]), /re-bootstrap before backup/);
+
+  await bootstrapBuckets(client, ["listing-videos"]);
+  await bootstrapBuckets(client, ["listing-videos"]);
+  assert.equal(client.policies.has("listing-videos"), false);
+  await backupBuckets(client, dir, ["listing-videos"]);
+  assert.equal(JSON.parse(await readFile(join(dir, "policies/listing-videos.json"), "utf8")), null);
+
+  // A historical backup can restore its bytes, but never its anonymous grant.
+  await writeFile(join(dir, "policies/listing-videos.json"), JSON.stringify(publicReadPolicy("listing-videos")));
+  const target = new FakeS3Client();
+  await restoreBuckets(target, dir);
+  assert.equal(target.policies.has("listing-videos"), false);
+  assert.equal(target.buckets.get("listing-videos").get("legacy/original.mp4").toString(), "video");
 });
 
 test("restore fails before writing when a backup object checksum does not match", async () => {

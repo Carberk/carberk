@@ -7,6 +7,7 @@ import { pipeline } from "node:stream/promises";
 
 import {
   CreateBucketCommand,
+  DeleteBucketPolicyCommand,
   GetBucketPolicyCommand,
   GetObjectCommand,
   HeadBucketCommand,
@@ -104,14 +105,14 @@ export async function bootstrapBuckets(client, buckets = MEDIA_BUCKETS) {
       created = true;
     }
 
-    const policy = publicReadPolicy(bucket);
-    await client.send(
-      new PutBucketPolicyCommand({
-        Bucket: bucket,
-        Policy: JSON.stringify(policy),
-      }),
-    );
-    assertPublicReadOnlyPolicy(policy, bucket);
+    if (bucket === "listing-videos") {
+      // Reconcile existing public buckets too; retaining bytes grants no serving access.
+      await client.send(new DeleteBucketPolicyCommand({ Bucket: bucket }));
+    } else {
+      const policy = publicReadPolicy(bucket);
+      await client.send(new PutBucketPolicyCommand({ Bucket: bucket, Policy: JSON.stringify(policy) }));
+      assertPublicReadOnlyPolicy(policy, bucket);
+    }
     if (bucket === "catalog-assets") {
       await client.send(new PutBucketLifecycleConfigurationCommand({
         Bucket: bucket,
@@ -135,10 +136,13 @@ export async function backupBuckets(client, outputDir, buckets = MEDIA_BUCKETS) 
   await mkdir(join(outputDir, "policies"), { recursive: true });
 
   for (const bucket of buckets) {
-    let policy = JSON.stringify(publicReadPolicy(bucket), null, 2);
+    let policy = JSON.stringify(bucket === "listing-videos" ? null : publicReadPolicy(bucket), null, 2);
     try {
       const response = await client.send(new GetBucketPolicyCommand({ Bucket: bucket }));
       if (response.Policy) {
+        if (bucket === "listing-videos") {
+          throw new Error("Bucket listing-videos must have no bucket policy during the video hold; re-bootstrap before backup");
+        }
         assertPublicReadOnlyPolicy(response.Policy, bucket);
         policy = JSON.stringify(JSON.parse(response.Policy), null, 2);
       }
@@ -180,8 +184,12 @@ export async function restoreBuckets(client, backupDir) {
     await bootstrapBuckets(client, [bucket.name]);
 
     const policy = await readFile(join(backupDir, bucket.policyFile), "utf8");
-    assertPublicReadOnlyPolicy(policy, bucket.name);
-    await client.send(new PutBucketPolicyCommand({ Bucket: bucket.name, Policy: policy }));
+    // Historical video backups contain an anonymous grant. Restore their bytes
+    // under today's private contract, never the captured public policy.
+    if (bucket.name !== "listing-videos") {
+      assertPublicReadOnlyPolicy(policy, bucket.name);
+      await client.send(new PutBucketPolicyCommand({ Bucket: bucket.name, Policy: policy }));
+    }
 
     for (const object of bucket.objects) {
       const source = join(backupDir, "objects", bucket.name, object.key);

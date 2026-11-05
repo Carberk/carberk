@@ -62,7 +62,7 @@ pnpm minio:bootstrap
 Buckets:
 
 - `listing-photos`
-- `listing-videos`
+- `listing-videos`: private while Listing video rollout is held; bootstrap removes any existing bucket policy without deleting objects.
 - `chat-attachments`
 - `catalog-assets`: anonymous reads cover only `brands/*`, including imported `imp-<hash>-<uuid>` and admin `v<epoch-ms>-<uuid>` activation directories (legacy `imp-<hash>` and `v<n>` directories stay readable while active). Replacing, removing or deleting a logo deletes its whole activation directory, best effort ([ADR-0072](../docs/adr/0072-imported-logo-cleanup-coordination.md)); whole-prefix deletion must not be enabled until every old API logo writer and deterministic importer process has stopped. Admin uploads under `pending/` are private. Confirmation deletes them; abandoned uploads are eligible for lifecycle expiration after one day. MinIO scanning is asynchronous, so deletion can occur later than that threshold.
 
@@ -70,26 +70,30 @@ When a bucket is added to this list, re-run `pnpm minio:bootstrap` against each
 environment's MinIO before deploying the API that uses it. Until then, requests
 that write to the missing bucket fail. `catalog-assets` was added for brand logos.
 
-Each bucket receives an anonymous policy for `s3:GetObject` only. The catalog grant is restricted to `brands/*`; the other buckets retain their full object read scope. Bootstrap reapplies the catalog pending-only lifecycle on every run. Re-run it in each environment before deploying this change, through the environment's authorized operator. Anonymous
+Photo and chat buckets receive anonymous `s3:GetObject` only; the catalog grant is restricted to `brands/*`. The video bucket has no bucket policy, so anonymous object reads, listing and writes are refused; signed operator reads still work. Bootstrap reapplies the catalog pending-only lifecycle on every run. Re-run it in each environment before deploying this change, through the environment's authorized operator. Anonymous
 `s3:PutObject` is not granted; uploads use short-lived signed PUT URLs produced
 by the API.
 
 ## Backup And Restore
 
-Backups capture object bytes, bucket policies, and a SHA-256 manifest. Catalog backups must contain the scoped `brands/*` policy. Legacy whole-bucket catalog policies are rejected, so re-bootstrap before creating a new backup. Lifecycle settings are repository-owned rather than captured in the v1 manifest; restore reestablishes the one-day pending rule during bootstrap:
+Backups capture object bytes, bucket policies, and a SHA-256 manifest. A private video bucket is recorded as JSON `null` in its policy file; backup refuses a video bucket with an existing policy, so reconcile it through an authorized operator first. Catalog backups must contain the scoped `brands/*` policy. Legacy whole-bucket catalog policies are rejected, so re-bootstrap before creating a new backup. Lifecycle settings are repository-owned rather than captured in the v1 manifest; restore reestablishes the one-day pending rule during bootstrap:
 
 ```sh
 pnpm minio:backup /tmp/autotm-minio-backup
 ```
 
 Restores are safe to rerun against isolated/non-production data. The restore
-path bootstraps the bucket, reapplies the captured policy, verifies every local
+path bootstraps the bucket, reapplies the captured policy except for video, verifies every local
 object checksum before upload, uploads the object, reads it back, and verifies
 the restored checksum:
 
 ```sh
 pnpm minio:restore /tmp/autotm-minio-backup
 ```
+
+Video restore always keeps the current private policy, including for historical backups that captured an anonymous grant; their bytes and checksums are still restored. Use this checkout’s restore command for null-policy video backups; older scripts require public policies. This is a temporary serving hold, not authenticated video delivery.
+
+Merging this repository change does not reconcile a live bucket. Staging and production bootstrap/restore remain authorized operator actions. Verify an existing anonymous video URL returns 403 after reconciliation; copies already downloaded are unaffected.
 
 Do not run restore over production as a drill. Restore into isolated data first
 and record the evidence in the deployment runbook.
