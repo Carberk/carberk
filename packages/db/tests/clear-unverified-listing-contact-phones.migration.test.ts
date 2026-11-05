@@ -26,13 +26,15 @@ async function insertListing(
 }
 
 async function listings(db: Client) {
+  // Interpret the stored UTC timestamp before pg converts it to a Date.
   const result = await db.query<{
     id: string;
     contactPhone: string | null;
     status: string;
     allowChat: boolean;
     updatedAt: Date;
-  }>(`SELECT id, "contactPhone", status::text AS status, "allowChat", "updatedAt"
+  }>(`SELECT id, "contactPhone", status::text AS status, "allowChat",
+      "updatedAt" AT TIME ZONE 'UTC' AS "updatedAt"
       FROM listings ORDER BY id`);
   return result.rows;
 }

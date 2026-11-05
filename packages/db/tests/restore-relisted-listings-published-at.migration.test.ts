@@ -41,13 +41,16 @@ async function insertListing(
 }
 
 async function listings(db: Client) {
+  // Qualify UTC wall-clock columns before pg converts them to local Dates.
   const result = await db.query<{
     id: string;
     publishedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
     status: string;
-  }>(`SELECT id, "publishedAt", "createdAt", "updatedAt", status::text AS status
+  }>(`SELECT id, "publishedAt" AT TIME ZONE 'UTC' AS "publishedAt",
+      "createdAt" AT TIME ZONE 'UTC' AS "createdAt",
+      "updatedAt" AT TIME ZONE 'UTC' AS "updatedAt", status::text AS status
       FROM listings ORDER BY id`);
   return result.rows.map((row) => ({
     ...row,
