@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { compactItem, executionSections, parseCommand, runCommand } from "./agent-github.mjs";
+import { compactItem, executionSections, isTransientGithubError, parseCommand, runCommand } from "./agent-github.mjs";
 
 test("reads every grouped Execution state and ignores headings inside fences", () => {
   const body = "## Summary\nhello\n## Execution state for #1\n- **Status:** verifying\n```md\n## Evidence\n```\n- **Next action:** tests\n## Evidence\npass\n## Execution state for #2\n- **Status:** implementing\n";
@@ -48,14 +48,20 @@ test("comments are dry-run by default; apply preserves body-file text and avoids
   const body = 'Line one\n\nLiteral $(touch /tmp/no) and `backticks`.\n';
   writeFileSync(path, body);
   const calls = [];
-  const deps = { repo: "owner/repo", gh(args) { calls.push(args); assert.equal(readFileSync(args[args.indexOf("--body-file") + 1], "utf8"), body); return "https://example.test/comment\n"; } };
+  const deps = { repo: "owner/repo", gh(args) {
+    calls.push(args);
+    if (args[0] === "api") return JSON.stringify({ id: 123, body, html_url: "https://github.com/owner/repo/issues/42#issuecomment-123" });
+    assert.equal(readFileSync(args[args.indexOf("--body-file") + 1], "utf8"), body);
+    return "https://github.com/owner/repo/issues/42#issuecomment-123\n";
+  } };
   try {
     const dry = runCommand(parseCommand(["comment", "issue", "42", "--body-file", path]), deps);
     assert.equal(dry.dryRun, true);
     assert.equal(calls.length, 0);
     const applied = runCommand(parseCommand(["comment", "issue", "42", "--body-file", path, "--apply"]), deps);
-    assert.equal(applied.url, "https://example.test/comment");
-    assert.equal(calls.length, 1);
+    assert.equal(applied.url, "https://github.com/owner/repo/issues/42#issuecomment-123");
+    assert.equal(applied.verification.status, "verified");
+    assert.equal(calls.length, 2);
     assert.ok(calls[0].includes(path));
     assert.equal(applied.body, undefined);
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -71,8 +77,69 @@ test("creating an issue requires a title and nonempty body file, and returns a s
     const args = ["create-issue", "--title", "A task", "--body-file", path, "--label", "task", "--apply"];
     assert.throws(() => runCommand(parseCommand(args), deps), /empty/i);
     writeFileSync(path, "## Acceptance criteria\n- [ ] Works\n");
-    const result = runCommand(parseCommand(args), deps);
-    assert.equal(result.url, "https://example.test/issues/1");
+    const result = runCommand(parseCommand(args), {
+      ...deps,
+      gh(call) {
+        if (call[0] === "issue" && !call.includes("--body-file")) return JSON.stringify({ number: 1, title: "A task", state: "OPEN", url: "https://github.com/owner/repo/issues/1" });
+        return "https://github.com/owner/repo/issues/1\n";
+      },
+    });
+    assert.equal(result.url, "https://github.com/owner/repo/issues/1");
+    assert.equal(result.verification.status, "verified");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("safe reads retry transient GitHub failures with bounded backoff", () => {
+  let attempts = 0;
+  const delays = [];
+  const result = runCommand(parseCommand(["issue", "7"]), {
+    repo: "owner/repo",
+    sleep: (delay) => delays.push(delay),
+    gh() {
+      attempts += 1;
+      if (attempts < 3) throw new Error("GitHub returned 503 Service Unavailable");
+      return JSON.stringify({ number: 7, title: "Ready", state: "OPEN", body: "## Acceptance criteria\n- [ ] Works" });
+    },
+  });
+  assert.equal(result.number, 7);
+  assert.equal(attempts, 3);
+  assert.deepEqual(delays, [200, 400]);
+});
+
+test("safe reads do not retry non-transient failures", () => {
+  let attempts = 0;
+  assert.throws(() => runCommand(parseCommand(["issue", "7"]), {
+    repo: "owner/repo", sleep: () => { throw new Error("must not sleep"); },
+    gh() { attempts += 1; throw new Error("GitHub returned 404 Not Found"); },
+  }), /404/);
+  assert.equal(attempts, 1);
+  assert.equal(isTransientGithubError(new Error("503 Service Unavailable")), true);
+  assert.equal(isTransientGithubError(new Error("422 Validation Failed")), false);
+});
+
+test("writes are never replayed and uncertain outcomes are explicit", () => {
+  const root = mkdtempSync(join(tmpdir(), "autotm-gh-"));
+  const path = join(root, "body.md");
+  writeFileSync(path, "A comment");
+  try {
+    let writes = 0;
+    const result = runCommand(parseCommand(["comment", "issue", "42", "--body-file", path, "--apply"]), {
+      repo: "owner/repo", sleep: () => {}, gh(args) {
+        if (args[0] === "api") throw new Error("GitHub returned 503 Service Unavailable");
+        writes += 1;
+        return "https://github.com/owner/repo/issues/42#issuecomment-123\n";
+      },
+    });
+    assert.equal(writes, 1);
+    assert.equal(result.applied, true);
+    assert.equal(result.verification.status, "uncertain");
+    assert.match(result.verification.reason, /503/);
+
+    const failed = runCommand(parseCommand(["comment", "issue", "42", "--body-file", path, "--apply"]), {
+      repo: "owner/repo", gh() { throw new Error("request timed out"); },
+    });
+    assert.equal(failed.applied, false);
+    assert.equal(failed.uncertain, true);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

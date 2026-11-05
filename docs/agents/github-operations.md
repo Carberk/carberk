@@ -2,6 +2,11 @@
 
 Use the installed `gh` CLI through `pnpm agent:github` for routine reads and file-based writes. It uses the existing `gh` authentication, no new MCP server or package. GitHub and the PR's Execution state remain authoritative. This helper does not approve, merge, close issues, reconcile labels or replace the broader automation in issue #648.
 
+Read operations retry a small number of transient transport or GitHub service
+errors. Writes are never replayed automatically. An applied issue or comment
+includes a read-back verification receipt; an `uncertain` result means the
+request may have completed and must be checked by resource before retrying.
+
 ## Read the part needed
 
 ```bash
