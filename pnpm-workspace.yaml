@@ -12,9 +12,9 @@ overrides:
   # GHSA-qw65-cvwx-89v3 and follow-up 3.x URI fixes. Keep fast-uri 4.x on
   # its existing line; only the vulnerable 3.x dependency edges are pinned.
   "fast-uri@>=3.0.0 <4.0.0": 3.1.9
-  # GHSA-p68q-wchp-6fh7: Nest 11 pins an affected Fastify release.
-  # Remove when the adapter itself depends on Fastify >=5.12.2.
-  "@nestjs/platform-fastify@11.2.5>fastify": 5.12.2
+  # GHSA-p68q-wchp-6fh7 and the 5.x follow-ups. Nest 11 pins an affected
+  # Fastify release; remove when the adapter itself depends on Fastify >=5.12.6.
+  "@nestjs/platform-fastify@11.2.5>fastify": 5.12.6
 
 # Official Android prefab backports, reviewed separately in PR #859.
 patchedDependencies:
@@ -50,7 +50,7 @@ catalog:
   clsx: ^2.1.1
   eslint: ^9.39.5
   eslint-plugin-react-hooks: 7.1.1
-  fastify: 5.12.2
+  fastify: 5.12.6
   # happy-dom 21 is out of scope (#854); hold the 20.x line.
   happy-dom: ^20.14.6
   ioredis: ^5.4.2
