@@ -268,6 +268,27 @@ describe("Conversation message broadcast e2e", () => {
     await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
   }
 
+  it("disconnects a malformed binary packet without interrupting other chat connections", async () => {
+    const { buyerToken, sellerToken, conversationId } = await seedConversation();
+    const { socket } = await joinedSocket(buyerToken, conversationId);
+    socket.io.reconnection(false);
+    const disconnected = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Malformed packet was not disconnected")), 5_000);
+      socket.once("disconnect", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+
+    // One bounded packet reproduces GHSA-2m8v-j782-fhvr's zero-attachment
+    // precondition without sending binary data or exhausting memory.
+    socket.io.engine.write(`50-${REALTIME_NAMESPACE},["invalid-binary-event"]`);
+    await disconnected;
+
+    const peer = await joinedSocket(sellerToken, conversationId);
+    expect(peer.socket.connected).toBe(true);
+  });
+
   it("delivers an image sent over HTTP to the peer and the sender's other device", async () => {
     const { buyerToken, sellerToken, conversationId } = await seedConversation();
     const peer = await joinedSocket(sellerToken, conversationId);
