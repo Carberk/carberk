@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -92,9 +94,58 @@ test("the required pr job needs every other PR Checks job and runs even when one
   assert.ok(pr, "PR Checks has no pr job");
   const needs = /needs: \[([^\]]*)\]/.exec(pr)?.[1].split(",").map((id) => id.trim()) ?? [];
   assert.deepEqual(needs.sort(), [...graph.keys()].filter((id) => id !== "pr").sort());
-  assert.match(pr, /\n {4}if: always\(\)\n/);
+  assert.match(pr, /\n {4}if: always\(\) && /);
   for (const id of needs) {
     assert.ok(pr.includes(`needs.${id}.result`), `pr does not check the ${id} job's result`);
+  }
+});
+
+test("draft checks cannot establish a green pr head for the docs shortcut", () => {
+  const source = workflow("pr-checks.yml");
+  assert.match(
+    source,
+    /pull_request:\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled\]/,
+    "PR Checks must rerun when a draft becomes ready",
+  );
+  const graph = jobs(source);
+  for (const id of ["docs", "static", "api", "db", "frontend", "pr"]) {
+    assert.match(
+      graph.get(id),
+      /^ {4}if: (?:always\(\) && )?\(github\.event\.pull_request\.draft != true \|\| contains\(github\.event\.pull_request\.labels\.\*\.name, 'run-full-ci'\)\)(?: && |\n)/m,
+      `${id} must skip draft pull requests`,
+    );
+  }
+});
+
+function runBlock(job) {
+  return job.split("        run: |\n")[1].split("\n").map(line => line.replace(/^ {10}/, "")).join("\n");
+}
+
+test("the explicit draft override forces the full lane, including docs-only changes", t => {
+  const cwd = mkdtempSync(join(tmpdir(), "ci-draft-override-"));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const output = join(cwd, "github-output");
+  const script = runBlock(jobs(workflow("pr-checks.yml")).get("lane"));
+  const result = spawnSync("bash", ["-c", script], {
+    cwd, env: { ...process.env, FORCE_FULL_CI: "true", GITHUB_OUTPUT: output }, encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(readFileSync(output, "utf8"), "lane=full\n");
+});
+
+test("the required check rejects failed, cancelled and unexpectedly skipped jobs", () => {
+  const script = runBlock(jobs(workflow("pr-checks.yml")).get("pr"));
+  const env = {
+    LANE: "full", LANE_RESULT: "success", DOCS_RESULT: "skipped",
+    STATIC_RESULT: "success", API_RESULT: "success", DB_RESULT: "success", FRONTEND_RESULT: "success",
+  };
+  const status = overrides => spawnSync("bash", ["-c", script], { env: { ...process.env, ...env, ...overrides } }).status;
+  assert.equal(status({}), 0);
+  assert.equal(status({ LANE: "docs", DOCS_RESULT: "success", STATIC_RESULT: "skipped", API_RESULT: "skipped", DB_RESULT: "skipped", FRONTEND_RESULT: "skipped" }), 0);
+  for (const id of ["LANE_RESULT", "STATIC_RESULT", "API_RESULT", "DB_RESULT", "FRONTEND_RESULT"]) {
+    for (const value of ["failure", "cancelled", "skipped", ""]) {
+      assert.equal(status({ [id]: value }), 1, `${id}=${value} must fail the full lane`);
+    }
   }
 });
 
@@ -108,7 +159,8 @@ for (const name of ["pr-checks.yml", "ci.yml"]) {
     assert.ok(api.includes("run: pnpm test:api") && !api.includes("pnpm test:db"));
     assert.ok(db.includes("run: pnpm test:db") && !db.includes("pnpm test:api"));
     for (const [id, text] of [["api", api], ["db", db]]) {
-      assert.match(text, /^ {4}needs: lane\n {4}if: needs\.lane\.outputs\.lane != 'docs'\n/m, `${name} ${id} is not skipped by the docs lane`);
+      const draftPrefix = name === "pr-checks.yml" ? "\\(github\\.event\\.pull_request\\.draft != true \\|\\| contains\\(github\\.event\\.pull_request\\.labels\\.\\*\\.name, 'run-full-ci'\\)\\) && " : "";
+      assert.match(text, new RegExp(`^ {4}needs: lane\\n {4}if: ${draftPrefix}needs\\.lane\\.outputs\\.lane != 'docs'\\n`, "m"), `${name} ${id} is not skipped by the docs lane`);
       assert.match(text, /TESTCONTAINERS_RYUK_DISABLED: "true"/, `${name} ${id} must disable Ryuk`);
     }
     assert.match(api, /scripts\/ci-services\.sh up/);
