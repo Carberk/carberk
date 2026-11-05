@@ -4,7 +4,7 @@ Carberk is the public product name. AutoTM identifiers, packages and domains rem
 
 Read the request and acceptance criteria, then [CONTEXT-MAP.md](CONTEXT-MAP.md), the owning overview, source and tests. Source, types, tests, and runtime evidence establish current behavior; the issue establishes the delivery slice. Use the [glossary](docs/domain/GLOSSARY.md) for terms, the [ADR index](docs/adr/README.md) for durable decisions, and task-scoped guides for specialized work. Read the roadmap only for scheduling.
 
-Every change follows the [delivery workflow](docs/agents/coding-workflow.md): one issue, one small PR from current `main`, reviewed by `sol-loop` and merged only on "full send" or founder approval ([ADR-0108](docs/adr/0108-small-prs-with-full-send-replace-integration-delivery.md)). The [environment guide](docs/agents/environment.md) says what exists (local Docker, simulators, CI, GitHub, Railway, EAS) and what you may change without asking. Repository skills live only in [.claude/skills](.claude/skills); open linked skills manually when the host cannot discover them.
+Every change follows the [delivery workflow](docs/agents/coding-workflow.md): one issue, one small PR from current `main`, reviewed by `sol-loop` and merged only on "full send" or founder approval ([ADR-0108](docs/adr/0108-small-prs-with-full-send-replace-integration-delivery.md)). The [environment guide](docs/agents/environment.md) says what exists (local Docker, simulators, CI, GitHub, Railway, EAS) and what you may change without asking. Repository skills live only in [.claude/skills](.claude/skills); `.agents/skills` is a symlink to it for Codex. Open linked skills manually when the host cannot discover them.
 
 | When changing | Read before editing |
 |---|---|

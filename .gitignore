@@ -86,7 +86,9 @@ tmp/
 .claude/worktrees/
 
 # Agent tooling is user-global; project workflow skills live in .claude/skills/.
-.agents/
+# .agents/skills is a tracked symlink to them so Codex can discover the skills.
+.agents/*
+!.agents/skills
 
 # Expo prebuild generated native projects
 apps/mobile/android/
