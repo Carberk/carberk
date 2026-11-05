@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and specs for Carberk live as GitHub issues on `Carberk/carberk`. Use the `gh` CLI for all operations. Write titles and bodies with [glossary](../domain/GLOSSARY.md) terms. The repository is public, so keep secrets and private data out.
+Issues and specs for Carberk live as GitHub issues on `Carberk/carberk`. Use the `gh` CLI for all operations, through `pnpm agent:github` ([GitHub operations](github-operations.md)) for bounded reads and file-based writes. Write titles and bodies with [glossary](../domain/GLOSSARY.md) terms. The repository is public, so keep secrets and private data out.
 
 ## Ticket shape
 
