@@ -60,6 +60,7 @@ const requests: string[] = [];
 
 beforeEach(() => {
   requests.length = 0;
+  server.use(http.get("*/catalog/brands", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })));
 });
 
 function serve(path: string, json: Record<string, unknown>) {

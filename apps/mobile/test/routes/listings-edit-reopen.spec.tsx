@@ -1,8 +1,10 @@
+import { http, HttpResponse } from "msw";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { waitFor } from "@testing-library/react-native";
 
 import { renderMobile, routeParams } from "../render";
 import EditListingScreen from "../../app/listings/[id]/edit";
+import { server } from "../msw";
 
 // Reopening the editor with the real upload queue over an in-memory staging
 // directory: files an earlier edit session left behind must not come back.
@@ -85,6 +87,7 @@ vi.mock("../../src/api/catalog/useCities", () => ({ useCities: () => ({ data: { 
 const stagingDir = `file:///doc/listing-staging/edit-${fixture.id}/`;
 
 beforeEach(() => {
+  server.use(http.get("*/catalog/models/:modelId/generations", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })));
   routeParams.id = fixture.id;
   fixture.files.clear();
 });

@@ -1,8 +1,10 @@
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthIntentStore } from "../../auth/intentStore";
 import { fireEvent, renderMobile, getAllHosts } from "../../../test/render";
 import { summaryFixture } from "../../../test/fixtures/listing";
+import { server } from "../../../test/msw";
 
 import { ListingPreview } from "./ListingPreview";
 
@@ -32,7 +34,14 @@ vi.mock("@/components/ui/skeleton", async () => ({
 }));
 
 const onBack = vi.fn();
-beforeEach(() => onBack.mockClear());
+beforeEach(() => {
+  onBack.mockClear();
+  server.use(
+    http.get("*/catalog/drive-types", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })),
+    http.get("*/catalog/body-types", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })),
+    http.get("*/catalog/colors", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })),
+  );
+});
 
 function preview(
   updates: Parameters<typeof summaryFixture>[0] = {},

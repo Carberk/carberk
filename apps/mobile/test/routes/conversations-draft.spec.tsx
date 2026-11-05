@@ -1,6 +1,8 @@
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { act, fireEvent, renderMobile, routeParams } from "../render";
+import { server } from "../msw";
 import ConversationDetailScreen from "../../app/conversations/[id]";
 
 const DRAFT = "Can I see the car?";
@@ -98,6 +100,7 @@ vi.mock("expo-file-system/legacy", () => ({ deleteAsync: vi.fn(async () => {}) }
 vi.mock("expo-linking", () => ({ openSettings: vi.fn() }));
 
 beforeEach(() => {
+  server.use(http.get("*/conversations/:id", () => HttpResponse.json({ code: "INTERNAL" }, { status: 503 })));
   mocks.sendTextMessage.mockClear();
   routeParams.id = "conversation-1";
   routeParams.listingId = "00000000-0000-4000-8000-000000000374";

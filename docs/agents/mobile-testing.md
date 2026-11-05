@@ -76,7 +76,10 @@ Router calls and route parameters reset before each test. `canGoBack` defaults
 to true; reset any changed return implementation in your spec. `useIsFocused`
 returns `screenFocus.focused`, true before each test; set it to false and
 rerender for a screen that another screen covers. Data, auth and
-native services still need explicit fixtures or MSW handlers. Render the actual
+native services still need explicit fixtures or MSW handlers. An unhandled MSW
+request fails teardown even if application code catches its transport error.
+Model expected failures with explicit HTTP handlers; do not leave requests
+unhandled to simulate an outage. Render the actual
 screen and feature components and mock the external service. For a new spec,
 [Coding standards](coding-standards.md#tests) prefer MSW with the real API
 hooks over a stubbed hook; a new test in an existing spec follows that spec. See `listingDetail.spec.tsx` for ownership, contact, retry,
