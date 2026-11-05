@@ -15,6 +15,7 @@ Every change follows the [delivery workflow](docs/agents/coding-workflow.md): on
 | Mobile styling/components or API/cache | [NativeWind](docs/agents/nativewind-v4.md) or [data fetching](docs/agents/mobile-data-fetching.md) |
 | Mobile screens/navigation/discovery | The affected source, tests, and approved issue or prototype; review the interaction with the installed `ux-heuristics`, `design-everyday-things`, and `impeccable` skills when available |
 | TypeScript imports, exports or shared runtime | [Runtime boundaries](docs/agents/typescript-runtime.md) |
+| Choosing a model or effort for agent work, delegates or reviews | [Models and effort](docs/agents/models.md) |
 | Running the app, the iOS Simulator, or signing in to the app or Admin locally | [Local testing](docs/agents/local-testing.md) |
 | Devices, CI, Railway, staging or deploys | [Environment guide](docs/agents/environment.md) and [deployment runbook](docs/prd/ops/80-deployment-runbook.md) |
 
