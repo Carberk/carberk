@@ -333,27 +333,6 @@ describe("AttachMedia", () => {
     expect(world.media).toHaveLength(1);
   });
 
-  it("attaches a video without calling variant generator", async () => {
-    seedActiveListing(repo);
-    presignedUpload("pending/abc/original.mp4", "video");
-    presignedUpload("pending/abc/poster.webp");
-
-    const result = await uc.execute({
-      listingId: "listing-1",
-      userId: "user-1",
-      key: "pending/abc/original.mp4",
-      kind: "video",
-      sortOrder: 0,
-      durationMs: 30000,
-      posterKey: "pending/abc/poster.webp",
-    });
-
-    expect(result.media.kind).toBe("video");
-    expect(variantGen.called).toBe(false);
-    expect(result.media.durationMs).toBe(30000);
-    expect(result.media.posterKey).toBe("pending/abc/poster.webp");
-  });
-
   it("rejects when photo limit (20) is exceeded", async () => {
     seedActiveListing(repo);
     for (let i = 0; i < 20; i++) {
@@ -376,31 +355,6 @@ describe("AttachMedia", () => {
         key: "pending/extra/original.webp",
         kind: "image",
         sortOrder: 21,
-      }),
-    ).rejects.toThrow(BadRequestException);
-  });
-
-  it("rejects when video limit (1) is exceeded", async () => {
-    seedActiveListing(repo);
-    world.media.push(
-      ListingMedia.create({
-        id: "media-video",
-        listingId: "listing-1",
-        kind: "video",
-        key: "pending/vid/original.mp4",
-        sortOrder: 0,
-        durationMs: 30000,
-      }),
-    );
-    presignedUpload("pending/extra/original.mp4", "video");
-
-    await expect(
-      uc.execute({
-        listingId: "listing-1",
-        userId: "user-1",
-        key: "pending/extra/original.mp4",
-        kind: "video",
-        sortOrder: 1,
       }),
     ).rejects.toThrow(BadRequestException);
   });

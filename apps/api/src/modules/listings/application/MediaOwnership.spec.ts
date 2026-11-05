@@ -235,19 +235,19 @@ describe("Listing media upload ownership (#536)", () => {
     });
 
     it("answers unknown, foreign and wrong-kind keys identically", async () => {
-      const own = await presign.execute({
-        userId: USER_A,
-        kind: "image",
-        contentType: "image/webp",
-        sizeBytes: 2048,
+      // Existing video uploads still must not be adopted as photos.
+      const key = "pending/legacy-video/original.mp4";
+      world.uploads.push({
+        id: "legacy-video", userId: USER_A, key, kind: "video",
+        contentType: "video/mp4", sizeBytes: 2048, createdAt: new Date("2026-05-01T00:00:00Z"),
       });
-      world.completeUpload(own.key);
+      world.completeUpload(key);
       const attempt = (key: string, kind: "image" | "video") =>
         rejection(
           attach.execute({ listingId: LISTING_A, userId: USER_A, key, kind, sortOrder: 0 }),
         ).then((err) => (err as BadRequestException).getResponse());
 
-      const wrongKind = await attempt(own.key, "video");
+      const wrongKind = await attempt(key, "image");
       const foreign = await attempt(victimKey, "image");
       const unknown = await attempt("pending/never-presigned/original.webp", "image");
 
@@ -258,8 +258,8 @@ describe("Listing media upload ownership (#536)", () => {
     it("rejects a poster key the caller did not upload", async () => {
       const presigned = await presign.execute({
         userId: USER_A,
-        kind: "video",
-        contentType: "video/mp4",
+        kind: "image",
+        contentType: "image/webp",
         sizeBytes: 2048,
       });
       world.completeUpload(presigned.key);
@@ -269,7 +269,7 @@ describe("Listing media upload ownership (#536)", () => {
           listingId: LISTING_A,
           userId: USER_A,
           key: presigned.key,
-          kind: "video",
+          kind: "image",
           sortOrder: 0,
           posterKey: victimKey,
         }),

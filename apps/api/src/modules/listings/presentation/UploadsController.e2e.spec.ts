@@ -134,15 +134,16 @@ describe("UploadsController e2e", () => {
       });
     });
 
-    it("returns presigned URL for video", async () => {
+    it("keeps Listing video uploads unavailable until rollout is ready", async () => {
       const res = await request
         .post("/api/v1/uploads/presign")
         .set("Authorization", `Bearer ${getToken()}`)
         .send({ kind: "video", contentType: "video/mp4", sizeBytes: 1024 })
-        .expect(201);
+        .expect(400);
 
-      expect(res.body.key).toMatch(/original\.mp4$/);
-      expect(res.body.maxSizeBytes).toBe(10 * 1024 * 1024);
+      expect(res.body.code).toBe("LISTING_VIDEO_UNAVAILABLE");
+      expect(res.body).not.toHaveProperty("uploadUrl");
+      expect(uploads.recorded.filter(upload => upload.kind === "video")).toEqual([]);
     });
 
     it("returns webp extension for image/webp", async () => {
@@ -173,20 +174,6 @@ describe("UploadsController e2e", () => {
           kind: "image",
           contentType: "image/webp",
           sizeBytes: 6 * 1024 * 1024,
-        })
-        .expect(400);
-
-      expect(res.body.code).toBe("HTTP_ERROR");
-    });
-
-    it("rejects oversized video", async () => {
-      const res = await request
-        .post("/api/v1/uploads/presign")
-        .set("Authorization", `Bearer ${getToken()}`)
-        .send({
-          kind: "video",
-          contentType: "video/mp4",
-          sizeBytes: 11 * 1024 * 1024,
         })
         .expect(400);
 
