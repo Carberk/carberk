@@ -370,15 +370,22 @@ export function validateStep(
 
   const errors: string[] = [];
   const fieldErrors: Record<string, string> = {};
+  const fieldErrorDepth: Record<string, number> = {};
   for (const issue of result.error.issues) {
     // A message set directly on a check bypasses the error map, so enforce
     // the keys-only contract here as well.
     const message = isWizardErrorKey(issue.message) ? issue.message : KEY.invalidValue;
     errors.push(message);
     const key = (issue.path[0] ?? "").toString();
-    // First issue per field wins — later ones are typically less specific.
-    if (!(key in fieldErrors)) {
+    // Prefer a direct field error over nested item errors. Zod 3 reported
+    // array-level constraints before item details; keeping that precedence
+    // preserves the existing wizard key for short, malformed collections.
+    if (
+      !(key in fieldErrors) ||
+      issue.path.length < (fieldErrorDepth[key] ?? Number.POSITIVE_INFINITY)
+    ) {
       fieldErrors[key] = message;
+      fieldErrorDepth[key] = issue.path.length;
     }
   }
   return { valid: false, errors, fieldErrors };

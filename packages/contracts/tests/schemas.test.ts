@@ -1442,6 +1442,12 @@ describe("validateStep", () => {
     );
   });
 
+  it("keeps the collection-level photo error when an item is also malformed", () => {
+    expect(validateStep("photos", { photos: [{}] } as never).fieldErrors["photos"]).toBe(
+      "wizardErrors.photosRequired",
+    );
+  });
+
   it("reports a missing field as required and a wrong value as invalid", () => {
     expect(validateStep("specs", {}).fieldErrors["condition"]).toBe(
       "wizardErrors.required",
