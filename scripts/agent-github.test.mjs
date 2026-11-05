@@ -97,7 +97,7 @@ test("safe reads retry transient GitHub failures with bounded backoff", () => {
     sleep: (delay) => delays.push(delay),
     gh() {
       attempts += 1;
-      if (attempts < 3) throw new Error("GitHub returned 503 Service Unavailable");
+      if (attempts < 3) throw new Error("gh: HTTP 503: Service Unavailable");
       return JSON.stringify({ number: 7, title: "Ready", state: "OPEN", body: "## Acceptance criteria\n- [ ] Works" });
     },
   });
@@ -113,8 +113,12 @@ test("safe reads do not retry non-transient failures", () => {
     gh() { attempts += 1; throw new Error("GitHub returned 404 Not Found"); },
   }), /404/);
   assert.equal(attempts, 1);
-  assert.equal(isTransientGithubError(new Error("503 Service Unavailable")), true);
+  assert.equal(isTransientGithubError(new Error("gh: HTTP 503: Service Unavailable")), true);
   assert.equal(isTransientGithubError(new Error("422 Validation Failed")), false);
+  assert.equal(isTransientGithubError(new Error("404 Not Found for issue #500")), false);
+  for (const message of ["Failed to connect to github.com", "Could not resolve host: github.com", "connection reset by peer"]) {
+    assert.equal(isTransientGithubError(new Error(message)), true, message);
+  }
 });
 
 test("writes are never replayed and uncertain outcomes are explicit", () => {
@@ -125,7 +129,7 @@ test("writes are never replayed and uncertain outcomes are explicit", () => {
     let writes = 0;
     const result = runCommand(parseCommand(["comment", "issue", "42", "--body-file", path, "--apply"]), {
       repo: "owner/repo", sleep: () => {}, gh(args) {
-        if (args[0] === "api") throw new Error("GitHub returned 503 Service Unavailable");
+        if (args[0] === "api") throw new Error("gh: HTTP 503: Service Unavailable");
         writes += 1;
         return "https://github.com/owner/repo/issues/42#issuecomment-123\n";
       },

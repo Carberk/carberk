@@ -134,7 +134,10 @@ function execute(program, args) {
 
 export function isTransientGithubError(error) {
   const text = `${error?.code ?? ""} ${error?.status ?? ""} ${error?.message ?? error ?? ""}`;
-  return /(?:429|500|502|503|504|ECONNRESET|ECONNREFUSED|ETIMEDOUT|timed out|timeout|temporarily unavailable|service unavailable)/i.test(text);
+  if ([429, 500, 502, 503, 504].includes(Number(error?.status))) return true;
+  const status = /(?:^|\b)(?:gh:\s*)?(?:HTTP(?:\/\d+(?:\.\d+)?)?\s*(?:error\s*)?|status(?:\s+code)?\s*[:=]?\s*|(?:returned|response)\s+)(429|500|502|503|504)\b/i;
+  const transport = /(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|failed to connect|could not resolve host|connection reset by peer|connection refused|network is unreachable|timed out|timeout|temporarily unavailable|service unavailable)/i;
+  return status.test(text) || transport.test(text);
 }
 
 function sleepSync(milliseconds) {
