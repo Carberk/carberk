@@ -21,6 +21,14 @@ In T3 Code, use `orchestrator_capabilities` to resolve the models, then
 the harness's subagent tools. If you cannot reach three providers, or a named
 member is unavailable, report it instead of substituting.
 
+## Carberk
+
+Unless the user names members, use the council in
+[models and effort](../../../docs/agents/models.md): GPT Sol 6.1, Claude Opus
+5.5 and Muse Wonder 1.0 at high effort. This replaces the three-provider rule
+above: if Opus or Muse is unavailable, run with the members you can reach and
+name the missing ones. Sol is required.
+
 Give each delegate the request and relevant context. For review or feedback,
 keep their work read-only. Collect their responses and summarize the useful
 findings, disagreements, and recommended next steps.

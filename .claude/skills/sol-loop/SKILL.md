@@ -29,9 +29,10 @@ Standards and Spec reviewers, so one Sol reviewer covers three things:
   findings (or the documented fallback when a skill was unavailable).
 
 Before round 1, run the checks CI runs for the touched packages (typecheck,
-lint, affected tests) and put the results in the brief. Use the latest Sol the
-orchestrator reports, at medium effort. Use `xhigh` for auth, permissions,
-migrations, data deletion, payments or concurrency. Never use Fast mode.
+lint, affected tests) and put the results in the brief. Use the Sol model and
+effort from [models and effort](../../../docs/agents/models.md): medium, or
+`xhigh` for auth, permissions, migrations, data deletion, payments or
+concurrency. Never use Fast mode.
 
 The ledger stays in this thread and the PR line below. Do not write review
 files into the repository.
@@ -69,7 +70,8 @@ missing or pre-failing checks in the brief.
 
 ## 2. Start Sol
 
-In T3, call `orchestrator_capabilities`. Pick the latest Sol unless the user
+In T3, call `orchestrator_capabilities`. Pick the Sol that
+[models and effort](../../../docs/agents/models.md) names unless the user
 named a version. Do not hardcode an ID. Record provider, model, and effort
 only if exposed. Use `delegate_task` every round (`role: "review"`,
 `mode: "async"`). Save `taskId`. New `clientRequestId` per round.
