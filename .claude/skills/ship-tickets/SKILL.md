@@ -26,6 +26,8 @@ Carry the founder's explicit mode into every ticket:
   may continue.
 
 Without an explicit mode, ask the founder to choose one before dispatch.
+The parent thread applies the mode. Implementation agents never invoke the
+mode's merge or auto-merge steps.
 
 Keep a compact ledger in the thread with one row per ticket:
 
@@ -73,7 +75,8 @@ Apply these skills to every ticket:
 1. `sol-loop` reviews bugs, acceptance and standards.
 2. `file-pr` opens the real PR with proof and `Closes #<ticket>`.
 3. `babysit-pr` handles CI and review changes.
-4. `full-send` or `full-stop` supplies the merge mode.
+4. The parent applies `full-send` or `full-stop` and owns every watch and merge
+   decision; children stop after filing or updating their PR.
 
 Merge only when required checks are green, review is complete, the branch is
 up to date and GitHub reports it mergeable. Use the repository's protected
