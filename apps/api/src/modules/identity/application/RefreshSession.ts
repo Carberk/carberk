@@ -2,10 +2,10 @@ import { randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
-import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
+import type { RefreshTokenHasherPort } from "../domain/ports/RefreshTokenHasherPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
-import { BcryptHasherAdapter } from "../infrastructure/BcryptHasherAdapter";
+import { RefreshTokenDigestAdapter } from "../infrastructure/RefreshTokenDigestAdapter";
 import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 
 import { UserSuspendedError } from "../domain/UserSuspendedError";
@@ -28,8 +28,8 @@ export class RefreshSession {
   constructor(
     @Inject(PrismaSessionRepository)
     private readonly sessionRepo: SessionRepository,
-    @Inject(BcryptHasherAdapter)
-    private readonly hasher: PasswordHasherPort,
+    @Inject(RefreshTokenDigestAdapter)
+    private readonly hasher: RefreshTokenHasherPort,
     @Inject(SystemClockAdapter)
     private readonly clock: ClockPort,
     @Inject(JwtService)

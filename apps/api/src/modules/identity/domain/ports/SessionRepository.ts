@@ -25,9 +25,9 @@ export interface SessionRepository {
   deleteOldestByUserId(userId: string): Promise<void>;
 
   /**
-   * Finds a session by scanning all rows and bcrypt-comparing the plaintext
-   * refresh token against each stored hash. Includes user identity for JWT issuance.
-   * Returns null when no match is found or the session has expired.
+   * Finds one session by its indexed refresh-token digest. Includes user
+   * identity for JWT issuance. Expiry is checked by the caller: logout may
+   * delete an expired session, while refresh must refuse it.
    */
   findByRefreshToken(plaintext: string): Promise<SessionLookupResult | null>;
 

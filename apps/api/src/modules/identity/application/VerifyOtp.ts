@@ -10,7 +10,7 @@ import { signInCodeDestination } from "../domain/SignInCodeDestination";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import type { UserRepository } from "../domain/ports/UserRepository";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
-import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
+import type { RefreshTokenHasherPort } from "../domain/ports/RefreshTokenHasherPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import type { ConstantTimeComparatorPort } from "../domain/ports/ConstantTimeComparatorPort";
 import { CONSTANT_TIME_COMPARATOR_PORT } from "../domain/ports/ConstantTimeComparatorPort";
@@ -22,7 +22,7 @@ import { drawGeneratedIdentity } from "../domain/GeneratedIdentity";
 import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
 import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
 import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
-import { BcryptHasherAdapter } from "../infrastructure/BcryptHasherAdapter";
+import { RefreshTokenDigestAdapter } from "../infrastructure/RefreshTokenDigestAdapter";
 import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 import type { IdentityCheckPort } from "../domain/ports/IdentityCheckPort";
 import { IDENTITY_TOKENS } from "../identity.tokens";
@@ -60,8 +60,8 @@ export class VerifyOtp {
     private readonly userRepo: UserRepository,
     @Inject(PrismaSessionRepository)
     private readonly sessionRepo: SessionRepository,
-    @Inject(BcryptHasherAdapter)
-    private readonly hasher: PasswordHasherPort,
+    @Inject(RefreshTokenDigestAdapter)
+    private readonly hasher: RefreshTokenHasherPort,
     @Inject(SystemClockAdapter)
     private readonly clock: ClockPort,
     @Inject(JwtService)

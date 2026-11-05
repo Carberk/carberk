@@ -37,7 +37,7 @@ import { PrismaUserRepository } from "./infrastructure/PrismaUserRepository";
 import { PrismaSessionRepository } from "./infrastructure/PrismaSessionRepository";
 import { PrismaTotpEnrollmentRepository } from "./infrastructure/PrismaTotpEnrollmentRepository";
 import { HttpOtpSenderAdapter } from "./infrastructure/HttpOtpSenderAdapter";
-import { BcryptHasherAdapter } from "./infrastructure/BcryptHasherAdapter";
+import { RefreshTokenDigestAdapter } from "./infrastructure/RefreshTokenDigestAdapter";
 import { SystemClockAdapter } from "./infrastructure/SystemClockAdapter";
 import { PrismaIdentityCheckAdapter } from "./infrastructure/PrismaIdentityCheckAdapter";
 import { PrismaIdentityReadAdapter } from "./infrastructure/PrismaIdentityReadAdapter";
@@ -88,7 +88,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     PrismaSessionRepository,
     PrismaTotpEnrollmentRepository,
     HttpOtpSenderAdapter,
-    BcryptHasherAdapter,
+    RefreshTokenDigestAdapter,
     SystemClockAdapter,
     PrismaIdentityCheckAdapter,
     PrismaIdentityReadAdapter,

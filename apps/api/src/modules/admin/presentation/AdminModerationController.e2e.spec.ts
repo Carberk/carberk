@@ -12,7 +12,6 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import supertest from "supertest";
-import { hash } from "bcryptjs";
 import { AdminSchemas } from "@auto-tm/contracts";
 import { PrismaService, Prisma } from "@auto-tm/db";
 
@@ -166,8 +165,10 @@ describe("AdminModerationController e2e smoke", () => {
       const senderToken = await createUser("seller-one");
       await createUser("admin-one", "admin");
       const adminToken = await createAdminSession(adminOneId);
-      const oldRefresh = "a".repeat(64);
-      await prisma.session.create({ data: { userId: sellerOneId, refreshTokenHash: await hash(oldRefresh, 4), expiresAt: new Date(Date.now() + 60_000) } });
+      let oldRefresh = "a".repeat(64);
+      await prisma.session.create({ data: { userId: sellerOneId, refreshTokenHash: createHash("sha256").update(oldRefresh).digest("hex"), expiresAt: new Date(Date.now() + 60_000) } });
+      const beforeSuspension = await request.post("/api/v1/auth/refresh").send({ refreshToken: oldRefresh }).expect(201);
+      oldRefresh = beforeSuspension.body.refreshToken as string;
       const listing = await createActiveListing(sellerOneId);
       const conversation = await prisma.conversation.create({ data: {
         listingId: listing.id, buyerId: reporterOneId, sellerId: sellerOneId,

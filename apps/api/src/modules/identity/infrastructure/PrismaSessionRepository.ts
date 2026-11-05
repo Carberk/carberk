@@ -2,14 +2,14 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 import type { Session } from "../domain/Session";
 import type { SessionRepository, SessionLookupResult } from "../domain/ports/SessionRepository";
-import type { PasswordHasherPort } from "../domain/ports/PasswordHasherPort";
-import { BcryptHasherAdapter } from "./BcryptHasherAdapter";
+import type { RefreshTokenHasherPort } from "../domain/ports/RefreshTokenHasherPort";
+import { RefreshTokenDigestAdapter } from "./RefreshTokenDigestAdapter";
 
 @Injectable()
 export class PrismaSessionRepository implements SessionRepository {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(BcryptHasherAdapter) private readonly hasher: PasswordHasherPort,
+    @Inject(RefreshTokenDigestAdapter) private readonly hasher: RefreshTokenHasherPort,
   ) {}
 
   async create(input: {
@@ -57,26 +57,20 @@ export class PrismaSessionRepository implements SessionRepository {
   }
 
   async findByRefreshToken(plaintext: string): Promise<SessionLookupResult | null> {
-    const rows = await this.prisma.session.findMany({
+    const row = await this.prisma.session.findUnique({
+      where: { refreshTokenHash: await this.hasher.hash(plaintext) },
       include: {
         user: { select: { id: true, phone: true, email: true, role: true } },
       },
     });
-
-    for (const row of rows) {
-      const match = await this.hasher.compare(plaintext, row.refreshTokenHash);
-      if (match) {
-        return {
-          session: this.toDomain(row),
-          userId: row.user.id,
-          phone: row.user.phone,
-          email: row.user.email,
-          role: row.user.role as string,
-        };
-      }
-    }
-
-    return null;
+    if (!row) return null;
+    return {
+      session: this.toDomain(row),
+      userId: row.user.id,
+      phone: row.user.phone,
+      email: row.user.email,
+      role: row.user.role as string,
+    };
   }
 
   async rotateRefreshToken(

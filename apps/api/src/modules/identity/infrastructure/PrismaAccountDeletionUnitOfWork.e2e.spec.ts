@@ -9,7 +9,7 @@ import type {
   AccountDeletionWrites,
 } from "../domain/ports/AccountDeletionUnitOfWork";
 import type { ClockPort } from "../domain/ports/ClockPort";
-import { BcryptHasherAdapter } from "./BcryptHasherAdapter";
+import { RefreshTokenDigestAdapter } from "./RefreshTokenDigestAdapter";
 import { PrismaAccountDeletionUnitOfWork } from "./PrismaAccountDeletionUnitOfWork";
 import { PrismaSessionRepository } from "./PrismaSessionRepository";
 import { PrismaUserRepository } from "./PrismaUserRepository";
@@ -70,7 +70,7 @@ describe("PrismaAccountDeletionUnitOfWork e2e", () => {
     await prisma.$connect();
     unitOfWork = new PrismaAccountDeletionUnitOfWork(prisma);
     userRepo = new PrismaUserRepository(prisma);
-    sessionRepo = new PrismaSessionRepository(prisma, new BcryptHasherAdapter());
+    sessionRepo = new PrismaSessionRepository(prisma, new RefreshTokenDigestAdapter());
   });
 
   afterAll(async () => {
