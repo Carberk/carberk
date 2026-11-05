@@ -15,7 +15,7 @@ function docker(args) {
   return result.stdout.trim();
 }
 const patches = Object.fromEntries(await Promise.all([
-  "expo-modules-core@55.0.26.patch", "react-native-reanimated@4.2.1.patch",
+  "expo-modules-core@55.0.27.patch", "react-native-reanimated@4.2.1.patch",
 ].map(async (name) => [name, createHash("sha256").update(await readFile(`patches/${name}`)).digest("hex")])));
 const probe = `
   const assert = require('node:assert/strict');
