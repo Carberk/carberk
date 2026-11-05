@@ -34,13 +34,13 @@ Bugs use the [bug template](../../.github/ISSUE_TEMPLATE/bug.md). One PR closes 
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body-file <file>`.
-- **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
+- **Read an issue**: `pnpm agent:github issue <number>` for the bounded delivery sections and body preview; add `--full` when the preview is truncated or another section may govern the decision. Fetch omitted comments separately with `pnpm agent:github comments issue <number>`.
 - **List issues**: `gh issue list --state open --json number,title,labels` with `--label` and `--state` filters.
 - **Sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>`.
 - **Blocking**: GitHub's native issue dependencies. Add an edge with `gh issue create --blocked-by <n>,<n> ...` or `gh issue edit <child> --add-blocked-by <blocker>`. A ticket is startable when every blocker is closed: `gh api repos/Carberk/carberk/issues/<n> --jq .issue_dependencies_summary.blocked_by` returns `0`.
-- **Comment**: `gh issue comment <number> --body "..."`.
+- **Comment**: `pnpm agent:github comment issue <number> --body-file <file>` for a dry-run, then add `--apply` to publish.
 - **Labels**: `gh issue edit <number> --add-label "..."` or `--remove-label "..."`. The vocabulary is in [triage labels](triage-labels.md).
-- **Close**: post the reason with `gh issue comment`, then `gh issue close <number>` with the right reason (`--reason "not planned"` when it is not done).
+- **Close**: write the reason to a body file, dry-run `pnpm agent:github comment issue <number> --body-file <file>`, apply it, then `gh issue close <number>` with the right reason (`--reason "not planned"` when it is not done).
 
 File issues only in `Carberk/carberk`.
 

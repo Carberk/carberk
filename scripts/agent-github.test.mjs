@@ -35,7 +35,7 @@ test("bounded comments request only the last requested nodes and report missing 
   const result = runCommand(parseCommand(["comments", "pr", "42", "--limit", "2", "--max-chars", "200"]), {
     repo: "owner/repo", gh(args) { calls.push(args); return JSON.stringify({ data: { repository: { pullRequest: { comments: { totalCount: 15, nodes: [{ body: "x".repeat(500), url: "https://example.test/c" }], pageInfo: { hasPreviousPage: true } } } } } }); },
   });
-  assert.match(calls[0].join(" "), /comments\(last: \$limit\)/);
+  assert.match(calls[0].join(" "), /comments\(last: \$limit, before: \$cursor\)/);
   assert.ok(calls[0].includes("limit=2"));
   assert.equal(result.omittedComments, 14);
   assert.equal(result.comments[0].body.length, 200);
@@ -83,7 +83,7 @@ test("queue snapshots preserve pending checks and flag a possibly incomplete lis
   assert.equal(result.possiblyMore, true);
   assert.deepEqual(result.prs[0].checks, [{ name: "pr", state: "IN_PROGRESS" }]);
   assert.equal(result.prs[0].execution[0].text, "- **Status:** verifying");
-  assert.deepEqual(result.omitted, ["full bodies", "comments", "formal reviews"]);
+  assert.deepEqual(result.omitted, ["full bodies", "comments", "formal reviews", "inline review threads"]);
 });
 
 test("full bodies require explicit opt-in and GraphQL failures never become empty history", () => {
@@ -91,7 +91,104 @@ test("full bodies require explicit opt-in and GraphQL failures never become empt
   const deps = { repo: "owner/repo", gh: () => JSON.stringify(item) };
   assert.equal(runCommand(parseCommand(["issue", "7"]), deps).body, undefined);
   assert.equal(runCommand(parseCommand(["issue", "7", "--full"]), deps).body, item.body);
-  assert.deepEqual(runCommand(parseCommand(["issue", "7", "--full"]), deps).omitted, ["comments"]);
-  assert.deepEqual(runCommand(parseCommand(["pr", "7", "--full"]), deps).omitted, ["comments", "formal reviews"]);
+  assert.equal(runCommand(parseCommand(["issue", "7", "--full"]), deps).bodyPreview, undefined);
+  assert.deepEqual(runCommand(parseCommand(["issue", "7", "--full"]), deps).omitted, ["comments", "native parent", "native blocking links"]);
+  assert.deepEqual(runCommand(parseCommand(["pr", "7", "--full"]), deps).omitted, ["comments", "formal reviews", "inline review threads"]);
   assert.throws(() => runCommand(parseCommand(["comments", "issue", "7"]), { repo: "owner/repo", gh: () => JSON.stringify({ errors: [{ message: "Not authorized" }] }) }), /errors/);
+});
+
+test("compact issues preserve the delivery slice and flag body text outside selected sections", () => {
+  const body = "## Parent\n#10\n## What to build\nRead the whole ticket.\n## Acceptance criteria\n- [ ] Works\n## Blocked by\n#11\n## Additional context\nA governing decision.";
+  const result = runCommand(parseCommand(["issue", "12"]), { repo: "owner/repo", gh: () => JSON.stringify({ body }) });
+  assert.equal(result.parent[0].text, "#10");
+  assert.equal(result.whatToBuild[0].text, "Read the whole ticket.");
+  assert.equal(result.dependencies[0].text, "#11");
+  assert.equal(result.bodyPreview.text, body);
+  assert.equal(result.bodyPreview.truncated, false);
+  assert.ok(!result.omitted.includes("full body"));
+  assert.ok(result.omitted.includes("native parent"));
+  assert.ok(result.omitted.includes("native blocking links"));
+  const bug = compactItem({ body: "## What happened\nA bug outside the ticket template." }, "issue", 20);
+  assert.equal(bug.bodyPreview.text, "## What happened\nA b");
+  assert.equal(bug.bodyPreview.truncated, true);
+  assert.equal(compactItem({ body: "## Depends on\n#3" }, "issue").dependencies[0].text, "#3");
+});
+
+test("ordinary comments expose a cursor for omitted history and never claim review coverage", () => {
+  const calls = [];
+  const result = runCommand(parseCommand(["comments", "pr", "42", "--before", "older-cursor"]), {
+    repo: "owner/repo", gh(args) {
+      calls.push(args);
+      return JSON.stringify({ data: { repository: { pullRequest: { comments: { totalCount: 4, nodes: [], pageInfo: { hasPreviousPage: true, startCursor: "next-older" } } } } } });
+    },
+  });
+  assert.ok(calls[0].includes("cursor=older-cursor"));
+  assert.deepEqual(result.pageInfo, { hasPreviousPage: true, startCursor: "next-older" });
+  assert.equal(result.surface, "comments");
+  assert.deepEqual(result.omitted, ["formal reviews", "inline review threads"]);
+});
+
+test("formal reviews keep verdicts and reviewed commits separate from comments", () => {
+  const result = runCommand(parseCommand(["reviews", "pr", "42", "--max-chars", "5"]), {
+    repo: "owner/repo", gh(args) {
+      assert.match(args.join(" "), /reviews\(last: \$limit, before: \$cursor\)/);
+      return JSON.stringify({ data: { repository: { pullRequest: { reviews: {
+        totalCount: 1, pageInfo: { hasPreviousPage: false, startCursor: "review" },
+        nodes: [{ state: "CHANGES_REQUESTED", body: "Please fix this", commit: { oid: "reviewed-sha" }, author: { login: "reviewer" } }],
+      } } } } });
+    },
+  });
+  assert.equal(result.surface, "reviews");
+  assert.equal(result.reviews[0].state, "CHANGES_REQUESTED");
+  assert.equal(result.reviews[0].commit.oid, "reviewed-sha");
+  assert.equal(result.reviews[0].body, "Pleas");
+  assert.equal(result.reviews[0].truncated, true);
+  assert.equal(result.omittedReviews, 0);
+});
+
+test("thread comments can page beyond the nested preview and full never removes count limits", () => {
+  const result = runCommand(parseCommand(["thread-comments", "PRRT_test", "--after", "next-comment", "--full", "--limit", "2"]), {
+    repo: "owner/repo", gh(args) {
+      assert.ok(args.includes("id=PRRT_test"));
+      assert.ok(args.includes("cursor=next-comment"));
+      assert.ok(args.includes("limit=2"));
+      return JSON.stringify({ data: { node: { comments: { totalCount: 12, pageInfo: { hasNextPage: false }, nodes: [{ body: "x".repeat(2000) }] } } } });
+    },
+  });
+  assert.equal(result.comments[0].body.length, 2000);
+  assert.equal(result.comments[0].truncated, false);
+  assert.equal(result.omittedComments, 11);
+});
+
+test("inline review threads expose resolution, location and nested comment omissions", () => {
+  const result = runCommand(parseCommand(["review-threads", "pr", "42", "--after", "thread-cursor", "--max-chars", "4"]), {
+    repo: "owner/repo", gh(args) {
+      assert.ok(args.includes("cursor=thread-cursor"));
+      assert.match(args.join(" "), /reviewThreads\(first: \$limit, after: \$cursor\)/);
+      return JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: {
+        totalCount: 2, pageInfo: { hasNextPage: true, endCursor: "next-thread" }, nodes: [{
+          id: "thread-id", isResolved: false, isOutdated: true, path: "src/feature.ts", line: 12,
+          comments: { totalCount: 12, pageInfo: { hasNextPage: true, endCursor: "next-comment" }, nodes: [{ body: "Fix this", url: "https://example.test/review" }] },
+        }],
+      } } } } });
+    },
+  });
+  assert.equal(result.surface, "review-threads");
+  assert.equal(result.threads[0].isResolved, false);
+  assert.equal(result.threads[0].isOutdated, true);
+  assert.equal(result.threads[0].path, "src/feature.ts");
+  assert.equal(result.threads[0].comments.omittedComments, 11);
+  assert.equal(result.threads[0].comments.nodes[0].body, "Fix ");
+  assert.equal(result.threads[0].comments.nodes[0].truncated, true);
+  assert.equal(result.pageInfo.endCursor, "next-thread");
+  assert.equal(result.omittedThreads, 1);
+});
+
+test("all discussion reads fail on missing or errored connections", () => {
+  for (const command of [["reviews", "pr", "42"], ["review-threads", "pr", "42"], ["thread-comments", "PRRT_test"]]) {
+    for (const response of [{ data: { repository: { pullRequest: null } } }, { errors: [{ message: "Denied" }] }]) {
+      assert.throws(() => runCommand(parseCommand(command), { repo: "owner/repo", gh: () => JSON.stringify(response) }));
+    }
+  }
+  for (const command of [["reviews", "issue", "1"], ["issue", "1", "--before", "x"], ["review-threads", "pr", "1", "--before", "x"]]) assert.throws(() => parseCommand(command));
 });

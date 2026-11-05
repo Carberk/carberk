@@ -25,6 +25,6 @@ Write only in your own worktree or `/tmp`, and remove your worktree after its PR
 
 Third-party skills and their pinned sources are listed in the [notices](.claude/skills/THIRD-PARTY-NOTICES.md).
 
-Work lives in GitHub Issues on `Carberk/carberk`. Read and write it with `pnpm agent:github` ([GitHub operations](docs/agents/github-operations.md)), which bounds bodies and comments. Ticket shape and labels: [issue tracker](docs/agents/issue-tracker.md) and [triage labels](docs/agents/triage-labels.md).
+Work lives in GitHub Issues on `Carberk/carberk`. Read and write it with `pnpm agent:github`; [GitHub operations](docs/agents/github-operations.md) owns complete issue reads, separate PR feedback surfaces, pagination and file-based writes. Ticket shape and labels: [issue tracker](docs/agents/issue-tracker.md) and [triage labels](docs/agents/triage-labels.md).
 
 Implemented behavior remains in source and tests; do not create a second implementation mirror.
