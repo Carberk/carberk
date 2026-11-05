@@ -21,6 +21,9 @@ overrides:
   # Forge's October/November security fixes, including GHSA-6889-vf6x-f3g5.
   # Remove when every parent resolves node-forge >=1.4.3 without this override.
   node-forge: 1.4.3
+  # GHSA-w7jw-789q-3m8p and subsequent shell-quote command-injection fixes.
+  # Keep React Native's existing 1.x edge on the patched release.
+  shell-quote: 1.12.0
 
 # Official Android prefab backports, reviewed separately in PR #859.
 patchedDependencies:
