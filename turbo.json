@@ -58,6 +58,7 @@
     },
     "@auto-tm/db#test": {
       "dependsOn": ["^build", "build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/infra/minio/**"],
       "outputs": []
     },
     "@auto-tm/db#test:unit": {

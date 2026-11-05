@@ -26,8 +26,10 @@ because its health probe runs `wget` through a shell. The entrypoint remains
 explicitly run as `0:0` so fresh and previously root-owned data stays writable.
 Preserve the volume and ownership when replacing the image.
 
-Bucket creation and anonymous-read policy setup are explicit, not an API boot
-side effect:
+Bucket creation and policy reconciliation are explicit, not an API boot
+side effect. Listing videos remain private during the rollout hold; bootstrap
+removes their old anonymous grant without deleting bytes. Photo/chat reads and
+the catalog `brands/*` grant stay public:
 
 ```sh
 pnpm compose:up
