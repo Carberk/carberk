@@ -15,6 +15,9 @@ overrides:
   # GHSA-p68q-wchp-6fh7 and the 5.x follow-ups. Nest 11 pins an affected
   # Fastify release; remove when the adapter itself depends on Fastify >=5.12.6.
   "@nestjs/platform-fastify@11.2.5>fastify": 5.12.6
+  # Forge's October/November security fixes, including GHSA-6889-vf6x-f3g5.
+  # Remove when every parent resolves node-forge >=1.4.3 without this override.
+  node-forge: 1.4.3
 
 # Official Android prefab backports, reviewed separately in PR #859.
 patchedDependencies:

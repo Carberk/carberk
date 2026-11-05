@@ -283,6 +283,7 @@ overrides:
   react-native-css-interop: 0.2.4
   fast-uri@>=3.0.0 <4.0.0: 3.1.9
   '@nestjs/platform-fastify@11.2.5>fastify': 5.12.6
+  node-forge: 1.4.3
 
 patchedDependencies:
   expo-modules-core@55.0.26: 9c2fcadc48eccd8ef1784c5059f2bf32e8c76696c99d3bc00bc7a356b04a88fa
@@ -8933,8 +8934,8 @@ packages:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
-  node-forge@1.4.0:
-    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+  node-forge@1.4.3:
+    resolution: {integrity: sha512-P6wzfh6t70avmV8FrVEAd/36sOPJQ+hkaJVX1Laap9J/77m7M0eyozDvc8SwnDf4P7MP94gwbAAo0rg3YVXT+g==}
     engines: {node: '>= 6.13.0'}
 
   node-gyp-build-optional-packages@5.2.2:
@@ -12893,7 +12894,7 @@ snapshots:
       glob: 13.0.6
       lan-network: 0.2.1
       multitars: 1.0.2
-      node-forge: 1.4.0
+      node-forge: 1.4.3
       npm-package-arg: 11.0.3
       ora: 3.4.0
       picomatch: 4.0.5
@@ -12930,7 +12931,7 @@ snapshots:
 
   '@expo/code-signing-certificates@0.0.6':
     dependencies:
-      node-forge: 1.4.0
+      node-forge: 1.4.3
 
   '@expo/config-plugins@55.0.11(supports-color@8.1.1)':
     dependencies:
@@ -14203,7 +14204,7 @@ snapshots:
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
       jsonwebtoken: 9.0.3
-      node-forge: 1.4.0
+      node-forge: 1.4.3
       verror: 1.10.1
     transitivePeerDependencies:
       - supports-color
@@ -20615,7 +20616,7 @@ snapshots:
       fetch-blob: 3.2.0
       formdata-polyfill: 4.0.10
 
-  node-forge@1.4.0: {}
+  node-forge@1.4.3: {}
 
   node-gyp-build-optional-packages@5.2.2:
     dependencies:
