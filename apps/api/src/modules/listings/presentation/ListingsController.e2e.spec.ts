@@ -679,6 +679,62 @@ describe("ListingsController e2e", () => {
   });
 
   describe("GET /api/v1/listings/:id", () => {
+    it("keeps legacy videos out of detail and card reads while preserving photos", async () => {
+      await seedCatalog();
+      const ownerToken = await createUser("user-1");
+      const viewerToken = await createUser("user-2");
+      const draft = await seedDraft("user-1", validPayload);
+      const published = await request.post(`/api/v1/listings/drafts/${draft.id}/publish`)
+        .set("Authorization", `Bearer ${ownerToken}`).send({}).expect(201);
+      const listingId = published.body.id as string;
+      const before = await request.get(`/api/v1/listings/${listingId}`).expect(200);
+      const photoKeys = before.body.media.map((media: { key: string }) => media.key) as string[];
+      // Represent a pre-hold row: current upload/attach endpoints reject video.
+      await prisma.listingMedia.updateMany({ where: { listingId }, data: { sortOrder: { increment: 1 } } });
+      const videoKey = `listings/${listingId}/legacy-read-hold/original.mp4`;
+      await prisma.listingMedia.create({ data: { listingId, kind: "video", key: videoKey, sortOrder: 0 } });
+
+      for (const token of [undefined, ownerToken]) {
+        const read = request.get(`/api/v1/listings/${listingId}`);
+        if (token) read.set("Authorization", `Bearer ${token}`);
+        const detail = await read.expect(200);
+        expect.soft(detail.body.media.map((media: { key: string }) => media.key)).toEqual(photoKeys);
+        expect.soft(detail.body.media.every((media: { kind: string }) => media.kind === "image")).toBe(true);
+        expect.soft(detail.body.media.map((media: ListingsSchemas.ListingMedia) => media.variants))
+          .toEqual(before.body.media.map((media: ListingsSchemas.ListingMedia) => media.variants));
+      }
+      await request.post(`/api/v1/listings/${listingId}/favorite`)
+        .set("Authorization", `Bearer ${viewerToken}`).send({}).expect(201);
+      const feed = await request.get("/api/v1/listings").expect(200);
+      const owned = await request.get("/api/v1/me/listings")
+        .set("Authorization", `Bearer ${ownerToken}`).expect(200);
+      const favorites = await request.get("/api/v1/favorites")
+        .set("Authorization", `Bearer ${viewerToken}`).expect(200);
+      for (const response of [feed, owned, favorites]) {
+        const card = response.body.items.find((item: { id: string }) => item.id === listingId);
+        expect.soft(card).toMatchObject({ coverMediaKey: photoKeys[0], photoKeys: photoKeys.slice(0, 2), photoCount: 3 });
+        expect.soft(JSON.stringify(card)).not.toContain(videoKey);
+      }
+
+      // Video-only legacy rows must not fall back to the ranked video cover.
+      await prisma.listingMedia.deleteMany({ where: { listingId, kind: "image" } });
+      const videoOnly = await request.get(`/api/v1/listings/${listingId}`).expect(200);
+      expect(videoOnly.body.media).toEqual([]);
+      for (const [path, token] of [
+        ["/api/v1/listings", undefined],
+        ["/api/v1/me/listings", ownerToken],
+        ["/api/v1/favorites", viewerToken],
+      ] as const) {
+        const read = request.get(path);
+        if (token) read.set("Authorization", `Bearer ${token}`);
+        const response = await read.expect(200);
+        const card = response.body.items.find((item: { id: string }) => item.id === listingId);
+        expect.soft(card).toMatchObject({ photoKeys: [], photoCount: 0 });
+        expect.soft(card).not.toHaveProperty("coverMediaKey");
+        expect.soft(JSON.stringify(card)).not.toContain(videoKey);
+      }
+    });
+
     it("returns detail for a published listing", async () => {
       await seedCatalog();
       const token = await createUser("user-1");
@@ -959,7 +1015,7 @@ describe("ListingsController e2e", () => {
         const byId = new Map(parsed.items.map((item) => [item.id, item]));
 
         expect(byId.get(gallery.id)).toMatchObject({
-          coverMediaKey: "g/clip",
+          coverMediaKey: "g/p9",
           photoKeys: ["g/p9", "g/p8"],
           galleryKeys: ["g/p9", "g/p8", "g/p7", "g/p6", "g/p5", "g/p4", "g/p3", "g/p2"],
           photoCount: 10,

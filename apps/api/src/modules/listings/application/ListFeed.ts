@@ -115,7 +115,7 @@ export class ListFeed {
         priceAmount: listing.priceAmount,
         priceCurrency: listing.priceCurrency,
         displayPriceTmt,
-        coverMediaKey: listing.coverMediaKey,
+        ...(photos.coverMediaKey ? { coverMediaKey: photos.coverMediaKey } : {}),
         photoKeys: photos.photoKeys,
         ...(photos.photoThumbHashes ? { photoThumbHashes: photos.photoThumbHashes } : {}),
         galleryKeys: photos.galleryKeys,

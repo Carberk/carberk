@@ -352,7 +352,7 @@ describe("My listings action sheet", () => {
     );
     api.get.mockImplementation((url: string) =>
       url === "/listings/rav4-1"
-        ? Promise.resolve({ contactPhone: "+99362000002" })
+        ? Promise.resolve({ contactPhone: "+99362000002", media: [] })
         : serve(url),
     );
     const view = await renderScreen();

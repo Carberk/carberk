@@ -127,7 +127,7 @@ export class GetListingDetail {
       allowChat: listing.allowChat,
       acceptsExchange: listing.acceptsExchange,
       installmentAvailable: listing.installmentAvailable,
-      media: media.map((m) => ({
+      media: media.filter((m) => m.kind === "image").map((m) => ({
         id: m.id,
         kind: m.kind,
         key: m.key,
@@ -168,11 +168,6 @@ function buildVariants(
   key: string,
   resolveUrl: (k: string) => string,
 ): { thumbnail: string; list: string; detail: string; fullscreen: string } {
-  if (key.endsWith(".mp4") || key.endsWith(".mov")) {
-    const url = resolveUrl(key);
-    return { thumbnail: url, list: url, detail: url, fullscreen: url };
-  }
-
   const base = key.replace(/\/original\.(jpg|webp|jpeg)$/, "");
   return {
     thumbnail: `${resolveUrl(`${base}/thumbnail.webp`)}?v=${UploadsSchemas.PHOTO_VARIANT_CACHE_VERSION}`,
