@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { describe, expect, it, vi } from "vitest";
 
 import { act, fireEvent, renderMobile } from "../../../test/render";
+import type { FakeVideoPlayer } from "../../../test/native-video";
 import type { StagedPhoto } from "../uploadStaging/types";
 import Step2Photos from "../wizard/Step2Photos";
 
@@ -24,8 +25,6 @@ vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: vi.fn(async () => {}),
 }));
 vi.mock("expo-linking", () => ({ openSettings: vi.fn(async () => {}) }));
-vi.mock("expo-video", async () => { const React = await import("react"); const { View } = await import("react-native"); return { VideoView: (props: Record<string, unknown>) => React.createElement(View, { testID: (props.testID as string | undefined) ?? "listing-video-preview" }), useVideoPlayer: () => ({ play: () => undefined, pause: () => undefined, currentTime: 0, addListener: () => ({ remove: () => undefined }) }) }; });
-vi.mock("expo-video-thumbnails", () => ({ getThumbnailAsync: async (_uri: string, o: { time: number }) => ({ uri: `file:///thumb-${o.time}.jpg`, width: 320, height: 180 }) }));
 
 const photo = (photoId: string, sortOrder: number): StagedPhoto => ({
   photoId,
@@ -161,6 +160,26 @@ describe("Listing video card on the Photos step", () => {
 });
 
 describe("Listing video editor", () => {
+  it("previews only the kept interval and stops at its end", async () => {
+    const screen = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo />);
+    await pickVideo(screen, 45_000);
+    await fireEvent(screen.getByTestId("listing-video-start-handle"), "accessibilityAction", {
+      nativeEvent: { actionName: "increment" },
+    });
+    const player = screen.getByTestId("listing-video-preview").props.player as FakeVideoPlayer;
+
+    await fireEvent.press(screen.getByRole("button", { name: "Play the part to keep" }));
+    expect(player.playing).toBe(true);
+    expect(player.currentTime).toBe(1);
+
+    await act(async () => { player.emitTimeUpdate(44); });
+    expect(player.playing).toBe(true);
+    await act(async () => { player.emitTimeUpdate(45); });
+    expect(player.playing).toBe(false);
+    expect(player.currentTime).toBe(1);
+    expect(screen.getByRole("button", { name: "Play the part to keep" })).toBeTruthy();
+  });
+
   it("opens a short video on the whole clip and hands source, interval and cover to preparation on Use video", async () => {
     const preparation = new FakeListingVideoPreparation();
     const screen = await renderMobile(
