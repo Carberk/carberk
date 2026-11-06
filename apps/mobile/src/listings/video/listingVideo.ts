@@ -40,7 +40,7 @@ export function createListingVideoDraft(source: ListingVideoSource): ListingVide
 
 export function coverTimesFor(draft: ListingVideoDraft): number[] {
   return Array.from({ length: LISTING_VIDEO_COVER_COUNT }, (_, i) =>
-    Math.round(draft.startS + ((draft.endS - draft.startS) * (i + 0.5)) / LISTING_VIDEO_COVER_COUNT),
+    draft.startS + ((draft.endS - draft.startS) * (i + 0.5)) / LISTING_VIDEO_COVER_COUNT,
   );
 }
 
