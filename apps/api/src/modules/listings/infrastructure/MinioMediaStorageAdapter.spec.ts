@@ -138,6 +138,12 @@ describe("MinioMediaStorageAdapter", () => {
     );
   });
 
+  it("refuses the retired single-PUT Listing video upload", async () => {
+    const adapter = makeAdapter("https://media.auto.tm");
+    await expect(adapter.presignUpload({ key: "pending/uuid/original.mp4", contentType: "video/mp4", sizeBytes: 1024 }))
+      .rejects.toThrow("Listing videos require multipart sessions");
+  });
+
   it("resolves public URL for listing video keys", () => {
     const adapter = makeAdapter("https://media.auto.tm");
 

@@ -86,6 +86,8 @@ model User {
   listingDrafts                ListingDraft[]
   verifiedContactPhones        VerifiedContactPhone[]
   mediaUploads                 MediaUpload[]
+  listingVideos                ListingVideo[]
+  videoSources                 VideoSource[]
   totpEnrollment               TotpEnrollment?
   reportsSubmitted             ContentReport[]           @relation("Reporter")
   reportsReviewed              ContentReport[]           @relation("Reviewer")
@@ -450,6 +452,7 @@ model Listing {
   knownIssuesText String?
 
   media               ListingMedia[]
+  listingVideo        ListingVideo?
   favorites           Favorite[]
   conversations       Conversation[]
   inspectionInterests InspectionInterest[]
@@ -547,6 +550,97 @@ model MediaUploadCleanup {
   @@map("media_upload_cleanups")
 }
 
+/// One optional video slot per Draft or Listing (ADR-0112). Exactly one of
+/// draftId / listingId is set; publishing transfers the slot (#1042).
+model ListingVideo {
+  id                  String    @id @default(uuid())
+  ownerId             String
+  owner               User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  draftId             String?   @unique
+  draft               ListingDraft? @relation(fields: [draftId], references: [id], onDelete: NoAction)
+  listingId           String?   @unique
+  listing             Listing?  @relation(fields: [listingId], references: [id], onDelete: NoAction)
+  activeGenerationId  String?   @unique
+  pendingGenerationId String?   @unique
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  generations VideoGeneration[]
+  sources     VideoSource[]
+
+  @@index([ownerId])
+  @@map("listing_videos")
+}
+
+/// Server-recorded provenance of one multipart video upload (ADR-0112).
+/// A client key, ETag or generation id confers no ownership.
+model VideoSource {
+  id                  String       @id @default(uuid())
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingVideoId      String
+  listingVideo        ListingVideo @relation(fields: [listingVideoId], references: [id], onDelete: Cascade)
+  bucket              String
+  objectKey           String       @unique
+  multipartUploadId   String
+  contentType         String
+  sizeBytes           Int
+  partSizeBytes       Int
+  partCount           Int
+  /// OPEN, COMPLETING, COMPLETED, CANCELLED or EXPIRED.
+  state               String       @default("OPEN")
+  openIdempotencyKey  String?
+  coverOffsetMs       Int
+  expiresAt           DateTime
+  completionStartedAt DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  generation VideoGeneration?
+
+  @@unique([userId, openIdempotencyKey])
+  @@index([state, expiresAt])
+  @@index([listingVideoId])
+  @@map("video_sources")
+}
+
+/// One processing generation of a Listing video; at most one per source.
+model VideoGeneration {
+  id                String       @id @default(uuid())
+  listingVideoId    String
+  listingVideo      ListingVideo @relation(fields: [listingVideoId], references: [id], onDelete: Cascade)
+  sourceId          String       @unique
+  source            VideoSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  /// Uploading, Processing, Failed, Ready or Retired.
+  status            String       @default("Uploading")
+  coverOffsetMs     Int
+  processingAttempt Int          @default(1)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([listingVideoId, status])
+  @@map("video_generations")
+}
+
+/// Durable cleanup for a cancelled/expired video source (ADR-0112). It has no
+/// foreign key, so it outlives the source and its User; retry until the exact
+/// owned object and multipart upload are verified gone.
+model VideoUploadCleanup {
+  sourceId          String    @id
+  objectKey         String
+  multipartUploadId String?
+  status            String    @default("PENDING")
+  attempts          Int       @default(0)
+  nextAttemptAt     DateTime  @default(now())
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@map("video_upload_cleanups")
+}
+
 /// A number a seller confirmed by SMS code for their Listings (ADR-0081). Owned
 /// by Listings; never a Sign-in Method and never touches `User.phone`. Reusable
 /// while now < confirmedAt + 7 days. Several sellers may confirm one number.
@@ -582,6 +676,8 @@ model ListingDraft {
   payload   Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  listingVideo ListingVideo?
 
   @@index([userId, updatedAt(sort: Desc)])
   @@map("listing_drafts")
