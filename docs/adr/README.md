@@ -123,6 +123,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0109](0109-source-first-documentation-and-design-workflow.md) | Source-first documentation and design workflow | Accepted | 2026-11-04 |
 | [0110](0110-draft-pull-request-ci-lane.md) | Draft pull requests use a short CI lane until ready | Accepted | 2026-11-05 |
 | [0111](0111-indexed-refresh-token-digests-and-one-time-reauthentication.md) | Indexed refresh-token digests and one-time reauthentication (supersedes ADR-0012 hashing/lookup only) | Accepted | 2026-11-05 |
+| [0112](0112-listing-video-upload-and-playback-contracts.md) | Listing video upload and playback contracts (complements ADR-0099; extends ADR-0079 and ADR-0088) | Accepted | 2026-11-06 |
 
 ## Per-app ADRs
 

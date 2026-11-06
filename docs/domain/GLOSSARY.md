@@ -88,6 +88,14 @@ The server's record that one User presigned one photo or video upload, which can
 
 _Avoid_: Pending file, staged key
 
+**Listing Video**
+
+The optional video belonging to one seller's Draft or Listing, with a current ready version and at most one pending replacement.
+
+**Video Generation**
+
+One prepared clip and its playback versions and covers. A replacement is a new Video Generation; retrying processing keeps the same clip.
+
 ## Conversations
 
 **Business Enquiry**
