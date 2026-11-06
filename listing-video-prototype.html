@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE · Carberk Listing video</title>
+<style>
+:root {
+  --page: hsl(60 7% 95%); --raised: #fff; --overlay: #fff; --tonal: hsl(60 5% 90%); --tonal-pressed: hsl(60 5% 85%);
+  --divider: hsl(60 5% 88%); --text: hsl(0 0% 9%); --muted: hsl(0 0% 40%); --brand: #E60000; --error: #F43F5E;
+  --ok: #15803d; --warn: #b45309; --focus: #2563eb;
+  --ui-bg: #f4f4f2; --ui-panel: #fff; --ui-text: #1b1b1b; --ui-muted: #6b6b6b; --ui-line: #e3e3df; --ui-accent: #1d4ed8;
+  --font: Geist, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+.dark { --page: hsl(240 3% 6%); --raised: hsl(240 3% 11%); --overlay: hsl(240 3% 14%); --tonal: hsl(240 3% 17%); --tonal-pressed: hsl(240 3% 23%);
+  --divider: hsl(240 3% 19%); --text: hsl(60 10% 98%); --muted: hsl(240 4% 66%); --ok: #4ade80; --warn: #fbbf24; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--font); background: var(--ui-bg); color: var(--ui-text); font-size: 14px; line-height: 1.45; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.top { padding: 18px 28px 10px; display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; border-bottom: 1px solid var(--ui-line); background: var(--ui-panel); }
+.top h1 { margin: 0; font-size: 20px; letter-spacing: -.2px; }
+.top p { margin: 4px 0 0; color: var(--ui-muted); max-width: 760px; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: #fde68a; color: #713f12; vertical-align: 2px; margin-right: 6px; }
+.seg { display: inline-flex; background: var(--ui-bg); border: 1px solid var(--ui-line); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 7px; font-weight: 600; color: var(--ui-muted); }
+.seg button[aria-pressed="true"] { background: var(--ui-panel); color: var(--ui-text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.layout { display: grid; grid-template-columns: 430px minmax(380px, 1fr); gap: 28px; padding: 22px 28px 40px; align-items: start; }
+@media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+
+/* ---------- Phone ---------- */
+.phone-wrap { position: sticky; top: 16px; }
+.phone { width: 390px; height: 844px; border-radius: 54px; background: #111; padding: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.25); margin: 0 auto; }
+.screen { position: relative; width: 370px; height: 824px; border-radius: 45px; overflow: hidden; background: var(--page); color: var(--text); }
+.status { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font-size: 15px; font-weight: 600; position: relative; z-index: 3; }
+.status.on-black { color: #fff; }
+.island { position: absolute; left: 50%; top: 11px; width: 120px; height: 34px; border-radius: 20px; background: #000; transform: translateX(-50%); }
+.content { position: absolute; top: 50px; bottom: 0; left: 0; right: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.content::-webkit-scrollbar { display: none; }
+.content.with-tabs { bottom: 0; padding-bottom: 96px; }
+.content.with-footer { padding-bottom: 110px; }
+.black { background: #000 !important; color: #fff; }
+.t-display { font-size: 34px; line-height: 40px; letter-spacing: -.4px; font-weight: 700; }
+.t-title { font-size: 28px; line-height: 34px; letter-spacing: -.3px; font-weight: 700; }
+.t-headline { font-size: 22px; line-height: 28px; letter-spacing: -.2px; font-weight: 700; }
+.t-subhead { font-size: 18px; line-height: 24px; font-weight: 600; }
+.t-body { font-size: 16px; line-height: 22px; }
+.t-callout { font-size: 15px; line-height: 20px; }
+.t-foot { font-size: 13px; line-height: 18px; }
+.t-cap { font-size: 12px; line-height: 16px; }
+.muted { color: var(--muted); }
+.tab-nums { font-variant-numeric: tabular-nums; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.grow { flex: 1; min-width: 0; }
+.px { padding-left: 16px; padding-right: 16px; }
+.card { background: var(--raised); border-radius: 24px; padding: 16px; }
+.btn { border: 0; min-height: 48px; border-radius: 16px; padding: 0 18px; font-weight: 600; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--tonal); color: var(--text); }
+.btn.full { width: 100%; }
+.btn.primary { background: var(--text); color: var(--page); }
+.btn.brand { background: var(--brand); color: #fff; }
+.btn.outline { background: transparent; box-shadow: inset 0 0 0 1.5px var(--divider); }
+.btn.danger { background: transparent; color: var(--error); box-shadow: inset 0 0 0 1.5px var(--divider); }
+.btn.small { min-height: 44px; font-size: 15px; padding: 0 14px; border-radius: 12px; }
+.btn.sq { width: 48px; padding: 0; }
+.circle { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--raised); display: inline-flex; align-items: center; justify-content: center; }
+.on-black .circle, .circle.dark { background: rgba(255,255,255,.14); color: #fff; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; background: var(--raised); font-weight: 500; font-size: 15px; border: 0; white-space: nowrap; }
+.badge { min-width: 24px; height: 24px; border-radius: 12px; background: var(--text); color: var(--page); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
+.icon { width: 20px; height: 20px; flex: none; }
+.icon.lg { width: 26px; height: 26px; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.progress { height: 6px; border-radius: 3px; background: var(--tonal); overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--text); }
+.progress.indet > span { width: 30%; background: var(--muted); }
+.note { border-radius: 16px; padding: 12px 14px; background: var(--tonal); font-size: 14px; line-height: 19px; }
+.note.err { background: color-mix(in srgb, var(--error) 14%, var(--raised)); }
+.note b { display: block; margin-bottom: 2px; }
+.divider { height: 1px; background: var(--divider); margin: 4px 0; }
+.sheet-scrim { position: absolute; inset: 0; background: rgba(0,0,0,.4); z-index: 20; display: flex; align-items: flex-end; }
+.sheet { width: 100%; background: var(--overlay); border-radius: 28px 28px 0 0; padding: 10px 16px 34px; max-height: 88%; overflow-y: auto; }
+.grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--divider); margin: 0 auto 12px; }
+.footer { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 30px; background: var(--page); border-top: 1px solid var(--divider); z-index: 5; display: flex; gap: 8px; }
+.footer.black { border-top-color: #222; }
+.tabbar { position: absolute; left: 16px; right: 16px; bottom: 24px; height: 62px; border-radius: 28px; background: color-mix(in srgb, var(--raised) 94%, transparent); box-shadow: 0 8px 28px rgba(0,0,0,.16); display: flex; justify-content: space-around; align-items: center; z-index: 6; }
+.tabbar span { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--muted); gap: 2px; }
+.tabbar span.on { color: var(--text); font-weight: 600; }
+
+/* Media placeholders */
+.media { position: relative; overflow: hidden; background: linear-gradient(160deg, #8aa1b8, #3f5468 60%, #2c3a47); }
+.media.p2 { background: linear-gradient(160deg, #b9b2a6, #6e6658 60%, #4a443b); }
+.media.p3 { background: linear-gradient(160deg, #a7b9a0, #5d7058 60%, #3b4a37); }
+.media.p4 { background: linear-gradient(160deg, #c3a9a9, #7b5a5a 60%, #4f3a3a); }
+.media.poster { background: linear-gradient(160deg, #5d6f84, #26313d 60%, #151b22); }
+.media svg.car { position: absolute; left: 50%; top: 56%; width: 62%; transform: translate(-50%, -50%); opacity: .55; }
+.media .lbl { position: absolute; left: 10px; top: 8px; font-size: 11px; color: rgba(255,255,255,.75); font-weight: 600; letter-spacing: .3px; }
+.play-dot { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 56px; height: 56px; border-radius: 50%; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; color: #fff; }
+.play-dot.sm { width: 40px; height: 40px; }
+.dur { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 8px; font-variant-numeric: tabular-nums; }
+.vchip { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 8px; display: inline-flex; gap: 4px; align-items: center; }
+
+/* Results strip */
+.strip { display: flex; gap: 2px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 0 8px; scrollbar-width: none; }
+.strip::-webkit-scrollbar { display: none; }
+.strip > * { flex: none; scroll-snap-align: start; scroll-margin-left: 8px; border: 0; padding: 0; }
+.strip > :first-child { border-radius: 20px 0 0 20px; }
+.strip > :last-child { border-radius: 0 20px 20px 0; }
+.dstrip { display: flex; gap: 2px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 0 16px; scrollbar-width: none; }
+.dstrip::-webkit-scrollbar { display: none; }
+.dstrip > * { flex: none; scroll-snap-align: center; border: 0; padding: 0; }
+.dstrip > :first-child { border-radius: 20px 0 0 20px; }
+.dstrip > :last-child { border-radius: 0 20px 20px 0; }
+.thumbs { display: flex; gap: 6px; overflow-x: auto; padding: 0 16px; scrollbar-width: none; }
+.thumbs > button { flex: none; width: 64px; height: 48px; border-radius: 8px; border: 0; padding: 0; opacity: .55; }
+.thumbs > button[aria-current="true"] { opacity: 1; outline: 2px solid #fff; outline-offset: 1px; }
+
+/* Seller editor */
+.trim { position: relative; padding: 0 22px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.track { position: relative; height: 56px; }
+.filmstrip { position: absolute; inset: 0; border-radius: 10px; overflow: hidden; display: flex; }
+.filmstrip > i { flex: 1; border-right: 1px solid rgba(0,0,0,.25); }
+.dim { position: absolute; top: 0; bottom: 0; background: rgba(0,0,0,.55); pointer-events: none; }
+.dim.l { left: 0; border-radius: 10px 0 0 10px; } .dim.r { right: 0; border-radius: 0 10px 10px 0; }
+.tw { position: absolute; top: -3px; bottom: -3px; border-top: 3px solid #facc15; border-bottom: 3px solid #facc15; cursor: grab; }
+.tw .h { position: absolute; top: -3px; bottom: -3px; width: 22px; background: #facc15; color: #4a3800; display: flex; align-items: center; justify-content: center; cursor: ew-resize; }
+.tw .h::before { content: ""; position: absolute; inset: -6px -11px; }
+.tw .h.l { left: -22px; border-radius: 10px 0 0 10px; } .tw .h.r { right: -22px; border-radius: 0 10px 10px 0; }
+.tw .h b { width: 3px; height: 20px; border-radius: 2px; background: currentColor; }
+.tw .h:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.trim-times { display: flex; justify-content: space-between; padding: 6px 22px 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.covers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.covers button { aspect-ratio: 4 / 3; border-radius: 12px; border: 0; padding: 0; position: relative; }
+.covers button[aria-pressed="true"] { outline: 3px solid #facc15; outline-offset: 2px; }
+.covers .ok { position: absolute; right: 4px; top: 4px; width: 22px; height: 22px; border-radius: 11px; background: #facc15; color: #4a3800; display: flex; align-items: center; justify-content: center; }
+.covers .ok svg { width: 14px; height: 14px; }
+.vrow { display: flex; gap: 12px; align-items: center; }
+.vthumb { width: 76px; height: 57px; border-radius: 12px; flex: none; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.photo-grid > div { aspect-ratio: 4 / 3; border-radius: 12px; }
+.picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.picker button { aspect-ratio: 1; border: 0; padding: 0; border-radius: 4px; }
+.player-frame { position: relative; width: 100%; background: #000; display: flex; align-items: center; justify-content: center; }
+.letterbox { width: 100%; aspect-ratio: 16 / 9; position: relative; }
+.overlay-msg { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #fff; text-align: center; padding: 20px; background: rgba(0,0,0,.35); }
+.scrub { display: flex; align-items: center; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.scrub input { accent-color: #fff; }
+
+/* ---------- Side panel ---------- */
+.panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.box { background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 14px; padding: 14px 16px; }
+.box h2 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--ui-muted); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 0; }
+.kv dt { color: var(--ui-muted); }
+.kv dd { margin: 0; font-weight: 600; }
+.kv dd.changed { color: var(--ui-accent); }
+.tickets a { color: var(--ui-accent); font-weight: 700; text-decoration: none; }
+.tickets li { margin-bottom: 6px; }
+.tickets ul { margin: 0; padding-left: 18px; }
+.sim { display: flex; flex-wrap: wrap; gap: 6px; }
+.sim button { border: 1px solid var(--ui-line); background: var(--ui-bg); border-radius: 9px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
+.sim button:hover:not(:disabled) { border-color: var(--ui-accent); }
+.sim h3 { width: 100%; margin: 6px 0 0; font-size: 12px; color: var(--ui-muted); font-weight: 600; }
+.wt-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.wt-tabs button { border: 1px solid var(--ui-line); background: var(--ui-bg); border-radius: 8px; padding: 5px 9px; font-size: 13px; font-weight: 600; }
+.wt-tabs button[aria-pressed="true"] { background: var(--ui-accent); border-color: var(--ui-accent); color: #fff; }
+.steps { margin: 8px 0 0; padding: 0; list-style: none; counter-reset: s; }
+.steps li { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px; }
+.steps li button { text-align: left; border: 1px solid var(--ui-line); background: var(--ui-bg); border-radius: 9px; padding: 6px 10px; font-size: 13px; flex: 1; }
+.steps li.done button { opacity: .55; }
+.steps li.next button { border-color: var(--ui-accent); background: #eef2ff; font-weight: 600; }
+.steps .n { width: 22px; height: 22px; border-radius: 11px; background: var(--ui-line); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 4px; flex: none; }
+.steps li.done .n { background: #bbf7d0; }
+.log { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-height: 120px; overflow: auto; color: var(--ui-muted); margin: 0; padding-left: 18px; }
+.log li:first-child { color: var(--ui-text); font-weight: 600; }
+.refusal { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #fef3c7; color: #713f12; font-size: 13px; }
+table.cov { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.cov th, table.cov td { text-align: left; vertical-align: top; border-top: 1px solid var(--ui-line); padding: 7px 8px 7px 0; }
+table.cov th { color: var(--ui-muted); font-weight: 600; }
+.pill { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+.pill.shown { background: #dcfce7; color: #14532d; }
+.pill.back { background: #e0e7ff; color: #1e3a8a; }
+.pill.gap { background: #fee2e2; color: #7f1d1d; }
+.pill.dec { background: #fef3c7; color: #713f12; }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="grow">
+    <h1><span class="tag">Prototype</span>Carberk Listing video: every state the current tickets ship</h1>
+    <p><b>Question:</b> if we build exactly what the Listing video tickets (#1038) describe, does the seller and buyer experience hold together, from choosing a video to a buyer playing it? Every screen says which ticket ships it. Video only. Nothing here encodes, uploads or plays real media; the phone runs on synthetic state.</p>
+  </div>
+  <div class="row" style="gap:10px; flex-wrap:wrap">
+    <div class="seg" role="group" aria-label="Flow">
+      <button data-shell="flow" data-v="seller">Seller</button>
+      <button data-shell="flow" data-v="buyer">Buyer</button>
+      <button data-shell="flow" data-v="coverage">Ticket coverage</button>
+    </div>
+    <div class="seg" role="group" aria-label="Theme">
+      <button data-shell="theme" data-v="light">Light</button>
+      <button data-shell="theme" data-v="dark">Dark</button>
+    </div>
+  </div>
+</header>
+<main class="layout" id="layout"></main>
+
+<script>
+/* =====================================================================
+   PURE MODEL. No DOM. Liftable into the real modules after review.
+   Sources: archived prototype-candidate-preview 49-video-model.js (b7d0bb2b),
+   native prototype state.ts / buyerState.ts (7b47bf3f), ADR-0099, hifi spec,
+   tickets #1041–#1061.
+   ===================================================================== */
+const VideoModel = (() => {
+  const MAX_S = 90;
+  const PART = 5 * 1024 * 1024;
+  const PREPARED_BYTES = 13002342; // ~12.4 MB, under the 15 MiB prepared cap
+  const SOURCES = {
+    clip45: { id: "clip45", label: "Walkaround", durationS: 45 },
+    clip90: { id: "clip90", label: "Engine sound", durationS: 90 },
+    clip120: { id: "clip120", label: "Interior and drive", durationS: 120 },
+  };
+  const RENDITIONS = ["240p", "360p", "720p"];
+  const QUALITIES = ["Auto", "Data saver · up to 360p", ...RENDITIONS.slice().reverse()];
+  const PHOTO_COUNT = 12;
+  const buyerMediaCount = (s) => PHOTO_COUNT + (publicVideo(s) ? 1 : 0);
+
+  const initial = () => ({
+    access: { uploadTester: true, viewTester: true, uploadsOn: true, permission: "granted", platform: "ios" },
+    listing: { published: false, banned: false, photos: 6 },
+    seller: { screen: "photos", picker: false, removeSheet: false, previewing: false },
+    task: null,      // the pending generation: selected, preparing, uploading, paused, processing or failed
+    active: null,    // the Ready generation; public only once the Listing is published
+    operation: null, // a cancellation or removal whose server result is not confirmed yet
+    nextGen: 1,
+    app: { foreground: true, online: true },
+    buyer: { surface: "results", stripIndex: 0, mediaIndex: 0, returnTo: "detail", player: "idle", positionS: 0,
+             muted: false, quality: "Auto", qualitySheet: false, fullscreen: false, streamRequests: 0, posterLoads: 0,
+             resultsScroll: 0, filters: ["Ashgabat", "2015 – 2022"], denied: false },
+    refusal: null,
+    event: "Start",
+  });
+
+  const MIN_S = 3, COVER_COUNT = 4;
+  const coverTimes = (t) => Array.from({ length: COVER_COUNT }, (_, i) => Math.round(t.startS + ((t.endS - t.startS) * (i + 0.5)) / COVER_COUNT));
+  const syncCover = (t) => { t.posterS = coverTimes(t)[t.coverIndex]; };
+  const busy = (t) => t && ["preparing", "uploading", "processing"].includes(t.phase);
+  const intervalError = (t) => {
+    if (!t) return "none";
+    if (!(t.endS > t.startS) || t.startS < 0 || t.endS > t.source.durationS) return "interval";
+    if (t.endS - t.startS > MAX_S) return "tooLong";
+    if (t.posterS < t.startS || t.posterS > t.endS) return "poster";
+    return null;
+  };
+  const publicVideo = (s) => s.active && s.listing.published && s.access.viewTester && !s.listing.banned ? s.active : null;
+  const canUpload = (s) => s.access.uploadTester && s.access.uploadsOn;
+
+  function reduce(prev, a) {
+    const s = structuredClone(prev);
+    s.refusal = null;
+    s.event = a.label || a.type;
+    const t = s.task;
+    const refuse = (msg) => { s.refusal = msg; return s; };
+    const b = s.buyer;
+    switch (a.type) {
+      /* ---------- seller navigation ---------- */
+      case "seller/screen": s.seller.screen = a.screen; s.seller.picker = false; s.seller.removeSheet = false; return s;
+      case "seller/openPicker":
+        if (!s.access.uploadTester) return refuse("This account is not a video tester, so the video slot is hidden.");
+        if (!s.access.uploadsOn) return refuse("Video uploads are switched off. Photos are unaffected.");
+        if (busy(t)) return refuse("Cancel the pending video before choosing another.");
+        if (s.operation) return refuse("Check the pending cancellation or removal first.");
+        if (s.access.permission === "denied") { s.seller.permissionNote = true; return s; }
+        s.seller.picker = true; return s;
+      case "seller/closePicker": s.seller.picker = false; return s;
+      case "seller/dismissPermission": s.seller.permissionNote = false; return s;
+      case "seller/pick": {
+        const src = SOURCES[a.source];
+        if (!src) return refuse("That item is not a selectable video.");
+        const endS = Math.min(MAX_S, src.durationS);
+        s.task = { gen: s.nextGen++, source: src, startS: 0, endS, coverIndex: 0, posterS: 0, hitMax: false,
+                   phase: "selected", preparedBytes: 0, confirmedBytes: 0, pause: null, error: null, statusUnknown: false };
+        syncCover(s.task);
+        s.seller.picker = false; s.seller.screen = "editor"; s.seller.previewing = false; return s;
+      }
+      case "seller/setInterval": {
+        if (!t || t.phase !== "selected") return refuse("Choose another video to change the part.");
+        const dur = t.source.durationS;
+        let st = Math.round(Number(a.startS)), en = Math.round(Number(a.endS));
+        if (!Number.isFinite(st) || !Number.isFinite(en)) return refuse("Choose a valid part.");
+        t.hitMax = false;
+        if (a.moved === "window") { const len = t.endS - t.startS; st = Math.max(0, Math.min(dur - len, st)); en = st + len; }
+        else if (a.moved === "start") { en = t.endS; st = Math.max(0, Math.min(en - MIN_S, st)); if (en - st > MAX_S) { st = en - MAX_S; t.hitMax = true; } }
+        else { st = t.startS; en = Math.min(dur, Math.max(st + MIN_S, en)); if (en - st > MAX_S) { en = st + MAX_S; t.hitMax = true; } }
+        t.startS = st; t.endS = en; syncCover(t); return s;
+      }
+      case "seller/cover":
+        if (!t || t.phase !== "selected") return refuse("Choose a video first.");
+        t.coverIndex = Math.max(0, Math.min(COVER_COUNT - 1, Number(a.index) || 0)); syncCover(t); return s;
+      case "seller/preview": s.seller.previewing = !s.seller.previewing; return s;
+      case "seller/use": {
+        if (!t || t.phase !== "selected") return refuse("Choose a video first.");
+        if (!canUpload(s)) return refuse("Video uploads were switched off. Your selection is kept.");
+        const err = intervalError(t);
+        if (err) return refuse({ tooLong: "Choose up to 90 seconds.", poster: "Choose a cover inside the interval.", interval: "Choose a valid interval." }[err]);
+        t.phase = "preparing"; s.seller.screen = s.seller.returnTo || "photos"; return s;
+      }
+      case "seller/cancelEditor":
+        if (t && t.phase === "selected") s.task = null;
+        s.seller.screen = s.seller.returnTo || "photos"; return s;
+      case "seller/editSelection": s.seller.returnTo = s.seller.screen; s.seller.screen = "editor"; return s;
+      case "seller/pause": if (t?.phase === "uploading") { t.phase = "paused"; t.pause = "user"; } return s;
+      case "seller/continue":
+        if (!t) return s;
+        if (t.phase === "paused" || (t.phase === "failed" && t.error === "transfer")) {
+          if (!s.app.online) { t.phase = "paused"; t.pause = "network"; return refuse("No connection. The upload continues when you are back online."); }
+          t.phase = "uploading"; t.pause = null; t.error = null;
+        }
+        return s;
+      case "seller/reprocess":
+        if (t?.phase === "failed" && t.error === "processing") { t.phase = "processing"; t.error = null; t.statusUnknown = false; }
+        return s;
+      case "seller/prepareAgain":
+        if (t?.phase === "failed" && ["preparation", "interrupted", "storage"].includes(t.error)) { t.phase = "preparing"; t.error = null; }
+        return s;
+      case "seller/cancelPending":
+        if (!t) return s;
+        if (a.uncertain) { s.operation = { kind: "cancel" }; s.task = null; return s; }
+        s.task = null; return s;
+      case "seller/openRemove": s.seller.removeSheet = true; return s;
+      case "seller/closeRemove": s.seller.removeSheet = false; return s;
+      case "seller/remove":
+        s.seller.removeSheet = false;
+        s.active = null; s.task = null;
+        if (a.uncertain) s.operation = { kind: "remove" };
+        return s;
+      case "seller/checkStatus":
+        if (s.operation) { s.operation = null; return s; }
+        if (t?.statusUnknown) t.statusUnknown = false;
+        return s;
+      case "seller/publish":
+        s.listing.published = true; s.seller.screen = "owner"; return s;
+      case "seller/replace": s.seller.returnTo = s.seller.screen; return reduce(s, { type: "seller/openPicker", label: a.label });
+
+      /* ---------- simulated outside events ---------- */
+      case "sim/prepared":
+        if (t?.phase !== "preparing") return refuse("Nothing is preparing.");
+        t.preparedBytes = PREPARED_BYTES; t.confirmedBytes = 0;
+        if (!s.app.online) { t.phase = "paused"; t.pause = "network"; } else t.phase = "uploading";
+        return s;
+      case "sim/prepareFail": if (t?.phase !== "preparing") return refuse("Nothing is preparing."); t.phase = "failed"; t.error = a.reason || "preparation"; return s;
+      case "sim/part":
+        if (t?.phase !== "uploading") return refuse("No upload is running.");
+        t.confirmedBytes = Math.min(t.preparedBytes, t.confirmedBytes + PART);
+        if (t.confirmedBytes === t.preparedBytes) t.phase = "processing";
+        return s;
+      case "sim/uploadFail": if (t?.phase !== "uploading") return refuse("No upload is running."); t.phase = "failed"; t.error = "transfer"; return s;
+      case "sim/offline":
+        s.app.online = false;
+        if (t?.phase === "uploading") { t.phase = "paused"; t.pause = "network"; }
+        if (b.surface === "player" && b.player === "playing") b.player = "buffering";
+        return s;
+      case "sim/online":
+        s.app.online = true;
+        if (t?.phase === "paused" && t.pause === "network") { t.phase = "uploading"; t.pause = null; }
+        return s;
+      case "sim/background":
+        s.app.foreground = false;
+        if (t?.phase === "preparing") { t.phase = "failed"; t.error = "interrupted"; }
+        if (t?.phase === "uploading") { t.phase = "paused"; t.pause = "lifecycle"; }
+        if (b.surface === "player") { b.surface = b.returnTo; b.player = "idle"; b.fullscreen = false; b.qualitySheet = false; }
+        return s;
+      case "sim/foreground":
+        s.app.foreground = true;
+        if (t?.phase === "paused" && t.pause === "lifecycle" && s.app.online) { t.phase = "uploading"; t.pause = null; }
+        return s;
+      case "sim/reopen":
+        s.app.foreground = true; s.seller.picker = false; s.seller.removeSheet = false;
+        if (t?.phase === "preparing") { t.phase = "failed"; t.error = "interrupted"; }
+        if (t?.phase === "uploading" || (t?.phase === "paused" && t.pause === "lifecycle")) { t.phase = s.app.online ? "uploading" : "paused"; t.pause = s.app.online ? null : "network"; }
+        if (b.surface === "player") { b.surface = b.returnTo; b.player = "idle"; b.fullscreen = false; b.qualitySheet = false; }
+        return s;
+      case "sim/processed":
+        if (t?.phase !== "processing") return refuse("Nothing is processing.");
+        s.active = { gen: t.gen, source: t.source, durationS: t.endS - t.startS, posterS: t.posterS - t.startS, renditions: RENDITIONS };
+        s.task = null; return s;
+      case "sim/processFail": if (t?.phase !== "processing") return refuse("Nothing is processing."); t.phase = "failed"; t.error = "processing"; return s;
+      case "sim/statusFail": if (t?.phase !== "processing") return refuse("Status checks run while processing."); t.statusUnknown = true; return s;
+      case "sim/sourceGone": if (t?.phase !== "preparing") return refuse("The source matters while preparing."); t.phase = "failed"; t.error = "source"; return s;
+
+      /* ---------- operator and account switches ---------- */
+      case "ops/uploadTester": s.access.uploadTester = !s.access.uploadTester; return s;
+      case "ops/viewTester": s.access.viewTester = !s.access.viewTester; return s;
+      case "ops/uploadsOn": s.access.uploadsOn = !s.access.uploadsOn; return s;
+      case "ops/permission": s.access.permission = s.access.permission === "granted" ? "denied" : "granted"; s.seller.permissionNote = false; return s;
+      case "ops/platform": s.access.platform = s.access.platform === "ios" ? "android" : "ios"; return s;
+      case "ops/ban": s.listing.banned = !s.listing.banned; return s;
+      case "ops/seedReady":
+        s.listing.published = true; s.task = null; s.operation = null;
+        s.active = { gen: s.nextGen++, source: SOURCES.clip45, durationS: 42, posterS: 6, renditions: RENDITIONS };
+        return s;
+
+      /* ---------- buyer ---------- */
+      case "buyer/strip": b.stripIndex = Math.max(0, Math.min(buyerMediaCount(s) - 1, Number(a.index) || 0)); return s;
+      case "buyer/openCard": b.surface = "detail"; b.mediaIndex = Math.max(0, Math.min(buyerMediaCount(s) - 1, Number(a.index) || 0)); b.denied = false; if (publicVideo(s)) b.posterLoads++; return s;
+      case "buyer/openGallery": b.surface = "gallery"; b.mediaIndex = Math.max(0, Math.min(buyerMediaCount(s) - 1, Number(a.index) || 0)); return s;
+      case "buyer/galleryTo": b.mediaIndex = Math.max(0, Math.min(buyerMediaCount(s) - 1, Number(a.index) || 0)); return s;
+      case "buyer/closeGallery": b.surface = "detail"; return s;
+      case "buyer/backResults": b.surface = "results"; b.player = "idle"; return s;
+      case "buyer/play": {
+        if (b.surface !== "player") {
+          if (!publicVideo(s)) { b.denied = true; return refuse("This video is no longer available. New playback is refused; photos keep their own rules."); }
+          b.returnTo = b.surface; b.surface = "player"; b.player = "loading"; b.positionS = 0; b.streamRequests++; return s;
+        }
+        if (["paused", "buffering"].includes(b.player)) b.player = "playing";
+        return s;
+      }
+      case "buyer/pause": if (b.player === "playing") b.player = "paused"; return s;
+      case "buyer/seek": b.positionS = Math.max(0, Math.min(s.active?.durationS || 0, Number(a.value) || 0)); return s;
+      case "buyer/mute": b.muted = !b.muted; return s;
+      case "buyer/fullscreen": b.fullscreen = !b.fullscreen; return s;
+      case "buyer/qualitySheet": b.qualitySheet = !b.qualitySheet; return s;
+      case "buyer/quality":
+        if (!QUALITIES.includes(a.value)) return refuse("That quality is not available for this video.");
+        b.quality = a.value; b.qualitySheet = false; return s;
+      case "buyer/closePlayer": b.surface = b.returnTo; b.player = "idle"; b.fullscreen = false; b.qualitySheet = false; return s;
+      case "buyer/retry": if (b.player === "error") { if (!publicVideo(s)) { b.player = "denied"; return s; } b.player = "loading"; b.streamRequests++; } return s;
+      case "buyer/scroll": b.resultsScroll = a.value; return s;
+      case "buyer/removeFilter": b.filters = b.filters.filter((f) => f !== a.value); return s;
+      case "sim/firstFrame": if (b.player !== "loading") return refuse("The player is not loading."); b.player = "playing"; return s;
+      case "sim/buffer": if (!["playing"].includes(b.player)) return refuse("Buffering happens while playing."); b.player = "buffering"; return s;
+      case "sim/recover": if (b.player !== "buffering") return refuse("Not buffering."); b.player = "playing"; return s;
+      case "sim/playError": if (!["loading", "playing", "buffering"].includes(b.player)) return refuse("Nothing is loading or playing."); b.player = "error"; return s;
+      case "sim/tick": if (b.player === "playing") b.positionS = Math.min(s.active?.durationS || 0, b.positionS + 7); return s;
+      case "reset": return initial();
+    }
+    return refuse(`Unknown action ${a.type}`);
+  }
+
+  return { initial, reduce, intervalError, coverTimes, MIN_S, publicVideo, canUpload, busy, SOURCES, MAX_S, RENDITIONS, QUALITIES, PHOTO_COUNT };
+})();
+
+/* =====================================================================
+   PAGE SHELL. Throwaway.
+   ===================================================================== */
+const TICKETS = {
+  1039: "Prove native trimming, preparation and recovery",
+  1040: "Prove upload and serving contracts",
+  1041: "Owned resumable upload sessions",
+  1042: "Replace and clean video generations",
+  1043: "Expose authorized Ready video in Listing reads",
+  1044: "Integrate native preparation into the seller flow",
+  1045: "Recover transfers across reconnect and reopen",
+  1046: "Native Listing video playback",
+  1047: "Select, trim and choose a poster",
+  1048: "Photo publication never waits for video",
+  1049: "Tester-only rollout guard and kill switch",
+  1050: "Android gallery and runtime proof",
+  1051: "Intentional poster navigation",
+  1052: "Limits and telemetry",
+  1056: "Process into Ready renditions",
+  1057: "Access and moderation visibility",
+  1058: "Acceptance evidence and tester activation",
+};
+const T = (n) => `<a href="https://github.com/Carberk/carberk/issues/${n}" target="_blank" rel="noopener">#${n}</a>`;
+
+let S = VideoModel.initial();
+let prevS = S;
+const ui = { flow: "seller", theme: "light", walk: null, walkStep: 0, log: [] };
+
+const E = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const mmss = (s) => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const mb = (bytes) => (bytes / 1048576).toFixed(1);
+const act = (type, extra = {}, label) => `data-act='${E(JSON.stringify({ type, ...extra, label }))}'`;
+
+const ICONS = {
+  play: '<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/>',
+  pause: '<path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor" stroke="none"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z"/>',
+  share: '<path d="M12 4v11M8 8l4-4 4 4M5 14v5h14v-5"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 4v6M8 14v6"/>',
+  sort: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/>',
+  phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a1 1 0 01-1 1A16 16 0 014 5a1 1 0 011-1z"/>',
+  msg: '<path d="M4 5h16v11H9l-5 4z"/>',
+  video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>',
+  photo: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
+  loader: '<path d="M12 3a9 9 0 109 9"/>',
+  mute: '<path d="M4 9h4l5-4v14l-5-4H4zM17 9l4 6M21 9l-4 6"/>',
+  sound: '<path d="M4 9h4l5-4v14l-5-4H4zM17 8a5 5 0 010 8"/>',
+  expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
+  wifi: '<path d="M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0M12 20h.01"/>',
+  alert: '<path d="M12 3l10 18H2zM12 10v5M12 18h.01"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  home: '<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/>',
+};
+const I = (name, cls = "icon") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+const CAR = '<svg class="car" viewBox="0 0 120 50" aria-hidden="true"><path fill="rgba(255,255,255,.85)" d="M8 36c0-6 4-8 10-9l14-10c4-3 8-4 13-4h28c5 0 9 2 12 5l9 9c8 1 18 3 18 9v6h-10a9 9 0 00-18 0H40a9 9 0 00-18 0H8z"/><circle cx="31" cy="42" r="7" fill="rgba(0,0,0,.55)"/><circle cx="89" cy="42" r="7" fill="rgba(0,0,0,.55)"/></svg>';
+const photo = (n, style = "", label = "") => `<div class="media p${(n % 4) + 1}" style="${style}">${CAR}${label ? `<span class="lbl">${E(label)}</span>` : ""}</div>`;
+const posterTile = (v, style, opts = {}) => `<div class="media poster" style="${style}">${CAR}<span class="lbl">Cover at ${mmss(v.posterS)}</span><span class="play-dot ${opts.small ? "sm" : ""}">${I("play", opts.small ? "icon" : "icon lg")}</span><span class="dur">${mmss(v.durationS)}</span></div>`;
+
+/* ---------- media list the buyer sees ---------- */
+function buyerMedia(s) {
+  const v = VideoModel.publicVideo(s);
+  const items = [{ kind: "photo", n: 0 }];
+  if (v) items.push({ kind: "video", v });
+  for (let i = 1; i < VideoModel.PHOTO_COUNT; i++) items.push({ kind: "photo", n: i });
+  return items;
+}
+
+/* =====================================================================
+   SELLER SCREENS
+   ===================================================================== */
+function videoCard(s) {
+  const t = s.task, a = s.active;
+  if (!s.access.uploadTester) return ""; // non-testers never see the slot (#1049)
+  let out = `<div class="card stack"><div class="between"><div><div class="t-subhead">Video <span class="muted t-callout">· optional</span></div><div class="t-foot muted">One video, up to 90 seconds, from your library</div></div>${I("video", "icon lg")}</div>`;
+  if (s.operation) {
+    out += `<div class="note"><b>${s.operation.kind === "remove" ? "Removal not confirmed yet" : "Cancellation not confirmed yet"}</b>The video is hidden here. We have not heard back from the server, so it may still exist.</div>
+      <button class="btn full" ${act("seller/checkStatus", {}, "Check status")}>Check status</button>`;
+    return out + "</div>";
+  }
+  if (a) {
+    out += `<div class="vrow">${posterTile(a, "width:76px;height:57px;border-radius:12px;flex:none", { small: true })}<div class="grow"><div class="t-callout" style="font-weight:600">${s.listing.published ? "Buyers see this video" : "Ready · private until you publish"}</div><div class="t-foot muted">${mmss(a.durationS)} · cover at ${mmss(a.posterS)}</div></div></div>`;
+  }
+  if (t && t.phase !== "selected") out += (a ? `<div class="divider"></div><div class="t-foot muted" style="font-weight:600">Replacement</div>` : "") + taskRow(s, t, !!a);
+  if (t && t.phase === "selected") out += `<div class="note"><b>Video chosen</b>Finish choosing the part to keep and its cover.</div><button class="btn full" ${act("seller/editSelection", {}, "Edit selection")}>Continue editing</button>`;
+  if (!s.access.uploadsOn) out += `<div class="note"><b>Video uploads are paused right now</b>Your photos and any ready video are not affected.</div>`;
+  if (!t && !a) out += `<button class="btn full" ${act("seller/openPicker", {}, "Choose from library")} ${s.access.uploadsOn ? "" : "disabled"}>${I("plus")}Choose from library</button>`;
+  if (a && !t) out += `<div class="row"><button class="btn small grow" ${act("seller/replace", {}, "Replace video")} ${s.access.uploadsOn ? "" : "disabled"}>Replace</button><button class="btn small danger grow" ${act("seller/openRemove", {}, "Remove video")}>Remove</button></div>`;
+  if (s.seller.permissionNote) out += `<div class="note err"><b>Carberk can't open your videos</b>Allow video access in Settings, or carry on with photos. Nothing you entered is lost.</div><div class="row"><button class="btn small grow" ${act("ops/permission", {}, "Open Settings and allow")}>Open Settings</button><button class="btn small outline grow" ${act("seller/dismissPermission", {}, "Not now")}>Not now</button></div>`;
+  return out + "</div>";
+}
+function taskRow(s, t, replacing) {
+  const thumb = `<div class="media poster vthumb">${CAR}</div>`;
+  const pct = t.preparedBytes ? Math.floor((t.confirmedBytes / t.preparedBytes) * 100) : 0;
+  const bytes = `${mb(t.confirmedBytes)} of ${mb(t.preparedBytes)} MB`;
+  const cancelLabel = replacing ? "Cancel replacement" : "Cancel";
+  const cancel = `<button class="btn small outline" ${act("seller/cancelPending", {}, cancelLabel)}>${cancelLabel}</button>`;
+  const head = (title, sub) => `<div class="vrow">${thumb}<div class="grow"><div class="t-callout" style="font-weight:600" role="status">${title}</div><div class="t-foot muted">${sub}</div></div></div>`;
+  switch (t.phase) {
+    case "preparing": return head(`${I("loader", "icon spin")} Preparing video…`, `Keep Carberk open. ${mmss(t.endS - t.startS)} selected`) + `<div class="progress indet"><span></span></div><div class="row">${cancel}</div>`;
+    case "uploading": return head("Uploading video", `${bytes} · ${pct}% confirmed`) + `<div class="progress"><span style="width:${pct}%"></span></div><div class="row"><button class="btn small" ${act("seller/pause", {}, "Pause upload")}>${I("pause")}Pause</button>${cancel}</div>`;
+    case "paused": {
+      const why = { user: ["Upload paused", "It stays paused until you continue, even after you close the app."], network: ["Waiting for a connection", "Continues by itself when you are back online."], lifecycle: ["Paused while Carberk was in the background", "Continues when you come back."] }[t.pause];
+      return head(why[0], `${bytes} confirmed · ${why[1]}`) + `<div class="progress"><span style="width:${pct}%"></span></div><div class="row">${t.pause === "user" ? `<button class="btn small" ${act("seller/continue", {}, "Continue upload")}>${I("play")}Continue</button>` : ""}${cancel}</div>`;
+    }
+    case "processing":
+      return head(`${I("loader", "icon spin")} Processing video…`, replacing ? "Buyers keep the current video until this one is ready." : "You can publish now. Buyers see the video once it is ready.") +
+        (t.statusUnknown ? `<div class="note"><b>Couldn't check the video status</b>Last known: processing. It may already be ready.</div><button class="btn small" ${act("seller/checkStatus", {}, "Check status again")}>Check again</button>` : `<div class="progress indet"><span></span></div>`) + `<div class="row">${cancel}</div>`;
+    case "failed": {
+      const copy = {
+        source: ["Video no longer available", "The original was moved, deleted or access was removed. Choose another video.", [["seller/replace", "Choose another"]]],
+        interrupted: ["Preparing stopped", "Carberk was closed while preparing. Your selection is kept.", [["seller/prepareAgain", "Prepare again"], ["seller/replace", "Choose another"]]],
+        storage: ["Not enough space on your phone", "Free up some space, then try again. Your selection is kept.", [["seller/prepareAgain", "Try again"], ["seller/replace", "Choose another"]]],
+        preparation: ["Couldn't prepare this video", "Try again, or choose another video.", [["seller/prepareAgain", "Try again"], ["seller/replace", "Choose another"]]],
+        transfer: ["Upload interrupted", "The confirmed part is kept. Continue from there.", [["seller/continue", "Continue upload"], ["seller/replace", "Choose another"]]],
+        processing: ["We couldn't process this video", "Try again uses the video you already uploaded; nothing is sent again. Your listing and photos are fine.", [["seller/reprocess", "Try again"], ["seller/replace", "Choose another"]]],
+      }[t.error];
+      return `<div class="note err" role="alert"><b>${copy[0]}</b>${copy[1]}</div><div class="row" style="flex-wrap:wrap">${copy[2].map(([type, label], i) => `<button class="btn small ${i ? "outline" : ""}" ${act(type, {}, label)}>${label}</button>`).join("")}<button class="btn small danger" ${act("seller/cancelPending", {}, "Remove pending video")}>Remove</button></div>`;
+    }
+  }
+  return "";
+}
+function sellerPhotos(s) {
+  const edit = s.listing.published;
+  return `<div class="content with-footer"><div class="px stack" style="padding-top:8px">
+    <div class="between"><button class="circle" aria-label="Back">${I("back")}</button><div class="t-foot muted">${edit ? "Edit listing" : "Step 2 of 7"}</div><span style="width:44px"></span></div>
+    <div><div class="t-title">Photos${s.access.uploadTester ? " and video" : ""}</div><div class="t-callout muted">At least 3 photos. The first one is the cover.</div></div>
+    <div class="card"><div class="photo-grid">${Array.from({ length: s.listing.photos }, (_, i) => photo(i, "", i ? "" : "Cover")).join("")}</div><div class="t-foot muted" style="margin-top:8px">${s.listing.photos} photos added</div></div>
+    ${videoCard(s)}
+    </div></div>
+    <div class="footer"><button class="btn primary full" ${act("seller/screen", { screen: edit ? "owner" : "review" }, edit ? "Save changes" : "Continue to review")}>${edit ? "Save" : "Continue"}</button></div>
+    ${s.seller.picker ? pickerSheet(s) : ""}${s.seller.removeSheet ? removeSheet(s) : ""}`;
+}
+function pickerSheet(s) {
+  const ios = s.access.platform === "ios";
+  const vids = [["clip45", 45], ["clip90", 90], ["clip120", 120]];
+  return `<div class="sheet-scrim"><div class="sheet" role="dialog" aria-label="${ios ? "Photos" : "Photo Picker"}"><div class="grabber"></div>
+    <div class="between" style="margin-bottom:10px"><button class="btn small outline" ${act("seller/closePicker", {}, "Cancel picker")}>Cancel</button><b>${ios ? "Photos · Videos" : "Select video"}</b><span style="width:70px"></span></div>
+    <div class="t-foot muted" style="margin-bottom:8px">${ios ? "System Photos picker (iOS). Carberk only gets the video you pick." : "Android system Photo Picker. Carberk only gets the video you pick."}</div>
+    <div class="picker">${vids.map(([k, d], i) => `<button class="media p${i + 2}" ${act("seller/pick", { source: k }, `Pick ${mmss(d)} video`)} aria-label="Video, ${mmss(d)}">${CAR}<span class="dur">${mmss(d)}</span></button>`).join("")}${[0, 1, 2].map((i) => `<button class="media p${i + 1}" disabled aria-label="Photo, not selectable">${CAR}</button>`).join("")}</div>
+    <div class="t-foot muted" style="margin-top:10px">Videos only. No recording in Carberk.</div></div></div>`;
+}
+function removeSheet(s) {
+  return `<div class="sheet-scrim"><div class="sheet" role="dialog" aria-label="Remove video"><div class="grabber"></div>
+    <div class="t-headline" style="margin-bottom:6px">Remove video?</div><p class="t-callout muted" style="margin-top:0">Buyers stop seeing it right away. Any pending replacement is cancelled too. Photos and details stay.</p>
+    <div class="stack"><button class="btn danger full" ${act("seller/remove", {}, "Remove video")}>Remove video</button>
+    <button class="btn full" ${act("seller/closeRemove", {}, "Keep video")}>Keep</button></div></div></div>`;
+}
+function sellerEditor(s) {
+  const t = s.task;
+  if (!t) return sellerPhotos(s);
+  const dur = t.source.durationS, sel = t.endS - t.startS, long = dur > VideoModel.MAX_S;
+  const left = (t.startS / dur) * 100, right = 100 - (t.endS / dur) * 100;
+  const covers = VideoModel.coverTimes(t);
+  const slider = (kind, now, text) => `<span class="h ${kind === "start" ? "l" : "r"}" role="slider" tabindex="0" data-drag="${kind}" aria-label="${kind === "start" ? "Start" : "End"} of the part to keep" aria-valuemin="0" aria-valuemax="${dur}" aria-valuenow="${now}" aria-valuetext="${text}"><b></b></span>`;
+  const hint = t.hitMax ? "Videos can be up to 1:30. Slide the frame to move it." : long ? `This video is ${mmss(dur)}. Drag the yellow frame to the 1:30 you want.` : "Drag the yellow edges to trim. Optional.";
+  return `<div class="content with-footer"><div class="px stack" style="padding-top:6px">
+    <div class="between"><button class="btn small outline" ${act("seller/cancelEditor", {}, "Cancel editing")}>Cancel</button><b class="t-body">Video</b><button class="btn small outline" ${act("seller/replace", {}, "Choose another from editor")}>Change</button></div>
+    <div class="player-frame" style="border-radius:16px;overflow:hidden"><div class="letterbox media poster">${CAR}${s.seller.previewing ? `<span class="lbl">Playing ${mmss(t.startS)}–${mmss(t.endS)}</span>` : ""}<button class="play-dot" style="border:0" ${act("seller/preview", {}, "Preview selection")} aria-label="${s.seller.previewing ? "Pause preview" : "Play the part to keep"}">${I(s.seller.previewing ? "pause" : "play", "icon lg")}</button></div></div>
+    <div><div class="between"><span class="t-headline tab-nums">${mmss(sel)}</span><span class="t-foot ${t.hitMax ? "" : "muted"}" style="${t.hitMax ? "font-weight:600" : ""}">Max 1:30</span></div>
+      <div class="t-foot muted" role="status">${hint}</div></div>
+    <div><div class="trim"><div class="track" data-track data-dur="${dur}">
+      <div class="filmstrip media" aria-hidden="true">${Array.from({ length: 9 }, () => "<i></i>").join("")}</div>
+      <div class="dim l" style="width:${left}%"></div><div class="dim r" style="width:${right}%"></div>
+      <div class="tw" data-drag="window" style="left:${left}%;right:${right}%" aria-hidden="false">${slider("start", t.startS, `Starts at ${mmss(t.startS)}`)}${slider("end", t.endS, `Ends at ${mmss(t.endS)}`)}</div>
+    </div></div><div class="trim-times"><span>${mmss(t.startS)}</span><span>${mmss(t.endS)}</span></div></div>
+    <div><div class="t-subhead">Cover</div><div class="t-foot muted" style="margin-bottom:8px">Buyers see this before they tap Play.</div>
+      <div class="covers" role="group" aria-label="Choose the cover">${covers.map((c, i) => `<button class="media p${(i % 4) + 1}" aria-pressed="${i === t.coverIndex}" ${act("seller/cover", { index: i }, `Cover ${i + 1} (${mmss(c)})`)} aria-label="Cover ${i + 1} of 4, frame at ${mmss(c)}">${CAR}${i === t.coverIndex ? `<span class="ok">${I("check")}</span>` : ""}</button>`).join("")}</div></div>
+    </div></div>
+    <div class="footer"><button class="btn primary full" ${act("seller/use", {}, long ? `Use ${mmss(t.startS)}–${mmss(t.endS)}` : "Use video")}>${long ? `Use ${mmss(t.startS)}–${mmss(t.endS)}` : "Use video"}</button></div>
+    ${s.seller.picker ? pickerSheet(s) : ""}`;
+}
+function sellerReview(s) {
+  const t = s.task, a = s.active;
+  const vline = !s.access.uploadTester ? "" : t ? ({ preparing: "Preparing", uploading: "Uploading", paused: "Upload paused", processing: "Processing", failed: "Needs attention", selected: "Not finished" }[t.phase]) : a ? "Ready" : "None";
+  return `<div class="content with-footer"><div class="px stack" style="padding-top:8px">
+    <div class="between"><button class="circle" aria-label="Back" ${act("seller/screen", { screen: "photos" }, "Back to photos")}>${I("back")}</button><div class="t-foot muted">Step 7 of 7</div><span style="width:44px"></span></div>
+    <div class="t-title">Review and publish</div>
+    <div class="card"><dl class="kv" style="grid-template-columns:120px 1fr;font-size:15px;gap:8px 12px">
+      <dt class="muted">Car</dt><dd>Toyota Land Cruiser Prado, 2019</dd><dt class="muted">Price</dt><dd>412 000 TMT</dd><dt class="muted">Mileage</dt><dd>86 000 km</dd>
+      <dt class="muted">Photos</dt><dd>${s.listing.photos} photos</dd>${vline ? `<dt class="muted">Video</dt><dd>${vline}</dd>` : ""}</dl></div>
+    ${t && t.phase !== "selected" ? `<div class="note">You can publish now. Buyers see the video only once it is ready${t.phase === "failed" ? "; this one needs attention first" : ""}.</div>` : ""}
+    ${t?.phase === "selected" ? `<div class="note">The chosen video is not used until you finish editing it. You can still publish with photos.</div>` : ""}
+    </div></div>
+    <div class="footer"><button class="btn brand full" ${act("seller/publish", {}, "Publish listing")}>Publish</button></div>`;
+}
+function sellerOwner(s) {
+  const t = s.task, a = s.active;
+  return `<div class="content with-tabs"><div class="px stack" style="padding-top:8px">
+    <div class="between"><span class="t-foot muted">My listings</span><span></span></div>
+    <div class="card stack"><div class="between"><span class="t-subhead">Your listing is live</span>${I("check")}</div>
+    <div class="row">${photo(0, "width:96px;height:72px;border-radius:12px", "Cover")}${a ? posterTile(a, "width:96px;height:72px;border-radius:12px", { small: true }) : ""}<div class="grow t-foot muted">Toyota Land Cruiser Prado, 2019<br>412 000 TMT</div></div>
+    ${t ? `<div class="note">${a ? "Replacement" : "Video"}: ${{ preparing: "preparing", uploading: "uploading", paused: "upload paused", processing: "processing", failed: "needs attention", selected: "not finished" }[t.phase]}. ${a ? "Buyers keep the current video meanwhile." : "Buyers see it once it is ready."}</div>` : ""}
+    <button class="btn full" ${act("seller/screen", { screen: "photos" }, "Edit photos and video")}>Edit photos${s.access.uploadTester ? " and video" : ""}</button></div>
+    </div></div>${tabbar("sell")}`;
+}
+function tabbar(on) {
+  const tabs = [["home", "Home"], ["search", "Search"], ["plus", "Sell"], ["msg", "Chats"], ["user", "Account"]];
+  return `<nav class="tabbar" aria-label="Tabs">${tabs.map(([i, l]) => `<span class="${l.toLowerCase() === on ? "on" : ""}">${I(i)}${l}</span>`).join("")}</nav>`;
+}
+
+/* =====================================================================
+   BUYER SCREENS
+   ===================================================================== */
+function resultsCard(s, listing, idx) {
+  const media = idx === 0 ? buyerMedia(s) : [{ kind: "photo", n: idx + 1 }, { kind: "photo", n: idx + 2 }, { kind: "photo", n: idx + 3 }];
+  const w = 226, h = 169; // 61% and 45.75% of the 370 px screen
+  const shown = media.slice(0, 5);
+  const more = idx === 0 ? media.length - shown.length : 6;
+  const tiles = shown.map((m, i) => m.kind === "video"
+    ? `<button ${act("buyer/openCard", { index: i }, "Results: tap the video cover")} aria-label="Video, ${m.v.durationS} seconds. Opens the listing with the video selected; it does not play." style="width:${w}px;height:${h}px;overflow:hidden">${posterTile(m.v, `width:${w}px;height:${h}px`)}</button>`
+    : `<button ${act("buyer/openCard", { index: i }, "Results: open listing")} aria-label="Photo ${i + 1}" style="width:${w}px;height:${h}px;overflow:hidden">${photo(m.n, `width:${w}px;height:${h}px`, i === 0 ? "Cover" : "")}</button>`).join("") +
+    `<button ${act("buyer/openCard", { index: 0 }, "Results: +N photos")} style="width:${w}px;height:${h}px;background:var(--tonal);display:flex;flex-direction:column;align-items:center;justify-content:center"><span class="t-title">+${more}</span><span class="t-foot muted">photos</span></button>`;
+  return `<article class="card" style="padding:0;border-radius:28px;overflow:hidden;margin-bottom:10px">
+    <div class="strip" data-strip="${idx}" style="margin-top:8px">${tiles}</div>
+    <button style="all:unset;display:block;cursor:pointer;padding:14px 16px 0" ${act("buyer/openCard", { index: 0 }, "Results: open listing")}>
+      <div class="t-headline tab-nums">${listing.price}</div><div class="t-callout tab-nums">${listing.spec}</div><div class="t-callout muted">${listing.title}</div></button>
+    <div style="padding:14px 16px 16px" class="stack"><div class="row"><button class="btn brand grow">${I("phone")}Call</button><button class="btn sq" aria-label="Message">${I("msg")}</button><button class="btn sq" aria-label="Favourite">${I("heart")}</button></div>
+    <div><div class="t-callout" style="font-weight:600">${listing.seller}</div><div class="t-foot muted">Private seller · Ashgabat · Today</div></div></div></article>`;
+}
+const LISTINGS = [
+  { title: "Toyota Land Cruiser Prado, 2019", price: "412 000 TMT", spec: "86 000 km · Automatic · Petrol", seller: "Merdan" },
+  { title: "Lexus GX 460, 2017", price: "455 000 TMT", spec: "112 000 km · Automatic · Petrol", seller: "Aýna" },
+  { title: "Toyota Camry, 2020", price: "268 000 TMT", spec: "54 000 km · Automatic · Petrol", seller: "Kemal" },
+];
+function buyerResults(s) {
+  const b = s.buyer;
+  return `<div class="content with-tabs" data-scroll="results"><div class="px" style="padding-top:6px">
+    <div class="between"><button class="circle" aria-label="Back">${I("back")}</button><div style="text-align:center"><div class="t-subhead tab-nums">1 284 cars</div><div class="t-foot muted">120 000 – 480 000 TMT</div><div class="t-foot muted">Newest first</div></div><button class="circle" aria-label="Sort">${I("sort")}</button></div>
+    <div class="row" style="overflow-x:auto;margin:12px -16px 12px;padding:0 16px;scrollbar-width:none">
+      <button class="chip" style="font-weight:600">${I("sliders")}Filters${b.filters.length ? `<span class="badge">${b.filters.length}</span>` : ""}</button>
+      ${b.filters.map((f) => `<button class="chip" ${act("buyer/removeFilter", { value: f }, `Remove filter ${f}`)} aria-label="Remove ${E(f)}">${E(f)} ${I("x")}</button>`).join("")}
+    </div></div>
+    ${LISTINGS.map((l, i) => resultsCard(s, l, i)).join("")}
+  </div>${tabbar("search")}`;
+}
+function buyerDetail(s) {
+  const b = s.buyer, media = buyerMedia(s), tw = 338, th = Math.round((tw * 3) / 4);
+  const tiles = media.map((m, i) => m.kind === "video"
+    ? `<button ${act("buyer/play", {}, "Detail: Play video")} aria-label="Play video, ${m.v.durationS} seconds" style="width:${tw}px;height:${th}px;overflow:hidden" data-idx="${i}">${posterTile(m.v, `width:${tw}px;height:${th}px`)}</button>`
+    : `<button ${act("buyer/openGallery", { index: i }, "Detail: open gallery")} aria-label="Photo ${i + 1} of ${media.length}" style="width:${tw}px;height:${th}px;overflow:hidden" data-idx="${i}">${photo(m.n, `width:${tw}px;height:${th}px`, i === 0 ? "Cover" : "")}</button>`).join("");
+  return `<div class="content with-footer" data-scroll="detail">
+    <div class="px between" style="padding-top:2px;padding-bottom:8px"><button class="circle" aria-label="Back to Results" ${act("buyer/backResults", {}, "Back to Results")}>${I("back")}</button><div class="row"><button class="circle" aria-label="Share">${I("share")}</button><button class="circle" aria-label="Favourite">${I("heart")}</button></div></div>
+    <div class="dstrip" data-dstrip="1">${tiles}</div>
+    ${b.denied ? `<div class="px" style="margin-top:10px"><div class="note err" role="alert"><b>Video unavailable</b>This listing's video can't be played any more.</div></div>` : ""}
+    <div class="px stack" style="margin-top:14px">
+      <div><div class="t-display tab-nums">412 000 TMT</div><div class="t-callout">Toyota Land Cruiser Prado, 2019</div><div class="t-foot muted">Ashgabat · Today</div></div>
+      <div class="card"><div class="t-subhead" style="margin-bottom:8px">Specifications</div><dl class="kv" style="grid-template-columns:120px 1fr;gap:6px 12px;font-size:15px"><dt class="muted">Mileage</dt><dd>86 000 km</dd><dt class="muted">Gearbox</dt><dd>Automatic</dd><dt class="muted">Engine</dt><dd>Petrol · 4.0</dd><dt class="muted">Body</dt><dd>SUV · White</dd></dl></div>
+      <div class="card"><div class="t-subhead" style="margin-bottom:6px">Description</div><div class="t-callout">One owner, full service history. Video shows a walkaround and the engine running.</div></div>
+    </div></div>
+    <div class="footer"><button class="btn brand grow">${I("phone")}Call</button><button class="btn grow">${I("msg")}Message</button></div>`;
+}
+function buyerGallery(s) {
+  const b = s.buyer, media = buyerMedia(s), m = media[Math.min(b.mediaIndex, media.length - 1)];
+  const i = Math.min(b.mediaIndex, media.length - 1);
+  const main = m.kind === "video"
+    ? `<div class="media poster" style="width:100%;aspect-ratio:4/3">${CAR}<span class="lbl">Video cover · not playing</span><button class="play-dot" style="border:0;width:72px;height:72px" ${act("buyer/play", {}, "Gallery: Play video")} aria-label="Play video, ${m.v.durationS} seconds">${I("play", "icon lg")}</button><span class="dur">${mmss(m.v.durationS)}</span></div>`
+    : photo(m.n, "width:100%;aspect-ratio:4/3", "");
+  return `<div class="content black with-footer" style="display:flex;flex-direction:column">
+    <div class="px between on-black" style="padding:2px 16px 8px"><button class="circle dark" aria-label="Close" ${act("buyer/closeGallery", {}, "Close gallery")}>${I("x")}</button><span class="t-callout tab-nums" style="font-weight:600">${i + 1} / ${media.length}</span><button class="circle dark" aria-label="Favourite">${I("heart")}</button></div>
+    <div style="flex:1;display:flex;align-items:center">${main}</div>
+    <div class="row" style="justify-content:space-between;padding:8px 16px"><button class="btn small" style="background:rgba(255,255,255,.14);color:#fff" ${act("buyer/galleryTo", { index: Math.max(0, i - 1) }, "Gallery: previous")} ${i === 0 ? "disabled" : ""}>Previous</button><button class="btn small" style="background:rgba(255,255,255,.14);color:#fff" ${act("buyer/galleryTo", { index: Math.min(media.length - 1, i + 1) }, "Gallery: next")} ${i === media.length - 1 ? "disabled" : ""}>Next</button></div>
+    <div class="thumbs" style="padding-bottom:12px">${media.map((x, j) => `<button aria-current="${j === i}" ${act("buyer/galleryTo", { index: j }, `Gallery: thumbnail ${j + 1}`)} aria-label="${x.kind === "video" ? "Video" : "Photo"} ${j + 1}">${x.kind === "video" ? `<div class="media poster" style="width:64px;height:48px;border-radius:8px"><span class="play-dot" style="width:24px;height:24px">${I("play", "icon")}</span></div>` : photo(x.n, "width:64px;height:48px;border-radius:8px")}</button>`).join("")}</div>
+    </div>
+    <div class="footer black" style="background:#000"><button class="btn brand grow">${I("phone")}Call</button><button class="btn grow" style="background:rgba(255,255,255,.14);color:#fff">${I("msg")}Message</button></div>`;
+}
+function buyerPlayer(s) {
+  const b = s.buyer, v = s.active, dur = v?.durationS || 0;
+  const overlay = {
+    loading: `<div class="overlay-msg">${I("loader", "icon lg spin")}<span>Loading video</span></div>`,
+    buffering: `<div class="overlay-msg">${I("loader", "icon lg spin")}<span>Buffering${s.app.online ? "" : " · no connection"}</span></div>`,
+    error: `<div class="overlay-msg">${I("wifi", "icon lg")}<b>Couldn't play the video</b><span class="t-foot">Check your connection and try again.</span><button class="btn small" ${act("buyer/retry", {}, "Player: Retry")}>Try again</button></div>`,
+    denied: `<div class="overlay-msg">${I("alert", "icon lg")}<b>Video unavailable</b><span class="t-foot">This listing's video can't be played any more.</span></div>`,
+    paused: `<button class="play-dot" style="border:0;width:72px;height:72px" ${act("buyer/play", {}, "Player: resume")} aria-label="Play">${I("play", "icon lg")}</button>`,
+  }[b.player] || "";
+  const avail = VideoModel.QUALITIES;
+  return `<div class="content black" style="display:flex;flex-direction:column">
+    ${b.fullscreen ? "" : `<div class="px between on-black" style="padding:2px 16px 8px"><button class="circle dark" aria-label="Close video" ${act("buyer/closePlayer", {}, "Close player")}>${I("x")}</button><span class="t-callout" style="font-weight:600">Video · ${mmss(dur)}</span><span style="width:44px"></span></div>`}
+    <div style="flex:1;display:flex;align-items:center;${b.fullscreen ? "transform:rotate(90deg) scale(1.55);" : ""}"><div class="player-frame"><div class="letterbox media poster" aria-label="Video frame, complete picture with black bars">${CAR}<span class="lbl">16:9 clip · black bars keep the whole frame</span>${overlay}</div></div></div>
+    <div class="px stack" style="padding-bottom:34px;${b.fullscreen ? "position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.7))" : ""}">
+      <div class="scrub"><span>${mmss(b.positionS)}</span><input type="range" min="0" max="${dur}" value="${b.positionS}" data-seek aria-label="Seek" ${["loading", "error", "denied"].includes(b.player) ? "disabled" : ""}><span>${mmss(dur)}</span></div>
+      <div class="between">
+        <button class="circle dark" ${b.player === "playing" ? act("buyer/pause", {}, "Player: Pause") : act("buyer/play", {}, "Player: Play")} aria-label="${b.player === "playing" ? "Pause" : "Play"}" ${["loading", "error", "denied"].includes(b.player) ? "disabled" : ""}>${I(b.player === "playing" ? "pause" : "play")}</button>
+        <button class="circle dark" ${act("buyer/mute", {}, b.muted ? "Unmute" : "Mute")} aria-pressed="${b.muted}" aria-label="${b.muted ? "Unmute" : "Mute"}">${I(b.muted ? "mute" : "sound")}</button>
+        <button class="btn small" style="background:rgba(255,255,255,.14);color:#fff" ${act("buyer/qualitySheet", {}, "Open quality")}>${I("gear")}${E(b.quality.split(" ·")[0])}</button>
+        <button class="circle dark" ${act("buyer/fullscreen", {}, b.fullscreen ? "Exit full screen" : "Full screen")} aria-label="${b.fullscreen ? "Exit full screen" : "Full screen"}">${I("expand")}</button>
+      </div></div></div>
+    ${b.qualitySheet ? `<div class="sheet-scrim"><div class="sheet" role="dialog" aria-label="Quality"><div class="grabber"></div><div class="t-subhead" style="margin-bottom:8px">Quality</div><div class="stack">${avail.map((q) => `<button class="btn full ${b.quality === q ? "primary" : ""}" style="justify-content:space-between" ${act("buyer/quality", { value: q }, `Quality ${q}`)}>${E(q)}${b.quality === q ? I("check") : ""}</button>`).join("")}</div><p class="t-foot muted">Auto starts low and rises with your connection. Only the qualities this video has are listed.</p></div></div>` : ""}`;
+}
+
+/* =====================================================================
+   TICKET MAP, WALKTHROUGHS, COVERAGE
+   ===================================================================== */
+function ticketsHere(s) {
+  const t = s.task;
+  if (ui.flow === "seller") {
+    const sc = s.seller.screen;
+    if (s.seller.picker) return [[1047, "Library only, one video, no in-app recording"], [1050, "Android Photo Picker path proven separately"], [1039, "Gallery/source persistence proof on iOS"]];
+    if (sc === "editor") return [[1047, "Preview, drag the timeline edges or slide the frame, 1:30 cap, four cover frames inside the part"], [1039, "Native trim boundaries and orientation proof"]];
+    if (sc === "review") return [[1048, "Publish with photos while video is pending or failed"], [1043, "Only Ready video is advertised"]];
+    if (sc === "owner") return [[1048, "Seller tells current Ready video from pending replacement"], [1042, "Replacement keeps the old video public until the new one is Ready"]];
+    const out = [[1047, "Optional Video card beside required photos (testers only)"]];
+    if (!s.access.uploadTester || !s.access.uploadsOn) out.push([1049, "Tester-only slot and upload kill switch; ready playback kept"]);
+    if (s.operation) out.push([1045, "Unconfirmed cancel/remove shows Check status"], [1042, "Removal hides immediately; server result wins"]);
+    if (t?.phase === "preparing" || (t?.phase === "failed" && ["preparation", "interrupted", "source", "storage"].includes(t.error))) out.push([1044, "Native preparation, interruption, source loss and retry"]);
+    if (["uploading", "paused"].includes(t?.phase) || t?.error === "transfer") out.push([1045, "Confirmed bytes only, Pause stays paused, reconnect and reopen"], [1041, "Owned resumable session the transfer talks to"]);
+    if (t?.phase === "processing" || t?.error === "processing") out.push([1048, "Processing card, failure copy, Try again, Check again"], [1056, "Server processing and reprocess"]);
+    if (s.active && t) out.push([1042, "Active video plus pending replacement"]);
+    if (s.active && !t) out.push([1042, "Replace and remove"]);
+    return out;
+  }
+  if (ui.flow === "buyer") {
+    const sf = s.buyer.surface;
+    if (sf === "results") return [[1051, "Results and Favorites cards: cover first, video cover second, Play, duration, opens detail without playing"], [1043, "Results read carries only Ready video"]];
+    if (sf === "detail") return [[1051, "Inset 4:3 strip, cover-shaped video tile, explicit Play"], [1057, "New playback refused after a ban or removal; Admin can watch"]];
+    if (sf === "gallery") return [[1051, "Video cover in paging and thumbnails; arriving never plays"]];
+    return [[1046, "Explicit start, pause, seek, mute, full screen, quality, loading, buffering, retry, cleanup"], [1057, "Every new stream request is authorized"]];
+  }
+  return [];
+}
+const WALKS = {
+  happy: { title: "Happy path", flow: "seller", text: "A tester adds a 2-minute video. Because it is longer than 1:30 they must choose the part to keep. They publish while it processes; buyers see it only when it is Ready, as the second tile, and Play is always a deliberate tap.",
+    steps: [["seller/openPicker", "Choose from library"], ["seller/pick", "Pick the 2:00 video", { source: "clip120" }], ["seller/setInterval", "Drag the right edge back to 1:15", { startS: 0, endS: 75, moved: "end" }], ["seller/cover", "Tap the second cover", { index: 1 }], ["seller/use", "Use 0:00–1:15"], ["sim/prepared", "Simulate: preparation finishes"], ["sim/part", "Simulate: server confirms part 1"], ["sim/part", "Simulate: server confirms part 2"], ["seller/screen", "Continue to review", { screen: "review" }], ["seller/publish", "Publish with photos while video is still uploading"], ["seller/screen", "Edit photos and video", { screen: "photos" }], ["sim/part", "Simulate: server confirms the last part"], ["sim/processed", "Simulate: processing finishes"], ["flow:buyer", "Switch to the buyer"], ["buyer/openCard", "Tap the video cover in Results", { index: 1 }], ["buyer/play", "Tap Play on the detail video tile"], ["sim/firstFrame", "Simulate: first frame arrives"], ["buyer/closePlayer", "Close the player"], ["buyer/backResults", "Back to Results"]] },
+  limit: { title: "90-second limit", flow: "seller", text: "Exactly 1:30 needs no trimming. A 2:00 video opens with the frame on the first 1:30; dragging an edge further stops at 1:30, and the seller slides the whole frame instead. The button names the exact part that will be used.",
+    steps: [["seller/openPicker", "Choose from library"], ["seller/pick", "Pick the 1:30 video", { source: "clip90" }], ["seller/cancelEditor", "Cancel editing (nothing is kept)"], ["seller/openPicker", "Choose from library"], ["seller/pick", "Pick the 2:00 video", { source: "clip120" }], ["seller/setInterval", "Drag the right edge toward 1:45 (stops at 1:30)", { startS: 0, endS: 105, moved: "end" }], ["seller/setInterval", "Slide the frame to start at 0:20", { startS: 20, endS: 110, moved: "window" }], ["seller/use", "Use 0:20–1:50"]] },
+  interrupt: { title: "Interruptions", flow: "seller", text: "Pause by hand stays paused even after reopening. A dropped connection or a trip to the background pauses by itself and continues when the cause goes away. Progress counts only bytes the server confirmed.",
+    steps: [["seller/openPicker", "Choose from library"], ["seller/pick", "Pick the 0:45 video", { source: "clip45" }], ["seller/use", "Use video"], ["sim/background", "Simulate: app goes to background while preparing"], ["sim/foreground", "Simulate: app comes back"], ["seller/prepareAgain", "Prepare again"], ["sim/prepared", "Simulate: preparation finishes"], ["sim/part", "Simulate: server confirms part 1"], ["sim/offline", "Simulate: connection drops"], ["sim/online", "Simulate: connection returns"], ["seller/pause", "Pause"], ["sim/reopen", "Simulate: app is closed and reopened"], ["seller/continue", "Continue"], ["sim/uploadFail", "Simulate: upload fails"], ["seller/continue", "Continue from confirmed part"]] },
+  replace: { title: "Replacement", flow: "seller", text: "A live listing already has a Ready video. The seller replaces it; buyers keep the old one until the new one is Ready, then it switches at once. Cancelling the replacement keeps the old video.",
+    steps: [["ops/seedReady", "Start from a live listing with a Ready video"], ["seller/replace", "Replace"], ["seller/pick", "Pick the 0:45 video", { source: "clip45" }], ["seller/use", "Use video"], ["sim/prepared", "Simulate: preparation finishes"], ["seller/cancelPending", "Cancel replacement"], ["seller/replace", "Replace again"], ["seller/pick", "Pick the 1:30 video", { source: "clip90" }], ["seller/use", "Use video"], ["sim/prepared", "Simulate: preparation finishes"], ["sim/part", "Simulate: part 1"], ["sim/part", "Simulate: part 2"], ["sim/part", "Simulate: last part"], ["sim/processed", "Simulate: processing finishes, video switches"]] },
+  failures: { title: "Failures", flow: "seller", text: "Each failure says what happened and offers only actions that really work. Processing failure retries from the already uploaded video, so nothing is sent again. A removal whose result is unknown is never shown as done.",
+    steps: [["seller/openPicker", "Choose from library"], ["seller/pick", "Pick the 0:45 video", { source: "clip45" }], ["seller/use", "Use video"], ["sim/sourceGone", "Simulate: the original disappears from the library"], ["seller/replace", "Choose another"], ["seller/pick", "Pick the 1:30 video", { source: "clip90" }], ["seller/use", "Use video"], ["sim/prepared", "Simulate: preparation finishes"], ["sim/part", "Part 1"], ["sim/part", "Part 2"], ["sim/part", "Last part"], ["sim/statusFail", "Simulate: status check fails"], ["seller/checkStatus", "Check again"], ["sim/processFail", "Simulate: processing fails"], ["seller/reprocess", "Try again (reprocess the uploaded video)"], ["sim/processFail", "Simulate: processing fails again"], ["seller/cancelPending", "Remove pending video (result unknown)", { uncertain: true }], ["seller/checkStatus", "Check status"]] },
+  access: { title: "Access and switches", flow: "seller", text: "Non-testers never see the slot. Switching uploads off stops new videos but keeps the Ready one playing. A denied library permission keeps everything the seller typed. A banned listing refuses new playback.",
+    steps: [["ops/seedReady", "Start from a live listing with a Ready video"], ["seller/screen", "Edit photos and video", { screen: "photos" }], ["ops/uploadsOn", "Operator: switch uploads off"], ["flow:buyer", "Switch to the buyer"], ["buyer/openCard", "Open the listing", { index: 1 }], ["buyer/play", "Play still works"], ["buyer/closePlayer", "Close the player"], ["ops/ban", "Moderator: ban the listing"], ["buyer/play", "Try Play (refused)"], ["flow:seller", "Back to the seller"], ["ops/uploadsOn", "Operator: switch uploads on"], ["ops/permission", "Phone: deny video access"], ["seller/remove", "Remove video"], ["seller/openPicker", "Choose from library"], ["ops/uploadTester", "Operator: remove this account from testers"]] },
+};
+const COVERAGE = [
+  [1047, "Video card (testers only), picker, permission note, editor: drag edges or slide the frame, 1:30 cap, 3 s minimum, four covers in the photo crop", "shown"],
+  [1044, "Preparing, Preparing stopped / Prepare again, source gone, not enough space, couldn't prepare", "shown"],
+  [1045, "Uploading with confirmed bytes, paused by seller / no connection / background, reopen, Upload interrupted, Check status", "shown"],
+  [1048, "Review video line, publish while pending, Ready private until publish, Ready + Replacement, Remove sheet, processing card and Try again", "shown"],
+  [1056, "Server side of Processing, Ready and Try again (reprocess)", "back"],
+  [1041, "Server side of the upload states", "back"],
+  [1042, "Replacement switch at Ready, Cancel replacement keeps the old video, Remove", "shown"],
+  [1043, "Reads carry only Ready video; owner reads carry pending status", "back"],
+  [1051, "Results/Favorites card 2nd tile, detail 4:3 strip, gallery paging and thumbnails, return positions", "shown"],
+  [1046, "Player: loading, playing, paused, buffering, error / Try again, unavailable, seek, mute, full screen, quality", "shown"],
+  [1057, "Banned listing refuses new Play; Admin can watch", "shown"],
+  [1049, "Card hidden for non-testers; uploads-off note; playback kept", "shown"],
+  [1050, "Android picker label; real proof on device", "back"],
+  [1039, "Native compression proof", "back"],
+  [1040, "Contracts ADR", "back"],
+  [1052, "Measurements and events", "back"],
+  [1058, "Final check with founder samples", "back"],
+];
+const GAPS = [
+  ["decide", null, "A “With video” filter on the Filters screen and a video badge on Results cards are in no ticket. Recommendation: leave out for the tester phase."],
+  ["decide", 1049, "Testers are two user-id lists in API config plus an uploads switch. Changing them needs a Railway change (founder approval). An Admin screen for this is not planned."],
+];
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function stateRows(s) {
+  const t = s.task, a = s.active, b = s.buyer;
+  const rows = [
+    ["Listing", s.listing.published ? (s.listing.banned ? "Published · banned" : "Published") : "Draft"],
+    ["Pending video", t ? `${({ selected: "Chosen, not used yet", preparing: "Preparing", uploading: "Uploading", paused: `Paused (${t.pause === "user" ? "by seller" : t.pause === "network" ? "no connection" : "app in background"})`, processing: "Processing", failed: `Failed: ${t.error}` })[t.phase]}${t.statusUnknown ? " · status unknown" : ""}` : "None"],
+    ["Interval", t ? `${mmss(t.startS)}–${mmss(t.endS)} (${mmss(t.endS - t.startS)}) · cover ${mmss(t.posterS)}` : "—"],
+    ["Confirmed upload", t?.preparedBytes ? `${mb(t.confirmedBytes)} of ${mb(t.preparedBytes)} MB` : "Nothing prepared"],
+    ["Ready video", a ? `${mmss(a.durationS)} · ${s.listing.published ? "public" : "private draft"}` : "None"],
+    ["Buyers see video", VideoModel.publicVideo(s) ? "Yes" : "No"],
+    ["Unconfirmed", s.operation ? (s.operation.kind === "remove" ? "Removal" : "Cancellation") : "None"],
+    ["Phone", `${s.access.platform === "ios" ? "iPhone" : "Android"} · ${s.app.online ? "online" : "offline"} · ${s.app.foreground ? "open" : "background"} · library ${s.access.permission}`],
+    ["Switches", `upload tester ${s.access.uploadTester ? "on" : "off"} · view tester ${s.access.viewTester ? "on" : "off"} · uploads ${s.access.uploadsOn ? "on" : "off"}`],
+    ["Buyer screen", `${b.surface}${b.surface === "player" ? ` · ${b.player} · ${b.quality}${b.muted ? " · muted" : ""}` : ""}`],
+    ["Stream requests", `${b.streamRequests} (only after Play) · cover loads ${b.posterLoads}`],
+    ["Results", `scroll ${b.resultsScroll}px · filters: ${b.filters.join(", ") || "none"}`],
+  ];
+  return rows;
+}
+function phoneHtml(s) {
+  if (ui.flow === "seller") {
+    const sc = s.seller.screen;
+    return sc === "editor" ? sellerEditor(s) : sc === "review" ? sellerReview(s) : sc === "owner" ? sellerOwner(s) : sellerPhotos(s);
+  }
+  const sf = s.buyer.surface;
+  return sf === "detail" ? buyerDetail(s) : sf === "gallery" ? buyerGallery(s) : sf === "player" ? buyerPlayer(s) : buyerResults(s);
+}
+const SIMS = {
+  seller: [["Preparation", [["sim/prepared", "Preparation finishes"], ["sim/prepareFail", "Preparation fails"], ["sim/sourceGone", "Original disappears"], ["sim/prepareFail", "Phone storage full", { reason: "storage" }]]],
+           ["Upload", [["sim/part", "Server confirms a 5 MB part"], ["sim/uploadFail", "Upload fails"], ["sim/offline", "Connection drops"], ["sim/online", "Connection returns"]]],
+           ["App", [["sim/background", "App to background"], ["sim/foreground", "App back"], ["sim/reopen", "Close and reopen app"]]],
+           ["Server", [["sim/processed", "Processing finishes"], ["sim/processFail", "Processing fails"], ["sim/statusFail", "Status check fails"], ["seller/cancelPending", "Cancel with unknown result", { uncertain: true }], ["seller/remove", "Remove with unknown result", { uncertain: true }]]]],
+  buyer: [["Player", [["sim/firstFrame", "First frame arrives"], ["sim/tick", "7 s pass"], ["sim/buffer", "Starts buffering"], ["sim/recover", "Buffering ends"], ["sim/playError", "Playback error"], ["sim/background", "App to background"], ["sim/offline", "Connection drops"], ["sim/online", "Connection returns"]]]],
+  common: [["Switches", [["ops/seedReady", "Seed a live listing with a Ready video"], ["ops/uploadTester", "Toggle upload tester"], ["ops/viewTester", "Toggle view tester"], ["ops/uploadsOn", "Toggle uploads kill switch"], ["ops/permission", "Toggle library permission"], ["ops/platform", "Toggle iPhone / Android"], ["ops/ban", "Toggle listing ban"], ["reset", "Reset everything"]]]],
+};
+function panelHtml(s) {
+  if (ui.flow === "coverage") return coverageHtml();
+  const rows = stateRows(s), prevRows = stateRows(prevS);
+  const tickets = ticketsHere(s);
+  const sims = [...SIMS[ui.flow], ...SIMS.common];
+  const walkKeys = Object.keys(WALKS);
+  const w = ui.walk ? WALKS[ui.walk] : null;
+  return `<section class="box tickets"><h2>Tickets on this screen</h2><ul>${tickets.map(([n, why]) => `<li>${T(n)} <b>${E(TICKETS[n])}</b><br><span style="color:var(--ui-muted)">${E(why)}</span></li>`).join("") || "<li>None</li>"}</ul></section>
+  <section class="box"><h2>Guided walkthroughs</h2><div class="wt-tabs">${walkKeys.map((k) => `<button data-walk="${k}" aria-pressed="${ui.walk === k}">${E(WALKS[k].title)}</button>`).join("")}</div>
+    ${w ? `<p style="margin:0">${E(w.text)}</p><ol class="steps">${w.steps.map(([type, label], i) => `<li class="${i < ui.walkStep ? "done" : i === ui.walkStep ? "next" : ""}"><span class="n">${i + 1}</span><button data-step="${i}">${E(label)}</button></li>`).join("")}</ol>` : `<p style="margin:0;color:var(--ui-muted)">Pick a scenario. It resets the phone and lists the taps in order. You can also tap the phone directly.</p>`}</section>
+  <section class="box"><h2>Current state</h2><dl class="kv">${rows.map(([k, v], i) => `<dt>${E(k)}</dt><dd class="${prevRows[i][1] !== v ? "changed" : ""}">${E(v)}</dd>`).join("")}</dl>
+    ${s.refusal ? `<div class="refusal" role="status">Refused: ${E(s.refusal)}</div>` : ""}
+    <h2 style="margin-top:12px">Last actions</h2><ol class="log" reversed>${ui.log.slice(0, 8).map((l) => `<li>${E(l)}</li>`).join("")}</ol></section>
+  <section class="box"><h2>Simulate the outside world</h2><div class="sim">${sims.map(([h, list]) => `<h3>${E(h)}</h3>${list.map(([type, label, extra]) => `<button ${act(type, extra || {}, `Simulate: ${label}`)}>${E(label)}</button>`).join("")}`).join("")}</div></section>`;
+}
+function coverageHtml() {
+  return `<section class="box"><h2>What each ticket looks like here</h2><table class="cov"><thead><tr><th>Ticket</th><th>Shown in this prototype</th><th></th></tr></thead><tbody>
+    ${COVERAGE.map(([n, what, kind]) => `<tr><td class="tickets">${T(n)}<br><span style="color:var(--ui-muted)">${E(TICKETS[n])}</span></td><td>${E(what)}</td><td><span class="pill ${kind}">${kind === "shown" ? "On screen" : "Behind the screen"}</span></td></tr>`).join("")}</tbody></table></section>
+  <section class="box"><h2>Open decisions</h2><table class="cov"><tbody>
+    ${GAPS.map(([kind, n, text]) => `<tr><td style="width:96px"><span class="pill ${kind === "edit" ? "gap" : "dec"}">${kind === "edit" ? "Ticket edit" : "Your call"}</span>${n ? `<div class="tickets" style="margin-top:4px">${T(n)}</div>` : ""}</td><td>${E(text)}</td></tr>`).join("")}</tbody></table></section>
+  <section class="box"><h2>Sources</h2><p style="margin:0">Archived browser prototype <code>prototype-candidate-preview</code> at <code>b7d0bb2b</code> (video model, editor, ready tile, player and <code>plan/VIDEO-UPLOAD.md</code>); native prototype <code>7b47bf3f</code>; ADR-0099; <code>docs/prd/ui/hifi/mobile-listing-video.md</code>; Results card, detail strip and viewer geometry from <code>apps/mobile/src/listings</code>; tickets #1037–#1061.</p></section>`;
+}
+
+let scrollMemo = {};
+function render() {
+  document.documentElement.classList.toggle("dark", ui.theme === "dark");
+  document.querySelectorAll("[data-shell]").forEach((b) => b.setAttribute("aria-pressed", String(ui[b.dataset.shell] === b.dataset.v)));
+  const old = document.querySelector(".screen .content");
+  if (old?.dataset.scroll) scrollMemo[old.dataset.scroll] = old.scrollTop;
+  const layout = document.getElementById("layout");
+  const coverage = ui.flow === "coverage";
+  const darkScreen = ui.flow === "buyer" && ["gallery", "player"].includes(S.buyer.surface);
+  layout.innerHTML = `${coverage ? "" : `<div class="phone-wrap"><div class="phone"><div class="screen ${ui.theme === "dark" ? "dark" : ""} ${darkScreen ? "black" : ""}"><div class="island"></div><div class="status ${darkScreen ? "on-black" : ""}"><span>9:41</span><span>${S.app.online ? "5G" : "No signal"} ▮▮▮</span></div>${phoneHtml(S)}</div></div></div>`}<div class="panel" style="${coverage ? "grid-column:1 / -1" : ""}">${panelHtml(S)}</div>`;
+  const content = document.querySelector(".screen .content");
+  if (content?.dataset.scroll === "results") content.scrollTop = S.buyer.resultsScroll;
+  const strip = document.querySelector('[data-strip="0"]');
+  if (strip) strip.scrollLeft = S.buyer.stripIndex * 228;
+  const dstrip = document.querySelector("[data-dstrip]");
+  if (dstrip) { const el = dstrip.querySelector(`[data-idx="${S.buyer.mediaIndex}"]`); if (el) dstrip.scrollLeft = el.offsetLeft - 16; }
+}
+function dispatch(a) {
+  if (a.type?.startsWith("flow:")) { ui.flow = a.type.slice(5); ui.log.unshift(a.label || a.type); render(); return; }
+  prevS = S;
+  if (a.type === "buyer/openCard" && S.buyer.surface === "results") {
+    const c = document.querySelector(".screen .content"); if (c) S = VideoModel.reduce(S, { type: "buyer/scroll", value: Math.round(c.scrollTop), label: "remember scroll" });
+    const st = document.querySelector('[data-strip="0"]'); if (st) S = VideoModel.reduce(S, { type: "buyer/strip", index: Math.round(st.scrollLeft / 228), label: "remember strip" });
+  }
+  S = VideoModel.reduce(S, a);
+  ui.log.unshift(`${a.label || a.type}${S.refusal ? " → refused" : ""}`);
+  render();
+}
+document.addEventListener("click", (e) => {
+  const shell = e.target.closest("[data-shell]");
+  if (shell) { ui[shell.dataset.shell] = shell.dataset.v; render(); return; }
+  const wt = e.target.closest("[data-walk]");
+  if (wt) { const w = WALKS[wt.dataset.walk]; ui.walk = wt.dataset.walk; ui.walkStep = 0; ui.flow = w.flow; ui.log = []; prevS = S = VideoModel.initial(); ui.log.unshift(`Walkthrough: ${w.title}`); render(); return; }
+  const st = e.target.closest("[data-step]");
+  if (st) { const i = Number(st.dataset.step), [type, label, extra] = WALKS[ui.walk].steps[i]; ui.walkStep = i + 1; dispatch({ type, label, ...(extra || {}) }); return; }
+  const el = e.target.closest("[data-act]");
+  if (el && !el.disabled) { dispatch(JSON.parse(el.dataset.act)); }
+});
+let drag = null;
+const quiet = (a) => { S = VideoModel.reduce(S, a); render(); };
+document.addEventListener("pointerdown", (e) => {
+  const track = e.target.closest("[data-track]");
+  if (!track || !S.task) return;
+  e.preventDefault();
+  const rect = track.getBoundingClientRect(), dur = Number(track.dataset.dur);
+  const handle = e.target.closest("[data-drag]");
+  prevS = S;
+  if (handle) { drag = { kind: handle.dataset.drag, x0: e.clientX, s0: S.task.startS, e0: S.task.endS, rect, dur, moved: false }; return; }
+  const at = Math.round(((e.clientX - rect.left) / rect.width) * dur);
+  const kind = at < S.task.startS ? "start" : "end";
+  quiet({ type: "seller/setInterval", moved: kind, startS: at, endS: at, label: `Tap the timeline at ${mmss(at)}` });
+  ui.log.unshift(`Tap the timeline at ${mmss(at)} → ${mmss(S.task.startS)}–${mmss(S.task.endS)}`); render();
+});
+document.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const d = ((e.clientX - drag.x0) / drag.rect.width) * drag.dur;
+  if (Math.abs(e.clientX - drag.x0) > 2) drag.moved = true;
+  quiet({ type: "seller/setInterval", moved: drag.kind, startS: drag.s0 + d, endS: drag.e0 + d, label: "drag" });
+});
+document.addEventListener("pointerup", () => {
+  if (!drag) return;
+  if (drag.moved) { ui.log.unshift(`Drag the ${drag.kind === "window" ? "frame" : drag.kind + " edge"} → ${mmss(S.task.startS)}–${mmss(S.task.endS)}`); render(); }
+  drag = null;
+});
+document.addEventListener("keydown", (e) => {
+  const h = e.target.closest?.('[role="slider"][data-drag]');
+  if (!h || !S.task || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+  e.preventDefault();
+  const step = (e.shiftKey ? 5 : 1) * (["ArrowLeft", "ArrowDown"].includes(e.key) ? -1 : 1), kind = h.dataset.drag;
+  dispatch({ type: "seller/setInterval", moved: kind, startS: S.task.startS + step, endS: S.task.endS + step, label: `${kind === "start" ? "Start" : "End"} ${step > 0 ? "+" : "−"}${Math.abs(step)} s` });
+  document.querySelector(`[role="slider"][data-drag="${kind}"]`)?.focus();
+});
+document.addEventListener("change", (e) => {
+  if (e.target.hasAttribute("data-seek")) dispatch({ type: "buyer/seek", value: Number(e.target.value), label: `Seek to ${mmss(Number(e.target.value))}` });
+});
+render();
+</script>
+</body>
+</html>
