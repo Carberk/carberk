@@ -1,12 +1,19 @@
 import { useCallback, useState } from "react";
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import { Plus, Video } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
+import type { ListingVideoNativeModule } from "../../../modules/listing-video/src/prepare";
+
 import { createListingVideoDraft, formatMmss, toSelection, type ListingVideoDraft } from "./listingVideo";
-import { inertListingVideoPreparation, type ListingVideoPreparationPort } from "./videoPreparation";
+import {
+  useListingVideoPreparation,
+  type AppStateSubscribe,
+  type ListingVideoFileSystem,
+  type ListingVideoPrepFailure,
+} from "./videoPreparation";
 import { ListingVideoEditor } from "./ListingVideoEditor";
 
 import { Button } from "@/components/ui/button";
@@ -15,14 +22,19 @@ import { Icon } from "@/components/ui/icon";
 
 interface ListingVideoCardProps {
   canUploadVideo?: boolean;
-  preparation?: ListingVideoPreparationPort;
+  /** Fake native module in tests; the real AVFoundation module by default. */
+  videoNative?: ListingVideoNativeModule | null;
+  videoFileSystem?: ListingVideoFileSystem;
+  subscribeAppState?: AppStateSubscribe;
   disabled?: boolean;
 }
 
 /**
  * Optional Video card for the Photos step (create wizard and Edit listing).
  * Hidden unless the current user can upload video; the flag stays false
- * until #1049 wires the real tester gate.
+ * until #1049 wires the real tester gate. After "Use video" the chosen
+ * clip is copied into app storage and prepared on the phone (#1044);
+ * photos and Listing fields are never touched by video failures.
  */
 function PermissionNote({ onDismiss }: { onDismiss: () => void }) {
   const { t } = useTranslation();
@@ -49,12 +61,33 @@ function PermissionNote({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-export function ListingVideoCard({ canUploadVideo = false, preparation = inertListingVideoPreparation, disabled = false }: ListingVideoCardProps) {
+const FAILURE_COPY: Record<
+  ListingVideoPrepFailure,
+  { title: string; body: string; retry: string | null }
+> = {
+  source: { title: "listingVideoGoneTitle", body: "listingVideoGoneBody", retry: null },
+  interrupted: { title: "listingVideoStoppedTitle", body: "listingVideoStoppedBody", retry: "listingVideoPrepareAgain" },
+  storage: { title: "listingVideoStorageTitle", body: "listingVideoStorageBody", retry: "listingVideoTryAgain" },
+  preparation: { title: "listingVideoFailedTitle", body: "listingVideoFailedBody", retry: "listingVideoTryAgain" },
+};
+
+export function ListingVideoCard({
+  canUploadVideo = false,
+  videoNative,
+  videoFileSystem,
+  subscribeAppState,
+  disabled = false,
+}: ListingVideoCardProps) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState<ListingVideoDraft | null>(null);
   const [committedDraft, setCommittedDraft] = useState<ListingVideoDraft | null>(null);
   const [editing, setEditing] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const prep = useListingVideoPreparation({
+    native: videoNative,
+    fileSystem: videoFileSystem,
+    subscribeAppState,
+  });
 
   const chooseFromLibrary = useCallback(async () => {
     let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -92,15 +125,20 @@ export function ListingVideoCard({ canUploadVideo = false, preparation = inertLi
           }}
           onChange={() => void chooseFromLibrary()}
           onUse={() => {
-            void preparation.prepare(toSelection(draft));
             setCommittedDraft(draft);
             setEditing(false);
+            prep.prepare(toSelection(draft));
           }}
         />
         {permissionDenied && <PermissionNote onDismiss={() => setPermissionDenied(false)} />}
       </View>
     );
   }
+
+  const clearSelection = () => {
+    setDraft(null);
+    setCommittedDraft(null);
+  };
 
   return (
     <View className="gap-3 rounded-3xl bg-card p-4" testID="listing-video-card">
@@ -114,7 +152,100 @@ export function ListingVideoCard({ canUploadVideo = false, preparation = inertLi
         <Icon as={Video} className="size-6 text-foreground" />
       </View>
 
-      {draft && !editing && (
+      {prep.state.phase === "preparing" && (
+        <View className="gap-2" testID="listing-video-preparing">
+          <Text className="text-callout font-semibold" accessibilityLiveRegion="polite">
+            {t("listingVideoPreparing")}
+          </Text>
+          <Text className="text-footnote text-muted-foreground">
+            {t("listingVideoPreparingHint", {
+              duration: formatMmss(prep.state.selection.endS - prep.state.selection.startS),
+            })}
+          </Text>
+          <View className="h-2 overflow-hidden rounded-full bg-secondary" testID="listing-video-preparing-bar">
+            <ActivityIndicator accessibilityLabel={t("listingVideoPreparing")} />
+          </View>
+          <Button
+            variant="outline"
+            onPress={() => {
+              prep.cancel();
+              clearSelection();
+            }}
+            accessibilityLabel={t("cancel")}
+          >
+            <Text>{t("cancel")}</Text>
+          </Button>
+        </View>
+      )}
+
+      {prep.state.phase === "failed" && (
+        <View className="gap-2" testID="listing-video-failed">
+          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
+            <Text className="text-callout font-semibold">{t(FAILURE_COPY[prep.state.failure].title)}</Text>
+            <Text className="text-footnote text-muted-foreground">{t(FAILURE_COPY[prep.state.failure].body)}</Text>
+          </View>
+          <View className="flex-row flex-wrap gap-2">
+            {FAILURE_COPY[prep.state.failure].retry ? (
+              <Button variant="secondary" onPress={prep.prepareAgain} accessibilityLabel={t(FAILURE_COPY[prep.state.failure].retry ?? "")}>
+                <Text>{t(FAILURE_COPY[prep.state.failure].retry ?? "")}</Text>
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              onPress={() => {
+                prep.remove();
+                clearSelection();
+                void chooseFromLibrary();
+              }}
+              accessibilityLabel={t("listingVideoChooseAnother")}
+            >
+              <Text>{t("listingVideoChooseAnother")}</Text>
+            </Button>
+            <Button
+              variant="outline"
+              onPress={() => {
+                prep.remove();
+                clearSelection();
+              }}
+              accessibilityLabel={t("listingVideoRemove")}
+            >
+              <Text>{t("listingVideoRemove")}</Text>
+            </Button>
+          </View>
+        </View>
+      )}
+
+      {prep.state.phase === "prepared" && (
+        <View className="gap-2" testID="listing-video-prepared">
+          <View className="rounded-2xl bg-secondary p-3">
+            <Text className="text-callout font-semibold">{t("listingVideoReady")}</Text>
+            <Text className="text-footnote text-muted-foreground">
+              {t("listingVideoReadySummary", {
+                duration: formatMmss(prep.state.file.durationS),
+                cover: formatMmss(prep.state.selection.posterS),
+              })}
+            </Text>
+          </View>
+          <View className="flex-row gap-2">
+            <Button variant="secondary" className="flex-1" onPress={() => setEditing(true)} accessibilityLabel={t("listingVideoContinueEditing")}>
+              <Text>{t("listingVideoContinueEditing")}</Text>
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onPress={() => {
+                prep.remove();
+                clearSelection();
+              }}
+              accessibilityLabel={t("listingVideoRemove")}
+            >
+              <Text>{t("listingVideoRemove")}</Text>
+            </Button>
+          </View>
+        </View>
+      )}
+
+      {prep.state.phase === "idle" && draft && !editing && (
         <View className="gap-2">
           <View className="rounded-2xl bg-secondary p-3">
             <Text className="text-callout font-semibold">{t("listingVideoChosen")}</Text>
@@ -131,7 +262,7 @@ export function ListingVideoCard({ canUploadVideo = false, preparation = inertLi
         </View>
       )}
 
-      {!draft && (
+      {prep.state.phase === "idle" && !draft && (
         <Button onPress={() => void chooseFromLibrary()} disabled={disabled} accessibilityLabel={t("listingVideoChoose")}>
           <Icon as={Plus} className="size-4" />
           <Text>{t("listingVideoChoose")}</Text>

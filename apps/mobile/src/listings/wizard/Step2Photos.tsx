@@ -16,7 +16,8 @@ import { useTranslation } from "react-i18next";
 import type { StagedPhoto } from "../uploadStaging/types";
 import { NEEDS_ATTENTION_STATES, countUploads } from "../uploadStaging/uploadCounts";
 import { ListingVideoCard } from "../video/ListingVideoCard";
-import type { ListingVideoPreparationPort } from "../video/videoPreparation";
+import type { ListingVideoNativeModule } from "../../../modules/listing-video/src/prepare";
+import type { AppStateSubscribe, ListingVideoFileSystem } from "../video/videoPreparation";
 
 import { PhotoActionSheet } from "./PhotoActionSheet";
 import { canRetryPhoto, photoFailureReason, photoPosition } from "./photoLabels";
@@ -49,8 +50,10 @@ interface Step2PhotosProps {
   continuesWhileUploading?: boolean;
   /** Show the optional Video card. False for everyone until #1049 sets the tester gate. */
   canUploadVideo?: boolean;
-  /** Preparation port handed the chosen video on "Use video" (#1044 connects native). */
-  videoPreparation?: ListingVideoPreparationPort;
+  /** Fake native preparation module in tests; real module by default (#1044). */
+  videoNative?: ListingVideoNativeModule | null;
+  videoFileSystem?: ListingVideoFileSystem;
+  subscribeAppState?: AppStateSubscribe;
 }
 
 function usePhotoPicker(onAddPhoto: (uri: string) => Promise<void>) {
@@ -400,7 +403,9 @@ export default function Step2Photos({
   showErrors = false,
   continuesWhileUploading = true,
   canUploadVideo = false,
-  videoPreparation,
+  videoNative,
+  videoFileSystem,
+  subscribeAppState,
 }: Step2PhotosProps) {
   const { t } = useTranslation();
   // Like the other steps: the photo error shows once the seller has removed a
@@ -486,7 +491,7 @@ export default function Step2Photos({
         <EmptyState />
       )}
 
-      <ListingVideoCard canUploadVideo={canUploadVideo} preparation={videoPreparation} disabled={disabled} />
+      <ListingVideoCard canUploadVideo={canUploadVideo} videoNative={videoNative} videoFileSystem={videoFileSystem} subscribeAppState={subscribeAppState} disabled={disabled} />
 
       <AlertDialog open={cameraDenied} onOpenChange={setCameraDenied}>
         <AlertDialogContent>
