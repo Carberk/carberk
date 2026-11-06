@@ -20,6 +20,9 @@ import { RetiredUploadCleanupScheduler } from "./queues/retired-upload-cleanup.s
 import { PushModule } from "./push/push.module";
 import { EmailModule } from "./email/email.module";
 import { VideoTranscodeProcessor } from "./queues/video-transcode.processor";
+import { ListingVideoProcessor } from "./video/ListingVideoProcessor";
+import { S3VideoProcessingStorage, VIDEO_PROCESSING_STORAGE } from "./video/VideoProcessingStorage";
+import { VideoProcessingScheduler } from "./video/VideoProcessingScheduler";
 import { NotificationFanoutProcessor } from "./queues/notification-fanout.processor";
 import { EmailCodeProcessor } from "./queues/email-code.processor";
 import { OrphanCleanupProcessor } from "./queues/orphan-cleanup.processor";
@@ -81,6 +84,19 @@ import {
         })),
     },
     VideoTranscodeProcessor,
+    ListingVideoProcessor,
+    VideoProcessingScheduler,
+    {
+      provide: VIDEO_PROCESSING_STORAGE,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => {
+        const endpoint = config.get("LISTING_VIDEO_BUCKET_ENDPOINT", { infer: true }) || config.get("MINIO_ENDPOINT", { infer: true });
+        const bucket = config.get("LISTING_VIDEO_BUCKET_NAME", { infer: true }) || "listing-videos";
+        const accessKeyId = config.get("LISTING_VIDEO_BUCKET_ACCESS_KEY_ID", { infer: true }) || config.get("MINIO_ACCESS_KEY", { infer: true });
+        const secretAccessKey = config.get("LISTING_VIDEO_BUCKET_SECRET_ACCESS_KEY", { infer: true }) || config.get("MINIO_SECRET_KEY", { infer: true });
+        return new S3VideoProcessingStorage(new S3Client({ endpoint, region: config.get("LISTING_VIDEO_BUCKET_REGION", { infer: true }) || config.get("MINIO_REGION", { infer: true }), credentials: { accessKeyId, secretAccessKey }, forcePathStyle: true }), bucket);
+      },
+    },
     NotificationFanoutProcessor,
     EmailCodeProcessor,
     OrphanCleanupProcessor,

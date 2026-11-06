@@ -63,6 +63,7 @@ export interface VideoGeneration {
   status: VideoGenerationStatus;
   coverOffsetMs: number;
   processingAttempt: number;
+  lastError: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -90,13 +91,13 @@ export function videoSessionExpiresAt(createdAt: Date): Date {
 }
 
 /** Client-visible session state; completion means Processing, never Ready. */
-export function videoSessionState(source: VideoSource): "UPLOADING" | "PROCESSING" | "CANCELLED" | "EXPIRED" {
+export function videoSessionState(source: VideoSource, generation?: VideoGeneration): "UPLOADING" | "PROCESSING" | "FAILED" | "CANCELLED" | "EXPIRED" {
   switch (source.state) {
     case "OPEN":
     case "COMPLETING":
       return "UPLOADING";
     case "COMPLETED":
-      return "PROCESSING";
+      return generation?.status === "Failed" ? "FAILED" : "PROCESSING";
     case "CANCELLED":
       return "CANCELLED";
     case "EXPIRED":

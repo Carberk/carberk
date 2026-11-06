@@ -36,6 +36,7 @@ export type ConfirmedVideoPart = z.infer<typeof ConfirmedVideoPartSchema>;
 export const VideoUploadStateSchema = z.enum([
   "UPLOADING",
   "PROCESSING",
+  "FAILED",
   "CANCELLED",
   "EXPIRED",
 ]);
@@ -61,6 +62,7 @@ export const VideoUploadStatusResponseSchema = z.object({
   confirmedParts: z.array(ConfirmedVideoPartSchema),
   parts: z.array(VideoUploadPartSchema),
   expiresAt: DateTimeSchema,
+  failureReason: z.string().max(500).nullable().optional(),
 });
 export type VideoUploadStatusResponse = z.infer<typeof VideoUploadStatusResponseSchema>;
 

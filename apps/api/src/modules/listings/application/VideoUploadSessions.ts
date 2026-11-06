@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { InjectQueue } from "@nestjs/bullmq";
+import type { Queue } from "bullmq";
 
 import {
   BadRequestException,
@@ -66,7 +68,8 @@ export interface VideoUploadView {
   sessionId: string;
   generationId: string;
   target: VideoUploadTarget;
-  state: "UPLOADING" | "PROCESSING" | "CANCELLED" | "EXPIRED";
+  state: "UPLOADING" | "PROCESSING" | "FAILED" | "CANCELLED" | "EXPIRED";
+  failureReason?: string | null;
   partSizeBytes: number;
   confirmedParts: { partNumber: number; sizeBytes: number }[];
   parts: VideoPartView[];
@@ -113,6 +116,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     @Inject(LISTING_DRAFT_REPOSITORY) private readonly drafts: ListingDraftRepository,
     @Inject(LISTING_REPOSITORY) private readonly listings: ListingRepository,
     @Optional() @Inject(VIDEO_UPLOAD_NOW) nowFn?: () => Date,
+    @Optional() @InjectQueue("video-transcode") private readonly videoQueue?: Queue,
   ) {
     this.nowFn = nowFn ?? (() => new Date());
   }
@@ -199,7 +203,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     const now = await this.now();
     if (session.source.state === "COMPLETING") {
       const head = await this.storage.headObject(session.source.objectKey);
-      if (head?.sizeBytes === session.source.sizeBytes) return this.statusView(await this.repo.finishCompletion(session.source.id, now).catch(rethrowDomain), now);
+      if (head?.sizeBytes === session.source.sizeBytes) return this.statusView(await this.finishAndEnqueue(session.source.id, now), now);
     }
     if (session.source.state === "OPEN" && now.getTime() >= session.source.expiresAt.getTime()) {
       const expired = await this.repo.claimExpiry(session.source.id, now).catch((e) => rethrowDomain(e));
@@ -229,7 +233,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     if (session.source.state === "COMPLETING") {
       const head = await this.storage.headObject(session.source.objectKey);
       if (head?.sizeBytes === session.source.sizeBytes) {
-        return this.repo.finishCompletion(session.source.id, now).catch(rethrowDomain);
+        return this.finishAndEnqueue(session.source.id, now);
       }
     }
     // Validate before recording completion intent. A missing/mismatched part
@@ -240,7 +244,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       if (isNoSuchUpload(err)) {
         const head = await this.storage.headObject(session.source.objectKey);
-        if (head?.sizeBytes === session.source.sizeBytes) return this.repo.finishCompletion(session.source.id, now).catch(rethrowDomain);
+        if (head?.sizeBytes === session.source.sizeBytes) return this.finishAndEnqueue(session.source.id, now);
       }
       throw err;
     }
@@ -253,7 +257,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     if (claim.session.source.state === "COMPLETED") return claim.session;
     if (!claim.claimed) {
       const head = await this.storage.headObject(session.source.objectKey);
-      if (head?.sizeBytes === session.source.sizeBytes) return this.repo.finishCompletion(session.source.id, now).catch(rethrowDomain);
+      if (head?.sizeBytes === session.source.sizeBytes) return this.finishAndEnqueue(session.source.id, now);
       throw new ConflictException({ code: LISTING_ERROR_CODES.VIDEO_UPLOAD_CONFLICT, message: "Completion is in progress; retry status" });
     }
     try {
@@ -271,7 +275,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     if (stored?.sizeBytes !== session.source.sizeBytes) {
       throw new ConflictException({ code: LISTING_ERROR_CODES.VIDEO_UPLOAD_CONFLICT, message: "Completion is still being reconciled" });
     }
-    return this.repo.finishCompletion(session.source.id, await this.now()).catch(rethrowDomain);
+    return this.finishAndEnqueue(session.source.id, await this.now());
   }
 
   async cancel(input: { userId: string; sessionId: string }): Promise<{ sessionId: string; generationId: string; state: "CANCELLED" }> {
@@ -297,6 +301,19 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     const claimed = await this.repo.claimCancellation(session.source.id, now).catch((e) => rethrowDomain(e));
     await this.cleanupSession(claimed);
     return { sessionId: claimed.source.id, generationId: claimed.generation.id, state: "CANCELLED" };
+  }
+
+  async reprocess(input: { userId: string; sessionId: string }): Promise<VideoUploadView> {
+    const session = await this.ownedSession(input.userId, input.sessionId);
+    await this.assertCurrentEligibility(input.userId, session);
+    if (session.source.state !== "COMPLETED" || session.generation.status !== "Failed") {
+      throw new ConflictException({ code: LISTING_ERROR_CODES.VIDEO_UPLOAD_CONFLICT, message: "Video is not ready to reprocess" });
+    }
+    const job = await this.repo.claimProcessingRetry(session.source.id, await this.now());
+    if (this.videoQueue) await this.videoQueue.add("process", job, { jobId: `${job.generationId}:${job.attempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
+    const latest = await this.repo.findSession(session.source.id);
+    if (!latest) throw notAvailable();
+    return this.statusView(latest, await this.now());
   }
 
   /** Reconciles completion first; only OPEN sessions can expire. */
@@ -339,6 +356,14 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
 
   private async now(): Promise<Date> {
     return this.nowFn();
+  }
+
+  private async finishAndEnqueue(sourceId: string, now: Date): Promise<VideoSession> {
+    const session = await this.repo.finishCompletion(sourceId, now).catch(rethrowDomain);
+    if (this.videoQueue) {
+      await this.videoQueue.add("process", { sourceId, generationId: session.generation.id, attempt: session.generation.processingAttempt }, { jobId: `${session.generation.id}:${session.generation.processingAttempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
+    }
+    return session;
   }
 
   private async ownedSession(userId: string, sessionId: string): Promise<VideoSession> {
@@ -464,7 +489,8 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
       sessionId: session.source.id,
       generationId: session.generation.id,
       target: session.slot.target,
-      state: videoSessionState(session.source),
+      state: videoSessionState(session.source, session.generation),
+      failureReason: session.generation.lastError,
       partSizeBytes: session.source.partSizeBytes,
       confirmedParts: [],
       parts: [],
@@ -473,15 +499,16 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
   }
 
   private async statusView(session: VideoSession, now: Date): Promise<VideoUploadView> {
-    const state = videoSessionState(session.source);
+    const state = videoSessionState(session.source, session.generation);
     if (state === "CANCELLED" || state === "EXPIRED") return this.terminalView(session);
     const layout = videoPartLayout(session.source.sizeBytes);
-    if (state === "PROCESSING") {
+    if (state === "PROCESSING" || state === "FAILED") {
       return {
         sessionId: session.source.id,
         generationId: session.generation.id,
         target: session.slot.target,
         state,
+        failureReason: session.generation.lastError,
         partSizeBytes: session.source.partSizeBytes,
         confirmedParts: layout.map((sizeBytes, i) => ({ partNumber: i + 1, sizeBytes })),
         parts: [],

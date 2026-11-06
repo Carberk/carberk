@@ -27,6 +27,7 @@
     "nestjs-pino": "catalog:",
     "reflect-metadata": "catalog:",
     "resend": "^6.28.1",
+    "sharp": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

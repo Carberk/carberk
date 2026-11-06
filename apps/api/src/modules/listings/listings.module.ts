@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { BullModule } from "@nestjs/bullmq";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 
 import { PrismaModule } from "../../common/prisma.module";
@@ -99,7 +100,7 @@ import { VIDEO_UPLOAD_REPOSITORY } from "./domain/ports/VideoUploadRepository";
 import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
 
 @Module({
-  imports: [PrismaModule, EventEmitterModule, IdentityModule],
+  imports: [PrismaModule, EventEmitterModule, IdentityModule, BullModule.registerQueue({ name: "video-transcode" })],
   controllers: [ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController],
   providers: [
     // Infrastructure adapters

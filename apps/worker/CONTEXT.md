@@ -1,6 +1,6 @@
 # Background worker
 
-The worker consumes queued work outside the API request path. Native direct-message push, sign-in email, expired-account purge and retired upload cleanup have implementations. Video transcoding and broad orphan cleanup are not implemented. Their registered processors reject jobs permanently and log an error instead of reporting success. They remain registered to reject queued or external work visibly; retries cannot supply the missing implementation. Failed-job retention follows the producer's BullMQ options, so operators must inspect failures/logs and explicitly requeue appropriate work after implementation.
+The worker consumes queued work outside the API request path. Native direct-message push, sign-in email, expired-account purge and retired upload cleanup have implementations. Listing video processing validates stored bytes with bounded `ffprobe`/FFmpeg work, writes attempt-scoped covers and HLS objects, HEAD-verifies the manifest, and marks a generation Ready only after every declared object exists. Processing failures remain Failed and the API retry command reuses the stored source with a new fenced attempt. Broad orphan cleanup remains an explicitly unsupported processor.
 
 The normal worker process serves dependency-free `/healthz` and bounded
 `/readyz` endpoints for Railway liveness and readiness. Responses include only
@@ -21,6 +21,7 @@ Read the queue processors and their tests for payload/retry behavior. Environmen
 ## Start here
 
 - [Queues and composition](src/app.module.ts)
+- [Listing video processing and tests](src/video/ListingVideoProcessor.ts)
 - [Push delivery and tests](src/push/application/ProcessDirectMessagePush.ts)
 - [Email delivery and tests](src/email/application/SendSignInCodeEmail.ts)
 - [Account purge and tests](src/jobs/PurgeExpiredAccounts.ts)

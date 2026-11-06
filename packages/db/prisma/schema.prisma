@@ -616,6 +616,16 @@ model VideoGeneration {
   status            String       @default("Uploading")
   coverOffsetMs     Int
   processingAttempt Int          @default(1)
+  /// Exact object keys written by the processing attempt. Ready requires all keys.
+  manifest          Json?
+  durationMs        Int?
+  width             Int?
+  height            Int?
+  videoCodec        String?
+  audioCodec        String?
+  lastError         String?
+  processingStartedAt DateTime?
+  completedAt       DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 

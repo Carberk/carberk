@@ -216,6 +216,7 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
           status: "Uploading",
           coverOffsetMs: input.coverOffsetMs,
           processingAttempt: 1,
+          lastError: null,
           createdAt: input.now,
           updatedAt: input.now,
         },
@@ -287,6 +288,18 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
       session.generation.status = "Processing";
       session.generation.updatedAt = now;
       return session;
+    });
+  }
+
+  async claimProcessingRetry(sessionId: string, now: Date): Promise<{ sourceId: string; generationId: string; attempt: number }> {
+    return this.locked(() => {
+      const session = this.mustGet(sessionId);
+      if (session.source.state !== "COMPLETED" || session.generation.status !== "Failed") throw conflict("Video is not ready to reprocess");
+      if (session.generation.processingAttempt >= 3) throw conflict("Video processing retry limit reached");
+      session.generation.processingAttempt += 1;
+      session.generation.status = "Processing";
+      session.generation.updatedAt = now;
+      return { sourceId: session.source.id, generationId: session.generation.id, attempt: session.generation.processingAttempt };
     });
   }
 

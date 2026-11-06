@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, Prisma } from "@auto-tm/db";
 
 import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
 import type {
@@ -63,6 +63,7 @@ function toSession(slot: SlotRow, source: SourceRow, generation: GenerationRow):
       status: generation.status as VideoGeneration["status"],
       coverOffsetMs: generation.coverOffsetMs,
       processingAttempt: generation.processingAttempt,
+      lastError: generation.lastError,
       createdAt: generation.createdAt,
       updatedAt: generation.updatedAt,
     },
@@ -269,6 +270,23 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       });
       const slot = await tx.listingVideo.findUniqueOrThrow({ where: { id: source.listingVideoId } });
       return toSession(slot, source, generation);
+    });
+  }
+
+  async claimProcessingRetry(sessionId: string, now: Date): Promise<{ sourceId: string; generationId: string; attempt: number }> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockSource(tx, sessionId);
+      const session = await this.loadSession(tx, sessionId);
+      if (!session || session.source.state !== "COMPLETED" || session.generation.status !== "Failed") {
+        throw conflict("Video is not ready to reprocess");
+      }
+      if (session.generation.processingAttempt >= 3) throw conflict("Video processing retry limit reached");
+      const attempt = session.generation.processingAttempt + 1;
+      const generation = await tx.videoGeneration.update({
+        where: { id: session.generation.id },
+        data: { status: "Processing", processingAttempt: attempt, manifest: Prisma.JsonNull, lastError: null, processingStartedAt: now, completedAt: null },
+      });
+      return { sourceId: session.source.id, generationId: generation.id, attempt };
     });
   }
 
