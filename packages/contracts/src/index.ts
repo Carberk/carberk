@@ -31,6 +31,7 @@ export * as CatalogSchemas from "./schemas/catalog";
 export * as ListingsSchemas from "./schemas/listings";
 export * as WizardSchemas from "./schemas/wizard";
 export * as UploadsSchemas from "./schemas/uploads";
+export * as VideoUploadsSchemas from "./schemas/video-uploads";
 export * as ExchangeRatesSchemas from "./schemas/exchange-rates";
 export * as SubscriptionsSchemas from "./schemas/subscriptions";
 export * as ConversationsSchemas from "./schemas/conversations";

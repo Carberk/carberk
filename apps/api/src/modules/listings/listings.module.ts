@@ -12,6 +12,7 @@ import { MyListingsController } from "./presentation/MyListingsController";
 import { ExchangeRatesController } from "./presentation/ExchangeRatesController";
 import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
+import { VideoUploadsController } from "./presentation/VideoUploadsController";
 import { NullVinDecoder } from "./infrastructure/NullVinDecoder";
 import { NullContentClassifier } from "./infrastructure/NullContentClassifier";
 import { SortedFeedRankingAdapter } from "./infrastructure/SortedFeedRankingAdapter";
@@ -33,6 +34,9 @@ import { PrismaFavoriteRepository } from "./infrastructure/PrismaFavoriteReposit
 import { IdentitySellerProfileAdapter } from "./infrastructure/IdentitySellerProfileAdapter";
 import { PrismaVerifiedContactPhoneRepository } from "./infrastructure/PrismaVerifiedContactPhoneRepository";
 import { MinioMediaStorageAdapter } from "./infrastructure/MinioMediaStorageAdapter";
+import { BucketVideoStorage } from "./infrastructure/BucketVideoStorage";
+import { PrismaVideoUploadRepository } from "./infrastructure/PrismaVideoUploadRepository";
+import { ConfigVideoUploadAccess } from "./infrastructure/ConfigVideoUploadAccess";
 import { SharpImageVariantGenerator } from "./infrastructure/SharpImageVariantGenerator";
 import { CreateDraft } from "./application/CreateDraft";
 import { CountListings } from "./application/CountListings";
@@ -45,6 +49,7 @@ import { ListMyDrafts } from "./application/ListMyDrafts";
 import { DiscardDraft } from "./application/DiscardDraft";
 import { UploadAdoptionGuard } from "./application/UploadAdoptionGuard";
 import { PresignUpload } from "./application/PresignUpload";
+import { VideoUploadSessions, VIDEO_UPLOAD_NOW } from "./application/VideoUploadSessions";
 import { PublishListing } from "./application/PublishListing";
 import { MarkSold } from "./application/MarkSold";
 import { ArchiveListing } from "./application/ArchiveListing";
@@ -89,10 +94,13 @@ import {
   type VerifiedContactPhoneRepository,
 } from "./domain/ports/VerifiedContactPhoneRepository";
 import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/AccountPhonePort";
+import { VIDEO_STORAGE_PORT } from "./domain/ports/VideoStoragePort";
+import { VIDEO_UPLOAD_REPOSITORY } from "./domain/ports/VideoUploadRepository";
+import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule],
-  controllers: [ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController],
+  controllers: [ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController],
   providers: [
     // Infrastructure adapters
     NullVinDecoder,
@@ -111,6 +119,9 @@ import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/Accoun
     PrismaFavoriteRepository,
     IdentitySellerProfileAdapter,
     MinioMediaStorageAdapter,
+    BucketVideoStorage,
+    PrismaVideoUploadRepository,
+    ConfigVideoUploadAccess,
     SharpImageVariantGenerator,
 
     // Port bindings
@@ -210,6 +221,19 @@ import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/Accoun
       useExisting: IDENTITY_CHECK_PORT,
     },
     {
+      provide: VIDEO_STORAGE_PORT,
+      useExisting: BucketVideoStorage,
+    },
+    {
+      provide: VIDEO_UPLOAD_REPOSITORY,
+      useClass: PrismaVideoUploadRepository,
+    },
+    {
+      provide: VIDEO_UPLOAD_ACCESS_PORT,
+      useClass: ConfigVideoUploadAccess,
+    },
+    { provide: VIDEO_UPLOAD_NOW, useValue: () => new Date() },
+    {
       provide: ContactPhonePolicy,
       useFactory: (
         accountPhones: AccountPhonePort,
@@ -230,6 +254,7 @@ import { ACCOUNT_PHONE_PORT, type AccountPhonePort } from "./domain/ports/Accoun
     DiscardDraft,
     UploadAdoptionGuard,
     PresignUpload,
+    VideoUploadSessions,
     PublishListing,
     MarkSold,
     ArchiveListing,

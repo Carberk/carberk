@@ -807,6 +807,13 @@ export const ListingsErrorCode = {
   UploadAlreadyAttached: "UPLOAD_ALREADY_ATTACHED",
   /** Storage holds no matching object for the presigned upload. */
   UploadObjectInvalid: "UPLOAD_OBJECT_INVALID",
+  ListingVideoUnavailable: "LISTING_VIDEO_UNAVAILABLE",
+  /** Unknown and foreign video sessions/targets share this unavailable response. */
+  VideoUploadNotAvailable: "VIDEO_UPLOAD_NOT_AVAILABLE",
+  /** A second pending selection, or idempotency-key reuse with different input. */
+  VideoUploadConflict: "VIDEO_UPLOAD_CONFLICT",
+  /** The 7-day session expiry passed; no renewal or completion can adopt it. */
+  VideoUploadExpired: "VIDEO_UPLOAD_EXPIRED",
 } as const;
 export type ListingsErrorCode =
   (typeof ListingsErrorCode)[keyof typeof ListingsErrorCode];

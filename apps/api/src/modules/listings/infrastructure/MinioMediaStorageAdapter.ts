@@ -60,6 +60,10 @@ export class MinioMediaStorageAdapter implements MediaStoragePort, MediaObjectIn
     writeProtocol?: "conditional-v1";
   }): Promise<{ url: string; key: string; headers?: Record<string, string>; objectKeys?: string[] }> {
     const bucket = this.inferBucket(data.key);
+    if (bucket === "listing-videos" ||
+      (bucket !== "chat-attachments" && data.contentType.startsWith("video/"))) {
+      throw new Error("Listing videos require multipart sessions");
+    }
     const objectKeys = data.writeProtocol ? imageUploadObjectKeys(data.key) : undefined;
     const match = objectKeys ? await new ConditionalImageStorage(this.s3).initialize(objectKeys) : undefined;
 

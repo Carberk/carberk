@@ -133,6 +133,16 @@ describe("PresignUpload", () => {
     });
   });
 
+  it("keeps the old single-PUT video path unavailable", async () => {
+    const uc = makeUseCase(storage);
+    await expect(
+      uc.execute({ userId: "user-1", kind: "video", contentType: "video/mp4", sizeBytes: 1024 }),
+    ).rejects.toMatchObject({
+      response: { code: "LISTING_VIDEO_UNAVAILABLE" },
+    });
+    expect(storage.lastCall).toBeUndefined();
+  });
+
   it("records nothing when the request is rejected", async () => {
     const uploads = new FakeMediaUploadRepository();
     const uc = makeUseCase(storage, uploads);
