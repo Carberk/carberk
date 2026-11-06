@@ -2,7 +2,19 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "infra/docker/admin.Dockerfile"
+    "dockerfilePath": "infra/docker/admin.Dockerfile",
+    "watchPatterns": [
+      "/apps/admin/**",
+      "/packages/contracts/**",
+      "/packages/ui/**",
+      "/packages/tsconfig/**",
+      "/infra/docker/admin.Dockerfile",
+      "/package.json",
+      "/pnpm-lock.yaml",
+      "/pnpm-workspace.yaml",
+      "/turbo.json",
+      "/patches/**"
+    ]
   },
   "deploy": {
     "startCommand": "node apps/admin/server.js",

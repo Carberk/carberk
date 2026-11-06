@@ -71,6 +71,12 @@ provisioning (S11-07/S11-08) — listed here so drift stays auditable:
    path and timeout, restart policy, sleep mode — applied per environment
    through `serviceInstanceUpdate`. These are not read from the repo
    (ADR-0044).
+   The `build.watchPatterns` lists use the same path: each service deploys
+   only when a changed file matches its own app, the workspace packages it
+   imports, its Dockerfile, or a root workspace file (`package.json`,
+   `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `turbo.json`, `patches/**`).
+   They are applied to **staging only**; production keeps no branch
+   autodeploy, so it needs no watch patterns.
 3. **Environments**: one project, `staging` + `production`. PR environments ([ADR-0075](../docs/adr/0075-railway-pr-backends-for-agent-native-sessions.md)) are off: ADR-0098 retired them for cost and [ADR-0108](../docs/adr/0108-small-prs-with-full-send-replace-integration-delivery.md) keeps them off. Staging
    auto-deploys `main` with **Wait for CI** (GitHub Actions must be green);
    production has **no branch autodeploy** — an operator manually deploys the
