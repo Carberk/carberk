@@ -15,6 +15,8 @@ import { useTranslation } from "react-i18next";
 
 import type { StagedPhoto } from "../uploadStaging/types";
 import { NEEDS_ATTENTION_STATES, countUploads } from "../uploadStaging/uploadCounts";
+import { ListingVideoCard } from "../video/ListingVideoCard";
+import type { ListingVideoPreparationPort } from "../video/videoPreparation";
 
 import { PhotoActionSheet } from "./PhotoActionSheet";
 import { canRetryPhoto, photoFailureReason, photoPosition } from "./photoLabels";
@@ -45,6 +47,10 @@ interface Step2PhotosProps {
    * false: Done there still waits for an uploaded photo, so it must not say so.
    */
   continuesWhileUploading?: boolean;
+  /** Show the optional Video card. False for everyone until #1049 sets the tester gate. */
+  canUploadVideo?: boolean;
+  /** Preparation port handed the chosen video on "Use video" (#1044 connects native). */
+  videoPreparation?: ListingVideoPreparationPort;
 }
 
 function usePhotoPicker(onAddPhoto: (uri: string) => Promise<void>) {
@@ -393,6 +399,8 @@ export default function Step2Photos({
   fieldErrors,
   showErrors = false,
   continuesWhileUploading = true,
+  canUploadVideo = false,
+  videoPreparation,
 }: Step2PhotosProps) {
   const { t } = useTranslation();
   // Like the other steps: the photo error shows once the seller has removed a
@@ -477,6 +485,8 @@ export default function Step2Photos({
       ) : (
         <EmptyState />
       )}
+
+      <ListingVideoCard canUploadVideo={canUploadVideo} preparation={videoPreparation} disabled={disabled} />
 
       <AlertDialog open={cameraDenied} onOpenChange={setCameraDenied}>
         <AlertDialogContent>
