@@ -71,7 +71,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
       if (e.currentTime >= draftRef.current.endS) { try { player.pause(); player.currentTime = draftRef.current.startS; } catch { /* stub */ } setPreviewing(false); }
     });
     return () => { try { sub?.remove(); } catch { /* stub */ } };
-     
+
   }, [player]);
 
   const applyMove = (kind: DragKind, snapshot: ListingVideoDraft, deltaS: number) => {
