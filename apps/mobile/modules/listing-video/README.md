@@ -30,13 +30,18 @@ remain durable across JavaScript sessions.
 |---|---|---|---|---|---|
 | Custom Expo module on AVFoundation (iOS) | Reader time-range, frame-accurate | Video composition | Writer bitrate | 709 writer colour | **Chosen, iOS** |
 | Media3 Transformer (Android) | Same contract | Same contract | Same contract | Same contract | **Chosen for #1050** |
-| FFmpegKit | Yes | Yes | Yes | Yes | Retired upstream (Jan 2025); no maintained SDK 55 build |
+| FFmpegKit / FFmpegKitNext | Yes | Yes | Yes | Yes | Original retired; Next is source-only and adds a separate native build |
 | react-native-compressor | No frame-accurate interval API | Partial | No cap guarantee | Not exposed | Does not cover the contract |
 | expo-video / expo-image-manipulator | Playback / images only | — | — | — | Wrong surface |
 
 One small Expo module owns both platforms behind the TypeScript
 interface above; Android lands in #1050 and currently rejects with
 `unsupported-platform`.
+
+[FFmpegKit's upstream](https://github.com/arthenica/ffmpeg-kit#readme)
+points to its source-only successor. The
+[compressor API](https://github.com/numandev1/react-native-compressor#video)
+does not expose the complete trim/colour/size contract.
 
 ## Still unproven
 
