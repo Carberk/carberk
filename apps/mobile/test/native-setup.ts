@@ -136,6 +136,10 @@ vi.mock("expo-image-picker", () => ({
   requestCameraPermissionsAsync: vi.fn(async () => ({ granted: false })),
 }));
 
+vi.mock("../modules/listing-video/src/index", () => ({
+  loadListingVideoNative: () => null,
+}));
+
 // Expo modules that load `expo-modules-core`, which needs the native runtime.
 // A spec that exercises one of them mocks it itself and wins over these stubs.
 vi.mock("expo-linking", () => ({ canOpenURL: vi.fn(async () => false), openURL: vi.fn(async () => {}) }));

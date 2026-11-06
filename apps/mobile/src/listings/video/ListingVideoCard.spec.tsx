@@ -1,13 +1,54 @@
 import * as Linking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import { describe, expect, it, vi } from "vitest";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import type { FakeVideoPlayer } from "../../../test/native-video";
 import type { StagedPhoto } from "../uploadStaging/types";
 import Step2Photos from "../wizard/Step2Photos";
+import type { ListingVideoNativeModule } from "../../../modules/listing-video/src/prepare";
 
-import { FakeListingVideoPreparation } from "./videoPreparation";
+type PreparedResult = Awaited<ReturnType<ListingVideoNativeModule["prepare"]>>;
+
+function fakeNative(
+  prepareImpl?: (
+    source: string,
+    startS: number,
+    endS: number,
+    coverS: number,
+    jobId: string,
+  ) => Promise<PreparedResult>,
+): ListingVideoNativeModule {
+  let next = 0;
+  return {
+    newJobId: () => `job-${++next}`,
+    prepare: vi.fn(
+      prepareImpl ??
+        (async (_source: string, startS: number, endS: number, _coverS: number, jobId: string) => ({
+          uri: `file:///documents/listing-video/${jobId}/prepared.mp4`,
+          durationS: endS - startS,
+          sizeBytes: 1_500_000,
+          width: 1280,
+          height: 720,
+          fps: 30,
+          hasAudio: true,
+        })),
+    ),
+    cancel: vi.fn(),
+    addProgressListener: vi.fn(() => ({ remove: vi.fn() })),
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 vi.mock("expo-image-picker", () => ({
   launchImageLibraryAsync: vi.fn(),
@@ -103,9 +144,9 @@ describe("Listing video card on the Photos step", () => {
   });
 
   it("opens a video-only picker and cancel changes nothing", async () => {
-    const preparation = new FakeListingVideoPreparation();
+    const native = fakeNative();
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoPreparation={preparation} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
     );
     vi.mocked(ImagePicker.getMediaLibraryPermissionsAsync).mockResolvedValue(granted);
     vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({ canceled: true, assets: null });
@@ -119,7 +160,7 @@ describe("Listing video card on the Photos step", () => {
     );
     expect(screen.queryByTestId("listing-video-editor")).toBeNull();
     expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
-    expect(preparation.selections).toEqual([]);
+    expect(native.prepare).not.toHaveBeenCalled();
   });
 
   it("shows the denied note with Open Settings and keeps every photo", async () => {
@@ -181,9 +222,9 @@ describe("Listing video editor", () => {
   });
 
   it("opens a short video on the whole clip and hands source, interval and cover to preparation on Use video", async () => {
-    const preparation = new FakeListingVideoPreparation();
+    const native = fakeNative();
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoPreparation={preparation} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
     );
     await pickVideo(screen, 45_000);
 
@@ -201,15 +242,20 @@ describe("Listing video editor", () => {
     await act(async () => {
       await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
     });
-    expect(preparation.selections).toEqual([
-      {
-        source: { uri: "file:///library/video.mp4", durationS: 45 },
-        startS: 0,
-        endS: 45,
-        coverIndex: 0,
-        posterS: 6,
-      },
-    ]);
+    // The library file is copied into app storage first; only the copy is
+    // prepared, with the kept interval and cover.
+    expect(FileSystem.copyAsync).toHaveBeenCalledWith({
+      from: "file:///library/video.mp4",
+      to: "file:///documents/listing-video/prep-1/source.mp4",
+    });
+    expect(native.prepare).toHaveBeenCalledWith(
+      "file:///documents/listing-video/prep-1/source.mp4",
+      0,
+      45,
+      6,
+      "job-1",
+    );
+    expect(await screen.findByText("Video ready")).toBeTruthy();
   });
 
   it("opens a long video on the first 1:30 and names the part on the Use button", async () => {
@@ -298,9 +344,9 @@ describe("Listing video editor", () => {
   });
 
   it("chooses one of four covers in the photo crop and keeps the slot when the frame moves", async () => {
-    const preparation = new FakeListingVideoPreparation();
+    const native = fakeNative();
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoPreparation={preparation} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
     );
     await pickVideo(screen, 120_000);
     await layoutTrack(screen, 300);
@@ -323,21 +369,20 @@ describe("Listing video editor", () => {
     await act(async () => {
       await fireEvent.press(screen.getByRole("button", { name: "Use 0:30–2:00" }));
     });
-    expect(preparation.selections[0]?.coverIndex).toBe(2);
-    expect(preparation.selections[0]?.startS).toBe(30);
-    expect(preparation.selections[0]?.endS).toBe(120);
+    expect(native.prepare).toHaveBeenCalledWith(expect.any(String), 30, 120, 86, "job-1");
+    expect(await screen.findByText("Video ready")).toBeTruthy();
   });
 
   it("keeps a used pick when re-editing is cancelled", async () => {
-    const preparation = new FakeListingVideoPreparation();
+    const native = fakeNative();
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoPreparation={preparation} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
     );
     await pickVideo(screen, 45_000);
     await act(async () => {
       await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
     });
-    expect(screen.getByText("Video chosen")).toBeTruthy();
+    expect(await screen.findByText("Video ready")).toBeTruthy();
 
     await act(async () => {
       await fireEvent.press(screen.getByRole("button", { name: "Continue editing" }));
@@ -348,8 +393,8 @@ describe("Listing video editor", () => {
     });
 
     expect(screen.queryByTestId("listing-video-editor")).toBeNull();
-    expect(screen.getByText("Video chosen")).toBeTruthy();
-    expect(preparation.selections).toHaveLength(1);
+    expect(screen.getByText("Video ready")).toBeTruthy();
+    expect(native.prepare).toHaveBeenCalledTimes(1);
   });
 
   it("shows the denied note from Change without leaving the editor", async () => {
@@ -367,9 +412,9 @@ describe("Listing video editor", () => {
   });
 
   it("will not use a video shorter than 3 seconds", async () => {
-    const preparation = new FakeListingVideoPreparation();
+    const native = fakeNative();
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoPreparation={preparation} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
     );
     await pickVideo(screen, 2_000);
 
@@ -378,19 +423,19 @@ describe("Listing video editor", () => {
     await act(async () => {
       await fireEvent.press(use);
     });
-    expect(preparation.selections).toEqual([]);
+    expect(native.prepare).not.toHaveBeenCalled();
   });
 
   it("will not use a 2.9-second video that only rounds up to 3 seconds", async () => {
-    const preparation = new FakeListingVideoPreparation();
+    const native = fakeNative();
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoPreparation={preparation} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
     );
     await pickVideo(screen, 2_999);
 
     const use = screen.getByRole("button", { name: "Use video" });
     expect(use.props.accessibilityState?.disabled ?? use.props.disabled).toBeTruthy();
-    expect(preparation.selections).toEqual([]);
+    expect(native.prepare).not.toHaveBeenCalled();
   });
 
   it("reopens the picker from Change and replaces the pick", async () => {
@@ -413,5 +458,308 @@ describe("Listing video editor", () => {
     const screen = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo />);
     await pickVideo(screen, 45_900);
     expect(screen.getAllByText("0:46").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Listing video preparation (#1044)", () => {
+  it("shows Preparing with an indeterminate bar and Cancel deletes the local files", async () => {
+    const gate = deferred<PreparedResult>();
+    const native = fakeNative(() => gate.promise);
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+
+    expect(await screen.findByText("Preparing video…")).toBeTruthy();
+    expect(screen.getByText("Keep Carberk open. 0:45 selected")).toBeTruthy();
+    expect(screen.getByTestId("listing-video-preparing-bar")).toBeTruthy();
+    expect(screen.getByLabelText("Photo 1 of 3, Cover, Uploaded")).toBeTruthy();
+
+    vi.mocked(FileSystem.deleteAsync).mockClear();
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    });
+    expect(native.cancel).toHaveBeenCalledWith("job-1");
+    expect(FileSystem.deleteAsync).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
+  });
+
+  it("stops preparation when the app leaves and Prepare again keeps trim and cover", async () => {
+    const gate = deferred<PreparedResult>();
+    let calls = 0;
+    const native = fakeNative(async (_s, startS, endS, _c, jobId) => {
+      calls += 1;
+      if (calls === 1) return gate.promise;
+      return {
+        uri: `file:///documents/listing-video/${jobId}/prepared.mp4`,
+        durationS: endS - startS,
+        sizeBytes: 1_500_000,
+        width: 1280,
+        height: 720,
+        fps: 30,
+        hasAudio: true,
+      };
+    });
+    let onBackground: (() => void) | undefined;
+    const subscribeAppState = (cb: () => void) => {
+      onBackground = cb;
+      return () => undefined;
+    };
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} subscribeAppState={subscribeAppState} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Preparing video…")).toBeTruthy();
+
+    await act(async () => {
+      onBackground?.();
+    });
+    expect(screen.getByText("Preparing stopped")).toBeTruthy();
+    expect(screen.getByText("Carberk was closed while preparing. Your selection is kept.")).toBeTruthy();
+    expect(native.cancel).toHaveBeenCalled();
+
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Prepare again" }));
+    });
+    expect(await screen.findByText("Video ready")).toBeTruthy();
+    expect(native.prepare).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows Video no longer available when the source is gone and keeps photos", async () => {
+    const native = fakeNative(async () => {
+      throw Object.assign(new Error("gone"), { code: "source-unreadable" });
+    });
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+
+    expect(await screen.findByText("Video no longer available")).toBeTruthy();
+    expect(screen.getByText("The original was moved, deleted or access was removed. Choose another video.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Choose another" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Prepare again" })).toBeNull();
+    expect(screen.getByLabelText("Photo 1 of 3, Cover, Uploaded")).toBeTruthy();
+    expect(screen.getByLabelText("Photo 3 of 3, Uploaded")).toBeTruthy();
+  });
+
+  it("shows Not enough space and Try again prepares from the kept selection", async () => {
+    let calls = 0;
+    const native = fakeNative(async (_s, startS, endS, _c, jobId) => {
+      calls += 1;
+      if (calls === 1) throw Object.assign(new Error("full"), { code: "insufficient-storage" });
+      return {
+        uri: `file:///documents/listing-video/${jobId}/prepared.mp4`,
+        durationS: endS - startS,
+        sizeBytes: 1_500_000,
+        width: 1280,
+        height: 720,
+        fps: 30,
+        hasAudio: true,
+      };
+    });
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+
+    expect(await screen.findByText("Not enough space on your phone")).toBeTruthy();
+    expect(screen.getByText("Free up some space, then try again. Your selection is kept.")).toBeTruthy();
+
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+    });
+    expect(await screen.findByText("Video ready")).toBeTruthy();
+  });
+
+  it("shows Couldn't prepare and rejects an oversized output before it can be used", async () => {
+    const native = fakeNative(async (_s, startS, endS, _c, jobId) => ({
+      uri: `file:///documents/listing-video/${jobId}/prepared.mp4`,
+      durationS: endS - startS,
+      sizeBytes: 16 * 1024 * 1024,
+      width: 1280,
+      height: 720,
+      fps: 30,
+      hasAudio: true,
+    }));
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+
+    expect(await screen.findByText("Couldn't prepare this video")).toBeTruthy();
+    expect(screen.getByText("Try again, or choose another video.")).toBeTruthy();
+    expect(screen.queryByText("Video ready")).toBeNull();
+    expect(screen.getByLabelText("Photo 1 of 3, Cover, Uploaded")).toBeTruthy();
+  });
+
+  it("deletes the copied source when Cancel lands during the copy", async () => {
+    const copyGate = deferred<undefined>();
+    vi.mocked(FileSystem.copyAsync).mockImplementationOnce(() => copyGate.promise);
+    const native = fakeNative();
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Preparing video…")).toBeTruthy();
+
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    });
+    await act(async () => {
+      copyGate.resolve(undefined);
+    });
+    expect(native.prepare).not.toHaveBeenCalled();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      "file:///documents/listing-video/prep-1/",
+      { idempotent: true },
+    );
+    expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
+  });
+
+  it("deletes the output of a preparation superseded by a re-edit", async () => {
+    const gate = deferred<PreparedResult>();
+    let calls = 0;
+    const native = fakeNative(async (_s, startS, endS, _c, jobId) => {
+      calls += 1;
+      if (calls === 1) return gate.promise;
+      return {
+        uri: `file:///documents/listing-video/${jobId}/prepared.mp4`,
+        durationS: endS - startS,
+        sizeBytes: 1_500_000,
+        width: 1280,
+        height: 720,
+        fps: 30,
+        hasAudio: true,
+      };
+    });
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Preparing video…")).toBeTruthy();
+
+    // Supersede the running preparation by removing it, then resolve late.
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    });
+    vi.mocked(FileSystem.deleteAsync).mockClear();
+    await act(async () => {
+      gate.resolve({
+        uri: "file:///documents/listing-video/job-1/prepared.mp4",
+        durationS: 45,
+        sizeBytes: 1_500_000,
+        width: 1280,
+        height: 720,
+        fps: 30,
+        hasAudio: true,
+      });
+    });
+    // The cancelled native job rejects instead of resolving, so no prepared
+    // file is kept and the card is back at Choose.
+    expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
+    expect(screen.queryByText("Video ready")).toBeNull();
+  });
+
+  it("shows Not enough space when the source copy runs out of storage", async () => {
+    vi.mocked(FileSystem.copyAsync).mockRejectedValueOnce(
+      Object.assign(new Error("No space left on device"), { code: "ENOSPC" }),
+    );
+    const native = fakeNative();
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Not enough space on your phone")).toBeTruthy();
+    expect(native.prepare).not.toHaveBeenCalled();
+  });
+
+  it("removes the preparation directory when the source copy fails", async () => {
+    vi.mocked(FileSystem.copyAsync).mockRejectedValueOnce(new Error("gone"));
+    const native = fakeNative();
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Video no longer available")).toBeTruthy();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      "file:///documents/listing-video/prep-1/",
+      { idempotent: true },
+    );
+    expect(native.prepare).not.toHaveBeenCalled();
+  });
+
+  it("deletes the previous output when the seller uses an edited selection again", async () => {
+    const native = fakeNative();
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Video ready")).toBeTruthy();
+
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Continue editing" }));
+    });
+    vi.mocked(FileSystem.deleteAsync).mockClear();
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Video ready")).toBeTruthy();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      "file:///documents/listing-video/job-1/prepared.mp4",
+      { idempotent: true },
+    );
+    expect(native.prepare).toHaveBeenCalledTimes(2);
+  });
+
+  it("Remove on a prepared video deletes the local files", async () => {
+    const native = fakeNative();
+    const screen = await renderMobile(
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+    );
+    await pickVideo(screen, 45_000);
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(await screen.findByText("Video ready")).toBeTruthy();
+
+    vi.mocked(FileSystem.deleteAsync).mockClear();
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Remove" }));
+    });
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
+      "file:///documents/listing-video/job-1/prepared.mp4",
+      { idempotent: true },
+    );
+    expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
   });
 });

@@ -25,7 +25,7 @@ interface RawNativeModule {
   ): { remove: () => void };
 }
 
-function loadNative(): ListingVideoNativeModule | null {
+export function loadListingVideoNative(): ListingVideoNativeModule | null {
   try {
     const raw = requireNativeModule<RawNativeModule>("ListingVideo");
     return {
@@ -51,5 +51,5 @@ export function prepare(
   coverS: number,
   onProgress?: (progress: PrepareProgress) => void,
 ): PrepareHandle {
-  return prepareListingVideo(loadNative(), source, startS, endS, coverS, onProgress);
+  return prepareListingVideo(loadListingVideoNative(), source, startS, endS, coverS, onProgress);
 }
