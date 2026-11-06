@@ -58,7 +58,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
   const trackRef = useRef<View | null>(null);
   const trackLeftRef = useRef(0);
   const player = useVideoPlayer(draft.source.uri, (p) => { p.timeUpdateEventInterval = 0.25; });
-  const filmTimes = Array.from({ length: 9 }, (_, i) => Math.round((durationS * (i + 0.5)) / 9));
+  const filmTimes = Array.from({ length: 9 }, (_, i) => (durationS * (i + 0.5)) / 9);
   const filmUris = useVideoThumbnails(draft.source.uri, filmTimes);
   const coverUris = useVideoThumbnails(draft.source.uri, covers);
   useEffect(() => {

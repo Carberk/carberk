@@ -201,6 +201,21 @@ describe("Listing video card on the Photos step", () => {
 });
 
 describe("Listing video editor", () => {
+  it("keeps four usable, rounded cover choices for a fractional short video", async () => {
+    const native = fakeNative();
+    const screen = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo videoNative={native} />);
+    await pickVideo(screen, 1_800);
+
+    const images = await screen.findAllByTestId("listing-video-cover-image");
+    expect(images.map((image) => image.props.source.uri)).toEqual([
+      "file:///thumb-225.jpg", "file:///thumb-675.jpg", "file:///thumb-1125.jpg", "file:///thumb-1575.jpg",
+    ]);
+    await fireEvent.press(screen.getByRole("button", { name: "Cover 4 of 4, frame at 0:02" }));
+    expect(screen.getByRole("button", { name: "Cover 4 of 4, frame at 0:02" }).props.accessibilityState.selected).toBe(true);
+    expect(screen.getAllByText("0:01")).toHaveLength(2);
+    expect(native.prepare).not.toHaveBeenCalled();
+  });
+
   it("previews only the kept interval and stops at its end", async () => {
     const screen = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo />);
     await pickVideo(screen, 45_000);
@@ -252,7 +267,7 @@ describe("Listing video editor", () => {
       "file:///documents/listing-video/prep-1/source.mp4",
       0,
       45,
-      6,
+      5.625,
       "job-1",
     );
     expect(await screen.findByText("Video ready")).toBeTruthy();
@@ -369,7 +384,7 @@ describe("Listing video editor", () => {
     await act(async () => {
       await fireEvent.press(screen.getByRole("button", { name: "Use 0:30–2:00" }));
     });
-    expect(native.prepare).toHaveBeenCalledWith(expect.any(String), 30, 120, 86, "job-1");
+    expect(native.prepare).toHaveBeenCalledWith(expect.any(String), 30, 120, 86.25, "job-1");
     expect(await screen.findByText("Video ready")).toBeTruthy();
   });
 
