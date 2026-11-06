@@ -292,9 +292,10 @@ const VideoModel = (() => {
         let st = Math.round(Number(a.startS)), en = Math.round(Number(a.endS));
         if (!Number.isFinite(st) || !Number.isFinite(en)) return refuse("Choose a valid part.");
         t.hitMax = false;
+        const minS = Math.min(MIN_S, dur);
         if (a.moved === "window") { const len = t.endS - t.startS; st = Math.max(0, Math.min(dur - len, st)); en = st + len; }
-        else if (a.moved === "start") { en = t.endS; st = Math.max(0, Math.min(en - MIN_S, st)); if (en - st > MAX_S) { st = en - MAX_S; t.hitMax = true; } }
-        else { st = t.startS; en = Math.min(dur, Math.max(st + MIN_S, en)); if (en - st > MAX_S) { en = st + MAX_S; t.hitMax = true; } }
+        else if (a.moved === "start") { en = t.endS; st = Math.max(0, Math.min(en - minS, st)); if (en - st > MAX_S) { st = en - MAX_S; t.hitMax = true; } }
+        else { st = t.startS; en = Math.min(dur, Math.max(st + minS, en)); if (en - st > MAX_S) { en = st + MAX_S; t.hitMax = true; } }
         t.startS = st; t.endS = en; syncCover(t); return s;
       }
       case "seller/cover":
@@ -602,7 +603,9 @@ function sellerEditor(s) {
   const dur = t.source.durationS, sel = t.endS - t.startS, long = dur > VideoModel.MAX_S;
   const left = (t.startS / dur) * 100, right = 100 - (t.endS / dur) * 100;
   const covers = VideoModel.coverTimes(t);
-  const slider = (kind, now, text) => `<span class="h ${kind === "start" ? "l" : "r"}" role="slider" tabindex="0" data-drag="${kind}" aria-label="${kind === "start" ? "Start" : "End"} of the part to keep" aria-valuemin="0" aria-valuemax="${dur}" aria-valuenow="${now}" aria-valuetext="${text}"><b></b></span>`;
+  const minS = Math.min(VideoModel.MIN_S, dur), MAX = VideoModel.MAX_S;
+  const range = (kind) => kind === "start" ? [Math.max(0, t.endS - MAX), t.endS - minS] : [t.startS + minS, Math.min(dur, t.startS + MAX)];
+  const slider = (kind, now, text) => `<span class="h ${kind === "start" ? "l" : "r"}" role="slider" tabindex="0" data-drag="${kind}" aria-label="${kind === "start" ? "Start" : "End"} of the part to keep" aria-valuemin="${range(kind)[0]}" aria-valuemax="${range(kind)[1]}" aria-valuenow="${now}" aria-valuetext="${text}"><b></b></span>`;
   const hint = t.hitMax ? "Videos can be up to 1:30. Slide the frame to move it." : long ? `This video is ${mmss(dur)}. Drag the yellow frame to the 1:30 you want.` : "Drag the yellow edges to trim. Optional.";
   return `<div class="content with-footer"><div class="px stack" style="padding-top:6px">
     <div class="between"><button class="btn small outline" ${act("seller/cancelEditor", {}, "Cancel editing")}>Cancel</button><b class="t-body">Video</b><button class="btn small outline" ${act("seller/replace", {}, "Choose another from editor")}>Change</button></div>
@@ -915,6 +918,7 @@ document.addEventListener("pointerdown", (e) => {
   prevS = S;
   if (handle) { drag = { kind: handle.dataset.drag, x0: e.clientX, s0: S.task.startS, e0: S.task.endS, rect, dur, moved: false }; return; }
   const at = Math.round(((e.clientX - rect.left) / rect.width) * dur);
+  if (at >= S.task.startS && at <= S.task.endS) return;
   const kind = at < S.task.startS ? "start" : "end";
   quiet({ type: "seller/setInterval", moved: kind, startS: at, endS: at, label: `Tap the timeline at ${mmss(at)}` });
   ui.log.unshift(`Tap the timeline at ${mmss(at)} → ${mmss(S.task.startS)}–${mmss(S.task.endS)}`); render();
