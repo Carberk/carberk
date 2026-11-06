@@ -1,7 +1,11 @@
+import { readFileSync } from "node:fs";
+
 import sharp from "sharp";
 import { siToyota } from "simple-icons";
 import { describe, expect, it } from "vitest";
 
+import { loadBrandLogoManifest } from "../scripts/brand-logos/manifest";
+import { verifyMasterSha } from "../scripts/brand-logos/sources";
 import { LOGO_SIZES, renderLogoMask, renderLogoMasks } from "../scripts/brand-logos/render";
 
 const enc = (text: string) => new TextEncoder().encode(text);
@@ -158,6 +162,25 @@ describe("logo masks", () => {
     const rendered = await renderLogoMasks(wordmark, "alpha");
     expect(rendered.map((logo) => logo.size)).toEqual([30, 60, 90]);
     for (const logo of rendered) expect((await inkOf(logo.png)).covered).toBeGreaterThan(0);
+  });
+
+  it("renders the pinned IH emblem as visible picker masks at every density", async () => {
+    const entry = loadBrandLogoManifest().entries.find((logo) => logo.slug === "international-harvester");
+    expect(entry?.source).toBe("commons");
+    if (!entry || entry.source === null) throw new Error("International Harvester has no sourced logo");
+    const master = readFileSync(new URL("./fixtures/international-harvester.svg", import.meta.url));
+    verifyMasterSha(entry, master);
+    const rendered = await renderLogoMasks(master, entry.transform);
+    expect(rendered.map((logo) => logo.size)).toEqual([30, 60, 90]);
+    for (const { size, png } of rendered) {
+      const ink = await inkOf(png);
+      expect(ink.nonBlackInk).toBe(0);
+      expect(ink.covered).toBeGreaterThan(size);
+      expect(ink.minX).toBeGreaterThanOrEqual(1);
+      expect(ink.minY).toBeGreaterThanOrEqual(1);
+      expect(ink.maxX).toBeLessThan(size - 1);
+      expect(ink.maxY).toBeLessThan(size - 1);
+    }
   });
 
   it("refuses a master that renders to nothing", async () => {

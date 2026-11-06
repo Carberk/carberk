@@ -35,7 +35,7 @@ Matching rules live in pure domain functions ([CatalogSearchMatcher](domain/Cata
 - Normalization: lowercase, Unicode NFD with combining marks stripped (folds the Turkmen letters ä/ç/ň/ö/ş/ü/ý/ž and also й→и), ё→е, punctuation collapsed to spaces.
 - Transliteration: Cyrillic↔Latin in both directions, so "toyota" matches "Тойота" and "камри" matches "Camry".
 - Tiers: exact > prefix > one forgiven edit (only for words of 4+ letters). Multi-token queries match token by token; a model also matches on its combined "Brand Model" names. Ties put brands before models.
-- Years: standalone four-digit tokens are year candidates. Candidates in [1950, current year + 1] become `yearFrom`/`yearTo` (a "2014-2019" style range with hyphen, en or em dash included); out-of-range candidates are ignored. Digits glued to letters ("B2000") are name text, never years. A bare year query returns only the range with empty results.
+- Years: standalone four-digit tokens are year candidates. Candidates in [1950, current year + 1] become `yearFrom`/`yearTo` (a "2014-2019" style range with hyphen, en or em dash included). Outside that range, a token exactly naming a numeric catalog model is retained when the remaining query matches its brand/model context; unrelated invalid-year tokens and invalid ranges are ignored. Valid years retain priority even when a model has the same numeric name. Digits glued to letters ("B2000") are name text, never years. A bare year query returns only the range with empty results.
 - An empty or one-character query returns an empty result list, not an error.
 
 Response items are `{ kind: "brand" | "model", brandId, modelId?, label, brandLabel?, localeFallback? }` with the same locale fallback order as the list endpoints.

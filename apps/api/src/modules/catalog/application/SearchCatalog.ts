@@ -46,7 +46,23 @@ export class SearchCatalog {
     const raw = input.query.trim();
     if (raw.length < MIN_QUERY_LENGTH) return { results: [] };
 
-    const parsed = parseYearQuery(raw);
+    let parsed = parseYearQuery(raw);
+    const { brands, models } = await this.index.getSnapshot();
+    const brandById = new Map(brands.map((b) => [b.id, b]));
+    const numericModelNames = new Set<string>();
+    for (const model of models) {
+      const numericNames = searchableNames(model).filter((name) => /^\d{4}$/.test(name));
+      if (numericNames.length === 0) continue;
+      // Ignore unrelated displacement/invalid-year tokens in a named query.
+      const contextMatches = !parsed.text || bestNameScore(
+        parsed.text,
+        modelSearchableNames(model, brandById.get(model.brandId)),
+      ) > 0;
+      if (contextMatches) {
+        for (const name of numericNames) numericModelNames.add(name);
+      }
+    }
+    parsed = parseYearQuery(raw, undefined, numericModelNames);
     const years: { yearFrom?: number; yearTo?: number } = {};
     if (parsed.yearFrom !== undefined && parsed.yearTo !== undefined) {
       years.yearFrom = parsed.yearFrom;
@@ -58,9 +74,6 @@ export class SearchCatalog {
       return { results: [], ...years };
     }
 
-    const { brands, models } = await this.index.getSnapshot();
-    const brandById = new Map(brands.map((b) => [b.id, b]));
-
     const scored: ScoredEntry[] = [];
 
     for (const brand of brands) {
@@ -70,15 +83,7 @@ export class SearchCatalog {
 
     for (const model of models) {
       const brand = brandById.get(model.brandId);
-      const names = searchableNames(model);
-      if (brand) {
-        names.push(
-          `${brand.nameEn} ${model.nameEn}`,
-          `${brand.nameRu} ${model.nameRu}`,
-          `${brand.nameTk} ${model.nameTk}`,
-        );
-      }
-      const score = bestNameScore(text, names);
+      const score = bestNameScore(text, modelSearchableNames(model, brand));
       if (score > 0) scored.push({ score, kind: "model", brand, model });
     }
 
@@ -103,6 +108,18 @@ function searchableNames(entry: {
   nameEn: string;
 }): string[] {
   return [entry.nameRu, entry.nameTk, entry.nameEn, entry.slug];
+}
+
+function modelSearchableNames(model: Model, brand: Brand | undefined): string[] {
+  const names = searchableNames(model);
+  if (brand) {
+    names.push(
+      `${brand.nameEn} ${model.nameEn}`,
+      `${brand.nameRu} ${model.nameRu}`,
+      `${brand.nameTk} ${model.nameTk}`,
+    );
+  }
+  return names;
 }
 
 function labelFor(entry: ScoredEntry, locale: Locale): string {
