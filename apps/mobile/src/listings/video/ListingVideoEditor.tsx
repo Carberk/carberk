@@ -55,6 +55,8 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
   const widthRef = useRef(trackWidth);
   widthRef.current = trackWidth;
   const grantRef = useRef<{ x: number; snapshot: ListingVideoDraft } | null>(null);
+  const trackRef = useRef<View | null>(null);
+  const trackLeftRef = useRef(0);
   const player = useVideoPlayer(draft.source.uri, (p) => { p.timeUpdateEventInterval = 0.25; });
   const filmTimes = Array.from({ length: 9 }, (_, i) => Math.round((durationS * (i + 0.5)) / 9));
   const filmUris = useVideoThumbnails(draft.source.uri, filmTimes);
@@ -92,6 +94,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
     onMoveShouldSetResponder: () => true,
     onResponderGrant: (event: GestureResponderEvent) => {
       grantRef.current = { x: event.nativeEvent.pageX, snapshot: draftRef.current };
+      if (typeof trackRef.current?.measureInWindow === "function") trackRef.current.measureInWindow((x) => { trackLeftRef.current = x; });
     },
     onResponderMove: (event: GestureResponderEvent) => {
       const grant = grantRef.current;
@@ -100,8 +103,16 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
       const deltaS = ((event.nativeEvent.pageX - grant.x) / width) * grant.snapshot.source.durationS;
       applyMove(kind, grant.snapshot, deltaS);
     },
-    onResponderRelease: () => {
+    onResponderRelease: (event: GestureResponderEvent) => {
+      const grant = grantRef.current;
       grantRef.current = null;
+      if (kind === "window" && grant && Math.abs(event.nativeEvent.pageX - grant.x) < 8) {
+        const width = Math.max(1, widthRef.current);
+        const timeS = ((event.nativeEvent.pageX - trackLeftRef.current) / width) * grant.snapshot.source.durationS;
+        const move = withTap(grant.snapshot, timeS);
+        setHitMax(move.hitMax);
+        onDraftChange(move.draft);
+      }
     },
     onResponderTerminate: () => {
       grantRef.current = null;
@@ -183,6 +194,8 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
 
       <View>
         <Pressable
+          ref={trackRef}
+          style={{ marginHorizontal: 24 }}
           testID="listing-video-trim-track"
           accessibilityRole="button"
           accessibilityLabel={t("listingVideoTimeline")}

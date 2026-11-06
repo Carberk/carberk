@@ -73,7 +73,7 @@ export function ListingVideoCard({ canUploadVideo = false, preparation = inertLi
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
-    const durationS = Math.floor((asset.duration ?? 0) / 1000);
+    const durationS = (asset.duration ?? 0) / 1000;
     setDraft(createListingVideoDraft({ uri: asset.uri, durationS }));
     setEditing(true);
   }, []);

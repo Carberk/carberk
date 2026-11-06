@@ -24,8 +24,8 @@ vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: vi.fn(async () => {}),
 }));
 vi.mock("expo-linking", () => ({ openSettings: vi.fn(async () => {}) }));
-vi.mock("expo-video", async () => { const React = await import("react"); const { View } = await import("react-native"); return { VideoView: (props: Record<string, unknown>) => React.createElement(View, { testID: props.testID ?? "listing-video-preview" }), useVideoPlayer: () => ({ play: vi.fn(), pause: vi.fn(), currentTime: 0, addListener: () => ({ remove: () => {} }) }) }; });
-vi.mock("expo-video-thumbnails", () => ({ getThumbnailAsync: vi.fn(async (_uri: string, o: { time: number }) => ({ uri: `file:///thumb-${o.time}.jpg`, width: 320, height: 180 })) }));
+vi.mock("expo-video", async () => { const React = await import("react"); const { View } = await import("react-native"); return { VideoView: (props: Record<string, unknown>) => React.createElement(View, { testID: (props.testID as string | undefined) ?? "listing-video-preview" }), useVideoPlayer: () => ({ play: () => undefined, pause: () => undefined, currentTime: 0, addListener: () => ({ remove: () => undefined }) }) }; });
+vi.mock("expo-video-thumbnails", () => ({ getThumbnailAsync: async (_uri: string, o: { time: number }) => ({ uri: `file:///thumb-${o.time}.jpg`, width: 320, height: 180 }) }));
 
 const photo = (photoId: string, sortOrder: number): StagedPhoto => ({
   photoId,
@@ -389,5 +389,10 @@ describe("Listing video editor", () => {
 
     expect(screen.getByRole("button", { name: "Use 0:00–1:30" })).toBeTruthy();
     expect(endNow(screen)).toBe(90);
+  });
+  it("keeps fractional source duration (45.9s shows 0:46)", async () => {
+    const screen = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo />);
+    await pickVideo(screen, 45_900);
+    expect(screen.getAllByText("0:46").length).toBeGreaterThan(0);
   });
 });

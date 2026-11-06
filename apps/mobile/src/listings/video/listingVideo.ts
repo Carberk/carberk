@@ -29,7 +29,7 @@ export function formatMmss(totalSeconds: number): string {
 }
 
 export function createListingVideoDraft(source: ListingVideoSource): ListingVideoDraft {
-  const durationS = Math.max(0, Math.round(source.durationS));
+  const durationS = Math.max(0, source.durationS);
   return {
     source: { uri: source.uri, durationS },
     startS: 0,
