@@ -84,9 +84,21 @@ _Avoid_: Account phone, login phone, phone verified badge, credential
 
 **Media Upload**
 
-The server's record that one User presigned one photo or video upload, which can back one Listing media item. A storage key without the caller's Media Upload authorizes nothing.
+The server's record that one User presigned one photo or legacy single-PUT video and that can back one Listing media item; new multipart Listing videos use a Video Source. A storage key without the caller's Media Upload authorizes nothing.
 
 _Avoid_: Pending file, staged key
+
+**Video Source**
+
+The server's record for one prepared multipart Listing video source in the Bucket, owned by one User and adoptable by one Video Generation. A storage key without its recorded source authorizes nothing.
+
+**Listing Video**
+
+The optional video belonging to one seller's Draft or Listing, with a current ready version and at most one pending replacement.
+
+**Video Generation**
+
+One prepared clip and its playback versions and covers. A replacement is a new Video Generation; retrying processing keeps the same clip.
 
 ## Conversations
 
