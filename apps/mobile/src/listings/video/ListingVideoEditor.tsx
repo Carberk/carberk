@@ -201,7 +201,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
           accessibilityLabel={t("listingVideoTimeline")}
           onLayout={(event) => setTrackWidth(Math.max(1, event.nativeEvent.layout.width))}
           onPress={(event) => handleTap(event.nativeEvent.locationX)}
-          className="relative h-14 w-full overflow-visible rounded-[10px] bg-muted"
+          className="relative h-14 overflow-visible rounded-[10px] bg-muted"
         >
           <View className="absolute inset-0 flex-row overflow-hidden rounded-[10px]" accessibilityElementsHidden>
             {filmUris.map((uri, i) => uri ? (<Image key={i} testID="listing-video-filmstrip-frame" source={{ uri }} style={{ flex: 1, height: "100%" }} contentFit="cover" />) : (<View key={i} className="flex-1 border-r border-black/25 bg-secondary" />))}
