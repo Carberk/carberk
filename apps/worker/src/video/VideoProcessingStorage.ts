@@ -39,7 +39,9 @@ export class S3VideoProcessingStorage implements VideoProcessingStorage {
   }
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
-    await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }));
+    // Attempt namespaces are write-once. A stale/replayed job must never
+    // overwrite an output that a newer attempt owns.
+    await this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType, IfNoneMatch: "*" }));
   }
 
   async head(key: string): Promise<{ sizeBytes: number; contentType: string | null } | null> {

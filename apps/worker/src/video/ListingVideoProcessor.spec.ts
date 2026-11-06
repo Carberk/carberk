@@ -17,10 +17,10 @@ const exec = promisify(execFile);
 class MemoryStorage implements VideoProcessingStorage {
   readonly bucket = "listing-videos-test";
   readonly objects = new Map<string, { body: Buffer; contentType: string }>();
-  constructor(private readonly source: Buffer, private readonly dropKey?: string) {}
-  async get(key: string) { if (key !== "video-sources/source/source.mp4") throw new Error("NoSuchKey"); return { key, body: this.source, contentType: "video/mp4" }; }
+  constructor(private readonly source: Buffer, private readonly dropKey?: string, private readonly missing = false) {}
+  async get(key: string) { if (this.missing || key !== "video-sources/source/source.mp4") throw new Error("NoSuchKey"); return { key, body: this.source, contentType: "video/mp4" }; }
   async put(key: string, body: Buffer, contentType: string) { if (key !== this.dropKey) this.objects.set(key, { body, contentType }); }
-  async head(key: string) { const value = this.objects.get(key); return value ? { sizeBytes: value.body.length, contentType: value.contentType } : null; }
+  async head(key: string) { if (this.missing) return null; if (key === "video-sources/source/source.mp4") return { sizeBytes: this.source.length, contentType: "video/mp4" }; const value = this.objects.get(key); return value ? { sizeBytes: value.body.length, contentType: value.contentType } : null; }
   async list(prefix: string) { return [...this.objects.keys()].filter((key) => key.startsWith(prefix)); }
 }
 
@@ -73,8 +73,8 @@ describe("ListingVideoProcessor", () => {
 
   it("records a missing source as Failed without trusting declared metadata", async () => {
     const prisma = prismaFor();
-    const storage = { ...new MemoryStorage(Buffer.alloc(0)), get: async () => { throw new Error("NoSuchKey"); } } as unknown as VideoProcessingStorage;
-    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("NoSuchKey");
+    const storage = new MemoryStorage(Buffer.alloc(0), undefined, true);
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("Stored video source is missing");
     expect(prisma.row.status).toBe("Failed");
   });
 

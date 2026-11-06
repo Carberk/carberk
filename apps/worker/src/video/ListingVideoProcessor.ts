@@ -93,6 +93,10 @@ export class ListingVideoProcessor {
     if (!generation || generation.sourceId !== job.sourceId || generation.processingAttempt !== job.attempt || generation.status !== "Processing") return;
     const workDir = await mkdtemp(join(tmpdir(), "carberk-video-"));
     try {
+      const sourceHead = await this.storage.head(generation.source.objectKey);
+      if (!sourceHead) throw new Error("Stored video source is missing");
+      if (sourceHead.sizeBytes > MAX_BYTES) throw new Error("Video exceeds 15 MiB");
+      if (sourceHead.sizeBytes !== generation.source.sizeBytes) throw new Error("Stored video size does not match the server record");
       const source = await this.storage.get(generation.source.objectKey);
       if (source.body.byteLength > MAX_BYTES) throw new Error("Video exceeds 15 MiB");
       if (source.body.byteLength !== generation.source.sizeBytes) throw new Error("Stored video size does not match the server record");
@@ -107,6 +111,7 @@ export class ListingVideoProcessor {
       const manifest: Record<string, string> = {};
       const offset = coverOffset(validated.duration, generation.coverOffsetMs);
       for (const [name, width, height] of COVER_SPECS) {
+        await this.assertAttemptActive(job);
         const output = join(workDir, `${name}.png`);
         await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-ss", String(offset), "-i", input, "-frames:v", "1", "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`, "-f", "image2", output]);
         const key = `${prefix}/covers/${name}.webp`;
@@ -115,6 +120,7 @@ export class ListingVideoProcessor {
       }
       const tiers = [240, 360, 720].filter((tier) => tier <= (validated.height >= validated.width ? validated.height : validated.width));
       for (const tier of tiers) {
+        await this.assertAttemptActive(job);
         const playlist = join(workDir, `${tier}.m3u8`);
         const segmentPattern = join(workDir, `${tier}-%03d.ts`);
         const scale = validated.height >= validated.width ? `scale=-2:min(${tier}\\,ih)` : `scale=min(${tier}\\,iw):-2`;
@@ -127,6 +133,7 @@ export class ListingVideoProcessor {
       }
       const masterKey = `${prefix}/hls/master.m3u8`;
       const master = tiers.map((tier) => `#EXT-X-STREAM-INF:BANDWIDTH=${tier * 1000},RESOLUTION=${validated.height >= validated.width ? Math.max(2, Math.round(validated.width * tier / validated.height)) : tier}x${Math.max(2, Math.round(validated.height * tier / validated.width))}\n${prefix}/hls/${tier}p/index.m3u8`).join("\n");
+      await this.assertAttemptActive(job);
       await this.storage.put(masterKey, Buffer.from(`#EXTM3U\n#EXT-X-VERSION:3\n${master}\n`), "application/vnd.apple.mpegurl");
       manifest["master"] = masterKey;
       for (const key of Object.values(manifest)) {
@@ -160,6 +167,11 @@ export class ListingVideoProcessor {
   }
 
   private async decode(input: string): Promise<void> { await run(FFMPEG_PATH, ["-v", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-i", input, "-map", "0:v:0", "-map", "0:a?", "-f", "null", "-"]); }
+
+  private async assertAttemptActive(job: VideoProcessingJob): Promise<void> {
+    const active = await this.prisma.videoGeneration.findUnique({ where: { id: job.generationId }, select: { processingAttempt: true, status: true } });
+    if (!active || active.processingAttempt !== job.attempt || active.status !== "Processing") throw new Error("Video processing attempt was revoked");
+  }
 
   private async uploadSegments(workDir: string, prefix: string, tier: number): Promise<string[]> {
     const keys: string[] = [];
