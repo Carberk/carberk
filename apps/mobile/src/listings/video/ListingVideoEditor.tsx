@@ -1,8 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
-import { Check, Pause, Play } from "lucide-react-native";
+import { Check, Play } from "lucide-react-native";
+import { VideoView, useVideoPlayer } from "expo-video";
+import { Image } from "expo-image";
 import { useTranslation } from "react-i18next";
 
+import { useVideoThumbnails } from "./useVideoThumbnails";
 import {
   LISTING_VIDEO_MAX_S,
   LISTING_VIDEO_MIN_S,
@@ -52,6 +55,22 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
   const widthRef = useRef(trackWidth);
   widthRef.current = trackWidth;
   const grantRef = useRef<{ x: number; snapshot: ListingVideoDraft } | null>(null);
+  const player = useVideoPlayer(draft.source.uri, (p) => { p.timeUpdateEventInterval = 0.25; });
+  const filmTimes = Array.from({ length: 9 }, (_, i) => Math.round((durationS * (i + 0.5)) / 9));
+  const filmUris = useVideoThumbnails(draft.source.uri, filmTimes);
+  const coverUris = useVideoThumbnails(draft.source.uri, covers);
+  useEffect(() => {
+    try { player.currentTime = draft.startS; } catch { /* native stub */ }
+    if (previewing) { try { player.play(); } catch { /* stub */ } }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.startS, draft.endS]);
+  useEffect(() => {
+    const sub = player.addListener?.("timeUpdate", (e: { currentTime: number }) => {
+      if (e.currentTime >= draftRef.current.endS) { try { player.pause(); player.currentTime = draftRef.current.startS; } catch { /* stub */ } setPreviewing(false); }
+    });
+    return () => { try { sub?.remove(); } catch { /* stub */ } };
+     
+  }, [player]);
 
   const applyMove = (kind: DragKind, snapshot: ListingVideoDraft, deltaS: number) => {
     if (kind === "start") {
@@ -137,20 +156,17 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
         </Button>
       </View>
 
-      <View className="w-full items-center justify-center overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: 16 / 9 }}>
+      <View className="w-full overflow-hidden rounded-2xl bg-black" style={{ aspectRatio: 16 / 9 }}>
+        <VideoView testID="listing-video-preview" player={player} style={{ flex: 1 }} contentFit="cover" nativeControls={false} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={previewing ? t("listingVideoPausePreview") : t("listingVideoPlayPreview")}
-          onPress={() => setPreviewing((value) => !value)}
-          className="h-14 w-14 items-center justify-center rounded-full bg-white/20"
+          onPress={() => { const next = !previewing; setPreviewing(next); try { if (next) { player.currentTime = draft.startS; player.play(); } else player.pause(); } catch { /* stub */ } }}
+          className="absolute inset-0 items-center justify-center"
         >
-          <Icon as={previewing ? Pause : Play} className="size-7 text-white" />
+          {!previewing && (<View className="h-14 w-14 items-center justify-center rounded-full bg-white/20"><Icon as={Play} className="size-7 text-white" /></View>)}
+          {previewing && (<Text className="absolute bottom-2 text-caption text-white">{t("listingVideoPlaying", { start: formatMmss(draft.startS), end: formatMmss(draft.endS) })}</Text>)}
         </Pressable>
-        {previewing && (
-          <Text className="mt-2 text-caption text-white">
-            {t("listingVideoPlaying", { start: formatMmss(draft.startS), end: formatMmss(draft.endS) })}
-          </Text>
-        )}
       </View>
 
       <View>
@@ -175,9 +191,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
           className="relative h-14 w-full overflow-visible rounded-[10px] bg-muted"
         >
           <View className="absolute inset-0 flex-row overflow-hidden rounded-[10px]" accessibilityElementsHidden>
-            {Array.from({ length: 9 }, (_, i) => (
-              <View key={i} className="flex-1 border-r border-black/25 bg-secondary" />
-            ))}
+            {filmUris.map((uri, i) => uri ? (<Image key={i} testID="listing-video-filmstrip-frame" source={{ uri }} style={{ flex: 1, height: "100%" }} contentFit="cover" />) : (<View key={i} className="flex-1 border-r border-black/25 bg-secondary" />))}
           </View>
           <View className="absolute top-0 bottom-0 left-0 bg-black/55" style={{ width: `${leftPct}%` }} accessibilityElementsHidden />
           <View
@@ -242,7 +256,8 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
                 className="flex-1 items-center justify-center bg-secondary"
                 style={{ aspectRatio: 4 / 3, borderRadius: 12, borderWidth: chosen ? 3 : 0, borderColor: FRAME_YELLOW }}
               >
-                <Text className="text-caption text-muted-foreground">{formatMmss(coverS)}</Text>
+                {coverUris[index] ? (<Image testID="listing-video-cover-image" source={{ uri: coverUris[index] }} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} contentFit="cover" />) : null}
+                <Text className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-caption text-white">{formatMmss(coverS)}</Text>
                 {chosen && (
                   <View className="absolute top-1 right-1 h-[22px] w-[22px] items-center justify-center rounded-full" style={{ backgroundColor: FRAME_YELLOW }}>
                     <Icon as={Check} className="size-3.5 text-black" />

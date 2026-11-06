@@ -24,6 +24,8 @@ vi.mock("expo-file-system/legacy", () => ({
   deleteAsync: vi.fn(async () => {}),
 }));
 vi.mock("expo-linking", () => ({ openSettings: vi.fn(async () => {}) }));
+vi.mock("expo-video", async () => { const React = await import("react"); const { View } = await import("react-native"); return { VideoView: (props: Record<string, unknown>) => React.createElement(View, { testID: props.testID ?? "listing-video-preview" }), useVideoPlayer: () => ({ play: vi.fn(), pause: vi.fn(), currentTime: 0, addListener: () => ({ remove: () => {} }) }) }; });
+vi.mock("expo-video-thumbnails", () => ({ getThumbnailAsync: vi.fn(async (_uri: string, o: { time: number }) => ({ uri: `file:///thumb-${o.time}.jpg`, width: 320, height: 180 })) }));
 
 const photo = (photoId: string, sortOrder: number): StagedPhoto => ({
   photoId,
@@ -145,6 +147,8 @@ describe("Listing video card on the Photos step", () => {
   it("discards the pick when the editor is cancelled", async () => {
     const screen = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo />);
     await pickVideo(screen, 45_000);
+    expect(screen.getByTestId("listing-video-preview")).toBeTruthy();
+    expect(await screen.findAllByTestId("listing-video-cover-image")).toHaveLength(4);
     expect(screen.getByTestId("listing-video-editor")).toBeTruthy();
 
     await act(async () => {
