@@ -38,6 +38,12 @@ vi.mock("expo-haptics", () => ({
   AndroidHaptics: { Clock_Tick: "clock-tick" },
 }));
 vi.mock("expo-image", async () => ({ Image: (await import("react-native")).Image }));
+vi.mock("expo-video", () => import("./native-video"));
+vi.mock("expo-video-thumbnails", () => ({
+  getThumbnailAsync: async (_uri: string, { time }: { time: number }) => ({
+    uri: `file:///thumb-${time}.jpg`, width: 320, height: 180,
+  }),
+}));
 vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));

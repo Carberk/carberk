@@ -1,0 +1,144 @@
+import { useCallback, useState } from "react";
+import { View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as Linking from "expo-linking";
+import { Plus, Video } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
+
+import { createListingVideoDraft, formatMmss, toSelection, type ListingVideoDraft } from "./listingVideo";
+import { inertListingVideoPreparation, type ListingVideoPreparationPort } from "./videoPreparation";
+import { ListingVideoEditor } from "./ListingVideoEditor";
+
+import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/text";
+import { Icon } from "@/components/ui/icon";
+
+interface ListingVideoCardProps {
+  canUploadVideo?: boolean;
+  preparation?: ListingVideoPreparationPort;
+  disabled?: boolean;
+}
+
+/**
+ * Optional Video card for the Photos step (create wizard and Edit listing).
+ * Hidden unless the current user can upload video; the flag stays false
+ * until #1049 wires the real tester gate.
+ */
+function PermissionNote({ onDismiss }: { onDismiss: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View className="gap-2" testID="listing-video-permission-note">
+      <View className="rounded-2xl bg-destructive/10 p-3">
+        <Text className="text-callout font-semibold">{t("listingVideoDeniedTitle")}</Text>
+        <Text className="text-footnote text-muted-foreground">{t("listingVideoDeniedBody")}</Text>
+      </View>
+      <View className="flex-row gap-2">
+        <Button
+          variant="secondary"
+          className="flex-1"
+          onPress={() => void Linking.openSettings()}
+          accessibilityLabel={t("listingVideoOpenSettings")}
+        >
+          <Text>{t("listingVideoOpenSettings")}</Text>
+        </Button>
+        <Button variant="outline" className="flex-1" onPress={onDismiss} accessibilityLabel={t("listingVideoNotNow")}>
+          <Text>{t("listingVideoNotNow")}</Text>
+        </Button>
+      </View>
+    </View>
+  );
+}
+
+export function ListingVideoCard({ canUploadVideo = false, preparation = inertListingVideoPreparation, disabled = false }: ListingVideoCardProps) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<ListingVideoDraft | null>(null);
+  const [committedDraft, setCommittedDraft] = useState<ListingVideoDraft | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
+  const chooseFromLibrary = useCallback(async () => {
+    let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!permission.granted && permission.canAskAgain) {
+      permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    }
+    if (!permission.granted) {
+      setPermissionDenied(true);
+      return;
+    }
+    setPermissionDenied(false);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["videos"],
+      allowsMultipleSelection: false,
+      quality: 1,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const durationS = (asset.duration ?? 0) / 1000;
+    setDraft(createListingVideoDraft({ uri: asset.uri, durationS }));
+    setEditing(true);
+  }, []);
+
+  if (!canUploadVideo) return null;
+
+  if (draft && editing) {
+    return (
+      <View className="gap-3">
+        <ListingVideoEditor
+          draft={draft}
+          onDraftChange={setDraft}
+          onCancel={() => {
+            setDraft(committedDraft);
+            setEditing(false);
+          }}
+          onChange={() => void chooseFromLibrary()}
+          onUse={() => {
+            void preparation.prepare(toSelection(draft));
+            setCommittedDraft(draft);
+            setEditing(false);
+          }}
+        />
+        {permissionDenied && <PermissionNote onDismiss={() => setPermissionDenied(false)} />}
+      </View>
+    );
+  }
+
+  return (
+    <View className="gap-3 rounded-3xl bg-card p-4" testID="listing-video-card">
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1">
+          <Text className="text-subhead">
+            {t("listingVideoTitle")} <Text className="text-callout text-muted-foreground">{t("listingVideoOptional")}</Text>
+          </Text>
+          <Text className="text-footnote text-muted-foreground">{t("listingVideoSubtitle")}</Text>
+        </View>
+        <Icon as={Video} className="size-6 text-foreground" />
+      </View>
+
+      {draft && !editing && (
+        <View className="gap-2">
+          <View className="rounded-2xl bg-secondary p-3">
+            <Text className="text-callout font-semibold">{t("listingVideoChosen")}</Text>
+            <Text className="text-footnote text-muted-foreground">
+              {t("listingVideoChosenSummary", {
+                duration: formatMmss(draft.endS - draft.startS),
+                cover: formatMmss(toSelection(draft).posterS),
+              })}
+            </Text>
+          </View>
+          <Button variant="secondary" onPress={() => setEditing(true)} accessibilityLabel={t("listingVideoContinueEditing")}>
+            <Text>{t("listingVideoContinueEditing")}</Text>
+          </Button>
+        </View>
+      )}
+
+      {!draft && (
+        <Button onPress={() => void chooseFromLibrary()} disabled={disabled} accessibilityLabel={t("listingVideoChoose")}>
+          <Icon as={Plus} className="size-4" />
+          <Text>{t("listingVideoChoose")}</Text>
+        </Button>
+      )}
+
+      {permissionDenied && <PermissionNote onDismiss={() => setPermissionDenied(false)} />}
+    </View>
+  );
+}
