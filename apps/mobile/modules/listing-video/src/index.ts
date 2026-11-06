@@ -1,4 +1,4 @@
-import { requireNativeModule } from "expo-modules-core";
+import { requireNativeModule, uuid } from "expo-modules-core";
 
 import {
   prepareListingVideo,
@@ -29,6 +29,7 @@ function loadNative(): ListingVideoNativeModule | null {
   try {
     const raw = requireNativeModule<RawNativeModule>("ListingVideo");
     return {
+      newJobId: () => uuid.v4(),
       prepare: (sourceUri, startS, endS, coverS, jobId) =>
         raw.prepare(sourceUri, startS, endS, coverS, jobId),
       cancel: (jobId) => raw.cancel(jobId),

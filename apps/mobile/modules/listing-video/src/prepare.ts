@@ -10,10 +10,6 @@
 export const MAX_INTERVAL_S = 90;
 export const MIN_INTERVAL_S = 3;
 export const MAX_OUTPUT_BYTES = 15 * 1024 * 1024;
-export const MAX_FPS = 30;
-export const AUDIO_BITRATE = 128_000;
-/** Long-side / short-side envelope; orientation follows the source. */
-export const ENVELOPE = { long: 1280, short: 720 } as const;
 
 export type ListingVideoErrorCode =
   | "invalid-interval"
@@ -69,6 +65,8 @@ export interface NativePreparedFile {
 }
 
 export interface ListingVideoNativeModule {
+  /** Native UUIDs remain unique across JavaScript reloads. */
+  newJobId(): string;
   prepare(
     sourceUri: string,
     startS: number,
@@ -80,32 +78,6 @@ export interface ListingVideoNativeModule {
   addProgressListener(
     listener: (event: { jobId: string; fraction: number }) => void,
   ): { remove: () => void };
-}
-
-/** Video bitrate that fits the 15 MiB cap alongside 128 kbps audio. */
-export function videoBitrateForDuration(durationS: number): number {
-  const budgetBits = MAX_OUTPUT_BYTES * 8 * 0.97;
-  const audioBits = AUDIO_BITRATE * durationS;
-  const perSecond = Math.floor((budgetBits - audioBits) / durationS);
-  return Math.max(400_000, Math.min(1_250_000, perSecond));
-}
-
-/** Fit `width`x`height` inside the 720p envelope without upscaling. Even out. */
-export function fitWithinEnvelope(
-  width: number,
-  height: number,
-): { width: number; height: number } {
-  const long = Math.max(width, height);
-  const short = Math.min(width, height);
-  const scale = Math.min(
-    1,
-    ENVELOPE.long / long,
-    ENVELOPE.short / short,
-  );
-  const even = (v: number) => Math.max(2, Math.floor((v * scale) / 2) * 2);
-  return width >= height
-    ? { width: even(width), height: even(height) }
-    : { width: even(width), height: even(height) };
 }
 
 export function validateInterval(
@@ -134,8 +106,6 @@ export function validateInterval(
   }
 }
 
-let jobCounter = 0;
-
 export function prepareListingVideo(
   native: ListingVideoNativeModule | null,
   source: string,
@@ -156,7 +126,7 @@ export function prepareListingVideo(
         "Video preparation is not available on this platform yet.",
       );
     }
-    const jobId = `lv-${++jobCounter}`;
+    const jobId = native.newJobId();
     let cancelled = false;
     cancelImpl = () => {
       cancelled = true;

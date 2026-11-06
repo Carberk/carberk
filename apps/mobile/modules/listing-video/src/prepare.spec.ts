@@ -2,10 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ListingVideoError,
-  fitWithinEnvelope,
   prepareListingVideo,
   validateInterval,
-  videoBitrateForDuration,
   type ListingVideoNativeModule,
 } from "./prepare";
 
@@ -13,6 +11,7 @@ function fakeNative(
   overrides: Partial<ListingVideoNativeModule> = {},
 ): ListingVideoNativeModule {
   return {
+    newJobId: () => crypto.randomUUID(),
     prepare: vi.fn(async () => ({
       uri: "file:///app/listing-video/prepared.mp4",
       durationS: 10,
@@ -53,34 +52,29 @@ describe("validateInterval", () => {
   });
 });
 
-describe("fitWithinEnvelope", () => {
-  it("fits landscape and portrait inside 720p without upscaling", () => {
-    expect(fitWithinEnvelope(1920, 1080)).toEqual({ width: 1280, height: 720 });
-    expect(fitWithinEnvelope(1080, 1920)).toEqual({ width: 720, height: 1280 });
-    expect(fitWithinEnvelope(640, 480)).toEqual({ width: 640, height: 480 });
-    expect(fitWithinEnvelope(3840, 2160)).toEqual({ width: 1280, height: 720 });
-  });
-
-  it("always returns even dimensions", () => {
-    const fitted = fitWithinEnvelope(1279, 719);
-    expect(fitted.width % 2).toBe(0);
-    expect(fitted.height % 2).toBe(0);
-  });
-});
-
-describe("videoBitrateForDuration", () => {
-  it("keeps a 90s clip with 128 kbps audio under 15 MiB", () => {
-    const totalBits = (videoBitrateForDuration(90) + 128_000) * 90;
-    expect(totalBits).toBeLessThanOrEqual(15 * 1024 * 1024 * 8);
-    expect(videoBitrateForDuration(90)).toBeLessThanOrEqual(1_250_000);
-  });
-
-  it("caps short clips at the 720p ceiling instead of wasting bytes", () => {
-    expect(videoBitrateForDuration(10)).toBe(1_250_000);
-  });
-});
-
 describe("prepareListingVideo", () => {
+  it("keeps job identities distinct after a JavaScript session restarts", async () => {
+    const jobIds: string[] = [];
+    const native = fakeNative({
+      newJobId: () => `native-uuid-${jobIds.length}`,
+      prepare: vi.fn(async (_source, _start, _end, _cover, jobId) => {
+        jobIds.push(jobId);
+        return {
+          uri: `file:///app/listing-video/${jobId}/prepared.mp4`,
+          durationS: 10, sizeBytes: 1_500_000, width: 1280, height: 720,
+          fps: 30, hasAudio: true,
+        };
+      }),
+    });
+    vi.resetModules();
+    const firstSession = await import("./prepare");
+    const first = await firstSession.prepareListingVideo(native, "file:///lib/a.mov", 0, 10, 5).done;
+    vi.resetModules();
+    const secondSession = await import("./prepare");
+    const second = await secondSession.prepareListingVideo(native, "file:///lib/a.mov", 0, 10, 5).done;
+    expect(second.uri).not.toBe(first.uri);
+  });
+
   it("returns the prepared file and forwards progress for its job only", async () => {
     let listener: ((e: { jobId: string; fraction: number }) => void) | undefined;
     const native = fakeNative({

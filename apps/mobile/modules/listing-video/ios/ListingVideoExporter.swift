@@ -95,10 +95,15 @@ public final class ListingVideoExporter: @unchecked Sendable {
     let support = try fileManager.url(
       for: .applicationSupportDirectory, in: .userDomainMask,
       appropriateFor: nil, create: true)
-    let jobDir = support.appendingPathComponent("listing-video/\(jobId)", isDirectory: true)
-    try? fileManager.removeItem(at: jobDir)
+    // Storage identity is native and independent of caller/session job IDs.
+    // Never remove a previous prepared file to start another export.
+    let jobDir = support.appendingPathComponent("listing-video/\(UUID().uuidString)", isDirectory: true)
     try fileManager.createDirectory(at: jobDir, withIntermediateDirectories: true)
-    defer { clearCancelled(jobId) }
+    var succeeded = false
+    defer {
+      clearCancelled(jobId)
+      if !succeeded { try? fileManager.removeItem(at: jobDir) }
+    }
 
     // 1. Copy the library video into app storage; never export in place.
     let copied = jobDir.appendingPathComponent("source.\(source.pathExtension.isEmpty ? "mov" : source.pathExtension)")
@@ -315,8 +320,9 @@ public final class ListingVideoExporter: @unchecked Sendable {
       try? fileManager.removeItem(at: final)
       throw ListingVideoExportError.cancelled
     }
-    try? fileManager.removeItem(at: final)
+    try fileManager.removeItem(at: copied)
     try fileManager.moveItem(at: partial, to: final)
+    succeeded = true
     return PreparedVideoInfo(
       url: final, durationS: info.durationS, sizeBytes: info.sizeBytes,
       width: info.width, height: info.height, fps: info.fps, hasAudio: info.hasAudio)
