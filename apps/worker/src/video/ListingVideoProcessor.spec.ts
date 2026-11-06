@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile , spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,6 +13,8 @@ import { ListingVideoProcessor } from "./ListingVideoProcessor";
 import { S3VideoProcessingStorage, type VideoProcessingStorage } from "./VideoProcessingStorage";
 
 const exec = promisify(execFile);
+const hasFfmpeg = spawnSync(process.env["FFMPEG_PATH"] ?? "ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
+const describeFfmpeg = hasFfmpeg ? describe : describe.skip;
 
 class MemoryStorage implements VideoProcessingStorage {
   readonly bucket = "listing-videos-test";
@@ -50,7 +52,7 @@ async function fixture(): Promise<{ dir: string; body: Buffer }> {
   return { dir, body: await readFile(path) };
 }
 
-describe("ListingVideoProcessor", () => {
+describeFfmpeg("ListingVideoProcessor", () => {
   it("validates actual bytes and only marks Ready after every manifest object exists", async () => {
     const fixtureData = await fixture();
     try {
