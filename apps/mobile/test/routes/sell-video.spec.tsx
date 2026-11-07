@@ -25,6 +25,14 @@ vi.mock("expo-file-system/legacy", () => ({
   documentDirectory: "file:///documents/", getInfoAsync: async () => ({ exists: true }),
   readDirectoryAsync: async () => [], deleteAsync: async () => {}, makeDirectoryAsync: async () => {},
 }));
+vi.mock("expo-secure-store", () => {
+  const values = new Map<string, string>();
+  return {
+    getItemAsync: async (key: string) => values.get(key) ?? null,
+    setItemAsync: async (key: string, value: string) => { values.set(key, value); },
+    deleteItemAsync: async (key: string) => { values.delete(key); },
+  };
+});
 const id = "11111111-1111-4111-8111-111111111111";
 const listingId = "22222222-2222-4222-8222-222222222222";
 const date = "2026-11-01T00:00:00.000Z";
@@ -95,4 +103,18 @@ it("keeps existing status and stored-source recovery available to a member with 
   expect(await screen.findByText("Processing video…")).toBeTruthy();
   expect(state.retried()).toBe(true);
   expect(state.targetReads()).toBeGreaterThan(0);
+});
+
+it("can retry an unreadable video status on Review while photos remain publishable", async () => {
+  const state = wizardServer("processing");
+  let failed = true;
+  server.use(http.get("*/listings/video-uploads/target/draft/:id", () => failed ? HttpResponse.error() : HttpResponse.json({})));
+  const screen = await renderWizard();
+  await screen.findByText("Couldn’t check the video status");
+  expect(screen.getByRole("button", { name: "Publish" }).props.disabled).toBeFalsy();
+  failed = false;
+  await fireEvent.press(screen.getByRole("button", { name: "Check again" }));
+  await screen.findByText("Video · None");
+  await fireEvent.press(screen.getByRole("button", { name: "Publish" }));
+  expect(state.published()).toBe(true);
 });

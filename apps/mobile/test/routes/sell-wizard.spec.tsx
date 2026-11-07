@@ -1,5 +1,7 @@
+import { http, HttpResponse } from "msw";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+import { server } from "../msw";
 import { fireEvent, renderMobile, routeParams } from "../render";
 import SellScreen from "../../app/(tabs)/sell";
 
@@ -83,6 +85,12 @@ function resume(payload: keyof typeof fixture.payloads) {
 }
 
 beforeEach(() => {
+  server.use(http.get("*/me", () => HttpResponse.json({
+    id: fixture.id, phone: "+99365000000", email: null, phoneVerified: true,
+    displayName: null, nameNumber: 1234, avatarIndex: 0, avatarKey: null, avatarUrl: null,
+    role: "buyer", locale: "en", createdAt: "2026-11-01T00:00:00.000Z", deletionScheduledAt: null,
+    isVideoUploadTester: false, canUploadVideo: false,
+  })));
   fixture.payload = {};
   fixture.save.mockClear();
 });

@@ -1,9 +1,22 @@
 import type { ListingsSchemas } from "@auto-tm/contracts";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
 
-import { renderMobile, fireEvent } from "../../../test/render";
+import { renderMobile, fireEvent, act } from "../../../test/render";
+import { server } from "../../../test/msw";
+import { storeAuthSession, clearAuthSession } from "../../auth/session";
 
 import { OwnerListingCard } from "./OwnerListingCard";
+
+vi.mock("expo-secure-store", () => {
+  const values = new Map<string, string>();
+  return {
+    getItemAsync: async (key: string) => values.get(key) ?? null,
+    setItemAsync: async (key: string, value: string) => { values.set(key, value); },
+    deleteItemAsync: async (key: string) => { values.delete(key); },
+  };
+});
+afterEach(clearAuthSession);
 
 function listing(status: ListingsSchemas.ListingSummary["status"]): ListingsSchemas.ListingSummary {
   return {
@@ -22,6 +35,24 @@ async function renderCard(status: ListingsSchemas.ListingSummary["status"]) {
 }
 
 describe("OwnerListingCard", () => {
+  it("reads own Ready and replacement while new uploads are paused, then honors an empty status over stale card data", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const user = { id, phone: null, email: "owner@example.com", displayName: null, role: "seller" as const };
+    await storeAuthSession({ accessToken: "test-access", refreshToken: "test-refresh", user });
+    const video: ListingsSchemas.ReadyListingVideo = { id, generationId: "22222222-2222-4222-8222-222222222222", galleryIndex: 1, durationMs: 6000, qualities: [240], cover: { thumbnail: "cover:thumbnail", list: "cover:list", detail: "cover:detail", fullscreen: "cover:fullscreen" } };
+    const pendingVideo = { id, generationId: "33333333-3333-4333-8333-333333333333", sourceId: id, sessionId: id, status: "processing" as const, canReprocess: false };
+    let removed = false;
+    server.use(
+      http.get("*/me", () => HttpResponse.json({ ...user, phoneVerified: false, nameNumber: 1234, avatarIndex: 0, avatarKey: null, avatarUrl: null, locale: "en", createdAt: "2026-11-01T00:00:00.000Z", deletionScheduledAt: null, isVideoUploadTester: true, canUploadVideo: false })),
+      http.get("*/listings/video-uploads/target/listing/:id", () => HttpResponse.json(removed ? {} : { video, pendingVideo })),
+    );
+    const view = await renderMobile(<OwnerListingCard listing={{ ...listing("active"), id, sellerId: id, video }} onOpen={() => {}} onMore={() => {}} />);
+    expect(await view.findByText("Video · Ready · Replacement: Processing")).toBeTruthy();
+    removed = true;
+    await act(async () => { await view.queryClient.refetchQueries(); });
+    expect(view.queryByText(/^Video ·/)).toBeNull();
+  });
+
   it("opens the Listing on tap and hands ⋯ its title", async () => {
     const { view, onOpen, onMore } = await renderCard("active");
     expect(view.getByText("Ashgabat")).toBeTruthy();

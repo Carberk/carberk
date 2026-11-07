@@ -1,6 +1,8 @@
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
+import { server } from "../msw";
 import { ApiError } from "../../src/api/client";
 import SellScreen from "../../app/(tabs)/sell";
 import { act, fireEvent, renderMobile, routeParams, routerMock } from "../render";
@@ -116,6 +118,12 @@ function resume(payload: keyof typeof fixture.payloads) {
 }
 
 beforeEach(() => {
+  server.use(http.get("*/me", () => HttpResponse.json({
+    id: fixture.id, phone: "+99365000000", email: null, phoneVerified: true,
+    displayName: null, nameNumber: 1234, avatarIndex: 0, avatarKey: null, avatarUrl: null,
+    role: "buyer", locale: "en", createdAt: "2026-11-01T00:00:00.000Z", deletionScheduledAt: null,
+    isVideoUploadTester: false, canUploadVideo: false,
+  })));
   fixture.payload = {};
   fixture.auth = { isAuthenticated: true, phone: "+99365000000" };
   fixture.confirmedPhones = [];
