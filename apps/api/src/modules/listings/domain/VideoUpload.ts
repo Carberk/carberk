@@ -50,6 +50,7 @@ export interface VideoSource {
   partCount: number;
   state: VideoSourceState;
   openIdempotencyKey: string | null;
+  openingDraftId: string | null;
   coverOffsetMs: number;
   expiresAt: Date;
   completionStartedAt: Date | null;

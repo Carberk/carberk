@@ -189,6 +189,7 @@ function makeFakePrisma() {
       },
     },
 
+    listingVideo: { deleteMany: async () => ({ count: 0 }) },
     listingDraft: {
       deleteMany: async (args: { where: { userId: string } }) => {
         const before = state.listingDrafts.length;

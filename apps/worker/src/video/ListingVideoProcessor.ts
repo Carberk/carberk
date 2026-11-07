@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, retireVideoGenerations } from "@auto-tm/db";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import sharp from "sharp";
 
@@ -48,9 +48,15 @@ export class ListingVideoProcessor {
   private readonly logger = new Logger(ListingVideoProcessor.name);
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(VIDEO_PROCESSING_STORAGE) private readonly storage: VideoProcessingStorage) {}
 
-  async process(job: VideoProcessingJob): Promise<void> {
+  async process(job: VideoProcessingJob, attemptsStarted = 1): Promise<void> {
     const generation = await this.prisma.videoGeneration.findUnique({ where: { id: job.generationId }, include: { source: true } });
     if (!generation || generation.sourceId !== job.sourceId || generation.processingAttempt !== job.attempt || generation.status !== "Processing") return;
+    if (attemptsStarted > 1) {
+      // BullMQ has recovered a lost execution lock. Never reuse output keys
+      // whose initialization or PUT may still be in flight from that worker.
+      await this.recordFailure(job, generation, new Error("Worker execution was abandoned"), "Worker execution was abandoned");
+      return;
+    }
     const workDir = await mkdtemp(join(tmpdir(), "carberk-video-"));
     try {
       const sourceHead = await this.storage.head(generation.source.objectKey);
@@ -105,7 +111,33 @@ export class ListingVideoProcessor {
         const head = await this.storage.head(record.key);
         if (!head || head.sizeBytes !== record.sizeBytes || (record.etag && head.etag && record.etag !== head.etag)) throw new Error(`Processing output missing or changed: ${record.key}`);
       }
-      await this.prisma.videoGeneration.updateMany({ where: { id: job.generationId, processingAttempt: job.attempt, status: "Processing" }, data: { status: "Ready", manifest, durationMs: actualDurationMs, width: validated.width, height: validated.height, videoCodec: validated.videoCodec, audioCodec: validated.audioCodec, processingStartedAt: generation.processingStartedAt ?? new Date(), completedAt: new Date(), lastError: null, failureType: null, nextRetryAt: null } });
+      await this.prisma.$transaction(async (tx) => {
+        const initialSlot = await tx.listingVideo.findUnique({ where: { id: generation.listingVideoId } });
+        if (!initialSlot) return;
+        await tx.$queryRaw`SELECT id FROM users WHERE id = ${initialSlot.ownerId} FOR UPDATE`;
+        // Publishing a Draft takes the same owner lock before transferring its
+        // slot, so resolve the canonical target only after that lock is held.
+        const target = await tx.listingVideo.findUnique({ where: { id: initialSlot.id } });
+        if (!target) return;
+        const owner = await tx.user.findUnique({ where: { id: target.ownerId } });
+        if (!owner || owner.suspendedAt || owner.deletionScheduledAt) throw new Error("Video target is ineligible");
+        if (target.draftId) {
+          await tx.$queryRaw`SELECT id FROM listing_drafts WHERE id = ${target.draftId} FOR UPDATE`;
+          const draft = await tx.listingDraft.findUnique({ where: { id: target.draftId } });
+          if (draft?.userId !== owner.id) throw new Error("Video target is ineligible");
+        } else {
+          await tx.$queryRaw`SELECT id FROM listings WHERE id = ${target.listingId} FOR UPDATE`;
+          const listing = target.listingId ? await tx.listing.findUnique({ where: { id: target.listingId } }) : null;
+          if (!listing || listing.sellerId !== owner.id || listing.deletedAt || listing.status === "banned") throw new Error("Video target is ineligible");
+        }
+        await tx.$queryRaw`SELECT id FROM listing_videos WHERE id = ${generation.listingVideoId} FOR UPDATE`;
+        const slot = await tx.listingVideo.findUnique({ where: { id: generation.listingVideoId } });
+        if (!slot || slot.pendingGenerationId !== job.generationId) return;
+        const ready = await tx.videoGeneration.updateMany({ where: { id: job.generationId, processingAttempt: job.attempt, status: "Processing" }, data: { status: "Ready", manifest, durationMs: actualDurationMs, width: validated.width, height: validated.height, videoCodec: validated.videoCodec, audioCodec: validated.audioCodec, processingStartedAt: generation.processingStartedAt ?? new Date(), completedAt: new Date(), lastError: null, failureType: null, nextRetryAt: null } });
+        if (!ready.count) return;
+        await tx.listingVideo.update({ where: { id: slot.id }, data: { activeGenerationId: job.generationId, pendingGenerationId: null } });
+        if (slot.activeGenerationId) await retireVideoGenerations(tx, slot.id, [slot.activeGenerationId], new Date());
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : "Video processing failed";
       if (!/attempt was revoked/i.test(message)) await this.recordFailure(job, generation, error, message);
@@ -121,14 +153,27 @@ export class ListingVideoProcessor {
   }
 
   private async writeOutput(job: VideoProcessingJob, key: string, body: Buffer, contentType: string, manifest: Record<string, ManifestRecord>, name: string): Promise<void> {
+    // Persist before storage I/O, outside the reservation transaction. A crash
+    // or an uncertain initialization must never erase its cleanup evidence.
+    const reservation = await this.prisma.videoOutputReservation.createMany({ data: { key, sourceId: job.sourceId, generationId: job.generationId, attempt: job.attempt }, skipDuplicates: true });
+    // Duplicate deliveries cannot initialize a key twice or fail its owner.
+    if (!reservation.count) throw new Error("Video processing attempt was revoked (duplicate delivery)");
     const fence = await this.prisma.$transaction(async (tx) => {
       // Retirement/attempt updates acquire this row lock too. Keep it through
       // reservation so revocation cannot commit between authorization and PUT.
       await tx.$queryRaw`SELECT "id" FROM "video_generations" WHERE "id" = ${job.generationId} FOR UPDATE`;
       const active = await tx.videoGeneration.findUnique({ where: { id: job.generationId }, select: { sourceId: true, processingAttempt: true, status: true } });
-      if (!active || active.sourceId !== job.sourceId || active.processingAttempt !== job.attempt || active.status !== "Processing") throw new Error("Video processing attempt was revoked");
-      return this.storage.initialize(key, contentType);
+      if (!active || active.sourceId !== job.sourceId || active.processingAttempt !== job.attempt || active.status !== "Processing") {
+        await tx.videoOutputReservation.update({ where: { key }, data: { settled: true } });
+        return null;
+      }
+      // Keep the issued intent even if initialize or the transaction fails.
+      await this.prisma.videoOutputReservation.update({ where: { key }, data: { started: true } });
+      const reserved = await this.storage.initialize(key, contentType);
+      await tx.videoOutputReservation.update({ where: { key }, data: { settled: true } });
+      return reserved;
     }, { timeout: 35_000 });
+    if (!fence) throw new Error("Video processing attempt was revoked");
     await this.assertAttemptActive(job); await this.storage.put(key, body, contentType, fence);
     const head = await this.storage.head(key); if (!head || head.sizeBytes !== body.byteLength) throw new Error(`Processing output missing or changed: ${key}`);
     manifest[name] = { key, sizeBytes: body.byteLength, etag: head.etag };

@@ -94,7 +94,9 @@ import {
         const bucket = config.get("LISTING_VIDEO_BUCKET_NAME", { infer: true }) || "listing-videos";
         const accessKeyId = config.get("LISTING_VIDEO_BUCKET_ACCESS_KEY_ID", { infer: true }) || config.get("MINIO_ACCESS_KEY", { infer: true });
         const secretAccessKey = config.get("LISTING_VIDEO_BUCKET_SECRET_ACCESS_KEY", { infer: true }) || config.get("MINIO_SECRET_KEY", { infer: true });
-        return new S3VideoProcessingStorage(new S3Client({ endpoint, region: config.get("LISTING_VIDEO_BUCKET_REGION", { infer: true }) || config.get("MINIO_REGION", { infer: true }), credentials: { accessKeyId, secretAccessKey }, forcePathStyle: true }), bucket);
+        // Initialization is issued exactly once. Retrying If-None-Match after
+        // cleanup could recreate its deleted reservation.
+        return new S3VideoProcessingStorage(new S3Client({ endpoint, region: config.get("LISTING_VIDEO_BUCKET_REGION", { infer: true }) || config.get("MINIO_REGION", { infer: true }), credentials: { accessKeyId, secretAccessKey }, forcePathStyle: true, maxAttempts: 1 }), bucket);
       },
     },
     NotificationFanoutProcessor,

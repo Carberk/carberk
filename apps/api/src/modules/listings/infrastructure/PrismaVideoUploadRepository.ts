@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService, Prisma } from "@auto-tm/db";
+import { PrismaService, Prisma, retireVideoGenerations } from "@auto-tm/db";
 
 import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
 import type {
@@ -49,6 +49,7 @@ function toSession(slot: SlotRow, source: SourceRow, generation: GenerationRow):
       partCount: source.partCount,
       state: source.state as VideoSource["state"],
       openIdempotencyKey: source.openIdempotencyKey,
+      openingDraftId: source.openingDraftId,
       coverOffsetMs: source.coverOffsetMs,
       expiresAt: source.expiresAt,
       completionStartedAt: source.completionStartedAt,
@@ -88,7 +89,16 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
 
   /** Takes the source row lock; callers must not hold it across storage I/O. */
   private async lockSource(tx: Tx, sourceId: string): Promise<void> {
-    await tx.$queryRaw`SELECT "id" FROM "video_sources" WHERE "id" = ${sourceId} FOR UPDATE`;
+    const source = await tx.videoSource.findUnique({ where: { id: sourceId } });
+    if (!source) return;
+    // The owner lock also serializes Draft -> Listing adoption.
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${source.userId} FOR UPDATE`;
+    // Owner -> target -> slot -> source -> generation is the lifecycle order.
+    const slot = await tx.listingVideo.findUnique({ where: { id: source.listingVideoId } });
+    if (slot?.draftId) await tx.$queryRaw`SELECT id FROM listing_drafts WHERE id = ${slot.draftId} FOR UPDATE`;
+    if (slot?.listingId) await tx.$queryRaw`SELECT id FROM listings WHERE id = ${slot.listingId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM listing_videos WHERE id = ${source.listingVideoId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM video_sources WHERE id = ${sourceId} FOR UPDATE`;
   }
 
   private async assertEligibleTarget(tx: Tx, ownerId: string, target: { type: "draft" | "listing"; id: string }): Promise<void> {
@@ -125,9 +135,10 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
         if (replayed) {
           const session = await this.loadSession(tx, replayed.id);
           if (!session) throw new Error("Video session rows are incomplete");
+          const openingTarget = replayed.openingDraftId ? { type: "draft", id: replayed.openingDraftId } : session.slot.target;
           const same =
-            session.slot.target.type === input.target.type &&
-            session.slot.target.id === input.target.id &&
+            openingTarget.type === input.target.type &&
+            openingTarget.id === input.target.id &&
             replayed.contentType === input.contentType &&
             replayed.sizeBytes === input.sizeBytes &&
             replayed.coverOffsetMs === input.coverOffsetMs;
@@ -144,6 +155,10 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
             : { listingId: input.target.id }),
         },
       });
+      if (slot) {
+        await tx.$queryRaw`SELECT id FROM listing_videos WHERE id = ${slot.id} FOR UPDATE`;
+        slot = await tx.listingVideo.findUniqueOrThrow({ where: { id: slot.id } });
+      }
       if (slot?.pendingGenerationId) {
         const pending = await tx.videoGeneration.findUnique({
           where: { id: slot.pendingGenerationId },
@@ -151,6 +166,7 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
         if (pending && (pending.status === "Uploading" || pending.status === "Processing")) {
           throw conflict("Target already has a pending video");
         }
+        if (pending) await retireVideoGenerations(tx, slot.id, [pending.id], input.now);
       }
       if (!slot) {
         slot = await tx.listingVideo.create({
@@ -178,6 +194,7 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
           partCount: input.partCount,
           state: "OPEN",
           openIdempotencyKey: input.openIdempotencyKey,
+          openingDraftId: input.target.type === "draft" ? input.target.id : null,
           coverOffsetMs: input.coverOffsetMs,
           expiresAt: input.expiresAt,
         },
@@ -239,6 +256,7 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       await this.lockSource(tx, sessionId);
       const session = await this.loadSession(tx, sessionId);
       if (!session) throw new DomainError(LISTING_ERROR_CODES.VIDEO_UPLOAD_NOT_AVAILABLE, "Video upload is not available");
+      if (session.generation.status === "Retired" || session.slot.pendingGenerationId !== session.generation.id) throw conflict("Video was removed");
       if (session.source.state === "COMPLETED") return { session, claimed: false };
       if (session.source.state === "CANCELLED") throw conflict("Upload was cancelled");
       if (session.source.state === "EXPIRED" || (session.source.state === "OPEN" && session.source.expiresAt <= now)) {
@@ -263,6 +281,7 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       if (!current) throw new DomainError(LISTING_ERROR_CODES.VIDEO_UPLOAD_NOT_AVAILABLE, "Video upload is not available");
       if (current.source.state === "COMPLETED") return current;
       if (current.source.state !== "COMPLETING") throw conflict("Upload is terminal");
+      if (current.generation.status === "Retired" || current.slot.pendingGenerationId !== current.generation.id) throw conflict("Video was removed");
       await this.assertEligibleTarget(tx, current.source.userId, current.slot.target);
       const source = await tx.videoSource.update({
         where: { id: sessionId }, data: { state: "COMPLETED", completedAt: now },
@@ -286,6 +305,8 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       if (session.generation.failureType === "SOURCE_MISSING" || session.generation.failureType === "SOURCE_INVALID") {
         throw conflict("This uploaded source cannot be reprocessed; choose another video");
       }
+      if (session.slot.pendingGenerationId !== session.generation.id) throw conflict("Video was removed");
+      await this.assertEligibleTarget(tx, session.source.userId, session.slot.target);
       const attempt = session.generation.processingAttempt + 1;
       const generation = await tx.videoGeneration.update({
         where: { id: session.generation.id },
@@ -305,36 +326,15 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
           "Video upload is not available",
         );
       }
-      if (session.source.state === "CANCELLED") return session;
-      if (session.source.state === "COMPLETED") throw conflict("Upload already completed");
+      if (session.generation.status === "Retired") return session;
+      if (session.slot.pendingGenerationId !== session.generation.id) throw conflict("Video is no longer pending");
+      if (session.source.state === "COMPLETED" && session.slot.activeGenerationId === null) throw conflict("Upload already completed");
       if (session.source.state === "COMPLETING") throw conflict("Completion is in progress");
-      if (session.source.state === "EXPIRED") {
-        throw new DomainError(LISTING_ERROR_CODES.VIDEO_UPLOAD_EXPIRED, "Upload expired");
-      }
-      const source = await tx.videoSource.update({
-        where: { id: sessionId },
-        data: { state: "CANCELLED" },
-      });
-      const generation = await tx.videoGeneration.update({
-        where: { sourceId: sessionId },
-        data: { status: "Retired" },
-      });
-      const slot = await tx.listingVideo.update({
-        where: { id: source.listingVideoId },
-        data: { pendingGenerationId: null },
-      });
-      await tx.videoUploadCleanup.upsert({
-        where: { sourceId: sessionId },
-        create: {
-          sourceId: sessionId,
-          objectKey: source.objectKey,
-          multipartUploadId: source.multipartUploadId,
-          status: "PENDING",
-          nextAttemptAt: now,
-        },
-        update: { status: "PENDING", nextAttemptAt: now },
-      });
-      return toSession(slot, source, generation);
+      if (session.source.state === "EXPIRED") throw new DomainError(LISTING_ERROR_CODES.VIDEO_UPLOAD_EXPIRED, "Upload expired");
+      await retireVideoGenerations(tx, session.slot.id, [session.generation.id], now);
+      const retired = await this.loadSession(tx, sessionId);
+      if (!retired) throw conflict("Video was removed");
+      return retired;
     });
   }
 
@@ -348,38 +348,14 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
           "Video upload is not available",
         );
       }
-      if (
-        session.source.state === "COMPLETED" ||
-        session.source.state === "COMPLETING" ||
-        session.source.state === "CANCELLED" ||
-        session.source.state === "EXPIRED"
-      ) {
+      if (session.source.state === "COMPLETED" || session.source.state === "COMPLETING" || session.source.state === "CANCELLED" || session.source.state === "EXPIRED") {
         return session;
       }
-      const source = await tx.videoSource.update({
-        where: { id: sessionId },
-        data: { state: "EXPIRED" },
-      });
-      const generation = await tx.videoGeneration.update({
-        where: { sourceId: sessionId },
-        data: { status: "Retired" },
-      });
-      const slot = await tx.listingVideo.update({
-        where: { id: source.listingVideoId },
-        data: { pendingGenerationId: null },
-      });
-      await tx.videoUploadCleanup.upsert({
-        where: { sourceId: sessionId },
-        create: {
-          sourceId: sessionId,
-          objectKey: source.objectKey,
-          multipartUploadId: source.multipartUploadId,
-          status: "PENDING",
-          nextAttemptAt: now,
-        },
-        update: { status: "PENDING", nextAttemptAt: now },
-      });
-      return toSession(slot, source, generation);
+      await retireVideoGenerations(tx, session.slot.id, [session.generation.id], now);
+      await tx.videoSource.update({ where: { id: sessionId }, data: { state: "EXPIRED" } });
+      const expired = await this.loadSession(tx, sessionId);
+      if (!expired) throw conflict("Video was removed");
+      return expired;
     });
   }
 
@@ -415,6 +391,7 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       partCount: source.partCount,
       state: source.state as VideoSource["state"],
       openIdempotencyKey: source.openIdempotencyKey,
+      openingDraftId: source.openingDraftId,
       coverOffsetMs: source.coverOffsetMs,
       expiresAt: source.expiresAt,
       completionStartedAt: source.completionStartedAt,
@@ -425,17 +402,56 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
   }
 
   async recordCleanup(work: VideoCleanup, now: Date): Promise<void> {
+    const data = {
+      sourceId: work.sourceId,
+      objectKey: work.objectKey,
+      multipartUploadId: work.multipartUploadId,
+      ...(work.objectPrefix !== undefined ? { objectPrefix: work.objectPrefix } : {}),
+      ...(work.bucket !== undefined ? { bucket: work.bucket } : {}),
+      ...(work.sizeBytes !== undefined ? { sizeBytes: work.sizeBytes } : {}),
+      ...(work.completionPending !== undefined ? { completionPending: work.completionPending } : {}),
+    };
     await this.prisma.videoUploadCleanup.upsert({
       where: { sourceId: work.sourceId },
-      create: { ...work, status: "PENDING", nextAttemptAt: now },
+      create: { ...data, status: "PENDING", nextAttemptAt: now },
       update: {},
     });
   }
 
   async listPendingCleanup(now: Date, limit: number) {
-    return this.prisma.videoUploadCleanup.findMany({
+    const rows = await this.prisma.videoUploadCleanup.findMany({
       where: { status: "PENDING", nextAttemptAt: { lte: now } },
       orderBy: { nextAttemptAt: "asc" }, take: limit,
+    });
+    const claimed = [];
+    for (const row of rows) {
+      const claim = await this.prisma.videoUploadCleanup.updateMany({ where: { sourceId: row.sourceId, status: "PENDING", nextAttemptAt: { lte: now } }, data: { attempts: { increment: 1 }, nextAttemptAt: new Date(now.getTime() + 600_000) } });
+      if (claim.count) claimed.push({ ...row, objectPrefix: row.objectPrefix ?? undefined, bucket: row.bucket ?? undefined, sizeBytes: row.sizeBytes ?? undefined });
+    }
+    return claimed;
+  }
+
+  async unsettledOutputs(sourceId: string): Promise<{ key: string; started: boolean }[]> {
+    return this.prisma.videoOutputReservation.findMany({ where: { sourceId, settled: false }, select: { key: true, started: true } });
+  }
+
+  async settleOutput(key: string): Promise<void> {
+    await this.prisma.videoOutputReservation.update({ where: { key }, data: { settled: true } });
+  }
+
+  async settleCleanupCompletion(sourceId: string): Promise<void> {
+    await this.prisma.videoUploadCleanup.update({ where: { sourceId }, data: { completionPending: false } });
+  }
+
+  async removeVideo(ownerId: string, target: { type: "draft" | "listing"; id: string }, now: Date): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${ownerId} FOR UPDATE`;
+      await this.assertEligibleTarget(tx, ownerId, target);
+      const slot = await tx.listingVideo.findFirst({ where: { ownerId, ...(target.type === "draft" ? { draftId: target.id } : { listingId: target.id }) } });
+      if (!slot) return;
+      await tx.$queryRaw`SELECT id FROM listing_videos WHERE id = ${slot.id} FOR UPDATE`;
+      const current = await tx.listingVideo.findUniqueOrThrow({ where: { id: slot.id } });
+      await retireVideoGenerations(tx, current.id, [current.activeGenerationId, current.pendingGenerationId].filter((id): id is string => id !== null), now);
     });
   }
 
@@ -462,10 +478,4 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
     });
   }
 
-  async hasPendingCleanup(sourceId: string): Promise<boolean> {
-    const row = await this.prisma.videoUploadCleanup.findFirst({
-      where: { sourceId, status: "PENDING" },
-    });
-    return row !== null;
-  }
 }

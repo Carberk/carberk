@@ -31,6 +31,11 @@ import {
 import { MEDIA_OBJECT_INSPECTOR } from "../domain/ports/MediaObjectInspector";
 import { IMAGE_VARIANT_GENERATOR } from "../domain/ports/ImageVariantGenerator";
 import { LISTING_EVENT_PUBLISHER } from "../domain/ports/ListingEventPublisher";
+import { PrismaVideoUploadRepository } from "../infrastructure/PrismaVideoUploadRepository";
+import { PrismaListingDraftRepository } from "../infrastructure/PrismaListingDraftRepository";
+import { PrismaListingRepository } from "../infrastructure/PrismaListingRepository";
+import { VideoUploadSessions } from "../application/VideoUploadSessions";
+import { FakeVideoStorage } from "../application/testing/InMemoryVideoWorld";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 
 const suite = defineE2eSuite("listings-controller");
@@ -301,6 +306,31 @@ describe("ListingsController e2e", () => {
         where: { action: "listing.published", targetId: res.body.id },
       });
       expect(audit).not.toBeNull();
+    });
+
+    it("transfers an unfinished Draft video to the Listing and preserves it when publication fails", async () => {
+      await seedCatalog();
+      const token = await createUser("user-1");
+      const draft = await seedDraft("user-1", { ...validPayload, description: "" });
+      const videos = new PrismaVideoUploadRepository(prisma);
+      const sessions = new VideoUploadSessions(videos, new FakeVideoStorage(), { canUploadVideo: () => true, canResumeVideo: () => true }, new PrismaListingDraftRepository(prisma), new PrismaListingRepository(prisma));
+      const opening = { userId: suite.id("user-1"), target: { type: "draft" as const, id: draft.id }, contentType: "video/mp4", sizeBytes: 1024, coverOffsetMs: 500, idempotencyKey: suite.id("video-open") };
+      const opened = await sessions.open(opening);
+      const sourceId = opened.sessionId;
+      const original = (await videos.findSession(sourceId))!;
+      const expiresAt = new Date(opened.expiresAt);
+      await request.post(`/api/v1/listings/drafts/${draft.id}/publish`).set("Authorization", `Bearer ${token}`).send({}).expect(400);
+      expect((await videos.findSession(sourceId))?.slot.target).toEqual({ type: "draft", id: draft.id });
+      await prisma.listingDraft.update({ where: { id: draft.id }, data: { payload: { ...draft.payload as object, description: "Great car" } } });
+      const result = await request.post(`/api/v1/listings/drafts/${draft.id}/publish`).set("Authorization", `Bearer ${token}`).send({}).expect(201);
+      expect(await videos.findSession(sourceId)).toMatchObject({
+        slot: { id: original.slot.id, target: { type: "listing", id: result.body.id }, pendingGenerationId: opened.generationId },
+        source: { id: sourceId, objectKey: `video-sources/${sourceId}/source.mp4`, multipartUploadId: original.source.multipartUploadId, expiresAt, state: "OPEN" },
+        generation: { id: opened.generationId, status: "Uploading" },
+      });
+      expect(await sessions.open(opening)).toMatchObject({ sessionId: sourceId, generationId: opened.generationId, target: { type: "listing", id: result.body.id }, expiresAt: opened.expiresAt });
+      await expect(sessions.open({ ...opening, sizeBytes: 2048 })).rejects.toThrow("Idempotency key was reused");
+      expect(await prisma.videoUploadCleanup.findUnique({ where: { sourceId } })).toBeNull();
     });
 
     it("publishes a New car without a Damaged answer as not damaged (ADR-0080)", async () => {

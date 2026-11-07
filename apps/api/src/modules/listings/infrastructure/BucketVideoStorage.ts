@@ -2,6 +2,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   AbortMultipartUploadCommand,
+  GetBucketVersioningCommand,
+  ListObjectsV2Command,
   CompleteMultipartUploadCommand,
   CreateBucketCommand,
   CreateMultipartUploadCommand,
@@ -187,6 +189,24 @@ export class BucketVideoStorage implements VideoStoragePort {
       }
       throw err;
     }
+  }
+
+  async assertUnversioned(): Promise<void> {
+    const versioning = await this.s3.send(new GetBucketVersioningCommand({ Bucket: this.bucket }), { abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    if (versioning.Status) throw new Error("Video cleanup requires unversioned storage");
+  }
+
+  async listObjects(prefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    let token: string | undefined;
+    do {
+      const page = await this.s3.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }), { abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      keys.push(...(page.Contents ?? []).flatMap((entry) => entry.Key ? [entry.Key] : []));
+      if (keys.length > 10_000) throw new Error("Too many video cleanup objects");
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+      if (page.IsTruncated && !token) throw new Error("Incomplete video object list");
+    } while (token);
+    return keys;
   }
 
   async deleteObject(key: string): Promise<void> {

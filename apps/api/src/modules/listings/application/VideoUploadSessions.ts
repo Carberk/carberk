@@ -284,24 +284,18 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     await this.assertCurrentEligibility(input.userId, session);
     const now = await this.now();
     if (session.source.state === "CANCELLED") {
-      if (await this.repo.hasPendingCleanup(session.source.id)) await this.cleanupSession(session);
+      await this.retryCleanup();
       return { sessionId: session.source.id, generationId: session.generation.id, state: "CANCELLED" };
     }
-    if (session.source.state === "COMPLETED") {
-      throw new ConflictException({
-        code: LISTING_ERROR_CODES.VIDEO_UPLOAD_CONFLICT,
-        message: "A completed video cannot be cancelled",
-      });
-    }
-    if (session.source.state === "EXPIRED") {
-      throw new BadRequestException({
-        code: LISTING_ERROR_CODES.VIDEO_UPLOAD_EXPIRED,
-        message: "Video upload expired",
-      });
-    }
     const claimed = await this.repo.claimCancellation(session.source.id, now).catch((e) => rethrowDomain(e));
-    await this.cleanupSession(claimed);
+    await this.retryCleanup();
     return { sessionId: claimed.source.id, generationId: claimed.generation.id, state: "CANCELLED" };
+  }
+
+  async remove(input: { userId: string; target: VideoUploadTarget }): Promise<{ state: "REMOVED" }> {
+    if (!this.access.canResumeVideo(input.userId)) throw notAvailable();
+    await this.repo.removeVideo(input.userId, input.target, await this.now()).catch(rethrowDomain);
+    return { state: "REMOVED" };
   }
 
   async reprocess(input: { userId: string; sessionId: string }): Promise<VideoUploadView> {
@@ -392,9 +386,10 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
 
   private assertReplayMatches(session: VideoSession, input: OpenVideoUploadInput): void {
     const s = session.source;
+    const openingTarget = s.openingDraftId ? { type: "draft", id: s.openingDraftId } : session.slot.target;
     const same =
-      session.slot.target.type === input.target.type &&
-      session.slot.target.id === input.target.id &&
+      openingTarget.type === input.target.type &&
+      openingTarget.id === input.target.id &&
       s.contentType === input.contentType &&
       s.sizeBytes === input.sizeBytes &&
       s.coverOffsetMs === input.coverOffsetMs;
@@ -408,14 +403,35 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
 
   private async cleanupSession(session: VideoSession): Promise<void> {
     if (session.source.state !== "CANCELLED" && session.source.state !== "EXPIRED") return;
-    await this.cleanup({ sourceId: session.source.id, objectKey: session.source.objectKey, multipartUploadId: session.source.multipartUploadId });
+    // The persisted ledger retains uncertainty from the pre-retirement state.
+    await this.retryCleanup();
   }
 
   private async cleanup(work: VideoCleanup): Promise<void> {
     const { objectKey, multipartUploadId, sourceId } = work;
     try {
       const current = await this.repo.findSession(sourceId);
-      if (current && current.source.state !== "CANCELLED" && current.source.state !== "EXPIRED") return;
+      if (current && current.generation.status !== "Retired") return;
+      if (work.bucket && work.bucket !== this.storage.bucket) throw new Error("Video cleanup bucket mismatch");
+      await this.storage.assertUnversioned();
+      let initializationPending = false;
+      for (const output of await this.repo.unsettledOutputs(sourceId)) {
+        if (output.started && !(await this.storage.headObject(output.key))) initializationPending = true;
+        else await this.repo.settleOutput(output.key);
+      }
+      if (work.completionPending && multipartUploadId) {
+        // Settle the same multipart id before deleting its source. A later
+        // repeated completion of that consumed id cannot recreate the object.
+        if (!(await this.storage.headObject(objectKey))) {
+          try {
+            const parts = await this.storage.listParts({ key: objectKey, uploadId: multipartUploadId });
+            await this.storage.completeMultipart({ key: objectKey, uploadId: multipartUploadId, parts });
+          } catch (err) { if (!isNoSuchUpload(err)) throw err; }
+        }
+        const completed = await this.storage.headObject(objectKey);
+        if (!completed || completed.sizeBytes !== work.sizeBytes) throw new Error("Video completion remains uncertain");
+        await this.repo.settleCleanupCompletion(sourceId);
+      }
       if (multipartUploadId) {
         await this.storage.abortMultipart({ key: objectKey, uploadId: multipartUploadId }).catch((err) => {
           if (!isNoSuchUpload(err)) throw err;
@@ -427,8 +443,20 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
           if (!isNoSuchUpload(err)) throw err;
         }
       }
+      if (work.objectPrefix) {
+        const expected = `video-sources/${sourceId}/`;
+        if (work.objectPrefix !== expected || objectKey !== `${expected}source.mp4`) throw new Error("Invalid video cleanup ownership");
+        for (const key of await this.storage.listObjects(expected)) {
+          await this.storage.deleteObject(key);
+          if (await this.storage.headObject(key)) throw new Error("Video output remains after cleanup");
+        }
+        if ((await this.storage.listObjects(expected)).length) throw new Error("Video outputs remain after cleanup");
+      }
       if (await this.storage.headObject(objectKey)) await this.storage.deleteObject(objectKey);
       if (await this.storage.headObject(objectKey)) throw new Error("Video source still present after cleanup");
+      // Remove known bytes now, but retain work for an uncertain PUT that may
+      // arrive later. A pre-I/O crash (started=false) needs no such wait.
+      if (initializationPending) throw new Error("Video output initialization remains uncertain");
       await this.repo.markCleanupDone(sourceId, await this.now());
     } catch (err) {
       await this.repo.markCleanupFailed(sourceId, err instanceof Error ? err.name : "cleanup failed", await this.now()).catch(() => undefined);

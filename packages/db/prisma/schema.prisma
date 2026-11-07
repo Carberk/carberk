@@ -590,6 +590,8 @@ model VideoSource {
   /// OPEN, COMPLETING, COMPLETED, CANCELLED or EXPIRED.
   state               String       @default("OPEN")
   openIdempotencyKey  String?
+  /// Original Draft identity survives adoption by a Listing for Open replays.
+  openingDraftId      String?
   coverOffsetMs       Int
   expiresAt           DateTime
   completionStartedAt DateTime?
@@ -646,6 +648,13 @@ model VideoUploadCleanup {
   sourceId          String    @id
   objectKey         String
   multipartUploadId String?
+  /// Exact source and processing objects owned by this retired generation.
+  /// The prefix lets the worker remove partial attempt objects that never
+  /// reached a Ready manifest.
+  objectPrefix      String?
+  bucket            String?
+  sizeBytes         Int?
+  completionPending Boolean   @default(false)
   status            String    @default("PENDING")
   attempts          Int       @default(0)
   nextAttemptAt     DateTime  @default(now())
@@ -949,4 +958,16 @@ model InspectionInterest {
   @@index([listingId, createdAt])
   @@index([requesterUserId, createdAt])
   @@map("inspection_interests")
+}
+
+/// One durable initialization intent per output key; no request is reissued.
+model VideoOutputReservation {
+  key          String @id
+  sourceId     String
+  generationId String
+  attempt      Int
+  started      Boolean @default(false)
+  settled      Boolean @default(false)
+  @@index([sourceId])
+  @@map("video_output_reservations")
 }

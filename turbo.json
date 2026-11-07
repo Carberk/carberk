@@ -67,7 +67,7 @@
     },
     "@auto-tm/api#test": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/admin/src/lib/**", "$TURBO_ROOT$/apps/admin/package.json"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/admin/src/lib/**", "$TURBO_ROOT$/apps/admin/package.json", "$TURBO_ROOT$/apps/worker/src/video/**", "$TURBO_ROOT$/apps/worker/src/jobs/PurgeExpiredAccounts.ts"],
       "outputs": []
     },
     "@auto-tm/api#test:unit": {

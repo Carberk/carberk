@@ -11,10 +11,10 @@ export class VideoTranscodeProcessor extends WorkerHost {
 
   constructor(@Optional() @Inject(ListingVideoProcessor) private readonly processor?: ListingVideoProcessor) { super(); }
 
-  async process(job?: { data: VideoProcessingJob }): Promise<void> {
+  async process(job?: { data: VideoProcessingJob; attemptsStarted?: number }): Promise<void> {
     try {
       if (!this.processor || !job) throw new UnrecoverableError("video-transcode is not implemented; no work was performed");
-      await this.processor.process(job.data);
+      await this.processor.process(job.data, job.attemptsStarted);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Video processing failed";
       this.logger.error(message);
