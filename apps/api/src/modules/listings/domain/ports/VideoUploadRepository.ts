@@ -57,6 +57,8 @@ export interface VideoUploadRepository {
   markCleanupDone(sourceId: string, now: Date): Promise<void>;
   markCleanupFailed(sourceId: string, error: string, now: Date): Promise<void>;
   hasPendingCleanup(sourceId: string): Promise<boolean>;
+  /** Failed -> Processing with a new fenced output namespace, retaining source bytes. */
+  claimProcessingRetry(sessionId: string, now: Date): Promise<{ sourceId: string; generationId: string; attempt: number }>;
 }
 
 export const VIDEO_UPLOAD_REPOSITORY = Symbol("VideoUploadRepository");

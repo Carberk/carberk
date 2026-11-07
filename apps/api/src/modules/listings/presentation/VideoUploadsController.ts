@@ -95,4 +95,12 @@ export class VideoUploadsController {
     await this.assertNotSuspended(userId);
     return this.sessions.cancel({ userId, sessionId });
   }
+
+  @Post(":sessionId/reprocess")
+  @SkipThrottle()
+  async reprocess(@Param("sessionId") sessionId: string, @Req() req: FastifyRequest) {
+    const userId = this.userId(req);
+    await this.assertNotSuspended(userId);
+    return this.sessions.reprocess({ userId, sessionId });
+  }
 }

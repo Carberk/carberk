@@ -28,6 +28,11 @@ const BaseSchema = z.object({
   MINIO_SECRET_KEY: z.string().min(1),
   /** Same default as the API. Retired upload cleanup signs its storage requests with it. */
   MINIO_REGION: z.string().default("us-east-1"),
+  LISTING_VIDEO_BUCKET_ENDPOINT: z.string().default(""),
+  LISTING_VIDEO_BUCKET_NAME: z.string().default(""),
+  LISTING_VIDEO_BUCKET_ACCESS_KEY_ID: z.string().default(""),
+  LISTING_VIDEO_BUCKET_SECRET_ACCESS_KEY: z.string().default(""),
+  LISTING_VIDEO_BUCKET_REGION: z.string().default("auto"),
 
   PUSH_TRANSPORT: z
     .enum(["test", "fcm", "fcm-apns", "ntfy"])

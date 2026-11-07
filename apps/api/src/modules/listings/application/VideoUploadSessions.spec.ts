@@ -293,4 +293,46 @@ describe("VideoUploadSessions", () => {
       world.sessions.complete({ userId: OWNER, sessionId: opened.sessionId }),
     ).rejects.toMatchObject({ response: { code: "VIDEO_UPLOAD_EXPIRED" } });
   });
+
+  it("reprocesses a failed stored source without opening another upload", async () => {
+    const opened = await world.sessions.open(openInput);
+    await uploadAll(opened.sessionId);
+    await world.sessions.complete({ userId: OWNER, sessionId: opened.sessionId });
+    const session = await world.repo.findSession(opened.sessionId);
+    session!.generation.status = "Failed";
+    session!.generation.lastError = "decode failed";
+    const retried = await world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId });
+    expect(retried.state).toBe("PROCESSING");
+    expect(retried.sessionId).toBe(opened.sessionId);
+    expect(world.repo.sessions.size).toBe(1);
+  });
+
+  it("rejects Try again for a permanent missing or invalid source", async () => {
+    const opened = await world.sessions.open(openInput);
+    await uploadAll(opened.sessionId);
+    await world.sessions.complete({ userId: OWNER, sessionId: opened.sessionId });
+    const session = await world.repo.findSession(opened.sessionId);
+    session!.generation.status = "Failed";
+    session!.generation.failureType = "SOURCE_MISSING";
+    await expect(world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId })).rejects.toMatchObject({ response: { code: "VIDEO_UPLOAD_CONFLICT" } });
+    session!.generation.failureType = "SOURCE_INVALID";
+    await expect(world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId })).rejects.toMatchObject({ response: { code: "VIDEO_UPLOAD_CONFLICT" } });
+  });
+
+  it("lets the seller retry after automatic retries are exhausted and fences concurrent Try again", async () => {
+    const opened = await world.sessions.open(openInput);
+    await uploadAll(opened.sessionId);
+    await world.sessions.complete({ userId: OWNER, sessionId: opened.sessionId });
+    const session = await world.repo.findSession(opened.sessionId);
+    session!.generation.status = "Failed";
+    session!.generation.processingAttempt = 3;
+    session!.generation.processingRetryCount = 2;
+    session!.generation.failureType = "TRANSIENT";
+    const retried = await world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId });
+    expect(retried.state).toBe("PROCESSING");
+    expect(retried.sessionId).toBe(opened.sessionId);
+    expect(session!.generation.processingAttempt).toBe(4);
+    expect(session!.generation.processingRetryCount).toBe(0);
+    await expect(world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId })).rejects.toMatchObject({ response: { code: "VIDEO_UPLOAD_CONFLICT" } });
+  });
 });

@@ -4,11 +4,13 @@ import { randomUUID } from "node:crypto";
 
 import { PrismaService } from "@auto-tm/db";
 import { VideoUploadsSchemas } from "@auto-tm/contracts";
+import { getQueueToken } from "@nestjs/bullmq";
 import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
+import { Queue } from "bullmq";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import supertest from "supertest";
 
@@ -44,6 +46,7 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
   let request: ReturnType<typeof supertest>;
   let prisma: PrismaService;
   let storage: BucketVideoStorage;
+  let queue: Queue;
   let uploadsEnabled = true;
   let testerIds = [owner, other];
   let beforeComplete: (() => Promise<void>) | undefined;
@@ -67,6 +70,7 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
       controllers: [VideoUploadsController],
       providers: [
         PrismaService, VideoUploadSessions,
+        { provide: getQueueToken("video-transcode"), useValue: queue },
         { provide: ConfigService, useValue: new ConfigService(env) },
         { provide: VIDEO_STORAGE_PORT, useClass: ControlledStorage },
         { provide: VIDEO_UPLOAD_REPOSITORY, useClass: PrismaVideoUploadRepository },
@@ -90,12 +94,17 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
   }
 
   beforeAll(async () => {
+    const redisUrl = process.env["REDIS_URL"];
+    if (!redisUrl) throw new Error("Video handoff integration tests require REDIS_URL");
+    queue = new Queue("video-transcode", { connection: { url: redisUrl }, prefix: `test-video-upload-${randomUUID()}` });
     await start();
     await seedSuiteCatalog(prisma, suite);
     for (const id of [owner, other, foreign]) await prisma.user.create({ data: { id } });
   });
 
   afterAll(async () => {
+    await queue.obliterate({ force: true });
+    await queue.close();
     // Exact keys returned by our own persisted sessions only. No bucket sweep.
     for (const source of sources.values()) {
       await storage.abortMultipart({ key: source.objectKey, uploadId: source.multipartUploadId });
@@ -216,6 +225,25 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
     await expect(storage.listParts({ key: source.objectKey, uploadId: source.multipartUploadId })).rejects.toMatchObject({ name: "NoSuchUpload" });
     const responses = await concurrentOpens(target.id, [randomUUID(), randomUUID()]);
     expect(responses.map((res) => res.status).sort()).toEqual([201, 409]);
+  });
+
+  it("reprocesses the same stored source after automatic exhaustion and serializes concurrent Try again", async () => {
+    const target = await draft();
+    const opened = await open(target.id);
+    for (const part of opened.body.parts) await put(part);
+    await request.post(`${path(opened.body.sessionId)}/complete`).set(auth()).expect(201);
+    expect((await queue.getJob(`${opened.body.generationId}-1`))?.data).toEqual({ sourceId: opened.body.sessionId, generationId: opened.body.generationId, attempt: 1 });
+    // The worker owns failure/exhaustion; the API owns the seller's retry.
+    await prisma.videoGeneration.update({ where: { id: opened.body.generationId }, data: { status: "Failed", processingAttempt: 3, processingRetryCount: 2, failureType: "TRANSIENT" } });
+    const responses = await Promise.all([1, 2].map(() => request.post(`${path(opened.body.sessionId)}/reprocess`).set(auth())));
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const conflict = responses.find((response) => response.status === 409);
+    expect(conflict?.body.code).toBe("VIDEO_UPLOAD_CONFLICT");
+    const session = await app.get<PrismaVideoUploadRepository>(VIDEO_UPLOAD_REPOSITORY).findSession(opened.body.sessionId);
+    expect(session?.generation).toMatchObject({ status: "Processing", processingAttempt: 4, processingRetryCount: 0 });
+    expect(session?.source.id).toBe(opened.body.sessionId);
+    expect((await queue.getJob(`${opened.body.generationId}-4`))?.data).toEqual({ sourceId: opened.body.sessionId, generationId: opened.body.generationId, attempt: 4 });
+    expect(await storage.headObject(sources.get(opened.body.sessionId)!.objectKey)).toMatchObject({ sizeBytes: 6291456 });
   });
 
   it("a cancelled video leaves the existing Draft discard path usable", async () => {

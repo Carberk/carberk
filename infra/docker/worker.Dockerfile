@@ -57,7 +57,7 @@ FROM base AS runtime
 # boot logs identify the exact revision even when Railway rebuilds it.
 ARG RAILWAY_GIT_COMMIT_SHA=unknown
 ENV AUTOTM_COMMIT_SHA=${RAILWAY_GIT_COMMIT_SHA}
-RUN apt-get update && apt-get install -y --no-install-recommends curl openssl postgresql-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl ffmpeg openssl postgresql-client && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r auto-tm && useradd -r -g auto-tm -s /bin/false auto-tm && chown auto-tm:auto-tm /app
 COPY --from=build --chown=auto-tm:auto-tm /app/node_modules /app/node_modules
 COPY --from=build --chown=auto-tm:auto-tm /app/apps/worker/node_modules /app/apps/worker/node_modules
