@@ -1,10 +1,10 @@
 import { http, HttpResponse } from "msw";
-import { server } from "../../../test/msw";
 import { useState } from "react";
 import { Pressable, Text } from "react-native";
 import { expect, it, vi } from "vitest";
 import type { VideoUploadsSchemas } from "@auto-tm/contracts";
 
+import { server } from "../../../test/msw";
 import { OwnerListingCard } from "../components/OwnerListingCard";
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import type { ListingVideoNativeModule, PreparedVideoFile } from "../../../modules/listing-video/src/prepare";
