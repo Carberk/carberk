@@ -54,7 +54,7 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
     if (attempt !== operation.current || result.error) return;
     setHidden(null); setUncertain(false); setActionFailed(false);
   };
-  const change = async (action: "remove" | "cancel" | "reprocess", chooseAfter = false) => {
+  const change = async (action: "remove" | "cancel" | "reprocess") => {
     if (busy.current) return;
     if (!target) { onClearSelection?.(); task.prep.remove(); await task.upload.clear(); return; }
     busy.current = true; setWorking(true);
@@ -73,7 +73,6 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
       status.queryClient.setQueryData(status.queryKey, action === "remove" ? {} : action === "cancel" ? { video: active } : { video: active, pendingVideo: { ...pending, status: "processing", canReprocess: false } });
       setHidden(null); setUncertain(false); setActionFailed(false);
       void status.queryClient.invalidateQueries({ queryKey: queryKeys.listings.all() });
-      if (chooseAfter) onChoose();
     } catch { if (attempt === operation.current) { if (action === "reprocess") setActionFailed(true); else setUncertain(true); } }
     finally { busy.current = false; setWorking(false); }
   };
@@ -96,7 +95,8 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
         <Text className="text-footnote text-muted-foreground">{t("listingVideoProcessFailedBody")}</Text>
       </View>
       {pending.canReprocess && <Button variant="secondary" onPress={() => void change("reprocess")} disabled={working}><Text>{t("listingVideoTryAgain")}</Text></Button>}
-      <Button variant="outline" onPress={() => void change(active ? "cancel" : "remove", true)} disabled={working}><Text>{t("listingVideoChooseAnother")}</Text></Button>
+      {/* Open retires the Failed source atomically after a new clip is accepted and prepared. */}
+      <Button variant="outline" onPress={onChoose} disabled={working}><Text>{t("listingVideoChooseAnother")}</Text></Button>
       <Button variant="outline" onPress={active ? removePending : () => setConfirm(true)} disabled={working}><Text>{t(active ? "listingVideoCancelReplacement" : "listingVideoRemove")}</Text></Button>
     </View>}
     {pending?.status === "uploading" && !hasLocal && <View className="gap-2">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import { MoreHorizontal } from "lucide-react-native";
@@ -60,7 +60,13 @@ export function OwnerListingCard({
 }: OwnerListingCardProps) {
   const task = useExistingListingVideoTask({ type: "listing", id: listing.id });
   const { isVideoUploadTester } = useListingVideoAccess(true);
-  const status = useTargetVideo({ type: "listing", id: listing.id }, isVideoUploadTester && listing.status !== Enums.ListingStatus.Banned);
+  const canReadVideo = isVideoUploadTester && listing.status !== Enums.ListingStatus.Banned;
+  const status = useTargetVideo({ type: "listing", id: listing.id }, canReadVideo);
+  const { refetch } = status;
+  const phase = task?.upload.state.phase;
+  const sessionId = task?.upload.state.sessionId;
+  // The first read may precede Open when publication happens during preparation.
+  useEffect(() => { if (canReadVideo) void refetch(); }, [canReadVideo, phase, sessionId, refetch]);
   const { video, pendingVideo } = (isVideoUploadTester ? status.data : undefined) ?? listing;
   const videoStatus = localVideoStatus(task, video, pendingVideo);
   const { t, i18n } = useTranslation();

@@ -1,10 +1,12 @@
 import { http, HttpResponse } from "msw";
 import { useState } from "react";
 import { Pressable, Text } from "react-native";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import { environmentManager, focusManager } from "@tanstack/react-query";
 import type { VideoUploadsSchemas } from "@auto-tm/contracts";
 
 import { server } from "../../../test/msw";
+import { storeAuthSession, clearAuthSession } from "../../auth/session";
 import { OwnerListingCard } from "../components/OwnerListingCard";
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import type { ListingVideoNativeModule, PreparedVideoFile } from "../../../modules/listing-video/src/prepare";
@@ -16,7 +18,22 @@ import { InMemoryVideoUploadPersistence } from "./application/testing/InMemoryVi
 const draft = { type: "draft" as const, id: "11111111-1111-4111-8111-111111111111" };
 const listing = { type: "listing" as const, id: "22222222-2222-4222-8222-222222222222" };
 
-it("keeps preparation alive through Review and publish, then opens against the canonical Listing", async () => {
+vi.mock("expo-secure-store", () => {
+  const values = new Map<string, string>();
+  return {
+    getItemAsync: async (key: string) => values.get(key) ?? null,
+    setItemAsync: async (key: string, value: string) => { values.set(key, value); },
+    deleteItemAsync: async (key: string) => { values.delete(key); },
+  };
+});
+const wasServer = environmentManager.isServer();
+afterEach(async () => { await clearAuthSession(); environmentManager.setIsServer(() => wasServer); focusManager.setFocused(undefined); });
+
+it.each(["ready", "failed"] as const)("keeps preparation through publication and discovers %s on My listings after an initially empty target", async (outcome) => {
+  environmentManager.setIsServer(() => false);
+  focusManager.setFocused(true);
+  const user = { id: draft.id, phone: null, email: "owner@example.com", displayName: null, role: "seller" as const };
+  await storeAuthSession({ accessToken: "test-access", refreshToken: "test-refresh", user });
   let finish!: (file: PreparedVideoFile) => void;
   const prepared = new Promise<PreparedVideoFile>((resolve) => { finish = resolve; });
   const native: ListingVideoNativeModule = {
@@ -27,7 +44,17 @@ it("keeps preparation alive through Review and publish, then opens against the c
     target, sessionId: "33333333-3333-4333-8333-333333333333", generationId: "44444444-4444-4444-8444-444444444444", state: "PROCESSING", partSizeBytes: 5242880, parts: [], confirmedParts: [], expiresAt: "2030-01-01T00:00:00.000Z",
   });
   const openedTargets: VideoUploadsSchemas.VideoUploadTarget[] = [];
+  let workerFinished = false;
+  let emptyReads = 0;
   server.use(
+    http.get("*/me", () => HttpResponse.json({ ...user, phoneVerified: false, nameNumber: 1234, avatarIndex: 0, avatarKey: null, avatarUrl: null, locale: "en", createdAt: "2026-11-01T00:00:00.000Z", deletionScheduledAt: null, isVideoUploadTester: true, canUploadVideo: true })),
+    http.get("*/listings/video-uploads/target/listing/:id", () => {
+      if (!openedTargets.length) { emptyReads++; return HttpResponse.json({}); }
+      const { generationId, sessionId } = session(listing);
+      return HttpResponse.json(workerFinished && outcome === "ready"
+        ? { video: { id: listing.id, generationId, galleryIndex: 1, durationMs: 4000, qualities: [240], cover: { thumbnail: "cover:thumbnail", list: "cover:list", detail: "cover:detail", fullscreen: "cover:fullscreen" } } }
+        : { pendingVideo: { id: listing.id, generationId, sessionId, sourceId: sessionId, status: workerFinished ? "failed" : "processing", canReprocess: workerFinished } });
+    }),
     http.post("*/listings/video-uploads", async ({ request }) => {
       const input = await request.json() as VideoUploadsSchemas.OpenVideoUploadRequest;
       openedTargets.push(input.target);
@@ -62,8 +89,13 @@ it("keeps preparation alive through Review and publish, then opens against the c
   expect(screen.getByText("owner")).toBeTruthy();
   expect(screen.getByText("Video · Preparing")).toBeTruthy();
   expect(native.cancel).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(emptyReads).toBeGreaterThan(0));
   await act(async () => { finish({ uri: "file:///prepared.mp4", durationS: 4, sizeBytes: 1000, width: 1280, height: 720, fps: 30, hasAudio: true }); await prepared; });
   expect(await screen.findByText("processing")).toBeTruthy();
   expect(openedTargets).toEqual([listing]);
   expect(native.prepare).toHaveBeenCalledOnce();
+  await screen.findByText("Video · Processing");
+  workerFinished = true;
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 3300)); });
+  expect(await screen.findByText(outcome === "ready" ? "Video · Ready" : "Video · Needs attention")).toBeTruthy();
 });

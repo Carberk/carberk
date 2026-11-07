@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import * as ImagePicker from "expo-image-picker";
 import { expect, it, vi } from "vitest";
 
 import { server } from "../../../test/msw";
@@ -9,6 +10,11 @@ import { ListingVideoCard } from "./ListingVideoCard";
 vi.mock("expo-file-system/legacy", () => ({
   documentDirectory: "file:///documents/", getInfoAsync: async () => ({ exists: true }),
   deleteAsync: async () => {}, copyAsync: async () => {}, makeDirectoryAsync: async () => {},
+}));
+vi.mock("expo-image-picker", () => ({
+  getMediaLibraryPermissionsAsync: vi.fn(async () => ({ granted: true })),
+  requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ granted: true })),
+  launchImageLibraryAsync: vi.fn(async () => ({ canceled: true, assets: null })),
 }));
 const id = "11111111-1111-4111-8111-111111111111";
 const pending = { id, generationId: "22222222-2222-4222-8222-222222222222", sourceId: "33333333-3333-4333-8333-333333333333", sessionId: "33333333-3333-4333-8333-333333333333", status: "processing", canReprocess: false };
@@ -105,4 +111,33 @@ it("fences a status response started before Remove so it cannot restore the vide
   expect(await screen.findByRole("button", { name: "Choose from library" })).toBeTruthy();
   await act(async () => { release(); await refreshing; });
   expect(screen.queryByText("Buyers see this video")).toBeNull();
+});
+
+
+it.each(["paused", "dismissed", "editor-cancelled"] as const)("preserves the failed source and Try again when Choose another is %s", async (reason) => {
+  let retired = false;
+  let reprocessed = false;
+  vi.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue(reason === "editor-cancelled"
+    ? { canceled: false, assets: [{ uri: "file:///replacement.mp4", width: 1280, height: 720, duration: 6000 }] }
+    : { canceled: true, assets: null });
+  server.use(
+    http.get("*/listings/video-uploads/target/draft/:id", () => HttpResponse.json(retired ? {} : { pendingVideo: { ...pending, status: reprocessed ? "processing" : "failed", canReprocess: !reprocessed } })),
+    http.post("*/listings/video-uploads/remove", () => { retired = true; return HttpResponse.json({ state: "REMOVED" }); }),
+    http.post(`*/listings/video-uploads/${pending.sessionId}/reprocess`, () => {
+      reprocessed = true;
+      return HttpResponse.json({ sessionId: pending.sessionId, generationId: pending.generationId, target: { type: "draft", id }, state: "PROCESSING", partSizeBytes: 5242880, confirmedParts: [], parts: [], expiresAt: "2030-01-01T00:00:00.000Z" });
+    }),
+  );
+  const screen = await renderMobile(<ListingVideoCard isVideoUploadTester canUploadVideo={reason !== "paused"} videoUploadTarget={{ type: "draft", id }} />);
+  await screen.findByText("We couldn’t process this video");
+  await fireEvent.press(screen.getByRole("button", { name: "Choose another" }));
+  if (reason === "editor-cancelled") {
+    await screen.findByRole("button", { name: "Use video" });
+    await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+  }
+  expect(retired).toBe(false);
+  expect(await screen.findByText("We couldn’t process this video")).toBeTruthy();
+  await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+  expect(await screen.findByText("Processing video…")).toBeTruthy();
+  expect(reprocessed).toBe(true);
 });
