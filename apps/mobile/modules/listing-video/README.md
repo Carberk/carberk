@@ -9,15 +9,16 @@ not called by any screen yet.
 
 ## Interface
 
-`prepare(source, startS, endS, coverS, onProgress?) -> { done, cancel }`
+`prepare(source, startS, endS, coverS, onProgress?, sourceDurationS?) -> { done, cancel }`
 in [src/index.ts](src/index.ts). `done` resolves to
 `PreparedVideoFile` (`uri, durationS, sizeBytes, width, height, fps,
 hasAudio`) or rejects with `ListingVideoError` whose `code` is one of
 `invalid-interval | invalid-cover | invalid-source |
 source-unreadable | unsupported-source | insufficient-storage |
 cancelled | export-failed | output-too-large |
-unsupported-platform`. Intervals are 3–90 s; the cover must sit inside
-the interval. Native output is written to `prepared.partial.mp4` and
+unsupported-platform`. Intervals are 3–90 s, except that a source shorter
+than 3 seconds may be prepared as its complete interval; the cover must sit
+inside the interval. Native output is written to `prepared.partial.mp4` and
 promoted to `prepared.mp4` only after `validateOutput` reopens it, so
 a half-written file never reaches a caller. Each job uses an exclusive
 native UUID directory; internal source copies are removed when export ends,

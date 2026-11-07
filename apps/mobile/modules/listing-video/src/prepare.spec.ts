@@ -42,6 +42,16 @@ describe("validateInterval", () => {
     }
   });
 
+  it("accepts a positive whole-source interval shorter than 3s", () => {
+    expect(() => validateInterval(0, 1.8, 0.225, 1.8)).not.toThrow();
+  });
+
+  it("keeps the 3s minimum for a short trim from a longer source", () => {
+    expect(() => validateInterval(0, 2.9, 0.5, 3.01)).toThrowError(
+      expect.objectContaining({ code: "invalid-interval" }),
+    );
+  });
+
   it("rejects a cover outside the kept interval", () => {
     expect(() => validateInterval(5, 15, 4.9)).toThrowError(
       expect.objectContaining({ code: "invalid-cover" }),

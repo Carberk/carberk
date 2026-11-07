@@ -50,6 +50,7 @@ export function prepare(
   endS: number,
   coverS: number,
   onProgress?: (progress: PrepareProgress) => void,
+  sourceDurationS?: number,
 ): PrepareHandle {
-  return prepareListingVideo(loadListingVideoNative(), source, startS, endS, coverS, onProgress);
+  return prepareListingVideo(loadListingVideoNative(), source, startS, endS, coverS, onProgress, sourceDurationS);
 }
