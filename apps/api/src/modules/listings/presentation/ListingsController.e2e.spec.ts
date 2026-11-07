@@ -92,6 +92,7 @@ describe("ListingsController e2e", () => {
   afterAll(async () => {
     // Card-field fixtures reference suite-owned transmission / engine type
     // rows, so drop the suite's listings first, then those lookup rows.
+    await prisma.listingVideo.deleteMany({ where: { ownerId: { in: SUITE_USERS.map((alias) => suite.id(alias)) } } });
     await cleanSuiteFixtures(prisma, suite, {
       userAliases: SUITE_USERS,
       exchangeRatePairs: [{ from: "USD", to: "TMT" }],
@@ -105,6 +106,7 @@ describe("ListingsController e2e", () => {
     // Only this suite owns the USD→TMT pair; the EXCHANGE_RATE_MISSING test
     // depends on its absence at test start. TMT→TMT is shared with other
     // suites — seeded via upsert, never deleted (see e2eSuite helper).
+    await prisma.listingVideo.deleteMany({ where: { ownerId: { in: SUITE_USERS.map((alias) => suite.id(alias)) } } });
     await cleanSuiteFixtures(prisma, suite, {
       userAliases: SUITE_USERS,
       exchangeRatePairs: [{ from: "USD", to: "TMT" }],
@@ -167,6 +169,87 @@ describe("ListingsController e2e", () => {
       knownIssuesText: "Small scratch",
     },
   };
+
+  describe("Listing video read projections", () => {
+    async function videoFixture() {
+      const token = await createUser("user-1");
+      await seedCatalog();
+      const draft = await seedDraft("user-1", validPayload);
+      const published = await request.post(`/api/v1/listings/drafts/${draft.id}/publish`).set("Authorization", `Bearer ${token}`).send({}).expect(201);
+      const listingId = published.body.id as string;
+      const slot = await prisma.listingVideo.create({ data: { ownerId: suite.id("user-1"), listingId } });
+      const source = await prisma.videoSource.create({ data: {
+        userId: suite.id("user-1"), listingVideoId: slot.id, bucket: "private", objectKey: `video-sources/${slot.id}/source.mp4`, multipartUploadId: slot.id,
+        contentType: "video/mp4", sizeBytes: 1000, partSizeBytes: 5242880, partCount: 1, state: "COMPLETED", coverOffsetMs: 0, expiresAt: new Date("2030-01-01"),
+      } });
+      const member = (key: string) => ({ key: `private/${key}`, sizeBytes: 100, etag: null });
+      const manifest = { master: member("master"), "cover:thumbnail": member("thumbnail"), "cover:list": member("list"), "cover:detail": member("detail"), "cover:fullscreen": member("fullscreen"), "playlist:240": member("240.m3u8"), "segment:240:240-000.ts": member("240-000.ts"), "playlist:360": member("360.m3u8"), "segment:360:360-000.ts": member("360-000.ts") };
+      const generation = await prisma.videoGeneration.create({ data: { listingVideoId: slot.id, sourceId: source.id, status: "Ready", coverOffsetMs: 0, durationMs: 8500, manifest } });
+      await prisma.listingVideo.update({ where: { id: slot.id }, data: { activeGenerationId: generation.id } });
+      return { token, listingId, slot, source, generation };
+    }
+
+    async function reads(token: string, listingId: string) {
+      await request.post(`/api/v1/listings/${listingId}/favorite`).set("Authorization", `Bearer ${token}`).send({}).expect(201);
+      const detail = await request.get(`/api/v1/listings/${listingId}`).expect(200);
+      const feed = await request.get("/api/v1/listings").expect(200);
+      const favorites = await request.get("/api/v1/favorites").set("Authorization", `Bearer ${token}`).expect(200);
+      const owner = await request.get("/api/v1/me/listings").set("Authorization", `Bearer ${token}`).expect(200);
+      return [detail.body, feed.body.items.find((item: { id: string }) => item.id === listingId), favorites.body.items.find((item: { id: string }) => item.id === listingId), owner.body.items.find((item: { id: string }) => item.id === listingId)];
+    }
+
+    it("returns active Ready manifest metadata on detail, Results, Favorites and owner without changing photos", async () => {
+      const { token, listingId, slot, generation } = await videoFixture();
+      const results = await reads(token, listingId);
+      for (const result of results) {
+        expect(result.video).toEqual({ id: slot.id, generationId: generation.id, galleryIndex: 1, durationMs: 8500, qualities: [240, 360], cover: { thumbnail: "cover:thumbnail", list: "cover:list", detail: "cover:detail", fullscreen: "cover:fullscreen" } });
+        expect(result.pendingVideo).toBeUndefined();
+        expect(JSON.stringify(result)).not.toContain("private/");
+      }
+      expect(results[0].media.map((item: { kind: string }) => item.kind)).toEqual(["image", "image", "image"]);
+      expect(results[1].photoKeys[0]).toBe(results[1].coverMediaKey);
+      expect(results[1].galleryKeys).toHaveLength(3);
+    });
+
+    it.each(["Uploading", "Processing", "Failed", "Retired"])("omits active %s and legacy video rows from every read", async (status) => {
+      const { token, listingId, generation } = await videoFixture();
+      await prisma.videoGeneration.update({ where: { id: generation.id }, data: { status } });
+      await prisma.listingMedia.create({ data: { listingId, kind: "video", key: "legacy.mp4", sortOrder: -1 } });
+      for (const result of await reads(token, listingId)) {
+        expect(result.video).toBeUndefined();
+        expect(JSON.stringify(result)).not.toContain("legacy.mp4");
+      }
+    });
+
+    it("never publishes pending Ready or incomplete manifest generations", async () => {
+      const { token, listingId, slot, generation } = await videoFixture();
+      await prisma.listingVideo.update({ where: { id: slot.id }, data: { activeGenerationId: null, pendingGenerationId: generation.id } });
+      for (const result of await reads(token, listingId)) expect(result.video).toBeUndefined();
+      await prisma.listingVideo.update({ where: { id: slot.id }, data: { activeGenerationId: generation.id, pendingGenerationId: null } });
+      await prisma.videoGeneration.update({ where: { id: generation.id }, data: { manifest: { master: { key: "guessed", sizeBytes: 100 } } } });
+      for (const result of await reads(token, listingId)) expect(result.video).toBeUndefined();
+    });
+
+    it.each([
+      ["Uploading", "OPEN", null, false, "uploading"],
+      ["Processing", "COMPLETED", "TRANSIENT", false, "processing"],
+      ["Failed", "COMPLETED", "TRANSIENT", true, "failed"],
+      ["Failed", "COMPLETED", "SOURCE_MISSING", false, "failed"],
+      ["Failed", "COMPLETED", "SOURCE_INVALID", false, "failed"],
+    ] as const)("returns owner-only %s / %s / %s alongside the active video", async (status, sourceState, failureType, canReprocess, projectedStatus) => {
+      const { token, listingId, slot, generation } = await videoFixture();
+      const source = await prisma.videoSource.create({ data: { userId: suite.id("user-1"), listingVideoId: slot.id, bucket: "private", objectKey: `pending/${slot.id}/source.mp4`, multipartUploadId: `pending-${slot.id}`, contentType: "video/mp4", sizeBytes: 1000, partSizeBytes: 5242880, partCount: 1, state: sourceState, coverOffsetMs: 0, expiresAt: new Date("2030-01-01") } });
+      const pending = await prisma.videoGeneration.create({ data: { listingVideoId: slot.id, sourceId: source.id, status, failureType, coverOffsetMs: 0 } });
+      await prisma.listingVideo.update({ where: { id: slot.id }, data: { pendingGenerationId: pending.id } });
+      const results = await reads(token, listingId);
+      for (const result of results) expect(result.video.generationId).toBe(generation.id);
+      for (const result of results.slice(0, 3)) expect(result.pendingVideo).toBeUndefined();
+      const expected = { id: slot.id, generationId: pending.id, sourceId: source.id, status: projectedStatus, ...(failureType ? { failureType } : {}), canReprocess };
+      expect(results[3].pendingVideo).toEqual(expected);
+      const ownerDetail = await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);
+      expect(ownerDetail.body.pendingVideo).toEqual(expected);
+    });
+  });
 
   describe("POST /api/v1/listings/drafts/:id/publish", () => {
     it("returns 401 without bearer token", async () => {
@@ -1128,8 +1211,8 @@ describe("ListingsController e2e", () => {
         expect(small).toBeGreaterThan(0);
         expect(large).toBe(small);
         // listings + cover media include + card photos + exchange rates +
-        // favorites + card sellers.
-        expect(large).toBeLessThanOrEqual(6);
+        // favorites + card sellers + generation-scoped video projections.
+        expect(large).toBeLessThanOrEqual(7);
       } finally {
         querySpy.mockRestore();
       }

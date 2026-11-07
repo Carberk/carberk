@@ -1,6 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import { ListingsSchemas } from "@auto-tm/contracts";
+import {
+  LISTING_VIDEO_READ_PORT,
+  type ListingVideoReadPort,
+} from "../domain/ports/ListingVideoReadPort";
 import type { z } from "zod";
 
 import {
@@ -25,6 +29,8 @@ export class ListMyListings {
   constructor(
     @Inject(LISTING_CARD_READ_PORT)
     private readonly cards: ListingCardReadPort,
+    @Inject(LISTING_VIDEO_READ_PORT)
+    private readonly videos: ListingVideoReadPort,
   ) {}
 
   async execute(input: ListMyListingsInput): Promise<MyListingsResponseDto> {
@@ -39,9 +45,12 @@ export class ListMyListings {
       limit,
     });
 
+    const videoById = await this.videos.getForListings(result.items.map((item) => item.id), input.userId);
+
     return {
       items: result.items.map((item) => ({
         id: item.id,
+        ...videoById.get(item.id),
         sellerId: item.sellerId,
         status: item.status,
         brandId: item.brandId,

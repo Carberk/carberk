@@ -1,6 +1,10 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 
 import { ErrorCode, ListingsSchemas } from "@auto-tm/contracts";
+import {
+  LISTING_VIDEO_READ_PORT,
+  type ListingVideoReadPort,
+} from "../domain/ports/ListingVideoReadPort";
 import type { z } from "zod";
 
 import {
@@ -65,6 +69,8 @@ export class ListFeed {
     private readonly cards: ListingCardReadPort,
     @Inject(SELLER_PROFILE_PORT)
     private readonly sellerProfiles: SellerProfilePort,
+    @Inject(LISTING_VIDEO_READ_PORT)
+    private readonly videos: ListingVideoReadPort,
   ) {}
 
   async execute(input: ListFeedInput): Promise<FeedResponseDto> {
@@ -95,6 +101,7 @@ export class ListFeed {
         : undefined,
     ]);
     const noPhotos = toCardPhotos([]);
+    const videoById = await this.videos.getForListings(listingIds);
 
     const items = rankResult.items.map((listing) => {
       const photos = photosById.get(listing.id) ?? noPhotos;
@@ -107,6 +114,7 @@ export class ListFeed {
 
       return {
         id: listing.id,
+        ...videoById.get(listing.id),
         sellerId: listing.sellerId,
         status: listing.status,
         brandId: listing.brandId,

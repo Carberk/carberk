@@ -1,3 +1,4 @@
+import { FakeListingVideoReadPort } from "./testing/FakeListingVideoReadPort";
 import { describe, it, expect, beforeEach } from "vitest";
 import { GetListingDetail } from "./GetListingDetail";
 import { Listing } from "../domain/Listing";
@@ -165,6 +166,7 @@ function makeUseCase(
     favorites ?? new FakeFavoriteRepository(),
     vinDecoder ?? new FakeVinDecoder(),
     sellerProfiles ?? seededSellerProfiles(),
+    new FakeListingVideoReadPort(),
   );
 }
 

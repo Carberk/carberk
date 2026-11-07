@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { FakeListingVideoReadPort } from "./testing/FakeListingVideoReadPort";
 import type { CardPhotos } from "../domain/CardPhotos";
 import { ListMyListings } from "./ListMyListings";
 import type { ListingCard, ListingCardReadPort } from "../domain/ports/ListingCardReadPort";
@@ -31,7 +32,7 @@ class FakeListingCardReadPort implements ListingCardReadPort {
 }
 
 function makeUseCase(port?: FakeListingCardReadPort) {
-  return new ListMyListings(port ?? new FakeListingCardReadPort());
+  return new ListMyListings(port ?? new FakeListingCardReadPort(), new FakeListingVideoReadPort());
 }
 
 describe("ListMyListings", () => {
@@ -85,7 +86,7 @@ describe("ListMyListings", () => {
       allowCalls: false,
     });
 
-    const uc = new ListMyListings(port);
+    const uc = new ListMyListings(port, new FakeListingVideoReadPort());
     const [item] = (await uc.execute({ userId: "user-1" })).items;
 
     expect(item).toMatchObject({
