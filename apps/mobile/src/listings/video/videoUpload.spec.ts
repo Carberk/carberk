@@ -147,6 +147,48 @@ describe("VideoUploadController", () => {
     expect(run.instance.state.phase).toBe("processing");
   });
 
+  it("reopens the session and finishes when connection returns after opening failed", async () => {
+    const run = controller();
+    vi.mocked(run.api.open).mockRejectedValueOnce(new Error("network offline"));
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([
+      { partNumber: 1, sizeBytes: PART_SIZE },
+      { partNumber: 2, sizeBytes: 2_000_000 },
+    ], "PROCESSING"));
+
+    await run.instance.start();
+    expect(run.instance.state.phase).toBe("paused");
+    expect(run.instance.state.pauseReason).toBe("network");
+    run.instance.setNetworkAvailable(true);
+
+    await vi.waitFor(() => expect(run.instance.state.phase).toBe("processing"));
+    expect(run.instance.state.confirmedBytes).toBe(7_242_880);
+  });
+
+  it("continues after a quick pause while the previous status request is still pending", async () => {
+    const run = controller();
+    const entered = deferred<boolean>();
+    const initialStatus = deferred<VideoUploadStatusResponse>();
+    vi.mocked(run.api.status)
+      .mockImplementationOnce(() => {
+        entered.resolve(true);
+        return initialStatus.promise;
+      })
+      .mockResolvedValue(statusResponse([
+        { partNumber: 1, sizeBytes: PART_SIZE },
+        { partNumber: 2, sizeBytes: 2_000_000 },
+      ], "PROCESSING"));
+
+    const running = run.instance.start();
+    await entered.promise;
+    await run.instance.pause();
+    const resumed = run.instance.resume();
+    initialStatus.resolve(statusResponse([]));
+    await Promise.all([running, resumed]);
+
+    await vi.waitFor(() => expect(run.instance.state.phase).toBe("processing"));
+    expect(run.instance.state.confirmedBytes).toBe(7_242_880);
+  });
+
   it("renews an expired part URL without uploading a confirmed part again", async () => {
     const run = controller();
     vi.mocked(run.api.status)

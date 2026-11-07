@@ -326,6 +326,10 @@ export class VideoUploadController {
       this.setState({ phase: "paused", pauseReason: "background", failure: undefined });
       return;
     }
+    if (!this.snapshot.sessionId) {
+      await this.start();
+      return;
+    }
     this.setState({ phase: "uploading", pauseReason: undefined, failure: undefined });
     this.startLoop();
     await this.runPromise;
@@ -406,6 +410,9 @@ export class VideoUploadController {
     const op = this.operationId;
     this.runPromise = this.run(op).finally(() => {
       this.running = false;
+      // A quick Continue may arrive before the fenced request finishes.
+      // Hand off to the current operation once the old loop has stopped.
+      if (op !== this.operationId && this.snapshot.phase === "uploading") this.startLoop();
     });
   }
 
