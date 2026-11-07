@@ -468,3 +468,75 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
+
+it("keeps an uploading session and manual pause when publication changes its target", async () => {
+  const { instance, persistence, api } = controller({ storageKey: "listing-video:draft:draft-1" });
+  await instance.openSession();
+  await instance.pause();
+  await instance.adopt({ type: "listing", id: "published-1" });
+  expect(instance.state).toMatchObject({ target: { type: "listing", id: "published-1" }, phase: "paused", pauseReason: "user", sessionId: "session-1" });
+  const reopened = new VideoUploadController({ target: { type: "listing", id: "published-1" }, storageKey: "listing-video:listing:published-1", localUri: "", sizeBytes: 0, coverOffsetMs: 0, persistence, api });
+  await reopened.restore();
+  expect(reopened.state).toMatchObject({ phase: "paused", pauseReason: "user", sessionId: "session-1", target: { type: "listing", id: "published-1" } });
+  instance.dispose(); reopened.dispose();
+});
+
+
+it("keeps the canonical Listing identity when an older Draft status arrives after publish", async () => {
+  const run = controller();
+  const late = deferred<VideoUploadStatusResponse>();
+  await run.instance.openSession();
+  vi.mocked(run.api.status).mockReturnValueOnce(late.promise);
+  const checking = run.instance.checkStatus();
+  const listing = { type: "listing" as const, id: "listing-1" };
+  await run.instance.adopt(listing);
+  late.resolve(statusResponse([]));
+  await checking;
+  expect(run.instance.state.target).toEqual(listing);
+  vi.mocked(run.api.status).mockResolvedValue({ ...statusResponse([]), target: listing });
+  await run.instance.checkStatus();
+  expect(run.instance.state.target).toEqual(listing);
+});
+
+it("waits for an in-flight Open before local removal and fences its late progress", async () => {
+  const run = controller();
+  const opening = deferred<OpenVideoUploadResponse>();
+  vi.mocked(run.api.open).mockReturnValue(opening.promise);
+  const starting = run.instance.start();
+  await vi.waitFor(() => expect(run.api.open).toHaveBeenCalled());
+  const clearing = run.instance.clear();
+  opening.resolve(openResponse());
+  await Promise.all([starting, clearing]);
+  expect(run.instance.state.phase).toBe("idle");
+  expect(run.instance.state.sessionId).toBeUndefined();
+  expect(run.api.status).not.toHaveBeenCalled();
+  expect(run.transport.put).not.toHaveBeenCalled();
+  expect(await run.persistence.get("listing-video:draft-1")).toBeNull();
+});
+
+
+it("recovers a published session's canonical target from status after reopening", async () => {
+  const run = controller({ storageKey: "listing-video:draft:draft-1" });
+  await run.instance.openSession();
+  await run.instance.pause();
+  const listing = { type: "listing" as const, id: "listing-1" };
+  vi.mocked(run.api.status).mockResolvedValue({ ...statusResponse([]), target: listing });
+  await run.instance.checkStatus();
+  expect(run.instance.state.target).toEqual(listing);
+  expect(await run.persistence.get("listing-video:draft:draft-1")).toBeNull();
+  expect(JSON.parse((await run.persistence.get("listing-video:listing:listing-1")) ?? "null").target).toEqual(listing);
+});
+
+it("replays a lost Open with its original Draft metadata after publish", async () => {
+  const run = controller();
+  const listing = { type: "listing" as const, id: "listing-1" };
+  vi.mocked(run.api.open).mockRejectedValueOnce(new Error("network response lost"))
+    .mockResolvedValue({ ...openResponse(), target: listing });
+  vi.mocked(run.api.status).mockResolvedValue({ ...statusResponse([], "PROCESSING"), target: listing });
+  await run.instance.start();
+  const first = vi.mocked(run.api.open).mock.calls[0];
+  await run.instance.adopt(listing);
+  await run.instance.resume();
+  expect(vi.mocked(run.api.open).mock.calls[1]).toEqual(first);
+  expect(run.instance.state).toMatchObject({ target: listing, phase: "processing" });
+});

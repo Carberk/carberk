@@ -31,6 +31,9 @@ import { PrismaVideoUploadRepository } from "../infrastructure/PrismaVideoUpload
 import { PrismaListingDraftRepository } from "../infrastructure/PrismaListingDraftRepository";
 import { PrismaListingRepository } from "../infrastructure/PrismaListingRepository";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { GetTargetVideoStatus } from "../application/GetTargetVideoStatus";
+import { LISTING_VIDEO_READ_PORT } from "../domain/ports/ListingVideoReadPort";
+import { PrismaListingVideoReadRepository } from "../infrastructure/PrismaListingVideoReadRepository";
 import { VideoUploadsController } from "./VideoUploadsController";
 
 const enabled = process.env["VIDEO_STORAGE_E2E"] === "1" || process.env["GITHUB_ACTIONS"] === "true";
@@ -69,12 +72,14 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
       imports: [JwtModule.register({ global: true, secret: process.env["JWT_ACCESS_SECRET"] ?? "dev-secret-change-me" })],
       controllers: [VideoUploadsController],
       providers: [
-        PrismaService, VideoUploadSessions,
+        PrismaService, VideoUploadSessions, GetTargetVideoStatus,
+        { provide: LISTING_VIDEO_READ_PORT, useClass: PrismaListingVideoReadRepository },
         { provide: getQueueToken("video-transcode"), useValue: queue },
         { provide: ConfigService, useValue: new ConfigService(env) },
         { provide: VIDEO_STORAGE_PORT, useClass: ControlledStorage },
         { provide: VIDEO_UPLOAD_REPOSITORY, useClass: PrismaVideoUploadRepository },
-        { provide: VIDEO_UPLOAD_ACCESS_PORT, useClass: ConfigVideoUploadAccess },
+        ConfigVideoUploadAccess,
+        { provide: VIDEO_UPLOAD_ACCESS_PORT, useExisting: ConfigVideoUploadAccess },
         { provide: LISTING_DRAFT_REPOSITORY, useClass: PrismaListingDraftRepository },
         { provide: LISTING_REPOSITORY, useClass: PrismaListingRepository },
         { provide: VIDEO_UPLOAD_NOW, useValue: () => now },
@@ -235,13 +240,17 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
     expect((await queue.getJob(`${opened.body.generationId}-1`))?.data).toEqual({ sourceId: opened.body.sessionId, generationId: opened.body.generationId, attempt: 1 });
     // The worker owns failure/exhaustion; the API owns the seller's retry.
     await prisma.videoGeneration.update({ where: { id: opened.body.generationId }, data: { status: "Failed", processingAttempt: 3, processingRetryCount: 2, failureType: "TRANSIENT" } });
-    const responses = await Promise.all([1, 2].map(() => request.post(`${path(opened.body.sessionId)}/reprocess`).set(auth())));
+    const discovered = await request.get(`/api/v1/listings/video-uploads/target/draft/${target.id}`).set(auth()).expect(200);
+    expect(discovered.body.pendingVideo).toMatchObject({ sessionId: opened.body.sessionId, sourceId: opened.body.sessionId, generationId: opened.body.generationId, status: "failed", canReprocess: true });
+    const responses = await Promise.all([1, 2].map(() => request.post(`${path(discovered.body.pendingVideo.sessionId)}/reprocess`).set(auth())));
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     const conflict = responses.find((response) => response.status === 409);
     expect(conflict?.body.code).toBe("VIDEO_UPLOAD_CONFLICT");
     const session = await app.get<PrismaVideoUploadRepository>(VIDEO_UPLOAD_REPOSITORY).findSession(opened.body.sessionId);
     expect(session?.generation).toMatchObject({ status: "Processing", processingAttempt: 4, processingRetryCount: 0 });
     expect(session?.source.id).toBe(opened.body.sessionId);
+    const refreshed = await request.get(`/api/v1/listings/video-uploads/target/draft/${target.id}`).set(auth()).expect(200);
+    expect(refreshed.body.pendingVideo).toMatchObject({ sessionId: opened.body.sessionId, status: "processing", canReprocess: false });
     expect((await queue.getJob(`${opened.body.generationId}-4`))?.data).toEqual({ sourceId: opened.body.sessionId, generationId: opened.body.generationId, attempt: 4 });
     expect(await storage.headObject(sources.get(opened.body.sessionId)!.objectKey)).toMatchObject({ sizeBytes: 6291456 });
   });

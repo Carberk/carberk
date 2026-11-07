@@ -1,3 +1,4 @@
+import type { VideoUploadsSchemas } from "@auto-tm/contracts";
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { Camera, Lock } from "lucide-react-native";
@@ -5,6 +6,7 @@ import { Enums, WizardSchemas } from "@auto-tm/contracts";
 import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { VideoReviewLine } from "../video/VideoReviewLine";
 import { useBrands } from "../../api/catalog/useBrands";
 import { findCityInGroups, useCityGroups } from "../../api/catalog/useCityGroups";
 import { useEngineTypes } from "../../api/catalog/useEngineTypes";
@@ -27,6 +29,7 @@ const DATA_STEPS = WizardSchemas.WIZARD_STEPS.filter((step): step is DataStep =>
 const NO_PHOTOS: StagedPhoto[] = [];
 
 export interface CheckAndPublishProps {
+  videoTarget?: VideoUploadsSchemas.VideoUploadTarget;
   payload: WizardSchemas.WizardDraftPayload;
   validatedSteps: WizardSchemas.WizardStep[];
   /** Opens a step from Check; Done on that step returns here. */
@@ -312,6 +315,7 @@ export default function CheckAndPublish({
   onChangeStep,
   photos: queuePhotos,
   photosReady = true,
+  videoTarget,
 }: CheckAndPublishProps) {
   const { t, i18n } = useTranslation();
   const photos = photosReady ? queuePhotos : NO_PHOTOS;
@@ -336,6 +340,8 @@ export default function CheckAndPublish({
           />
         ))}
       </View>
+
+      {videoTarget && <VideoReviewLine target={videoTarget} />}
 
       <Text className="pt-1 text-caption leading-normal text-muted-foreground">
         {t("publishRulesPrefix")}

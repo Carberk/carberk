@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import { MoreHorizontal } from "lucide-react-native";
@@ -6,6 +6,10 @@ import { Enums } from "@auto-tm/contracts";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { useExistingListingVideoTask } from "../video/ListingVideoTasks";
+import { useListingVideoAccess } from "../video/useListingVideoAccess";
+import { useTargetVideo } from "../video/useTargetVideo";
+import { VideoStatusLine, localVideoStatus } from "../video/VideoStatusLine";
 import { carTitle } from "../carTitle";
 import { buildVariantUrl } from "../detail/buildVariantUrl";
 
@@ -15,7 +19,7 @@ import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/src/listings/formatPrice";
 
-type ListingSummary = ListingsSchemas.ListingSummary;
+type ListingSummary = ListingsSchemas.ListingSummary & { pendingVideo?: ListingsSchemas.PendingListingVideo };
 
 interface OwnerListingCardProps {
   listing: ListingSummary;
@@ -54,6 +58,17 @@ export function OwnerListingCard({
   onOpen,
   onMore,
 }: OwnerListingCardProps) {
+  const task = useExistingListingVideoTask({ type: "listing", id: listing.id });
+  const { isVideoUploadTester } = useListingVideoAccess(true);
+  const canReadVideo = isVideoUploadTester && listing.status !== Enums.ListingStatus.Banned;
+  const status = useTargetVideo({ type: "listing", id: listing.id }, canReadVideo);
+  const { refetch } = status;
+  const phase = task?.upload.state.phase;
+  const sessionId = task?.upload.state.sessionId;
+  // The first read may precede Open when publication happens during preparation.
+  useEffect(() => { if (canReadVideo) void refetch(); }, [canReadVideo, phase, sessionId, refetch]);
+  const { video, pendingVideo } = (isVideoUploadTester ? status.data : undefined) ?? listing;
+  const videoStatus = localVideoStatus(task, video, pendingVideo);
   const { t, i18n } = useTranslation();
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = listing.coverMediaKey
@@ -114,6 +129,7 @@ export function OwnerListingCard({
             {cityName ?? listing.cityId}
           </Text>
         </View>
+        {(video || pendingVideo || videoStatus) && <VideoStatusLine video={video} pendingVideo={pendingVideo} localStatus={videoStatus} />}
         {isBlocked ? (
           <Text className="text-caption text-muted-foreground">{t("myListingsBlockedNote")}</Text>
         ) : null}

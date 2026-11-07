@@ -456,6 +456,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
             fieldErrors={fieldErrors}
             showErrors={attemptedSteps.photos === true}
             continuesWhileUploading={false}
+            videoUploadTarget={{ type: "listing", id: listingId }}
           />
         )}
         {currentStep === "specs" && (

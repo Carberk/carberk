@@ -16,6 +16,7 @@ import type { z } from "zod";
 import { AdminSchemas, ErrorCode, VideoUploadsSchemas } from "@auto-tm/contracts";
 
 import { IDENTITY_CHECK_PORT, type IdentityCheckPort } from "../../identity/identity.public";
+import { GetTargetVideoStatus } from "../application/GetTargetVideoStatus";
 import { VideoUploadSessions } from "../application/VideoUploadSessions";
 
 type AuthenticatedRequest = FastifyRequest & { user?: { sub?: string } };
@@ -23,6 +24,7 @@ type AuthenticatedRequest = FastifyRequest & { user?: { sub?: string } };
 @Controller("api/v1/listings/video-uploads")
 export class VideoUploadsController {
   constructor(
+    @Inject(GetTargetVideoStatus) private readonly targetStatus: GetTargetVideoStatus,
     @Inject(VideoUploadSessions) private readonly sessions: VideoUploadSessions,
     @Inject(IDENTITY_CHECK_PORT)
     private readonly identityCheck: IdentityCheckPort,
@@ -71,6 +73,14 @@ export class VideoUploadsController {
       coverOffsetMs: parsed.coverOffsetMs,
       ...(idempotencyKey ? { idempotencyKey } : {}),
     });
+  }
+
+  @Get("target/:targetType/:targetId")
+  async target(@Param("targetType") type: string, @Param("targetId") id: string, @Req() req: FastifyRequest) {
+    const parsed = this.parseOrThrow(VideoUploadsSchemas.VideoUploadTargetSchema, { type, id });
+    const userId = this.userId(req);
+    await this.assertNotSuspended(userId);
+    return this.targetStatus.execute(parsed, userId);
   }
 
   @Get(":sessionId")

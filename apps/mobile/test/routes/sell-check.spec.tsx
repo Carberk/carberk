@@ -1,6 +1,8 @@
+import { http, HttpResponse } from "msw";
 import { AccessibilityInfo } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { server } from "../msw";
 import SellScreen from "../../app/(tabs)/sell";
 import { ApiError } from "../../src/api/client";
 import { act, fireEvent, renderMobile, routerMock, within } from "../render";
@@ -131,6 +133,12 @@ async function openCheck() {
 }
 
 beforeEach(() => {
+  server.use(http.get("*/me", () => HttpResponse.json({
+    id: fixture.id, phone: "+99365000000", email: null, phoneVerified: true,
+    displayName: null, nameNumber: 1234, avatarIndex: 0, avatarKey: null, avatarUrl: null,
+    role: "buyer", locale: "en", createdAt: "2026-11-01T00:00:00.000Z", deletionScheduledAt: null,
+    isVideoUploadTester: false, canUploadVideo: false,
+  })));
   fixture.payload = fixture.complete;
   fixture.staged = { [`draft-${id}`]: [`${photoId}.webp`] };
   fixture.stagingRead = null;

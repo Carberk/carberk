@@ -1,3 +1,4 @@
+import { GetTargetVideoStatus } from "./application/GetTargetVideoStatus";
 import { LISTING_VIDEO_READ_PORT } from "./domain/ports/ListingVideoReadPort";
 import { PrismaListingVideoReadRepository } from "./infrastructure/PrismaListingVideoReadRepository";
 import { Module } from "@nestjs/common";
@@ -105,6 +106,7 @@ import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
   imports: [PrismaModule, EventEmitterModule, IdentityModule, BullModule.registerQueue({ name: "video-transcode" })],
   controllers: [ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController],
   providers: [
+    GetTargetVideoStatus,
     { provide: LISTING_VIDEO_READ_PORT, useClass: PrismaListingVideoReadRepository },
     // Infrastructure adapters
     NullVinDecoder,

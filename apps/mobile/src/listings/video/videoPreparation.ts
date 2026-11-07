@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 
@@ -288,5 +288,5 @@ export function useListingVideoPreparation(options: UseListingVideoPreparationOp
   // Navigation must leave resumable files intact; only its terminal outcome cleans them.
   const handoff = useCallback(() => { detachJob(); }, [detachJob]);
 
-  return { state, prepare, prepareAgain, cancel, remove, handoff };
+  return useMemo(() => ({ state, prepare, prepareAgain, cancel, remove, handoff }), [state, prepare, prepareAgain, cancel, remove, handoff]);
 }

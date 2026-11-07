@@ -33,6 +33,7 @@ import { NAV_THEME } from "../lib/theme";
 import { ApiError } from "../src/api/client";
 import { useAuth } from "../src/auth/useAuth";
 import { useGlobalConversationSocket } from "../src/conversations/socket/useGlobalConversationSocket";
+import { ListingVideoTasksProvider } from "../src/listings/video/ListingVideoTasks";
 import { OrphanCleanupOnBoot } from "../src/listings/uploadStaging/OrphanCleanupOnBoot";
 import { usePushTokenSync } from "../src/notifications/usePushTokenSync";
 import { initI18n } from "../src/i18n";
@@ -214,6 +215,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
     <QueryClientProvider client={queryClient}>
       <AppNavigationEffects />
+      <ListingVideoTasksProvider>
       <ThemeProvider value={NAV_THEME[scheme]}>
         <ToastProvider>
           <OrphanCleanupOnBoot />
@@ -243,6 +245,7 @@ export default function RootLayout() {
           <PortalHost />
         </ToastProvider>
       </ThemeProvider>
+      </ListingVideoTasksProvider>
     </QueryClientProvider>
     </GestureHandlerRootView>
     </LaunchEntrance>
