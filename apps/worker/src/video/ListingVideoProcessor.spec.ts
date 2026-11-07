@@ -59,13 +59,6 @@ async function fixture(size = "320x240", hasAudio = false): Promise<{ dir: strin
   return { dir, body: await readFile(path) };
 }
 
-async function smallFixture(): Promise<{ dir: string; body: Buffer }> {
-  const dir = await mkdtemp(join(tmpdir(), "carberk-video-small-fixture-"));
-  const path = join(dir, "source.mp4");
-  await exec("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=160x120:r=25", "-t", "3", "-c:v", "libx264", "-pix_fmt", "yuv420p", path]);
-  return { dir, body: await readFile(path) };
-}
-
 describeFfmpeg("ListingVideoProcessor", () => {
   it("validates actual bytes and only marks Ready after every manifest object exists", async () => {
     const fixtureData = await fixture();
@@ -92,14 +85,15 @@ describeFfmpeg("ListingVideoProcessor", () => {
       const masterObject = storage.objects.get("video-sources/source/processing/1/hls/master.m3u8");
       if (!masterObject) throw new Error("No master playlist was stored");
       const master = masterObject.body.toString();
-      expect(master).toContain("RESOLUTION=136x240");
-      for (const tier of [240, 360, 720]) {
+      expect(master).toContain("RESOLUTION=240x426");
+      for (const [tier, width, height] of [[240, 240, 426], [360, 360, 640], [720, 720, 1280]] as const) {
         const segment = storage.objects.get(`video-sources/source/processing/1/hls/${tier}p/${tier}-000.ts`);
         if (!segment) throw new Error("No rendition segment was stored");
         const segmentPath = join(fixtureData.dir, `${tier}.ts`);
         await writeFile(segmentPath, segment.body);
         const { stdout: probeText } = await exec("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", segmentPath]);
         const stream = JSON.parse(probeText).streams[0] as { width: number; height: number };
+        expect(stream).toEqual({ width, height });
         const { stdout: h264 } = await exec("ffmpeg", ["-v", "error", "-i", segmentPath, "-c:v", "copy", "-an", "-f", "h264", "pipe:1"], { encoding: "buffer" });
         const sps = h264.indexOf(Buffer.from([0, 0, 0, 1, 0x67]));
         expect(sps).toBeGreaterThanOrEqual(0);
@@ -108,6 +102,36 @@ describeFfmpeg("ListingVideoProcessor", () => {
         const variant = lines[lines.findIndex((line) => line.endsWith(`/${tier}p/index.m3u8`)) - 1];
         expect(variant).toContain(`CODECS="avc1.${codec}${hasAudio ? ",mp4a.40.2" : ""}"`);
         expect(variant).toContain(`RESOLUTION=${stream.width}x${stream.height}`);
+      }
+    } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it.each([
+    { size: "1280x720", renditions: [[240, 426, 240], [360, 640, 360], [720, 1280, 720]] },
+    { size: "640x360", renditions: [[240, 426, 240], [360, 640, 360]] },
+    { size: "640x240", renditions: [[240, 640, 240]] },
+    { size: "240x640", renditions: [[240, 240, 640]] },
+  ] as const)("keeps available resolution without advertising unsupported tiers for $size", async ({ size, renditions }) => {
+    const fixtureData = await fixture(size);
+    try {
+      const storage = new MemoryStorage(fixtureData.body);
+      const prisma = prismaFor();
+      prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
+      await new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
+      expect(prisma.row.status).toBe("Ready");
+      const master = storage.objects.get("video-sources/source/processing/1/hls/master.m3u8")?.body.toString();
+      if (!master) throw new Error("No master playlist was stored");
+      expect(master.match(/#EXT-X-STREAM-INF:/g)).toHaveLength(renditions.length);
+      for (const [tier, width, height] of renditions) {
+        const segment = storage.objects.get(`video-sources/source/processing/1/hls/${tier}p/${tier}-000.ts`);
+        if (!segment) throw new Error("No rendition segment was stored");
+        const segmentPath = join(fixtureData.dir, `${tier}.ts`);
+        await writeFile(segmentPath, segment.body);
+        const { stdout } = await exec("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", segmentPath]);
+        expect(JSON.parse(stdout).streams[0]).toEqual({ width, height });
+        const lines = master.split("\n");
+        const variant = lines[lines.findIndex((line) => line.endsWith(`/${tier}p/index.m3u8`)) - 1];
+        expect(variant).toContain(`RESOLUTION=${width}x${height}`);
       }
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
   }, 30_000);
@@ -135,7 +159,7 @@ describeFfmpeg("ListingVideoProcessor", () => {
   });
 
   it("rejects a source that cannot produce a playable 240p tier", async () => {
-    const fixtureData = await smallFixture();
+    const fixtureData = await fixture("320x180");
     try {
       const storage = new MemoryStorage(fixtureData.body);
       const prisma = prismaFor();

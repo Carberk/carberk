@@ -80,13 +80,13 @@ export class ListingVideoProcessor {
         await this.writeOutput(job, `${prefix}/covers/${name}.webp`, await sharp(await readFile(output)).webp({ quality: 80 }).toBuffer(), "image/webp", manifest, `cover:${name}`);
       }
 
-      const tiers = [240, 360, 720].filter((tier) => tier <= Math.max(validated.height, validated.width));
+      const tiers = [240, 360, 720].filter((tier) => tier <= Math.min(validated.height, validated.width));
       if (tiers.length === 0) throw new SourceVideoError("Video is too small to produce a playable tier", "SOURCE_INVALID");
       const hasAudio = validated.audioCodec !== null;
       const variants: string[] = [];
       for (const tier of tiers) {
         const playlist = join(workDir, `${tier}.m3u8`); const segmentPattern = join(workDir, `${tier}-%03d.ts`);
-        const scale = validated.height >= validated.width ? `scale=-2:min(${tier}\\,ih)` : `scale=min(${tier}\\,iw):-2`;
+        const scale = validated.height >= validated.width ? `scale=${tier}:-2` : `scale=-2:${tier}`;
         await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-i", input, "-vf", scale, "-c:v", "libx264", "-preset", "veryfast", "-b:v", `${tier}k`, "-maxrate", `${tier}k`, "-bufsize", `${tier * 2}k`, "-g", "120", "-keyint_min", "120", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)", ...(hasAudio ? ["-c:a", "aac", "-b:a", "128k"] : ["-an"]), "-f", "hls", "-hls_time", "4", "-hls_playlist_type", "vod", "-hls_flags", "independent_segments", "-master_pl_name", `${tier}-master.m3u8`, "-hls_segment_filename", segmentPattern, playlist]);
         const playlistKey = `${prefix}/hls/${tier}p/index.m3u8`;
         // The muxer reads codec profile/compatibility/level and dimensions from
