@@ -1,4 +1,5 @@
 import { ListingsSchemas } from "@auto-tm/contracts";
+import type { VideoUploadsSchemas } from "@auto-tm/contracts";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
@@ -18,6 +19,7 @@ import { NEEDS_ATTENTION_STATES, countUploads } from "../uploadStaging/uploadCou
 import { ListingVideoCard } from "../video/ListingVideoCard";
 import type { ListingVideoNativeModule } from "../../../modules/listing-video/src/prepare";
 import type { AppStateSubscribe, ListingVideoFileSystem } from "../video/videoPreparation";
+import type { VideoUploadApi, VideoUploadFileSystem, VideoUploadPersistence, VideoUploadTransport } from "../video/videoUpload";
 
 import { PhotoActionSheet } from "./PhotoActionSheet";
 import { canRetryPhoto, photoFailureReason, photoPosition } from "./photoLabels";
@@ -54,6 +56,11 @@ interface Step2PhotosProps {
   videoNative?: ListingVideoNativeModule | null;
   videoFileSystem?: ListingVideoFileSystem;
   subscribeAppState?: AppStateSubscribe;
+  videoUploadTarget?: VideoUploadsSchemas.VideoUploadTarget;
+  videoUploadApi?: VideoUploadApi;
+  videoUploadFileSystem?: VideoUploadFileSystem;
+  videoUploadTransport?: VideoUploadTransport;
+  videoUploadPersistence?: VideoUploadPersistence;
 }
 
 function usePhotoPicker(onAddPhoto: (uri: string) => Promise<void>) {
@@ -406,6 +413,11 @@ export default function Step2Photos({
   videoNative,
   videoFileSystem,
   subscribeAppState,
+  videoUploadTarget,
+  videoUploadApi,
+  videoUploadFileSystem,
+  videoUploadTransport,
+  videoUploadPersistence,
 }: Step2PhotosProps) {
   const { t } = useTranslation();
   // Like the other steps: the photo error shows once the seller has removed a
@@ -491,7 +503,7 @@ export default function Step2Photos({
         <EmptyState />
       )}
 
-      <ListingVideoCard canUploadVideo={canUploadVideo} videoNative={videoNative} videoFileSystem={videoFileSystem} subscribeAppState={subscribeAppState} disabled={disabled} />
+      <ListingVideoCard canUploadVideo={canUploadVideo} videoNative={videoNative} videoFileSystem={videoFileSystem} subscribeAppState={subscribeAppState} videoUploadTarget={videoUploadTarget} videoUploadApi={videoUploadApi} videoUploadFileSystem={videoUploadFileSystem} videoUploadTransport={videoUploadTransport} videoUploadPersistence={videoUploadPersistence} disabled={disabled} />
 
       <AlertDialog open={cameraDenied} onOpenChange={setCameraDenied}>
         <AlertDialogContent>
