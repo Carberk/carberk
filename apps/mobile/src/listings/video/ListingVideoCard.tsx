@@ -101,6 +101,7 @@ export function ListingVideoCard({
     subscribeAppState,
   });
   const upload = useVideoUpload({ target: videoUploadTarget, api: videoUploadApi, fileSystem: videoUploadFileSystem, transport: videoUploadTransport, persistence: videoUploadPersistence });
+  const { handoff, remove: clearPreparation } = prep;
   const startedUploadUri = useRef<string | null>(null);
 
   useEffect(() => {
@@ -111,8 +112,20 @@ export function ListingVideoCard({
     if (!videoUploadTarget) return;
     if (upload.state.phase !== "idle" || startedUploadUri.current === prep.state.file.uri) return;
     startedUploadUri.current = prep.state.file.uri;
+    handoff();
     void upload.start(prep.state.file, prep.state.selection);
-  }, [prep.state, upload, upload.start, upload.state.phase, videoUploadTarget]);
+  }, [prep.state, upload, upload.start, upload.state.phase, videoUploadTarget, handoff]);
+
+  const previousUploadPhase = useRef(upload.state.phase);
+  useEffect(() => {
+    const previous = previousUploadPhase.current;
+    previousUploadPhase.current = upload.state.phase;
+    if ((upload.state.phase === "idle" && previous !== "idle") || upload.state.phase === "processing") {
+      clearPreparation();
+      setDraft(null);
+      setCommittedDraft(null);
+    }
+  }, [upload.state.phase, clearPreparation]);
 
   const chooseFromLibrary = useCallback(async () => {
     let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -237,6 +250,18 @@ export function ListingVideoCard({
         </View>
       )}
 
+      {upload.state.phase === "failed" && upload.state.failure === "source" && (
+        <View className="gap-2" testID="listing-video-upload-source-missing">
+          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
+            <Text className="text-callout font-semibold">{t("listingVideoGoneTitle")}</Text>
+            <Text className="text-footnote text-muted-foreground">{t("listingVideoGoneBody")}</Text>
+          </View>
+          <Button variant="outline" onPress={() => void upload.remove()} accessibilityLabel={t("listingVideoRemove")}>
+            <Text>{t("listingVideoRemove")}</Text>
+          </Button>
+        </View>
+      )}
+
       {upload.state.phase === "operation-unknown" && (
         <View className="gap-2" testID="listing-video-upload-operation-unknown">
           <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
@@ -350,7 +375,7 @@ export function ListingVideoCard({
         </View>
       )}
 
-      {prep.state.phase === "idle" && draft && !editing && (
+      {upload.state.phase === "idle" && prep.state.phase === "idle" && draft && !editing && (
         <View className="gap-2">
           <View className="rounded-2xl bg-secondary p-3">
             <Text className="text-callout font-semibold">{t("listingVideoChosen")}</Text>
@@ -367,7 +392,7 @@ export function ListingVideoCard({
         </View>
       )}
 
-      {prep.state.phase === "idle" && !draft && (
+      {upload.state.phase === "idle" && prep.state.phase === "idle" && !draft && (
         <Button onPress={() => void chooseFromLibrary()} disabled={disabled} accessibilityLabel={t("listingVideoChoose")}>
           <Icon as={Plus} className="size-4" />
           <Text>{t("listingVideoChoose")}</Text>

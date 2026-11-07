@@ -1,13 +1,18 @@
 import * as Linking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
 import { describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
 import * as FileSystem from "expo-file-system/legacy";
 
+import { server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import type { FakeVideoPlayer } from "../../../test/native-video";
 import type { StagedPhoto } from "../uploadStaging/types";
 import Step2Photos from "../wizard/Step2Photos";
 import type { ListingVideoNativeModule } from "../../../modules/listing-video/src/prepare";
+
+import { InMemoryVideoUploadPersistence } from "./application/testing/InMemoryVideoUploadPersistence";
+import { ListingVideoCard } from "./ListingVideoCard";
 
 type PreparedResult = Awaited<ReturnType<ListingVideoNativeModule["prepare"]>>;
 
@@ -265,10 +270,10 @@ describe("Listing video editor", () => {
     // prepared, with the kept interval and cover.
     expect(FileSystem.copyAsync).toHaveBeenCalledWith({
       from: "file:///library/video.mp4",
-      to: "file:///documents/listing-video/prep-1/source.mp4",
+      to: expect.stringMatching(/^file:\/\/\/documents\/listing-video\/prep-[^/]+\/source.mp4$/),
     });
     expect(native.prepare).toHaveBeenCalledWith(
-      "file:///documents/listing-video/prep-1/source.mp4",
+      expect.stringMatching(/^file:\/\/\/documents\/listing-video\/prep-[^/]+\/source.mp4$/),
       0,
       45,
       5.625,
@@ -650,7 +655,7 @@ describe("Listing video preparation (#1044)", () => {
     });
     expect(native.prepare).not.toHaveBeenCalled();
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
-      "file:///documents/listing-video/prep-1/",
+      expect.stringMatching(/^file:\/\/\/documents\/listing-video\/prep-[^/]+\/$/),
       { idempotent: true },
     );
     expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
@@ -731,7 +736,7 @@ describe("Listing video preparation (#1044)", () => {
     });
     expect(await screen.findByText("Video no longer available")).toBeTruthy();
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
-      "file:///documents/listing-video/prep-1/",
+      expect.stringMatching(/^file:\/\/\/documents\/listing-video\/prep-[^/]+\/$/),
       { idempotent: true },
     );
     expect(native.prepare).not.toHaveBeenCalled();
@@ -783,5 +788,149 @@ describe("Listing video preparation (#1044)", () => {
       { idempotent: true },
     );
     expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
+  });
+});
+
+
+const uploadTarget = { type: "draft" as const, id: "10000000-0000-4000-8000-000000000001" };
+const uploadSession = "10000000-0000-4000-8000-000000000002";
+const uploadGeneration = "10000000-0000-4000-8000-000000000003";
+const uploadRoot = "http://localhost:3006/api/v1/listings/video-uploads";
+
+function uploadServer() {
+  const persistence = new InMemoryVideoUploadPersistence();
+  const state = { confirmed: false, phase: "UPLOADING", cancelUnknown: true, sent: [] as number[], keys: [] as string[], cover: 0 };
+  const response = () => ({
+    sessionId: uploadSession, generationId: uploadGeneration, target: uploadTarget, state: state.phase,
+    partSizeBytes: 5_242_880, expiresAt: "2030-01-01T00:00:00.000Z",
+    confirmedParts: state.confirmed ? [{ partNumber: 1, sizeBytes: 1_500_000 }] : [],
+    parts: state.confirmed || state.phase !== "UPLOADING" ? [] : [{ partNumber: 1, sizeBytes: 1_500_000, uploadUrl: "https://bucket/part1", expiresAt: "2030-01-01T00:00:00.000Z" }],
+  });
+  server.use(
+    http.post(uploadRoot, async ({ request }) => {
+      const body = await request.json() as { coverOffsetMs: number };
+      state.cover = body.coverOffsetMs;
+      state.keys.push(request.headers.get("Idempotency-Key") ?? "missing");
+      return HttpResponse.json(response());
+    }),
+    http.get(`${uploadRoot}/${uploadSession}`, () => HttpResponse.json(response())),
+    http.post(`${uploadRoot}/${uploadSession}/complete`, () => { state.phase = "PROCESSING"; return HttpResponse.json(response()); }),
+    http.post(`${uploadRoot}/${uploadSession}/cancel`, () => {
+      if (state.cancelUnknown) return HttpResponse.error();
+      state.phase = "CANCELLED";
+      return HttpResponse.json({ sessionId: uploadSession, generationId: uploadGeneration, state: "CANCELLED" });
+    }),
+  );
+  return { state, persistence };
+}
+
+describe("Listing video resumable upload card with the real HTTP client", () => {
+  it("retains unknown Cancel and clears preparation and selection only after confirmation", async () => {
+    const { state, persistence } = uploadServer();
+    const part = deferred<undefined>();
+    const screen = await renderMobile(<ListingVideoCard canUploadVideo videoNative={fakeNative()}
+      videoUploadTarget={uploadTarget} videoUploadPersistence={persistence}
+      videoUploadTransport={{ put: async () => part.promise }} />);
+    await pickVideo(screen, 45_000);
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    expect(await screen.findByText("Uploading video")).toBeTruthy();
+    expect(screen.getByText("0.0 of 1.4 MB · 0%")).toBeTruthy();
+    vi.mocked(FileSystem.deleteAsync).mockClear();
+    await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByText("Cancellation not confirmed yet")).toBeTruthy();
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+    expect(screen.queryByText("Video ready")).toBeNull();
+    await screen.unmount();
+    const reopened = await renderMobile(<ListingVideoCard canUploadVideo videoUploadTarget={uploadTarget} videoUploadPersistence={persistence} />);
+    expect(await reopened.findByText("Cancellation not confirmed yet")).toBeTruthy();
+    state.phase = "PROCESSING";
+    await fireEvent.press(reopened.getByRole("button", { name: "Check status" }));
+    expect(reopened.getByText("Cancellation not confirmed yet")).toBeTruthy();
+    expect(await persistence.get(`listing-video:draft:${uploadTarget.id}`)).not.toBeNull();
+    state.phase = "CANCELLED";
+    await fireEvent.press(reopened.getByRole("button", { name: "Check status" }));
+    expect(await reopened.findByRole("button", { name: "Choose from library" })).toBeTruthy();
+    expect(reopened.queryByText("Video ready")).toBeNull();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(expect.stringMatching(/\/prep-[^/]+\/$/), { idempotent: true });
+    part.resolve(undefined);
+  });
+
+  it("clears the mounted prepared card after confirmed Cancel", async () => {
+    const { state, persistence } = uploadServer();
+    state.cancelUnknown = false;
+    const pending = deferred<undefined>();
+    const screen = await renderMobile(<ListingVideoCard canUploadVideo videoNative={fakeNative()}
+      videoUploadTarget={uploadTarget} videoUploadPersistence={persistence}
+      videoUploadTransport={{ put: async () => pending.promise }} />);
+    await pickVideo(screen, 45_000);
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    expect(await screen.findByText("Uploading video")).toBeTruthy();
+    await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByRole("button", { name: "Choose from library" })).toBeTruthy();
+    expect(screen.queryByText("Video ready")).toBeNull();
+    expect(screen.queryByText("Video chosen")).toBeNull();
+    pending.resolve(undefined);
+  });
+
+  it("explains a missing prepared file and offers Remove before another selection", async () => {
+    const { persistence } = uploadServer();
+    vi.mocked(FileSystem.getInfoAsync).mockImplementation(async (uri) => ({ exists: !String(uri).endsWith("/prepared.mp4") }) as FileSystem.FileInfo);
+    const screen = await renderMobile(<ListingVideoCard canUploadVideo videoNative={fakeNative()}
+      videoUploadTarget={uploadTarget} videoUploadPersistence={persistence} />);
+    await pickVideo(screen, 45_000);
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    expect(await screen.findByText("Video no longer available")).toBeTruthy();
+    expect(screen.queryByText("Video ready")).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Remove" }));
+    expect(await screen.findByRole("button", { name: "Choose from library" })).toBeTruthy();
+    vi.mocked(FileSystem.getInfoAsync).mockResolvedValue({ exists: true } as FileSystem.FileInfo);
+  });
+
+  it("shows bounded failure, then Continue uses the same prepared file and cleans both owned paths", async () => {
+    const { state, persistence } = uploadServer();
+    let refuse = true;
+    const native = fakeNative();
+    const screen = await renderMobile(<ListingVideoCard canUploadVideo videoNative={native}
+      videoUploadTarget={uploadTarget} videoUploadPersistence={persistence}
+      videoUploadTransport={{ put: async (_url, part) => {
+        state.sent.push(part.offset);
+        if (refuse) throw new Error("HTTP 500");
+        state.confirmed = true;
+      } }} />);
+    await pickVideo(screen, 45_000);
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    expect(await screen.findByText("Upload interrupted")).toBeTruthy();
+    expect(state.sent).toEqual([0, 0, 0]);
+    refuse = false;
+    vi.mocked(FileSystem.deleteAsync).mockClear();
+    await fireEvent.press(screen.getByRole("button", { name: "Continue upload" }));
+    expect(await screen.findByText("Processing video…")).toBeTruthy();
+    expect(state.keys).toHaveLength(1);
+    expect(native.prepare).toHaveBeenCalledOnce();
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith("file:///documents/listing-video/job-1/prepared.mp4", { idempotent: true });
+    expect(FileSystem.deleteAsync).toHaveBeenCalledWith(expect.stringMatching(/\/prep-[^/]+\/$/), { idempotent: true });
+    expect(screen.queryByText("Video ready")).toBeNull();
+  });
+
+  it("shows a durable manual pause after remount and Continue reconciles server-confirmed bytes", async () => {
+    const { state, persistence } = uploadServer();
+    const part = deferred<undefined>();
+    const screen = await renderMobile(<ListingVideoCard canUploadVideo videoNative={fakeNative()}
+      videoUploadTarget={uploadTarget} videoUploadPersistence={persistence}
+      videoUploadTransport={{ put: async () => part.promise }} />);
+    await pickVideo(screen, 45_000);
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    expect(await screen.findByText("Uploading video")).toBeTruthy();
+    await fireEvent.press(screen.getByRole("button", { name: "Pause upload" }));
+    expect(await screen.findByText("Upload paused")).toBeTruthy();
+    await screen.unmount();
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith("file:///documents/listing-video/job-1/prepared.mp4", { idempotent: true });
+    const reopened = await renderMobile(<ListingVideoCard canUploadVideo videoUploadTarget={uploadTarget} videoUploadPersistence={persistence} />);
+    expect(await reopened.findByText("Upload paused")).toBeTruthy();
+    state.phase = "PROCESSING";
+    state.confirmed = true;
+    await fireEvent.press(reopened.getByRole("button", { name: "Continue upload" }));
+    expect(await reopened.findByText("Processing video…")).toBeTruthy();
+    part.resolve(undefined);
   });
 });

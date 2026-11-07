@@ -104,6 +104,7 @@ module.exports = {
   // component moved a list; the adapter never scrolls anything itself.
   scrollRequests, measureRects, deferredMeasurements, measurementCallbacks,
   BackHandler, pressHardwareBack,
+  AppState: { currentState: "active", addEventListener: () => ({ remove() {} }) },
   Platform: { OS: "ios", select: (options) => options.ios ?? options.native ?? options.default },
   StyleSheet: { create: (styles) => styles, flatten, hairlineWidth: 1,
     absoluteFillObject: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },

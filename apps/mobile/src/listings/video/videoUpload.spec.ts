@@ -5,13 +5,15 @@ type OpenVideoUploadResponse = VideoUploadsSchemas.OpenVideoUploadResponse;
 type VideoUploadStatusResponse = VideoUploadsSchemas.VideoUploadStatusResponse;
 type CancelVideoUploadResponse = VideoUploadsSchemas.CancelVideoUploadResponse;
 
+import { ApiError } from "../../api/client";
+
 import {
   VideoUploadController,
   type VideoUploadApi,
   type VideoUploadFileSystem,
-  type VideoUploadPersistence,
   type VideoUploadTransport,
 } from "./videoUpload";
+import { InMemoryVideoUploadPersistence } from "./application/testing/InMemoryVideoUploadPersistence";
 
 const TARGET = { type: "draft" as const, id: "draft-1" };
 const PART_SIZE = 5 * 1024 * 1024;
@@ -47,15 +49,9 @@ function cancelResponse(): CancelVideoUploadResponse {
 }
 
 function harness() {
-  const stored = new Map<string, string>();
-  const persistence: VideoUploadPersistence = {
-    get: vi.fn(async (key) => stored.get(key) ?? null),
-    set: vi.fn(async (key, value) => void stored.set(key, value)),
-    remove: vi.fn(async (key) => void stored.delete(key)),
-  };
+  const persistence = new InMemoryVideoUploadPersistence();
   const fs: VideoUploadFileSystem = {
     exists: vi.fn(async () => true),
-    readPart: vi.fn(async (_uri, _offset, size) => new Blob([new Uint8Array(size)])),
     remove: vi.fn(async () => {}),
   };
   const transport: VideoUploadTransport = { put: vi.fn(async () => {}) };
@@ -99,8 +95,8 @@ describe("VideoUploadController", () => {
 
     expect(first.instance.state.confirmedBytes).toBe(TOTAL);
     expect(first.instance.state.phase).toBe("processing");
-    expect(first.fs.readPart).toHaveBeenCalledWith("file:///prepared.mp4", 0, PART_SIZE);
-    expect(first.fs.readPart).toHaveBeenCalledWith("file:///prepared.mp4", PART_SIZE, 2_000_000);
+    expect(first.transport.put).toHaveBeenCalledWith("https://bucket/1", { uri: "file:///prepared.mp4", offset: 0, sizeBytes: PART_SIZE }, expect.any(AbortSignal));
+    expect(first.transport.put).toHaveBeenCalledWith("https://bucket/2", { uri: "file:///prepared.mp4", offset: PART_SIZE, sizeBytes: 2_000_000 }, expect.any(AbortSignal));
     expect(first.fs.remove).toHaveBeenCalledWith("file:///prepared.mp4");
     expect(first.api.complete).toHaveBeenCalledOnce();
     await first.instance.start();
@@ -131,7 +127,7 @@ describe("VideoUploadController", () => {
       .mockResolvedValue(statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }], "PROCESSING"));
     await paused.instance.resume();
     expect(paused.instance.state.phase).toBe("processing");
-    expect(paused.fs.readPart).toHaveBeenCalledWith("file:///prepared.mp4", PART_SIZE, 2_000_000);
+    expect(paused.transport.put).toHaveBeenCalledWith("https://bucket/2", { uri: "file:///prepared.mp4", offset: PART_SIZE, sizeBytes: 2_000_000 }, expect.any(AbortSignal));
   });
 
   it("waits for a lost connection and auto-continues when it returns", async () => {
@@ -189,6 +185,20 @@ describe("VideoUploadController", () => {
     expect(run.instance.state.confirmedBytes).toBe(7_242_880);
   });
 
+  it.each(["network", "foreground"] as const)("continues after a quick %s return while the prior PUT is pending", async (cause) => {
+    const run = controller();
+    const part = deferred<undefined>();
+    vi.mocked(run.transport.put).mockReturnValueOnce(part.promise);
+    vi.mocked(run.api.status).mockResolvedValueOnce(statusResponse([])).mockResolvedValue(statusResponse([], "PROCESSING"));
+    const started = run.instance.start();
+    await vi.waitFor(() => expect(run.transport.put).toHaveBeenCalled());
+    if (cause === "network") { run.instance.setNetworkAvailable(false); run.instance.setNetworkAvailable(true); }
+    else { run.instance.setForeground(false); run.instance.setForeground(true); }
+    part.resolve(undefined);
+    await started;
+    await vi.waitFor(() => expect(run.instance.state.phase).toBe("processing"));
+  });
+
   it("renews an expired part URL without uploading a confirmed part again", async () => {
     const run = controller();
     vi.mocked(run.api.status)
@@ -204,27 +214,227 @@ describe("VideoUploadController", () => {
 
     await run.instance.start();
 
-    expect(run.transport.put).toHaveBeenNthCalledWith(2, "https://bucket/renewed", expect.any(Blob));
-    expect(run.fs.readPart).toHaveBeenCalledTimes(3);
+    expect(run.transport.put).toHaveBeenNthCalledWith(2, "https://bucket/renewed", expect.objectContaining({ offset: 0, sizeBytes: PART_SIZE }), expect.any(AbortSignal));
+    expect(run.transport.put).toHaveBeenCalledTimes(3);
     expect(run.instance.state.confirmedBytes).toBe(TOTAL);
   });
 
-  it("treats duplicate completion as success and ignores a late response after cancel", async () => {
+  it("sends the cover offset relative to the kept interval", async () => {
     const run = controller();
-    const late = deferred<VideoUploadStatusResponse>();
-    vi.mocked(run.api.status).mockImplementation(async () => late.promise);
+    run.instance.setPreparedFile({ uri: "file:///prepared.mp4", sizeBytes: TOTAL }, {
+      source: { uri: "file:///original.mp4", durationS: 45 }, startS: 20, endS: 35, posterS: 25, coverIndex: 1,
+    });
     await run.instance.openSession();
-    const cancel = run.instance.cancel("remove");
-    late.resolve(statusResponse([], "PROCESSING"));
-    await cancel;
-    expect(run.instance.state.operation).toBeUndefined();
+    expect(run.api.open).toHaveBeenCalledWith(expect.objectContaining({ coverOffsetMs: 5_000 }), expect.any(String));
+  });
+
+  it("retains Cancel during Open and cancels the idempotent session before deleting the file", async () => {
+    const run = controller();
+    const pending = deferred<OpenVideoUploadResponse>();
+    vi.mocked(run.api.open).mockReturnValue(pending.promise);
+    const started = run.instance.start();
+    await vi.waitFor(() => expect(run.api.open).toHaveBeenCalled());
+    const cancelled = run.instance.cancel();
+    expect(run.instance.state.phase).toBe("operation-unknown");
+    expect(run.fs.remove).not.toHaveBeenCalled();
+    await vi.waitFor(async () => expect(JSON.parse((await run.persistence.get("listing-video:draft-1")) ?? "null")).toMatchObject({ operation: "cancel", idempotencyKey: expect.any(String) }));
+    pending.resolve(openResponse());
+    await Promise.all([started, cancelled]);
+    expect(run.api.cancel).toHaveBeenCalledWith("session-1");
     expect(run.instance.state.phase).toBe("idle");
     expect(run.fs.remove).toHaveBeenCalledWith("file:///prepared.mp4");
   });
 
+  it("keeps removal unknown across reopen when the server reports processing", async () => {
+    const run = controller();
+    vi.mocked(run.api.cancel).mockRejectedValue(new Error("connection lost"));
+    await run.instance.openSession();
+    await run.instance.cancel("remove");
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([], "PROCESSING"));
+    await run.instance.checkStatus();
+    const reopened = controller({ persistence: run.persistence });
+    await reopened.instance.restore();
+    expect(reopened.instance.state).toMatchObject({ phase: "operation-unknown", operation: "remove" });
+    expect(run.fs.remove).not.toHaveBeenCalled();
+  });
+
+  it("resumes a restored automatic background pause when already foregrounded", async () => {
+    const run = controller();
+    await run.instance.openSession();
+    run.instance.setForeground(false);
+    const reopened = controller({ persistence: run.persistence, isForeground: () => true });
+    vi.mocked(reopened.api.status).mockResolvedValue(statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }]));
+    await reopened.instance.restore();
+    await vi.waitFor(() => expect(reopened.instance.state.phase).toBe("processing"));
+  });
+
+  it("uses fixed part offsets when confirmed parts are sparse", async () => {
+    const run = controller({ sizeBytes: PART_SIZE * 2 + 100 });
+    const sparse = { ...statusResponse([{ partNumber: 2, sizeBytes: PART_SIZE }]), parts: [
+      { partNumber: 3, sizeBytes: 100, uploadUrl: "https://bucket/3", expiresAt: URL_EXPIRY },
+      { partNumber: 1, sizeBytes: PART_SIZE, uploadUrl: "https://bucket/1", expiresAt: URL_EXPIRY },
+    ] };
+    vi.mocked(run.api.status).mockResolvedValueOnce(sparse).mockResolvedValue(statusResponse([], "PROCESSING"));
+    await run.instance.start();
+    expect(run.transport.put).toHaveBeenCalledWith("https://bucket/3", { uri: "file:///prepared.mp4", offset: 10_485_760, sizeBytes: 100 }, expect.any(AbortSignal));
+  });
+
+  it("reconciles a lost completion response without completing twice", async () => {
+    const run = controller();
+    const all = [{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }];
+    const pending = deferred<VideoUploadStatusResponse>();
+    vi.mocked(run.api.status).mockResolvedValueOnce(statusResponse(all)).mockResolvedValue(statusResponse(all, "PROCESSING"));
+    vi.mocked(run.api.complete).mockImplementationOnce(async () => {
+      await pending.promise;
+      throw new Error("completion response lost");
+    });
+    const started = run.instance.start();
+    await vi.waitFor(() => expect(run.api.complete).toHaveBeenCalled());
+    await run.instance.pause();
+    const resumed = run.instance.resume();
+    pending.resolve(statusResponse(all, "PROCESSING"));
+    await Promise.all([started, resumed]);
+    await vi.waitFor(() => expect(run.instance.state.phase).toBe("processing"));
+    expect(run.api.complete).toHaveBeenCalledOnce();
+  });
+
+  it.each(["status", "complete"] as const)("ignores an actual late %s response after confirmed Cancel", async (request) => {
+    const run = controller();
+    const pending = deferred<VideoUploadStatusResponse>();
+    if (request === "status") vi.mocked(run.api.status).mockReturnValue(pending.promise);
+    else {
+      vi.mocked(run.api.status).mockResolvedValue(statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }]));
+      vi.mocked(run.api.complete).mockReturnValue(pending.promise);
+    }
+    const started = run.instance.start();
+    await vi.waitFor(() => expect(run.api[request]).toHaveBeenCalled());
+    await run.instance.cancel("remove");
+    pending.resolve(statusResponse([], "PROCESSING"));
+    await started;
+    expect(run.instance.state.phase).toBe("idle");
+    expect(await run.persistence.get("listing-video:draft-1")).toBeNull();
+  });
+
+  it("interrupts persistent HTTP 500s after bounded renewal and Continue can retry", async () => {
+    const run = controller();
+    vi.mocked(run.transport.put).mockRejectedValue(new Error("HTTP 500"));
+    await run.instance.start();
+    expect(run.instance.state).toMatchObject({ phase: "failed", failure: "transfer" });
+    expect(run.transport.put).toHaveBeenCalledTimes(3);
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([], "PROCESSING"));
+    await run.instance.resume();
+    expect(run.instance.state.phase).toBe("processing");
+  });
+
+  it("persists Open identity before the request and reuses it after restart", async () => {
+    const run = controller();
+    const pending = deferred<OpenVideoUploadResponse>();
+    vi.mocked(run.api.open).mockReturnValue(pending.promise);
+    void run.instance.start();
+    await vi.waitFor(() => expect(run.api.open).toHaveBeenCalled());
+    const record = JSON.parse((await run.persistence.get("listing-video:draft-1")) ?? "null");
+    const reopened = controller({ persistence: run.persistence });
+    vi.mocked(reopened.api.status).mockResolvedValue(statusResponse([], "PROCESSING"));
+    await reopened.instance.restore();
+    expect(reopened.api.open).toHaveBeenCalledWith(expect.anything(), record.idempotencyKey);
+    expect(reopened.instance.state.phase).toBe("processing");
+    run.instance.dispose();
+    pending.resolve(openResponse());
+  });
+
+  it("fences a late Cancel response from the next prepared selection", async () => {
+    const run = controller();
+    const lateCancel = deferred<ReturnType<typeof cancelResponse>>();
+    vi.mocked(run.api.cancel).mockReturnValueOnce(lateCancel.promise);
+    await run.instance.openSession();
+    const cancelling = run.instance.cancel();
+    await vi.waitFor(() => expect(run.api.cancel).toHaveBeenCalled());
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([], "CANCELLED"));
+    await run.instance.checkStatus();
+    run.instance.setPreparedFile({ uri: "file:///next-prepared.mp4", sizeBytes: 100 }, {
+      source: { uri: "file:///next-original.mp4", durationS: 15 }, startS: 0, endS: 15, posterS: 2, coverIndex: 0,
+    });
+    vi.mocked(run.api.open).mockResolvedValueOnce({ ...openResponse(), sessionId: "session-2", generationId: "generation-2" });
+    await run.instance.openSession();
+    lateCancel.resolve(cancelResponse());
+    await cancelling;
+    expect(run.instance.state).toMatchObject({ phase: "uploading", sessionId: "session-2", localUri: "file:///next-prepared.mp4" });
+    expect(run.fs.remove).not.toHaveBeenCalledWith("file:///next-prepared.mp4");
+  });
+
+  it("does not let an unmounted Open overwrite the reopened seller's manual pause", async () => {
+    const run = controller();
+    const lateOpen = deferred<OpenVideoUploadResponse>();
+    vi.mocked(run.api.open).mockReturnValueOnce(lateOpen.promise);
+    const oldStart = run.instance.start();
+    await vi.waitFor(() => expect(run.api.open).toHaveBeenCalled());
+    run.instance.dispose();
+    const reopened = controller({ persistence: run.persistence });
+    const part = deferred<undefined>();
+    vi.mocked(reopened.transport.put).mockReturnValueOnce(part.promise);
+    const restoring = reopened.instance.restore();
+    await vi.waitFor(() => expect(reopened.transport.put).toHaveBeenCalled());
+    await reopened.instance.pause();
+    lateOpen.resolve(openResponse());
+    await oldStart;
+    expect(JSON.parse((await run.persistence.get("listing-video:draft-1")) ?? "null")).toMatchObject({ phase: "paused", pauseReason: "user" });
+    part.resolve(undefined);
+    await restoring;
+  });
+
+  it("reports a missing prepared file before resuming unconfirmed bytes", async () => {
+    const run = controller();
+    await run.instance.openSession();
+    await run.instance.pause();
+    vi.mocked(run.fs.exists).mockResolvedValue(false);
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }]));
+    await run.instance.resume();
+    expect(run.instance.state).toMatchObject({ phase: "failed", failure: "source" });
+    expect(run.transport.put).not.toHaveBeenCalled();
+  });
+
+  it("retains an unknown cancellation through delayed completion cleanup", async () => {
+    const run = controller();
+    const deleting = deferred<undefined>();
+    vi.mocked(run.fs.remove).mockReturnValueOnce(deleting.promise);
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([], "PROCESSING"));
+    vi.mocked(run.api.cancel).mockRejectedValue(new Error("connection lost"));
+    const started = run.instance.start();
+    await vi.waitFor(() => expect(run.fs.remove).toHaveBeenCalled());
+    await run.instance.cancel();
+    deleting.resolve(undefined);
+    await started;
+    const reopened = controller({ persistence: run.persistence });
+    await reopened.instance.restore();
+    expect(reopened.instance.state).toMatchObject({ phase: "operation-unknown", operation: "cancel" });
+  });
+
+  it("serializes a new cancellation after an in-flight persistence removal", async () => {
+    const run = controller();
+    const removing = deferred<undefined>();
+    const remove = run.persistence.remove.bind(run.persistence);
+    vi.spyOn(run.persistence, "remove").mockImplementationOnce(async (key) => { await removing.promise; await remove(key); });
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([], "PROCESSING"));
+    vi.mocked(run.api.cancel).mockRejectedValue(new Error("connection lost"));
+    const started = run.instance.start();
+    await vi.waitFor(() => expect(run.persistence.remove).toHaveBeenCalled());
+    const cancelled = run.instance.cancel();
+    removing.resolve(undefined);
+    await Promise.all([started, cancelled]);
+    expect(JSON.parse((await run.persistence.get("listing-video:draft-1")) ?? "null")).toMatchObject({ phase: "operation-unknown", operation: "cancel" });
+    expect(run.instance.state.phase).toBe("operation-unknown");
+  });
+
+  it("offers transfer recovery after a timeout while connectivity remains online", async () => {
+    const run = controller();
+    vi.mocked(run.transport.put).mockRejectedValue(new ApiError("NETWORK_ERROR", 0, "Upload timed out"));
+    await run.instance.start();
+    expect(run.instance.state).toMatchObject({ phase: "failed", failure: "transfer" });
+  });
+
   it("keeps an unknown cancel visible until Check status confirms it", async () => {
     const run = controller();
-    vi.mocked(run.api.cancel).mockRejectedValueOnce(new Error("connection lost"));
+    vi.mocked(run.api.cancel).mockRejectedValue(new Error("connection lost"));
     await run.instance.openSession();
     await run.instance.cancel("cancel");
     expect(run.instance.state.phase).toBe("operation-unknown");
@@ -234,12 +444,12 @@ describe("VideoUploadController", () => {
     vi.mocked(run.api.status).mockResolvedValue(statusResponse([], "CANCELLED"));
     await run.instance.checkStatus();
     expect(run.instance.state.phase).toBe("idle");
-    expect(run.persistence.remove).toHaveBeenCalledWith("listing-video:draft-1");
+    expect(await run.persistence.get("listing-video:draft-1")).toBeNull();
   });
 
   it("does not turn an unknown cancel into a failure when status is still uploading", async () => {
     const run = controller();
-    vi.mocked(run.api.cancel).mockRejectedValueOnce(new Error("connection lost"));
+    vi.mocked(run.api.cancel).mockRejectedValue(new Error("connection lost"));
     await run.instance.openSession();
     await run.instance.cancel("remove");
 

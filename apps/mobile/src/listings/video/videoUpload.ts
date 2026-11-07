@@ -1,11 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, type AppStateStatus } from "react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { VideoUploadsSchemas } from "@auto-tm/contracts";
 
 import { ApiError, apiClient } from "../../api/client";
 
+import { nativeVideoUploadTransport, type VideoUploadTransport } from "./nativeVideoUpload";
 import type { ListingVideoSelection } from "./listingVideo";
+
+export type { VideoUploadTransport } from "./nativeVideoUpload";
 
 type VideoUploadTarget = VideoUploadsSchemas.VideoUploadTarget;
 type OpenVideoUploadResponse = VideoUploadsSchemas.OpenVideoUploadResponse;
@@ -45,6 +48,8 @@ interface PersistedVideoUpload {
   confirmedParts: { partNumber: number; sizeBytes: number }[];
   coverOffsetMs: number;
   idempotencyKey: string;
+  openAttempted?: boolean;
+  sourceDirectory?: string;
 }
 
 export interface VideoUploadApi {
@@ -56,12 +61,7 @@ export interface VideoUploadApi {
 
 export interface VideoUploadFileSystem {
   exists(uri: string): Promise<boolean>;
-  readPart(uri: string, offset: number, size: number): Promise<Blob>;
   remove(uri: string): Promise<void>;
-}
-
-export interface VideoUploadTransport {
-  put(url: string, body: Blob): Promise<void>;
 }
 
 export interface VideoUploadPersistence {
@@ -84,7 +84,6 @@ export interface VideoUploadControllerOptions {
   isForeground?: () => boolean;
 }
 
-const UPLOAD_TIMEOUT_MS = 60_000;
 const SNAPSHOT_VERSION = 1 as const;
 
 const defaultPersistence: VideoUploadPersistence = {
@@ -98,28 +97,9 @@ const defaultFileSystem: VideoUploadFileSystem = {
     const fileSystem = await import("expo-file-system/legacy");
     return (await fileSystem.getInfoAsync(uri)).exists;
   },
-  readPart: async (uri, offset, size) => {
-    // The new File API can produce a Blob for a byte range. Load it lazily so
-    // unit tests can use the injected file seam without a native Expo module.
-    const { File } = await import("expo-file-system");
-    return new File(uri).slice(offset, offset + size, "video/mp4");
-  },
   remove: async (uri) => {
     const fileSystem = await import("expo-file-system/legacy");
     await fileSystem.deleteAsync(uri, { idempotent: true });
-  },
-};
-
-const defaultTransport: VideoUploadTransport = {
-  put: async (url, body) => {
-    const timeout = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new ApiError("NETWORK_ERROR", 0, "Upload timed out")), UPLOAD_TIMEOUT_MS);
-    });
-    const response = await Promise.race([
-      fetch(url, { method: "PUT", headers: { "Content-Type": "video/mp4" }, body }),
-      timeout,
-    ]);
-    if (!response.ok) throw new ApiError("VIDEO_PART_UPLOAD_FAILED", response.status, "Video part upload failed");
   },
 };
 
@@ -182,12 +162,16 @@ export class VideoUploadController {
   private operationId = 0;
   private running = false;
   private runPromise: Promise<void> | null = null;
+  private disposed = false;
   private localDeleted = false;
+  private openPromise: Promise<void> | null = null;
+  private partAbort: AbortController | null = null;
+  private persistenceQueue: Promise<void> = Promise.resolve();
 
   constructor(options: VideoUploadControllerOptions) {
     this.api = options.api ?? defaultApi;
     this.fs = options.fileSystem ?? defaultFileSystem;
-    this.transport = options.transport ?? defaultTransport;
+    this.transport = options.transport ?? nativeVideoUploadTransport;
     this.persistence = options.persistence ?? defaultPersistence;
     this.storageKey = options.storageKey;
     this.online = options.isOnline ?? (() => true);
@@ -219,7 +203,7 @@ export class VideoUploadController {
 
   async restore(): Promise<void> {
     const raw = await this.persistence.get(this.storageKey);
-    if (!raw) return;
+    if (this.disposed || !raw) return;
     let restored: PersistedVideoUpload;
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -232,88 +216,91 @@ export class VideoUploadController {
     this.snapshot = restored;
     this.localDeleted = false;
     this.publish();
-    if (!restored.sessionId || restored.phase === "idle" || restored.phase === "operation-unknown" || restored.phase === "processing") return;
-    await this.reconcile(this.operationId);
-    if (this.snapshot.phase === "uploading" && this.isOnline() && this.isForeground()) this.startLoop();
+    if (restored.phase === "idle" || restored.phase === "operation-unknown" || restored.phase === "processing") return;
+    if (restored.phase === "paused" && restored.pauseReason === "user") {
+      await this.reconcile(this.operationId);
+      return;
+    }
+    if (restored.phase === "uploading" || restored.phase === "paused") await this.resumeAutomatic();
+  }
+
+  private async ensureSession(): Promise<void> {
+    if (this.snapshot.sessionId) return;
+    if (!this.openPromise) {
+      this.openPromise = (async () => {
+        this.snapshot.openAttempted = true;
+        // Recovery, including Cancel during Open, must use the same key after a restart.
+        await this.persist();
+        if (this.disposed) return;
+        const opened = await this.api.open({
+          target: this.snapshot.target, contentType: "video/mp4",
+          sizeBytes: this.snapshot.sizeBytes, coverOffsetMs: this.snapshot.coverOffsetMs,
+        }, this.snapshot.idempotencyKey);
+        if (this.disposed) return;
+        this.snapshot.sessionId = opened.sessionId;
+        this.snapshot.generationId = opened.generationId;
+        await this.persist();
+      })().finally(() => { this.openPromise = null; });
+    }
+    await this.openPromise;
   }
 
   async start(): Promise<void> {
+    if (this.disposed || this.snapshot.phase === "processing" || this.snapshot.operation) return;
     const op = ++this.operationId;
-    if (this.snapshot.phase === "processing") return;
+    this.setState({ phase: "uploading", pauseReason: undefined, failure: undefined });
     if (!(await this.fs.exists(this.snapshot.localUri).catch(() => false))) {
-      this.setState({ phase: "failed", failure: "source" });
+      if (op === this.operationId) this.setState({ phase: "failed", failure: "source" });
       return;
     }
-    if (!this.snapshot.sessionId) {
-      try {
-        const opened = await this.api.open(
-          {
-            target: this.snapshot.target,
-            contentType: "video/mp4",
-            sizeBytes: this.snapshot.sizeBytes,
-            coverOffsetMs: this.snapshot.coverOffsetMs,
-          },
-          this.snapshot.idempotencyKey,
-        );
-        if (op !== this.operationId) return;
-        this.snapshot.sessionId = opened.sessionId;
-        this.snapshot.generationId = opened.generationId;
-        this.snapshot.phase = "uploading";
-        await this.persist();
-        this.publish();
-      } catch (error) {
-        if (op !== this.operationId) return;
-        this.setState({ phase: isNetworkError(error) ? "paused" : "failed", pauseReason: isNetworkError(error) ? "network" : undefined, failure: isNetworkError(error) ? undefined : "transfer" });
-        return;
-      }
-    } else {
-      this.setState({ phase: "uploading", pauseReason: undefined, failure: undefined });
-    }
-    if (!this.isOnline()) {
-      this.setState({ phase: "paused", pauseReason: "network" });
+    if (op !== this.operationId) return;
+    if (!this.isOnline() || !this.isForeground()) {
+      this.setState({ phase: "paused", pauseReason: !this.isOnline() ? "network" : "background" });
       return;
     }
-    if (!this.isForeground()) {
-      this.setState({ phase: "paused", pauseReason: "background" });
+    try {
+      await this.ensureSession();
+    } catch (error) {
+      if (op === this.operationId) this.failTransfer(error);
       return;
     }
+    if (op !== this.operationId) return;
+    this.publish();
     this.startLoop();
     await this.runPromise;
   }
 
-  setPreparedFile(file: { uri: string; sizeBytes: number }, selection: ListingVideoSelection): void {
-    if (this.snapshot.sessionId || this.snapshot.phase === "processing") return;
+  setPreparedFile(file: { uri: string; sizeBytes: number; sourceDirectory?: string }, selection: ListingVideoSelection): void {
+    if (this.snapshot.openAttempted || this.snapshot.sessionId || this.snapshot.phase === "processing") return;
+    this.snapshot.idempotencyKey = newIdempotencyKey();
     this.snapshot.localUri = file.uri;
     this.snapshot.sizeBytes = file.sizeBytes;
-    this.snapshot.coverOffsetMs = Math.round(selection.posterS * 1000);
+    this.snapshot.sourceDirectory = file.sourceDirectory;
+    this.snapshot.coverOffsetMs = Math.round((selection.posterS - selection.startS) * 1000);
     this.snapshot.confirmedParts = [];
     this.snapshot.phase = "idle";
     this.snapshot.failure = undefined;
     this.snapshot.operation = undefined;
     this.snapshot.pauseReason = undefined;
     this.localDeleted = false;
-    void this.persist();
+    void this.persist().catch(() => undefined);
     this.publish();
   }
 
   /** Reserve the server session without starting a part. Useful for lifecycle handoff. */
   async openSession(): Promise<void> {
-    const op = ++this.operationId;
-    if (!this.snapshot.sessionId) {
-      const opened = await this.api.open({ target: this.snapshot.target, contentType: "video/mp4", sizeBytes: this.snapshot.sizeBytes, coverOffsetMs: this.snapshot.coverOffsetMs }, this.snapshot.idempotencyKey);
-      if (op !== this.operationId) return;
-      this.snapshot.sessionId = opened.sessionId;
-      this.snapshot.generationId = opened.generationId;
-      this.snapshot.phase = "uploading";
-      await this.persist();
-      this.publish();
-    }
+    if (this.snapshot.operation || this.snapshot.phase === "processing") return;
+    this.setState({ phase: "uploading" });
+    await this.ensureSession();
+    this.publish();
   }
 
   async pause(): Promise<void> {
     if (this.snapshot.phase !== "uploading") return;
     ++this.operationId;
+    this.partAbort?.abort();
     this.setState({ phase: "paused", pauseReason: "user", failure: undefined });
+    await this.persist();
   }
 
   async resume(): Promise<void> {
@@ -339,6 +326,7 @@ export class VideoUploadController {
     this.networkAvailable = available;
     if (!available && this.snapshot.phase === "uploading") {
       ++this.operationId;
+      this.partAbort?.abort();
       this.setState({ phase: "paused", pauseReason: "network", failure: undefined });
       return;
     }
@@ -349,55 +337,65 @@ export class VideoUploadController {
     this.foregroundActive = foreground;
     if (!foreground && this.snapshot.phase === "uploading") {
       ++this.operationId;
+      this.partAbort?.abort();
       this.setState({ phase: "paused", pauseReason: "background", failure: undefined });
       return;
     }
     if (foreground && this.snapshot.phase === "paused" && this.snapshot.pauseReason === "background") void this.resume();
   }
 
-  async cancel(operation: VideoUploadOperation = "cancel"): Promise<void> {
-    const op = ++this.operationId;
-    this.running = false;
-    if (!this.snapshot.sessionId) {
-      await this.deleteLocalAndForget();
+  private async resumeAutomatic(): Promise<void> {
+    if (!this.isOnline() || !this.isForeground()) {
+      this.setState({ phase: "paused", pauseReason: !this.isOnline() ? "network" : "background" });
       return;
     }
+    if (this.snapshot.phase === "uploading") this.setState({ phase: "paused", pauseReason: "background" });
+    await this.resume();
+  }
+
+  async cancel(operation: VideoUploadOperation = "cancel"): Promise<void> {
+    const op = ++this.operationId;
+    this.partAbort?.abort();
     this.setState({ phase: "operation-unknown", operation, pauseReason: undefined, failure: undefined });
+    await this.persist();
+    if (!this.snapshot.sessionId && !this.snapshot.openAttempted) {
+      await this.deleteLocalAndForget(op);
+      return;
+    }
+    await this.confirmCancellation(op);
+  }
+
+  private async confirmCancellation(op: number): Promise<void> {
     try {
-      await this.api.cancel(this.snapshot.sessionId);
+      await this.ensureSession();
       if (op !== this.operationId) return;
-      await this.deleteLocalAndForget();
+      await this.api.cancel(this.snapshot.sessionId as string);
+      if (op === this.operationId) await this.deleteLocalAndForget(op);
     } catch {
-      // The operation is deliberately retained as unknown. It must never look
-      // completed until Check status receives an authoritative answer.
+      // Only the requested terminal outcome can clear this durable operation.
       if (op === this.operationId) await this.persist();
     }
   }
 
   async checkStatus(): Promise<void> {
     const op = ++this.operationId;
-    if (!this.snapshot.sessionId) return;
     try {
-      const status = await this.api.status(this.snapshot.sessionId);
+      await this.ensureSession();
       if (op !== this.operationId) return;
-      if (status.state === "CANCELLED" || status.state === "EXPIRED") {
-        await this.deleteLocalAndForget();
-        return;
-      }
-      if (status.state === "PROCESSING") {
-        await this.finishProcessing(op, status);
-        return;
-      }
-      if (this.snapshot.phase === "operation-unknown") {
-        await this.persist();
-        this.publish();
-        return;
-      }
-      await this.persist();
-      this.publish();
+      const status = await this.api.status(this.snapshot.sessionId as string);
+      if (op !== this.operationId) return;
+      if (await this.applyStatus(op, status)) return;
+      if (this.snapshot.operation) await this.confirmCancellation(op);
     } catch {
       // Keep the operation-unknown card and Check status action in place.
     }
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    ++this.operationId;
+    this.partAbort?.abort();
+    this.listeners.clear();
   }
 
   async waitForIdleForTest(): Promise<void> {
@@ -405,7 +403,7 @@ export class VideoUploadController {
   }
 
   private startLoop(): void {
-    if (this.running || !this.snapshot.sessionId) return;
+    if (this.disposed || this.running || !this.snapshot.sessionId) return;
     this.running = true;
     const op = this.operationId;
     this.runPromise = this.run(op).finally(() => {
@@ -417,6 +415,7 @@ export class VideoUploadController {
   }
 
   private async run(op: number): Promise<void> {
+    let attemptsWithoutProgress = 0;
     try {
       while (op === this.operationId && this.snapshot.phase === "uploading") {
         if (!this.isOnline()) {
@@ -430,13 +429,13 @@ export class VideoUploadController {
         const status = await this.api.status(this.snapshot.sessionId as string);
         if (op !== this.operationId) return;
         const done = await this.applyStatus(op, status);
-        if (done || this.snapshot.phase !== "uploading") return;
+        if (op !== this.operationId || done || this.snapshot.phase !== "uploading") return;
         const next = status.parts.find((part) => !this.snapshot.confirmedParts.some((confirmed) => confirmed.partNumber === part.partNumber));
         if (!next) {
           try {
             const completed = await this.api.complete(this.snapshot.sessionId as string);
             if (op !== this.operationId) return;
-            await this.applyStatus(op, completed);
+            if (!(await this.applyStatus(op, completed))) this.failTransfer(new Error("Completion not confirmed"));
           } catch (error) {
             if (op !== this.operationId) return;
             const reconciled = await this.api.status(this.snapshot.sessionId as string).catch(() => null);
@@ -445,15 +444,18 @@ export class VideoUploadController {
               const terminal = await this.applyStatus(op, reconciled);
               if (terminal || this.snapshot.phase !== "uploading") return;
             }
-            if (isNetworkError(error)) this.setState({ phase: "paused", pauseReason: "network" });
-            else this.setState({ phase: "failed", failure: "transfer" });
+            this.failTransfer(error);
           }
           continue;
         }
-        const offset = this.snapshot.confirmedParts.filter((part) => part.partNumber < next.partNumber).reduce((sum, part) => sum + part.sizeBytes, 0);
-        const body = await this.fs.readPart(this.snapshot.localUri, offset, next.sizeBytes);
+        const available = await this.fs.exists(this.snapshot.localUri).catch(() => false);
+        if (op !== this.operationId) return;
+        if (!available) { this.setState({ phase: "failed", failure: "source" }); return; }
+        const offset = (next.partNumber - 1) * status.partSizeBytes;
+        const before = confirmedBytes(this.snapshot.confirmedParts);
+        this.partAbort = new AbortController();
         try {
-          await this.transport.put(next.uploadUrl, body);
+          await this.transport.put(next.uploadUrl, { uri: this.snapshot.localUri, offset, sizeBytes: next.sizeBytes, ...(this.snapshot.sourceDirectory ? { temporaryDirectory: this.snapshot.sourceDirectory } : {}) }, this.partAbort.signal);
         } catch (error) {
           if (op !== this.operationId) return;
           const reconciled = await this.api.status(this.snapshot.sessionId as string).catch(() => null);
@@ -461,22 +463,28 @@ export class VideoUploadController {
           if (reconciled) {
             const terminal = await this.applyStatus(op, reconciled);
             if (terminal || this.snapshot.phase !== "uploading") return;
-            // The URL may have expired. The next loop gets a newly signed part.
+            if (confirmedBytes(this.snapshot.confirmedParts) > before) attemptsWithoutProgress = 0;
+            else if (isNetworkError(error) || (error instanceof ApiError && error.code === "VIDEO_UPLOAD_TIMEOUT")) { this.failTransfer(error); return; }
+            else if (++attemptsWithoutProgress >= 3) { this.failTransfer(error); return; }
+            // A bounded renewal retries only missing parts.
             continue;
           }
-          this.setState({ phase: isNetworkError(error) ? "paused" : "failed", pauseReason: isNetworkError(error) ? "network" : undefined, failure: isNetworkError(error) ? undefined : "transfer" });
+          this.failTransfer(error);
           return;
         }
+        if (op !== this.operationId) return;
         // A successful PUT is not progress. Only this status response is the
         // authority that moves the confirmed byte count forward.
         const reconciled = await this.api.status(this.snapshot.sessionId as string);
         if (op !== this.operationId) return;
         const terminal = await this.applyStatus(op, reconciled);
         if (terminal || this.snapshot.phase !== "uploading") return;
+        if (confirmedBytes(this.snapshot.confirmedParts) > before) attemptsWithoutProgress = 0;
+        else if (++attemptsWithoutProgress >= 3) { this.failTransfer(new Error("Part was not confirmed")); return; }
       }
     } catch (error) {
       if (op !== this.operationId) return;
-      this.setState({ phase: isNetworkError(error) ? "paused" : "failed", pauseReason: isNetworkError(error) ? "network" : undefined, failure: isNetworkError(error) ? undefined : "transfer" });
+      this.failTransfer(error);
     }
   }
 
@@ -488,7 +496,7 @@ export class VideoUploadController {
       await this.applyStatus(op, status);
     } catch (error) {
       if (op !== this.operationId || !isNetworkError(error)) return;
-      if (this.snapshot.phase === "uploading") this.setState({ phase: "paused", pauseReason: "network" });
+      if (this.snapshot.phase === "uploading") this.failTransfer(error);
     }
   }
 
@@ -505,11 +513,16 @@ export class VideoUploadController {
     const confirmed = uniqueParts(status.confirmedParts);
     this.snapshot.confirmedParts = confirmed;
     if (status.state === "PROCESSING") {
+      if (this.snapshot.operation) {
+        await this.persist();
+        this.publish();
+        return false;
+      }
       await this.finishProcessing(op, status);
       return true;
     }
     if (status.state === "CANCELLED" || status.state === "EXPIRED") {
-      await this.deleteLocalAndForget();
+      await this.deleteLocalAndForget(op);
       return true;
     }
     await this.persist();
@@ -519,42 +532,66 @@ export class VideoUploadController {
 
   private async finishProcessing(op: number, _status: VideoUploadStatusResponse): Promise<void> {
     if (op !== this.operationId) return;
+    await this.deleteLocalOnly(op);
+    if (op !== this.operationId) return;
+    await this.forget(op);
+    if (op !== this.operationId) return;
     this.snapshot.phase = "processing";
     this.snapshot.pauseReason = undefined;
     this.snapshot.failure = undefined;
-    this.snapshot.operation = undefined;
-    await this.deleteLocalOnly();
-    await this.persistence.remove(this.storageKey);
     this.publish();
   }
 
-  private async deleteLocalOnly(): Promise<void> {
+  private async deleteLocalOnly(op: number): Promise<void> {
     if (this.localDeleted) return;
-    this.localDeleted = true;
-    await this.fs.remove(this.snapshot.localUri).catch(() => undefined);
+    const { localUri, sourceDirectory } = this.snapshot;
+    await this.fs.remove(localUri);
+    if (sourceDirectory) await this.fs.remove(sourceDirectory);
+    if (op === this.operationId) this.localDeleted = true;
   }
 
-  private async deleteLocalAndForget(): Promise<void> {
-    await this.deleteLocalOnly();
+  private async forget(op: number): Promise<void> {
+    // A newer operation's write must run after this removal, even when its
+    // request arrives while AsyncStorage is still deleting the old record.
+    this.persistenceQueue = this.persistenceQueue.catch(() => undefined).then(async () => {
+      if (op === this.operationId) await this.persistence.remove(this.storageKey);
+    });
+    await this.persistenceQueue;
+  }
+
+  private async deleteLocalAndForget(op: number): Promise<void> {
+    if (op !== this.operationId) return;
+    await this.deleteLocalOnly(op);
+    if (op !== this.operationId) return;
+    await this.forget(op);
+    if (op !== this.operationId) return;
     this.snapshot.phase = "idle";
+    this.snapshot.openAttempted = false;
     this.snapshot.sessionId = undefined;
     this.snapshot.generationId = undefined;
     this.snapshot.confirmedParts = [];
     this.snapshot.operation = undefined;
     this.snapshot.failure = undefined;
     this.snapshot.pauseReason = undefined;
-    await this.persistence.remove(this.storageKey);
     this.publish();
   }
 
   private setState(patch: Partial<PersistedVideoUpload>): void {
     Object.assign(this.snapshot, patch);
-    void this.persist();
+    void this.persist().catch(() => undefined);
     this.publish();
   }
 
-  private async persist(): Promise<void> {
-    await this.persistence.set(this.storageKey, JSON.stringify(this.snapshot));
+  private persist(): Promise<void> {
+    const value = JSON.stringify(this.snapshot);
+    this.persistenceQueue = this.persistenceQueue.catch(() => undefined).then(() => this.persistence.set(this.storageKey, value));
+    return this.persistenceQueue;
+  }
+
+  private failTransfer(error: unknown): void {
+    const timedOut = error instanceof Error && /timed out|timeout/i.test(error.message);
+    const network = isNetworkError(error) && !(timedOut && this.isOnline());
+    this.setState({ phase: network ? "paused" : "failed", pauseReason: network ? "network" : undefined, failure: network ? undefined : "transfer" });
   }
 
   private publish(): void {
@@ -590,6 +627,7 @@ export interface VideoUploadLifecycleHandlers {
 export type VideoUploadLifecycleSubscribe = (handlers: VideoUploadLifecycleHandlers) => () => void;
 
 const defaultLifecycleSubscribe: VideoUploadLifecycleSubscribe = (handlers) => {
+  handlers.onAppState(AppState.currentState);
   const appSubscription = AppState.addEventListener("change", (status) => handlers.onAppState(status));
   let disposed = false;
   let networkSubscription: (() => void) | undefined;
@@ -619,7 +657,9 @@ export interface UseVideoUploadOptions {
 export function useVideoUpload(options: UseVideoUploadOptions = {}) {
   const controllerRef = useRef<VideoUploadController | null>(null);
   const [, rerender] = useState(0);
-  const target = options.target;
+  const targetType = options.target?.type;
+  const targetId = options.target?.id;
+  const target = useMemo(() => targetType && targetId ? { type: targetType, id: targetId } : undefined, [targetType, targetId]);
   const storageKey = options.storageKey ?? (target ? `listing-video:${target.type}:${target.id}` : "listing-video:none");
 
   useEffect(() => {
@@ -639,12 +679,12 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
       transport: options.transport,
       persistence: options.persistence,
       isOnline: () => true,
-      isForeground: () => true,
+      isForeground: () => AppState.currentState === "active",
     });
     controllerRef.current = controller;
     const unsubscribe = controller.subscribe(() => rerender((value) => value + 1));
     void controller.restore();
-    return () => unsubscribe();
+    return () => { unsubscribe(); controller.dispose(); };
   }, [options.api, options.fileSystem, options.persistence, options.transport, rerender, storageKey, target]);
 
   useEffect(() => {
@@ -656,7 +696,7 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
     });
   }, [options.subscribeLifecycle, target]);
 
-  const start = useCallback(async (file: { uri: string; sizeBytes: number }, selection: ListingVideoSelection) => {
+  const start = useCallback(async (file: { uri: string; sizeBytes: number; sourceDirectory?: string }, selection: ListingVideoSelection) => {
     const current = controllerRef.current;
     if (!current || !target) return;
     current.setPreparedFile(file, selection);
