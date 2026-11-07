@@ -104,7 +104,11 @@ export function ListingVideoCard({
   const startedUploadUri = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!videoUploadTarget || prep.state.phase !== "prepared") return;
+    if (prep.state.phase !== "prepared") {
+      startedUploadUri.current = null;
+      return;
+    }
+    if (!videoUploadTarget) return;
     if (upload.state.phase !== "idle" || startedUploadUri.current === prep.state.file.uri) return;
     startedUploadUri.current = prep.state.file.uri;
     void upload.start(prep.state.file, prep.state.selection);

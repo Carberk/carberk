@@ -62,7 +62,7 @@ function harness() {
   const api: VideoUploadApi = {
     open: vi.fn(async () => openResponse()),
     status: vi.fn(async () => statusResponse([])),
-    complete: vi.fn(async () => statusResponse([], "PROCESSING")),
+    complete: vi.fn(async () => statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }], "PROCESSING")),
     cancel: vi.fn(async () => cancelResponse()),
   };
   return { api, fs, transport, persistence };
@@ -93,7 +93,7 @@ describe("VideoUploadController", () => {
       statusCalls += 1;
       if (statusCalls === 1) return statusResponse([]);
       if (statusCalls === 2 || statusCalls === 3) return statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }]);
-      return statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }], "PROCESSING");
+      return statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }]);
     });
     await first.instance.start();
 
@@ -102,6 +102,9 @@ describe("VideoUploadController", () => {
     expect(first.fs.readPart).toHaveBeenCalledWith("file:///prepared.mp4", 0, PART_SIZE);
     expect(first.fs.readPart).toHaveBeenCalledWith("file:///prepared.mp4", PART_SIZE, 2_000_000);
     expect(first.fs.remove).toHaveBeenCalledWith("file:///prepared.mp4");
+    expect(first.api.complete).toHaveBeenCalledOnce();
+    await first.instance.start();
+    expect(first.api.complete).toHaveBeenCalledOnce();
 
     const reopened = controller({ persistence: first.persistence });
     await reopened.instance.restore();
@@ -190,6 +193,19 @@ describe("VideoUploadController", () => {
     await run.instance.checkStatus();
     expect(run.instance.state.phase).toBe("idle");
     expect(run.persistence.remove).toHaveBeenCalledWith("listing-video:draft-1");
+  });
+
+  it("does not turn an unknown cancel into a failure when status is still uploading", async () => {
+    const run = controller();
+    vi.mocked(run.api.cancel).mockRejectedValueOnce(new Error("connection lost"));
+    await run.instance.openSession();
+    await run.instance.cancel("remove");
+
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([]));
+    await run.instance.checkStatus();
+
+    expect(run.instance.state.phase).toBe("operation-unknown");
+    expect(run.instance.state.operation).toBe("remove");
   });
 });
 

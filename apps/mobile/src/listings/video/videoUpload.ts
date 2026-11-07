@@ -385,11 +385,12 @@ export class VideoUploadController {
         return;
       }
       if (this.snapshot.phase === "operation-unknown") {
-        this.setState({ phase: "failed", failure: "transfer", operation: undefined });
-      } else {
         await this.persist();
         this.publish();
+        return;
       }
+      await this.persist();
+      this.publish();
     } catch {
       // Keep the operation-unknown card and Check status action in place.
     }
