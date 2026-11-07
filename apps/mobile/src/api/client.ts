@@ -40,11 +40,13 @@ interface RequestOptions<TResponse> {
   accessToken?: string;
   // Per-request timeout override (defaults to 30s)
   timeout?: number;
+  // Additional headers for idempotency or other endpoint-specific contracts.
+  headers?: Record<string, string>;
   // Fence this request before sending or retrying, never the shared refresh.
   assertSession?: () => Promise<unknown>;
 }
 
-type ClientOptions = Pick<RequestOptions<unknown>, "auth" | "accessToken" | "timeout" | "assertSession">;
+type ClientOptions = Pick<RequestOptions<unknown>, "auth" | "accessToken" | "timeout" | "assertSession" | "headers">;
 
 let refreshInFlight: Promise<void> | null = null;
 
@@ -168,6 +170,7 @@ async function rawRequest<TResponse>(
   await opts.assertSession?.();
   const headers: Record<string, string> = {
     Accept: "application/json",
+    ...(opts.headers ?? {}),
   };
 
   const locale = localeStore.getState().locale ?? "ru";

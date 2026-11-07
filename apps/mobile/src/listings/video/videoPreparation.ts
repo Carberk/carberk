@@ -31,7 +31,7 @@ export type ListingVideoPrepFailure = "source" | "interrupted" | "storage" | "pr
 export type ListingVideoPrepState =
   | { phase: "idle" }
   | { phase: "preparing"; selection: ListingVideoSelection }
-  | { phase: "prepared"; selection: ListingVideoSelection; file: PreparedVideoFile }
+  | { phase: "prepared"; selection: ListingVideoSelection; file: PreparedVideoFile & { sourceDirectory: string } }
   | { phase: "failed"; selection: ListingVideoSelection; failure: ListingVideoPrepFailure };
 
 /** File-system seam (system boundary) so tests can use the mocked legacy FS. */
@@ -157,7 +157,7 @@ export function useListingVideoPreparation(options: UseListingVideoPreparationOp
         // 1. Copy the source into app storage first (reuse the copy on retry).
         let job = jobRef.current;
         if (!job || !(await fs.exists(job.copiedUri).catch(() => false))) {
-          const jobId = `prep-${runId}`;
+          const jobId = `prep-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           const dir = `${fs.documentDirectory ?? ""}listing-video/${jobId}/`;
           const copiedUri = `${dir}source.${sourceExtension(selection.source.uri)}`;
           try {
@@ -206,7 +206,7 @@ export function useListingVideoPreparation(options: UseListingVideoPreparationOp
         // 3. Keep only a complete, checked output for upload.
         job.fileUri = file.uri;
         validatePreparedOutput(file, selection);
-        setState({ phase: "prepared", selection, file });
+        setState({ phase: "prepared", selection, file: { ...file, sourceDirectory: job.dir } });
       } catch (error) {
         if (runRef.current !== runId) return;
         if (error instanceof ListingVideoError && error.code === "cancelled") {
@@ -284,5 +284,9 @@ export function useListingVideoPreparation(options: UseListingVideoPreparationOp
     });
   }, [subscribe]);
 
-  return { state, prepare, prepareAgain, cancel, remove };
+  // Upload now owns both paths and persists them before contacting the server.
+  // Navigation must leave resumable files intact; only its terminal outcome cleans them.
+  const handoff = useCallback(() => { detachJob(); }, [detachJob]);
+
+  return { state, prepare, prepareAgain, cancel, remove, handoff };
 }

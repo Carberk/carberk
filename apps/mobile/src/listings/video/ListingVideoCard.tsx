@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
+import type { VideoUploadsSchemas } from "@auto-tm/contracts";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import { Plus, Video } from "lucide-react-native";
@@ -14,6 +15,7 @@ import {
   type ListingVideoFileSystem,
   type ListingVideoPrepFailure,
 } from "./videoPreparation";
+import { useVideoUpload, type VideoUploadApi, type VideoUploadFileSystem, type VideoUploadPersistence, type VideoUploadTransport } from "./videoUpload";
 import { ListingVideoEditor } from "./ListingVideoEditor";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,11 @@ interface ListingVideoCardProps {
   videoNative?: ListingVideoNativeModule | null;
   videoFileSystem?: ListingVideoFileSystem;
   subscribeAppState?: AppStateSubscribe;
+  videoUploadTarget?: VideoUploadsSchemas.VideoUploadTarget;
+  videoUploadApi?: VideoUploadApi;
+  videoUploadFileSystem?: VideoUploadFileSystem;
+  videoUploadTransport?: VideoUploadTransport;
+  videoUploadPersistence?: VideoUploadPersistence;
   disabled?: boolean;
 }
 
@@ -76,6 +83,11 @@ export function ListingVideoCard({
   videoNative,
   videoFileSystem,
   subscribeAppState,
+  videoUploadTarget,
+  videoUploadApi,
+  videoUploadFileSystem,
+  videoUploadTransport,
+  videoUploadPersistence,
   disabled = false,
 }: ListingVideoCardProps) {
   const { t } = useTranslation();
@@ -88,6 +100,32 @@ export function ListingVideoCard({
     fileSystem: videoFileSystem,
     subscribeAppState,
   });
+  const upload = useVideoUpload({ target: videoUploadTarget, api: videoUploadApi, fileSystem: videoUploadFileSystem, transport: videoUploadTransport, persistence: videoUploadPersistence });
+  const { handoff, remove: clearPreparation } = prep;
+  const startedUploadUri = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (prep.state.phase !== "prepared") {
+      startedUploadUri.current = null;
+      return;
+    }
+    if (!videoUploadTarget) return;
+    if (upload.state.phase !== "idle" || startedUploadUri.current === prep.state.file.uri) return;
+    startedUploadUri.current = prep.state.file.uri;
+    handoff();
+    void upload.start(prep.state.file, prep.state.selection);
+  }, [prep.state, upload, upload.start, upload.state.phase, videoUploadTarget, handoff]);
+
+  const previousUploadPhase = useRef(upload.state.phase);
+  useEffect(() => {
+    const previous = previousUploadPhase.current;
+    previousUploadPhase.current = upload.state.phase;
+    if ((upload.state.phase === "idle" && previous !== "idle") || upload.state.phase === "processing") {
+      clearPreparation();
+      setDraft(null);
+      setCommittedDraft(null);
+    }
+  }, [upload.state.phase, clearPreparation]);
 
   const chooseFromLibrary = useCallback(async () => {
     let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
@@ -152,6 +190,98 @@ export function ListingVideoCard({
         <Icon as={Video} className="size-6 text-foreground" />
       </View>
 
+      {(upload.state.phase === "uploading" || upload.state.phase === "paused") && (() => {
+        const confirmedMb = (upload.state.confirmedBytes / (1024 * 1024)).toFixed(1);
+        const totalMb = (upload.state.totalBytes / (1024 * 1024)).toFixed(1);
+        const percent = upload.state.totalBytes > 0
+          ? Math.min(100, Math.floor((upload.state.confirmedBytes / upload.state.totalBytes) * 100))
+          : 0;
+        const pausedTitle = upload.state.pauseReason === "network"
+          ? t("listingVideoUploadWaiting")
+          : upload.state.pauseReason === "background"
+            ? t("listingVideoUploadBackground")
+            : t("listingVideoUploadPaused");
+        const pausedBody = upload.state.pauseReason === "network"
+          ? t("listingVideoUploadWaitingBody")
+          : upload.state.pauseReason === "background"
+            ? t("listingVideoUploadBackgroundBody")
+            : t("listingVideoUploadPausedBody");
+        return (
+          <View className="gap-2" testID="listing-video-uploading">
+            <Text className="text-callout font-semibold" accessibilityLiveRegion="polite">
+              {upload.state.phase === "uploading" ? t("listingVideoUploading") : pausedTitle}
+            </Text>
+            <Text className="text-footnote text-muted-foreground">
+              {upload.state.phase === "uploading" ? t("listingVideoUploadProgress", { confirmed: confirmedMb, total: totalMb, percent }) : `${t("listingVideoUploadProgress", { confirmed: confirmedMb, total: totalMb, percent })} · ${pausedBody}`}
+            </Text>
+            <View className="h-2 overflow-hidden rounded-full bg-secondary" testID="listing-video-upload-progress">
+              <View className="h-full bg-primary" style={{ width: `${percent}%` }} />
+            </View>
+            <View className="flex-row gap-2">
+              {upload.state.phase === "uploading" ? (
+                <Button variant="secondary" onPress={() => void upload.pause()} accessibilityLabel={t("listingVideoPause")}>
+                  <Text>{t("listingVideoPause")}</Text>
+                </Button>
+              ) : upload.state.pauseReason === "user" ? (
+                <Button variant="secondary" onPress={() => void upload.resume()} accessibilityLabel={t("listingVideoContinueUpload")}>
+                  <Text>{t("listingVideoContinueUpload")}</Text>
+                </Button>
+              ) : null}
+              <Button variant="outline" onPress={() => void upload.cancel()} accessibilityLabel={t("cancel")}>
+                <Text>{t("cancel")}</Text>
+              </Button>
+            </View>
+          </View>
+        );
+      })()}
+
+      {upload.state.phase === "failed" && upload.state.failure === "transfer" && (
+        <View className="gap-2" testID="listing-video-upload-failed">
+          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
+            <Text className="text-callout font-semibold">{t("listingVideoUploadInterrupted")}</Text>
+            <Text className="text-footnote text-muted-foreground">{t("listingVideoUploadInterruptedBody")}</Text>
+          </View>
+          <Button variant="secondary" onPress={() => void upload.resume()} accessibilityLabel={t("listingVideoContinueUpload")}>
+            <Text>{t("listingVideoContinueUpload")}</Text>
+          </Button>
+          <Button variant="outline" onPress={() => void upload.remove()} accessibilityLabel={t("listingVideoRemove")}>
+            <Text>{t("listingVideoRemove")}</Text>
+          </Button>
+        </View>
+      )}
+
+      {upload.state.phase === "failed" && upload.state.failure === "source" && (
+        <View className="gap-2" testID="listing-video-upload-source-missing">
+          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
+            <Text className="text-callout font-semibold">{t("listingVideoGoneTitle")}</Text>
+            <Text className="text-footnote text-muted-foreground">{t("listingVideoGoneBody")}</Text>
+          </View>
+          <Button variant="outline" onPress={() => void upload.remove()} accessibilityLabel={t("listingVideoRemove")}>
+            <Text>{t("listingVideoRemove")}</Text>
+          </Button>
+        </View>
+      )}
+
+      {upload.state.phase === "operation-unknown" && (
+        <View className="gap-2" testID="listing-video-upload-operation-unknown">
+          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
+            <Text className="text-callout font-semibold">
+              {upload.state.operation === "remove" ? t("listingVideoUploadNotConfirmedRemove") : t("listingVideoUploadNotConfirmedCancel")}
+            </Text>
+            <Text className="text-footnote text-muted-foreground">{t("listingVideoUploadNotConfirmedBody")}</Text>
+          </View>
+          <Button variant="outline" onPress={() => void upload.checkStatus()} accessibilityLabel={t("listingVideoCheckStatus")}>
+            <Text>{t("listingVideoCheckStatus")}</Text>
+          </Button>
+        </View>
+      )}
+
+      {upload.state.phase === "processing" && (
+        <View className="gap-2" testID="listing-video-upload-processing">
+          <Text className="text-callout font-semibold">{t("listingVideoProcessing")}</Text>
+        </View>
+      )}
+
       {prep.state.phase === "preparing" && (
         <View className="gap-2" testID="listing-video-preparing">
           <Text className="text-callout font-semibold" accessibilityLiveRegion="polite">
@@ -215,7 +345,7 @@ export function ListingVideoCard({
         </View>
       )}
 
-      {prep.state.phase === "prepared" && (
+      {prep.state.phase === "prepared" && upload.state.phase === "idle" && (
         <View className="gap-2" testID="listing-video-prepared">
           <View className="rounded-2xl bg-secondary p-3">
             <Text className="text-callout font-semibold">{t("listingVideoReady")}</Text>
@@ -245,7 +375,7 @@ export function ListingVideoCard({
         </View>
       )}
 
-      {prep.state.phase === "idle" && draft && !editing && (
+      {upload.state.phase === "idle" && prep.state.phase === "idle" && draft && !editing && (
         <View className="gap-2">
           <View className="rounded-2xl bg-secondary p-3">
             <Text className="text-callout font-semibold">{t("listingVideoChosen")}</Text>
@@ -262,7 +392,7 @@ export function ListingVideoCard({
         </View>
       )}
 
-      {prep.state.phase === "idle" && !draft && (
+      {upload.state.phase === "idle" && prep.state.phase === "idle" && !draft && (
         <Button onPress={() => void chooseFromLibrary()} disabled={disabled} accessibilityLabel={t("listingVideoChoose")}>
           <Icon as={Plus} className="size-4" />
           <Text>{t("listingVideoChoose")}</Text>
