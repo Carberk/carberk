@@ -19,11 +19,11 @@ const describeFfmpeg = hasFfmpeg ? describe : describe.skip;
 class MemoryStorage implements VideoProcessingStorage {
   readonly bucket = "listing-videos-test";
   readonly objects = new Map<string, { body: Buffer; contentType: string }>();
-  constructor(private readonly source: Buffer, private readonly dropKey?: string, private readonly missing = false) {}
+  constructor(private readonly source: Buffer, private readonly dropKey?: string, private readonly missing = false, private readonly dropAll = false) {}
   private etag(body: Buffer) { return `"${createHash("md5").update(body).digest("hex")}"`; }
   async get(key: string) { if (this.missing || key !== "video-sources/source/source.mp4") throw new Error("NoSuchKey"); return { key, body: this.source, contentType: "video/mp4", etag: this.etag(this.source) }; }
   async initialize(key: string, contentType: string) { if (this.objects.has(key)) throw new Error("PreconditionFailed"); this.objects.set(key, { body: Buffer.alloc(0), contentType }); return this.etag(Buffer.alloc(0)); }
-  async put(key: string, body: Buffer, contentType: string, expectedETag?: string) { if (key === this.dropKey) return; const value = this.objects.get(key); if (expectedETag && (!value || this.etag(value.body) !== expectedETag)) throw new Error("PreconditionFailed"); if (!expectedETag && value) throw new Error("PreconditionFailed"); this.objects.set(key, { body, contentType }); }
+  async put(key: string, body: Buffer, contentType: string, expectedETag?: string) { if (this.dropAll || key === this.dropKey) return; const value = this.objects.get(key); if (expectedETag && (!value || this.etag(value.body) !== expectedETag)) throw new Error("PreconditionFailed"); if (!expectedETag && value) throw new Error("PreconditionFailed"); this.objects.set(key, { body, contentType }); }
   async head(key: string) { if (this.missing) return null; if (key === "video-sources/source/source.mp4") return { sizeBytes: this.source.length, contentType: "video/mp4", etag: this.etag(this.source) }; const value = this.objects.get(key); return value ? { sizeBytes: value.body.length, contentType: value.contentType, etag: this.etag(value.body) } : null; }
   async list(prefix: string) { return [...this.objects.keys()].filter((key) => key.startsWith(prefix)); }
 }
@@ -54,6 +54,13 @@ async function fixture(): Promise<{ dir: string; body: Buffer }> {
   return { dir, body: await readFile(path) };
 }
 
+async function smallFixture(): Promise<{ dir: string; body: Buffer }> {
+  const dir = await mkdtemp(join(tmpdir(), "carberk-video-small-fixture-"));
+  const path = join(dir, "source.mp4");
+  await exec("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=160x120:r=25", "-t", "3", "-c:v", "libx264", "-pix_fmt", "yuv420p", path]);
+  return { dir, body: await readFile(path) };
+}
+
 describeFfmpeg("ListingVideoProcessor", () => {
   it("validates actual bytes and only marks Ready after every manifest object exists", async () => {
     const fixtureData = await fixture();
@@ -65,6 +72,23 @@ describeFfmpeg("ListingVideoProcessor", () => {
       expect(prisma.row.status).toBe("Ready");
       expect(storage.objects.size).toBeGreaterThan(4);
       for (const value of storage.objects.values()) expect(value.body.length).toBeGreaterThan(0);
+      const master = [...storage.objects.entries()].find(([key]) => key.endsWith("/hls/master.m3u8"));
+      expect(master?.[1].body.toString()).toContain("CODECS=\"avc1.64001f\"");
+    } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it("bounds transient processing retries and eventually records Failed", async () => {
+    const fixtureData = await fixture();
+    try {
+      const storage = new MemoryStorage(fixtureData.body, undefined, false, true);
+      const prisma = prismaFor();
+      prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
+      const processor = new ListingVideoProcessor(prisma as unknown as PrismaService, storage);
+      await expect(processor.process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
+      await expect(processor.process({ sourceId: "source-1", generationId: "generation-1", attempt: 2 })).rejects.toThrow();
+      await expect(processor.process({ sourceId: "source-1", generationId: "generation-1", attempt: 3 })).rejects.toThrow();
+      expect(prisma.row.status).toBe("Failed");
+      expect(prisma.row["processingAttempt"]).toBe(3);
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
   }, 30_000);
 
@@ -74,6 +98,17 @@ describeFfmpeg("ListingVideoProcessor", () => {
     await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
     expect(prisma.row.status).toBe("Failed");
   });
+
+  it("rejects a source that cannot produce a playable 240p tier", async () => {
+    const fixtureData = await smallFixture();
+    try {
+      const storage = new MemoryStorage(fixtureData.body);
+      const prisma = prismaFor();
+      prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
+      await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("playable tier");
+      expect(prisma.row.status).toBe("Failed");
+    } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
+  }, 30_000);
 
   it("records a missing source as Failed without trusting declared metadata", async () => {
     const prisma = prismaFor();
