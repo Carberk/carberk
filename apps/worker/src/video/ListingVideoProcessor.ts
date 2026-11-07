@@ -59,7 +59,9 @@ export class ListingVideoProcessor {
       let source;
       try { source = await this.storage.get(generation.source.objectKey); } catch (error) {
         const missing = error instanceof Error && /NoSuchKey|NotFound/i.test(error.message);
-        throw new SourceVideoError(missing ? "Stored video source is missing" : "Stored video source could not be read", missing ? "SOURCE_MISSING" : "SOURCE_INVALID");
+        if (missing) throw new SourceVideoError("Stored video source is missing", "SOURCE_MISSING");
+        if (error instanceof Error && /maximum body size/i.test(error.message)) throw new SourceVideoError(error.message, "SOURCE_INVALID");
+        throw error;
       }
       if (source.body.byteLength > MAX_BYTES || source.body.byteLength !== generation.source.sizeBytes) throw new SourceVideoError("Stored video size does not match the server record", "SOURCE_INVALID");
       const input = join(workDir, "source.mp4"); await writeFile(input, source.body, { mode: 0o600 });
@@ -118,7 +120,7 @@ export class ListingVideoProcessor {
   }
 
   private async writeOutput(job: VideoProcessingJob, key: string, body: Buffer, contentType: string, manifest: Record<string, ManifestRecord>, name: string): Promise<void> {
-    await this.assertAttemptActive(job); const fence = await this.storage.initialize(key, contentType); await this.storage.put(key, body, contentType, fence);
+    await this.assertAttemptActive(job); const fence = await this.storage.initialize(key, contentType); await this.assertAttemptActive(job); await this.storage.put(key, body, contentType, fence);
     const head = await this.storage.head(key); if (!head || head.sizeBytes !== body.byteLength) throw new Error(`Processing output missing or changed: ${key}`);
     manifest[name] = { key, sizeBytes: body.byteLength, etag: head.etag };
   }

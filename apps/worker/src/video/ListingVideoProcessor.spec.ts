@@ -119,4 +119,39 @@ describe.skipIf(process.env["VIDEO_PROCESSING_STORAGE_E2E"] !== "1")("ListingVid
       await s3.destroy();
     }
   }, 30_000);
+
+  it("rejects broken, missing, same-size-corrupt and partial real-storage inputs", async () => {
+    const fixtureData = await fixture();
+    const endpoint = process.env["MINIO_ENDPOINT"] ?? "http://127.0.0.1:9000";
+    const bucket = process.env["LISTING_VIDEO_BUCKET_NAME"] || "listing-videos";
+    const s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+    const storage = new S3VideoProcessingStorage(s3, bucket);
+    const namespaces = ["broken", "missing", "corrupt", "partial"].map((name) => `e2e/${randomUUID()}/${name}`);
+    try {
+      const brokenKey = `${namespaces[0]}/source.mp4`;
+      await storage.put(brokenKey, Buffer.alloc(fixtureData.body.length, 7), "video/mp4");
+      const brokenPrisma = prismaFor(); brokenPrisma.row["source"] = { objectKey: brokenKey, sizeBytes: fixtureData.body.length };
+      await expect(new ListingVideoProcessor(brokenPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
+      expect(brokenPrisma.row.status).toBe("Failed");
+
+      const missingPrisma = prismaFor(); missingPrisma.row["source"] = { objectKey: `${namespaces[1]}/source.mp4`, sizeBytes: fixtureData.body.length };
+      await expect(new ListingVideoProcessor(missingPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("missing");
+      expect(missingPrisma.row.status).toBe("Failed");
+
+      const partialKey = `${namespaces[3]}/source.mp4`;
+      await storage.put(partialKey, fixtureData.body, "video/mp4");
+      const partialPrisma = prismaFor(); partialPrisma.row["source"] = { objectKey: partialKey, sizeBytes: fixtureData.body.length };
+      await new ListingVideoProcessor(partialPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
+      const outputKeys = await storage.list(namespaces[3] ?? "");
+      const output = outputKeys.find((key) => key.endsWith("/covers/list.webp"));
+      if (!output) throw new Error("fixture did not create a cover");
+      await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: [{ Key: output }] } }));
+      partialPrisma.row.status = "Processing";
+      await expect(new ListingVideoProcessor(partialPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
+      expect(partialPrisma.row.status).toBe("Processing");
+    } finally {
+      for (const prefix of namespaces) { const keys = await storage.list(prefix); if (keys.length) await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys.map((Key) => ({ Key })) } })); }
+      await rm(fixtureData.dir, { recursive: true, force: true }); await s3.destroy();
+    }
+  }, 60_000);
 });
