@@ -721,4 +721,3 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
     checkStatus: () => invoke("checkStatus"),
   };
 }
-
