@@ -935,6 +935,101 @@
       "ListingSummary": {
         "type": "object",
         "properties": {
+          "video": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "generationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "galleryIndex": {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 90000
+              },
+              "qualities": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        240
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        360
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        720
+                      ]
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 3
+              },
+              "cover": {
+                "type": "object",
+                "properties": {
+                  "thumbnail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:thumbnail"
+                    ]
+                  },
+                  "list": {
+                    "type": "string",
+                    "enum": [
+                      "cover:list"
+                    ]
+                  },
+                  "detail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:detail"
+                    ]
+                  },
+                  "fullscreen": {
+                    "type": "string",
+                    "enum": [
+                      "cover:fullscreen"
+                    ]
+                  }
+                },
+                "required": [
+                  "thumbnail",
+                  "list",
+                  "detail",
+                  "fullscreen"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "generationId",
+              "galleryIndex",
+              "durationMs",
+              "qualities",
+              "cover"
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -1088,6 +1183,101 @@
       "FeedListingSummary": {
         "type": "object",
         "properties": {
+          "video": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "generationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "galleryIndex": {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 90000
+              },
+              "qualities": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        240
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        360
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        720
+                      ]
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 3
+              },
+              "cover": {
+                "type": "object",
+                "properties": {
+                  "thumbnail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:thumbnail"
+                    ]
+                  },
+                  "list": {
+                    "type": "string",
+                    "enum": [
+                      "cover:list"
+                    ]
+                  },
+                  "detail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:detail"
+                    ]
+                  },
+                  "fullscreen": {
+                    "type": "string",
+                    "enum": [
+                      "cover:fullscreen"
+                    ]
+                  }
+                },
+                "required": [
+                  "thumbnail",
+                  "list",
+                  "detail",
+                  "fullscreen"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "generationId",
+              "galleryIndex",
+              "durationMs",
+              "qualities",
+              "cover"
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -1282,6 +1472,144 @@
       "ListingDetail": {
         "type": "object",
         "properties": {
+          "video": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "generationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "galleryIndex": {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 90000
+              },
+              "qualities": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        240
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        360
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        720
+                      ]
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 3
+              },
+              "cover": {
+                "type": "object",
+                "properties": {
+                  "thumbnail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:thumbnail"
+                    ]
+                  },
+                  "list": {
+                    "type": "string",
+                    "enum": [
+                      "cover:list"
+                    ]
+                  },
+                  "detail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:detail"
+                    ]
+                  },
+                  "fullscreen": {
+                    "type": "string",
+                    "enum": [
+                      "cover:fullscreen"
+                    ]
+                  }
+                },
+                "required": [
+                  "thumbnail",
+                  "list",
+                  "detail",
+                  "fullscreen"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "generationId",
+              "galleryIndex",
+              "durationMs",
+              "qualities",
+              "cover"
+            ]
+          },
+          "pendingVideo": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "generationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sourceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "uploading",
+                  "processing",
+                  "failed"
+                ]
+              },
+              "failureType": {
+                "type": "string",
+                "enum": [
+                  "SOURCE_MISSING",
+                  "SOURCE_INVALID",
+                  "TRANSIENT"
+                ]
+              },
+              "canReprocess": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "generationId",
+              "sourceId",
+              "status",
+              "canReprocess"
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -2544,6 +2872,101 @@
             "items": {
               "type": "object",
               "properties": {
+                "video": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "generationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "galleryIndex": {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "durationMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 90000
+                    },
+                    "qualities": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "enum": [
+                              240
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              360
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              720
+                            ]
+                          }
+                        ]
+                      },
+                      "minItems": 1,
+                      "maxItems": 3
+                    },
+                    "cover": {
+                      "type": "object",
+                      "properties": {
+                        "thumbnail": {
+                          "type": "string",
+                          "enum": [
+                            "cover:thumbnail"
+                          ]
+                        },
+                        "list": {
+                          "type": "string",
+                          "enum": [
+                            "cover:list"
+                          ]
+                        },
+                        "detail": {
+                          "type": "string",
+                          "enum": [
+                            "cover:detail"
+                          ]
+                        },
+                        "fullscreen": {
+                          "type": "string",
+                          "enum": [
+                            "cover:fullscreen"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "thumbnail",
+                        "list",
+                        "detail",
+                        "fullscreen"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "generationId",
+                    "galleryIndex",
+                    "durationMs",
+                    "qualities",
+                    "cover"
+                  ]
+                },
                 "id": {
                   "type": "string",
                   "format": "uuid"
@@ -2989,6 +3412,101 @@
             "items": {
               "type": "object",
               "properties": {
+                "video": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "generationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "galleryIndex": {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "durationMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 90000
+                    },
+                    "qualities": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "enum": [
+                              240
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              360
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              720
+                            ]
+                          }
+                        ]
+                      },
+                      "minItems": 1,
+                      "maxItems": 3
+                    },
+                    "cover": {
+                      "type": "object",
+                      "properties": {
+                        "thumbnail": {
+                          "type": "string",
+                          "enum": [
+                            "cover:thumbnail"
+                          ]
+                        },
+                        "list": {
+                          "type": "string",
+                          "enum": [
+                            "cover:list"
+                          ]
+                        },
+                        "detail": {
+                          "type": "string",
+                          "enum": [
+                            "cover:detail"
+                          ]
+                        },
+                        "fullscreen": {
+                          "type": "string",
+                          "enum": [
+                            "cover:fullscreen"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "thumbnail",
+                        "list",
+                        "detail",
+                        "fullscreen"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "generationId",
+                    "galleryIndex",
+                    "durationMs",
+                    "qualities",
+                    "cover"
+                  ]
+                },
                 "id": {
                   "type": "string",
                   "format": "uuid"
@@ -3122,6 +3640,49 @@
                 },
                 "allowChat": {
                   "type": "boolean"
+                },
+                "pendingVideo": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "generationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "uploading",
+                        "processing",
+                        "failed"
+                      ]
+                    },
+                    "failureType": {
+                      "type": "string",
+                      "enum": [
+                        "SOURCE_MISSING",
+                        "SOURCE_INVALID",
+                        "TRANSIENT"
+                      ]
+                    },
+                    "canReprocess": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "generationId",
+                    "sourceId",
+                    "status",
+                    "canReprocess"
+                  ]
                 }
               },
               "required": [
@@ -3385,6 +3946,101 @@
       "FavoriteListingSummary": {
         "type": "object",
         "properties": {
+          "video": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "generationId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "galleryIndex": {
+                "type": "number",
+                "enum": [
+                  1
+                ]
+              },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 90000
+              },
+              "qualities": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "enum": [
+                        240
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        360
+                      ]
+                    },
+                    {
+                      "type": "number",
+                      "enum": [
+                        720
+                      ]
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 3
+              },
+              "cover": {
+                "type": "object",
+                "properties": {
+                  "thumbnail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:thumbnail"
+                    ]
+                  },
+                  "list": {
+                    "type": "string",
+                    "enum": [
+                      "cover:list"
+                    ]
+                  },
+                  "detail": {
+                    "type": "string",
+                    "enum": [
+                      "cover:detail"
+                    ]
+                  },
+                  "fullscreen": {
+                    "type": "string",
+                    "enum": [
+                      "cover:fullscreen"
+                    ]
+                  }
+                },
+                "required": [
+                  "thumbnail",
+                  "list",
+                  "detail",
+                  "fullscreen"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "generationId",
+              "galleryIndex",
+              "durationMs",
+              "qualities",
+              "cover"
+            ]
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -3567,6 +4223,101 @@
             "items": {
               "type": "object",
               "properties": {
+                "video": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "generationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "galleryIndex": {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "durationMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true,
+                      "maximum": 90000
+                    },
+                    "qualities": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "enum": [
+                              240
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              360
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              720
+                            ]
+                          }
+                        ]
+                      },
+                      "minItems": 1,
+                      "maxItems": 3
+                    },
+                    "cover": {
+                      "type": "object",
+                      "properties": {
+                        "thumbnail": {
+                          "type": "string",
+                          "enum": [
+                            "cover:thumbnail"
+                          ]
+                        },
+                        "list": {
+                          "type": "string",
+                          "enum": [
+                            "cover:list"
+                          ]
+                        },
+                        "detail": {
+                          "type": "string",
+                          "enum": [
+                            "cover:detail"
+                          ]
+                        },
+                        "fullscreen": {
+                          "type": "string",
+                          "enum": [
+                            "cover:fullscreen"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "thumbnail",
+                        "list",
+                        "detail",
+                        "fullscreen"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "generationId",
+                    "galleryIndex",
+                    "durationMs",
+                    "qualities",
+                    "cover"
+                  ]
+                },
                 "id": {
                   "type": "string",
                   "format": "uuid"

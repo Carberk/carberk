@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { FakeListingVideoReadPort } from "./testing/FakeListingVideoReadPort";
 import type { CardPhotos } from "../domain/CardPhotos";
 
 import { ListMyFavorites } from "./ListMyFavorites";
@@ -125,6 +126,7 @@ function makeUseCase(
   return new ListMyFavorites(
     favorites ?? new FakeFavoriteRepository(),
     listingsRead ?? new FakeListingCardReadPort(),
+    new FakeListingVideoReadPort(),
   );
 }
 

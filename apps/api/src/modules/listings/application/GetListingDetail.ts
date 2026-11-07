@@ -1,5 +1,9 @@
 import { UploadsSchemas } from "@auto-tm/contracts";
 
+import {
+  LISTING_VIDEO_READ_PORT,
+  type ListingVideoReadPort,
+} from "../domain/ports/ListingVideoReadPort";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 
 import type { ListingsSchemas } from "@auto-tm/contracts";
@@ -59,6 +63,8 @@ export class GetListingDetail {
     private readonly vinDecoder: VinDecoderPort,
     @Inject(SELLER_PROFILE_PORT)
     private readonly sellerProfiles: SellerProfilePort,
+    @Inject(LISTING_VIDEO_READ_PORT)
+    private readonly videos: ListingVideoReadPort,
   ) {}
 
   async execute(input: GetListingDetailInput): Promise<ListingDetailDto> {
@@ -89,8 +95,11 @@ export class GetListingDetail {
       ? await this.vinDecoder.decode(listing.vin)
       : undefined;
 
+    const videoById = await this.videos.getForListings([listing.id], input.requestingUserId);
+
     return {
       id: listing.id,
+      ...videoById.get(listing.id),
       publicNumber: listing.publicNumber,
       sellerId: listing.sellerId,
       seller: {

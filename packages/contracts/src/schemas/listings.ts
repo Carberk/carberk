@@ -105,8 +105,36 @@ function checkParallel(
 
 // ── ListingSummary (cross-context read surface) ──
 
+/** References name recorded manifest members; file grants are issued by #1057.
+ * Photo arrays stay photo-only. Insert this optional item after the cover photo. */
+export const ReadyListingVideoSchema = z.object({
+  id: z.string().uuid(),
+  generationId: z.string().uuid(),
+  galleryIndex: z.literal(1),
+  durationMs: z.number().int().positive().max(90_000),
+  qualities: z.array(z.union([z.literal(240), z.literal(360), z.literal(720)])).min(1).max(3),
+  cover: z.object({
+    thumbnail: z.literal("cover:thumbnail"),
+    list: z.literal("cover:list"),
+    detail: z.literal("cover:detail"),
+    fullscreen: z.literal("cover:fullscreen"),
+  }),
+});
+export type ReadyListingVideo = z.infer<typeof ReadyListingVideoSchema>;
+
+export const PendingListingVideoSchema = z.object({
+  id: z.string().uuid(),
+  generationId: z.string().uuid(),
+  sourceId: z.string().uuid(),
+  status: z.enum(["uploading", "processing", "failed"]),
+  failureType: z.enum(["SOURCE_MISSING", "SOURCE_INVALID", "TRANSIENT"]).optional(),
+  canReprocess: z.boolean(),
+});
+export type PendingListingVideo = z.infer<typeof PendingListingVideoSchema>;
+
 /** The summary fields; `ListingSummarySchema` adds the parallel-array check. */
 export const ListingSummaryBaseSchema = z.object({
+  video: ReadyListingVideoSchema.optional(),
   id: z.string().guid(),
   sellerId: z.string().guid(),
   status: ListingStatusSchema,
@@ -239,6 +267,8 @@ export type ListingMedia = z.infer<typeof ListingMediaSchema>;
 // ── ListingDetail ──
 
 export const ListingDetailSchema = z.object({
+  video: ReadyListingVideoSchema.optional(),
+  pendingVideo: PendingListingVideoSchema.optional(),
   id: z.string().guid(),
   publicNumber: LegacyIntegerSchema.positive().openapi({
     type: "integer",
@@ -650,7 +680,7 @@ export type ListingBrandCountResponse = z.infer<typeof ListingBrandCountResponse
 // ── My listings / drafts responses ──
 
 export const MyListingsResponseSchema = z.object({
-  items: z.array(ListingSummarySchema),
+  items: z.array(ListingSummaryBaseSchema.extend({ pendingVideo: PendingListingVideoSchema.optional() }).superRefine(checkSummaryHashes)),
   nextCursor: z.string().nullable(),
 });
 export type MyListingsResponse = z.infer<typeof MyListingsResponseSchema>;

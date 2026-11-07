@@ -9,6 +9,7 @@ import type { ExchangeRatePort } from "../domain/ports/ExchangeRatePort";
 import type { MediaStoragePort } from "../domain/ports/MediaStoragePort";
 import { BadRequestException } from "@nestjs/common";
 import { ListingsSchemas } from "@auto-tm/contracts";
+import { FakeListingVideoReadPort } from "./testing/FakeListingVideoReadPort";
 import type { FeedCursor, FeedSort, ListingFilterCriteria } from "../domain/types";
 import type { SellerProfile } from "../domain/ports/SellerProfilePort";
 import { InMemorySellerProfiles } from "./testing/InMemorySellerProfiles";
@@ -143,6 +144,7 @@ function makeUseCase(
     favorites ?? new FakeFavoriteRepository(),
     cards ?? new FakeListingCardReadPort(),
     sellers ?? new InMemorySellerProfiles(),
+    new FakeListingVideoReadPort(),
   );
 }
 
@@ -363,6 +365,7 @@ describe("ListFeed", () => {
       new FakeFavoriteRepository(),
       new FakeListingCardReadPort(),
       new InMemorySellerProfiles(),
+      new FakeListingVideoReadPort(),
     );
     await uc.execute({ filters: { brandId: "brand-x", priceMin: 50000 } });
 
