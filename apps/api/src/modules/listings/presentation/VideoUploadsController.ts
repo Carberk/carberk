@@ -96,6 +96,14 @@ export class VideoUploadsController {
     return this.sessions.cancel({ userId, sessionId });
   }
 
+  @Post("remove")
+  async remove(@Body() body: unknown, @Req() req: FastifyRequest) {
+    const target = this.parseOrThrow(VideoUploadsSchemas.VideoUploadTargetSchema, body);
+    const userId = this.userId(req);
+    await this.assertNotSuspended(userId);
+    return this.sessions.remove({ userId, target });
+  }
+
   @Post(":sessionId/reprocess")
   @SkipThrottle()
   async reprocess(@Param("sessionId") sessionId: string, @Req() req: FastifyRequest) {

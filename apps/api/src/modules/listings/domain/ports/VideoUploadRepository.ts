@@ -52,6 +52,10 @@ export interface VideoUploadRepository {
   listExpired(now: Date, limit: number): Promise<VideoSource[]>;
   /** Stale completion intents are reconciled separately from expiry backlog. */
   listStaleCompletions(now: Date, limit: number): Promise<VideoSource[]>;
+  removeVideo(ownerId: string, target: VideoUploadTarget, now: Date): Promise<void>;
+  settleCleanupCompletion(sourceId: string): Promise<void>;
+  unsettledOutputs(sourceId: string): Promise<{ key: string; started: boolean }[]>;
+  settleOutput(key: string): Promise<void>;
   recordCleanup(work: VideoCleanup, now: Date): Promise<void>;
   listPendingCleanup(now: Date, limit: number): Promise<VideoCleanup[]>;
   markCleanupDone(sourceId: string, now: Date): Promise<void>;
@@ -69,4 +73,8 @@ export interface VideoCleanup {
   sourceId: string;
   objectKey: string;
   multipartUploadId: string | null;
+  bucket?: string | undefined;
+  sizeBytes?: number | undefined;
+  completionPending?: boolean;
+  objectPrefix?: string | undefined;
 }

@@ -29,6 +29,8 @@ interface StoredMultipart {
 /** In-memory Bucket: parts are confirmed only when the server lists them. */
 export class FakeVideoStorage implements VideoStoragePort {
   readonly bucket = "listing-videos";
+  async assertUnversioned(): Promise<void> {}
+  async listObjects(prefix: string): Promise<string[]> { return [...this.objects.keys()].filter((key) => key.startsWith(prefix)); }
   private uploads = new Map<string, StoredMultipart>();
   private objects = new Map<string, VideoStoredObject>();
   completeCalls = 0;
@@ -147,6 +149,18 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
     } finally {
       release();
     }
+  }
+
+  private cleanupFor(session: VideoSession): VideoCleanup {
+    return {
+      sourceId: session.source.id,
+      objectKey: session.source.objectKey,
+      multipartUploadId: session.source.multipartUploadId,
+      objectPrefix: session.source.objectKey.replace(/\/source\.mp4$/, "/"),
+      bucket: session.source.bucket,
+      sizeBytes: session.source.sizeBytes,
+      completionPending: session.source.state === "COMPLETING",
+    };
   }
 
   async openSession(input: OpenVideoSessionInput): Promise<OpenVideoSessionResult> {
@@ -314,7 +328,9 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
     return this.locked(() => {
       const session = this.mustGet(sessionId);
       if (session.source.state === "CANCELLED") return session;
-      if (session.source.state === "COMPLETED") throw conflict("Upload already completed");
+      if (session.generation.status === "Retired") return session;
+      if (session.slot.pendingGenerationId !== session.generation.id) throw conflict("Video is no longer pending");
+      if (session.source.state === "COMPLETED" && session.slot.activeGenerationId === null) throw conflict("Upload already completed");
       if (session.source.state === "COMPLETING") throw conflict("Completion is in progress");
       if (session.source.state === "EXPIRED") {
         throw new DomainError(LISTING_ERROR_CODES.VIDEO_UPLOAD_EXPIRED, "Upload expired");
@@ -325,6 +341,7 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
       session.generation.updatedAt = now;
       session.slot.pendingGenerationId = null;
       this.cleanups.add(sessionId);
+      this.cleanupWork.set(sessionId, this.cleanupFor(session));
       return session;
     });
   }
@@ -342,6 +359,7 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
       session.generation.updatedAt = now;
       session.slot.pendingGenerationId = null;
       this.cleanups.add(sessionId);
+      this.cleanupWork.set(sessionId, this.cleanupFor(session));
       return session;
     });
   }
@@ -361,6 +379,20 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
       .map((s) => s.source)
       .filter((s) => s.state === "COMPLETING" && Boolean(s.completionStartedAt && now.getTime() - s.completionStartedAt.getTime() >= 120_000))
       .slice(0, limit);
+  }
+
+  async settleCleanupCompletion(): Promise<void> {}
+  async unsettledOutputs(): Promise<{ key: string; started: boolean }[]> { return []; }
+  async settleOutput(): Promise<void> {}
+  async removeVideo(ownerId: string, target: { type: "draft" | "listing"; id: string }): Promise<void> {
+    for (const session of this.sessions.values()) {
+      if (session.source.userId !== ownerId || session.slot.target.id !== target.id || session.slot.target.type !== target.type) continue;
+      session.generation.status = "Retired";
+      session.slot.activeGenerationId = null;
+      session.slot.pendingGenerationId = null;
+      this.cleanups.add(session.source.id);
+      this.cleanupWork.set(session.source.id, this.cleanupFor(session));
+    }
   }
 
   async recordCleanup(work: VideoCleanup): Promise<void> {

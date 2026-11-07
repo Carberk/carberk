@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, retireTargetVideos } from "@auto-tm/db";
 import type { Prisma } from "@auto-tm/db";
 
 import { ListingDraft } from "../domain/ListingDraft";
@@ -92,7 +92,12 @@ export class PrismaListingDraftRepository implements ListingDraftRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.listingDraft.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM listing_drafts WHERE id = ${id} FOR UPDATE`;
+      await retireTargetVideos(tx, { draftId: id }, new Date());
+      await tx.listingVideo.deleteMany({ where: { draftId: id } });
+      await tx.listingDraft.delete({ where: { id } });
+    });
   }
 
   private toDomain(row: {

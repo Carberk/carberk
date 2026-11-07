@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { PrismaService, recomputeListingPricesTmt } from "@auto-tm/db";
+import { PrismaService, recomputeListingPricesTmt, retireTargetVideos } from "@auto-tm/db";
 
 import { Listing } from "../domain/Listing";
 import type { ListingRepository } from "../domain/ports/ListingRepository";
@@ -138,9 +138,9 @@ export class PrismaListingRepository implements ListingRepository {
   }
 
   async softDelete(id: string, at: Date): Promise<void> {
-    await this.prisma.listing.update({
-      where: { id },
-      data: { deletedAt: at },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.listing.update({ where: { id }, data: { deletedAt: at } });
+      await retireTargetVideos(tx, { listingId: id }, at);
     });
   }
 

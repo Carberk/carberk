@@ -322,6 +322,8 @@ export class PublishListing {
       // The Listing, its media, the draft removal, the audit entry and the
       // adoption of every upload commit together or not at all.
       const listingRow = await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM listing_drafts WHERE id = ${draft.id} FOR UPDATE`;
         await this.claims.finalize(tx, { token: reservation.token, ...claim });
         const created = await tx.listing.create({
           data: {
@@ -371,6 +373,11 @@ export class PublishListing {
             },
           });
         }
+        // Transfer server-recorded ownership, independently of optional video state.
+        await tx.listingVideo.updateMany({
+          where: { draftId: draft.id, ownerId: input.userId },
+          data: { draftId: null, listingId },
+        });
         await tx.listingDraft.delete({ where: { id: draft.id } });
         await tx.auditLog.create({
           data: {

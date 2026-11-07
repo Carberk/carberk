@@ -121,6 +121,8 @@ class FakeImageVariantGenerator implements ImageVariantGenerator {
 }
 
 class FakePrisma {
+  $queryRaw = async () => [];
+  listingVideo = { updateMany: async () => ({ count: 0 }) };
   auditLogs: Array<{
     actorId: string;
     action: string;

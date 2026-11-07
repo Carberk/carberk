@@ -31,6 +31,10 @@ class MemoryStorage implements VideoProcessingStorage {
 interface FakePrisma {
   row: { status: string; [key: string]: unknown };
   videoGeneration: { findUnique: () => Promise<FakePrisma["row"]>; updateMany: (input: { data: Record<string, unknown> }) => Promise<{ count: number }> };
+  listingVideo: { findUnique: () => Promise<{ id: string; ownerId: string; draftId: string; pendingGenerationId: string; activeGenerationId: null }>; update: () => Promise<unknown> };
+  user: { findUnique: () => Promise<{ id: string }> };
+  listingDraft: { findUnique: () => Promise<{ userId: string }> };
+  videoOutputReservation: { createMany: () => Promise<{ count: number }>; update: () => Promise<unknown> };
   $queryRaw: () => Promise<unknown>;
   $transaction: <T>(work: (tx: FakePrisma) => Promise<T>) => Promise<T>;
 }
@@ -46,6 +50,13 @@ function prismaFor(status = "Processing"): FakePrisma {
       findUnique: async () => row,
       updateMany: async ({ data }: { data: Record<string, unknown> }) => { Object.assign(row, data); return { count: 1 }; },
     },
+    listingVideo: {
+      findUnique: async () => ({ id: "slot-1", ownerId: "owner-1", draftId: "draft-1", pendingGenerationId: "generation-1", activeGenerationId: null }),
+      update: async () => ({}),
+    },
+    user: { findUnique: async () => ({ id: "owner-1" }) },
+    listingDraft: { findUnique: async () => ({ userId: "owner-1" }) },
+    videoOutputReservation: { createMany: async () => ({ count: 1 }), update: async () => ({}) },
     $queryRaw: async () => [],
     $transaction: async (work) => work(prisma),
   };

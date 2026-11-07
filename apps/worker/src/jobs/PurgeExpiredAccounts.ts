@@ -125,6 +125,11 @@ export class PurgeExpiredAccounts {
         where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
       }),
 
+      // Purged Users remain as public tombstones. Delete their video slots
+      // explicitly; source cascades preserve exact cleanup in the DB ledger.
+      // This precedes Draft deletion because a video target uses NO ACTION.
+      this.prisma.listingVideo.deleteMany({ where: { ownerId: userId } }),
+
       // Prune dealership memberships
       this.prisma.dealershipMember.deleteMany({ where: { userId } }),
 
