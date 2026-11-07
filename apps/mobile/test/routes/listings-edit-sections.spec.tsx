@@ -153,6 +153,13 @@ async function answerNotDamaged(screen: Screen, locale: keyof typeof localized) 
 }
 
 beforeEach(() => {
+  server.use(http.get("*/me", () => HttpResponse.json({
+    id: "550e8400-e29b-41d4-a716-446655440000", phone: null, email: null,
+    phoneVerified: false, displayName: null, nameNumber: 4821, avatarIndex: 0,
+    avatarKey: null, avatarUrl: null, role: "seller", locale: "en",
+    createdAt: "2026-01-01T00:00:00.000Z", deletionScheduledAt: null,
+    isVideoUploadTester: false, canUploadVideo: false,
+  })));
   routeParams.id = id;
   routerMock.canGoBack.mockReturnValue(true);
 });

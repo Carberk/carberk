@@ -7,6 +7,6 @@ export interface ListingVideoProjection {
 
 export interface ListingVideoReadPort {
   /** One authoritative page read; pending state is returned only for this owner. */
-  getForListings(listingIds: string[], ownerId?: string): Promise<Map<string, ListingVideoProjection>>;
+  getForListings(listingIds: string[], ownerId?: string, viewerId?: string): Promise<Map<string, ListingVideoProjection>>;
 }
 export const LISTING_VIDEO_READ_PORT = Symbol("ListingVideoReadPort");

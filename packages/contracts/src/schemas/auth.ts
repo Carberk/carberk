@@ -121,6 +121,9 @@ export const MeResponseSchema = z.object({
   locale: z.string().nullable(),
   createdAt: DateTimeSchema,
   deletionScheduledAt: DateTimeSchema.nullable(),
+  // Optional for installed APIs; absence always keeps the Video card hidden.
+  isVideoUploadTester: z.boolean().optional(),
+  canUploadVideo: z.boolean().optional(),
 });
 export type MeResponse = z.infer<typeof MeResponseSchema>;
 

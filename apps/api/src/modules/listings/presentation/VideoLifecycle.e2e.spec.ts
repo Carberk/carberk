@@ -8,14 +8,21 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { PrismaService } from "@auto-tm/db";
-import { ConfigService } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { JwtModule } from "@nestjs/jwt";
+import { Test, type TestingModule } from "@nestjs/testing";
 import { S3Client } from "@aws-sdk/client-s3";
 import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
-import { EnvSchema } from "../../../env.schema";
+import { EnvSchema, type Env } from "../../../env.schema";
+import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
+import { IdentityModule } from "../../identity/identity.module";
+import { IDENTITY_CHECK_PORT, type IdentityCheckPort } from "../../identity/identity.public";
+import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 import { VideoUploadSessions } from "../application/VideoUploadSessions";
 import { BucketVideoStorage } from "../infrastructure/BucketVideoStorage";
 import { PrismaVideoUploadRepository } from "../infrastructure/PrismaVideoUploadRepository";
@@ -43,6 +50,7 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
   const sourceIds: string[] = [];
   const listingIds: string[] = [];
   let prisma: PrismaService;
+  let identityModule: TestingModule;
   let s3: S3Client;
   let storage: BucketVideoStorage;
   interface ProcessingStorage {
@@ -100,6 +108,12 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
     prisma = new PrismaService();
     await seedSuiteCatalog(prisma, suite);
     const env = EnvSchema.parse(process.env);
+    identityModule = await Test.createTestingModule({ imports: [
+      EventEmitterModule.forRoot(), bullTestRoot(),
+      ConfigModule.forRoot({ isGlobal: true, validate: (cfg) => EnvSchema.parse(cfg) }),
+      JwtModule.register({ global: true, secret: process.env["JWT_ACCESS_SECRET"] ?? "dev-secret-change-me" }),
+      IdentityModule,
+    ] }).compile();
     storage = new ControlledStorage(new ConfigService(env));
     s3 = new S3Client({ endpoint: env.MINIO_ENDPOINT, region: env.MINIO_REGION, forcePathStyle: true, maxAttempts: 1,
       credentials: { accessKeyId: env.MINIO_ACCESS_KEY, secretAccessKey: env.MINIO_SECRET_KEY } });
@@ -115,6 +129,7 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
   });
 
   afterAll(async () => {
+    await identityModule?.close();
     if (!prisma) return;
     await prisma.user.deleteMany({ where: { id: { in: users } } });
     await prisma.listing.deleteMany({ where: { id: { in: listingIds } } });
@@ -157,7 +172,9 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
 
   async function slot(input: Awaited<ReturnType<typeof target>>) { return repo.findSlotForTarget(input.userId, input.target); }
   async function publicGeneration(input: Awaited<ReturnType<typeof target>>) {
-    return (await new PrismaListingVideoReadRepository(prisma).getForListings([input.target.id])).get(input.target.id)?.video?.generationId;
+    const access = new ConfigListingVideoAccess(new ConfigService<Env, true>({ LISTING_VIDEO_VIEW_TESTER_USER_IDS: input.userId }));
+    const read = new PrismaListingVideoReadRepository(prisma, access, identityModule.get<IdentityCheckPort>(IDENTITY_CHECK_PORT));
+    return (await read.getForListings([input.target.id], undefined, input.userId)).get(input.target.id)?.video?.generationId;
   }
   async function clean() {
     // Exercise the retry interface with a deterministic clock, including work

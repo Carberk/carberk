@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 import { BullModule } from "@nestjs/bullmq";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { AuthSchemas } from "@auto-tm/contracts";
@@ -16,6 +17,7 @@ import { RefreshSession } from "./application/RefreshSession";
 import { Logout } from "./application/Logout";
 import { LogoutAll } from "./application/LogoutAll";
 import { GetMe } from "./application/GetMe";
+import { ConfigListingVideoAccess } from "../../common/ConfigListingVideoAccess";
 import { UpdateDisplayName } from "./application/UpdateDisplayName";
 import { DeleteMe } from "./application/DeleteMe";
 import { RecoverAccount } from "./application/RecoverAccount";
@@ -71,6 +73,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
 
 @Module({
   imports: [
+    ConfigModule,
     EventEmitterModule,
     PrismaModule,
     BullModule.registerQueue({ name: AuthSchemas.EMAIL_CODE_QUEUE }),
@@ -207,6 +210,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     RefreshSession,
     Logout,
     LogoutAll,
+    ConfigListingVideoAccess,
     GetMe,
     UpdateDisplayName,
     DeleteMe,

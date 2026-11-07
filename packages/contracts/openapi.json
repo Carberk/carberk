@@ -7509,6 +7509,12 @@
             "type": "string",
             "nullable": true,
             "format": "date-time"
+          },
+          "isVideoUploadTester": {
+            "type": "boolean"
+          },
+          "canUploadVideo": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -9112,6 +9118,12 @@
             "type": "string",
             "nullable": true,
             "format": "date-time"
+          },
+          "isVideoUploadTester": {
+            "type": "boolean"
+          },
+          "canUploadVideo": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -12415,6 +12427,12 @@
                       "type": "string",
                       "nullable": true,
                       "format": "date-time"
+                    },
+                    "isVideoUploadTester": {
+                      "type": "boolean"
+                    },
+                    "canUploadVideo": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -12756,6 +12774,12 @@
                       "type": "string",
                       "nullable": true,
                       "format": "date-time"
+                    },
+                    "isVideoUploadTester": {
+                      "type": "boolean"
+                    },
+                    "canUploadVideo": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -13139,6 +13163,12 @@
                       "type": "string",
                       "nullable": true,
                       "format": "date-time"
+                    },
+                    "isVideoUploadTester": {
+                      "type": "boolean"
+                    },
+                    "canUploadVideo": {
+                      "type": "boolean"
                     }
                   },
                   "required": [

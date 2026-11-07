@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import { Check, Play } from "lucide-react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -33,11 +33,12 @@ interface ListingVideoEditorProps {
   onCancel: () => void;
   onChange: () => void;
   onUse: () => void;
+  actionNote?: ReactNode;
 }
 
 type DragKind = "start" | "end" | "window";
 
-export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, onUse }: ListingVideoEditorProps) {
+export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, onUse, actionNote }: ListingVideoEditorProps) {
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const [previewing, setPreviewing] = useState(false);
@@ -283,6 +284,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
         </View>
       </View>
 
+      {actionNote}
       <Button onPress={onUse} disabled={!canUse} accessibilityLabel={useLabel}>
         <Text>{useLabel}</Text>
       </Button>

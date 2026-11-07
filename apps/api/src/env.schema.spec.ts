@@ -503,3 +503,14 @@ describe("photo conversion maintenance setting", () => {
     expect(EnvSchema.safeParse({ ...baseEnv, PHOTO_CONVERSION_MAINTENANCE: "yes" }).success).toBe(false);
   });
 });
+
+
+describe("Listing video rollout defaults", () => {
+  it("starts with no upload or view testers and new uploads disabled", () => {
+    expect(EnvSchema.parse(baseEnv)).toMatchObject({
+      LISTING_VIDEO_UPLOADS_ENABLED: false,
+      LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: "",
+      LISTING_VIDEO_VIEW_TESTER_USER_IDS: "",
+    });
+  });
+});

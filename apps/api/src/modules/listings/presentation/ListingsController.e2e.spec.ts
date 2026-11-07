@@ -3,7 +3,7 @@ import "reflect-metadata";
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { Test, type TestingModule } from "@nestjs/testing";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigService, ConfigModule } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import {
@@ -108,6 +108,10 @@ describe("ListingsController e2e", () => {
   });
 
   beforeEach(async () => {
+    const config = app.get(ConfigService);
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", suite.id("user-1"));
+    config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", suite.id("user-1"));
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", true);
     // Only this suite owns the USD→TMT pair; the EXCHANGE_RATE_MISSING test
     // depends on its absence at test start. TMT→TMT is shared with other
     // suites — seeded via upsert, never deleted (see e2eSuite helper).
@@ -194,14 +198,54 @@ describe("ListingsController e2e", () => {
       return { token, listingId, slot, source, generation };
     }
 
-    async function reads(token: string, listingId: string) {
-      await request.post(`/api/v1/listings/${listingId}/favorite`).set("Authorization", `Bearer ${token}`).send({}).expect(201);
-      const detail = await request.get(`/api/v1/listings/${listingId}`).expect(200);
-      const feed = await request.get("/api/v1/listings").expect(200);
+    async function reads(token: string, listingId: string, ensureFavorite = true) {
+      if (ensureFavorite) await request.post(`/api/v1/listings/${listingId}/favorite`).set("Authorization", `Bearer ${token}`).send({}).expect(201);
+      const detail = await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);
+      const feed = await request.get("/api/v1/listings").set("Authorization", `Bearer ${token}`).expect(200);
       const favorites = await request.get("/api/v1/favorites").set("Authorization", `Bearer ${token}`).expect(200);
       const owner = await request.get("/api/v1/me/listings").set("Authorization", `Bearer ${token}`).expect(200);
       return [detail.body, feed.body.items.find((item: { id: string }) => item.id === listingId), favorites.body.items.find((item: { id: string }) => item.id === listingId), owner.body.items.find((item: { id: string }) => item.id === listingId)];
     }
+
+    it.each([
+      [false, false, false], [false, false, true],
+      [true, false, false], [true, false, true],
+      [false, true, false], [false, true, true],
+      [true, true, false], [true, true, true],
+    ])("keeps upload=%s view=%s switch=%s independent on real reads and /me", async (upload, view, enabled) => {
+      const { token, listingId, slot } = await videoFixture();
+      const source = await prisma.videoSource.create({ data: { userId: suite.id("user-1"), listingVideoId: slot.id, bucket: "private", objectKey: `pending/${slot.id}/source.mp4`, multipartUploadId: slot.id, contentType: "video/mp4", sizeBytes: 1000, partSizeBytes: 5242880, partCount: 1, state: "COMPLETED", coverOffsetMs: 0, expiresAt: new Date("2030-01-01") } });
+      const pending = await prisma.videoGeneration.create({ data: { listingVideoId: slot.id, sourceId: source.id, status: "Processing", coverOffsetMs: 0 } });
+      await prisma.listingVideo.update({ where: { id: slot.id }, data: { pendingGenerationId: pending.id } });
+      const config = app.get(ConfigService);
+      config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", upload ? suite.id("user-1") : "");
+      config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", view ? suite.id("user-1") : "");
+      config.set("LISTING_VIDEO_UPLOADS_ENABLED", enabled);
+      const results = await reads(token, listingId);
+      for (const [index, result] of results.entries()) {
+        expect(!!result.video).toBe(view);
+        expect(!!result.pendingVideo).toBe(upload && (index === 0 || index === 3));
+        expect(JSON.stringify(result)).not.toContain("private/");
+      }
+      const me = await request.get("/api/v1/me").set("Authorization", `Bearer ${token}`).expect(200);
+      expect(me.body).toMatchObject({ isVideoUploadTester: upload, canUploadVideo: upload && enabled });
+      for (const path of [`/api/v1/listings/${listingId}`, "/api/v1/listings"]) {
+        const anonymous = await request.get(path).expect(200);
+        expect(JSON.stringify(anonymous.body)).not.toContain('"video":');
+      }
+    });
+
+    it.each(["suspendedAt", "deletionScheduledAt"])("removes video metadata and upload capability from an account with %s", async (field) => {
+      const { token, listingId } = await videoFixture();
+      await reads(token, listingId);
+      await prisma.user.update({ where: { id: suite.id("user-1") }, data: { [field]: new Date() } });
+      for (const result of await reads(token, listingId, false)) {
+        expect(result.video).toBeUndefined();
+        expect(result.pendingVideo).toBeUndefined();
+      }
+      const me = await request.get("/api/v1/me").set("Authorization", `Bearer ${token}`).expect(200);
+      expect(me.body).toMatchObject({ isVideoUploadTester: false, canUploadVideo: false });
+    });
 
     it("returns active Ready manifest metadata on detail, Results, Favorites and owner without changing photos", async () => {
       const { token, listingId, slot, generation } = await videoFixture();
@@ -248,7 +292,7 @@ describe("ListingsController e2e", () => {
       await prisma.listingVideo.update({ where: { id: slot.id }, data: { pendingGenerationId: pending.id } });
       const results = await reads(token, listingId);
       for (const result of results) expect(result.video.generationId).toBe(generation.id);
-      for (const result of results.slice(0, 3)) expect(result.pendingVideo).toBeUndefined();
+      for (const result of results.slice(1, 3)) expect(result.pendingVideo).toBeUndefined();
       const expected = { id: slot.id, generationId: pending.id, sourceId: source.id, status: projectedStatus, ...(failureType ? { failureType } : {}), canReprocess };
       expect(results[3].pendingVideo).toEqual(expected);
       const ownerDetail = await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);

@@ -1,3 +1,7 @@
+import type { Env } from "../../../env.schema";
+import { InMemoryIdentityCheck } from "./testing/InMemoryIdentityCheck";
+import { ConfigService } from "@nestjs/config";
+import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
 import { describe, it, expect, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import type { SignInMethods } from "../domain/SignInMethods";
@@ -46,7 +50,7 @@ class FakeUserRepository implements UserRepository {
 }
 
 function makeUseCase(userRepo?: FakeUserRepository) {
-  return new GetMe(userRepo ?? new FakeUserRepository());
+  return new GetMe(userRepo ?? new FakeUserRepository(), new ConfigListingVideoAccess(new ConfigService<Env, true>({ LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: "", LISTING_VIDEO_VIEW_TESTER_USER_IDS: "", LISTING_VIDEO_UPLOADS_ENABLED: false })), new InMemoryIdentityCheck());
 }
 
 describe("GetMe", () => {
@@ -54,6 +58,22 @@ describe("GetMe", () => {
 
   beforeEach(() => {
     userRepo = new FakeUserRepository();
+  });
+
+  it("reports membership separately from the switch and removes capabilities from ineligible accounts", async () => {
+    userRepo.users.set("user-1", makeUser());
+    const config = new ConfigService<Env, true>({ LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: " user-1, user-2 ", LISTING_VIDEO_VIEW_TESTER_USER_IDS: "", LISTING_VIDEO_UPLOADS_ENABLED: true });
+    const identity = new InMemoryIdentityCheck();
+    const me = new GetMe(userRepo, new ConfigListingVideoAccess(config), identity);
+    expect(await me.execute({ userId: "user-1" })).toMatchObject({ isVideoUploadTester: true, canUploadVideo: true });
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", false);
+    expect(await me.execute({ userId: "user-1" })).toMatchObject({ isVideoUploadTester: true, canUploadVideo: false });
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", true);
+    identity.suspend("user-1");
+    expect(await me.execute({ userId: "user-1" })).toMatchObject({ isVideoUploadTester: false, canUploadVideo: false });
+    identity.unsuspend("user-1");
+    userRepo.users.set("user-1", makeUser({ deletionScheduledAt: new Date() }));
+    expect(await me.execute({ userId: "user-1" })).toMatchObject({ isVideoUploadTester: false, canUploadVideo: false });
   });
 
   it("returns the contract user shape for an existing user", async () => {
