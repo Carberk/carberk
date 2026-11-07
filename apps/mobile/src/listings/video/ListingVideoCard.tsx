@@ -103,6 +103,8 @@ export function ListingVideoCard({
   const [draft, setDraft] = useState<ListingVideoDraft | null>(null);
   const [committedDraft, setCommittedDraft] = useState<ListingVideoDraft | null>(null);
   const [editing, setEditing] = useState(false);
+  const selectionRevision = useRef(0);
+  useEffect(() => () => { selectionRevision.current += 1; }, []);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const prep = useListingVideoPreparation({
     native: videoNative,
@@ -153,6 +155,7 @@ export function ListingVideoCard({
   };
 
   const chooseFromLibrary = async () => {
+    selectionRevision.current += 1;
     if (!(await checkAccess())) return;
     let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
     if (!permission.granted && permission.canAskAgain) {
@@ -196,14 +199,19 @@ export function ListingVideoCard({
         <ListingVideoEditor
           draft={draft}
           actionNote={accessNote}
-          onDraftChange={setDraft}
+          onDraftChange={(next) => {
+            selectionRevision.current += 1;
+            setDraft(next);
+          }}
           onCancel={() => {
+            selectionRevision.current += 1;
             setDraft(committedDraft);
             setEditing(false);
           }}
           onChange={() => void chooseFromLibrary()}
           onUse={() => void (async () => {
-            if (!(await checkAccess())) return;
+            const revision = selectionRevision.current;
+            if (!(await checkAccess()) || revision !== selectionRevision.current) return;
             setCommittedDraft(draft);
             setEditing(false);
             prep.prepare(toSelection(draft));

@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as FileSystem from "expo-file-system/legacy";
+import { waitFor } from "@testing-library/react-native";
 
 import { storeAuthSession, clearAuthSession } from "../../auth/session";
 import { server } from "../../../test/msw";
@@ -990,5 +991,36 @@ describe("current-user video access", () => {
     enabled = true;
     await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
     expect(await screen.findByTestId("listing-video-prepared")).toBeTruthy();
+  });
+
+  it.each(["cancel", "trim", "cover"])("ignores pending Use video authorization after the seller changes %s", async (change) => {
+    const started = deferred<undefined>();
+    const response = deferred<undefined>();
+    let hold = false;
+    server.use(http.get("*/me", async () => {
+      if (hold) { started.resolve(undefined); await response.promise; }
+      return HttpResponse.json({ ...me, isVideoUploadTester: true, canUploadVideo: true });
+    }));
+    const native = fakeNative();
+    const screen = await renderMobile(<ListingVideoCard videoNative={native} />);
+    await screen.findByRole("button", { name: "Choose from library" });
+    await pickVideo(screen, 12_000);
+    hold = true;
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    await started.promise;
+    if (change === "cancel") {
+      await fireEvent.press(screen.getByRole("button", { name: "Cancel" }));
+    } else if (change === "trim") {
+      await fireEvent(screen.getByTestId("listing-video-start-handle"), "accessibilityAction", { nativeEvent: { actionName: "increment" } });
+    } else {
+      await fireEvent.press(screen.getByRole("button", { name: "Cover 2 of 4, frame at 0:05" }));
+    }
+    response.resolve(undefined);
+    await waitFor(() => expect(screen.queryByLabelText(screen.i18n.t("loading"))).toBeNull());
+    expect(native.prepare).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("listing-video-prepared")).toBeNull();
+    if (change === "cancel") expect(screen.getByRole("button", { name: "Choose from library" })).toBeTruthy();
+    if (change === "trim") expect(startNow(screen)).toBe(1);
+    if (change === "cover") expect(screen.getByRole("button", { name: "Cover 2 of 4, frame at 0:05" }).props.accessibilityState.selected).toBe(true);
   });
 });
