@@ -193,6 +193,8 @@ export function useListingVideoPreparation(options: UseListingVideoPreparationOp
           selection.startS,
           selection.endS,
           selection.posterS,
+          undefined,
+          selection.source.durationS,
         );
         handleRef.current = handle;
         const file = await handle.done;

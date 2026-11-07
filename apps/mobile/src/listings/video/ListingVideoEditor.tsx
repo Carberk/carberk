@@ -49,6 +49,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
   const long = isLongSource(draft);
   const covers = coverTimesFor(draft);
   const minS = Math.min(LISTING_VIDEO_MIN_S, durationS);
+  const canUse = selectedS > 0 && selectedS >= minS;
 
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -282,7 +283,7 @@ export function ListingVideoEditor({ draft, onDraftChange, onCancel, onChange, o
         </View>
       </View>
 
-      <Button onPress={onUse} disabled={selectedS < LISTING_VIDEO_MIN_S} accessibilityLabel={useLabel}>
+      <Button onPress={onUse} disabled={!canUse} accessibilityLabel={useLabel}>
         <Text>{useLabel}</Text>
       </Button>
     </View>

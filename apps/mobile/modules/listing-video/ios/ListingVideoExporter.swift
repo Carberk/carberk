@@ -127,6 +127,15 @@ public final class ListingVideoExporter: @unchecked Sendable {
     guard assetDuration.isFinite, endS <= assetDuration + 0.05 else {
       throw ListingVideoExportError.sourceUnreadable
     }
+    // Keep the editor's 3-second trim floor in native preparation too. The
+    // one exception is a source shorter than 3 seconds kept in full.
+    let isWholeShortSource =
+      assetDuration > 0 && assetDuration < 3.0 &&
+      durationS > 0 && durationS < 3.0 &&
+      abs(startS) <= 0.001 && abs(endS - assetDuration) <= 0.01
+    guard durationS >= 3.0 || isWholeShortSource else {
+      throw ListingVideoExportError.exportFailed("interval-too-short")
+    }
 
     // 2. Reader over only the kept interval.
     let start = CMTime(seconds: startS, preferredTimescale: 600)

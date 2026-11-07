@@ -201,7 +201,7 @@ describe("Listing video card on the Photos step", () => {
 });
 
 describe("Listing video editor", () => {
-  it("keeps four usable, rounded cover choices for a fractional short video", async () => {
+  it("keeps four usable fractional cover choices for a short video", async () => {
     const native = fakeNative();
     const screen = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo videoNative={native} />);
     await pickVideo(screen, 1_800);
@@ -213,7 +213,11 @@ describe("Listing video editor", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Cover 4 of 4, frame at 0:02" }));
     expect(screen.getByRole("button", { name: "Cover 4 of 4, frame at 0:02" }).props.accessibilityState.selected).toBe(true);
     expect(screen.getAllByText("0:01")).toHaveLength(2);
-    expect(native.prepare).not.toHaveBeenCalled();
+    await act(async () => {
+      await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    });
+    expect(native.prepare).toHaveBeenCalledWith(expect.any(String), 0, 1.8, 1.575, "job-1");
+    expect(await screen.findByText("Video ready")).toBeTruthy();
   });
 
   it("previews only the kept interval and stops at its end", async () => {
@@ -426,7 +430,7 @@ describe("Listing video editor", () => {
     expect(screen.getByRole("button", { name: "Open Settings" })).toBeTruthy();
   });
 
-  it("will not use a video shorter than 3 seconds", async () => {
+  it("uses a whole video shorter than 3 seconds", async () => {
     const native = fakeNative();
     const screen = await renderMobile(
       <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
@@ -434,14 +438,14 @@ describe("Listing video editor", () => {
     await pickVideo(screen, 2_000);
 
     const use = screen.getByRole("button", { name: "Use video" });
-    expect(use.props.accessibilityState?.disabled ?? use.props.disabled).toBeTruthy();
+    expect(use.props.accessibilityState?.disabled ?? use.props.disabled).toBeFalsy();
     await act(async () => {
       await fireEvent.press(use);
     });
-    expect(native.prepare).not.toHaveBeenCalled();
+    expect(native.prepare).toHaveBeenCalledWith(expect.any(String), 0, 2, 0.25, "job-1");
   });
 
-  it("will not use a 2.9-second video that only rounds up to 3 seconds", async () => {
+  it("uses a whole 2.9-second video without rounding its interval", async () => {
     const native = fakeNative();
     const screen = await renderMobile(
       <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
@@ -449,8 +453,11 @@ describe("Listing video editor", () => {
     await pickVideo(screen, 2_999);
 
     const use = screen.getByRole("button", { name: "Use video" });
-    expect(use.props.accessibilityState?.disabled ?? use.props.disabled).toBeTruthy();
-    expect(native.prepare).not.toHaveBeenCalled();
+    expect(use.props.accessibilityState?.disabled ?? use.props.disabled).toBeFalsy();
+    await act(async () => {
+      await fireEvent.press(use);
+    });
+    expect(native.prepare).toHaveBeenCalledWith(expect.any(String), 0, 2.999, 0.374875, "job-1");
   });
 
   it("reopens the picker from Change and replaces the pick", async () => {

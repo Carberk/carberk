@@ -84,6 +84,7 @@ export function validateInterval(
   startS: number,
   endS: number,
   coverS: number,
+  sourceDurationS?: number,
 ): void {
   if (!Number.isFinite(startS) || !Number.isFinite(endS) || startS < 0 || endS <= startS) {
     throw new ListingVideoError(
@@ -92,7 +93,18 @@ export function validateInterval(
     );
   }
   const durationS = endS - startS;
-  if (durationS < MIN_INTERVAL_S || durationS > MAX_INTERVAL_S) {
+  // The editor enforces a 3-second minimum for trims. A source shorter than
+  // that may be prepared only as its complete interval (start at zero and
+  // end at the source duration); all other intervals retain the minimum.
+  const isWholeShortSource =
+    Number.isFinite(sourceDurationS) &&
+    (sourceDurationS ?? 0) > 0 &&
+    (sourceDurationS ?? 0) < MIN_INTERVAL_S &&
+    durationS > 0 &&
+    durationS < MIN_INTERVAL_S &&
+    startS === 0 &&
+    Math.abs(durationS - (sourceDurationS ?? 0)) <= 0.001;
+  if ((!isWholeShortSource && durationS < MIN_INTERVAL_S) || durationS > MAX_INTERVAL_S) {
     throw new ListingVideoError(
       "invalid-interval",
       `The kept part must be between ${MIN_INTERVAL_S} and ${MAX_INTERVAL_S} seconds.`,
@@ -113,13 +125,14 @@ export function prepareListingVideo(
   endS: number,
   coverS: number,
   onProgress?: (progress: PrepareProgress) => void,
+  sourceDurationS?: number,
 ): PrepareHandle {
   let cancelImpl: () => void = () => undefined;
   const done = (async (): Promise<PreparedVideoFile> => {
     if (!source || typeof source !== "string") {
       throw new ListingVideoError("invalid-source", "No source video was given.");
     }
-    validateInterval(startS, endS, coverS);
+    validateInterval(startS, endS, coverS, sourceDurationS);
     if (!native) {
       throw new ListingVideoError(
         "unsupported-platform",
