@@ -60,7 +60,6 @@ export interface VideoUploadRepository {
   listPendingCleanup(now: Date, limit: number): Promise<VideoCleanup[]>;
   markCleanupDone(sourceId: string, now: Date): Promise<void>;
   markCleanupFailed(sourceId: string, error: string, now: Date): Promise<void>;
-  hasPendingCleanup(sourceId: string): Promise<boolean>;
   /** Failed -> Processing with a new fenced output namespace, retaining source bytes. */
   claimProcessingRetry(sessionId: string, now: Date): Promise<{ sourceId: string; generationId: string; attempt: number }>;
 }

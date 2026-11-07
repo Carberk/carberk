@@ -284,7 +284,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     await this.assertCurrentEligibility(input.userId, session);
     const now = await this.now();
     if (session.source.state === "CANCELLED") {
-      if (await this.repo.hasPendingCleanup(session.source.id)) await this.cleanupSession(session);
+      await this.retryCleanup();
       return { sessionId: session.source.id, generationId: session.generation.id, state: "CANCELLED" };
     }
     const claimed = await this.repo.claimCancellation(session.source.id, now).catch((e) => rethrowDomain(e));
@@ -386,9 +386,10 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
 
   private assertReplayMatches(session: VideoSession, input: OpenVideoUploadInput): void {
     const s = session.source;
+    const openingTarget = s.openingDraftId ? { type: "draft", id: s.openingDraftId } : session.slot.target;
     const same =
-      session.slot.target.type === input.target.type &&
-      session.slot.target.id === input.target.id &&
+      openingTarget.type === input.target.type &&
+      openingTarget.id === input.target.id &&
       s.contentType === input.contentType &&
       s.sizeBytes === input.sizeBytes &&
       s.coverOffsetMs === input.coverOffsetMs;
@@ -402,15 +403,8 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
 
   private async cleanupSession(session: VideoSession): Promise<void> {
     if (session.source.state !== "CANCELLED" && session.source.state !== "EXPIRED") return;
-    await this.cleanup({
-      sourceId: session.source.id,
-      objectKey: session.source.objectKey,
-      multipartUploadId: session.source.multipartUploadId,
-      objectPrefix: session.source.objectKey.replace(/\/source\.mp4$/, "/"),
-      bucket: session.source.bucket,
-      sizeBytes: session.source.sizeBytes,
-      completionPending: false,
-    });
+    // The persisted ledger retains uncertainty from the pre-retirement state.
+    await this.retryCleanup();
   }
 
   private async cleanup(work: VideoCleanup): Promise<void> {

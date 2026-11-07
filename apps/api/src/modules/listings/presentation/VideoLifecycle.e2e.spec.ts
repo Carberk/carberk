@@ -10,6 +10,8 @@ import { promisify } from "node:util";
 import { PrismaService } from "@auto-tm/db";
 import { ConfigService } from "@nestjs/config";
 import { S3Client } from "@aws-sdk/client-s3";
+import { Queue, Worker } from "bullmq";
+import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
@@ -51,6 +53,7 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
   }
   let StorageClass: new (s3: S3Client, bucket: string) => ProcessingStorage;
   let Processor: new (prisma: PrismaService, storage: ProcessingStorage) => { process(job: { sourceId: string; generationId: string; attempt: number }): Promise<void> };
+  let Transcoder: new (processor: InstanceType<typeof Processor>) => { process(job: { data: { sourceId: string; generationId: string; attempt: number }; attemptsStarted: number }): Promise<void> };
   let Purge: new (prisma: PrismaService) => { execute(input: { now: Date }): Promise<unknown> };
   let outputs: ProcessingStorage;
   let repo: PrismaVideoUploadRepository;
@@ -63,9 +66,11 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
   let beforePut: (() => Promise<void>) | undefined;
   let beforeInitialize: (() => Promise<void>) | undefined;
   let beforeComplete: (() => Promise<void>) | undefined;
+  let completionUncertain = false;
 
   class ControlledStorage extends BucketVideoStorage {
     override async completeMultipart(input: Parameters<BucketVideoStorage["completeMultipart"]>[0]) {
+      if (completionUncertain) throw new Error("TimeoutError");
       const hook = beforeComplete; beforeComplete = undefined;
       if (hook) await hook();
       return super.completeMultipart(input);
@@ -77,6 +82,7 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
     // bridge tests do. Dynamic loading keeps their TypeScript roots separate.
     const workerRoot = resolve(__dirname, "../../../../../worker/src");
     ({ ListingVideoProcessor: Processor } = await import(join(workerRoot, "video/ListingVideoProcessor")));
+    ({ VideoTranscodeProcessor: Transcoder } = await import(join(workerRoot, "queues/video-transcode.processor")));
     ({ S3VideoProcessingStorage: StorageClass } = await import(join(workerRoot, "video/VideoProcessingStorage")));
     ({ PurgeExpiredAccounts: Purge } = await import(join(workerRoot, "jobs/PurgeExpiredAccounts")));
   class ControlledOutputs extends StorageClass {
@@ -308,5 +314,53 @@ describe.skipIf(!enabled || !hasFfmpeg)("video lifecycle on Postgres and MinIO (
     expect(await storage.listObjects(`video-sources/${job.sourceId}/`)).toEqual([]);
     expect(await prisma.videoUploadCleanup.findUnique({ where: { sourceId: job.sourceId } })).toMatchObject({ status: "PENDING" });
     await deliver(); await clean(); await gone(job.sourceId);
+  });
+
+  it("keeps uncertain completion cleanup pending when Remove is followed by Cancel", async () => {
+    const input = await target();
+    const job = await upload(input, false);
+    completionUncertain = true;
+    try {
+      await expect(sessions.complete({ userId: input.userId, sessionId: job.sourceId })).rejects.toThrow("TimeoutError");
+      await sessions.remove(input); await clean();
+      await sessions.cancel({ userId: input.userId, sessionId: job.sourceId });
+      expect(await prisma.videoUploadCleanup.findUnique({ where: { sourceId: job.sourceId } })).toMatchObject({ status: "PENDING", completionPending: true });
+    } finally { completionUncertain = false; }
+    await clean(); await gone(job.sourceId);
+  });
+
+  it("recovers a stalled delivery into a fresh attempt and fences its late writes", async () => {
+    const input = await target();
+    const job = await upload(input);
+    const gate = barrier(); beforePut = gate.wait;
+    const connection = new Redis(process.env["REDIS_URL"]!, { maxRetriesPerRequest: null });
+    const name = `video-recovery-${randomUUID()}`;
+    const queue = new Queue(name, { connection });
+    const transcoder = new Transcoder(new Processor(prisma, outputs));
+    let firstRun: Promise<void> | undefined;
+    const first = new Worker(name, (delivery) => { firstRun = transcoder.process(delivery); return firstRun; }, { connection, lockDuration: 300, skipLockRenewal: true, stalledInterval: 100 });
+    first.on("error", () => undefined); // The deliberately abandoned lock is lost.
+    let recovery: Worker | undefined;
+    try {
+      await queue.add("process", job, { jobId: `${job.generationId}-1`, attempts: 1 });
+      await gate.started;
+      await first.close(true);
+      recovery = new Worker(name, (delivery) => transcoder.process(delivery), { connection, stalledInterval: 100 });
+      recovery.on("error", () => undefined);
+      const completed = () => new Promise<void>((resolve, reject) => { recovery!.once("completed", () => resolve()); recovery!.once("failed", (_job, error) => reject(error)); });
+      await completed();
+      expect(await repo.findSession(job.sourceId)).toMatchObject({ generation: { status: "Processing", processingAttempt: 2 } });
+      gate.release(); await firstRun?.catch(() => undefined);
+      const ready = completed();
+      await queue.add("process", { ...job, attempt: 2 }, { jobId: `${job.generationId}-2`, attempts: 1 });
+      await ready;
+      expect(await publicGeneration(input)).toBe(job.generationId);
+      expect((await storage.listObjects(`video-sources/${job.sourceId}/`)).some((key) => key.includes("/processing/2/"))).toBe(true);
+      await sessions.remove(input); await clean(); await gone(job.sourceId);
+    } finally {
+      gate.release(); await firstRun?.catch(() => undefined);
+      await first.close(true); await recovery?.close(true);
+      await queue.obliterate({ force: true }); await queue.close(); connection.disconnect();
+    }
   });
 });

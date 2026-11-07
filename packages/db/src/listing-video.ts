@@ -24,4 +24,3 @@ export async function retireTargetVideos(tx: Prisma.TransactionClient, target: {
     await retireVideoGenerations(tx, slot.id, generations.map((generation) => generation.id), now);
   }
 }
-

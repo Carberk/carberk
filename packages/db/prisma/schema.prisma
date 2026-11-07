@@ -590,6 +590,8 @@ model VideoSource {
   /// OPEN, COMPLETING, COMPLETED, CANCELLED or EXPIRED.
   state               String       @default("OPEN")
   openIdempotencyKey  String?
+  /// Original Draft identity survives adoption by a Listing for Open replays.
+  openingDraftId      String?
   coverOffsetMs       Int
   expiresAt           DateTime
   completionStartedAt DateTime?

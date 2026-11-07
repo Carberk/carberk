@@ -173,9 +173,10 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
         );
         if (existing) {
           const s = existing.source;
+          const openingTarget = s.openingDraftId ? { type: "draft", id: s.openingDraftId } : existing.slot.target;
           const sameInput =
-            existing.slot.target.type === input.target.type &&
-            existing.slot.target.id === input.target.id &&
+            openingTarget.type === input.target.type &&
+            openingTarget.id === input.target.id &&
             s.contentType === input.contentType &&
             s.sizeBytes === input.sizeBytes &&
             s.coverOffsetMs === input.coverOffsetMs;
@@ -216,6 +217,7 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
           partCount: input.partCount,
           state: "OPEN",
           openIdempotencyKey: input.openIdempotencyKey,
+          openingDraftId: input.target.type === "draft" ? input.target.id : null,
           coverOffsetMs: input.coverOffsetMs,
           expiresAt: input.expiresAt,
           completionStartedAt: null,
@@ -415,7 +417,4 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
     this.cleanups.add(sourceId);
   }
 
-  async hasPendingCleanup(sourceId: string): Promise<boolean> {
-    return this.cleanups.has(sourceId);
-  }
 }

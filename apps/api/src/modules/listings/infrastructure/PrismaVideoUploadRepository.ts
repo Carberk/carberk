@@ -49,6 +49,7 @@ function toSession(slot: SlotRow, source: SourceRow, generation: GenerationRow):
       partCount: source.partCount,
       state: source.state as VideoSource["state"],
       openIdempotencyKey: source.openIdempotencyKey,
+      openingDraftId: source.openingDraftId,
       coverOffsetMs: source.coverOffsetMs,
       expiresAt: source.expiresAt,
       completionStartedAt: source.completionStartedAt,
@@ -134,9 +135,10 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
         if (replayed) {
           const session = await this.loadSession(tx, replayed.id);
           if (!session) throw new Error("Video session rows are incomplete");
+          const openingTarget = replayed.openingDraftId ? { type: "draft", id: replayed.openingDraftId } : session.slot.target;
           const same =
-            session.slot.target.type === input.target.type &&
-            session.slot.target.id === input.target.id &&
+            openingTarget.type === input.target.type &&
+            openingTarget.id === input.target.id &&
             replayed.contentType === input.contentType &&
             replayed.sizeBytes === input.sizeBytes &&
             replayed.coverOffsetMs === input.coverOffsetMs;
@@ -192,6 +194,7 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
           partCount: input.partCount,
           state: "OPEN",
           openIdempotencyKey: input.openIdempotencyKey,
+          openingDraftId: input.target.type === "draft" ? input.target.id : null,
           coverOffsetMs: input.coverOffsetMs,
           expiresAt: input.expiresAt,
         },
@@ -388,6 +391,7 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       partCount: source.partCount,
       state: source.state as VideoSource["state"],
       openIdempotencyKey: source.openIdempotencyKey,
+      openingDraftId: source.openingDraftId,
       coverOffsetMs: source.coverOffsetMs,
       expiresAt: source.expiresAt,
       completionStartedAt: source.completionStartedAt,
@@ -474,10 +478,4 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
     });
   }
 
-  async hasPendingCleanup(sourceId: string): Promise<boolean> {
-    const row = await this.prisma.videoUploadCleanup.findFirst({
-      where: { sourceId, status: "PENDING" },
-    });
-    return row !== null;
-  }
 }

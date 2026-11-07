@@ -48,9 +48,15 @@ export class ListingVideoProcessor {
   private readonly logger = new Logger(ListingVideoProcessor.name);
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(VIDEO_PROCESSING_STORAGE) private readonly storage: VideoProcessingStorage) {}
 
-  async process(job: VideoProcessingJob): Promise<void> {
+  async process(job: VideoProcessingJob, attemptsStarted = 1): Promise<void> {
     const generation = await this.prisma.videoGeneration.findUnique({ where: { id: job.generationId }, include: { source: true } });
     if (!generation || generation.sourceId !== job.sourceId || generation.processingAttempt !== job.attempt || generation.status !== "Processing") return;
+    if (attemptsStarted > 1) {
+      // BullMQ has recovered a lost execution lock. Never reuse output keys
+      // whose initialization or PUT may still be in flight from that worker.
+      await this.recordFailure(job, generation, new Error("Worker execution was abandoned"), "Worker execution was abandoned");
+      return;
+    }
     const workDir = await mkdtemp(join(tmpdir(), "carberk-video-"));
     try {
       const sourceHead = await this.storage.head(generation.source.objectKey);
