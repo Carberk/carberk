@@ -63,7 +63,7 @@ export class ListMyFavorites {
 
     const listingIds = favoriteResult.items.map((f) => f.listingId);
     const cards = await this.cards.getVisibleCards(listingIds);
-    const videoById = await this.videos.getForListings(listingIds);
+    const videoById = await this.videos.getForListings(listingIds, undefined, input.userId);
 
     // Build a map for stable ordering and deduplication
     const cardMap = new Map(cards.map((s) => [s.id, s]));

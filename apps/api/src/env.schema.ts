@@ -85,6 +85,7 @@ const BaseSchema = z.object({
   /** Listing video uploads (ADR-0112): off by default; testers are User IDs. */
   LISTING_VIDEO_UPLOADS_ENABLED: booleanFlag,
   LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: z.string().default(""),
+  LISTING_VIDEO_VIEW_TESTER_USER_IDS: z.string().default(""),
   /** Dedicated Railway Bucket for video sources; falls back to MinIO locally. */
   LISTING_VIDEO_BUCKET_ENDPOINT: z.string().default(""),
   LISTING_VIDEO_BUCKET_NAME: z.string().default(""),

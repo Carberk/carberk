@@ -1,9 +1,10 @@
 import * as Linking from "expo-linking";
 import * as ImagePicker from "expo-image-picker";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as FileSystem from "expo-file-system/legacy";
 
+import { storeAuthSession, clearAuthSession } from "../../auth/session";
 import { server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import type { FakeVideoPlayer } from "../../../test/native-video";
@@ -55,6 +56,14 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+vi.mock("expo-secure-store", () => {
+  const values = new Map<string, string>();
+  return {
+    getItemAsync: async (key: string) => values.get(key) ?? null,
+    setItemAsync: async (key: string, value: string) => { values.set(key, value); },
+    deleteItemAsync: async (key: string) => { values.delete(key); },
+  };
+});
 vi.mock("expo-image-picker", () => ({
   launchImageLibraryAsync: vi.fn(),
   launchCameraAsync: vi.fn(),
@@ -932,5 +941,54 @@ describe("Listing video resumable upload card with the real HTTP client", () => 
     await fireEvent.press(reopened.getByRole("button", { name: "Continue upload" }));
     expect(await reopened.findByText("Processing video…")).toBeTruthy();
     part.resolve(undefined);
+  });
+});
+
+
+describe("current-user video access", () => {
+  const user = { id: "11111111-1111-4111-8111-111111111111", phone: null, email: "video@example.com", displayName: null, role: "seller" as const };
+  const me = { ...user, phoneVerified: false, nameNumber: 4821, avatarIndex: 0, avatarKey: null, avatarUrl: null, locale: "en", createdAt: "2026-01-01T00:00:00.000Z", deletionScheduledAt: null };
+  beforeEach(async () => {
+    await storeAuthSession({ accessToken: "test-token", refreshToken: "test-refresh", user });
+  });
+  afterEach(async () => { await clearAuthSession(); });
+
+  it("hides the card for a non-tester and retains the paused card for an upload tester", async () => {
+    server.use(http.get("*/me", () => HttpResponse.json({ ...me, isVideoUploadTester: false, canUploadVideo: false })));
+    const hidden = await renderMobile(<ListingVideoCard />);
+    expect(hidden.queryByTestId("listing-video-card")).toBeNull();
+    await hidden.unmount();
+    server.use(http.get("*/me", () => HttpResponse.json({ ...me, isVideoUploadTester: true, canUploadVideo: false })));
+    const paused = await renderMobile(<ListingVideoCard />);
+    expect(await paused.findByText("Video uploads are paused right now")).toBeTruthy();
+    expect(paused.getByRole("button", { name: "Choose from library" })).toBeDisabled();
+  });
+
+  it("refreshes before opening the picker and hides the card when upload membership was removed", async () => {
+    let tester = true;
+    server.use(http.get("*/me", () => HttpResponse.json({ ...me, isVideoUploadTester: tester, canUploadVideo: tester })));
+    const screen = await renderMobile(<ListingVideoCard />);
+    await screen.findByRole("button", { name: "Choose from library" });
+    vi.mocked(ImagePicker.launchImageLibraryAsync).mockClear();
+    tester = false;
+    await fireEvent.press(screen.getByRole("button", { name: "Choose from library" }));
+    expect(screen.queryByTestId("listing-video-card")).toBeNull();
+    expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
+  });
+
+  it("refreshes before Use video, refuses a newly paused upload and preserves the chosen interval", async () => {
+    let enabled = true;
+    server.use(http.get("*/me", () => HttpResponse.json({ ...me, isVideoUploadTester: true, canUploadVideo: enabled })));
+    const screen = await renderMobile(<ListingVideoCard videoNative={fakeNative()} />);
+    await screen.findByRole("button", { name: "Choose from library" });
+    await pickVideo(screen, 12_000);
+    enabled = false;
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    expect(await screen.findByText("Video uploads are paused right now")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use video" })).toBeTruthy();
+    expect(screen.queryByText("Preparing video")).toBeNull();
+    enabled = true;
+    await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
+    expect(await screen.findByTestId("listing-video-prepared")).toBeTruthy();
   });
 });

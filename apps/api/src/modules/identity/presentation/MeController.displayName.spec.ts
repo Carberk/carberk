@@ -1,3 +1,6 @@
+import type { Env } from "../../../env.schema";
+import { ConfigService } from "@nestjs/config";
+import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
 import "reflect-metadata";
 
 import { inspect } from "node:util";
@@ -37,7 +40,7 @@ describe("MeController PATCH /api/v1/me", () => {
     users.seed({ id: "user-1", phone: "+99365180518", nameNumber: 4821, avatarIndex: 7 });
     const unused = {} as never;
     controller = new MeController(
-      new GetMe(users),
+      new GetMe(users, new ConfigListingVideoAccess(new ConfigService<Env, true>({ LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: "", LISTING_VIDEO_VIEW_TESTER_USER_IDS: "", LISTING_VIDEO_UPLOADS_ENABLED: false })), identityCheck),
       unused,
       unused,
       unused,
@@ -68,6 +71,8 @@ describe("MeController PATCH /api/v1/me", () => {
       locale: "ru",
       createdAt: "2026-05-01T00:00:00.000Z",
       deletionScheduledAt: null,
+      isVideoUploadTester: false,
+      canUploadVideo: false,
     });
     expect(await controller.me(requestFor("user-1"))).toEqual(patched);
   });

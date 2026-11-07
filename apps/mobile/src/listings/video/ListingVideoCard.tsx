@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import type { VideoUploadsSchemas } from "@auto-tm/contracts";
 import * as ImagePicker from "expo-image-picker";
@@ -7,6 +7,7 @@ import { Plus, Video } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
 import type { ListingVideoNativeModule } from "../../../modules/listing-video/src/prepare";
+import { mapErrorToCopy } from "../../api/getErrorCopy";
 
 import { createListingVideoDraft, formatMmss, toSelection, type ListingVideoDraft } from "./listingVideo";
 import {
@@ -17,6 +18,7 @@ import {
 } from "./videoPreparation";
 import { useVideoUpload, type VideoUploadApi, type VideoUploadFileSystem, type VideoUploadPersistence, type VideoUploadTransport } from "./videoUpload";
 import { ListingVideoEditor } from "./ListingVideoEditor";
+import { useListingVideoAccess } from "./useListingVideoAccess";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -24,6 +26,7 @@ import { Icon } from "@/components/ui/icon";
 
 interface ListingVideoCardProps {
   canUploadVideo?: boolean;
+  isVideoUploadTester?: boolean;
   /** Fake native module in tests; the real AVFoundation module by default. */
   videoNative?: ListingVideoNativeModule | null;
   videoFileSystem?: ListingVideoFileSystem;
@@ -38,8 +41,7 @@ interface ListingVideoCardProps {
 
 /**
  * Optional Video card for the Photos step (create wizard and Edit listing).
- * Hidden unless the current user can upload video; the flag stays false
- * until #1049 wires the real tester gate. After "Use video" the chosen
+ * Hidden unless the current user is an eligible upload tester. After "Use video" the chosen
  * clip is copied into app storage and prepared on the phone (#1044);
  * photos and Listing fields are never touched by video failures.
  */
@@ -79,7 +81,8 @@ const FAILURE_COPY: Record<
 };
 
 export function ListingVideoCard({
-  canUploadVideo = false,
+  canUploadVideo,
+  isVideoUploadTester,
   videoNative,
   videoFileSystem,
   subscribeAppState,
@@ -91,6 +94,12 @@ export function ListingVideoCard({
   disabled = false,
 }: ListingVideoCardProps) {
   const { t } = useTranslation();
+  const access = useListingVideoAccess(canUploadVideo === undefined);
+  const tester = isVideoUploadTester ?? canUploadVideo ?? access.isVideoUploadTester;
+  const uploadsOn = canUploadVideo ?? access.canUploadVideo;
+  const [checkingAccess, setCheckingAccess] = useState(false);
+  const accessCheckInFlight = useRef(false);
+  const [accessError, setAccessError] = useState<unknown>(null);
   const [draft, setDraft] = useState<ListingVideoDraft | null>(null);
   const [committedDraft, setCommittedDraft] = useState<ListingVideoDraft | null>(null);
   const [editing, setEditing] = useState(false);
@@ -127,7 +136,24 @@ export function ListingVideoCard({
     }
   }, [upload.state.phase, clearPreparation]);
 
-  const chooseFromLibrary = useCallback(async () => {
+  const checkAccess = async () => {
+    if (accessCheckInFlight.current) return false;
+    accessCheckInFlight.current = true;
+    setCheckingAccess(true);
+    setAccessError(null);
+    try {
+      return canUploadVideo ?? await access.refresh();
+    } catch (error) {
+      setAccessError(error);
+      return false;
+    } finally {
+      accessCheckInFlight.current = false;
+      setCheckingAccess(false);
+    }
+  };
+
+  const chooseFromLibrary = async () => {
+    if (!(await checkAccess())) return;
     let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
     if (!permission.granted && permission.canAskAgain) {
       permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -147,26 +173,41 @@ export function ListingVideoCard({
     const durationS = (asset.duration ?? 0) / 1000;
     setDraft(createListingVideoDraft({ uri: asset.uri, durationS }));
     setEditing(true);
-  }, []);
+  };
 
-  if (!canUploadVideo) return null;
+  if (!tester) return null;
+
+  const accessNote = (
+    <>
+      {checkingAccess && <ActivityIndicator accessibilityLabel={t("loading")} />}
+      {!uploadsOn && (
+        <View className="gap-1 rounded-2xl bg-secondary p-3" accessibilityLiveRegion="polite">
+          <Text className="text-callout font-semibold">{t("listingVideoUploadsPaused")}</Text>
+          <Text className="text-footnote text-muted-foreground">{t("listingVideoUploadsPausedBody")}</Text>
+        </View>
+      )}
+      {accessError != null && <Text accessibilityRole="alert" className="text-footnote text-destructive">{mapErrorToCopy(accessError, t).description}</Text>}
+    </>
+  );
 
   if (draft && editing) {
     return (
       <View className="gap-3">
         <ListingVideoEditor
           draft={draft}
+          actionNote={accessNote}
           onDraftChange={setDraft}
           onCancel={() => {
             setDraft(committedDraft);
             setEditing(false);
           }}
           onChange={() => void chooseFromLibrary()}
-          onUse={() => {
+          onUse={() => void (async () => {
+            if (!(await checkAccess())) return;
             setCommittedDraft(draft);
             setEditing(false);
             prep.prepare(toSelection(draft));
-          }}
+          })()}
         />
         {permissionDenied && <PermissionNote onDismiss={() => setPermissionDenied(false)} />}
       </View>
@@ -180,6 +221,7 @@ export function ListingVideoCard({
 
   return (
     <View className="gap-3 rounded-3xl bg-card p-4" testID="listing-video-card">
+      {accessNote}
       <View className="flex-row items-start justify-between">
         <View className="flex-1">
           <Text className="text-subhead">
@@ -393,7 +435,7 @@ export function ListingVideoCard({
       )}
 
       {upload.state.phase === "idle" && prep.state.phase === "idle" && !draft && (
-        <Button onPress={() => void chooseFromLibrary()} disabled={disabled} accessibilityLabel={t("listingVideoChoose")}>
+        <Button onPress={() => void chooseFromLibrary()} disabled={disabled || checkingAccess || !uploadsOn} accessibilityLabel={t("listingVideoChoose")}>
           <Icon as={Plus} className="size-4" />
           <Text>{t("listingVideoChoose")}</Text>
         </Button>

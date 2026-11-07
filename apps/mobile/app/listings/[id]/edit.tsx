@@ -456,7 +456,6 @@ function EditListingSession({ listingId }: { listingId: string }) {
             fieldErrors={fieldErrors}
             showErrors={attemptedSteps.photos === true}
             continuesWhileUploading={false}
-            canUploadVideo={false}
           />
         )}
         {currentStep === "specs" && (

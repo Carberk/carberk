@@ -50,7 +50,7 @@ interface Step2PhotosProps {
    * false: Done there still waits for an uploaded photo, so it must not say so.
    */
   continuesWhileUploading?: boolean;
-  /** Show the optional Video card. False for everyone until #1049 sets the tester gate. */
+  /** Optional capability override; otherwise the card reads current-user access. */
   canUploadVideo?: boolean;
   /** Fake native preparation module in tests; real module by default (#1044). */
   videoNative?: ListingVideoNativeModule | null;
@@ -409,7 +409,7 @@ export default function Step2Photos({
   fieldErrors,
   showErrors = false,
   continuesWhileUploading = true,
-  canUploadVideo = false,
+  canUploadVideo,
   videoNative,
   videoFileSystem,
   subscribeAppState,

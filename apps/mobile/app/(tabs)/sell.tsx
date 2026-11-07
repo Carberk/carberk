@@ -659,7 +659,6 @@ export default function SellScreen() {
             isUploading={uploadQueue.isUploading}
             fieldErrors={fieldErrors}
             showErrors={attemptedSteps.photos === true}
-            canUploadVideo={false}
           />
         )}
         {currentStep === "vehicle" && (

@@ -1,3 +1,6 @@
+import type { Env } from "../../../env.schema";
+import { ConfigService } from "@nestjs/config";
+import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
 import "reflect-metadata";
 
 import { beforeEach, describe, expect, it } from "vitest";
@@ -41,7 +44,7 @@ describe("MePhotoController /api/v1/me/photo", () => {
     identityCheck = new InMemoryIdentityCheck();
     photos = new InMemoryProfilePhotos(users);
     users.seed({ id: "user-1", phone: "+99365180518", nameNumber: 4821, avatarIndex: 7 });
-    getMe = new GetMe(users);
+    getMe = new GetMe(users, new ConfigListingVideoAccess(new ConfigService<Env, true>({ LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: "", LISTING_VIDEO_VIEW_TESTER_USER_IDS: "", LISTING_VIDEO_UPLOADS_ENABLED: false })), identityCheck);
     controller = new MePhotoController(
       getMe,
       new SetProfilePhoto(users, identityCheck, photos),
@@ -76,6 +79,8 @@ describe("MePhotoController /api/v1/me/photo", () => {
         locale: "ru",
         createdAt: "2026-05-01T00:00:00.000Z",
         deletionScheduledAt: null,
+        isVideoUploadTester: false,
+        canUploadVideo: false,
       });
       expect(await getMe.execute({ userId: "user-1" })).toEqual(answer);
     });

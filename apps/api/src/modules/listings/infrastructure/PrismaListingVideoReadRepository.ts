@@ -2,6 +2,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import { ListingsSchemas } from "@auto-tm/contracts";
 import type { ListingVideoReadPort, ListingVideoProjection } from "../domain/ports/ListingVideoReadPort";
+import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
+import { IDENTITY_CHECK_PORT, type IdentityCheckPort } from "../../identity/identity.public";
 
 type GenerationRow = {
   id: string;
@@ -16,10 +18,17 @@ type SlotRow = { id: string; ownerId: string; listingId: string; active: Generat
 
 @Injectable()
 export class PrismaListingVideoReadRepository implements ListingVideoReadPort {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ConfigListingVideoAccess) private readonly access: ConfigListingVideoAccess,
+    @Inject(IDENTITY_CHECK_PORT) private readonly identity: IdentityCheckPort,
+  ) {}
 
-  async getForListings(listingIds: string[], ownerId?: string): Promise<Map<string, ListingVideoProjection>> {
-    if (listingIds.length === 0) return new Map();
+  async getForListings(listingIds: string[], ownerId?: string, viewerId = ownerId): Promise<Map<string, ListingVideoProjection>> {
+    if (listingIds.length === 0 || !viewerId) return new Map();
+    const canView = this.access.canViewVideo(viewerId);
+    const canReadPending = ownerId === viewerId && this.access.canResumeVideo(viewerId);
+    if ((!canView && !canReadPending) || await this.identity.isSuspended(viewerId) || await this.identity.isDeletionScheduled(viewerId)) return new Map();
     // One statement snapshots slot pointers and generations together. A Ready
     // pending generation is deliberately invisible until lifecycle publishes it.
     const slots = await this.prisma.$queryRaw<SlotRow[]>`
@@ -36,7 +45,7 @@ export class PrismaListingVideoReadRepository implements ListingVideoReadPort {
       JOIN listings l ON l.id = v."listingId" AND l."deletedAt" IS NULL
       LEFT JOIN video_generations a ON a.id = v."activeGenerationId" AND a."listingVideoId" = v.id AND a.status = 'Ready'
       LEFT JOIN video_sources sa ON sa.id = a."sourceId" AND sa."listingVideoId" = v.id
-      LEFT JOIN video_generations p ON p.id = v."pendingGenerationId" AND p."listingVideoId" = v.id AND v."ownerId" = ${ownerId ?? null}
+      LEFT JOIN video_generations p ON p.id = v."pendingGenerationId" AND p."listingVideoId" = v.id AND v."ownerId" = ${canReadPending ? ownerId : null}
       LEFT JOIN video_sources sp ON sp.id = p."sourceId" AND sp."listingVideoId" = v.id
       WHERE v."listingId" = ANY(${listingIds}::text[])`;
     const result = new Map<string, ListingVideoProjection>();
@@ -44,7 +53,7 @@ export class PrismaListingVideoReadRepository implements ListingVideoReadPort {
       if (!slot.listingId) continue;
       const projection: ListingVideoProjection = {};
       const active = slot.active;
-      if (active && active.sourceState === "COMPLETED") {
+      if (canView && active && active.sourceState === "COMPLETED") {
         const manifest = active.manifest;
         const members = manifest && typeof manifest === "object" && !Array.isArray(manifest) ? manifest : {};
         const recorded = (name: string) => {
@@ -60,7 +69,7 @@ export class PrismaListingVideoReadRepository implements ListingVideoReadPort {
           if (parsed.success) projection.video = parsed.data;
         }
       }
-      if (slot.ownerId === ownerId) {
+      if (canReadPending && slot.ownerId === ownerId) {
         const pending = slot.pending;
         if (pending && ["Uploading", "Processing", "Failed"].includes(pending.status) && ["OPEN", "COMPLETING", "COMPLETED"].includes(pending.sourceState)) {
           const parsed = ListingsSchemas.PendingListingVideoSchema.safeParse({

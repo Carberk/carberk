@@ -1,7 +1,10 @@
+import type { Env } from "../../../env.schema";
 import "reflect-metadata";
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { Test, type TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
+import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
 import { Reflector } from "@nestjs/core";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import {
@@ -29,13 +32,18 @@ import { mintUserJwt } from "../../../../test/helpers/mintUserJwt";
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const DRAFT_ID = "33333333-3333-4333-8333-333333333333";
+const LISTING_ID = "44444444-4444-4444-8444-444444444444";
 const SIZE = 6 * 1024 * 1024;
 
 describe("VideoUploadsController e2e", () => {
   const storage = new FakeVideoStorage();
   const repo = new InMemoryVideoUploadRepository();
+  const config = new ConfigService<Env, true>({ LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: OWNER, LISTING_VIDEO_VIEW_TESTER_USER_IDS: "", LISTING_VIDEO_UPLOADS_ENABLED: true });
   let app: NestFastifyApplication;
   let request: ReturnType<typeof supertest>;
+  let published = false;
+  let suspended = false;
+  let deletionScheduled = false;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -53,23 +61,23 @@ describe("VideoUploadsController e2e", () => {
         { provide: VIDEO_UPLOAD_REPOSITORY, useValue: repo },
         {
           provide: VIDEO_UPLOAD_ACCESS_PORT,
-          useValue: { canResumeVideo: (userId: string) => userId === OWNER, canUploadVideo: (userId: string) => userId === OWNER },
+          useValue: new ConfigListingVideoAccess(config),
         },
         {
           provide: LISTING_DRAFT_REPOSITORY,
           useValue: {
             findById: async (id: string) =>
-              id === DRAFT_ID ? { id, userId: OWNER } : null,
+              id === DRAFT_ID && !published ? { id, userId: OWNER } : null,
           },
         },
-        { provide: LISTING_REPOSITORY, useValue: { findById: async () => null } },
+        { provide: LISTING_REPOSITORY, useValue: { findById: async (id: string) => published && id === LISTING_ID ? { id, sellerId: OWNER, status: "published", deletedAt: null } : null } },
         {
           provide: IDENTITY_CHECK_PORT,
           useValue: {
-            isSuspended: async () => false,
+            isSuspended: async () => suspended,
             isAdmin: async () => false,
             isInDealership: async () => false,
-            isDeletionScheduled: async () => false,
+            isDeletionScheduled: async () => deletionScheduled,
             holdsSignInPhone: async () => false,
           },
         },
@@ -92,6 +100,17 @@ describe("VideoUploadsController e2e", () => {
     await app.close();
   });
 
+  beforeEach(() => {
+    repo.sessions.clear();
+    published = false;
+    suspended = false;
+    deletionScheduled = false;
+    storage.completeCalls = 0;
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", OWNER);
+    config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", "");
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", true);
+  });
+
   const openBody = {
     target: { type: "draft", id: DRAFT_ID },
     contentType: "video/mp4",
@@ -110,6 +129,30 @@ describe("VideoUploadsController e2e", () => {
       .send(openBody)
       .expect(403);
     expect(res.body.code).toBe("LISTING_VIDEO_UNAVAILABLE");
+  });
+
+  it.each([false, true])("view-only membership never grants sessions (switch=%s)", async (enabled) => {
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", "");
+    config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", OWNER);
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", enabled);
+    await request.post("/api/v1/listings/video-uploads").set("Authorization", `Bearer ${mintUserJwt(OWNER)}`).send(openBody).expect(403);
+  });
+
+  it("switch-off refuses new sessions but retains owned status/cancel; removal from upload testers refuses direct recovery", async () => {
+    const auth = `Bearer ${mintUserJwt(OWNER)}`;
+    const opened = await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).send(openBody).expect(201);
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", false);
+    const refused = await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).send(openBody).expect(403);
+    expect(refused.body.code).toBe("LISTING_VIDEO_UNAVAILABLE");
+    await request.get(`/api/v1/listings/video-uploads/${opened.body.sessionId}`).set("Authorization", auth).expect(200);
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", "");
+    for (const action of ["", "/complete", "/cancel", "/reprocess"]) {
+      const url = `/api/v1/listings/video-uploads/${opened.body.sessionId}${action}`;
+      const response = action ? request.post(url) : request.get(url);
+      await response.set("Authorization", auth).expect(404);
+    }
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", OWNER);
+    await request.post(`/api/v1/listings/video-uploads/${opened.body.sessionId}/cancel`).set("Authorization", auth).expect(201);
   });
 
   it("opens, resumes, completes exactly once and cancels only before completion", async () => {
@@ -167,4 +210,68 @@ describe("VideoUploadsController e2e", () => {
       .expect(409);
     expect(cancelCompleted.body.code).toBe("VIDEO_UPLOAD_CONFLICT");
   });
+
+  it("raw-target remove requires upload membership, even when the caller can view video; the switch never blocks removal", async () => {
+    const auth = `Bearer ${mintUserJwt(OWNER)}`;
+    const opened = await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).send(openBody).expect(201);
+    const remove = "/api/v1/listings/video-uploads/remove";
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", false);
+    await request.post(remove).send(openBody.target).expect(401);
+    await request.post(remove).set("Authorization", `Bearer ${mintUserJwt(OTHER)}`).send(openBody.target).expect(404);
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", "");
+    config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", OWNER);
+    await request.post(remove).set("Authorization", auth).send(openBody.target).expect(404);
+    expect((await repo.findSession(opened.body.sessionId))?.slot.pendingGenerationId).toBe(opened.body.generationId);
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", OWNER);
+    const removed = await request.post(remove).set("Authorization", auth).send(openBody.target).expect(201);
+    expect(removed.body).toEqual({ state: "REMOVED" });
+    expect((await repo.findSession(opened.body.sessionId))?.slot.pendingGenerationId).toBeNull();
+  });
+
+  it("resumes the canonical Listing after publish while uploads are off, including an identical original-Draft replay", async () => {
+    const auth = `Bearer ${mintUserJwt(OWNER)}`;
+    const opened = await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).set("Idempotency-Key", "published-replay").send(openBody).expect(201);
+    const session = (await repo.findSession(opened.body.sessionId))!;
+    // Publication moves the slot, retaining source/session identity and openingDraftId.
+    session.slot.target = { type: "listing", id: LISTING_ID };
+    published = true;
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", false);
+    const status = await request.get(`/api/v1/listings/video-uploads/${opened.body.sessionId}`).set("Authorization", auth).expect(200);
+    expect(status.body.target).toEqual(session.slot.target);
+    const replay = await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).set("Idempotency-Key", "published-replay").send(openBody).expect(201);
+    expect(replay.body).toMatchObject({ sessionId: opened.body.sessionId, target: session.slot.target });
+    await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).send({ ...openBody, target: session.slot.target }).expect(403);
+    await request.post("/api/v1/listings/video-uploads/remove").set("Authorization", auth).send(session.slot.target).expect(201);
+  });
+
+  it.each(["suspended", "deletion scheduled"])("refuses new and existing video controls for an account that is %s", async (state) => {
+    const auth = `Bearer ${mintUserJwt(OWNER)}`;
+    const opened = await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).send(openBody).expect(201);
+    suspended = state === "suspended";
+    deletionScheduled = state === "deletion scheduled";
+    await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).send(openBody).expect(403);
+    await request.post("/api/v1/listings/video-uploads/remove").set("Authorization", auth).send(openBody.target).expect(403);
+    for (const action of ["", "/complete", "/cancel", "/reprocess"]) {
+      const url = `/api/v1/listings/video-uploads/${opened.body.sessionId}${action}`;
+      await (action ? request.post(url) : request.get(url)).set("Authorization", auth).expect(403);
+    }
+  });
+  it("completes and reprocesses an owned stored source while new uploads are off", async () => {
+    const auth = `Bearer ${mintUserJwt(OWNER)}`;
+    const opened = await request.post("/api/v1/listings/video-uploads").set("Authorization", auth).send(openBody).expect(201);
+    const session = (await repo.findSession(opened.body.sessionId))!;
+    storage.putPart(session.source.objectKey, 1, 5 * 1024 * 1024);
+    storage.putPart(session.source.objectKey, 2, 1024 * 1024);
+    config.set("LISTING_VIDEO_UPLOADS_ENABLED", false);
+    await request.post(`/api/v1/listings/video-uploads/${opened.body.sessionId}/complete`).set("Authorization", auth).expect(201);
+    session.generation.status = "Failed";
+    session.generation.failureType = "TRANSIENT";
+    const retried = await request.post(`/api/v1/listings/video-uploads/${opened.body.sessionId}/reprocess`).set("Authorization", auth).expect(201);
+    expect(retried.body).toMatchObject({ sessionId: opened.body.sessionId, generationId: opened.body.generationId, state: "PROCESSING", parts: [] });
+    for (const action of ["", "/complete", "/cancel", "/reprocess"]) {
+      const url = `/api/v1/listings/video-uploads/${opened.body.sessionId}${action}`;
+      await (action ? request.post(url) : request.get(url)).expect(401);
+    }
+  });
+
 });

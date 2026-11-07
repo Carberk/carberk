@@ -101,7 +101,7 @@ export class ListFeed {
         : undefined,
     ]);
     const noPhotos = toCardPhotos([]);
-    const videoById = await this.videos.getForListings(listingIds);
+    const videoById = await this.videos.getForListings(listingIds, undefined, input.viewerId);
 
     const items = rankResult.items.map((listing) => {
       const photos = photosById.get(listing.id) ?? noPhotos;

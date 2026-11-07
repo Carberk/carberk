@@ -1,5 +1,7 @@
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { server } from "../msw";
 import SellScreen from "../../app/(tabs)/sell";
 import { fireEvent, renderMobile, routeParams } from "../render";
 
@@ -102,6 +104,13 @@ function resume(payload: "atPhotos" | "complete") {
 const continueButton = (screen: Awaited<ReturnType<typeof renderMobile>>) => screen.getByRole("button", { name: "Continue" });
 
 beforeEach(() => {
+  server.use(http.get("*/me", () => HttpResponse.json({
+    id: "550e8400-e29b-41d4-a716-446655440000", phone: null, email: null,
+    phoneVerified: false, displayName: null, nameNumber: 4821, avatarIndex: 0,
+    avatarKey: null, avatarUrl: null, role: "seller", locale: "en",
+    createdAt: "2026-01-01T00:00:00.000Z", deletionScheduledAt: null,
+    isVideoUploadTester: false, canUploadVideo: false,
+  })));
   fixture.payload = {};
   fixture.queuePhotos = [];
   // The mocked queue already holds the open draft's photos, unless a test says not.

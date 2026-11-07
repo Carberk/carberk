@@ -120,3 +120,5 @@ The shared `compressPhoto` helper accepts a target long side and source dimensio
 - [Media decision](../../../../docs/adr/0008-media.md)
 
 While Listing video rollout is paused, `useListingDetail` selects photo-only media before detail and edit consumers see it, including older cached responses. This does not rewrite cached snapshots or revoke previously public object URLs.
+
+The optional Video card reads current-user upload membership separately from permission to start new work. It refreshes `/me` before picking or using a selection; an upload pause keeps the card and selection, while existing uploads retain their own resume authorization.

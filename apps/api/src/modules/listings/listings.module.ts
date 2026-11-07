@@ -234,8 +234,9 @@ import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
     },
     {
       provide: VIDEO_UPLOAD_ACCESS_PORT,
-      useClass: ConfigVideoUploadAccess,
+      useExisting: ConfigVideoUploadAccess,
     },
+    ConfigVideoUploadAccess,
     { provide: VIDEO_UPLOAD_NOW, useValue: () => new Date() },
     {
       provide: ContactPhonePolicy,
