@@ -1,13 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { execFile , spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { DeleteObjectsCommand, S3Client } from "@aws-sdk/client-s3";
-import type { PrismaService } from "@auto-tm/db";
-import { describe, expect, it } from "vitest";
+import { PrismaService } from "@auto-tm/db";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ListingVideoProcessor } from "./ListingVideoProcessor";
 import { S3VideoProcessingStorage, type VideoProcessingStorage } from "./VideoProcessingStorage";
@@ -31,6 +31,8 @@ class MemoryStorage implements VideoProcessingStorage {
 interface FakePrisma {
   row: { status: string; [key: string]: unknown };
   videoGeneration: { findUnique: () => Promise<FakePrisma["row"]>; updateMany: (input: { data: Record<string, unknown> }) => Promise<{ count: number }> };
+  $queryRaw: () => Promise<unknown>;
+  $transaction: <T>(work: (tx: FakePrisma) => Promise<T>) => Promise<T>;
 }
 
 function prismaFor(status = "Processing"): FakePrisma {
@@ -38,19 +40,22 @@ function prismaFor(status = "Processing"): FakePrisma {
     id: "generation-1", sourceId: "source-1", processingAttempt: 1, processingRetryCount: 0, nextRetryAt: null, failureType: null, status,
     coverOffsetMs: 2_625, processingStartedAt: new Date(), source: { objectKey: "video-sources/source/source.mp4", sizeBytes: 0 },
   };
-  return {
+  const prisma: FakePrisma = {
     row,
     videoGeneration: {
       findUnique: async () => row,
       updateMany: async ({ data }: { data: Record<string, unknown> }) => { Object.assign(row, data); return { count: 1 }; },
     },
+    $queryRaw: async () => [],
+    $transaction: async (work) => work(prisma),
   };
+  return prisma;
 }
 
-async function fixture(): Promise<{ dir: string; body: Buffer }> {
+async function fixture(size = "320x240", hasAudio = false): Promise<{ dir: string; body: Buffer }> {
   const dir = await mkdtemp(join(tmpdir(), "carberk-video-fixture-"));
   const path = join(dir, "source.mp4");
-  await exec("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=320x240:r=25", "-t", "3", "-c:v", "libx264", "-pix_fmt", "yuv420p", path]);
+  await exec("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", `color=c=blue:s=${size}:r=25`, ...(hasAudio ? ["-f", "lavfi", "-i", "sine=frequency=440", "-c:a", "aac"] : []), "-t", "3", "-c:v", "libx264", "-pix_fmt", "yuv420p", path]);
   return { dir, body: await readFile(path) };
 }
 
@@ -73,7 +78,37 @@ describeFfmpeg("ListingVideoProcessor", () => {
       expect(storage.objects.size).toBeGreaterThan(4);
       for (const value of storage.objects.values()) expect(value.body.length).toBeGreaterThan(0);
       const master = [...storage.objects.entries()].find(([key]) => key.endsWith("/hls/master.m3u8"));
-      expect(master?.[1].body.toString()).toContain("CODECS=\"avc1.64001f\"");
+      expect(master?.[1].body.toString()).toMatch(/CODECS="avc1\.[0-9a-f]+"/);
+    } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it.each([false, true])("advertises the dimensions and H264 level encoded in every portrait rendition (audio=%s)", async (hasAudio) => {
+    const fixtureData = await fixture("720x1280", hasAudio);
+    try {
+      const storage = new MemoryStorage(fixtureData.body);
+      const prisma = prismaFor();
+      prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
+      await new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
+      const masterObject = storage.objects.get("video-sources/source/processing/1/hls/master.m3u8");
+      if (!masterObject) throw new Error("No master playlist was stored");
+      const master = masterObject.body.toString();
+      expect(master).toContain("RESOLUTION=136x240");
+      for (const tier of [240, 360, 720]) {
+        const segment = storage.objects.get(`video-sources/source/processing/1/hls/${tier}p/${tier}-000.ts`);
+        if (!segment) throw new Error("No rendition segment was stored");
+        const segmentPath = join(fixtureData.dir, `${tier}.ts`);
+        await writeFile(segmentPath, segment.body);
+        const { stdout: probeText } = await exec("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", segmentPath]);
+        const stream = JSON.parse(probeText).streams[0] as { width: number; height: number };
+        const { stdout: h264 } = await exec("ffmpeg", ["-v", "error", "-i", segmentPath, "-c:v", "copy", "-an", "-f", "h264", "pipe:1"], { encoding: "buffer" });
+        const sps = h264.indexOf(Buffer.from([0, 0, 0, 1, 0x67]));
+        expect(sps).toBeGreaterThanOrEqual(0);
+        const codec = h264.subarray(sps + 5, sps + 8).toString("hex");
+        const lines = master.split("\n");
+        const variant = lines[lines.findIndex((line) => line.endsWith(`/${tier}p/index.m3u8`)) - 1];
+        expect(variant).toContain(`CODECS="avc1.${codec}${hasAudio ? ",mp4a.40.2" : ""}"`);
+        expect(variant).toContain(`RESOLUTION=${stream.width}x${stream.height}`);
+      }
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
   }, 30_000);
 
@@ -130,63 +165,148 @@ describeFfmpeg("ListingVideoProcessor", () => {
   }, 30_000);
 });
 
-describe.skipIf(process.env["VIDEO_PROCESSING_STORAGE_E2E"] !== "1")("ListingVideoProcessor with local MinIO", () => {
-  it("processes and verifies a namespaced real-storage object set", async () => {
+describe.skipIf(!hasFfmpeg || (process.env["VIDEO_PROCESSING_DATABASE_E2E"] !== "1" && process.env["GITHUB_ACTIONS"] !== "true"))("ListingVideoProcessor with Postgres", () => {
+  it("serializes output reservation with revocation and refuses subsequent reservations", async () => {
+    const prisma = new PrismaService();
     const fixtureData = await fixture();
-    const namespace = `e2e/${randomUUID()}`;
-    const endpoint = process.env["MINIO_ENDPOINT"] ?? "http://127.0.0.1:9000";
-    const bucket = process.env["LISTING_VIDEO_BUCKET_NAME"] || "listing-videos";
-    const s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
-    const storage = new S3VideoProcessingStorage(s3, bucket);
-    const sourceKey = `${namespace}/source.mp4`;
-    await storage.put(sourceKey, fixtureData.body, "video/mp4");
-    const prisma = prismaFor();
-    prisma.row["source"] = { objectKey: sourceKey, sizeBytes: fixtureData.body.length };
+    const userId = randomUUID();
+    let release!: () => void;
+    let entered!: () => void;
+    const initialized = new Promise<void>((resolve) => { entered = resolve; });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    class GatedStorage extends MemoryStorage {
+      override async initialize(key: string, contentType: string) {
+        entered();
+        await gate;
+        return super.initialize(key, contentType);
+      }
+    }
+    const storage = new GatedStorage(fixtureData.body);
+    let processing: Promise<unknown> | undefined;
+    let revocation: Promise<unknown> | undefined;
     try {
-      await new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
-      expect(prisma.row.status).toBe("Ready");
-      const keys = await storage.list(namespace);
-      expect(keys.length).toBeGreaterThan(4);
+      await prisma.user.create({ data: { id: userId } });
+      const draft = await prisma.listingDraft.create({ data: { userId, payload: {} } });
+      const slot = await prisma.listingVideo.create({ data: { ownerId: userId, draftId: draft.id } });
+      const source = await prisma.videoSource.create({ data: { userId, listingVideoId: slot.id, bucket: storage.bucket, objectKey: `lock-test/${userId}/source.mp4`, multipartUploadId: randomUUID(), contentType: "video/mp4", sizeBytes: fixtureData.body.length, partSizeBytes: 5 * 1024 * 1024, partCount: 1, state: "COMPLETED", coverOffsetMs: 500, expiresAt: new Date() } });
+      // MemoryStorage uses one canonical source key; the DB still owns a unique key.
+      const sourceStorage: VideoProcessingStorage = {
+        bucket: storage.bucket,
+        get: () => storage.get("video-sources/source/source.mp4"),
+        head: (key) => storage.head(key === source.objectKey ? "video-sources/source/source.mp4" : key),
+        initialize: (key, type) => storage.initialize(key, type),
+        put: (key, body, type, fence) => storage.put(key, body, type, fence),
+        list: (prefix) => storage.list(prefix),
+      };
+      const generation = await prisma.videoGeneration.create({ data: { listingVideoId: slot.id, sourceId: source.id, status: "Processing", coverOffsetMs: 500 } });
+      processing = new ListingVideoProcessor(prisma, sourceStorage).process({ sourceId: source.id, generationId: generation.id, attempt: 1 }).catch((error: unknown) => error);
+      await initialized;
+      revocation = prisma.videoGeneration.update({ where: { id: generation.id }, data: { status: "Retired" } }).then(() => false);
+      const blocked = async () => {
+        const deadline = Date.now() + 3_000;
+        while (Date.now() < deadline) {
+          const [state] = await prisma.$queryRaw<{ waiting: bigint }[]>`SELECT count(*) AS waiting FROM pg_stat_activity WHERE datname = current_database() AND cardinality(pg_blocking_pids(pid)) > 0`;
+          if (Number(state?.waiting) > 0) return true;
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+        throw new Error("Revocation did not reach the generation lock");
+      };
+      expect(await Promise.race([revocation, blocked()])).toBe(true);
+      release();
+      await revocation;
+      expect(await processing).toMatchObject({ message: "Video processing attempt was revoked" });
+      expect((await prisma.videoGeneration.findUniqueOrThrow({ where: { id: generation.id } })).status).toBe("Retired");
+      expect([...storage.objects.keys()]).toEqual([`lock-test/${userId}/processing/1/covers/thumbnail.webp`]);
     } finally {
-      const keys = await storage.list(namespace);
-      if (keys.length) await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys.map((Key) => ({ Key })) } }));
+      release();
+      await Promise.allSettled([processing, revocation]);
+      await prisma.user.deleteMany({ where: { id: userId } });
+      await prisma.onModuleDestroy();
       await rm(fixtureData.dir, { recursive: true, force: true });
-      await s3.destroy();
     }
   }, 30_000);
+});
 
-  it("rejects broken, missing, same-size-corrupt and partial real-storage inputs", async () => {
-    const fixtureData = await fixture();
-    const endpoint = process.env["MINIO_ENDPOINT"] ?? "http://127.0.0.1:9000";
-    const bucket = process.env["LISTING_VIDEO_BUCKET_NAME"] || "listing-videos";
-    const s3 = new S3Client({ endpoint, region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
-    const storage = new S3VideoProcessingStorage(s3, bucket);
-    const namespaces = ["broken", "missing", "corrupt", "partial"].map((name) => `e2e/${randomUUID()}/${name}`);
+describe.skipIf(process.env["VIDEO_PROCESSING_STORAGE_E2E"] !== "1")("ListingVideoProcessor with local MinIO", () => {
+  let fixtureData: Awaited<ReturnType<typeof fixture>>;
+  let namespace: string;
+  let s3: S3Client;
+  let storage: S3VideoProcessingStorage;
+  const bucket = process.env["LISTING_VIDEO_BUCKET_NAME"] || "listing-videos";
+
+  beforeEach(async () => {
+    fixtureData = await fixture();
+    namespace = `e2e/${randomUUID()}`;
+    s3 = new S3Client({ endpoint: process.env["MINIO_ENDPOINT"] ?? "http://127.0.0.1:9000", region: process.env["MINIO_REGION"] ?? "us-east-1", forcePathStyle: true, credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin" } });
+    storage = new S3VideoProcessingStorage(s3, bucket);
+  });
+
+  afterEach(async () => {
     try {
-      const brokenKey = `${namespaces[0]}/source.mp4`;
-      await storage.put(brokenKey, Buffer.alloc(fixtureData.body.length, 7), "video/mp4");
-      const brokenPrisma = prismaFor(); brokenPrisma.row["source"] = { objectKey: brokenKey, sizeBytes: fixtureData.body.length };
-      await expect(new ListingVideoProcessor(brokenPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
-      expect(brokenPrisma.row.status).toBe("Failed");
-
-      const missingPrisma = prismaFor(); missingPrisma.row["source"] = { objectKey: `${namespaces[1]}/source.mp4`, sizeBytes: fixtureData.body.length };
-      await expect(new ListingVideoProcessor(missingPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("missing");
-      expect(missingPrisma.row.status).toBe("Failed");
-
-      const partialKey = `${namespaces[3]}/source.mp4`;
-      await storage.put(partialKey, fixtureData.body, "video/mp4");
-      const partialPrisma = prismaFor(); partialPrisma.row["source"] = { objectKey: partialKey, sizeBytes: fixtureData.body.length };
-      await new ListingVideoProcessor(partialPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
-      const outputKeys = await storage.list(namespaces[3] ?? "");
-      const output = outputKeys.find((key) => key.endsWith("/covers/list.webp"));
-      if (!output) throw new Error("fixture did not create a cover");
-      await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: [{ Key: output }] } }));
-      partialPrisma.row.status = "Processing";
-      await expect(new ListingVideoProcessor(partialPrisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
-      expect(partialPrisma.row.status).toBe("Processing");
+      const keys = await storage.list(namespace);
+      if (keys.length) await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys.map((Key) => ({ Key })) } }));
     } finally {
-      for (const prefix of namespaces) { const keys = await storage.list(prefix); if (keys.length) await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys.map((Key) => ({ Key })) } })); }
-      await rm(fixtureData.dir, { recursive: true, force: true }); await s3.destroy();
+      await rm(fixtureData.dir, { recursive: true, force: true });
+      s3.destroy();
     }
-  }, 60_000);
+  });
+
+  function recordedSource(sizeBytes: number) {
+    const prisma = prismaFor();
+    prisma.row["source"] = { objectKey: `${namespace}/source.mp4`, sizeBytes };
+    return prisma;
+  }
+
+  it("processes and verifies a namespaced real-storage object set", async () => {
+    await storage.put(`${namespace}/source.mp4`, fixtureData.body, "video/mp4");
+    const prisma = recordedSource(fixtureData.body.length);
+    await new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
+    expect(prisma.row.status).toBe("Ready");
+    const manifest = prisma.row["manifest"] as Record<string, { key: string; sizeBytes: number; etag: string }>;
+    for (const record of Object.values(manifest)) expect(await storage.head(record.key)).toMatchObject({ sizeBytes: record.sizeBytes, etag: record.etag });
+  }, 30_000);
+
+  it("rejects a broken real-storage source after checking its actual bytes", async () => {
+    const broken = Buffer.from("not an mp4");
+    await storage.put(`${namespace}/source.mp4`, broken, "video/mp4");
+    const prisma = recordedSource(broken.length);
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("Video source is invalid");
+    expect(prisma.row).toMatchObject({ status: "Failed", failureType: "SOURCE_INVALID" });
+  });
+
+  it("records a missing real-storage source as a permanent failure", async () => {
+    const prisma = recordedSource(fixtureData.body.length);
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("missing");
+    expect(prisma.row).toMatchObject({ status: "Failed", failureType: "SOURCE_MISSING" });
+  });
+
+  it("rejects same-size corruption in real storage even when HEAD still matches the recorded size", async () => {
+    const sourceKey = `${namespace}/source.mp4`;
+    await storage.put(sourceKey, fixtureData.body, "video/mp4");
+    const original = await storage.head(sourceKey);
+    if (!original?.etag) throw new Error("No source write fence was stored");
+    await storage.put(sourceKey, Buffer.alloc(fixtureData.body.length, 7), "video/mp4", original.etag);
+    expect(await storage.head(sourceKey)).toMatchObject({ sizeBytes: fixtureData.body.length });
+    const prisma = recordedSource(fixtureData.body.length);
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow("Video source is invalid");
+    expect(prisma.row).toMatchObject({ status: "Failed", failureType: "SOURCE_INVALID" });
+  });
+
+  it("refuses Ready when a stored output disappears before final manifest verification", async () => {
+    const removedKey = `${namespace}/processing/1/covers/list.webp`;
+    class PartialStorage extends S3VideoProcessingStorage {
+      override async put(key: string, body: Buffer, contentType: string, expectedETag?: string) {
+        await super.put(key, body, contentType, expectedETag);
+        if (key.endsWith("/hls/master.m3u8")) await s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: [{ Key: removedKey }] } }));
+      }
+    }
+    const partialStorage = new PartialStorage(s3, bucket);
+    await partialStorage.put(`${namespace}/source.mp4`, fixtureData.body, "video/mp4");
+    const prisma = recordedSource(fixtureData.body.length);
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, partialStorage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow(`Processing output missing or changed: ${removedKey}`);
+    expect(await storage.head(removedKey)).toBeNull();
+    expect(await storage.head(`${namespace}/processing/1/hls/master.m3u8`)).not.toBeNull();
+    expect(prisma.row).toMatchObject({ status: "Processing", processingAttempt: 2, failureType: "TRANSIENT" });
+    expect(prisma.row["manifest"]).toBeUndefined();
+  }, 30_000);
 });

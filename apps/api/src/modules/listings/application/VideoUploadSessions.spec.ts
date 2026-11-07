@@ -319,14 +319,20 @@ describe("VideoUploadSessions", () => {
     await expect(world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId })).rejects.toMatchObject({ response: { code: "VIDEO_UPLOAD_CONFLICT" } });
   });
 
-  it("translates the durable retry limit into a conflict", async () => {
+  it("lets the seller retry after automatic retries are exhausted and fences concurrent Try again", async () => {
     const opened = await world.sessions.open(openInput);
     await uploadAll(opened.sessionId);
     await world.sessions.complete({ userId: OWNER, sessionId: opened.sessionId });
     const session = await world.repo.findSession(opened.sessionId);
     session!.generation.status = "Failed";
     session!.generation.processingAttempt = 3;
+    session!.generation.processingRetryCount = 2;
     session!.generation.failureType = "TRANSIENT";
+    const retried = await world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId });
+    expect(retried.state).toBe("PROCESSING");
+    expect(retried.sessionId).toBe(opened.sessionId);
+    expect(session!.generation.processingAttempt).toBe(4);
+    expect(session!.generation.processingRetryCount).toBe(0);
     await expect(world.sessions.reprocess({ userId: OWNER, sessionId: opened.sessionId })).rejects.toMatchObject({ response: { code: "VIDEO_UPLOAD_CONFLICT" } });
   });
 });

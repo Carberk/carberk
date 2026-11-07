@@ -286,11 +286,10 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       if (session.generation.failureType === "SOURCE_MISSING" || session.generation.failureType === "SOURCE_INVALID") {
         throw conflict("This uploaded source cannot be reprocessed; choose another video");
       }
-      if (session.generation.processingAttempt >= 3) throw conflict("Video processing retry limit reached");
       const attempt = session.generation.processingAttempt + 1;
       const generation = await tx.videoGeneration.update({
         where: { id: session.generation.id },
-        data: { status: "Processing", processingAttempt: attempt, manifest: Prisma.JsonNull, lastError: null, failureType: null, nextRetryAt: null, processingStartedAt: now, completedAt: null },
+        data: { status: "Processing", processingAttempt: attempt, processingRetryCount: 0, manifest: Prisma.JsonNull, lastError: null, failureType: null, nextRetryAt: null, processingStartedAt: now, completedAt: null },
       });
       return { sourceId: session.source.id, generationId: generation.id, attempt };
     });

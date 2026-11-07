@@ -83,22 +83,23 @@ export class ListingVideoProcessor {
       const tiers = [240, 360, 720].filter((tier) => tier <= Math.max(validated.height, validated.width));
       if (tiers.length === 0) throw new SourceVideoError("Video is too small to produce a playable tier", "SOURCE_INVALID");
       const hasAudio = validated.audioCodec !== null;
+      const variants: string[] = [];
       for (const tier of tiers) {
         const playlist = join(workDir, `${tier}.m3u8`); const segmentPattern = join(workDir, `${tier}-%03d.ts`);
         const scale = validated.height >= validated.width ? `scale=-2:min(${tier}\\,ih)` : `scale=min(${tier}\\,iw):-2`;
-        await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-i", input, "-vf", scale, "-c:v", "libx264", "-preset", "veryfast", "-b:v", `${tier}k`, "-maxrate", `${tier}k`, "-bufsize", `${tier * 2}k`, "-g", "120", "-keyint_min", "120", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)", ...(hasAudio ? ["-c:a", "aac", "-b:a", "128k"] : ["-an"]), "-f", "hls", "-hls_time", "4", "-hls_playlist_type", "vod", "-hls_flags", "independent_segments", "-hls_segment_filename", segmentPattern, playlist]);
+        await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-i", input, "-vf", scale, "-c:v", "libx264", "-preset", "veryfast", "-b:v", `${tier}k`, "-maxrate", `${tier}k`, "-bufsize", `${tier * 2}k`, "-g", "120", "-keyint_min", "120", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)", ...(hasAudio ? ["-c:a", "aac", "-b:a", "128k"] : ["-an"]), "-f", "hls", "-hls_time", "4", "-hls_playlist_type", "vod", "-hls_flags", "independent_segments", "-master_pl_name", `${tier}-master.m3u8`, "-hls_segment_filename", segmentPattern, playlist]);
         const playlistKey = `${prefix}/hls/${tier}p/index.m3u8`;
+        // The muxer reads codec profile/compatibility/level and dimensions from
+        // the encoded stream, including the scaler's even-pixel rounding.
+        const streamInfo = (await readFile(join(workDir, `${tier}-master.m3u8`), "utf8")).split("\n").find((line) => line.startsWith("#EXT-X-STREAM-INF:"));
+        if (!streamInfo || !streamInfo.includes("CODECS=") || !streamInfo.includes("RESOLUTION=")) throw new Error("Encoded rendition metadata is missing");
+        variants.push(`${streamInfo}\n${playlistKey}`);
         const playlistText = (await readFile(playlist, "utf8")).replace(/(\S+\.ts)/g, (member) => `${prefix}/hls/${tier}p/${member}`);
         await this.writeOutput(job, playlistKey, Buffer.from(playlistText), "application/vnd.apple.mpegurl", manifest, `playlist:${tier}`);
         await this.uploadSegments(workDir, prefix, tier, job, manifest);
       }
       const masterKey = `${prefix}/hls/master.m3u8`;
-      const master = tiers.map((tier) => {
-        const width = validated.height >= validated.width ? Math.max(2, Math.round(validated.width * tier / validated.height)) : tier;
-        const height = validated.height >= validated.width ? tier : Math.max(2, Math.round(validated.height * tier / validated.width));
-        const codecs = hasAudio ? "avc1.64001f,mp4a.40.2" : "avc1.64001f";
-        return `#EXT-X-STREAM-INF:BANDWIDTH=${tier * 1000 + (hasAudio ? 128_000 : 0)},CODECS="${codecs}",RESOLUTION=${width}x${height}\n${prefix}/hls/${tier}p/index.m3u8`;
-      }).join("\n");
+      const master = variants.join("\n");
       await this.writeOutput(job, masterKey, Buffer.from(`#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-INDEPENDENT-SEGMENTS\n${master}\n`), "application/vnd.apple.mpegurl", manifest, "master");
       for (const record of Object.values(manifest)) {
         const head = await this.storage.head(record.key);
@@ -120,7 +121,15 @@ export class ListingVideoProcessor {
   }
 
   private async writeOutput(job: VideoProcessingJob, key: string, body: Buffer, contentType: string, manifest: Record<string, ManifestRecord>, name: string): Promise<void> {
-    await this.assertAttemptActive(job); const fence = await this.storage.initialize(key, contentType); await this.assertAttemptActive(job); await this.storage.put(key, body, contentType, fence);
+    const fence = await this.prisma.$transaction(async (tx) => {
+      // Retirement/attempt updates acquire this row lock too. Keep it through
+      // reservation so revocation cannot commit between authorization and PUT.
+      await tx.$queryRaw`SELECT "id" FROM "video_generations" WHERE "id" = ${job.generationId} FOR UPDATE`;
+      const active = await tx.videoGeneration.findUnique({ where: { id: job.generationId }, select: { sourceId: true, processingAttempt: true, status: true } });
+      if (!active || active.sourceId !== job.sourceId || active.processingAttempt !== job.attempt || active.status !== "Processing") throw new Error("Video processing attempt was revoked");
+      return this.storage.initialize(key, contentType);
+    }, { timeout: 35_000 });
+    await this.assertAttemptActive(job); await this.storage.put(key, body, contentType, fence);
     const head = await this.storage.head(key); if (!head || head.sizeBytes !== body.byteLength) throw new Error(`Processing output missing or changed: ${key}`);
     manifest[name] = { key, sizeBytes: body.byteLength, etag: head.etag };
   }

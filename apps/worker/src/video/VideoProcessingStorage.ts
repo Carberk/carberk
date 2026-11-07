@@ -1,3 +1,5 @@
+import type { Readable } from "node:stream";
+
 import {
   GetObjectCommand,
   HeadObjectCommand,
@@ -51,21 +53,39 @@ export class S3VideoProcessingStorage implements VideoProcessingStorage {
   }
 
   async get(key: string): Promise<StoredVideoObject> {
-    const result = await this.send<GetObjectCommandOutput>(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
-    if (!result.Body) throw new Error("Stored video has no body");
-    const chunks: Buffer[] = [];
-    let total = 0;
-    for await (const chunk of result.Body as AsyncIterable<Uint8Array>) {
-      total += chunk.byteLength;
-      if (total > MAX_SOURCE_BYTES) throw new Error("Stored video exceeds maximum body size");
-      chunks.push(Buffer.from(chunk));
-    }
-    return {
-      key,
-      body: Buffer.concat(chunks),
-      contentType: result.ContentType ?? null,
-      etag: result.ETag ?? null,
+    const controller = new AbortController();
+    let body: Readable | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error("Stored video read timed out"));
+        controller.abort();
+        body?.destroy();
+      }, REQUEST_TIMEOUT_MS);
+    });
+    const read = async (): Promise<StoredVideoObject> => {
+      const result: GetObjectCommandOutput = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }), { abortSignal: controller.signal });
+      body = result.Body as Readable | undefined;
+      try {
+        controller.signal.throwIfAborted();
+        if (!body) throw new Error("Stored video has no body");
+        const chunks: Buffer[] = [];
+        let total = 0;
+        for await (const chunk of body as AsyncIterable<Uint8Array>) {
+          total += chunk.byteLength;
+          if (total > MAX_SOURCE_BYTES) throw new Error("Stored video exceeds maximum body size");
+          chunks.push(Buffer.from(chunk));
+        }
+        return { key, body: Buffer.concat(chunks), contentType: result.ContentType ?? null, etag: result.ETag ?? null };
+      } finally {
+        body?.destroy();
+      }
     };
+    try {
+      return await Promise.race([read(), deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async initialize(key: string, contentType: string): Promise<string> {

@@ -218,6 +218,23 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
     expect(responses.map((res) => res.status).sort()).toEqual([201, 409]);
   });
 
+  it("reprocesses the same stored source after automatic exhaustion and serializes concurrent Try again", async () => {
+    const target = await draft();
+    const opened = await open(target.id);
+    for (const part of opened.body.parts) await put(part);
+    await request.post(`${path(opened.body.sessionId)}/complete`).set(auth()).expect(201);
+    // The worker owns failure/exhaustion; the API owns the seller's retry.
+    await prisma.videoGeneration.update({ where: { id: opened.body.generationId }, data: { status: "Failed", processingAttempt: 3, processingRetryCount: 2, failureType: "TRANSIENT" } });
+    const responses = await Promise.all([1, 2].map(() => request.post(`${path(opened.body.sessionId)}/reprocess`).set(auth())));
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const conflict = responses.find((response) => response.status === 409);
+    expect(conflict?.body.code).toBe("VIDEO_UPLOAD_CONFLICT");
+    const session = await app.get<PrismaVideoUploadRepository>(VIDEO_UPLOAD_REPOSITORY).findSession(opened.body.sessionId);
+    expect(session?.generation).toMatchObject({ status: "Processing", processingAttempt: 4, processingRetryCount: 0 });
+    expect(session?.source.id).toBe(opened.body.sessionId);
+    expect(await storage.headObject(sources.get(opened.body.sessionId)!.objectKey)).toMatchObject({ sizeBytes: 6291456 });
+  });
+
   it("a cancelled video leaves the existing Draft discard path usable", async () => {
     const target = await draft();
     const opened = await open(target.id);

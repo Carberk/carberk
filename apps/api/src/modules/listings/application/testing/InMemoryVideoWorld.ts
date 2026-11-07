@@ -299,10 +299,9 @@ export class InMemoryVideoUploadRepository implements VideoUploadRepository {
       const session = this.mustGet(sessionId);
       if (session.source.state !== "COMPLETED" || session.generation.status !== "Failed") throw conflict("Video is not ready to reprocess");
       if (session.generation.failureType === "SOURCE_MISSING" || session.generation.failureType === "SOURCE_INVALID") throw conflict("This uploaded source cannot be reprocessed; choose another video");
-      if (session.generation.processingAttempt >= 3) throw conflict("Video processing retry limit reached");
       session.generation.processingAttempt += 1;
       session.generation.status = "Processing";
-      session.generation.processingRetryCount += 1;
+      session.generation.processingRetryCount = 0;
       session.generation.failureType = null;
       session.generation.lastError = null;
       session.generation.nextRetryAt = null;
