@@ -15,7 +15,7 @@ describe("VideoProcessingScheduler", () => {
     const scheduler = new VideoProcessingScheduler({ videoGeneration: { findMany } } as never, { add } as never);
     await expect(scheduler.enqueuePending()).resolves.toBe(2);
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: "Processing", OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now } }] } }));
-    expect(add).toHaveBeenNthCalledWith(1, "process", { sourceId: "source-ready", generationId: "generation-ready", attempt: 2 }, expect.objectContaining({ jobId: "generation-ready:2", attempts: 1 }));
+    expect(add).toHaveBeenNthCalledWith(1, "process", { sourceId: "source-ready", generationId: "generation-ready", attempt: 2 }, expect.objectContaining({ jobId: "generation-ready-2", attempts: 1 }));
     vi.useRealTimers();
   });
 });

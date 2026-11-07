@@ -29,7 +29,7 @@ export class VideoProcessingScheduler implements OnModuleInit, OnModuleDestroy {
       include: { source: true }, orderBy: { updatedAt: "asc" }, take: limit,
     });
     for (const row of rows) {
-      await this.queue.add("process", { sourceId: row.sourceId, generationId: row.id, attempt: row.processingAttempt }, { jobId: `${row.id}:${row.processingAttempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
+      await this.queue.add("process", { sourceId: row.sourceId, generationId: row.id, attempt: row.processingAttempt }, { jobId: `${row.id}-${row.processingAttempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
     }
     return rows.length;
   }

@@ -311,7 +311,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
       throw new ConflictException({ code: LISTING_ERROR_CODES.VIDEO_UPLOAD_CONFLICT, message: "Video is not ready to reprocess" });
     }
     const job = await this.repo.claimProcessingRetry(session.source.id, await this.now()).catch(rethrowDomain);
-    if (this.videoQueue) await this.videoQueue.add("process", job, { jobId: `${job.generationId}:${job.attempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
+    if (this.videoQueue) await this.videoQueue.add("process", job, { jobId: `${job.generationId}-${job.attempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
     const latest = await this.repo.findSession(session.source.id);
     if (!latest) throw notAvailable();
     return this.statusView(latest, await this.now());
@@ -362,7 +362,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
   private async finishAndEnqueue(sourceId: string, now: Date): Promise<VideoSession> {
     const session = await this.repo.finishCompletion(sourceId, now).catch(rethrowDomain);
     if (this.videoQueue) {
-      await this.videoQueue.add("process", { sourceId, generationId: session.generation.id, attempt: session.generation.processingAttempt }, { jobId: `${session.generation.id}:${session.generation.processingAttempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
+      await this.videoQueue.add("process", { sourceId, generationId: session.generation.id, attempt: session.generation.processingAttempt }, { jobId: `${session.generation.id}-${session.generation.processingAttempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
     }
     return session;
   }
