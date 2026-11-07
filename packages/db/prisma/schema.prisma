@@ -616,6 +616,12 @@ model VideoGeneration {
   status            String       @default("Uploading")
   coverOffsetMs     Int
   processingAttempt Int          @default(1)
+  /// Number of automatic retryable processing failures already consumed.
+  processingRetryCount Int       @default(0)
+  /// Earliest time a durable scheduler may enqueue the next attempt.
+  nextRetryAt       DateTime?
+  /// SOURCE_MISSING, SOURCE_INVALID or TRANSIENT; retained for the owner UI.
+  failureType       String?
   /// Exact object keys written by the processing attempt. Ready requires all keys.
   manifest          Json?
   durationMs        Int?

@@ -70,6 +70,7 @@ export interface VideoUploadView {
   target: VideoUploadTarget;
   state: "UPLOADING" | "PROCESSING" | "FAILED" | "CANCELLED" | "EXPIRED";
   failureReason?: string | null;
+  failureType?: "SOURCE_MISSING" | "SOURCE_INVALID" | "TRANSIENT" | null;
   partSizeBytes: number;
   confirmedParts: { partNumber: number; sizeBytes: number }[];
   parts: VideoPartView[];
@@ -309,7 +310,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
     if (session.source.state !== "COMPLETED" || session.generation.status !== "Failed") {
       throw new ConflictException({ code: LISTING_ERROR_CODES.VIDEO_UPLOAD_CONFLICT, message: "Video is not ready to reprocess" });
     }
-    const job = await this.repo.claimProcessingRetry(session.source.id, await this.now());
+    const job = await this.repo.claimProcessingRetry(session.source.id, await this.now()).catch(rethrowDomain);
     if (this.videoQueue) await this.videoQueue.add("process", job, { jobId: `${job.generationId}:${job.attempt}`, attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
     const latest = await this.repo.findSession(session.source.id);
     if (!latest) throw notAvailable();
@@ -491,6 +492,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
       target: session.slot.target,
       state: videoSessionState(session.source, session.generation),
       failureReason: session.generation.lastError,
+      failureType: session.generation.failureType,
       partSizeBytes: session.source.partSizeBytes,
       confirmedParts: [],
       parts: [],
@@ -509,6 +511,7 @@ export class VideoUploadSessions implements OnModuleInit, OnModuleDestroy {
         target: session.slot.target,
         state,
         failureReason: session.generation.lastError,
+        failureType: session.generation.failureType,
         partSizeBytes: session.source.partSizeBytes,
         confirmedParts: layout.map((sizeBytes, i) => ({ partNumber: i + 1, sizeBytes })),
         parts: [],

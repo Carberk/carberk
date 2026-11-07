@@ -1,5 +1,5 @@
+import { createHash, randomUUID } from "node:crypto";
 import { execFile , spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,9 +20,11 @@ class MemoryStorage implements VideoProcessingStorage {
   readonly bucket = "listing-videos-test";
   readonly objects = new Map<string, { body: Buffer; contentType: string }>();
   constructor(private readonly source: Buffer, private readonly dropKey?: string, private readonly missing = false) {}
-  async get(key: string) { if (this.missing || key !== "video-sources/source/source.mp4") throw new Error("NoSuchKey"); return { key, body: this.source, contentType: "video/mp4" }; }
-  async put(key: string, body: Buffer, contentType: string) { if (key !== this.dropKey) this.objects.set(key, { body, contentType }); }
-  async head(key: string) { if (this.missing) return null; if (key === "video-sources/source/source.mp4") return { sizeBytes: this.source.length, contentType: "video/mp4" }; const value = this.objects.get(key); return value ? { sizeBytes: value.body.length, contentType: value.contentType } : null; }
+  private etag(body: Buffer) { return `"${createHash("md5").update(body).digest("hex")}"`; }
+  async get(key: string) { if (this.missing || key !== "video-sources/source/source.mp4") throw new Error("NoSuchKey"); return { key, body: this.source, contentType: "video/mp4", etag: this.etag(this.source) }; }
+  async initialize(key: string, contentType: string) { if (this.objects.has(key)) throw new Error("PreconditionFailed"); this.objects.set(key, { body: Buffer.alloc(0), contentType }); return this.etag(Buffer.alloc(0)); }
+  async put(key: string, body: Buffer, contentType: string, expectedETag?: string) { if (key === this.dropKey) return; const value = this.objects.get(key); if (expectedETag && (!value || this.etag(value.body) !== expectedETag)) throw new Error("PreconditionFailed"); if (!expectedETag && value) throw new Error("PreconditionFailed"); this.objects.set(key, { body, contentType }); }
+  async head(key: string) { if (this.missing) return null; if (key === "video-sources/source/source.mp4") return { sizeBytes: this.source.length, contentType: "video/mp4", etag: this.etag(this.source) }; const value = this.objects.get(key); return value ? { sizeBytes: value.body.length, contentType: value.contentType, etag: this.etag(value.body) } : null; }
   async list(prefix: string) { return [...this.objects.keys()].filter((key) => key.startsWith(prefix)); }
 }
 
@@ -33,7 +35,7 @@ interface FakePrisma {
 
 function prismaFor(status = "Processing"): FakePrisma {
   const row = {
-    id: "generation-1", sourceId: "source-1", processingAttempt: 1, status,
+    id: "generation-1", sourceId: "source-1", processingAttempt: 1, processingRetryCount: 0, nextRetryAt: null, failureType: null, status,
     coverOffsetMs: 2_625, processingStartedAt: new Date(), source: { objectKey: "video-sources/source/source.mp4", sizeBytes: 0 },
   };
   return {
@@ -87,7 +89,8 @@ describeFfmpeg("ListingVideoProcessor", () => {
       const prisma = prismaFor();
       prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
       await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow(/output missing/);
-      expect(prisma.row.status).toBe("Failed");
+      expect(prisma.row.status).toBe("Processing");
+      expect(prisma.row["processingAttempt"]).toBe(2);
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
   }, 30_000);
 });

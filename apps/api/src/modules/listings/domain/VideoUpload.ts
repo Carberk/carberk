@@ -25,6 +25,8 @@ export type VideoGenerationStatus =
   | "Ready"
   | "Retired";
 
+export type VideoFailureType = "SOURCE_MISSING" | "SOURCE_INVALID" | "TRANSIENT";
+
 export interface ListingVideoSlot {
   id: string;
   ownerId: string;
@@ -63,6 +65,9 @@ export interface VideoGeneration {
   status: VideoGenerationStatus;
   coverOffsetMs: number;
   processingAttempt: number;
+  processingRetryCount: number;
+  nextRetryAt: Date | null;
+  failureType: VideoFailureType | null;
   lastError: string | null;
   createdAt: Date;
   updatedAt: Date;

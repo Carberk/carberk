@@ -63,6 +63,9 @@ function toSession(slot: SlotRow, source: SourceRow, generation: GenerationRow):
       status: generation.status as VideoGeneration["status"],
       coverOffsetMs: generation.coverOffsetMs,
       processingAttempt: generation.processingAttempt,
+      processingRetryCount: generation.processingRetryCount,
+      nextRetryAt: generation.nextRetryAt,
+      failureType: generation.failureType as VideoGeneration["failureType"],
       lastError: generation.lastError,
       createdAt: generation.createdAt,
       updatedAt: generation.updatedAt,
@@ -280,11 +283,14 @@ export class PrismaVideoUploadRepository implements VideoUploadRepository {
       if (!session || session.source.state !== "COMPLETED" || session.generation.status !== "Failed") {
         throw conflict("Video is not ready to reprocess");
       }
+      if (session.generation.failureType === "SOURCE_MISSING" || session.generation.failureType === "SOURCE_INVALID") {
+        throw conflict("This uploaded source cannot be reprocessed; choose another video");
+      }
       if (session.generation.processingAttempt >= 3) throw conflict("Video processing retry limit reached");
       const attempt = session.generation.processingAttempt + 1;
       const generation = await tx.videoGeneration.update({
         where: { id: session.generation.id },
-        data: { status: "Processing", processingAttempt: attempt, manifest: Prisma.JsonNull, lastError: null, processingStartedAt: now, completedAt: null },
+        data: { status: "Processing", processingAttempt: attempt, manifest: Prisma.JsonNull, lastError: null, failureType: null, nextRetryAt: null, processingStartedAt: now, completedAt: null },
       });
       return { sourceId: session.source.id, generationId: generation.id, attempt };
     });

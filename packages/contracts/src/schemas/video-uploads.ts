@@ -63,6 +63,7 @@ export const VideoUploadStatusResponseSchema = z.object({
   parts: z.array(VideoUploadPartSchema),
   expiresAt: DateTimeSchema,
   failureReason: z.string().max(500).nullable().optional(),
+  failureType: z.enum(["SOURCE_MISSING", "SOURCE_INVALID", "TRANSIENT"]).nullable().optional(),
 });
 export type VideoUploadStatusResponse = z.infer<typeof VideoUploadStatusResponseSchema>;
 
