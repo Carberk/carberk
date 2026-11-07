@@ -818,8 +818,8 @@ function uploadServer() {
     parts: state.confirmed || state.phase !== "UPLOADING" ? [] : [{ partNumber: 1, sizeBytes: 1_500_000, uploadUrl: "https://bucket/part1", expiresAt: "2030-01-01T00:00:00.000Z" }],
   });
   server.use(
-    http.get(`${uploadRoot}/target/draft/:id`, () => HttpResponse.json({})),
-    http.post(`${uploadRoot}/remove`, () => HttpResponse.json({ state: "REMOVED" })),
+    http.get(`${uploadRoot}/target/draft/:id`, () => HttpResponse.json(state.keys.length && state.phase !== "CANCELLED" ? { pendingVideo: { id: uploadTarget.id, generationId: uploadGeneration, sourceId: uploadSession, sessionId: uploadSession, status: state.phase === "PROCESSING" ? "processing" : "uploading", canReprocess: false } } : {})),
+    http.post(`${uploadRoot}/remove`, () => { state.phase = "CANCELLED"; return HttpResponse.json({ state: "REMOVED" }); }),
     http.post(uploadRoot, async ({ request }) => {
       const body = await request.json() as { coverOffsetMs: number };
       state.cover = body.coverOffsetMs;

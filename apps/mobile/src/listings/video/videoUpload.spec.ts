@@ -526,3 +526,17 @@ it("recovers a published session's canonical target from status after reopening"
   expect(await run.persistence.get("listing-video:draft:draft-1")).toBeNull();
   expect(JSON.parse((await run.persistence.get("listing-video:listing:listing-1")) ?? "null").target).toEqual(listing);
 });
+
+it("replays a lost Open with its original Draft metadata after publish", async () => {
+  const run = controller();
+  const listing = { type: "listing" as const, id: "listing-1" };
+  vi.mocked(run.api.open).mockRejectedValueOnce(new Error("network response lost"))
+    .mockResolvedValue({ ...openResponse(), target: listing });
+  vi.mocked(run.api.status).mockResolvedValue({ ...statusResponse([], "PROCESSING"), target: listing });
+  await run.instance.start();
+  const first = vi.mocked(run.api.open).mock.calls[0];
+  await run.instance.adopt(listing);
+  await run.instance.resume();
+  expect(vi.mocked(run.api.open).mock.calls[1]).toEqual(first);
+  expect(run.instance.state).toMatchObject({ target: listing, phase: "processing" });
+});

@@ -239,13 +239,17 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
     expect((await queue.getJob(`${opened.body.generationId}-1`))?.data).toEqual({ sourceId: opened.body.sessionId, generationId: opened.body.generationId, attempt: 1 });
     // The worker owns failure/exhaustion; the API owns the seller's retry.
     await prisma.videoGeneration.update({ where: { id: opened.body.generationId }, data: { status: "Failed", processingAttempt: 3, processingRetryCount: 2, failureType: "TRANSIENT" } });
-    const responses = await Promise.all([1, 2].map(() => request.post(`${path(opened.body.sessionId)}/reprocess`).set(auth())));
+    const discovered = await request.get(`/api/v1/listings/video-uploads/target/draft/${target.id}`).set(auth()).expect(200);
+    expect(discovered.body.pendingVideo).toMatchObject({ sessionId: opened.body.sessionId, sourceId: opened.body.sessionId, generationId: opened.body.generationId, status: "failed", canReprocess: true });
+    const responses = await Promise.all([1, 2].map(() => request.post(`${path(discovered.body.pendingVideo.sessionId)}/reprocess`).set(auth())));
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     const conflict = responses.find((response) => response.status === 409);
     expect(conflict?.body.code).toBe("VIDEO_UPLOAD_CONFLICT");
     const session = await app.get<PrismaVideoUploadRepository>(VIDEO_UPLOAD_REPOSITORY).findSession(opened.body.sessionId);
     expect(session?.generation).toMatchObject({ status: "Processing", processingAttempt: 4, processingRetryCount: 0 });
     expect(session?.source.id).toBe(opened.body.sessionId);
+    const refreshed = await request.get(`/api/v1/listings/video-uploads/target/draft/${target.id}`).set(auth()).expect(200);
+    expect(refreshed.body.pendingVideo).toMatchObject({ sessionId: opened.body.sessionId, status: "processing", canReprocess: false });
     expect((await queue.getJob(`${opened.body.generationId}-4`))?.data).toEqual({ sourceId: opened.body.sessionId, generationId: opened.body.generationId, attempt: 4 });
     expect(await storage.headObject(sources.get(opened.body.sessionId)!.objectKey)).toMatchObject({ sizeBytes: 6291456 });
   });

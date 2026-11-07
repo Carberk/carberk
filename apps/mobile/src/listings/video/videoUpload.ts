@@ -49,6 +49,7 @@ interface PersistedVideoUpload {
   coverOffsetMs: number;
   idempotencyKey: string;
   openAttempted?: boolean;
+  openingTarget?: VideoUploadTarget;
   sourceDirectory?: string;
 }
 
@@ -229,12 +230,13 @@ export class VideoUploadController {
     if (this.snapshot.sessionId) return;
     if (!this.openPromise) {
       this.openPromise = (async () => {
+        this.snapshot.openingTarget ??= this.snapshot.target;
         this.snapshot.openAttempted = true;
         // Recovery, including Cancel during Open, must use the same key after a restart.
         await this.persist();
         if (this.disposed) return;
         const opened = await this.api.open({
-          target: this.snapshot.target, contentType: "video/mp4",
+          target: this.snapshot.openingTarget, contentType: "video/mp4",
           sizeBytes: this.snapshot.sizeBytes, coverOffsetMs: this.snapshot.coverOffsetMs,
         }, this.snapshot.idempotencyKey);
         if (this.disposed) return;
@@ -397,6 +399,7 @@ export class VideoUploadController {
   async adopt(target: VideoUploadTarget): Promise<void> {
     if (sameTarget(target, this.snapshot.target)) return;
     if (this.snapshot.target.type !== "draft" || target.type !== "listing") return;
+    if (this.snapshot.openAttempted) this.snapshot.openingTarget ??= this.snapshot.target;
     const oldKey = this.storageKey;
     const oldSuffix = `${this.snapshot.target.type}:${this.snapshot.target.id}`;
     this.storageKey = oldKey.endsWith(oldSuffix) ? `${oldKey.slice(0, -oldSuffix.length)}${target.type}:${target.id}` : oldKey;
@@ -597,6 +600,7 @@ export class VideoUploadController {
     if (op !== this.operationId) return;
     this.snapshot.phase = "idle";
     this.snapshot.openAttempted = false;
+    this.snapshot.openingTarget = undefined;
     this.snapshot.sessionId = undefined;
     this.snapshot.generationId = undefined;
     this.snapshot.confirmedParts = [];

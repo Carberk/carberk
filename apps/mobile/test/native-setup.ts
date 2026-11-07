@@ -329,3 +329,15 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
     getAllKeys: vi.fn(async () => []),
   },
 }));
+
+
+// Preparation is now reachable from Review and the owner's Listing screen.
+// Filesystem behavior is a native boundary; dedicated video specs override it.
+vi.mock("expo-file-system/legacy", () => ({
+  documentDirectory: "file:///documents/",
+  getInfoAsync: vi.fn(async () => ({ exists: true })),
+  copyAsync: vi.fn(async () => {}),
+  makeDirectoryAsync: vi.fn(async () => {}),
+  deleteAsync: vi.fn(async () => {}),
+  readDirectoryAsync: vi.fn(async () => []),
+}));

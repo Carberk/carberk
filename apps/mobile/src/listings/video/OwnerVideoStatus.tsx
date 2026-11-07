@@ -32,14 +32,19 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
   const operation = useRef(0);
   const { refetch } = status;
   const clear = task.upload.clear;
-  const readyGeneration = status.data?.video?.generationId;
   const localGeneration = task.upload.state.generationId;
   const phase = task.upload.state.phase;
   const hasTarget = !!target;
-  useEffect(() => { if (hasTarget) void refetch(); }, [phase, hasTarget, refetch]);
   useEffect(() => {
-    if (phase === "processing" && readyGeneration && readyGeneration === localGeneration) void clear();
-  }, [phase, readyGeneration, localGeneration, clear]);
+    let current = true;
+    if (hasTarget) void refetch().then((result) => {
+      if (!current || result.error || !result.data || !localGeneration || phase === "operation-unknown") return;
+      // A read begun after Open/phase change is authoritative. Worker promotion,
+      // removal, or a newer replacement retires this controller's local state.
+      if (result.data.pendingVideo?.generationId !== localGeneration || result.data.pendingVideo.status !== "uploading") void clear();
+    });
+    return () => { current = false; };
+  }, [phase, hasTarget, localGeneration, refetch, clear]);
   const active = hidden === "all" ? undefined : status.data?.video;
   const pending = hidden ? undefined : status.data?.pendingVideo;
 
@@ -55,11 +60,11 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
     busy.current = true; setWorking(true);
     const attempt = ++operation.current;
     if (action !== "reprocess") setHidden(action === "remove" ? "all" : "pending");
-    await status.queryClient.cancelQueries({ queryKey: status.queryKey });
-    if (action !== "reprocess") {
-      onClearSelection?.(); task.prep.remove(); await task.upload.clear();
-    }
     try {
+      await status.queryClient.cancelQueries({ queryKey: status.queryKey });
+      if (action !== "reprocess") {
+        onClearSelection?.(); task.prep.remove(); await task.upload.clear();
+      }
       if (action === "remove") await apiClient.post("/listings/video-uploads/remove", target, Removed);
       else if (pending && action === "cancel") await apiClient.post(`/listings/video-uploads/${pending.sessionId}/cancel`, {}, VideoUploadsSchemas.CancelVideoUploadResponseSchema);
       else if (pending) await apiClient.post(`/listings/video-uploads/${pending.sessionId}/reprocess`, {}, VideoUploadsSchemas.VideoUploadStatusResponseSchema);

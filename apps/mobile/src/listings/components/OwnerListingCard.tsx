@@ -6,7 +6,8 @@ import { Enums } from "@auto-tm/contracts";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
-import { VideoStatusLine } from "../video/VideoStatusLine";
+import { useExistingListingVideoTask } from "../video/ListingVideoTasks";
+import { VideoStatusLine, localVideoStatus } from "../video/VideoStatusLine";
 import { carTitle } from "../carTitle";
 import { buildVariantUrl } from "../detail/buildVariantUrl";
 
@@ -55,6 +56,8 @@ export function OwnerListingCard({
   onOpen,
   onMore,
 }: OwnerListingCardProps) {
+  const task = useExistingListingVideoTask({ type: "listing", id: listing.id });
+  const videoStatus = localVideoStatus(task, listing.video, listing.pendingVideo);
   const { t, i18n } = useTranslation();
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = listing.coverMediaKey
@@ -115,7 +118,7 @@ export function OwnerListingCard({
             {cityName ?? listing.cityId}
           </Text>
         </View>
-        {(listing.video || listing.pendingVideo) && <VideoStatusLine video={listing.video} pendingVideo={listing.pendingVideo} />}
+        {(listing.video || listing.pendingVideo || videoStatus) && <VideoStatusLine video={listing.video} pendingVideo={listing.pendingVideo} localStatus={videoStatus} />}
         {isBlocked ? (
           <Text className="text-caption text-muted-foreground">{t("myListingsBlockedNote")}</Text>
         ) : null}

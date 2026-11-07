@@ -6,7 +6,7 @@ import { Enums, WizardSchemas } from "@auto-tm/contracts";
 import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { VideoReviewLine } from "../video/VideoStatusLine";
+import { VideoReviewLine } from "../video/VideoReviewLine";
 import { useBrands } from "../../api/catalog/useBrands";
 import { findCityInGroups, useCityGroups } from "../../api/catalog/useCityGroups";
 import { useEngineTypes } from "../../api/catalog/useEngineTypes";

@@ -1,10 +1,7 @@
-import { useEffect } from "react";
-import type { ListingsSchemas, VideoUploadsSchemas } from "@auto-tm/contracts";
-import { View } from "react-native";
+import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
-import { useSharedListingVideoTask } from "./ListingVideoTasks";
-import { useTargetVideo } from "./useTargetVideo";
+import type { ListingVideoTask } from "./ListingVideoTasks";
 
 import { Text } from "@/components/ui/text";
 
@@ -20,16 +17,19 @@ export function VideoStatusLine({ video, pendingVideo, localStatus }: {
     {video && pending ? t("listingVideoReplacementStatus", { status: label }) : `${t("listingVideoTitle")} · ${label}`}
   </Text>;
 }
-export function VideoReviewLine({ target }: { target: VideoUploadsSchemas.VideoUploadTarget }) {
-  const task = useSharedListingVideoTask({ target });
-  const status = useTargetVideo(target);
-  const phase = task?.upload.state.phase;
-  const sessionId = task?.upload.state.sessionId;
-  const { refetch } = status;
-  useEffect(() => { void refetch(); }, [phase, sessionId, refetch]);
-  if (!status.data && (!task || (task.prep.state.phase === "idle" && task.upload.state.phase === "idle"))) return null;
-  const prep = task?.prep.state.phase;
-  const upload = task?.upload.state.phase;
-  const localStatus = prep === "preparing" ? "preparing" : prep === "failed" ? "attention" : upload === "paused" ? "paused" : upload === "uploading" ? "uploading" : upload === "processing" && !status.data?.video && !status.data?.pendingVideo ? "processing" : upload === "failed" || upload === "operation-unknown" ? "attention" : undefined;
-  return <View className="py-3"><VideoStatusLine {...status.data} localStatus={localStatus} /></View>;
+
+
+export function localVideoStatus(task: ListingVideoTask | undefined, video?: ListingsSchemas.ReadyListingVideo, pending?: ListingsSchemas.PendingListingVideo) {
+  if (task?.prep.state.phase === "preparing") return "preparing";
+  if (task?.prep.state.phase === "failed") return "attention";
+  const generation = task?.upload.state.generationId;
+  if (generation && video?.generationId === generation || pending && (pending.generationId !== generation || pending.status !== "uploading")) return undefined;
+  switch (task?.upload.state.phase) {
+    case "paused": return "paused";
+    case "uploading": return "uploading";
+    case "processing": return video || pending ? undefined : "processing";
+    case "failed":
+    case "operation-unknown": return "attention";
+    default: return undefined;
+  }
 }

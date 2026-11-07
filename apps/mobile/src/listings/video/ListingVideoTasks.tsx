@@ -76,6 +76,10 @@ function TaskRunner({ entryKey, entry, setEntries, userId }: { userId: string | 
   return <Runner options={{ ...entry.options, storageKey: `listing-video:${userId}:${entryKey}` }} report={report} />;
 }
 export function useListingVideoTasks() { return useContext(Context); }
+export function useExistingListingVideoTask(target: Target) {
+  const tasks = useContext(Context);
+  return tasks ? Object.values(tasks.entries).find((entry) => entry.options.target && keyOf(entry.options.target) === keyOf(target))?.task : undefined;
+}
 export function useSharedListingVideoTask(options: ListingVideoTaskOptions) {
   const tasks = useContext(Context);
   const target = options.target;

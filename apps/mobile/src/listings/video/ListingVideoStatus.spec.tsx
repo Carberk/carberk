@@ -83,3 +83,26 @@ it("offers Check again after a failed status read, preserving the last known pro
   await fireEvent.press(screen.getByRole("button", { name: "Check again" }));
   expect(await screen.findByText("Processing video…")).toBeTruthy();
 });
+
+it("fences a status response started before Remove so it cannot restore the video", async () => {
+  let release!: () => void;
+  const late = new Promise<void>((resolve) => { release = resolve; });
+  let reads = 0;
+  let removed = false;
+  server.use(
+    http.get("*/listings/video-uploads/target/listing/:id", async () => {
+      if (++reads === 2) { await late; return HttpResponse.json({ video: ready }); }
+      return HttpResponse.json(removed ? {} : { video: ready });
+    }),
+    http.post("*/listings/video-uploads/remove", () => { removed = true; return HttpResponse.json({ state: "REMOVED" }); }),
+  );
+  const screen = await renderMobile(<ListingVideoCard canUploadVideo videoUploadTarget={{ type: "listing", id }} />);
+  await screen.findByText("Buyers see this video");
+  let refreshing!: Promise<void>;
+  await act(async () => { refreshing = screen.queryClient.refetchQueries(); });
+  await fireEvent.press(screen.getByRole("button", { name: "Remove" }));
+  await fireEvent.press(screen.getByRole("button", { name: "Remove video" }));
+  expect(await screen.findByRole("button", { name: "Choose from library" })).toBeTruthy();
+  await act(async () => { release(); await refreshing; });
+  expect(screen.queryByText("Buyers see this video")).toBeNull();
+});
