@@ -126,6 +126,8 @@ export const PendingListingVideoSchema = z.object({
   id: z.string().uuid(),
   generationId: z.string().uuid(),
   sourceId: z.string().uuid(),
+  /** Owner-only upload authority; aliases the source id, never a public field. */
+  sessionId: z.string().uuid(),
   status: z.enum(["uploading", "processing", "failed"]),
   failureType: z.enum(["SOURCE_MISSING", "SOURCE_INVALID", "TRANSIENT"]).optional(),
   canReprocess: z.boolean(),

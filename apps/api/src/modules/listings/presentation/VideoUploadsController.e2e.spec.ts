@@ -13,6 +13,9 @@ import {
 } from "@nestjs/platform-fastify";
 import supertest from "supertest";
 
+import { GetTargetVideoStatus } from "../application/GetTargetVideoStatus";
+import { LISTING_VIDEO_READ_PORT } from "../domain/ports/ListingVideoReadPort";
+import { FakeListingVideoReadPort } from "../application/testing/FakeListingVideoReadPort";
 import { VideoUploadsController } from "./VideoUploadsController";
 import { VideoUploadSessions, VIDEO_UPLOAD_NOW } from "../application/VideoUploadSessions";
 import { VIDEO_STORAGE_PORT } from "../domain/ports/VideoStoragePort";
@@ -56,7 +59,8 @@ describe("VideoUploadsController e2e", () => {
       ],
       controllers: [VideoUploadsController],
       providers: [
-        VideoUploadSessions,
+        VideoUploadSessions, GetTargetVideoStatus,
+        { provide: LISTING_VIDEO_READ_PORT, useClass: FakeListingVideoReadPort },
         { provide: VIDEO_STORAGE_PORT, useValue: storage },
         { provide: VIDEO_UPLOAD_REPOSITORY, useValue: repo },
         {

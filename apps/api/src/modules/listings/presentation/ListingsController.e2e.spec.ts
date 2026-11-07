@@ -198,6 +198,48 @@ describe("ListingsController e2e", () => {
       return { token, listingId, slot, source, generation };
     }
 
+    it("reopens private Draft Ready video only for its authorized owner", async () => {
+      const { token, listingId, slot, generation } = await videoFixture();
+      const other = await createUser("user-2");
+      const draft = await seedDraft("user-1", validPayload);
+      await prisma.listingVideo.update({ where: { id: slot.id }, data: { listingId: null, draftId: draft.id } });
+      const path = `/api/v1/listings/video-uploads/target/draft/${draft.id}`;
+      const status = await request.get(path).set("Authorization", `Bearer ${token}`).expect(200);
+      expect(status.body.video.generationId).toBe(generation.id);
+      expect(status.body.pendingVideo).toBeUndefined();
+      expect((await request.get(`/api/v1/listings/${listingId}`).expect(200)).body.video).toBeUndefined();
+      await request.get(path).expect(401);
+      const foreign = await request.get(path).set("Authorization", `Bearer ${other}`).expect(404);
+      const missing = await request.get(`/api/v1/listings/video-uploads/target/draft/${suite.id("absent")}`).set("Authorization", `Bearer ${token}`).expect(404);
+      expect(foreign.body.code).toBe("VIDEO_UPLOAD_NOT_AVAILABLE");
+      expect(missing.body.code).toBe("VIDEO_UPLOAD_NOT_AVAILABLE");
+      const empty = await seedDraft("user-1", validPayload);
+      expect((await request.get(`/api/v1/listings/video-uploads/target/draft/${empty.id}`).set("Authorization", `Bearer ${token}`).expect(200)).body).toEqual({});
+      await request.get(`/api/v1/listings/video-uploads/target/other/${draft.id}`).set("Authorization", `Bearer ${token}`).expect(400);
+      await request.get(`/api/v1/listings/video-uploads/target/draft/not-a-uuid`).set("Authorization", `Bearer ${token}`).expect(400);
+    });
+
+    it("requires owner resume membership even with uploads off and hides unavailable targets", async () => {
+      const { token, listingId } = await videoFixture();
+      const other = await createUser("user-2");
+      const path = `/api/v1/listings/video-uploads/target/listing/${listingId}`;
+      app.get(ConfigService).set("LISTING_VIDEO_UPLOADS_ENABLED", false);
+      app.get(ConfigService).set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", "");
+      expect((await request.get(path).set("Authorization", `Bearer ${token}`).expect(200)).body.video).toBeDefined();
+      app.get(ConfigService).set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", "");
+      expect((await request.get(path).set("Authorization", `Bearer ${token}`).expect(404)).body.code).toBe("VIDEO_UPLOAD_NOT_AVAILABLE");
+      app.get(ConfigService).set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", suite.id("user-1"));
+      expect((await request.get(path).set("Authorization", `Bearer ${other}`).expect(404)).body.code).toBe("VIDEO_UPLOAD_NOT_AVAILABLE");
+      await prisma.listing.update({ where: { id: listingId }, data: { deletedAt: new Date() } });
+      expect((await request.get(path).set("Authorization", `Bearer ${token}`).expect(404)).body.code).toBe("VIDEO_UPLOAD_NOT_AVAILABLE");
+    });
+
+    it.each(["suspendedAt", "deletionScheduledAt"] as const)("refuses owner target status for %s accounts", async (field) => {
+      const { token, listingId } = await videoFixture();
+      await prisma.user.update({ where: { id: suite.id("user-1") }, data: { [field]: new Date() } });
+      await request.get(`/api/v1/listings/video-uploads/target/listing/${listingId}`).set("Authorization", `Bearer ${token}`).expect(403);
+    });
+
     async function reads(token: string, listingId: string, ensureFavorite = true) {
       if (ensureFavorite) await request.post(`/api/v1/listings/${listingId}/favorite`).set("Authorization", `Bearer ${token}`).send({}).expect(201);
       const detail = await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);
@@ -293,10 +335,13 @@ describe("ListingsController e2e", () => {
       const results = await reads(token, listingId);
       for (const result of results) expect(result.video.generationId).toBe(generation.id);
       for (const result of results.slice(1, 3)) expect(result.pendingVideo).toBeUndefined();
-      const expected = { id: slot.id, generationId: pending.id, sourceId: source.id, status: projectedStatus, ...(failureType ? { failureType } : {}), canReprocess };
+      const expected = { id: slot.id, generationId: pending.id, sourceId: source.id, sessionId: source.id, status: projectedStatus, ...(failureType ? { failureType } : {}), canReprocess };
       expect(results[3].pendingVideo).toEqual(expected);
       const ownerDetail = await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);
       expect(ownerDetail.body.pendingVideo).toEqual(expected);
+      const statusRead = await request.get(`/api/v1/listings/video-uploads/target/listing/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);
+      expect(statusRead.body.pendingVideo).toEqual(expected);
+      expect(statusRead.body.video.generationId).toBe(generation.id);
     });
   });
 

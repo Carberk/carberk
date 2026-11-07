@@ -6,6 +6,7 @@ import { Enums } from "@auto-tm/contracts";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { VideoStatusLine } from "../video/VideoStatusLine";
 import { carTitle } from "../carTitle";
 import { buildVariantUrl } from "../detail/buildVariantUrl";
 
@@ -15,7 +16,7 @@ import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/src/listings/formatPrice";
 
-type ListingSummary = ListingsSchemas.ListingSummary;
+type ListingSummary = ListingsSchemas.ListingSummary & { pendingVideo?: ListingsSchemas.PendingListingVideo };
 
 interface OwnerListingCardProps {
   listing: ListingSummary;
@@ -114,6 +115,7 @@ export function OwnerListingCard({
             {cityName ?? listing.cityId}
           </Text>
         </View>
+        {(listing.video || listing.pendingVideo) && <VideoStatusLine video={listing.video} pendingVideo={listing.pendingVideo} />}
         {isBlocked ? (
           <Text className="text-caption text-muted-foreground">{t("myListingsBlockedNote")}</Text>
         ) : null}

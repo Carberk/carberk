@@ -793,6 +793,7 @@ describe("Listing video preparation (#1044)", () => {
     await act(async () => {
       await fireEvent.press(screen.getByRole("button", { name: "Remove" }));
     });
+    await fireEvent.press(screen.getByRole("button", { name: "Remove video" }));
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
       "file:///documents/listing-video/job-1/prepared.mp4",
       { idempotent: true },
@@ -817,6 +818,8 @@ function uploadServer() {
     parts: state.confirmed || state.phase !== "UPLOADING" ? [] : [{ partNumber: 1, sizeBytes: 1_500_000, uploadUrl: "https://bucket/part1", expiresAt: "2030-01-01T00:00:00.000Z" }],
   });
   server.use(
+    http.get(`${uploadRoot}/target/draft/:id`, () => HttpResponse.json({})),
+    http.post(`${uploadRoot}/remove`, () => HttpResponse.json({ state: "REMOVED" })),
     http.post(uploadRoot, async ({ request }) => {
       const body = await request.json() as { coverOffsetMs: number };
       state.cover = body.coverOffsetMs;
@@ -892,6 +895,7 @@ describe("Listing video resumable upload card with the real HTTP client", () => 
     expect(await screen.findByText("Video no longer available")).toBeTruthy();
     expect(screen.queryByText("Video ready")).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Remove" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Remove video" }));
     expect(await screen.findByRole("button", { name: "Choose from library" })).toBeTruthy();
     vi.mocked(FileSystem.getInfoAsync).mockResolvedValue({ exists: true } as FileSystem.FileInfo);
   });

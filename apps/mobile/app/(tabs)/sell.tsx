@@ -5,6 +5,7 @@ import { BackHandler } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ListingsSchemas, type WizardSchemas } from "@auto-tm/contracts";
 
+import { useListingVideoTasks } from "../../src/listings/video/ListingVideoTasks";
 import { ApiError } from "../../src/api/client";
 import { useCreateDraft } from "../../src/api/listings/useCreateDraft";
 import { useDiscardDraft } from "../../src/api/listings/useDiscardDraft";
@@ -157,6 +158,7 @@ export default function SellScreen() {
 
   const createDraft = useCreateDraft();
   const publishDraft = usePublishDraft();
+  const videoTasks = useListingVideoTasks();
   const discardDraft = useDiscardDraft();
 
   const { data: brandsData } = useBrands();
@@ -417,6 +419,7 @@ export default function SellScreen() {
 
     try {
       const result = await publishDraft.mutateAsync(machineState.draftId);
+      videoTasks?.published(machineState.draftId, result.id);
       show({
         title: t("listingPublished"),
         variant: "success",
@@ -442,7 +445,7 @@ export default function SellScreen() {
     } finally {
       publishingRef.current = false;
     }
-  }, [machineState, photosToSave, flush, publishDraft, show, t]);
+  }, [machineState, photosToSave, flush, publishDraft, videoTasks, show, t]);
 
   const closeWizard = useCallback(() => {
     newDraftIdRef.current = null;
@@ -659,6 +662,7 @@ export default function SellScreen() {
             isUploading={uploadQueue.isUploading}
             fieldErrors={fieldErrors}
             showErrors={attemptedSteps.photos === true}
+            videoUploadTarget={machineState.draftId ? { type: "draft", id: machineState.draftId } : undefined}
           />
         )}
         {currentStep === "vehicle" && (
@@ -721,6 +725,7 @@ export default function SellScreen() {
         )}
         {currentStep === "review" && (
           <CheckAndPublish
+            videoTarget={machineState.draftId ? { type: "draft", id: machineState.draftId } : undefined}
             payload={machineState.payload}
             validatedSteps={machineState.validatedSteps}
             onChangeStep={(step) => dispatch({ type: "CHANGE_FROM_REVIEW", step })}

@@ -31,6 +31,9 @@ import { PrismaVideoUploadRepository } from "../infrastructure/PrismaVideoUpload
 import { PrismaListingDraftRepository } from "../infrastructure/PrismaListingDraftRepository";
 import { PrismaListingRepository } from "../infrastructure/PrismaListingRepository";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { GetTargetVideoStatus } from "../application/GetTargetVideoStatus";
+import { LISTING_VIDEO_READ_PORT } from "../domain/ports/ListingVideoReadPort";
+import { PrismaListingVideoReadRepository } from "../infrastructure/PrismaListingVideoReadRepository";
 import { VideoUploadsController } from "./VideoUploadsController";
 
 const enabled = process.env["VIDEO_STORAGE_E2E"] === "1" || process.env["GITHUB_ACTIONS"] === "true";
@@ -69,7 +72,8 @@ describe.skipIf(!enabled)("video upload API on Postgres and real storage (#1041)
       imports: [JwtModule.register({ global: true, secret: process.env["JWT_ACCESS_SECRET"] ?? "dev-secret-change-me" })],
       controllers: [VideoUploadsController],
       providers: [
-        PrismaService, VideoUploadSessions,
+        PrismaService, VideoUploadSessions, GetTargetVideoStatus,
+        { provide: LISTING_VIDEO_READ_PORT, useClass: PrismaListingVideoReadRepository },
         { provide: getQueueToken("video-transcode"), useValue: queue },
         { provide: ConfigService, useValue: new ConfigService(env) },
         { provide: VIDEO_STORAGE_PORT, useClass: ControlledStorage },

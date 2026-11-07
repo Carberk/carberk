@@ -4,6 +4,7 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { ChevronRight, Flag } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
+import { ListingVideoCard } from "../video/ListingVideoCard";
 import type { CatalogMaps } from "../detail/useCatalogMaps";
 import {
   closedListingBannerKey,
@@ -130,6 +131,7 @@ export function ListingDetailView({
         {isOwner && (
           <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} />
         )}
+        {isOwner && <ListingVideoCard videoUploadTarget={{ type: "listing", id: listing.id }} />}
         <Text
           className="text-headline font-heading font-semibold text-foreground"
           numberOfLines={2}

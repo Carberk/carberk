@@ -151,7 +151,7 @@ export class VideoUploadController {
   private readonly fs: VideoUploadFileSystem;
   private readonly transport: VideoUploadTransport;
   private readonly persistence: VideoUploadPersistence;
-  private readonly storageKey: string;
+  private storageKey: string;
   private readonly online: () => boolean;
   private readonly foreground: () => boolean;
   private networkAvailable: boolean;
@@ -202,8 +202,9 @@ export class VideoUploadController {
   }
 
   async restore(): Promise<void> {
+    const op = this.operationId;
     const raw = await this.persistence.get(this.storageKey);
-    if (this.disposed || !raw) return;
+    if (this.disposed || op !== this.operationId || !raw) return;
     let restored: PersistedVideoUpload;
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -237,6 +238,7 @@ export class VideoUploadController {
           sizeBytes: this.snapshot.sizeBytes, coverOffsetMs: this.snapshot.coverOffsetMs,
         }, this.snapshot.idempotencyKey);
         if (this.disposed) return;
+        await this.adopt(opened.target);
         this.snapshot.sessionId = opened.sessionId;
         this.snapshot.generationId = opened.generationId;
         await this.persist();
@@ -391,6 +393,32 @@ export class VideoUploadController {
     }
   }
 
+  /** Publish preserves the session; local recovery follows its canonical target. */
+  async adopt(target: VideoUploadTarget): Promise<void> {
+    if (sameTarget(target, this.snapshot.target)) return;
+    if (this.snapshot.target.type !== "draft" || target.type !== "listing") return;
+    const oldKey = this.storageKey;
+    const oldSuffix = `${this.snapshot.target.type}:${this.snapshot.target.id}`;
+    this.storageKey = oldKey.endsWith(oldSuffix) ? `${oldKey.slice(0, -oldSuffix.length)}${target.type}:${target.id}` : oldKey;
+    this.snapshot.target = target;
+    const value = JSON.stringify(this.snapshot);
+    const key = this.storageKey;
+    this.persistenceQueue = this.persistenceQueue.catch(() => undefined).then(async () => {
+      await this.persistence.set(key, value);
+      if (oldKey !== key) await this.persistence.remove(oldKey);
+    });
+    this.publish();
+    await this.persistenceQueue;
+  }
+
+  /** Fence local callbacks after target removal; server lifecycle is separate. */
+  async clear(): Promise<void> {
+    const op = ++this.operationId;
+    this.partAbort?.abort();
+    await this.openPromise?.catch(() => undefined);
+    await this.deleteLocalAndForget(op);
+  }
+
   dispose(): void {
     this.disposed = true;
     ++this.operationId;
@@ -510,9 +538,11 @@ export class VideoUploadController {
 
   private async applyStatus(op: number, status: VideoUploadStatusResponse): Promise<boolean> {
     if (op !== this.operationId) return true;
+    await this.adopt(status.target);
+    if (op !== this.operationId) return true;
     const confirmed = uniqueParts(status.confirmedParts);
     this.snapshot.confirmedParts = confirmed;
-    if (status.state === "PROCESSING") {
+    if (status.state === "PROCESSING" || status.state === "FAILED") {
       if (this.snapshot.operation) {
         await this.persist();
         this.publish();
@@ -545,7 +575,7 @@ export class VideoUploadController {
   private async deleteLocalOnly(op: number): Promise<void> {
     if (this.localDeleted) return;
     const { localUri, sourceDirectory } = this.snapshot;
-    await this.fs.remove(localUri);
+    if (localUri) await this.fs.remove(localUri);
     if (sourceDirectory) await this.fs.remove(sourceDirectory);
     if (op === this.operationId) this.localDeleted = true;
   }
@@ -584,7 +614,8 @@ export class VideoUploadController {
 
   private persist(): Promise<void> {
     const value = JSON.stringify(this.snapshot);
-    this.persistenceQueue = this.persistenceQueue.catch(() => undefined).then(() => this.persistence.set(this.storageKey, value));
+    const key = this.storageKey;
+    this.persistenceQueue = this.persistenceQueue.catch(() => undefined).then(() => this.persistence.set(key, value));
     return this.persistenceQueue;
   }
 
@@ -662,7 +693,10 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
   const target = useMemo(() => targetType && targetId ? { type: targetType, id: targetId } : undefined, [targetType, targetId]);
   const storageKey = options.storageKey ?? (target ? `listing-video:${target.type}:${target.id}` : "listing-video:none");
 
+  const targetRef = useRef(target);
+  targetRef.current = target;
   useEffect(() => {
+    const target = targetRef.current;
     if (!target) {
       controllerRef.current = null;
       rerender((value) => value + 1);
@@ -685,7 +719,7 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
     const unsubscribe = controller.subscribe(() => rerender((value) => value + 1));
     void controller.restore();
     return () => { unsubscribe(); controller.dispose(); };
-  }, [options.api, options.fileSystem, options.persistence, options.transport, rerender, storageKey, target]);
+  }, [options.api, options.fileSystem, options.persistence, options.transport, rerender, storageKey]);
 
   useEffect(() => {
     if (!target) return;
@@ -695,6 +729,8 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
       onNetwork: (available) => controllerRef.current?.setNetworkAvailable(available),
     });
   }, [options.subscribeLifecycle, target]);
+
+  useEffect(() => { if (target) void controllerRef.current?.adopt(target).catch(() => undefined); }, [target]);
 
   const start = useCallback(async (file: { uri: string; sizeBytes: number; sourceDirectory?: string }, selection: ListingVideoSelection) => {
     const current = controllerRef.current;
@@ -711,7 +747,7 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
   }, []);
 
   const state = controllerRef.current?.state ?? ({ phase: "idle", target: target ?? { type: "draft", id: "" }, sizeBytes: 0, totalBytes: 0, confirmedBytes: 0, confirmedParts: [], coverOffsetMs: 0 } satisfies VideoUploadState);
-  return {
+  return useMemo(() => ({
     state,
     start,
     pause: () => invoke("pause"),
@@ -719,5 +755,7 @@ export function useVideoUpload(options: UseVideoUploadOptions = {}) {
     cancel: () => invoke("cancel", "cancel"),
     remove: () => invoke("cancel", "remove"),
     checkStatus: () => invoke("checkStatus"),
-  };
+    adopt: (target: VideoUploadTarget) => controllerRef.current?.adopt(target),
+    clear: () => controllerRef.current?.clear(),
+  }), [state, start, invoke]);
 }

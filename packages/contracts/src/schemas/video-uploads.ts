@@ -1,4 +1,11 @@
 import { DateTimeSchema, z } from "../zod";
+import { PendingListingVideoSchema, ReadyListingVideoSchema } from "./listings";
+
+export const TargetVideoStatusResponseSchema = z.object({
+  video: ReadyListingVideoSchema.optional(),
+  pendingVideo: PendingListingVideoSchema.optional(),
+});
+export type TargetVideoStatusResponse = z.infer<typeof TargetVideoStatusResponseSchema>;
 
 /** Prepared Listing video cap (ADR-0112): at most 15 MiB, MP4 only. */
 export const MAX_VIDEO_UPLOAD_BYTES = 15 * 1024 * 1024;

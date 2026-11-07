@@ -11,12 +11,13 @@ import { mapErrorToCopy } from "../../api/getErrorCopy";
 
 import { createListingVideoDraft, formatMmss, toSelection, type ListingVideoDraft } from "./listingVideo";
 import {
-  useListingVideoPreparation,
   type AppStateSubscribe,
   type ListingVideoFileSystem,
   type ListingVideoPrepFailure,
 } from "./videoPreparation";
-import { useVideoUpload, type VideoUploadApi, type VideoUploadFileSystem, type VideoUploadPersistence, type VideoUploadTransport } from "./videoUpload";
+import { type VideoUploadApi, type VideoUploadFileSystem, type VideoUploadPersistence, type VideoUploadTransport } from "./videoUpload";
+import { useLocalListingVideoTask, useSharedListingVideoTask, useListingVideoTasks, type ListingVideoTask, type ListingVideoTaskOptions } from "./ListingVideoTasks";
+import { OwnerVideoStatus } from "./OwnerVideoStatus";
 import { ListingVideoEditor } from "./ListingVideoEditor";
 import { useListingVideoAccess } from "./useListingVideoAccess";
 
@@ -80,19 +81,25 @@ const FAILURE_COPY: Record<
   preparation: { title: "listingVideoFailedTitle", body: "listingVideoFailedBody", retry: "listingVideoTryAgain" },
 };
 
-export function ListingVideoCard({
-  canUploadVideo,
-  isVideoUploadTester,
-  videoNative,
-  videoFileSystem,
-  subscribeAppState,
-  videoUploadTarget,
-  videoUploadApi,
-  videoUploadFileSystem,
-  videoUploadTransport,
-  videoUploadPersistence,
-  disabled = false,
-}: ListingVideoCardProps) {
+export function ListingVideoCard(props: ListingVideoCardProps) {
+  const tasks = useListingVideoTasks();
+  const options: ListingVideoTaskOptions = { target: props.videoUploadTarget, native: props.videoNative,
+    fileSystem: props.videoFileSystem, subscribeAppState: props.subscribeAppState,
+    api: props.videoUploadApi, uploadFileSystem: props.videoUploadFileSystem,
+    transport: props.videoUploadTransport, persistence: props.videoUploadPersistence };
+  return tasks && props.videoUploadTarget
+    ? <SharedCard {...props} options={options} />
+    : <LocalCard {...props} options={options} />;
+}
+function SharedCard(props: ListingVideoCardProps & { options: ListingVideoTaskOptions }) {
+  const task = useSharedListingVideoTask(props.options);
+  return task ? <VideoCardContent {...props} task={task} /> : null;
+}
+function LocalCard(props: ListingVideoCardProps & { options: ListingVideoTaskOptions }) {
+  const task = useLocalListingVideoTask(props.options);
+  return <VideoCardContent {...props} task={task} />;
+}
+function VideoCardContent({ canUploadVideo, isVideoUploadTester, disabled = false, videoUploadTarget, task }: ListingVideoCardProps & { task: ListingVideoTask }) {
   const { t } = useTranslation();
   const access = useListingVideoAccess(canUploadVideo === undefined);
   const tester = isVideoUploadTester ?? canUploadVideo ?? access.isVideoUploadTester;
@@ -106,38 +113,11 @@ export function ListingVideoCard({
   const selectionRevision = useRef(0);
   useEffect(() => () => { selectionRevision.current += 1; }, []);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const prep = useListingVideoPreparation({
-    native: videoNative,
-    fileSystem: videoFileSystem,
-    subscribeAppState,
-  });
-  const upload = useVideoUpload({ target: videoUploadTarget, api: videoUploadApi, fileSystem: videoUploadFileSystem, transport: videoUploadTransport, persistence: videoUploadPersistence });
-  const { handoff, remove: clearPreparation } = prep;
-  const startedUploadUri = useRef<string | null>(null);
-
+  const { prep, upload } = task;
   useEffect(() => {
-    if (prep.state.phase !== "prepared") {
-      startedUploadUri.current = null;
-      return;
-    }
-    if (!videoUploadTarget) return;
-    if (upload.state.phase !== "idle" || startedUploadUri.current === prep.state.file.uri) return;
-    startedUploadUri.current = prep.state.file.uri;
-    handoff();
-    void upload.start(prep.state.file, prep.state.selection);
-  }, [prep.state, upload, upload.start, upload.state.phase, videoUploadTarget, handoff]);
-
-  const previousUploadPhase = useRef(upload.state.phase);
-  useEffect(() => {
-    const previous = previousUploadPhase.current;
-    previousUploadPhase.current = upload.state.phase;
-    if ((upload.state.phase === "idle" && previous !== "idle") || upload.state.phase === "processing") {
-      clearPreparation();
-      setDraft(null);
-      setCommittedDraft(null);
-    }
-  }, [upload.state.phase, clearPreparation]);
-
+    if (upload.state.phase === "idle") return;
+    setDraft(null); setCommittedDraft(null);
+  }, [upload.state.phase]);
   const checkAccess = async () => {
     if (accessCheckInFlight.current) return false;
     accessCheckInFlight.current = true;
@@ -240,6 +220,8 @@ export function ListingVideoCard({
         <Icon as={Video} className="size-6 text-foreground" />
       </View>
 
+      <OwnerVideoStatus key={videoUploadTarget ? `${videoUploadTarget.type}:${videoUploadTarget.id}` : "local"} target={videoUploadTarget} task={task} onClearSelection={clearSelection} onChoose={() => void chooseFromLibrary()}>
+      {(serverBusy, replacing, requestRemove) => <>
       {(upload.state.phase === "uploading" || upload.state.phase === "paused") && (() => {
         const confirmedMb = (upload.state.confirmedBytes / (1024 * 1024)).toFixed(1);
         const totalMb = (upload.state.totalBytes / (1024 * 1024)).toFixed(1);
@@ -277,8 +259,8 @@ export function ListingVideoCard({
                   <Text>{t("listingVideoContinueUpload")}</Text>
                 </Button>
               ) : null}
-              <Button variant="outline" onPress={() => void upload.cancel()} accessibilityLabel={t("cancel")}>
-                <Text>{t("cancel")}</Text>
+              <Button variant="outline" onPress={() => void upload.cancel()} accessibilityLabel={replacing ? t("listingVideoCancelReplacement") : t("cancel")}>
+                <Text>{replacing ? t("listingVideoCancelReplacement") : t("cancel")}</Text>
               </Button>
             </View>
           </View>
@@ -294,7 +276,7 @@ export function ListingVideoCard({
           <Button variant="secondary" onPress={() => void upload.resume()} accessibilityLabel={t("listingVideoContinueUpload")}>
             <Text>{t("listingVideoContinueUpload")}</Text>
           </Button>
-          <Button variant="outline" onPress={() => void upload.remove()} accessibilityLabel={t("listingVideoRemove")}>
+          <Button variant="outline" onPress={requestRemove} accessibilityLabel={t("listingVideoRemove")}>
             <Text>{t("listingVideoRemove")}</Text>
           </Button>
         </View>
@@ -306,7 +288,7 @@ export function ListingVideoCard({
             <Text className="text-callout font-semibold">{t("listingVideoGoneTitle")}</Text>
             <Text className="text-footnote text-muted-foreground">{t("listingVideoGoneBody")}</Text>
           </View>
-          <Button variant="outline" onPress={() => void upload.remove()} accessibilityLabel={t("listingVideoRemove")}>
+          <Button variant="outline" onPress={requestRemove} accessibilityLabel={t("listingVideoRemove")}>
             <Text>{t("listingVideoRemove")}</Text>
           </Button>
         </View>
@@ -326,9 +308,10 @@ export function ListingVideoCard({
         </View>
       )}
 
-      {upload.state.phase === "processing" && (
+      {upload.state.phase === "processing" && !serverBusy && (
         <View className="gap-2" testID="listing-video-upload-processing">
           <Text className="text-callout font-semibold">{t("listingVideoProcessing")}</Text>
+          <Text className="text-footnote text-muted-foreground">{t("listingVideoPublishNow")}</Text>
         </View>
       )}
 
@@ -383,10 +366,7 @@ export function ListingVideoCard({
             </Button>
             <Button
               variant="outline"
-              onPress={() => {
-                prep.remove();
-                clearSelection();
-              }}
+              onPress={requestRemove}
               accessibilityLabel={t("listingVideoRemove")}
             >
               <Text>{t("listingVideoRemove")}</Text>
@@ -413,10 +393,7 @@ export function ListingVideoCard({
             <Button
               variant="outline"
               className="flex-1"
-              onPress={() => {
-                prep.remove();
-                clearSelection();
-              }}
+              onPress={requestRemove}
               accessibilityLabel={t("listingVideoRemove")}
             >
               <Text>{t("listingVideoRemove")}</Text>
@@ -442,12 +419,15 @@ export function ListingVideoCard({
         </View>
       )}
 
-      {upload.state.phase === "idle" && prep.state.phase === "idle" && !draft && (
+      {upload.state.phase === "idle" && prep.state.phase === "idle" && !draft && !serverBusy && (
         <Button onPress={() => void chooseFromLibrary()} disabled={disabled || checkingAccess || !uploadsOn} accessibilityLabel={t("listingVideoChoose")}>
           <Icon as={Plus} className="size-4" />
           <Text>{t("listingVideoChoose")}</Text>
         </Button>
       )}
+
+      </>}
+      </OwnerVideoStatus>
 
       {permissionDenied && <PermissionNote onDismiss={() => setPermissionDenied(false)} />}
     </View>

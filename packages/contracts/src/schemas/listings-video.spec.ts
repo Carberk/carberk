@@ -11,7 +11,7 @@ describe("Listing video read contracts", () => {
   });
 
   it("keeps preparing on the phone and distinguishes stored-source processing failures", () => {
-    const pending = { id: "11111111-1111-4111-8111-111111111111", generationId: "22222222-2222-4222-8222-222222222222", sourceId: "33333333-3333-4333-8333-333333333333", status: "failed", failureType: "SOURCE_MISSING", canReprocess: false };
+    const pending = { id: "11111111-1111-4111-8111-111111111111", generationId: "22222222-2222-4222-8222-222222222222", sourceId: "33333333-3333-4333-8333-333333333333", sessionId: "33333333-3333-4333-8333-333333333333", status: "failed", failureType: "SOURCE_MISSING", canReprocess: false };
     expect(PendingListingVideoSchema.parse(pending)).toEqual(pending);
     expect(PendingListingVideoSchema.safeParse({ ...pending, status: "preparing" }).success).toBe(false);
     expect(PendingListingVideoSchema.safeParse({ ...pending, status: "Ready" }).success).toBe(false);
