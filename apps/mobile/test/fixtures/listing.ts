@@ -93,3 +93,37 @@ export const fixture = (
   conditionDisclosure: { damaged: false, knownIssuesText: "Small scratch" },
   ...updates,
 });
+
+export const VIDEO_ID = "00000000-0000-4000-8000-000000000a01";
+export const VIDEO_GENERATION_ID = "00000000-0000-4000-8000-000000000a02";
+
+/** A Ready video as Listing reads carry it (#1043): manifest names, never file URLs. */
+export const readyVideoFixture = (
+  updates: Partial<ListingsSchemas.ReadyListingVideo> = {},
+): ListingsSchemas.ReadyListingVideo => ({
+  id: VIDEO_ID,
+  generationId: VIDEO_GENERATION_ID,
+  galleryIndex: 1,
+  durationMs: 42_000,
+  qualities: [360, 720],
+  cover: { thumbnail: "cover:thumbnail", list: "cover:list", detail: "cover:detail", fullscreen: "cover:fullscreen" },
+  ...updates,
+});
+
+/** The cover grant the viewer cover read returns (#1057): cover URLs only, no playlist. */
+export const videoCoverAccessFixture = (listingId: string) => ({
+  status: "ready",
+  video: {
+    id: VIDEO_ID,
+    generationId: VIDEO_GENERATION_ID,
+    durationMs: 42_000,
+    cover: {
+      thumbnail: `http://localhost:3006/api/v1/listings/video-files/viewer/${listingId}/thumbnail.webp?grant=cover`,
+      list: `http://localhost:3006/api/v1/listings/video-files/viewer/${listingId}/list.webp?grant=cover`,
+      detail: `http://localhost:3006/api/v1/listings/video-files/viewer/${listingId}/detail.webp?grant=cover`,
+      fullscreen: `http://localhost:3006/api/v1/listings/video-files/viewer/${listingId}/fullscreen.webp?grant=cover`,
+    },
+  },
+  expiresAt: "2030-01-01T00:05:00.000Z",
+  qualities: [360, 720],
+});

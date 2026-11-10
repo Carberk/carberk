@@ -23,6 +23,7 @@ import { useAuth } from "../../../src/auth/useAuth";
 import { CollapsingHeader } from "../../../src/listings/detail/CollapsingHeader";
 import { DetailSkeleton } from "../../../src/listings/detail/DetailSkeleton";
 import { ListingPreview } from "../../../src/listings/detail/ListingPreview";
+import { DETAIL_MEDIA_VIDEO } from "../../../src/listings/detail/listingDetailHref";
 import { useDetailPhotosBottom } from "../../../src/listings/components/DetailPhotoStrip";
 import { OwnerActions } from "../../../src/listings/components/OwnerActions";
 import { HOME_HREF } from "../../../src/navigation/homeHref";
@@ -60,7 +61,7 @@ function UnavailableState({
 }
 
 export default function ListingDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, media } = useLocalSearchParams<{ id: string; media?: string }>();
   const goBack = useSafeBack();
   const insets = useSafeAreaInsets();
   const { data, isPending, error, refetch } = useListingDetail(id ?? "");
@@ -104,6 +105,7 @@ export default function ListingDetailScreen() {
     return preview ? (
       <ListingPreview
         summary={preview}
+        startOnVideo={media === DETAIL_MEDIA_VIDEO}
         isOwner={viewer != null && viewer.userId === preview.sellerId}
         reportEnabled={config?.reportEntryEnabled !== false}
         onBack={goBack}
@@ -168,6 +170,7 @@ export default function ListingDetailScreen() {
           listing={data}
           maps={maps}
           isOwner={isOwner}
+          startOnVideo={media === DETAIL_MEDIA_VIDEO}
           onReport={
             config?.reportEntryEnabled !== false ? handleReport : undefined
           }

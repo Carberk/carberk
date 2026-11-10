@@ -37,6 +37,8 @@ interface ListingDetailProps {
   onScroll?: ScrollViewProps["onScroll"];
   /** Room kept at the end of the scroll for a bar that floats over it. */
   bottomSpace?: number;
+  /** Open the photos on the Ready video, as when a card's video cover was tapped. */
+  startOnVideo?: boolean;
 }
 export function ListingDetailView({
   listing,
@@ -46,6 +48,7 @@ export function ListingDetailView({
   onSeeSimilar,
   onScroll,
   bottomSpace = 0,
+  startOnVideo = false,
 }: ListingDetailProps) {
   const { t, i18n } = useTranslation();
   const scrollRef = useRef<View>(null);
@@ -98,6 +101,9 @@ export function ListingDetailView({
       <PhotoGallery
         visibleTop={visibleTop}
         media={listing.media}
+        listingId={listing.id}
+        video={listing.video}
+        startOnVideo={startOnVideo}
         banner={banner ? t(banner) : undefined}
         viewerHeaderAction={
           showViewerActions

@@ -3,6 +3,8 @@ import { FlatList, Pressable, View, useWindowDimensions, type ListRenderItem, ty
 import { useTranslation } from "react-i18next";
 
 import { listingPhotoUrl } from "../detail/buildVariantUrl";
+import { isVideoGalleryItem, type VideoGalleryItem } from "../video/videoGalleryItem";
+import { VideoCover } from "../video/VideoCover";
 
 import { GalleryBanner, GalleryImage, type GalleryPhoto } from "./GalleryImage";
 import { clippedRadii, intersectRect, minimalStripOffset, type PhotoGeometry } from "./photoTransitionMath";
@@ -39,6 +41,8 @@ export function useDetailPhotosBottom() {
 
 /** A photo of the strip, or a photo the Listing has that the tapped card did not know yet. */
 export type StripPhoto = (GalleryPhoto & { pending?: false }) | { key: string; pending: true };
+/** A strip tile: a photo, or the Listing's Ready video as its cover (#1051). */
+export type StripItem = StripPhoto | VideoGalleryItem;
 
 /** What a parent can ask of the strip: land on a photo, as when the viewer closes on it. */
 export interface DetailPhotoStripHandle {
@@ -47,7 +51,11 @@ export interface DetailPhotoStripHandle {
 }
 
 interface DetailPhotoStripProps {
-  photos: readonly StripPhoto[];
+  photos: readonly StripItem[];
+  /** The tile the strip opens on, as when a card's video cover opened the Listing. */
+  initialIndex?: number;
+  /** Play on the video tile. Without it the video tile is a picture, as in the preview. */
+  onPressVideo?: () => void;
   /** Status strip across the bottom of every tile, e.g. "Sold" on a closed Listing. */
   banner?: string | undefined;
   /**
@@ -82,27 +90,34 @@ interface DetailPhotoStripProps {
  *
  * There is no counter here: each photo reads "Photo n of N" to a screen
  * reader, and the viewer shows `n / N`.
+ *
+ * A Ready video is the second tile (#1051): its cover, Play and duration,
+ * counted with the photos. Tapping it opens the player; nothing of the video
+ * but the cover loads before that.
  */
-export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenIndex, visibleTop = 0 }: DetailPhotoStripProps) {
+export function DetailPhotoStrip({ photos, banner, onPressPhoto, onPressVideo, initialIndex = 0, ref, hiddenIndex, visibleTop = 0 }: DetailPhotoStripProps) {
   const { t } = useTranslation();
   const tile = useDetailPhotoTile();
   const { width: viewport, height: windowHeight } = useWindowDimensions();
   const interval = tile.width + DETAIL_STRIP_SEAM;
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
   // Neighbours wait until the first photo has loaded, so on a slow connection
   // they never share its bandwidth; once the buyer swipes they load anyway.
   const [firstLoaded, setFirstLoaded] = useState(false);
   const loadNeighbours = firstLoaded || activeIndex !== 0;
-  const listRef = useRef<FlatList<StripPhoto>>(null);
+  const listRef = useRef<FlatList<StripItem>>(null);
   const tiles = useRef(new Map<number, View>());
   const container = useRef<View>(null);
-  const offset = useRef(0);
+  // Snap points are whole intervals from the start, so the opening tile's offset is too.
+  const [initialOffset] = useState(() => ({ x: interval * initialIndex, y: 0 }));
+  const offset = useRef(initialOffset.x);
   const ratios = useRef(new Map<number, number>());
   const uris = useRef(new Map<number, string>());
   const measurePhoto = useCallback((index: number, callback: (geometry: PhotoGeometry | null) => void) => {
     const photo = photos[index];
     const node = tiles.current.get(index);
-    if (!photo || photo.pending || !node || !container.current) { callback(null); return; }
+    // The video has no photo to fly: the viewer opens and closes on it by fading.
+    if (!photo || isVideoGalleryItem(photo) || photo.pending || !node || !container.current) { callback(null); return; }
     container.current.measureInWindow((sx, sy, sw, sh) => {
       node.measureInWindow((x, y, width, height) => {
         if (width <= 0 || height <= 0) { callback(null); return; }
@@ -131,9 +146,20 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
   const count = photos.length;
-  const renderItem = useCallback<ListRenderItem<StripPhoto>>(({ item, index }) => {
+  const renderItem = useCallback<ListRenderItem<StripItem>>(({ item, index }) => {
     const label = t("photoOf", { n: index + 1, total: count });
     const value = banner ? { text: banner } : undefined;
+    if (isVideoGalleryItem(item)) {
+      const seconds = Math.round(item.durationMs / 1000);
+      const cover = (
+        <View testID="listing-video-tile" style={{ width: tile.width, height: tile.height }} className={cn("overflow-hidden bg-black", tileEnds(index, count))}>
+          <VideoCover uri={item.cover?.detail} durationMs={item.durationMs} />
+          {banner && <GalleryBanner label={banner} hidden />}
+        </View>
+      );
+      if (!onPressVideo) return <View accessible accessibilityRole="image" accessibilityLabel={t("listingVideoTile", { count: seconds })} accessibilityValue={value}>{cover}</View>;
+      return <Pressable accessibilityRole="button" accessibilityLabel={t("listingVideoPlay", { count: seconds })} accessibilityValue={value} onPress={onPressVideo} className="active:opacity-90">{cover}</Pressable>;
+    }
     const frame = (
       <View
         ref={(node) => {
@@ -175,7 +201,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
         {frame}
       </Pressable>
     );
-  }, [t, count, banner, tile, activeIndex, loadNeighbours, onPressPhoto, hiddenIndex]);
+  }, [t, count, banner, tile, activeIndex, loadNeighbours, onPressPhoto, onPressVideo, hiddenIndex]);
 
   if (count === 0) {
     return (
@@ -199,7 +225,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
         testID="detail-photo-strip"
         horizontal
         data={photos}
-        keyExtractor={(item, index) => (item.pending ? `pending-${index}` : item.key)}
+        keyExtractor={(item, index) => (!isVideoGalleryItem(item) && item.pending ? `pending-${index}` : item.key)}
         renderItem={renderItem}
         extraData={{ activeIndex, loadNeighbours, hiddenIndex }}
         onScroll={(event) => { offset.current = event.nativeEvent.contentOffset.x; }}
@@ -207,6 +233,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, ref, hiddenInde
         ItemSeparatorComponent={StripSeam}
         contentContainerStyle={STRIP_CONTENT}
         getItemLayout={(_, index) => ({ length: tile.width, offset: DETAIL_MARGIN + interval * index, index })}
+        contentOffset={initialOffset}
         scrollEnabled={count > 1}
         snapToInterval={interval}
         snapToAlignment="start"

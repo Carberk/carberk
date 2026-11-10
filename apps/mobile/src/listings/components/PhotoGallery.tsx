@@ -1,5 +1,9 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { router, useIsFocused } from "expo-router";
 import type { ListingsSchemas } from "@auto-tm/contracts";
+
+import { useListingVideoCover } from "../video/useListingVideoCover";
+import { isVideoGalleryItem, VIDEO_GALLERY_INDEX, withVideoItem } from "../video/videoGalleryItem";
 
 import { DetailPhotoStrip, type DetailPhotoStripHandle } from "./DetailPhotoStrip";
 import type { PhotoGeometry } from "./photoTransitionMath";
@@ -9,6 +13,12 @@ type ListingMedia = ListingsSchemas.ListingMedia;
 
 interface PhotoGalleryProps {
   media: ListingMedia[];
+  /** The Listing whose Ready video plays from the strip and the viewer. */
+  listingId?: string;
+  /** The Listing read's Ready video, shown second among the photos. */
+  video?: ListingsSchemas.ReadyListingVideo | undefined;
+  /** Open on the video, as when a card's video cover was tapped. */
+  startOnVideo?: boolean;
   visibleTop?: number;
   /** Status strip across the bottom of each photo, e.g. "Sold" on a closed Listing. */
   banner?: string;
@@ -22,9 +32,17 @@ interface PhotoGalleryProps {
  * Loaded Listing detail's photos: the inset strip (`DetailPhotoStrip`), and
  * the full-screen viewer a tapped photo opens on. Closing the viewer lands
  * the strip on the photo the viewer was left on.
+ *
+ * A Ready video is the second item of both (#1051). On the strip its Play
+ * opens the player route; in the viewer, arriving on it shows the cover and
+ * Play, and Play closes the viewer for the player. When the player closes and
+ * detail is on screen again, the viewer reopens on the video.
  */
 export function PhotoGallery({
-  media,
+  media: photos,
+  listingId,
+  video,
+  startOnVideo = false,
   visibleTop,
   banner,
   viewerHeaderAction,
@@ -36,6 +54,12 @@ export function PhotoGallery({
   const returns = useRef(new Map<number, PhotoGeometry>());
   const openingRequest = useRef(0);
   const stripRef = useRef<DetailPhotoStripHandle>(null);
+  const videoCover = useListingVideoCover(listingId ?? "", listingId ? video : undefined);
+  const media = useMemo(() => withVideoItem(photos, video?.id, videoCover), [photos, video?.id, videoCover]);
+  const hasVideo = isVideoGalleryItem(media[VIDEO_GALLERY_INDEX]);
+  // The viewer item the player was opened from, reopened when detail is focused again.
+  const resumeIndex = useRef<number | null>(null);
+  const focused = useIsFocused();
 
   const prepareReturn = useCallback((index: number) => {
     stripRef.current?.scrollToPhoto(index);
@@ -72,10 +96,27 @@ export function PhotoGallery({
     setHiddenIndex(null);
     stripRef.current?.scrollToPhoto(index);
   }, []);
+  const openPlayer = useCallback(() => {
+    if (listingId) router.push(`/(public)/listings/${listingId}/video`);
+  }, [listingId]);
+  // The viewer is a Modal above the navigation stack, so the player can show only once it has closed.
+  const playFromViewer = useCallback((index: number) => {
+    resumeIndex.current = index;
+    closeViewer(index);
+    openPlayer();
+  }, [closeViewer, openPlayer]);
+  useEffect(() => {
+    if (!focused || resumeIndex.current === null) return;
+    const index = resumeIndex.current;
+    resumeIndex.current = null;
+    setOrigin(null);
+    setViewerIndex(index);
+  }, [focused]);
 
   return (
     <>
-      <DetailPhotoStrip visibleTop={visibleTop} hiddenIndex={hiddenIndex} ref={stripRef} photos={media} banner={banner} onPressPhoto={openViewer} />
+      <DetailPhotoStrip visibleTop={visibleTop} hiddenIndex={hiddenIndex} ref={stripRef} photos={media} banner={banner} onPressPhoto={openViewer}
+        onPressVideo={openPlayer} initialIndex={startOnVideo && hasVideo ? VIDEO_GALLERY_INDEX : 0} />
       {media.length > 0 && (
         <PhotoViewer
           key={viewerIndex === null ? "closed" : `open-${viewerIndex}`}
@@ -87,6 +128,7 @@ export function PhotoGallery({
           media={media}
           initialIndex={viewerIndex ?? 0}
           onClose={closeViewer}
+          onPlayVideo={playFromViewer}
           headerAction={viewerHeaderAction}
           footer={viewerFooter}
         />

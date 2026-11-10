@@ -14,6 +14,7 @@ import { useTransmissions } from "../../../src/api/catalog/useTransmissions";
 import { useEngineTypes } from "../../../src/api/catalog/useEngineTypes";
 import { useViewer } from "../../../src/auth/useViewer";
 import { ListingLargeCard, ListingLargeCardSkeleton } from "../../../src/listings/feed/ListingLargeCard";
+import { listingDetailHref } from "../../../src/listings/detail/listingDetailHref";
 import { FeedEmpty } from "../../../src/listings/feed/FeedEmpty";
 import { FeedError } from "../../../src/listings/feed/FeedError";
 import { FilteredEmpty } from "../../../src/listings/feed/FilteredEmpty";
@@ -117,7 +118,7 @@ export default function ResultsScreen() {
     <ResultsHeader count={count.data} sort={sort} onSort={() => setSortOpen(true)} onBack={goBack} />
     <FlatList testID="results-list" data={feed.isPending || feed.isError ? [] : items} keyExtractor={(item) => item.id} ListHeaderComponent={header} ListEmptyComponent={empty}
       contentContainerClassName="grow" contentContainerStyle={{ paddingBottom: tabBarSpace + (items.length ? 68 : 8) }} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}
-      renderItem={({ item, index }) => <ListingLargeCard listing={item} enterOrder={enterOrder(index)} onPress={(id) => router.push(`/(public)/listings/${id}`)}
+      renderItem={({ item, index }) => <ListingLargeCard listing={item} enterOrder={enterOrder(index)} onPress={(id, open) => router.push(listingDetailHref(id, open))}
         brandName={catalog.brandName(item.brandId)} modelName={catalog.modelName(item.modelId)} cityName={catalog.cityName(item.cityId)}
         transmissionName={transmissions.data?.items.find((entry) => entry.id === item.transmissionId)?.name}
         engineTypeName={engineTypes.data?.items.find((entry) => entry.id === item.engineTypeId)?.name}
