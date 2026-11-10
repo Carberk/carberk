@@ -22,6 +22,7 @@ import {
   useListingPlayback,
   type PlaybackTarget,
 } from "./useListingPlayback";
+import { sendListingVideoTelemetry, type ListingVideoTelemetry } from "./listingVideoTelemetry";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -29,8 +30,9 @@ import { Icon } from "@/components/ui/icon";
 
 interface ListingVideoPlayerProps extends PlaybackTarget {
   onClose: () => void;
-  /** Wall clock in epoch ms, for grant expiry. */
+  /** Wall clock in epoch ms, for grant expiry and playback measurements. */
   now?: () => number;
+  telemetry?: ListingVideoTelemetry;
 }
 
 /**
@@ -39,7 +41,7 @@ interface ListingVideoPlayerProps extends PlaybackTarget {
  * closing or backgrounding stops playback and fetching. The whole frame
  * is shown (`contain`), never cropped or stretched.
  */
-export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now }: ListingVideoPlayerProps) {
+export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now, telemetry = sendListingVideoTelemetry }: ListingVideoPlayerProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { playback, retry } = useListingPlayback({ audience, type, id });
@@ -72,6 +74,16 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
   const startedRef = useRef(false);
   // Position and play intent to apply to the next player that has a source.
   const restoreRef = useRef<{ position: number; playing: boolean } | null>(null);
+
+  // Tester measurements (#1052): time from the Play tap (this mount) to the
+  // first playing frame, then stalls until the player closes. Only counts
+  // and durations are reported; the grant URL never leaves this component.
+  const [openedAt] = useState(now);
+  const measureRef = useRef({ started: false, stallSince: null as number | null, stallCount: 0, stallMs: 0, furthestS: 0 });
+  const reportRef = useRef({ telemetry, audience, now });
+  reportRef.current = { telemetry, audience, now };
+  const choiceRef = useRef(choice);
+  choiceRef.current = choice;
 
   // Variant URLs come from the granted master playlist itself, so a manual
   // quality never invents a storage key the server did not publish. This is
@@ -126,6 +138,13 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
     const subs = [
       player.addListener?.("statusChange", (e: { status: VideoPlayerStatus }) => {
         setStatus(e.status);
+        const measure = measureRef.current;
+        if (measure.started && e.status === "loading" && measure.stallSince === null) measure.stallSince = now();
+        else if (e.status !== "loading" && measure.stallSince !== null) {
+          measure.stallCount += 1;
+          measure.stallMs += now() - measure.stallSince;
+          measure.stallSince = null;
+        }
         if (e.status === "readyToPlay" && intentRef.current) {
           startedRef.current = true;
           try { player.play(); } catch { /* native stub */ }
@@ -133,9 +152,16 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
       }),
       player.addListener?.("playingChange", (e: { isPlaying: boolean }) => {
         setPlaying(e.isPlaying);
+        if (e.isPlaying && !measureRef.current.started) {
+          measureRef.current.started = true;
+          const picked = choiceRef.current;
+          const quality = picked === "auto" || picked === "data-saver" ? picked : (`${picked}` as const);
+          telemetry({ event: "playback_started", audience, quality, startupMs: Math.max(0, Math.round(now() - openedAt)) });
+        }
       }),
       player.addListener?.("timeUpdate", (e: { currentTime: number }) => {
         positionRef.current = e.currentTime;
+        measureRef.current.furthestS = Math.max(measureRef.current.furthestS, e.currentTime);
         setPositionS(e.currentTime);
       }),
       player.addListener?.("playToEnd", () => {
@@ -206,6 +232,17 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
   // Leaving the player releases the native player (hook cleanup) after pause.
   useEffect(() => () => {
     try { playerRef.current.pause(); } catch { /* native stub */ }
+    const measure = measureRef.current;
+    if (!measure.started) return;
+    const { telemetry: report, audience: viewedAs, now: clock } = reportRef.current;
+    const openStallMs = measure.stallSince === null ? 0 : clock() - measure.stallSince;
+    report({
+      event: "playback_buffering",
+      audience: viewedAs,
+      stallCount: measure.stallCount + (measure.stallSince === null ? 0 : 1),
+      stallMs: Math.max(0, Math.round(measure.stallMs + openStallMs)),
+      watchedMs: Math.round(measure.furthestS * 1000),
+    });
   }, []);
 
   const playerError = status === "error";

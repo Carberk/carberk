@@ -23,6 +23,9 @@ import { ExchangeRatesController } from "./presentation/ExchangeRatesController"
 import { FavoritesController } from "./presentation/FavoritesController";
 import { ContactPhonesController } from "./presentation/ContactPhonesController";
 import { VideoUploadsController } from "./presentation/VideoUploadsController";
+import { VideoTelemetryController } from "./presentation/VideoTelemetryController";
+import { LISTING_VIDEO_TELEMETRY_PORT } from "./domain/ports/ListingVideoTelemetryPort";
+import { LogListingVideoTelemetry } from "./infrastructure/LogListingVideoTelemetry";
 import { NullVinDecoder } from "./infrastructure/NullVinDecoder";
 import { NullContentClassifier } from "./infrastructure/NullContentClassifier";
 import { SortedFeedRankingAdapter } from "./infrastructure/SortedFeedRankingAdapter";
@@ -110,7 +113,7 @@ import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule, BullModule.registerQueue({ name: "video-transcode" })],
-  controllers: [VideoServingController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController],
+  controllers: [VideoServingController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController, VideoTelemetryController],
   providers: [
     GetTargetVideoStatus,
     ServeListingVideo,
@@ -138,6 +141,7 @@ import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
     BucketVideoStorage,
     PrismaVideoUploadRepository,
     ConfigVideoUploadAccess,
+    { provide: LISTING_VIDEO_TELEMETRY_PORT, useClass: LogListingVideoTelemetry },
     SharpImageVariantGenerator,
 
     // Port bindings

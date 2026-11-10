@@ -14,6 +14,7 @@ import {
   type VideoUploadTransport,
 } from "./videoUpload";
 import { InMemoryVideoUploadPersistence } from "./application/testing/InMemoryVideoUploadPersistence";
+import { RecordingListingVideoTelemetry } from "./application/testing/RecordingListingVideoTelemetry";
 
 const TARGET = { type: "draft" as const, id: "draft-1" };
 const PART_SIZE = 5 * 1024 * 1024;
@@ -61,7 +62,7 @@ function harness() {
     complete: vi.fn(async () => statusResponse([{ partNumber: 1, sizeBytes: PART_SIZE }, { partNumber: 2, sizeBytes: 2_000_000 }], "PROCESSING")),
     cancel: vi.fn(async () => cancelResponse()),
   };
-  return { api, fs, transport, persistence };
+  return { api, fs, transport, persistence, telemetry: new RecordingListingVideoTelemetry() };
 }
 
 function controller(overrides: Partial<ConstructorParameters<typeof VideoUploadController>[0]> = {}) {
@@ -76,6 +77,7 @@ function controller(overrides: Partial<ConstructorParameters<typeof VideoUploadC
     fileSystem: deps.fs,
     transport: deps.transport,
     persistence: deps.persistence,
+    telemetry: deps.telemetry.report,
     ...overrides,
   });
   return { instance, ...deps };
@@ -539,4 +541,77 @@ it("replays a lost Open with its original Draft metadata after publish", async (
   await run.instance.resume();
   expect(vi.mocked(run.api.open).mock.calls[1]).toEqual(first);
   expect(run.instance.state).toMatchObject({ target: listing, phase: "processing" });
+});
+
+describe("Upload measurements for testers", () => {
+  const ONE_PART = [{ partNumber: 1, sizeBytes: PART_SIZE }];
+
+  it("reports a lost connection as an interruption and its return as a resume, with confirmed bytes only", async () => {
+    const run = controller();
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse(ONE_PART));
+    await run.instance.openSession();
+    await run.instance.checkStatus();
+    run.instance.setNetworkAvailable(false);
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([...ONE_PART, { partNumber: 2, sizeBytes: 2_000_000 }]));
+    run.instance.setNetworkAvailable(true);
+    await run.instance.waitForIdleForTest();
+
+    expect(run.telemetry.events).toEqual([
+      { event: "upload_interrupted", reason: "network", confirmedBytes: PART_SIZE, totalBytes: TOTAL },
+      { event: "upload_resumed", reason: "network", confirmedBytes: PART_SIZE, totalBytes: TOTAL },
+    ]);
+  });
+
+  it("reports a manual pause and Continue", async () => {
+    const run = controller();
+    await run.instance.openSession();
+    await run.instance.pause();
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([...ONE_PART, { partNumber: 2, sizeBytes: 2_000_000 }], "PROCESSING"));
+    await run.instance.resume();
+
+    expect(run.telemetry.events).toEqual([
+      { event: "upload_interrupted", reason: "user", confirmedBytes: 0, totalBytes: TOTAL },
+      { event: "upload_resumed", reason: "user", confirmedBytes: 0, totalBytes: TOTAL },
+    ]);
+  });
+
+  it("reports an upload picked up again after the app reopened as a restart, not a new interruption", async () => {
+    const first = controller();
+    await first.instance.openSession();
+    vi.mocked(first.api.status).mockResolvedValue(statusResponse(ONE_PART));
+    await first.instance.checkStatus();
+    first.instance.dispose();
+
+    const reopened = controller({ persistence: first.persistence });
+    vi.mocked(reopened.api.status).mockResolvedValue(statusResponse([...ONE_PART, { partNumber: 2, sizeBytes: 2_000_000 }], "PROCESSING"));
+    await reopened.instance.restore();
+
+    expect(reopened.instance.state.phase).toBe("processing");
+    expect(reopened.telemetry.events).toEqual([
+      { event: "upload_resumed", reason: "restart", confirmedBytes: PART_SIZE, totalBytes: TOTAL },
+    ]);
+  });
+
+  it("reports a transfer failure once and a retry from it", async () => {
+    const run = controller();
+    vi.mocked(run.api.status).mockRejectedValueOnce(new ApiError("INTERNAL", 500, "boom"));
+    await run.instance.start();
+    expect(run.instance.state.failure).toBe("transfer");
+    vi.mocked(run.api.status).mockResolvedValue(statusResponse([...ONE_PART, { partNumber: 2, sizeBytes: 2_000_000 }], "PROCESSING"));
+    await run.instance.resume();
+
+    expect(run.telemetry.events).toEqual([
+      { event: "upload_failed", failure: "transfer", confirmedBytes: 0, totalBytes: TOTAL },
+      { event: "upload_resumed", reason: "retry", confirmedBytes: 0, totalBytes: TOTAL },
+    ]);
+  });
+
+  it("never reports the part URL, the file path, or a session or generation id", async () => {
+    const run = controller();
+    await run.instance.openSession();
+    await run.instance.pause();
+    await run.instance.resume();
+    const sent = JSON.stringify(run.telemetry.events);
+    for (const secret of ["https://bucket", "file://", "prepared.mp4", "session-1", "generation-1", "draft-1"]) expect(sent).not.toContain(secret);
+  });
 });

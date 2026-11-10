@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PrismaService, retireVideoGenerations } from "@auto-tm/db";
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import sharp from "sharp";
 
 import { VIDEO_PROCESSING_STORAGE } from "./VideoProcessingStorage";
 import type { VideoProcessingStorage } from "./VideoProcessingStorage";
+import { LogVideoProcessingTelemetry, VIDEO_PROCESSING_TELEMETRY } from "./VideoProcessingTelemetry";
+import type { VideoProcessingTelemetry } from "./VideoProcessingTelemetry";
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 90;
@@ -46,15 +48,20 @@ function coverOffset(duration: number, offsetMs: number): number { return offset
 @Injectable()
 export class ListingVideoProcessor {
   private readonly logger = new Logger(ListingVideoProcessor.name);
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(VIDEO_PROCESSING_STORAGE) private readonly storage: VideoProcessingStorage) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(VIDEO_PROCESSING_STORAGE) private readonly storage: VideoProcessingStorage,
+    @Optional() @Inject(VIDEO_PROCESSING_TELEMETRY) private readonly telemetry: VideoProcessingTelemetry = new LogVideoProcessingTelemetry(),
+  ) {}
 
   async process(job: VideoProcessingJob, attemptsStarted = 1): Promise<void> {
     const generation = await this.prisma.videoGeneration.findUnique({ where: { id: job.generationId }, include: { source: true } });
     if (!generation || generation.sourceId !== job.sourceId || generation.processingAttempt !== job.attempt || generation.status !== "Processing") return;
+    const startedAt = Date.now();
     if (attemptsStarted > 1) {
       // BullMQ has recovered a lost execution lock. Never reuse output keys
       // whose initialization or PUT may still be in flight from that worker.
-      await this.recordFailure(job, generation, new Error("Worker execution was abandoned"), "Worker execution was abandoned");
+      await this.recordFailure(job, generation, new Error("Worker execution was abandoned"), "Worker execution was abandoned", startedAt);
       return;
     }
     const workDir = await mkdtemp(join(tmpdir(), "carberk-video-"));
@@ -111,14 +118,14 @@ export class ListingVideoProcessor {
         const head = await this.storage.head(record.key);
         if (!head || head.sizeBytes !== record.sizeBytes || (record.etag && head.etag && record.etag !== head.etag)) throw new Error(`Processing output missing or changed: ${record.key}`);
       }
-      await this.prisma.$transaction(async (tx) => {
+      const promoted = await this.prisma.$transaction(async (tx) => {
         const initialSlot = await tx.listingVideo.findUnique({ where: { id: generation.listingVideoId } });
-        if (!initialSlot) return;
+        if (!initialSlot) return false;
         await tx.$queryRaw`SELECT id FROM users WHERE id = ${initialSlot.ownerId} FOR UPDATE`;
         // Publishing a Draft takes the same owner lock before transferring its
         // slot, so resolve the canonical target only after that lock is held.
         const target = await tx.listingVideo.findUnique({ where: { id: initialSlot.id } });
-        if (!target) return;
+        if (!target) return false;
         const owner = await tx.user.findUnique({ where: { id: target.ownerId } });
         if (!owner || owner.suspendedAt || owner.deletionScheduledAt) throw new Error("Video target is ineligible");
         if (target.draftId) {
@@ -132,24 +139,30 @@ export class ListingVideoProcessor {
         }
         await tx.$queryRaw`SELECT id FROM listing_videos WHERE id = ${generation.listingVideoId} FOR UPDATE`;
         const slot = await tx.listingVideo.findUnique({ where: { id: generation.listingVideoId } });
-        if (!slot || slot.pendingGenerationId !== job.generationId) return;
+        if (!slot || slot.pendingGenerationId !== job.generationId) return false;
         const ready = await tx.videoGeneration.updateMany({ where: { id: job.generationId, processingAttempt: job.attempt, status: "Processing" }, data: { status: "Ready", manifest, durationMs: actualDurationMs, width: validated.width, height: validated.height, videoCodec: validated.videoCodec, audioCodec: validated.audioCodec, processingStartedAt: generation.processingStartedAt ?? new Date(), completedAt: new Date(), lastError: null, failureType: null, nextRetryAt: null } });
-        if (!ready.count) return;
+        if (!ready.count) return false;
         await tx.listingVideo.update({ where: { id: slot.id }, data: { activeGenerationId: job.generationId, pendingGenerationId: null } });
         if (slot.activeGenerationId) await retireVideoGenerations(tx, slot.id, [slot.activeGenerationId], new Date());
+        return true;
       });
+      if (promoted) {
+        const bytes = (covers: boolean) => Object.entries(manifest).filter(([name]) => name.startsWith("cover:") === covers).reduce((sum, [, record]) => sum + record.sizeBytes, 0);
+        this.telemetry.record({ event: "processed", attempt: job.attempt, elapsedMs: Date.now() - startedAt, durationMs: actualDurationMs, tiers, sourceBytes: source.body.byteLength, coverBytes: bytes(true), renditionBytes: bytes(false) });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : "Video processing failed";
-      if (!/attempt was revoked/i.test(message)) await this.recordFailure(job, generation, error, message);
+      if (!/attempt was revoked/i.test(message)) await this.recordFailure(job, generation, error, message, startedAt);
       this.logger.warn(`Video processing attempt ${job.attempt} failed: ${message}`); throw error;
     } finally { await rm(workDir, { recursive: true, force: true }); }
   }
 
-  private async recordFailure(job: VideoProcessingJob, generation: { processingRetryCount?: number }, error: unknown, message: string): Promise<void> {
+  private async recordFailure(job: VideoProcessingJob, generation: { processingRetryCount?: number }, error: unknown, message: string, startedAt: number): Promise<void> {
     const failureType: FailureType = error instanceof SourceVideoError ? error.failureType : "TRANSIENT";
     const retryCount = Number(generation.processingRetryCount ?? 0);
     const retryable = failureType === "TRANSIENT" && retryCount + 1 < MAX_ATTEMPTS;
     await this.prisma.videoGeneration.updateMany({ where: { id: job.generationId, processingAttempt: job.attempt, status: "Processing" }, data: retryable ? { status: "Processing", processingAttempt: job.attempt + 1, processingRetryCount: retryCount + 1, nextRetryAt: new Date(Date.now() + RETRY_BACKOFF_MS * 2 ** retryCount), lastError: message, failureType } : { status: "Failed", lastError: message, failureType, nextRetryAt: null } });
+    this.telemetry.record({ event: "processing_failed", attempt: job.attempt, failureType, retryable, elapsedMs: Date.now() - startedAt });
   }
 
   private async writeOutput(job: VideoProcessingJob, key: string, body: Buffer, contentType: string, manifest: Record<string, ManifestRecord>, name: string): Promise<void> {

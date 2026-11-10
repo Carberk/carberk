@@ -1,6 +1,6 @@
 import { beforeAll, afterEach, afterAll } from "vitest";
 
-import { server } from "./msw";
+import { sentVideoTelemetry, server } from "./msw";
 
 const unhandledRequests: string[] = [];
 const recordUnhandledRequest = ({ request }: { request: Request }) => {
@@ -14,6 +14,7 @@ beforeAll(() => {
 afterEach(() => {
   const requests = unhandledRequests.splice(0);
   server.resetHandlers();
+  sentVideoTelemetry.length = 0;
   if (requests.length > 0) {
     throw new Error(`Unhandled MSW request(s): ${requests.join(", ")}`);
   }

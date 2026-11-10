@@ -5,6 +5,7 @@ import { VideoUploadsSchemas } from "@auto-tm/contracts";
 
 import { ApiError, apiClient } from "../../api/client";
 
+import { sendListingVideoTelemetry, type ListingVideoTelemetry } from "./listingVideoTelemetry";
 import { nativeVideoUploadTransport, type VideoUploadTransport } from "./nativeVideoUpload";
 import type { ListingVideoSelection } from "./listingVideo";
 
@@ -83,6 +84,7 @@ export interface VideoUploadControllerOptions {
   persistence?: VideoUploadPersistence;
   isOnline?: () => boolean;
   isForeground?: () => boolean;
+  telemetry?: ListingVideoTelemetry;
 }
 
 const SNAPSHOT_VERSION = 1 as const;
@@ -168,6 +170,9 @@ export class VideoUploadController {
   private openPromise: Promise<void> | null = null;
   private partAbort: AbortController | null = null;
   private persistenceQueue: Promise<void> = Promise.resolve();
+  private readonly telemetry: ListingVideoTelemetry;
+  /** Set while an upload restored after reopening is picked up again. */
+  private restarting = false;
 
   constructor(options: VideoUploadControllerOptions) {
     this.api = options.api ?? defaultApi;
@@ -177,6 +182,7 @@ export class VideoUploadController {
     this.storageKey = options.storageKey;
     this.online = options.isOnline ?? (() => true);
     this.foreground = options.isForeground ?? (() => true);
+    this.telemetry = options.telemetry ?? sendListingVideoTelemetry;
     this.networkAvailable = this.online();
     this.foregroundActive = this.foreground();
     this.snapshot = {
@@ -223,7 +229,10 @@ export class VideoUploadController {
       await this.reconcile(this.operationId);
       return;
     }
-    if (restored.phase === "uploading" || restored.phase === "paused") await this.resumeAutomatic();
+    if (restored.phase === "uploading" || restored.phase === "paused") {
+      this.restarting = true;
+      try { await this.resumeAutomatic(); } finally { this.restarting = false; }
+    }
   }
 
   private async ensureSession(): Promise<void> {
@@ -611,7 +620,9 @@ export class VideoUploadController {
   }
 
   private setState(patch: Partial<PersistedVideoUpload>): void {
+    const before = { phase: this.snapshot.phase, pauseReason: this.snapshot.pauseReason, failure: this.snapshot.failure };
     Object.assign(this.snapshot, patch);
+    this.measure(before);
     void this.persist().catch(() => undefined);
     this.publish();
   }
@@ -627,6 +638,22 @@ export class VideoUploadController {
     const timedOut = error instanceof Error && /timed out|timeout/i.test(error.message);
     const network = isNetworkError(error) && !(timedOut && this.isOnline());
     this.setState({ phase: network ? "paused" : "failed", pauseReason: network ? "network" : undefined, failure: network ? undefined : "transfer" });
+  }
+
+  /** Interruptions, resumes and failures for tester measurements (#1052). */
+  private measure(before: Pick<PersistedVideoUpload, "phase" | "pauseReason" | "failure">): void {
+    const { phase, pauseReason, failure } = this.snapshot;
+    const progress = { confirmedBytes: confirmedBytes(uniqueParts(this.snapshot.confirmedParts)), totalBytes: this.snapshot.sizeBytes };
+    if (phase === "paused" && pauseReason && before.phase === "uploading") {
+      // A reopened app passes through a synthetic background pause; the
+      // interruption itself was the app closing, which no code observed.
+      if (!this.restarting) this.telemetry({ event: "upload_interrupted", reason: pauseReason, ...progress });
+    } else if (phase === "uploading" && (before.phase === "paused" || (before.phase === "failed" && before.failure === "transfer"))) {
+      const reason = this.restarting ? "restart" : before.phase === "failed" ? "retry" : before.pauseReason ?? "retry";
+      this.telemetry({ event: "upload_resumed", reason, ...progress });
+    } else if (phase === "failed" && failure && (before.phase !== "failed" || before.failure !== failure)) {
+      this.telemetry({ event: "upload_failed", failure, ...progress });
+    }
   }
 
   private publish(): void {
