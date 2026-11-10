@@ -1,13 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { execFile , spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { DeleteObjectsCommand, S3Client } from "@aws-sdk/client-s3";
 import { PrismaService } from "@auto-tm/db";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ListingVideoProcessor } from "./ListingVideoProcessor";
 import { S3VideoProcessingStorage, type VideoProcessingStorage } from "./VideoProcessingStorage";
@@ -69,6 +69,17 @@ async function fixture(size = "320x240", hasAudio = false): Promise<{ dir: strin
   const path = join(dir, "source.mp4");
   await exec("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", `color=c=blue:s=${size}:r=25`, ...(hasAudio ? ["-f", "lavfi", "-i", "sine=frequency=440", "-c:a", "aac"] : []), "-t", "3", "-c:v", "libx264", "-pix_fmt", "yuv420p", path]);
   return { dir, body: await readFile(path) };
+}
+
+/** Stored landscape bytes whose tkhd display matrix rotates them to portrait. */
+function rotate90(body: Buffer): Buffer {
+  const patched = Buffer.from(body);
+  const tkhd = patched.indexOf("tkhd");
+  if (tkhd < 0) throw new Error("No tkhd box in fixture");
+  // Display matrix (a,b,c,d,e,f,g,h,i) for a quarter-turn, 16.16 fixed point.
+  const matrix = [0, 65_536, 0, -65_536, 0, 0, 0, 0, 1_073_741_824];
+  matrix.forEach((value, index) => patched.writeInt32BE(value, tkhd + 44 + index * 4));
+  return patched;
 }
 
 describeFfmpeg("ListingVideoProcessor", () => {
@@ -154,6 +165,66 @@ describeFfmpeg("ListingVideoProcessor", () => {
         expect(variant).toContain(`RESOLUTION=${width}x${height}`);
       }
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it("scales a rotated portrait source on its displayed short side", async () => {
+    const fixtureData = await fixture("1280x720");
+    try {
+      const rotated = rotate90(fixtureData.body);
+      const storage = new MemoryStorage(rotated);
+      const prisma = prismaFor();
+      prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: rotated.length };
+      await new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
+      expect(prisma.row.status).toBe("Ready");
+      expect(prisma.row["width"]).toBe(720);
+      expect(prisma.row["height"]).toBe(1280);
+      const master = storage.objects.get("video-sources/source/processing/1/hls/master.m3u8")?.body.toString();
+      if (!master) throw new Error("No master playlist was stored");
+      for (const [tier, width, height] of [[240, 240, 426], [360, 360, 640], [720, 720, 1280]] as const) {
+        const segment = storage.objects.get(`video-sources/source/processing/1/hls/${tier}p/${tier}-000.ts`);
+        if (!segment) throw new Error("No rendition segment was stored");
+        const segmentPath = join(fixtureData.dir, `${tier}.ts`);
+        await writeFile(segmentPath, segment.body);
+        const { stdout } = await exec("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", segmentPath]);
+        expect(JSON.parse(stdout).streams[0]).toEqual({ width, height });
+        expect(master).toContain(`RESOLUTION=${width}x${height}`);
+      }
+    } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
+  }, 30_000);
+
+  it("passes the thread limit to the encoder after the input", async () => {
+    const fixtureData = await fixture("320x240");
+    const logPath = join(fixtureData.dir, "ffmpeg-args.log");
+    const wrapperPath = join(fixtureData.dir, "ffmpeg");
+    const previousPath = process.env["FFMPEG_PATH"];
+    const previousThreads = process.env["FFMPEG_THREADS"];
+    try {
+      await writeFile(wrapperPath, `#!/bin/sh\nprintf 'CALL\\n' >> "${logPath}"\nfor arg in "$@"; do printf '%s\\n' "$arg" >> "${logPath}"; done\nexec ffmpeg "$@"\n`, { mode: 0o755 });
+      await symlink(spawnSync("which", ["ffprobe"], { encoding: "utf8" }).stdout.trim(), join(fixtureData.dir, "ffprobe"));
+      process.env["FFMPEG_PATH"] = wrapperPath;
+      process.env["FFMPEG_THREADS"] = "3";
+      vi.resetModules();
+      const { ListingVideoProcessor: WrappedProcessor } = await import("./ListingVideoProcessor");
+      const storage = new MemoryStorage(fixtureData.body);
+      const prisma = prismaFor();
+      prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
+      await new WrappedProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
+      expect(prisma.row.status).toBe("Ready");
+      const calls = (await readFile(logPath, "utf8")).split("CALL\n").filter(Boolean).map((call) => call.split("\n").filter(Boolean));
+      const encodes = calls.filter((args) => args.includes("libx264"));
+      expect(encodes.length).toBeGreaterThan(0);
+      for (const args of encodes) {
+        const inputIndex = args.indexOf("-i");
+        const threadsIndex = args.lastIndexOf("-threads");
+        expect(threadsIndex).toBeGreaterThan(inputIndex);
+        expect(args[threadsIndex + 1]).toBe("3");
+      }
+    } finally {
+      if (previousPath === undefined) delete process.env["FFMPEG_PATH"]; else process.env["FFMPEG_PATH"] = previousPath;
+      if (previousThreads === undefined) delete process.env["FFMPEG_THREADS"]; else process.env["FFMPEG_THREADS"] = previousThreads;
+      vi.resetModules();
+      await rm(fixtureData.dir, { recursive: true, force: true });
+    }
   }, 30_000);
 
   it("bounds transient processing retries and eventually records Failed", async () => {

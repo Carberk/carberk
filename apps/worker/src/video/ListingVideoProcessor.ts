@@ -24,7 +24,7 @@ const COVER_SPECS = [["thumbnail", 200, 200], ["list", 600, 400], ["detail", 120
 export interface VideoProcessingJob { sourceId: string; generationId: string; attempt: number; }
 type FailureType = "SOURCE_MISSING" | "SOURCE_INVALID" | "TRANSIENT";
 type ManifestRecord = { key: string; sizeBytes: number; etag: string | null };
-interface ProbeStream { codec_type?: string; codec_name?: string; width?: number; height?: number; bit_rate?: string; pix_fmt?: string; r_frame_rate?: string; color_transfer?: string; color_space?: string; }
+interface ProbeStream { codec_type?: string; codec_name?: string; width?: number; height?: number; bit_rate?: string; pix_fmt?: string; r_frame_rate?: string; color_transfer?: string; color_space?: string; tags?: { rotate?: string }; side_data_list?: { rotation?: number }[]; }
 interface ProbeResult { format?: { duration?: string; size?: string; bit_rate?: string }; streams?: ProbeStream[]; }
 
 class SourceVideoError extends Error { constructor(message: string, readonly failureType: Exclude<FailureType, "TRANSIENT">) { super(message); } }
@@ -44,6 +44,8 @@ function run(command: string, args: string[], timeoutMs = FFMPEG_TIMEOUT_MS): Pr
 function parseRate(rate: string | undefined): number { if (!rate) return 0; const [numerator = 0, denominator = 0] = rate.split("/").map(Number); return denominator > 0 ? numerator / denominator : 0; }
 function processingPrefix(sourceKey: string, attempt: number): string { return `${sourceKey.replace(/\/source\.mp4$/, "")}/processing/${attempt}`; }
 function coverOffset(duration: number, offsetMs: number): number { return offsetMs >= Math.round(duration * 1000) ? Math.max(0, duration - 0.001) : Math.max(0, offsetMs / 1000); }
+/** Display rotation in degrees, from the display matrix side data or the legacy `rotate` tag. */
+function displayRotation(video: ProbeStream): number { const tag = Number(video.tags?.rotate); const side = video.side_data_list?.find((entry) => typeof entry.rotation === "number")?.rotation; const raw = Number.isFinite(tag) && tag !== 0 ? tag : (side ?? 0); return ((Math.round(raw) % 360) + 360) % 360; }
 
 @Injectable()
 export class ListingVideoProcessor {
@@ -89,7 +91,7 @@ export class ListingVideoProcessor {
       const offset = coverOffset(validated.duration, generation.coverOffsetMs);
       for (const [name, width, height] of COVER_SPECS) {
         const output = join(workDir, `${name}.png`);
-        await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-ss", String(offset), "-i", input, "-frames:v", "1", "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`, "-f", "image2", output]);
+        await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-ss", String(offset), "-i", input, "-threads", FFMPEG_THREADS, "-frames:v", "1", "-vf", `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`, "-f", "image2", output]);
         await this.writeOutput(job, `${prefix}/covers/${name}.webp`, await sharp(await readFile(output)).webp({ quality: 80 }).toBuffer(), "image/webp", manifest, `cover:${name}`);
       }
 
@@ -100,7 +102,7 @@ export class ListingVideoProcessor {
       for (const tier of tiers) {
         const playlist = join(workDir, `${tier}.m3u8`); const segmentPattern = join(workDir, `${tier}-%03d.ts`);
         const scale = validated.height >= validated.width ? `scale=${tier}:-2` : `scale=-2:${tier}`;
-        await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-i", input, "-vf", scale, "-c:v", "libx264", "-preset", "veryfast", "-b:v", `${tier}k`, "-maxrate", `${tier}k`, "-bufsize", `${tier * 2}k`, "-g", "120", "-keyint_min", "120", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)", ...(hasAudio ? ["-c:a", "aac", "-b:a", "128k"] : ["-an"]), "-f", "hls", "-hls_time", "4", "-hls_playlist_type", "vod", "-hls_flags", "independent_segments", "-master_pl_name", `${tier}-master.m3u8`, "-hls_segment_filename", segmentPattern, playlist]);
+        await run(FFMPEG_PATH, ["-y", "-hide_banner", "-loglevel", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-i", input, "-threads", FFMPEG_THREADS, "-vf", scale, "-c:v", "libx264", "-x264-params", `threads=${FFMPEG_THREADS}`, "-preset", "veryfast", "-b:v", `${tier}k`, "-maxrate", `${tier}k`, "-bufsize", `${tier * 2}k`, "-g", "120", "-keyint_min", "120", "-sc_threshold", "0", "-force_key_frames", "expr:gte(t,n_forced*4)", ...(hasAudio ? ["-c:a", "aac", "-b:a", "128k"] : ["-an"]), "-f", "hls", "-hls_time", "4", "-hls_playlist_type", "vod", "-hls_flags", "independent_segments", "-master_pl_name", `${tier}-master.m3u8`, "-hls_segment_filename", segmentPattern, playlist]);
         const playlistKey = `${prefix}/hls/${tier}p/index.m3u8`;
         // The muxer reads codec profile/compatibility/level and dimensions from
         // the encoded stream, including the scaler's even-pixel rounding.
@@ -196,9 +198,14 @@ export class ListingVideoProcessor {
   private validate(probe: ProbeResult, sizeBytes: number): { duration: number; width: number; height: number; videoCodec: string; audioCodec: string | null } {
     const video = probe.streams?.find((stream) => stream.codec_type === "video"); const audio = probe.streams?.find((stream) => stream.codec_type === "audio"); const duration = Number(probe.format?.duration ?? 0);
     if (!video || !Number.isFinite(duration) || duration <= 0 || duration > MAX_DURATION_SECONDS || sizeBytes > MAX_BYTES) throw new SourceVideoError("Video duration, size or stream is invalid", "SOURCE_INVALID");
-    if (video.codec_name !== "h264" || !video.width || !video.height || video.width > 1280 || video.height > 1280 || (video.width > 720 && video.height > 720) || parseRate(video.r_frame_rate) > 30 || ["bt2020", "smpte2084", "arib-std-b67"].includes(video.color_transfer ?? "") || video.color_space === "bt2020nc") throw new SourceVideoError("Video codec, dimensions, frame rate or color space is unsupported", "SOURCE_INVALID");
+    // Stored dimensions are not displayed dimensions when a quarter-turn is
+    // flagged: FFmpeg rotates decoded frames, so validate and scale the
+    // displayed frame.
+    const rotation = displayRotation(video); const quarterTurn = rotation === 90 || rotation === 270;
+    const width = quarterTurn ? video.height : video.width; const height = quarterTurn ? video.width : video.height;
+    if (video.codec_name !== "h264" || !width || !height || width > 1280 || height > 1280 || (width > 720 && height > 720) || parseRate(video.r_frame_rate) > 30 || ["bt2020", "smpte2084", "arib-std-b67"].includes(video.color_transfer ?? "") || video.color_space === "bt2020nc") throw new SourceVideoError("Video codec, dimensions, frame rate or color space is unsupported", "SOURCE_INVALID");
     if (audio && audio.codec_name !== "aac") throw new SourceVideoError("Audio codec is unsupported", "SOURCE_INVALID");
-    return { duration, width: video.width, height: video.height, videoCodec: "h264", audioCodec: audio?.codec_name ?? null };
+    return { duration, width, height, videoCodec: "h264", audioCodec: audio?.codec_name ?? null };
   }
   private async decode(input: string): Promise<void> { await run(FFMPEG_PATH, ["-v", "error", "-max_alloc", "67108864", "-threads", FFMPEG_THREADS, "-i", input, "-map", "0:v:0", "-map", "0:a?", "-f", "null", "-"]); }
   private async assertAttemptActive(job: VideoProcessingJob): Promise<void> { const active = await this.prisma.videoGeneration.findUnique({ where: { id: job.generationId }, select: { processingAttempt: true, status: true } }); if (!active || active.processingAttempt !== job.attempt || active.status !== "Processing") throw new Error("Video processing attempt was revoked"); }

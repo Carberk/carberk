@@ -52,6 +52,16 @@ export function pickSpare(devices, hasApp) {
   return free.find((device) => device.name.startsWith('Carberk')) ?? free[0];
 }
 
+/** The documented Carberk iPhone 17 (iOS 26.2); other "iPhone 17" devices may run a newer iOS. */
+export const TEMPLATE_UDID = '38747B85-BB39-48A2-BF0D-4DD6A5ED1D13';
+
+/** Template for a new spare: the documented iPhone 17, else the first iPhone 17, else any iPhone. */
+export function pickTemplate(devices) {
+  return devices.find((device) => device.udid === TEMPLATE_UDID)
+    ?? devices.find((device) => device.name === 'iPhone 17')
+    ?? devices.find((device) => device.name.startsWith('iPhone'));
+}
+
 function main() {
   const devices = iosDevices(JSON.parse(simctl('list', 'devices', 'available', '-j')));
   const spare = pickSpare(devices, (udid) => installedApp(udid) !== undefined);
@@ -59,7 +69,7 @@ function main() {
     console.log(`${spare.name} ${spare.udid}`);
     return;
   }
-  const template = devices.find((device) => device.name === 'iPhone 17') ?? devices.find((device) => device.name.startsWith('iPhone'));
+  const template = pickTemplate(devices);
   const source = devices.map((device) => installedApp(device.udid)).find(Boolean);
   if (!template || !source) {
     throw new Error('No iPhone Simulator or installed Carberk build to copy; build it once as in docs/agents/mobile-expo.md');
