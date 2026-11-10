@@ -71,13 +71,15 @@ async function fixture(size = "320x240", hasAudio = false): Promise<{ dir: strin
   return { dir, body: await readFile(path) };
 }
 
-/** Stored landscape bytes whose tkhd display matrix rotates them to portrait. */
-function rotate90(body: Buffer): Buffer {
+/** Stored landscape bytes whose tkhd display matrix turns them a quarter-turn either way, or half a turn. */
+function rotate(body: Buffer, turn: "clockwise" | "counterclockwise" | "half"): Buffer {
   const patched = Buffer.from(body);
   const tkhd = patched.indexOf("tkhd");
   if (tkhd < 0) throw new Error("No tkhd box in fixture");
-  // Display matrix (a,b,c,d,e,f,g,h,i) for a quarter-turn, 16.16 fixed point.
-  const matrix = [0, 65_536, 0, -65_536, 0, 0, 0, 0, 1_073_741_824];
+  // Display matrix (a,b,u,c,d,v,x,y,w); a-d are 16.16 fixed point, w is 2.30.
+  const one = 65_536;
+  const [a, b, c, d] = turn === "clockwise" ? [0, one, -one, 0] : turn === "counterclockwise" ? [0, -one, one, 0] : [-one, 0, 0, -one];
+  const matrix = [a, b, 0, c, d, 0, 0, 0, 1_073_741_824];
   matrix.forEach((value, index) => patched.writeInt32BE(value, tkhd + 44 + index * 4));
   return patched;
 }
@@ -167,20 +169,24 @@ describeFfmpeg("ListingVideoProcessor", () => {
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
   }, 30_000);
 
-  it("scales a rotated portrait source on its displayed short side", async () => {
+  it.each([
+    ["clockwise", 720, 1280, [[240, 240, 426], [360, 360, 640], [720, 720, 1280]]],
+    ["counterclockwise", 720, 1280, [[240, 240, 426], [360, 360, 640], [720, 720, 1280]]],
+    ["half", 1280, 720, [[240, 426, 240], [360, 640, 360], [720, 1280, 720]]],
+  ] as const)("scales a source turned %s on its displayed short side", async (turn, storedWidth, storedHeight, tiers) => {
     const fixtureData = await fixture("1280x720");
     try {
-      const rotated = rotate90(fixtureData.body);
+      const rotated = rotate(fixtureData.body, turn);
       const storage = new MemoryStorage(rotated);
       const prisma = prismaFor();
       prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: rotated.length };
       await new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
       expect(prisma.row.status).toBe("Ready");
-      expect(prisma.row["width"]).toBe(720);
-      expect(prisma.row["height"]).toBe(1280);
+      expect(prisma.row["width"]).toBe(storedWidth);
+      expect(prisma.row["height"]).toBe(storedHeight);
       const master = storage.objects.get("video-sources/source/processing/1/hls/master.m3u8")?.body.toString();
       if (!master) throw new Error("No master playlist was stored");
-      for (const [tier, width, height] of [[240, 240, 426], [360, 360, 640], [720, 720, 1280]] as const) {
+      for (const [tier, width, height] of tiers) {
         const segment = storage.objects.get(`video-sources/source/processing/1/hls/${tier}p/${tier}-000.ts`);
         if (!segment) throw new Error("No rendition segment was stored");
         const segmentPath = join(fixtureData.dir, `${tier}.ts`);

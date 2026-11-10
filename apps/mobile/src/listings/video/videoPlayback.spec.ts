@@ -67,8 +67,8 @@ describe("parseMasterPlaylist", () => {
   });
 
   it("maps a rotated iPhone portrait clip by tier order, not by its odd sizes", () => {
-    // Stored 1920x1080 with a rotate flag, the worker currently outputs
-    // 202x360 and 404x720; the master still lists tiers in ascending order.
+    // Generations made before #1089 output a stored 1920x1080 clip with a
+    // rotate flag at 202x360 and 404x720; tiers stay in ascending order.
     const rotated = [
       "#EXTM3U",
       "#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=134x240",

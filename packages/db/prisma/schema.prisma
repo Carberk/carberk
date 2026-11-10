@@ -627,6 +627,7 @@ model VideoGeneration {
   /// Exact object keys written by the processing attempt. Ready requires all keys.
   manifest          Json?
   durationMs        Int?
+  /// Displayed (post-rotation) size; generations made before #1089 stored the encoded size.
   width             Int?
   height            Int?
   videoCodec        String?

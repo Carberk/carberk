@@ -44,8 +44,8 @@ function run(command: string, args: string[], timeoutMs = FFMPEG_TIMEOUT_MS): Pr
 function parseRate(rate: string | undefined): number { if (!rate) return 0; const [numerator = 0, denominator = 0] = rate.split("/").map(Number); return denominator > 0 ? numerator / denominator : 0; }
 function processingPrefix(sourceKey: string, attempt: number): string { return `${sourceKey.replace(/\/source\.mp4$/, "")}/processing/${attempt}`; }
 function coverOffset(duration: number, offsetMs: number): number { return offsetMs >= Math.round(duration * 1000) ? Math.max(0, duration - 0.001) : Math.max(0, offsetMs / 1000); }
-/** Display rotation in degrees, from the display matrix side data or the legacy `rotate` tag. */
-function displayRotation(video: ProbeStream): number { const tag = Number(video.tags?.rotate); const side = video.side_data_list?.find((entry) => typeof entry.rotation === "number")?.rotation; const raw = Number.isFinite(tag) && tag !== 0 ? tag : (side ?? 0); return ((Math.round(raw) % 360) + 360) % 360; }
+/** Display rotation in degrees. FFmpeg auto-rotates by the display matrix, so it wins; the legacy `rotate` tag is only a fallback. */
+function displayRotation(video: ProbeStream): number { const side = video.side_data_list?.find((entry) => typeof entry.rotation === "number")?.rotation; const tag = Number(video.tags?.rotate); const raw = side ?? (Number.isFinite(tag) ? tag : 0); return ((Math.round(raw) % 360) + 360) % 360; }
 
 @Injectable()
 export class ListingVideoProcessor {
