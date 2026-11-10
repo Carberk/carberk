@@ -23,6 +23,7 @@ import { VIDEO_MEDIA_STORAGE } from "../domain/ports/VideoMediaStorage";
 import { VIDEO_SERVING_REPOSITORY } from "../domain/ports/VideoServingRepository";
 import { PrismaVideoServingRepository } from "../infrastructure/PrismaVideoServingRepository";
 import { BucketVideoStorage } from "../infrastructure/BucketVideoStorage";
+import { PrismaListingsReadRepository } from "../infrastructure/PrismaListingsReadRepository";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
 import { VideoServingController } from "./VideoServingController";
 
@@ -90,7 +91,7 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
     await prisma.listingVideo.update({ where: { id: videoId }, data: { activeGenerationId: generationId } });
   });
   beforeEach(async () => {
-    now = new Date(); config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", viewer);
+    now = new Date(); config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", viewer); config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", owner);
     await prisma.user.updateMany({ where: { id: { in: [owner, viewer, admin, outsider] } }, data: { suspendedAt: null, deletionScheduledAt: null } });
     await prisma.user.update({ where: { id: admin }, data: { role: "admin" } });
     await prisma.listing.update({ where: { id: listingId }, data: { status: "active", deletedAt: null } });
@@ -209,6 +210,23 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
       await prisma.listingVideo.update({ where: { id: videoId }, data: { pendingGenerationId: null } });
       await prisma.videoGeneration.update({ where: { id: pending }, data: { status: "Ready" } });
     }
+  });
+  it("turns owner preview off with the upload list and on banned Listings, including issued grants", async () => {
+    const preview = await read("owner-preview", owner, true); const url = local(preview.body.url);
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", "");
+    await request.get(path("owner-preview")).set(auth(owner)).expect(404); await request.get(url).expect(404);
+    await request.get(path("owner-preview")).set(auth(outsider)).expect(404);
+    config.set("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS", owner); await request.get(url).expect(200);
+    await prisma.listing.update({ where: { id: listingId }, data: { status: "banned" } });
+    await request.get(path("owner-preview")).set(auth(owner)).expect(404); await request.get(url).expect(404);
+  });
+  it("flags Admin report Listings with a current non-retired video only", async () => {
+    const reads = new PrismaListingsReadRepository(prisma, {} as never);
+    expect((await reads.getListingAdminSummaries([listingId]))[0]?.hasVideo).toBe(true);
+    await prisma.videoGeneration.update({ where: { id: generationId }, data: { status: "Retired" } });
+    expect((await reads.getListingAdminSummaries([listingId]))[0]?.hasVideo).toBe(false);
+    await prisma.listingVideo.update({ where: { id: videoId }, data: { activeGenerationId: null } });
+    expect((await reads.getListingAdminSummaries([listingId]))[0]?.hasVideo).toBe(false);
   });
   it("never lets moderators reuse retained grants after removal or purge", async () => {
     const cover = await read("moderator", admin); const play = await read("moderator", admin, true);

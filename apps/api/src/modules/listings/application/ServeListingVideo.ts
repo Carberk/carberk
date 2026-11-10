@@ -41,10 +41,12 @@ export class ServeListingVideo {
     if (audience === "moderator") {
       if (!await this.identity.isAdmin(sub) || !session.adminTotpExpiresAt || session.adminTotpExpiresAt <= now) throw unavailable();
     } else if (audience === "viewer" && !this.access.canViewVideo(sub)) throw unavailable();
+    // Owner preview follows the owner status read (#1043): upload membership, never banned Listings.
+    else if (audience === "owner-preview" && !this.access.canResumeVideo(sub)) throw unavailable();
     if (!video) return { sub, sid };
     if (video.deleted) throw unavailable();
     if (audience === "viewer" && !["active", "sold"].includes(video.listingStatus ?? "")) throw unavailable();
-    if (audience === "owner-preview" && (video.ownerId !== sub || video.targetOwnerId !== sub)) throw unavailable();
+    if (audience === "owner-preview" && (video.ownerId !== sub || video.targetOwnerId !== sub || video.listingStatus === "banned")) throw unavailable();
     if (audience === "moderator" && !video.listingStatus) throw unavailable();
     return { sub, sid };
   }
