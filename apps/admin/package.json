@@ -16,6 +16,7 @@
     "@auto-tm/contracts": "workspace:*",
     "@auto-tm/ui": "workspace:*",
     "clsx": "catalog:",
+    "hls.js": "1.7.4",
     "lucide-react": "^0.469.0",
     "next": "catalog:",
     "qrcode": "^1.5.4",

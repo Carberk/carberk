@@ -1,4 +1,10 @@
 import { GetTargetVideoStatus } from "./application/GetTargetVideoStatus";
+import { ConfigListingVideoAccess } from "../../common/ConfigListingVideoAccess";
+import { VideoServingController } from "./presentation/VideoServingController";
+import { ServeListingVideo } from "./application/ServeListingVideo";
+import { VIDEO_MEDIA_STORAGE } from "./domain/ports/VideoMediaStorage";
+import { VIDEO_SERVING_REPOSITORY } from "./domain/ports/VideoServingRepository";
+import { PrismaVideoServingRepository } from "./infrastructure/PrismaVideoServingRepository";
 import { LISTING_VIDEO_READ_PORT } from "./domain/ports/ListingVideoReadPort";
 import { PrismaListingVideoReadRepository } from "./infrastructure/PrismaListingVideoReadRepository";
 import { Module } from "@nestjs/common";
@@ -104,9 +110,13 @@ import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
 
 @Module({
   imports: [PrismaModule, EventEmitterModule, IdentityModule, BullModule.registerQueue({ name: "video-transcode" })],
-  controllers: [ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController],
+  controllers: [VideoServingController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController],
   providers: [
     GetTargetVideoStatus,
+    ServeListingVideo,
+    ConfigListingVideoAccess,
+    { provide: VIDEO_SERVING_REPOSITORY, useClass: PrismaVideoServingRepository },
+    { provide: VIDEO_MEDIA_STORAGE, useExisting: BucketVideoStorage },
     { provide: LISTING_VIDEO_READ_PORT, useClass: PrismaListingVideoReadRepository },
     // Infrastructure adapters
     NullVinDecoder,

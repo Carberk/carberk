@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import {
   AbortMultipartUploadCommand,
   GetBucketVersioningCommand,
+  GetObjectCommand,
   ListObjectsV2Command,
   CompleteMultipartUploadCommand,
   CreateBucketCommand,
@@ -207,6 +208,20 @@ export class BucketVideoStorage implements VideoStoragePort {
       if (page.IsTruncated && !token) throw new Error("Incomplete video object list");
     } while (token);
     return keys;
+  }
+
+  async mediaHead(key: string): Promise<{ sizeBytes: number; etag: string }> {
+    const head = await this.s3.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }), { abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    return { sizeBytes: head.ContentLength ?? 0, etag: head.ETag ?? "" };
+  }
+
+  async mediaRead(key: string, range?: string): Promise<Uint8Array> {
+    const result = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key, ...(range ? { Range: range } : {}) }), { abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    if (!result.Body || (result.ContentLength ?? 0) > 16 * 1024 * 1024) {
+      if (result.Body && "destroy" in result.Body) result.Body.destroy();
+      throw new Error("Video asset unavailable");
+    }
+    return result.Body.transformToByteArray();
   }
 
   async deleteObject(key: string): Promise<void> {

@@ -43,6 +43,7 @@ export interface GetReportDetailResult {
     make?: string | undefined;
     model?: string | undefined;
     status?: string | undefined;
+    hasVideo?: boolean | undefined;
     role?: string | undefined;
     avatarKey?: string | null | undefined;
     avatarIndex?: number | undefined;
@@ -180,7 +181,7 @@ export class GetReportDetail {
   }
 
   private buildListingTarget(
-    listing: { id: string; sellerId: string; status: string; year: number | null; brandName: string; modelName: string } | undefined,
+    listing: { id: string; sellerId: string; status: string; year: number | null; brandName: string; modelName: string; hasVideo?: boolean } | undefined,
     targetId: string,
   ): GetReportDetailResult["target"] {
     if (!listing) {
@@ -206,6 +207,7 @@ export class GetReportDetail {
       make: listing.brandName,
       model: listing.modelName,
       status: listing.status,
+      hasVideo: listing.hasVideo,
     };
   }
 
@@ -239,7 +241,7 @@ export class GetReportDetail {
       targetId: string;
       messageContext: { messageId: string; conversationId: string; listingId: string; buyerId: string; sellerId: string; senderId: string; createdAt: Date; body: string | null; deletedAt: Date | null } | null;
     },
-    listing: { id: string; sellerId: string; status: string; year: number | null; brandName: string; modelName: string } | undefined,
+    listing: { id: string; sellerId: string; status: string; year: number | null; brandName: string; modelName: string; hasVideo?: boolean } | undefined,
     user: { id: string; displayName: string | null; role: string; avatarKey: string | null; avatarIndex: number; suspendedAt: Date | null; suspendedById: string | null; suspensionReason: string | null } | undefined,
   ): GetReportDetailResult["target"] {
     if (report.targetType === "listing") {

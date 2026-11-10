@@ -28,6 +28,7 @@ export interface ListReportsResult {
       label: string;
       targetType: string;
       targetId: string;
+      hasVideo?: boolean;
     };
   }>;
   total: number;
@@ -139,7 +140,7 @@ export class ListReports {
       targetId: string;
       messageContext: { messageId: string; conversationId: string; deletedAt: Date | null } | null;
     }>,
-  ): Promise<Map<string, { available: boolean; label: string; targetType: string; targetId: string }>> {
+  ): Promise<Map<string, { available: boolean; label: string; targetType: string; targetId: string; hasVideo?: boolean }>> {
     const listingIds: string[] = [];
     const userIds: string[] = [];
 
@@ -156,7 +157,7 @@ export class ListReports {
       this.identityRead.findUsersByIds(userIds),
     ]);
 
-    const map = new Map<string, { available: boolean; label: string; targetType: string; targetId: string }>();
+    const map = new Map<string, { available: boolean; label: string; targetType: string; targetId: string; hasVideo?: boolean }>();
 
     for (const l of listings) {
       const label = l.year
@@ -167,6 +168,7 @@ export class ListReports {
         label,
         targetType: "listing",
         targetId: l.id,
+        hasVideo: l.hasVideo ?? false,
       });
     }
 

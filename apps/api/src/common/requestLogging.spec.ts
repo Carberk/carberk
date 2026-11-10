@@ -96,6 +96,12 @@ describe("API request logging", () => {
     expect(log).not.toContain('"query"');
   });
 
+  it("redacts a media grant in both query and referrer", async () => {
+    const log = await logOneRequest({ referer: "https://api.example/video.m3u8?grant=secret-playback-grant" }, "/api/v1/listings?grant=secret-cover-grant");
+    expect(log).not.toContain("secret-playback-grant");
+    expect(log).not.toContain("secret-cover-grant");
+  });
+
   it("never writes a bearer token, a cookie or a set-cookie to the log", async () => {
     const log = await logOneRequest({
       authorization: `Bearer ${TOKEN}`,

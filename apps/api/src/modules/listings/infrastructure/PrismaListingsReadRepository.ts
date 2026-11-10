@@ -185,7 +185,7 @@ export class PrismaListingsReadRepository
         id: { in: ids },
         deletedAt: null,
       },
-      include: { brand: true, model: true },
+      include: { brand: true, model: true, listingVideo: { select: { activeGenerationId: true, pendingGenerationId: true, generations: { select: { id: true, status: true } } } } },
     });
 
     return rows.map((r) => ({
@@ -193,6 +193,7 @@ export class PrismaListingsReadRepository
       sellerId: r.sellerId,
       status: r.status,
       year: r.year ?? null,
+      hasVideo: r.listingVideo?.generations.some((g) => g.status !== "Retired" && [r.listingVideo?.activeGenerationId, r.listingVideo?.pendingGenerationId].includes(g.id)) ?? false,
       brandName: r.brand.nameRu,
       modelName: r.model.nameRu,
     }));

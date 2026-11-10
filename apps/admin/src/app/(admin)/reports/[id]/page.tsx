@@ -206,6 +206,7 @@ export default async function ReportDetailPage({ params }: PageProps) {
                 </div>
               </>
             )}
+            {isListing && report.target.hasVideo && <p>Есть видео — <Link href={`/listings/${report.target.targetId}`} className="text-brand-600 hover:underline">Смотреть видео</Link></p>}
             {isListing && report.target.status && (
               <div>
                 <span className="text-neutral-500">Статус объявления:</span>{" "}

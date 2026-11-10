@@ -20,6 +20,7 @@ export interface ListingSummary {
 }
 
 export interface AdminListingSummary {
+  hasVideo?: boolean;
   id: string;
   sellerId: string;
   status: string;

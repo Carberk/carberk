@@ -79,6 +79,7 @@ export type ReportTargetType =
 // ── Shared summary DTOs ──
 
 export const TargetSummarySchema = z.object({
+  hasVideo: z.boolean().optional(),
   available: z.boolean(),
   label: z.string(),
   targetType: z.nativeEnum(ReportTargetType),
@@ -172,6 +173,7 @@ export const ReporterSummarySchema = z.object({
 export type ReporterSummary = z.infer<typeof ReporterSummarySchema>;
 
 export const ReportDetailTargetSchema = z.object({
+  hasVideo: z.boolean().optional(),
   targetType: z.nativeEnum(ReportTargetType),
   available: z.boolean(),
   label: z.string(),

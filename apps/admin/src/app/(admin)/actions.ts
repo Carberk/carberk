@@ -1,7 +1,7 @@
 "use server";
 
 import { unstable_rethrow } from "next/navigation";
-import type { AdminSchemas, ReportsSchemas } from "@auto-tm/contracts";
+import { ListingsSchemas, type AdminSchemas, type ReportsSchemas } from "@auto-tm/contracts";
 
 import { rejectExpiredSession } from "@/lib/action-session";
 import { apiFetch, ApiError } from "@/lib/api-client";
@@ -248,4 +248,19 @@ export async function getConfig(): Promise<ActionResult<ConfigResponse>> {
   } catch (err) {
     return handleApiError(err);
   }
+}
+
+/** Cover-only metadata; the playback control is invoked only by Play/Retry. */
+export async function getListingVideo(id: string): Promise<ActionResult<ListingsSchemas.VideoAccessResponse>> {
+  await rejectExpiredSession();
+  try {
+    return { ok: true, data: ListingsSchemas.VideoAccessResponseSchema.parse(await apiFetch(`/listings/video-access/moderator/listing/${encodeURIComponent(id)}`, { cache: "no-store" })) };
+  } catch (err) { return handleApiError(err); }
+}
+
+export async function playListingVideo(id: string): Promise<ActionResult<ListingsSchemas.VideoAccessResponse>> {
+  await rejectExpiredSession();
+  try {
+    return { ok: true, data: ListingsSchemas.VideoAccessResponseSchema.parse(await apiFetch(`/listings/video-access/moderator/listing/${encodeURIComponent(id)}/playback`, { method: "POST", cache: "no-store" })) };
+  } catch (err) { return handleApiError(err); }
 }
