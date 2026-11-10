@@ -91,6 +91,8 @@ Round 1 brief (T3 children get no history):
 
 ```
 Review only. Do not edit, commit, push, comment on PRs, or start subagents.
+Never checkout or switch branches in <abs path>; to run tests, use your own
+`git worktree add /tmp/review-<sha> <sha>` and remove it afterwards.
 Repo: <abs path> Base: <sha> Intent: <intent> Out of scope: <scope> Checks: <results>
 Spec: <issue URL>. Each acceptance criterion must hold; unmet = blocker.
 Standards: docs/agents/coding-standards.md and <routed docs for touched areas>.

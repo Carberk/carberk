@@ -32,6 +32,8 @@ pnpm db:migrate:deploy     # apply committed migrations locally
 pnpm db:seed               # canonical reference baseline and brand logos, when needed
 ```
 
+For test Users, Listings and Ready videos, run the fixtures in [local testing](local-testing.md#1a-seed-test-data).
+
 Copy each app's `.env.template` to `.env` and keep secrets out of git. The templates point everything at localhost:
 
 | App | Port | Start |
@@ -42,7 +44,7 @@ Copy each app's `.env.template` to `.env` and keep secrets out of git. The templ
 | Web (`apps/web`) | `3002` | `pnpm --filter @auto-tm/web dev` |
 | Mobile Metro (`apps/mobile`) | `8081` | `pnpm --filter @auto-tm/mobile dev` |
 
-`pnpm dev` starts all of them. The stack is shared by every agent on this Mac. Use your own database for destructive test runs, and never run `docker compose down -v` without asking. Schema changes are committed migrations; `db push` and `migrate dev` stay on localhost.
+`pnpm dev` starts all of them. A real Listing video upload stays in Processing until the worker runs, so start it when you test uploads; `video:fixture` does not need it. The stack is shared by every agent on this Mac. Use your own database for destructive test runs, and never run `docker compose down -v` without asking. Schema changes are committed migrations; `db push` and `migrate dev` stay on localhost.
 
 [Local testing](local-testing.md) has the fast path: env files, the API log, sign-in codes, the local admin and its authenticator code, and the iOS Simulator steps.
 
@@ -56,13 +58,14 @@ Test the app on the iOS Simulator. Android is not used for development testing o
 2. `device_open` with the host and device id returns an `agent-device` command bound to that device.
 3. Run that command for every launch, deep link, tap, text entry and screenshot. `device_screenshot` shows the screen.
 
-Do not use `simctl`, `adb` or `idb` for taps, text or screenshots in T3. They stay fine for builds, installs, logs, Metro and port forwards. If `open` reports `DEVICE_IN_USE`, another session holds the device: do not close or reuse it, tell the founder.
+Do not use `simctl`, `adb` or `idb` for taps, text or screenshots in T3. They stay fine for builds, installs, logs, Metro and port forwards. If `open` reports `DEVICE_IN_USE`, another session holds the device: do not close or reuse it. Run `pnpm sim:spare` for a free Simulator with the Carberk build, as in [local testing](local-testing.md#4-run-the-app-on-the-ios-simulator). Tell the founder only when a finished or failed thread still holds a device.
 
 Devices on the founder's Mac:
 
 | Device | Platform | Use |
 |---|---|---|
 | iPhone 17 (`38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`) | iOS 26.2 Simulator | Carberk development testing; the Debug build is installed |
+| `Carberk …` Simulators, such as `Carberk Agent 1` | iOS 26.2 Simulator | Spares for parallel agents; `pnpm sim:spare` picks or creates one |
 | `Carberk_Shots` | Android 16 emulator | Only for Android-only tickets |
 | `Tayyn_Hyzmat_Test` | Android 16 emulator | Another project; do not use |
 

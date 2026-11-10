@@ -67,6 +67,8 @@ pnpm --filter @auto-tm/worker video:fixture -- --write-env  # Ready portrait and
 
 Sign in as these Users instead of making new ones. A fixture User that stays signed in uses no new codes.
 
+To test a real upload rather than the fixture videos, also start the worker, which processes uploads: `pnpm --filter @auto-tm/worker dev > /tmp/carberk-worker.log 2>&1 &`. Only one worker should run against the shared stack, so check `pgrep -fl apps/worker` first and reuse a running one.
+
 For video expiry checks, set `LISTING_VIDEO_GRANT_TTL_SECONDS=30` in `apps/api/.env`, or on the API command line, instead of editing code. It shortens playback grants from five minutes to that many seconds. It applies only when `APP_ENV` is `development` or `test`.
 
 ## 2. Get a sign-in code
