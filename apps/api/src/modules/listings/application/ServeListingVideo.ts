@@ -1,5 +1,4 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { posix } from "node:path";
 import { Inject, Injectable, NotFoundException, HttpException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { z } from "zod";
@@ -90,12 +89,14 @@ export class ServeListingVideo {
     const video = await this.videos.find({ type, id });
     const authorized = await this.authorize(actor, audience.data, video);
     if (!video) { if (play) throw unavailable(); return { status: "none" }; }
-    if (!video.active) { if (play) throw unavailable(); return { status: video.pendingStatus?.toLowerCase() ?? "none" }; }
+    // ADR-0112 reserves pending state for owner and moderator reads; viewers see only Ready.
+    const pendingStatus = audience.data === "viewer" ? undefined : video.pendingStatus?.toLowerCase();
+    if (!video.active) { if (play) throw unavailable(); return { status: pendingStatus ?? "none" }; }
     const { generation, manifest } = this.ready(video);
     const grant: Grant = { sub: authorized.sub, sid: authorized.sid, aud: audience.data, video: video.id, generation: generation.id, scope: play ? "playback" : "cover", exp: this.clock.now().getTime() + 300_000 };
     const token = this.sign(grant);
     const cover = Object.fromEntries(["thumbnail", "list", "detail", "fullscreen"].map((variant) => [variant, this.url(grant, token, `cover:${variant}`)]));
-    return { status: "ready", ...(video.pendingStatus ? { pendingStatus: video.pendingStatus.toLowerCase() } : {}), video: { id: video.id, generationId: generation.id, durationMs: generation.durationMs, cover }, expiresAt: new Date(grant.exp).toISOString(), ...(play ? { url: this.url(grant, token, "master") } : {}), qualities: [240, 360, 720].filter((tier) => manifest[`playlist:${tier}`]) };
+    return { status: "ready", ...(pendingStatus ? { pendingStatus } : {}), video: { id: video.id, generationId: generation.id, durationMs: generation.durationMs, cover }, expiresAt: new Date(grant.exp).toISOString(), ...(play ? { url: this.url(grant, token, "master") } : {}), qualities: [240, 360, 720].filter((tier) => manifest[`playlist:${tier}`]) };
   }
 
   async file(input: { audience: string; videoId: string; generationId: string; resource: string; token: string; range?: string; head: boolean }) {
@@ -115,10 +116,8 @@ export class ServeListingVideo {
       if (playlist) {
         const bytes = await this.storage.mediaRead(entry.key);
         const rewrite = (uri: string) => {
-          // Worker emits relative VOD paths. Resolve paths only inside the exact recorded manifest.
-          if (/^[a-z][a-z\d+.-]*:|^\/\/|[?#]/i.test(uri)) throw unavailable();
-          const key = posix.normalize(posix.join(posix.dirname(entry.key), uri));
-          const child = Object.keys(manifest).find((name) => manifest[name]?.key === key);
+          // The worker writes full Bucket keys into every playlist; only exact recorded manifest keys resolve.
+          const child = Object.keys(manifest).find((name) => manifest[name]?.key === uri);
           if (!child) throw unavailable();
           return this.url(grant, input.token, child);
         };

@@ -39,6 +39,7 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
   let manifest: Record<string, { key: string; sizeBytes: number }>;
   const path = (audience = "viewer", type = "listing", id = listingId) => `/api/v1/listings/video-access/${audience}/${type}/${id}`;
   const auth = (id = viewer) => ({ Authorization: `Bearer ${app.get(JwtService).sign({ sub: id, sid: suite.id(`session-${id}`) })}` });
+  const masterBody = () => `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=100000,CODECS="avc1.64001e",RESOLUTION=202x360\n${prefix}hls/360p/index.m3u8\n`;
   const local = (url: string) => { const parsed = new URL(url); expect(parsed.origin).toBe("https://media.example.test"); return parsed.pathname + parsed.search; };
   async function read(audience = "viewer", id = viewer, play = false, type = "listing", targetId = listingId) {
     return request[play ? "post" : "get"](path(audience, type, targetId) + (play ? "/playback" : "")).set(auth(id)).expect(play ? 201 : 200);
@@ -76,7 +77,8 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
     await prisma.listingVideo.create({ data: { id: videoId, ownerId: owner, listingId } });
     await prisma.videoSource.create({ data: { id: sourceId, userId: owner, listingVideoId: videoId, bucket: storage.bucket, objectKey: `${prefix}source.mp4`, multipartUploadId: "fixture", contentType: "video/mp4", sizeBytes: 10, partSizeBytes: 10, partCount: 1, state: "COMPLETED", coverOffsetMs: 0, expiresAt: now } });
     manifest = {};
-    const assets: Record<string, [string, string]> = { master: ["master.m3u8", '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100000\n360/index.m3u8\n'], "playlist:360": ["360/index.m3u8", '#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,URI="segment.ts"\n#EXTINF:3,\nsegment.ts\n#EXT-X-ENDLIST\n'], "segment:360:0": ["360/segment.ts", "0123456789"] };
+    // Worker format (ListingVideoProcessor): every playlist line is a full recorded Bucket key.
+    const assets: Record<string, [string, string]> = { master: ["hls/master.m3u8", masterBody()], "playlist:360": ["hls/360p/index.m3u8", `#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,URI="${prefix}hls/360p/360-000.ts"\n#EXTINF:3,\n${prefix}hls/360p/360-000.ts\n#EXT-X-ENDLIST\n`], "segment:360:0": ["hls/360p/360-000.ts", "0123456789"] };
     for (const variant of ["thumbnail", "list", "detail", "fullscreen"]) assets[`cover:${variant}`] = [`${variant}.webp`, "WEBPfixture"];
     for (const [member, [relative, body]] of Object.entries(assets)) {
       const key = prefix + relative; keys.push(key); manifest[member] = { key, sizeBytes: Buffer.byteLength(body) };
@@ -177,17 +179,35 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
       await request.get(local(preview.body.url)).expect(404);
       await s3.send(new PutObjectCommand({ Bucket: storage.bucket, Key: master, Body: '#EXTM3U\n../not-recorded.ts\n' }));
       await request.get(local(preview.body.url)).expect(404);
+      await s3.send(new PutObjectCommand({ Bucket: storage.bucket, Key: master, Body: '#EXTM3U\nhls/360p/index.m3u8\n' }));
+      await request.get(local(preview.body.url)).expect(404);
       await request.get(local(preview.body.url).replace(/\/[^/]+\.m3u8\?/, "/source.mp4?")).expect(404);
     } finally {
       await prisma.listingVideo.update({ where: { id: videoId }, data: { listingId, draftId: null } });
       await prisma.listingDraft.delete({ where: { id: draft.id } });
-      await s3.send(new PutObjectCommand({ Bucket: storage.bucket, Key: manifest["master"]!.key, Body: '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100000\n360/index.m3u8\n' }));
+      await s3.send(new PutObjectCommand({ Bucket: storage.bucket, Key: manifest["master"]!.key, Body: masterBody() }));
     }
   });
   it("binds control authority to the current login session rather than a User id alone", async () => {
     const jwt = app.get(JwtService);
     for (const actor of [{ sub: viewer }, { sub: owner, sid: suite.id(`session-${viewer}`) }]) {
       await request.get(path()).set("Authorization", `Bearer ${jwt.sign(actor)}`).expect(404);
+    }
+  });
+  it("hides a seller's pending replacement or first upload from viewers but not from owner or moderator", async () => {
+    const pending = suite.id("new-generation");
+    await prisma.videoGeneration.update({ where: { id: pending }, data: { status: "Processing" } });
+    await prisma.listingVideo.update({ where: { id: videoId }, data: { pendingGenerationId: pending } });
+    try {
+      const viewerReady = await read(); expect(viewerReady.body.status).toBe("ready"); expect(viewerReady.body.pendingStatus).toBeUndefined();
+      expect((await read("owner-preview", owner)).body.pendingStatus).toBe("processing");
+      expect((await read("moderator", admin)).body.pendingStatus).toBe("processing");
+      await prisma.listingVideo.update({ where: { id: videoId }, data: { activeGenerationId: null } });
+      expect((await read()).body).toEqual({ status: "none" });
+      expect((await read("owner-preview", owner)).body).toEqual({ status: "processing" });
+    } finally {
+      await prisma.listingVideo.update({ where: { id: videoId }, data: { pendingGenerationId: null } });
+      await prisma.videoGeneration.update({ where: { id: pending }, data: { status: "Ready" } });
     }
   });
   it("never lets moderators reuse retained grants after removal or purge", async () => {
