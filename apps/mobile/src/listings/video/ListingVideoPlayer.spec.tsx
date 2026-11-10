@@ -1,8 +1,9 @@
 import { http, HttpResponse } from "msw";
 import { AppState } from "react-native";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { waitFor } from "@testing-library/react-native";
 
-import { server } from "../../../test/msw";
+import { sentVideoTelemetry, server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import { createdPlayers, type FakeVideoPlayer } from "../../../test/native-video";
 
@@ -536,5 +537,149 @@ describe("ListingVideoPlayer", () => {
     await act(async () => { screen.unmount(); });
     expect(player.playing).toBe(false);
     expect(player.released).toBe(true);
+  });
+
+  describe("tester measurements", () => {
+    async function renderTimed() {
+      let clock = 10_000;
+      const screen = await renderMobile(
+        <ListingVideoPlayer audience="viewer" type="listing" id={LISTING_ID} onClose={vi.fn()} now={() => clock} />,
+      );
+      return { screen, tick: (ms: number) => { clock += ms; } };
+    }
+
+    it("reports how long Play took to show the first frame, once", async () => {
+      const { screen, tick } = await renderTimed();
+      await act(async () => {});
+      tick(1_850);
+      const player = await startPlaying(screen);
+      // A pause and play again is not another start.
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      expect(player.playing).toBe(true);
+
+      await waitFor(() => expect(sentVideoTelemetry).toEqual([
+        { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 1_850 },
+      ]));
+    });
+
+    it("reports stalls after the start when the player closes, and never the grant URL", async () => {
+      const { screen, tick } = await renderTimed();
+      tick(900);
+      const player = await startPlaying(screen);
+      await act(async () => { player.emitTimeUpdate(12); });
+      await act(async () => { player.emitStatus("loading"); });
+      tick(2_000);
+      await act(async () => { player.emitStatus("readyToPlay"); });
+      await act(async () => { player.emitStatus("loading"); });
+      tick(500);
+      await act(async () => { player.emitStatus("readyToPlay"); });
+      await act(async () => { player.emitTimeUpdate(30.4); });
+
+      await act(async () => { screen.unmount(); });
+
+      await waitFor(() => expect(sentVideoTelemetry).toEqual([
+        { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 900 },
+        { event: "playback_buffering", audience: "viewer", stallCount: 2, stallMs: 2_500, watchedMs: 30_400 },
+      ]));
+      const sent = JSON.stringify(sentVideoTelemetry);
+      for (const secret of ["grant", "tok", "http", LISTING_ID, VIDEO_ID, GENERATION_ID]) expect(sent).not.toContain(secret);
+    });
+
+    it("reports the wait and nothing else when the viewer leaves before the first frame", async () => {
+      servePlayback(() => ({ status: "unavailable" }), 404);
+      const { screen, tick } = await renderTimed();
+      expect(await screen.findByText("Video unavailable")).toBeTruthy();
+      tick(3_200);
+      await act(async () => { screen.unmount(); });
+      await waitFor(() => expect(sentVideoTelemetry).toEqual([
+        { event: "playback_abandoned", audience: "viewer", waitedMs: 3_200 },
+      ]));
+    });
+
+    it("does not count a stall that is still open when the app backgrounds", async () => {
+      const appState = captureAppState();
+      try {
+        const { screen, tick } = await renderTimed();
+        const player = await startPlaying(screen);
+        await act(async () => { player.emitStatus("loading"); });
+        tick(2_000);
+        await act(async () => { appState.emit("background"); });
+        await act(async () => { appState.emit("active"); });
+        await act(async () => { screen.unmount(); });
+        await waitFor(() => expect(sentVideoTelemetry).toEqual([
+          { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 0 },
+          { event: "playback_buffering", audience: "viewer", stallCount: 0, stallMs: 0, watchedMs: 0 },
+        ]));
+      } finally {
+        appState.restore();
+      }
+    });
+
+    it("does not count the reload after a background return as a stall", async () => {
+      const appState = captureAppState();
+      try {
+        const { screen, tick } = await renderTimed();
+        const player = await startPlaying(screen);
+        await act(async () => { appState.emit("background"); });
+        await act(async () => { appState.emit("active"); });
+        const back = await nextPlayer(screen, player);
+        await act(async () => { back.emitStatus("loading"); });
+        tick(1_500);
+        await act(async () => { back.emitStatus("readyToPlay"); });
+        await act(async () => { screen.unmount(); });
+        await waitFor(() => expect(sentVideoTelemetry).toEqual([
+          { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 0 },
+          { event: "playback_buffering", audience: "viewer", stallCount: 0, stallMs: 0, watchedMs: 0 },
+        ]));
+      } finally {
+        appState.restore();
+      }
+    });
+
+    it("does not count loading while the viewer is paused", async () => {
+      const { screen, tick } = await renderTimed();
+      const player = await startPlaying(screen);
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      await act(async () => { player.emitStatus("loading"); });
+      tick(1_500);
+      await act(async () => { player.emitStatus("readyToPlay"); });
+      await act(async () => { screen.unmount(); });
+      await waitFor(() => expect(sentVideoTelemetry).toEqual([
+        { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 0 },
+        { event: "playback_buffering", audience: "viewer", stallCount: 0, stallMs: 0, watchedMs: 0 },
+      ]));
+    });
+
+    it("does not count a seek wait as a stall", async () => {
+      const { screen, tick } = await renderTimed();
+      const player = await startPlaying(screen);
+      const seek = screen.getByTestId("listing-video-player-seek");
+      await fireEvent(seek, "layout", { nativeEvent: { layout: { width: 200 } } });
+      await fireEvent(seek, "press", { nativeEvent: { locationX: 100 } });
+      await act(async () => { player.emitStatus("loading"); });
+      tick(1_500);
+      await act(async () => { player.emitStatus("readyToPlay"); });
+      await act(async () => { screen.unmount(); });
+      await waitFor(() => expect(sentVideoTelemetry).toEqual([
+        { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 0 },
+        { event: "playback_buffering", audience: "viewer", stallCount: 0, stallMs: 0, watchedMs: 0 },
+      ]));
+    });
+
+    it("does not count the loading of a newly chosen quality as a stall", async () => {
+      const { screen, tick } = await renderTimed();
+      const player = await startPlaying(screen);
+      await pickQuality(screen, "720p");
+      const switched = await nextPlayer(screen, player);
+      await act(async () => { switched.emitStatus("loading"); });
+      tick(1_500);
+      await act(async () => { switched.emitStatus("readyToPlay"); });
+      await act(async () => { screen.unmount(); });
+      await waitFor(() => expect(sentVideoTelemetry).toEqual([
+        { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 0 },
+        { event: "playback_buffering", audience: "viewer", stallCount: 0, stallMs: 0, watchedMs: 0 },
+      ]));
+    });
   });
 });

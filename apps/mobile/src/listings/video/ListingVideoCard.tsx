@@ -30,6 +30,8 @@ interface ListingVideoCardProps {
   isVideoUploadTester?: boolean;
   /** Fake native module in tests; the real AVFoundation module by default. */
   videoNative?: ListingVideoNativeModule | null;
+  /** Clock for preparation measurements in tests; the real clock by default. */
+  videoNow?: () => number;
   videoFileSystem?: ListingVideoFileSystem;
   subscribeAppState?: AppStateSubscribe;
   videoUploadTarget?: VideoUploadsSchemas.VideoUploadTarget;
@@ -83,7 +85,7 @@ const FAILURE_COPY: Record<
 
 export function ListingVideoCard(props: ListingVideoCardProps) {
   const tasks = useListingVideoTasks();
-  const options: ListingVideoTaskOptions = { target: props.videoUploadTarget, native: props.videoNative,
+  const options: ListingVideoTaskOptions = { target: props.videoUploadTarget, native: props.videoNative, now: props.videoNow,
     fileSystem: props.videoFileSystem, subscribeAppState: props.subscribeAppState,
     api: props.videoUploadApi, uploadFileSystem: props.videoUploadFileSystem,
     transport: props.videoUploadTransport, persistence: props.videoUploadPersistence };

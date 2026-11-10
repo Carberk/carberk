@@ -22,6 +22,7 @@ import {
   useListingPlayback,
   type PlaybackTarget,
 } from "./useListingPlayback";
+import { sendListingVideoTelemetry } from "./listingVideoTelemetry";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -29,7 +30,7 @@ import { Icon } from "@/components/ui/icon";
 
 interface ListingVideoPlayerProps extends PlaybackTarget {
   onClose: () => void;
-  /** Wall clock in epoch ms, for grant expiry. */
+  /** Wall clock in epoch ms, for grant expiry and playback measurements. */
   now?: () => number;
 }
 
@@ -65,6 +66,8 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
   const [trackWidth, setTrackWidth] = useState(1);
 
   const positionRef = useRef(0);
+  // A seek makes the player load at the new position; that wait is not a stall.
+  const seekPendingRef = useRef(false);
   const mutedRef = useRef(false);
   // Explicit user intent: the native player can report `readyToPlay` again
   // after a pause, and that must never undo the pause.
@@ -72,6 +75,17 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
   const startedRef = useRef(false);
   // Position and play intent to apply to the next player that has a source.
   const restoreRef = useRef<{ position: number; playing: boolean } | null>(null);
+
+  // Tester measurements (#1052): time from the Play tap (this mount) to the
+  // first playing frame, then stalls until the player closes. Only counts
+  // and durations are reported; the grant URL never leaves this component.
+  const [openedAt] = useState(now);
+  const openedAtRef = useRef(openedAt);
+  const measureRef = useRef({ started: false, stallSince: null as number | null, stallCount: 0, stallMs: 0, furthestS: 0 });
+  const reportRef = useRef({ audience, now });
+  reportRef.current = { audience, now };
+  const choiceRef = useRef(choice);
+  choiceRef.current = choice;
 
   // Variant URLs come from the granted master playlist itself, so a manual
   // quality never invents a storage key the server did not publish. This is
@@ -123,9 +137,28 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
   useEffect(() => {
     setStatus(player.status ?? "idle");
     setPlaying(!!player.playing);
+    // A swapped-in player (background return, quality switch, renewed
+    // grant) starts clean: a stall still open on the player it replaces is
+    // discarded, and this player's own loading does not count until it has
+    // played and the viewer still wants playback.
+    measureRef.current.stallSince = null;
+    let playedHere = false;
+    let loadedHere = false;
     const subs = [
       player.addListener?.("statusChange", (e: { status: VideoPlayerStatus }) => {
         setStatus(e.status);
+        const measure = measureRef.current;
+        if (e.status === "loading") {
+          if (measure.started && playedHere && loadedHere && intentRef.current && !seekPendingRef.current && measure.stallSince === null) measure.stallSince = now();
+        } else {
+          if (e.status === "readyToPlay") loadedHere = true;
+          seekPendingRef.current = false;
+          if (measure.stallSince !== null) {
+            measure.stallCount += 1;
+            measure.stallMs += now() - measure.stallSince;
+            measure.stallSince = null;
+          }
+        }
         if (e.status === "readyToPlay" && intentRef.current) {
           startedRef.current = true;
           try { player.play(); } catch { /* native stub */ }
@@ -133,9 +166,17 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
       }),
       player.addListener?.("playingChange", (e: { isPlaying: boolean }) => {
         setPlaying(e.isPlaying);
+        if (e.isPlaying) playedHere = true;
+        if (e.isPlaying && !measureRef.current.started) {
+          measureRef.current.started = true;
+          const picked = choiceRef.current;
+          const quality = picked === "auto" || picked === "data-saver" ? picked : (`${picked}` as const);
+          sendListingVideoTelemetry({ event: "playback_started", audience, quality, startupMs: Math.max(0, Math.round(now() - openedAt)) });
+        }
       }),
       player.addListener?.("timeUpdate", (e: { currentTime: number }) => {
         positionRef.current = e.currentTime;
+        measureRef.current.furthestS = Math.max(measureRef.current.furthestS, e.currentTime);
         setPositionS(e.currentTime);
       }),
       player.addListener?.("playToEnd", () => {
@@ -186,6 +227,7 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
     if (state === "background" && foregroundRef.current) {
       foregroundRef.current = false;
       intentRef.current = false;
+      measureRef.current.stallSince = null;
       restoreRef.current = { position: restoreRef.current?.position ?? positionRef.current, playing: false };
       try { playerRef.current.pause(); } catch { /* native stub */ }
       setForeground(false);
@@ -206,6 +248,22 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
   // Leaving the player releases the native player (hook cleanup) after pause.
   useEffect(() => () => {
     try { playerRef.current.pause(); } catch { /* native stub */ }
+    const measure = measureRef.current;
+    const { audience: viewedAs, now: clock } = reportRef.current;
+    if (!measure.started) {
+      // No first frame: say how long the viewer waited before leaving.
+      sendListingVideoTelemetry({ event: "playback_abandoned", audience: viewedAs, waitedMs: Math.max(0, Math.round(clock() - openedAtRef.current)) });
+      return;
+    }
+    const openStallMs = measure.stallSince === null ? 0 : clock() - measure.stallSince;
+    sendListingVideoTelemetry({
+      event: "playback_buffering",
+      audience: viewedAs,
+      stallCount: measure.stallCount + (measure.stallSince === null ? 0 : 1),
+      stallMs: Math.max(0, Math.round(measure.stallMs + openStallMs)),
+      // The furthest position reached, not the total time spent playing.
+      watchedMs: Math.round(measure.furthestS * 1000),
+    });
   }, []);
 
   const playerError = status === "error";
@@ -260,6 +318,7 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
 
   const seekTo = (seconds: number) => {
     const clamped = Math.max(0, Math.min(durationS || 0, seconds));
+    seekPendingRef.current = true;
     try { player.currentTime = clamped; } catch { /* native stub */ }
     positionRef.current = clamped;
     setPositionS(clamped);

@@ -6,7 +6,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { waitFor } from "@testing-library/react-native";
 
 import { storeAuthSession, clearAuthSession } from "../../auth/session";
-import { server } from "../../../test/msw";
+import { sentVideoTelemetry, server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import type { FakeVideoPlayer } from "../../../test/native-video";
 import type { StagedPhoto } from "../uploadStaging/types";
@@ -256,9 +256,13 @@ describe("Listing video editor", () => {
   });
 
   it("opens a short video on the whole clip and hands source, interval and cover to preparation on Use video", async () => {
-    const native = fakeNative();
+    let clock = 5_000;
+    const native = fakeNative(async (_source, startS, endS, _coverS, jobId) => {
+      clock += 2_500;
+      return { uri: `file:///documents/listing-video/${jobId}/prepared.mp4`, durationS: endS - startS, sizeBytes: 1_500_000, width: 1280, height: 720, fps: 30, hasAudio: true };
+    });
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} videoNow={() => clock} />,
     );
     await pickVideo(screen, 45_000);
 
@@ -290,6 +294,12 @@ describe("Listing video editor", () => {
       "job-1",
     );
     expect(await screen.findByText("Video ready")).toBeTruthy();
+    // Testers' preparation time and prepared size reach the API, and
+    // nothing that names the file or where it lives.
+    await waitFor(() => expect(sentVideoTelemetry).toEqual([
+      { event: "preparation_finished", outcome: "prepared", durationMs: 2_500, clipMs: 45_000, preparedBytes: 1_500_000 },
+    ]));
+    expect(JSON.stringify(sentVideoTelemetry)).not.toMatch(/file:|documents|library|job-1|prep-/);
   });
 
   it("opens a long video on the first 1:30 and names the part on the Use button", async () => {
@@ -566,6 +576,10 @@ describe("Listing video preparation (#1044)", () => {
     });
     expect(await screen.findByText("Video ready")).toBeTruthy();
     expect(native.prepare).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(sentVideoTelemetry).toEqual([
+      { event: "preparation_finished", outcome: "failed", failure: "interrupted", durationMs: expect.any(Number), clipMs: 45_000 },
+      { event: "preparation_finished", outcome: "prepared", durationMs: expect.any(Number), clipMs: 45_000, preparedBytes: 1_500_000 },
+    ]));
   });
 
   it("shows Video no longer available when the source is gone and keeps photos", async () => {
@@ -641,6 +655,10 @@ describe("Listing video preparation (#1044)", () => {
     expect(await screen.findByText("Couldn't prepare this video")).toBeTruthy();
     expect(screen.getByText("Try again, or choose another video.")).toBeTruthy();
     expect(screen.queryByText("Video ready")).toBeNull();
+    // An output over the cap is reported as a failure, never as a size.
+    await waitFor(() => expect(sentVideoTelemetry).toEqual([
+      { event: "preparation_finished", outcome: "failed", failure: "preparation", durationMs: expect.any(Number), clipMs: 45_000 },
+    ]));
     expect(screen.getByLabelText("Photo 1 of 3, Cover, Uploaded")).toBeTruthy();
   });
 

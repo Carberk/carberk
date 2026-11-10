@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ListingVideoProcessor } from "./ListingVideoProcessor";
 import { S3VideoProcessingStorage, type VideoProcessingStorage } from "./VideoProcessingStorage";
+import { RecordingVideoProcessingTelemetry } from "./testing/RecordingVideoProcessingTelemetry";
 
 const exec = promisify(execFile);
 const hasFfmpeg = spawnSync(process.env["FFMPEG_PATH"] ?? "ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
@@ -77,10 +78,18 @@ describeFfmpeg("ListingVideoProcessor", () => {
       const storage = new MemoryStorage(fixtureData.body);
       const prisma = prismaFor();
       prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
-      await new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
+      const telemetry = new RecordingVideoProcessingTelemetry();
+      await new ListingVideoProcessor(prisma as unknown as PrismaService, storage, telemetry).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 });
       expect(prisma.row.status).toBe("Ready");
       expect(storage.objects.size).toBeGreaterThan(4);
       for (const value of storage.objects.values()) expect(value.body.length).toBeGreaterThan(0);
+      const stored = (part: string) => [...storage.objects.entries()].filter(([key]) => key.includes(part)).reduce((sum, [, value]) => sum + value.body.length, 0);
+      // What one Ready video costs in storage and worker time, by asset kind.
+      expect(telemetry.events).toEqual([{
+        event: "processed", attempt: 1, durationMs: 3_000, tiers: [240],
+        sourceBytes: fixtureData.body.length, coverBytes: stored("/covers/"), renditionBytes: stored("/hls/"),
+        elapsedMs: expect.any(Number),
+      }]);
       const master = [...storage.objects.entries()].find(([key]) => key.endsWith("/hls/master.m3u8"));
       expect(master?.[1].body.toString()).toMatch(/CODECS="avc1\.[0-9a-f]+"/);
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
@@ -162,12 +171,39 @@ describeFfmpeg("ListingVideoProcessor", () => {
     } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
   }, 30_000);
 
-  it("records a broken source as Failed", async () => {
+  it("records a broken source as Failed and reports the failure without keys, IDs or error text", async () => {
     const prisma = prismaFor();
     const storage = new MemoryStorage(Buffer.from("not an mp4"));
-    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
+    const telemetry = new RecordingVideoProcessingTelemetry();
+    prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: 10 };
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage, telemetry).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
     expect(prisma.row.status).toBe("Failed");
+    expect(telemetry.events).toEqual([{ event: "processing_failed", attempt: 1, failureType: "SOURCE_INVALID", retryable: false, elapsedMs: expect.any(Number) }]);
+    const line = JSON.stringify(telemetry.events);
+    for (const secret of ["video-sources", "generation-1", "source-1", "owner-1", "invalid", "tmp"]) expect(line).not.toContain(secret);
   });
+
+  it("reports no failure when the generation was already superseded", async () => {
+    const prisma = prismaFor();
+    prisma.videoGeneration.updateMany = async () => ({ count: 0 });
+    const storage = new MemoryStorage(Buffer.from("not an mp4"));
+    const telemetry = new RecordingVideoProcessingTelemetry();
+    prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: 10 };
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage, telemetry).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
+    expect(telemetry.events).toEqual([]);
+  });
+
+  it("reports a transient failure as retryable", async () => {
+    const fixtureData = await fixture();
+    try {
+      const storage = new MemoryStorage(fixtureData.body, undefined, false, true);
+      const prisma = prismaFor();
+      prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: fixtureData.body.length };
+      const telemetry = new RecordingVideoProcessingTelemetry();
+      await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage, telemetry).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
+      expect(telemetry.events).toEqual([{ event: "processing_failed", attempt: 1, failureType: "TRANSIENT", retryable: true, elapsedMs: expect.any(Number) }]);
+    } finally { await rm(fixtureData.dir, { recursive: true, force: true }); }
+  }, 30_000);
 
   it("rejects a source that cannot produce a playable 240p tier", async () => {
     const fixtureData = await fixture("320x180");
