@@ -6,7 +6,7 @@ What exists for Carberk, how to use it, and what an agent may change without ask
 |---|---|---|---|
 | Local Docker stack | Daily development and manual testing | Start, stop, migrate, seed, reset its data | Deleting its volumes (`down -v`) |
 | GitHub Actions CI | Proving every PR | Run and rerun checks | Changing workflows or branch protection |
-| Railway staging | Real phones, testers, a last check before release | Read status, logs and metrics | Deploys, variable or setting changes, data resets |
+| Railway staging | Real phones, testers, a last check before release | Everything: deploy, redeploy, change variables and settings, add or change Buckets, run migrations and seeds, reset data | Nothing; see the staging rules below |
 | Railway production | Real users later | Read status | Everything else |
 | iOS Simulator | Running the app and taking screenshots | Boot, install development builds, drive, screenshot | Nothing |
 
@@ -115,7 +115,23 @@ railway api '{ project(id: "176ddec0-dd65-4087-b82c-798599fc2ebe") { environment
 
 Never print variable values; they are secrets.
 
-**Cost:** Railway bills memory every minute a service runs, about $10 per GB per month. Idle `auto-tm` uses about 1.5 GB. Redeploy bursts cost much more: 110 deploys between 5 and 14 October drove most of one month's bill. So do not create services, environments, sandboxes or extra deploys without asking. Planned savings: move storage from MinIO to Railway Buckets, and redeploy each staging service only when its own code changes.
+**Staging is the agents' environment (founder, 2026-11-10).** Use it fully, without asking, to build, test and measure:
+
+- Set or change staging variables and service settings, including new feature variables such as `LISTING_VIDEO_*`.
+- Create and configure staging Buckets.
+- Redeploy staging services.
+- Run migrations and seeds.
+- Sign in as test Users, and reset or reseed staging data, which is disposable.
+
+Production stays the founder's: read its status only.
+
+When you work on staging:
+
+- **Never touch production.** Check `-e staging` on every command, and never copy a value from production.
+- **Record what you changed.** List the variable names and settings you changed, never their values, in the PR or issue you are working on, so the next agent knows staging's state.
+- **Keep the cost down.** Prefer changing an existing service to adding one. Batch variable changes so each service redeploys once. Remove anything temporary you created.
+
+**Cost:** Railway bills memory every minute a service runs, about $10 per GB per month. Idle `auto-tm` uses about 1.5 GB. Redeploy bursts cost much more: 110 deploys between 5 and 14 October drove most of one month's bill. So batch staging changes, remove what you create, and never create production services. Planned savings: move storage from MinIO to Railway Buckets, and redeploy each staging service only when its own code changes.
 
 ## Mobile builds and stores
 
