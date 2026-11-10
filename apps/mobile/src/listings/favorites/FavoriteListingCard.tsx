@@ -108,7 +108,7 @@ export const FavoriteListingCard = memo(function FavoriteListingCard(props: Favo
     <MotionView testID="favorite-card" style={press.style} className="overflow-hidden rounded-3xl bg-card">
       <View>
         <View testID="listing-photos-frame" className={cn(closedLabel && "opacity-50")}>
-          <ListingPhotoStrip listingId={listing.id} video={listing.video} photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount}
+          <ListingPhotoStrip listingId={listing.id} video={listing.video} status={listing.status} isOwn={isOwn} photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount}
             onOpen={() => onPress(listing.id)} onOpenVideo={() => onPress(listing.id, { video: true })} {...press.handlers} />
         </View>
         {closedLabel ? <PhotoChip label={closedLabel} tone={sold ? "solid" : "quiet"} className="left-4 top-4" /> : null}

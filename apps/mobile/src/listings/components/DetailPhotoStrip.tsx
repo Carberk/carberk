@@ -147,7 +147,7 @@ export function DetailPhotoStrip({ photos, banner, onPressPhoto, onPressVideo, i
 
   const count = photos.length;
   const renderItem = useCallback<ListRenderItem<StripItem>>(({ item, index }) => {
-    const label = t("photoOf", { n: index + 1, total: count });
+    const label = t("itemOf", { n: index + 1, total: count });
     const value = banner ? { text: banner } : undefined;
     if (isVideoGalleryItem(item)) {
       const seconds = Math.round(item.durationMs / 1000);

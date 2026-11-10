@@ -1,3 +1,4 @@
+import { focusManager } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -106,6 +107,61 @@ describe("Video cover on Results and Favorites cards", () => {
   it.each([["ru", "Видео, 42 секунды"], ["tk", "Wideo, 42 sekunt"]])("labels the video tile in %s", async (locale, label) => {
     const { view } = await resultsCard(feedItem, locale);
     expect(await view.findByRole("button", { name: label })).toBeTruthy();
+  });
+
+  it("keeps the cover image in memory only, never on disk", async () => {
+    const { view } = await resultsCard();
+    await view.findByRole("button", { name: "Video, 42 seconds" });
+    const image = await view.findByTestId("video-cover-image");
+    expect(image.props.cachePolicy).toBe("memory");
+  });
+
+  it("reads the cover as owner-preview on the owner's own pending Listing", async () => {
+    server.use(
+      http.get("*/listings/video-access/owner-preview/listing/:id", ({ params }) => HttpResponse.json(videoCoverAccessFixture(String(params["id"])))),
+    );
+    const { view } = await resultsCard({ ...feedItem, sellerId: user.id, status: "pending_review" });
+    expect(await view.findByRole("button", { name: "Video, 42 seconds" })).toBeTruthy();
+    expect(requests).toEqual([`GET /api/v1/listings/video-access/owner-preview/listing/${LISTING_ID}`]);
+  });
+
+  it("shows no video tile to a buyer on a pending Listing", async () => {
+    const { view } = await resultsCard({ ...feedItem, status: "pending_review" });
+    expect(view.queryByRole("button", { name: /Video/ })).toBeNull();
+    expect(requests).toEqual([]);
+  });
+
+  it("shows no video tile on an archived Favorite", async () => {
+    const view = await renderMobile(
+      <FavoriteListingCard listing={{ ...favorite, status: "archived" }} brandName="Toyota" modelName="Camry" cityName="Ashgabat" onPress={vi.fn()} isOwn={false} onRemoveFavorite={vi.fn()} />,
+    );
+    expect(view.queryByRole("button", { name: /Video/ })).toBeNull();
+    expect(requests).toEqual([]);
+  });
+
+  it("never shows the video tile on a banned Listing, even to its owner", async () => {
+    const view = await renderMobile(
+      <FavoriteListingCard listing={{ ...favorite, status: "banned", sellerId: user.id }} brandName="Toyota" modelName="Camry" cityName="Ashgabat" onPress={vi.fn()} isOwn onRemoveFavorite={vi.fn()} />,
+    );
+    expect(view.queryByRole("button", { name: /Video/ })).toBeNull();
+    expect(requests).toEqual([]);
+  });
+
+  it("does not poll for a new cover while a card stays mounted", async () => {
+    focusManager.setFocused(true);
+    vi.useFakeTimers();
+    try {
+      const { view } = await resultsCard();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(view.getByRole("button", { name: "Video, 42 seconds" })).toBeTruthy();
+      expect(requests).toHaveLength(1);
+      const coverQuery = view.queryClient.getQueryCache().getAll().find((query) => JSON.stringify(query.queryKey).includes("video-cover"));
+      expect((coverQuery?.options as { refetchInterval?: unknown }).refetchInterval).toBeFalsy();
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(requests).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows the same video tile on a Favorites card", async () => {

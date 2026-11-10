@@ -63,7 +63,7 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
     expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
     // No counter on detail: the photo says where it is to a screen reader only.
     expect(screen.queryByText("1 / 12")).toBeNull();
-    expect(screen.getByLabelText("Photo 1 of 12")).toBeTruthy();
+    expect(screen.getByLabelText("1 of 12")).toBeTruthy();
     // The `detail` size the Results card strip already loaded, cover-fit as
     // there, so it paints from memory with no smaller size under it (#816, #864).
     const [photo, ...rest] = getAllHosts(screen.container, "Image").map((image) => image.props);

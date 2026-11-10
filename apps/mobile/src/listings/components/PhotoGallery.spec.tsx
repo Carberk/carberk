@@ -30,7 +30,7 @@ describe("Photo gallery and viewer", () => {
     const screen = await renderMobile(<PhotoGallery media={mediaFixture(3)} />);
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
 
-    await fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 2 of 3" })));
+    await fireEvent.press(first(screen.getAllByRole("button", { name: "2 of 3" })));
 
     expect(viewer(screen).getByText("2 / 3")).toBeTruthy();
     expect(
@@ -40,7 +40,7 @@ describe("Photo gallery and viewer", () => {
 
   it("returns the gallery to the photo the viewer was closed on", async () => {
     const screen = await renderMobile(<PhotoGallery media={mediaFixture(3)} />);
-    await fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 1 of 3" })));
+    await fireEvent.press(first(screen.getAllByRole("button", { name: "1 of 3" })));
 
     await fireEvent.press(viewer(screen).getByRole("button", { name: "Photo 3 of 3" }));
     await fireEvent.press(viewer(screen).getByRole("button", { name: "Close" }));
@@ -68,7 +68,7 @@ describe("Photo gallery and viewer", () => {
         )}
       />,
     );
-    await fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 1 of 2" })));
+    await fireEvent.press(first(screen.getAllByRole("button", { name: "1 of 2" })));
 
     await fireEvent.press(viewer(screen).getByRole("button", { name: "Message" }));
 
@@ -119,7 +119,7 @@ describe("Photo gallery and viewer", () => {
     const media = mediaFixture(2).map((photo) => ({ ...photo, thumbHash: "2yMBBYCIh4iHiHeAiId4dXh3f4f4" }));
     const screen = await renderMobile(<PhotoGallery media={media} />);
 
-    await fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 1 of 2" })));
+    await fireEvent.press(first(screen.getAllByRole("button", { name: "1 of 2" })));
 
     const sources = getAllHosts(getHost(screen.container, "Modal"), "Image").map((image) => image.props.source as { uri?: string; thumbhash?: string });
     const thumbnails = sources.filter((source) => source.uri?.includes("thumbnail.webp"));
@@ -137,7 +137,7 @@ it("keeps the source hidden until the contain page has displayed the cached imag
   measured.set("photo-viewer-root", [0, 24, 390, 820]);
   measured.set("photo-viewer-page", [0, 80, 390, 640]);
   const screen = await renderMobile(<PhotoGallery media={mediaFixture(1).map((photo) => ({ ...photo, width: 1920, height: 1080 }))} />);
-  await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+  await fireEvent.press(screen.getByRole("button", { name: "1 of 1" }));
   await act(() => getHost(screen.container, "Modal").props.onShow());
   const overlay = screen.getByTestId("photo-transition-overlay", { includeHiddenElements: true });
   await fireEvent(getHost(overlay, "Image"), "display");
@@ -156,7 +156,7 @@ it("fades instead of guessing a flight shape before any photo size is known", as
   measured.set("photo-viewer-page", [0, 80, 390, 640]);
   const media = mediaFixture(1).map((photo) => ({ ...photo, width: undefined, height: undefined }));
   const screen = await renderMobile(<PhotoGallery media={media} />);
-  await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+  await fireEvent.press(screen.getByRole("button", { name: "1 of 1" }));
   await act(() => getHost(screen.container, "Modal").props.onShow());
   expect(screen.queryByTestId("photo-transition-overlay", { includeHiddenElements: true })).toBeNull();
   expect(screen.getByTestId("listing-photo-tile").props.style.opacity).toBeUndefined();
@@ -167,7 +167,7 @@ it("measures the paged tile only after two frames, once the strip scroll has lan
   native.measureRects.set("detail-photos", [0, 80, 390, 280]);
   native.measureRects.set("listing-photo-tile", [16, 88, 358, 268.5]);
   const screen = await renderMobile(<PhotoGallery media={mediaFixture(3)} />);
-  await fireEvent.press(first(screen.getAllByRole("button", { name: "Photo 1 of 3" })));
+  await fireEvent.press(first(screen.getAllByRole("button", { name: "1 of 3" })));
   await act(() => getHost(screen.container, "Modal").props.onShow());
 
   const queue: (() => void)[] = [];
@@ -196,7 +196,7 @@ it("waits for the tapped tile measurement before presenting the Modal", async ()
   globalThis.requestAnimationFrame = () => 0;
   try {
     const screen = await renderMobile(<PhotoGallery media={mediaFixture(1).map((photo) => ({ ...photo, width: 1920, height: 1080 }))} />);
-    await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+    await fireEvent.press(screen.getByRole("button", { name: "1 of 1" }));
     expect(screen.queryByTestId("photo-viewer-pager")).toBeNull();
     await act(() => native.measurementCallbacks.shift()?.());
     await act(() => getHost(screen.container, "Modal").props.onShow());

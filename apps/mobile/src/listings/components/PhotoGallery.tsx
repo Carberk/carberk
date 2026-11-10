@@ -17,6 +17,10 @@ interface PhotoGalleryProps {
   listingId?: string;
   /** The Listing read's Ready video, shown second among the photos. */
   video?: ListingsSchemas.ReadyListingVideo | undefined;
+  /** The viewer owns this Listing: the cover and the player use owner-preview. */
+  isOwner?: boolean;
+  /** The Listing's status: a non-owner sees the video only while it is active or sold. */
+  status?: string | undefined;
   /** Open on the video, as when a card's video cover was tapped. */
   startOnVideo?: boolean;
   visibleTop?: number;
@@ -42,6 +46,8 @@ export function PhotoGallery({
   media: photos,
   listingId,
   video,
+  isOwner = false,
+  status,
   startOnVideo = false,
   visibleTop,
   banner,
@@ -54,7 +60,7 @@ export function PhotoGallery({
   const returns = useRef(new Map<number, PhotoGeometry>());
   const openingRequest = useRef(0);
   const stripRef = useRef<DetailPhotoStripHandle>(null);
-  const videoCover = useListingVideoCover(listingId ?? "", listingId ? video : undefined);
+  const videoCover = useListingVideoCover(listingId ?? "", listingId ? video : undefined, { isOwner, status, timedRefresh: true });
   const media = useMemo(() => withVideoItem(photos, video?.id, videoCover), [photos, video?.id, videoCover]);
   const hasVideo = isVideoGalleryItem(media[VIDEO_GALLERY_INDEX]);
   // The viewer item the player was opened from, reopened when detail is focused again.
@@ -97,8 +103,8 @@ export function PhotoGallery({
     stripRef.current?.scrollToPhoto(index);
   }, []);
   const openPlayer = useCallback(() => {
-    if (listingId) router.push(`/(public)/listings/${listingId}/video`);
-  }, [listingId]);
+    if (listingId) router.push(isOwner ? `/(public)/listings/${listingId}/video?audience=owner-preview` : `/(public)/listings/${listingId}/video`);
+  }, [listingId, isOwner]);
   // The viewer is a Modal above the navigation stack, so the player can show only once it has closed.
   const playFromViewer = useCallback((index: number) => {
     resumeIndex.current = index;

@@ -146,8 +146,10 @@ function ViewerContent({
   const [loadedRatios, setLoadedRatios] = useState<Record<string, number>>({});
   // As in the gallery, neighbours start once the opening photo has loaded.
   const openingId = media[initialIndex]?.id;
-  const loadNeighbours =
-    index !== initialIndex || (openingId !== undefined && loadedRatios[openingId] !== undefined);
+  // A video opening item has no photo ratio to wait for: it counts as loaded,
+  // so its neighbour photos load with it instead of staying black.
+  const openingLoaded = isVideoGalleryItem(media[initialIndex]) || (openingId !== undefined && loadedRatios[openingId] !== undefined);
+  const loadNeighbours = index !== initialIndex || openingLoaded;
   const [pagerHeight, setPagerHeight] = useState(height * 0.6);
   const pagerRef = useRef<FlatList<ViewerItem>>(null);
   const stripRef = useRef<FlatList<ViewerItem>>(null);

@@ -67,7 +67,7 @@ export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack,
   // already decoded, so each paints from memory; the Listing's other photos
   // hold their tiles until detail names them.
   // The card's video cover sits second, from the grant the card already holds.
-  const videoCover = useListingVideoCover(summary.id, summary.video);
+  const videoCover = useListingVideoCover(summary.id, summary.video, { isOwner, status: summary.status, timedRefresh: true });
   const known = useMemo<StripPhoto[]>(() => {
     const hashes = feedCardPhotoThumbHashes(summary);
     const known = feedCardPhotoKeys(summary).map((key, index) => ({ key, thumbHash: hashes[index] }));

@@ -103,6 +103,8 @@ export function ListingDetailView({
         media={listing.media}
         listingId={listing.id}
         video={listing.video}
+        isOwner={isOwner}
+        status={listing.status}
         startOnVideo={startOnVideo}
         banner={banner ? t(banner) : undefined}
         viewerHeaderAction={

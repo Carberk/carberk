@@ -94,7 +94,7 @@ describe("PhotoGallery", () => {
       variants: { thumbnail: "https://media/thumbnail.webp?v=webp-natural-1", list: "https://media/list.webp?v=webp-natural-1", detail: "https://media/detail.webp?v=webp-natural-1", fullscreen: "https://media/fullscreen.webp?v=webp-natural-1" } }];
     const screen = await renderMobile(<PhotoGallery media={media} />);
     expect(getHost(screen.container, "Image", { priority: "high" }).props.source.uri).toBe("https://media/detail.webp?v=webp-natural-1");
-    await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 1" }));
+    await fireEvent.press(screen.getByRole("button", { name: "1 of 1" }));
     const images = getAllHosts(screen.container, "Image");
     // The 2400 px size waits for a zoom (#816); the viewer's page is the last detail image.
     expect(images.some((image) => image.props.source.uri === "https://media/fullscreen.webp?v=webp-natural-1")).toBe(false);

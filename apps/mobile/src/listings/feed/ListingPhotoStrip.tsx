@@ -56,6 +56,10 @@ interface ListingPhotoStripProps {
   listingId: string;
   /** The Listing read's Ready video; it shows second and opens the Listing on it. */
   video?: ListingsSchemas.ReadyListingVideo | undefined;
+  /** The Listing's status: a non-owner sees the video only while it is active or sold. */
+  status?: string | undefined;
+  /** The viewer owns this Listing: its cover is read as owner-preview. */
+  isOwn?: boolean;
   photoKeys: readonly string[];
   /** ThumbHashes parallel to `photoKeys`; a missing or null slot has no blurred preview. */
   thumbHashes?: readonly (string | null)[];
@@ -99,9 +103,9 @@ interface ListingPhotoStripProps {
  * a photo it is its own button ("Video, 42 seconds") because it opens the
  * Listing on the video, not on the cover photo. Only the cover loads here.
  */
-export function ListingPhotoStrip({ listingId, video, photoKeys, thumbHashes, photoCount, condition, onOpen, onOpenVideo, onPressIn, onPressOut }: ListingPhotoStripProps) {
+export function ListingPhotoStrip({ listingId, video, status, isOwn, photoKeys, thumbHashes, photoCount, condition, onOpen, onOpenVideo, onPressIn, onPressOut }: ListingPhotoStripProps) {
   const { t } = useTranslation();
-  const videoCover = useListingVideoCover(listingId, video);
+  const videoCover = useListingVideoCover(listingId, video, { status, isOwner: isOwn });
   const durationMs = videoCover?.durationMs;
   const coverUri = videoCover?.cover?.detail;
   const stripVideo = useMemo(() => durationMs === undefined ? undefined : { durationMs, uri: coverUri }, [durationMs, coverUri]);
