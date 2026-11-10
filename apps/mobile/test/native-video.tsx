@@ -1,26 +1,70 @@
-import { createElement, useEffect, useMemo, useRef } from "react";
+import { createElement, useEffect, useRef } from "react";
 import { View } from "react-native";
+
+type Listener = (event: never) => void;
 
 /** Native playback boundary for component tests; it never decodes video. */
 export class FakeVideoPlayer {
-  constructor(readonly source: unknown) {}
+  source: unknown;
+
+  constructor(source: unknown) {
+    this.source = source;
+  }
+
+  /** expo-video replaces the source on the same player; it loads paused at 0. */
+  replaceSource(source: unknown) {
+    this.source = source;
+    this.currentTime = 0;
+    this.playing = false;
+  }
 
   currentTime = 0;
   playing = false;
+  muted = false;
+  status: "idle" | "loading" | "readyToPlay" | "error" = "idle";
   timeUpdateEventInterval = 0;
-  private readonly listeners = new Set<(event: { currentTime: number }) => void>();
+  private readonly listeners = new Map<string, Set<Listener>>();
 
-  play() { this.playing = true; }
-  pause() { this.playing = false; }
+  play() {
+    this.playing = true;
+    this.emit("playingChange", { isPlaying: true });
+  }
 
-  addListener(_event: "timeUpdate", listener: (event: { currentTime: number }) => void) {
-    this.listeners.add(listener);
-    return { remove: () => { this.listeners.delete(listener); } };
+  pause() {
+    this.playing = false;
+    // The native player can report its status again after a pause; a
+    // listener must not read that as a reason to resume.
+    this.emit("statusChange", { status: this.status, oldStatus: this.status });
+    this.emit("playingChange", { isPlaying: false });
+  }
+
+  addListener(event: string, listener: Listener) {
+    const set = this.listeners.get(event) ?? new Set<Listener>();
+    set.add(listener);
+    this.listeners.set(event, set);
+    return { remove: () => { set.delete(listener); } };
+  }
+
+  private emit(event: string, payload: unknown) {
+    for (const listener of this.listeners.get(event) ?? []) {
+      (listener as (event: unknown) => void)(payload);
+    }
   }
 
   emitTimeUpdate(currentTime: number) {
     this.currentTime = currentTime;
-    for (const listener of this.listeners) listener({ currentTime });
+    this.emit("timeUpdate", { currentTime });
+  }
+
+  emitStatus(status: FakeVideoPlayer["status"]) {
+    const oldStatus = this.status;
+    this.status = status;
+    this.emit("statusChange", { status, oldStatus });
+  }
+
+  emitPlayToEnd() {
+    this.playing = false;
+    this.emit("playToEnd", undefined);
   }
 
   release() {
@@ -32,11 +76,15 @@ export class FakeVideoPlayer {
 export function useVideoPlayer(source: unknown, setup?: (player: FakeVideoPlayer) => void) {
   const setupRef = useRef(setup);
   setupRef.current = setup;
-  const player = useMemo(() => {
-    const value = new FakeVideoPlayer(source);
-    setupRef.current?.(value);
-    return value;
-  }, [source]);
+  const playerRef = useRef<FakeVideoPlayer | null>(null);
+  if (playerRef.current === null) {
+    playerRef.current = new FakeVideoPlayer(source);
+    setupRef.current?.(playerRef.current);
+  }
+  const player = playerRef.current;
+  useEffect(() => {
+    if (!Object.is(player.source, source)) player.replaceSource(source);
+  }, [player, source]);
   useEffect(() => () => player.release(), [player]);
   return player;
 }
