@@ -24,7 +24,7 @@ Proof is what you observed in this session:
 
 - the checks CI runs for the touched packages (typecheck, lint, tests);
 - one focused test that fails without the change, when behavior changed;
-- for UI or runtime behavior, the running app on the iOS Simulator, as described in [local testing](local-testing.md).
+- for UI or runtime behavior, the running app on the iOS Simulator, as described in [local testing](local-testing.md). Use its fixture Users, Listings and videos rather than hand-made data.
 
 Put proof in the PR description. Screenshots go in the PR, never in the repository. Do not commit evidence, receipts or review files.
 
@@ -33,6 +33,12 @@ Draft pull requests run only the lane selector. Their required `pr` check is ski
 ## 4. Review
 
 Run [sol-loop](../../.claude/skills/sol-loop/SKILL.md) before filing or updating the PR. One Sol reviewer checks bugs, the issue's acceptance criteria and the [coding standards](coding-standards.md). It runs up to 3 rounds, or 5 for auth, permissions, data loss or concurrency.
+
+Every reviewer, whatever its model, reviews without touching another session's checkout:
+
+- Read the change with `git fetch origin pull/<n>/head:review-<n>`, `git diff` and `git show`. Never `git checkout` or `git switch` in a worktree you did not create; another session may have uncommitted work there.
+- To run tests or the app, make a temporary worktree: `git worktree add /tmp/review-<n> review-<n>`, then `pnpm install --frozen-lockfile` in it. Remove it with `git worktree remove /tmp/review-<n>` when done.
+- For runtime behavior, use the fixture data and a spare Simulator from [local testing](local-testing.md). Use your own ports, and stop the processes and close the devices you started.
 
 ## 5. File, watch and merge
 
