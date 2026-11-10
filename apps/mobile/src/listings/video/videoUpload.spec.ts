@@ -592,6 +592,27 @@ describe("Upload measurements for testers", () => {
     ]);
   });
 
+  it("reports a network loss during the first run after a reopen as an interruption", async () => {
+    const first = controller();
+    await first.instance.openSession();
+    first.instance.dispose();
+
+    const reopened = controller({ persistence: first.persistence });
+    // The first part hangs until aborted, so the restart resume is still running when the network drops.
+    vi.mocked(reopened.transport.put).mockImplementation((_url, _part, signal) => new Promise<void>((_resolve, reject) => {
+      signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    }));
+    const restoring = reopened.instance.restore();
+    await vi.waitFor(() => expect(reopened.transport.put).toHaveBeenCalled());
+    reopened.instance.setNetworkAvailable(false);
+    await restoring.catch(() => undefined);
+    reopened.instance.dispose();
+
+    expect(reopened.telemetry.events).toContainEqual(
+      { event: "upload_interrupted", reason: "network", confirmedBytes: 0, totalBytes: TOTAL },
+    );
+  });
+
   it("reports a transfer failure once and a retry from it", async () => {
     const run = controller();
     vi.mocked(run.api.status).mockRejectedValueOnce(new ApiError("INTERNAL", 500, "boom"));

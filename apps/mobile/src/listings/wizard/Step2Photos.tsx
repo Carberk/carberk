@@ -54,6 +54,8 @@ interface Step2PhotosProps {
   canUploadVideo?: boolean;
   /** Fake native preparation module in tests; real module by default (#1044). */
   videoNative?: ListingVideoNativeModule | null;
+  /** Clock for preparation measurements in tests; the real clock by default. */
+  videoNow?: () => number;
   videoFileSystem?: ListingVideoFileSystem;
   subscribeAppState?: AppStateSubscribe;
   videoUploadTarget?: VideoUploadsSchemas.VideoUploadTarget;
@@ -411,6 +413,7 @@ export default function Step2Photos({
   continuesWhileUploading = true,
   canUploadVideo,
   videoNative,
+  videoNow,
   videoFileSystem,
   subscribeAppState,
   videoUploadTarget,
@@ -503,7 +506,7 @@ export default function Step2Photos({
         <EmptyState />
       )}
 
-      <ListingVideoCard canUploadVideo={canUploadVideo} videoNative={videoNative} videoFileSystem={videoFileSystem} subscribeAppState={subscribeAppState} videoUploadTarget={videoUploadTarget} videoUploadApi={videoUploadApi} videoUploadFileSystem={videoUploadFileSystem} videoUploadTransport={videoUploadTransport} videoUploadPersistence={videoUploadPersistence} disabled={disabled} />
+      <ListingVideoCard canUploadVideo={canUploadVideo} videoNative={videoNative} videoNow={videoNow} videoFileSystem={videoFileSystem} subscribeAppState={subscribeAppState} videoUploadTarget={videoUploadTarget} videoUploadApi={videoUploadApi} videoUploadFileSystem={videoUploadFileSystem} videoUploadTransport={videoUploadTransport} videoUploadPersistence={videoUploadPersistence} disabled={disabled} />
 
       <AlertDialog open={cameraDenied} onOpenChange={setCameraDenied}>
         <AlertDialogContent>

@@ -10,6 +10,7 @@ const VALID = [
   { event: "upload_failed", failure: "transfer", confirmedBytes: 0, totalBytes: 11_200_000 },
   { event: "playback_started", audience: "viewer", quality: "auto", startupMs: 1_850 },
   { event: "playback_buffering", audience: "viewer", stallCount: 2, stallMs: 3_100, watchedMs: 41_000 },
+  { event: "playback_abandoned", audience: "owner-preview", waitedMs: 3_200 },
 ];
 
 describe("Listing video telemetry contract", () => {

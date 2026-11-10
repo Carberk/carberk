@@ -70,6 +70,11 @@ describe("Listing video telemetry endpoint", () => {
     ]);
   });
 
+  it("records a viewer who left before the first frame", async () => {
+    await send(VIEWER, { event: "playback_abandoned", audience: "viewer", waitedMs: 3_200 }).expect(204);
+    expect(telemetry.events).toEqual([{ event: "playback_abandoned", audience: "viewer", waitedMs: 3_200 }]);
+  });
+
   it("refuses an event carrying a grant URL and records nothing", async () => {
     const res = await send(VIEWER, { ...STARTED, url: "https://api.example/files/master.m3u8?grant=secret" }).expect(400);
     expect(res.body.code).toBe("VALIDATION_FAILED");

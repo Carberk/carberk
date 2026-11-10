@@ -161,8 +161,9 @@ export class ListingVideoProcessor {
     const failureType: FailureType = error instanceof SourceVideoError ? error.failureType : "TRANSIENT";
     const retryCount = Number(generation.processingRetryCount ?? 0);
     const retryable = failureType === "TRANSIENT" && retryCount + 1 < MAX_ATTEMPTS;
-    await this.prisma.videoGeneration.updateMany({ where: { id: job.generationId, processingAttempt: job.attempt, status: "Processing" }, data: retryable ? { status: "Processing", processingAttempt: job.attempt + 1, processingRetryCount: retryCount + 1, nextRetryAt: new Date(Date.now() + RETRY_BACKOFF_MS * 2 ** retryCount), lastError: message, failureType } : { status: "Failed", lastError: message, failureType, nextRetryAt: null } });
-    this.telemetry.record({ event: "processing_failed", attempt: job.attempt, failureType, retryable, elapsedMs: Date.now() - startedAt });
+    const failed = await this.prisma.videoGeneration.updateMany({ where: { id: job.generationId, processingAttempt: job.attempt, status: "Processing" }, data: retryable ? { status: "Processing", processingAttempt: job.attempt + 1, processingRetryCount: retryCount + 1, nextRetryAt: new Date(Date.now() + RETRY_BACKOFF_MS * 2 ** retryCount), lastError: message, failureType } : { status: "Failed", lastError: message, failureType, nextRetryAt: null } });
+    // A superseded attempt writes nothing; its failure is not this generation's.
+    if (failed.count > 0) this.telemetry.record({ event: "processing_failed", attempt: job.attempt, failureType, retryable, elapsedMs: Date.now() - startedAt });
   }
 
   private async writeOutput(job: VideoProcessingJob, key: string, body: Buffer, contentType: string, manifest: Record<string, ManifestRecord>, name: string): Promise<void> {

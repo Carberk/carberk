@@ -256,9 +256,13 @@ describe("Listing video editor", () => {
   });
 
   it("opens a short video on the whole clip and hands source, interval and cover to preparation on Use video", async () => {
-    const native = fakeNative();
+    let clock = 5_000;
+    const native = fakeNative(async (_source, startS, endS, _coverS, jobId) => {
+      clock += 2_500;
+      return { uri: `file:///documents/listing-video/${jobId}/prepared.mp4`, durationS: endS - startS, sizeBytes: 1_500_000, width: 1280, height: 720, fps: 30, hasAudio: true };
+    });
     const screen = await renderMobile(
-      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} />,
+      <Step2Photos {...stepProps()} canUploadVideo videoNative={native} videoNow={() => clock} />,
     );
     await pickVideo(screen, 45_000);
 
@@ -293,7 +297,7 @@ describe("Listing video editor", () => {
     // Testers' preparation time and prepared size reach the API, and
     // nothing that names the file or where it lives.
     await waitFor(() => expect(sentVideoTelemetry).toEqual([
-      { event: "preparation_finished", outcome: "prepared", durationMs: expect.any(Number), clipMs: 45_000, preparedBytes: 1_500_000 },
+      { event: "preparation_finished", outcome: "prepared", durationMs: 2_500, clipMs: 45_000, preparedBytes: 1_500_000 },
     ]));
     expect(JSON.stringify(sentVideoTelemetry)).not.toMatch(/file:|documents|library|job-1|prep-/);
   });

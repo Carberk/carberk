@@ -13,7 +13,7 @@ import {
 import { loadListingVideoNative } from "../../../modules/listing-video/src/index";
 
 import type { ListingVideoSelection } from "./listingVideo";
-import { sendListingVideoTelemetry, type ListingVideoTelemetry } from "./listingVideoTelemetry";
+import { sendListingVideoTelemetry } from "./listingVideoTelemetry";
 
 /**
  * Phone-side preparation for one chosen Listing video (#1044).
@@ -111,8 +111,7 @@ export interface UseListingVideoPreparationOptions {
   native?: ListingVideoNativeModule | null;
   fileSystem?: ListingVideoFileSystem;
   subscribeAppState?: AppStateSubscribe;
-  telemetry?: ListingVideoTelemetry;
-  /** Monotonic-enough clock in ms for preparation time. */
+  /** Monotonic-enough clock in ms for preparation time; tests drive it to assert the reported duration. */
   now?: () => number;
 }
 
@@ -121,13 +120,12 @@ export function useListingVideoPreparation(options: UseListingVideoPreparationOp
   if (nativeRef.current === undefined && options.native !== undefined) nativeRef.current = options.native;
   const fs = options.fileSystem ?? expoListingVideoFileSystem;
   const subscribe = options.subscribeAppState ?? defaultSubscribeAppState;
-  const telemetry = options.telemetry ?? sendListingVideoTelemetry;
   const now = options.now ?? Date.now;
   const startedAtRef = useRef(0);
   // Preparation time and prepared size for tester measurements (#1052).
   // A user Cancel or a superseded run is not a result and is not reported.
   const reportRef = useRef<(selection: ListingVideoSelection, result: { preparedBytes: number } | { failure: ListingVideoPrepFailure }) => void>(() => undefined);
-  reportRef.current = (selection, result) => telemetry({
+  reportRef.current = (selection, result) => sendListingVideoTelemetry({
     event: "preparation_finished",
     ...("failure" in result ? { outcome: "failed", failure: result.failure } : { outcome: "prepared", preparedBytes: result.preparedBytes }),
     durationMs: Math.max(0, Math.round(now() - startedAtRef.current)),

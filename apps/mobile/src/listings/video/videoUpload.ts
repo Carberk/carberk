@@ -262,6 +262,7 @@ export class VideoUploadController {
     if (this.disposed || this.snapshot.phase === "processing" || this.snapshot.operation) return;
     const op = ++this.operationId;
     this.setState({ phase: "uploading", pauseReason: undefined, failure: undefined });
+    this.restarting = false;
     if (!(await this.fs.exists(this.snapshot.localUri).catch(() => false))) {
       if (op === this.operationId) this.setState({ phase: "failed", failure: "source" });
       return;
@@ -331,6 +332,9 @@ export class VideoUploadController {
       return;
     }
     this.setState({ phase: "uploading", pauseReason: undefined, failure: undefined });
+    // The restart resume has been sent: an interruption from here is a real
+    // interruption of this run, not the reopen the flag was holding back.
+    this.restarting = false;
     this.startLoop();
     await this.runPromise;
   }

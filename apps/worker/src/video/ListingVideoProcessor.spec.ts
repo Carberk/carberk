@@ -183,6 +183,16 @@ describeFfmpeg("ListingVideoProcessor", () => {
     for (const secret of ["video-sources", "generation-1", "source-1", "owner-1", "invalid", "tmp"]) expect(line).not.toContain(secret);
   });
 
+  it("reports no failure when the generation was already superseded", async () => {
+    const prisma = prismaFor();
+    prisma.videoGeneration.updateMany = async () => ({ count: 0 });
+    const storage = new MemoryStorage(Buffer.from("not an mp4"));
+    const telemetry = new RecordingVideoProcessingTelemetry();
+    prisma.row["source"] = { objectKey: "video-sources/source/source.mp4", sizeBytes: 10 };
+    await expect(new ListingVideoProcessor(prisma as unknown as PrismaService, storage, telemetry).process({ sourceId: "source-1", generationId: "generation-1", attempt: 1 })).rejects.toThrow();
+    expect(telemetry.events).toEqual([]);
+  });
+
   it("reports a transient failure as retryable", async () => {
     const fixtureData = await fixture();
     try {

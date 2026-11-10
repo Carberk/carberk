@@ -49,11 +49,18 @@ export const ListingVideoTelemetryEventSchema = z.discriminatedUnion("event", [
     startupMs: durationMs,
   }),
   z.strictObject({
+    event: z.literal("playback_abandoned"),
+    audience,
+    /** From the Play tap to leaving before the first playing frame. */
+    waitedMs: durationMs,
+  }),
+  z.strictObject({
     event: z.literal("playback_buffering"),
     audience,
     /** Stalls after playback started, reported when the player closes. */
     stallCount: count,
     stallMs: durationMs,
+    /** The furthest position reached, not the total time spent playing. */
     watchedMs: durationMs,
   }),
 ]);
