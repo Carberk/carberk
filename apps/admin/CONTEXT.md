@@ -26,3 +26,5 @@ Tests beside the API client, cookies, validators, and server actions cover these
 - [Auth actions and tests](src/app/actions.ts)
 - [Moderation routes and actions](src/app/(admin))
 - [Identity implementation](../api/src/modules/identity/CONTEXT.md)
+
+Listing moderation pages show current video status, a private cover and duration. Play/Retry alone calls the authenticated playback control; HLS.js (native HLS fallback) plays grant URLs without exposing API tokens. Closing, leaving or hiding the page releases playback. Listing report summaries show video presence and link to the Listing page. The API rechecks current elevated Admin permission for each media request, including on banned/archived Listings.

@@ -231,6 +231,7 @@ export default async function ReportsPage({
                       ) : (
                         <span className="text-neutral-400 italic">{item.targetSummary.label}</span>
                       )}
+                      {item.targetSummary.hasVideo && <p className="text-sm text-neutral-600">Есть видео</p>}
                     </td>
                     <td className="px-4 py-3 text-neutral-500">{formatDate(item.createdAt)}</td>
                   </tr>

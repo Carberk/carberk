@@ -64,6 +64,7 @@ const BaseSchema = z.object({
   SOCKET_IO_CORS_ORIGIN: z.string().min(1).default("*"),
   SOCKET_IO_REDIS_ADAPTER_ENABLED: booleanFlag,
 
+  LISTING_VIDEO_API_ORIGIN: z.string().url().refine((value) => { const url = new URL(value); return url.origin === value && (url.protocol === "https:" || ["localhost", "127.0.0.1"].includes(url.hostname)); }, "Use an HTTPS origin (HTTP is local-only)").optional(),
   MINIO_ENDPOINT: z.string().default("http://localhost:9000"),
   MINIO_PUBLIC_URL: z.string().default("http://localhost:9000"),
   MINIO_ACCESS_KEY: z.string().default("minioadmin"),

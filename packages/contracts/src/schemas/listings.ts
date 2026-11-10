@@ -122,6 +122,21 @@ export const ReadyListingVideoSchema = z.object({
 });
 export type ReadyListingVideo = z.infer<typeof ReadyListingVideoSchema>;
 
+/** Authenticated cover read and explicit Play controls; no Bucket URLs. */
+export const VideoAccessResponseSchema = z.object({
+  status: z.enum(["none", "uploading", "processing", "failed", "ready"]),
+  pendingStatus: z.enum(["uploading", "processing", "failed"]).optional(),
+  video: z.object({
+    id: z.string().uuid(), generationId: z.string().uuid(),
+    durationMs: z.number().int().positive().max(90_000),
+    cover: z.object({ thumbnail: z.string().url(), list: z.string().url(), detail: z.string().url(), fullscreen: z.string().url() }),
+  }).optional(),
+  expiresAt: DateTimeSchema.optional(),
+  url: z.string().url().optional(),
+  qualities: z.array(z.union([z.literal(240), z.literal(360), z.literal(720)])).optional(),
+});
+export type VideoAccessResponse = z.infer<typeof VideoAccessResponseSchema>;
+
 export const PendingListingVideoSchema = z.object({
   id: z.string().uuid(),
   generationId: z.string().uuid(),

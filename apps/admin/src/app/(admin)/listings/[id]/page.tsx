@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { getConfig } from "../../actions";
+import { ListingVideo } from "../../components/ListingVideo";
+import { getListingVideo, getConfig } from "../../actions";
 import { DirectActionForm } from "../../components/DirectActionForm";
 
 interface PageProps {
@@ -9,7 +10,7 @@ interface PageProps {
 
 export default async function ListingActionPage({ params }: PageProps) {
   const { id } = await params;
-  const configResult = await getConfig();
+  const [configResult, videoResult] = await Promise.all([getConfig(), getListingVideo(id)]);
   const moderationEnabled = configResult.ok
     ? configResult.data.adminModerationActionsEnabled
     : true;
@@ -24,6 +25,8 @@ export default async function ListingActionPage({ params }: PageProps) {
 
       <h1 className="text-2xl font-bold mb-2">Действия с объявлением</h1>
       <p className="text-sm text-neutral-500 mb-6">ID: {id}</p>
+
+      <ListingVideo key={id} listingId={id} result={videoResult} />
 
       {moderationEnabled ? (
         <div className="space-y-6">
