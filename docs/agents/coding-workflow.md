@@ -40,6 +40,16 @@ Every reviewer, whatever its model, reviews without touching another session's c
 - To run tests or the app, make a temporary worktree: `git worktree add /tmp/review-<n> review-<n>`, then `pnpm install --frozen-lockfile` in it. Remove it with `git worktree remove /tmp/review-<n>` when done.
 - For runtime behavior, use the fixture data and a spare Simulator from [local testing](local-testing.md). Use your own ports, and stop the processes and close the devices you started.
 
+Every review reply starts with `MERGE CONFIDENCE: N/10` for correctness and the issue's criteria.
+
+**UI changes** (any change a User sees in the app or Admin) get a second, separate score that the founder reads before merging. The reviewer:
+
+1. Runs the PR on a spare Simulator, or Admin in the preview browser, with the fixture data, and takes screenshots of every state the PR changes: empty, loading, success, error, and long text in Russian and Turkmen.
+2. Looks at each screenshot with the `impeccable`, `ux-heuristics` and `design-everyday-things` skills: text density, one clear primary action, visual hierarchy, spacing and tokens, consistency with nearby screens, readable errors with a way forward, and touch targets.
+3. Replies with `UI CONFIDENCE: N/10` on its own line after the merge score, then numbered UI findings with the screenshot or state each one comes from.
+
+Screenshots go in the review reply or the PR, never in the repository. A UI score below 8 holds the merge until its findings are fixed or the founder accepts them. If the reviewer cannot run the app, it says so and gives no UI score; reading code is not a UI review.
+
 ## 5. File, watch and merge
 
 - File the PR with [file-pr](../../.claude/skills/file-pr/SKILL.md). The [PR template](../../.github/pull_request_template.md) has the shape: problem, change, proof, review, and `Closes #<issue>`.
