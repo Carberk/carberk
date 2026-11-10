@@ -1,6 +1,6 @@
 import { http, HttpResponse } from "msw";
 import { AppState } from "react-native";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
@@ -55,9 +55,10 @@ function readyBody(overrides: Record<string, unknown> = {}) {
 function servePlayback(
   body: () => unknown,
   status = 200,
-  { orientation = "landscape", playlistGate }: {
+  { orientation = "landscape", playlistGate, playlistStatus = 200 }: {
     orientation?: "landscape" | "portrait";
     playlistGate?: Promise<void>;
+    playlistStatus?: number;
   } = {},
 ) {
   server.use(
@@ -67,6 +68,7 @@ function servePlayback(
     }),
     http.get("*/files/master.m3u8", async ({ request }) => {
       await playlistGate;
+      if (playlistStatus !== 200) return new HttpResponse(null, { status: playlistStatus });
       const grant = new URL(request.url).searchParams.get("grant") ?? "";
       return new HttpResponse(playlist(grant, orientation), {
         headers: { "Content-Type": "application/vnd.apple.mpegurl" },
@@ -123,6 +125,18 @@ function captureAppState() {
   }) as never);
   return { emit: (state: string) => listeners.forEach((cb) => cb(state)), restore: () => spy.mockRestore() };
 }
+
+/** A grant that is valid when it arrives and expires 40 s later. */
+const shortGrant = () => readyBody({ expiresAt: new Date(Date.now() + 40_000).toISOString() });
+
+/** Moves the wall clock on without re-rendering anything. */
+function advanceClock(ms: number) {
+  vi.setSystemTime(new Date(Date.now() + ms));
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   posts = 0;
@@ -329,7 +343,8 @@ describe("ListingVideoPlayer", () => {
   });
 
   it("renews an expired grant on a chosen quality without falling back to the master", async () => {
-    servePlayback(() => readyBody({ expiresAt: "2000-01-01T00:05:00.000Z" }));
+    vi.useFakeTimers({ toFake: ["Date"] });
+    servePlayback(shortGrant);
     const { screen } = await renderPlayer();
     await startPlaying(screen);
     await pickQuality(screen, "720p");
@@ -338,6 +353,7 @@ describe("ListingVideoPlayer", () => {
     await act(async () => { player.emitTimeUpdate(20); });
     await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
 
+    advanceClock(60_000);
     await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
     const renewed = await nextPlayer(screen, player);
     expect(uriOf(renewed)).toBe(variantUrl(720, "tok2"));
@@ -357,6 +373,108 @@ describe("ListingVideoPlayer", () => {
     const renewed = await nextPlayer(screen, player);
     expect(renewed.currentTime).toBe(0);
     expect(renewed.playing).toBe(true);
+  });
+
+  it("renews on Play when the grant expired during a pause, though nothing re-rendered", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    servePlayback(shortGrant);
+    const { screen } = await renderPlayer();
+    const player = await startPlaying(screen);
+    await act(async () => { player.emitTimeUpdate(30); });
+    await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+
+    advanceClock(60_000);
+    await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+    expect(posts).toBe(2);
+    const renewed = await nextPlayer(screen, player);
+    expect(uriOf(renewed)).toBe(masterUrl("tok2"));
+    expect(renewed.currentTime).toBe(30);
+    expect(renewed.playing).toBe(true);
+  });
+
+  it("renews a grant that expired in the background, and comes back paused without an error", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    servePlayback(shortGrant);
+    const appState = captureAppState();
+    try {
+      const { screen } = await renderPlayer();
+      const player = await startPlaying(screen);
+      await act(async () => { player.emitTimeUpdate(25); });
+      await act(async () => { appState.emit("background"); });
+      const builtBefore = createdPlayers.length;
+
+      advanceClock(60_000);
+      await act(async () => { appState.emit("active"); });
+      const renewed = await nextPlayer(screen, player);
+      expect(posts).toBe(2);
+      // The expired URL is never loaded again.
+      expect(createdPlayers.slice(builtBefore).some((p) => uriOf(p) === MASTER)).toBe(false);
+      expect(uriOf(renewed)).toBe(masterUrl("tok2"));
+      expect(renewed.currentTime).toBe(25);
+      await act(async () => { renewed.emitStatus("readyToPlay"); });
+      expect(renewed.playing).toBe(false);
+      expect(screen.queryByText("Couldn't play the video")).toBeNull();
+      expect(screen.getByTestId("listing-video-player-play-pause").props.accessibilityLabel).toBe("Play");
+    } finally {
+      appState.restore();
+    }
+  });
+
+  it("renews an expired grant before loading a newly chosen quality", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    servePlayback(shortGrant);
+    const { screen } = await renderPlayer();
+    const player = await startPlaying(screen);
+    await act(async () => { player.emitTimeUpdate(15); });
+
+    advanceClock(60_000);
+    await pickQuality(screen, "720p");
+    expect(posts).toBe(2);
+    const renewed = await nextPlayer(screen, player);
+    expect(uriOf(renewed)).toBe(variantUrl(720, "tok2"));
+    expect(renewed.currentTime).toBe(15);
+    expect(renewed.playing).toBe(true);
+    expect(createdPlayers.some((p) => uriOf(p) === V720)).toBe(false);
+  });
+
+  it("keeps playing the same video when the app is only inactive", async () => {
+    const appState = captureAppState();
+    try {
+      const { screen } = await renderPlayer();
+      const player = await startPlaying(screen);
+
+      // Control Center, the app switcher or a call banner.
+      await act(async () => { appState.emit("inactive"); });
+      expect(playerOf(screen)).toBe(player);
+      expect(player.released).toBe(false);
+
+      await act(async () => { appState.emit("active"); });
+      expect(playerOf(screen)).toBe(player);
+      expect(player.playing).toBe(true);
+    } finally {
+      appState.restore();
+    }
+  });
+
+  it("keeps the manual qualities disabled when the master playlist cannot be read", async () => {
+    servePlayback(() => readyBody(), 200, { playlistStatus: 500 });
+    const { screen } = await renderPlayer();
+    await startPlaying(screen);
+
+    await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
+    for (const name of ["720p", "360p", "Data saver · up to 360p"]) {
+      expect(screen.getByRole("button", { name }).props.accessibilityState).toMatchObject({ disabled: true });
+    }
+    expect(screen.getByRole("button", { name: "Auto" }).props.accessibilityState).toMatchObject({ disabled: false });
+  });
+
+  it("does not offer Data saver when no rendition fits its cap", async () => {
+    servePlayback(() => readyBody({ qualities: [720] }));
+    const { screen } = await renderPlayer();
+    await startPlaying(screen);
+
+    await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
+    expect(screen.queryByRole("button", { name: "Data saver · up to 360p" })).toBeNull();
   });
 
   it("shows Video unavailable without Try again when playback is refused", async () => {
