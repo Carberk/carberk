@@ -118,6 +118,19 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
     const master = new URL(play.body.url); master.searchParams.set("grant", coverGrant);
     await request.get(local(master.toString())).expect(404);
   });
+  it("shortens grants only for local testing, never in a deployed environment", async () => {
+    const lifetime = async () => { const body = (await read("viewer", viewer, true)).body; return new Date(body.expiresAt).getTime() - Date.now(); };
+    const appEnv = config.get("APP_ENV");
+    try {
+      expect(await lifetime()).toBeGreaterThan(290_000);
+      config.set("LISTING_VIDEO_GRANT_TTL_SECONDS", 20);
+      expect(await lifetime()).toBeLessThanOrEqual(20_000);
+      config.set("APP_ENV", "staging");
+      expect(await lifetime()).toBeGreaterThan(290_000);
+    } finally {
+      config.set("APP_ENV", appEnv); config.set("LISTING_VIDEO_GRANT_TTL_SECONDS", 300);
+    }
+  });
   it("returns binary ranges, suffixes, HEAD, validators and unsatisfiable ranges without cache bypass", async () => {
     const play = await read("viewer", viewer, true); const [variant] = await children(play.body.url); const [segment] = await children(variant!); const url = local(segment!);
     const ranged = await request.get(url).set("Range", "bytes=2-5").expect(206);

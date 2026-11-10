@@ -65,6 +65,12 @@ export class ServeListingVideo {
     if (!configured && env !== "development" && env !== "test") throw unavailable();
     return configured ?? `http://localhost:${this.config.get("PORT", { infer: true }) ?? 3006}`;
   }
+  /** ADR-0112 fixes grants at five minutes; only local development and tests may shorten them. */
+  private grantTtlMs(): number {
+    const env = this.config.get("APP_ENV", { infer: true });
+    const local = env === "development" || env === "test" ? this.config.get("LISTING_VIDEO_GRANT_TTL_SECONDS", { infer: true }) : undefined;
+    return (local ?? 300) * 1000;
+  }
   private sign(grant: Grant): string {
     const payload = Buffer.from(JSON.stringify(grant)).toString("base64url");
     return `${payload}.${createHmac("sha256", this.key).update(payload).digest("base64url")}`;
@@ -95,7 +101,7 @@ export class ServeListingVideo {
     const pendingStatus = audience.data === "viewer" ? undefined : video.pendingStatus?.toLowerCase();
     if (!video.active) { if (play) throw unavailable(); return { status: pendingStatus ?? "none" }; }
     const { generation, manifest } = this.ready(video);
-    const grant: Grant = { sub: authorized.sub, sid: authorized.sid, aud: audience.data, video: video.id, generation: generation.id, scope: play ? "playback" : "cover", exp: this.clock.now().getTime() + 300_000 };
+    const grant: Grant = { sub: authorized.sub, sid: authorized.sid, aud: audience.data, video: video.id, generation: generation.id, scope: play ? "playback" : "cover", exp: this.clock.now().getTime() + this.grantTtlMs() };
     const token = this.sign(grant);
     const cover = Object.fromEntries(["thumbnail", "list", "detail", "fullscreen"].map((variant) => [variant, this.url(grant, token, `cover:${variant}`)]));
     return { status: "ready", ...(pendingStatus ? { pendingStatus } : {}), video: { id: video.id, generationId: generation.id, durationMs: generation.durationMs, cover }, expiresAt: new Date(grant.exp).toISOString(), ...(play ? { url: this.url(grant, token, "master") } : {}), qualities: [240, 360, 720].filter((tier) => manifest[`playlist:${tier}`]) };
