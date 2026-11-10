@@ -13,16 +13,18 @@ In a fresh worktree, create the local env files once. The templates point at loc
 ```bash
 pnpm install --frozen-lockfile
 for app in api admin mobile; do cp -n apps/$app/.env.template apps/$app/.env; done
-grep '^DATABASE_URL=' apps/api/.env > packages/db/.env
+grep -E '^(DATABASE_URL|MINIO_ENDPOINT|MINIO_ACCESS_KEY|MINIO_SECRET_KEY|MINIO_REGION)=' apps/api/.env > packages/db/.env
 ```
 
-Start the API in the background, with its log in `/tmp/carberk-api.log`. In Claude Code or Codex, use the tool's background mode instead of the trailing `&`:
+The shared local database can lag behind `main`. Bring it up to date and seed it before testing (section 1a).
+
+Start the API in the background on a free port, with its own log. Several agents share this Mac, so check `lsof -nP -iTCP:<port> -sTCP:LISTEN` first; `3006` is the default. In Claude Code or Codex, use the tool's background mode instead of the trailing `&`:
 
 ```bash
-pnpm --filter @auto-tm/api dev > /tmp/carberk-api.log 2>&1 &
+PORT=3006 LISTING_VIDEO_API_ORIGIN=http://localhost:3006 pnpm --filter @auto-tm/api dev > /tmp/carberk-api-3006.log 2>&1 &
 ```
 
-Then check it until it answers, usually within a few seconds:
+Use the same port in all three places. `LISTING_VIDEO_API_ORIGIN` puts that port into video URLs; with the wrong port, video plays from another agent's API. Then check it until it answers, usually within a few seconds:
 
 ```bash
 curl -sf http://localhost:3006/readyz && echo ready
@@ -42,7 +44,30 @@ curl -sf http://localhost:3001/login > /dev/null && echo ready
 
 If port `3001` is taken, check the existing process before starting another. Stop only processes you started.
 
-Starting the API also builds `@auto-tm/db` and contracts, which the scripts below need. The API serves the code of the worktree that started it. If port `3006` is already taken, another session's API is running. Read its log in `/tmp/carberk-api.log` if it uses this convention, and ask before stopping it.
+Starting the API also builds `@auto-tm/db` and contracts, which the scripts below need. The API serves the code of the worktree that started it. If a port is taken, another session's API is running: pick another port rather than stopping it.
+
+## 1a. Seed test data
+
+Run these from the repository root. Each one is safe to repeat, and the local data is disposable:
+
+```bash
+pnpm db:migrate:deploy                               # apply migrations main has and the database lacks
+pnpm db:seed                                         # catalog and brand logos
+pnpm --filter @auto-tm/db ui:fixture                 # Users, 12 Listings with real photos, favourites, conversations
+pnpm --filter @auto-tm/worker video:fixture -- --write-env  # Ready portrait and landscape videos
+```
+
+`video:fixture` puts the videos on the first two Listings of seller `+99361000001`: portrait on `f1000000-0000-4000-8000-000000000100`, landscape on `…000000000101`. It makes them with the real worker processing code, so covers, 240p/360p/720p playlists and segments match production. With `--write-env`, it also sets the video tester lists in `apps/api/.env`; restart the API afterwards. Add `--force` to rebuild the videos. Rerunning `ui:fixture` removes them, so run `video:fixture` again after it.
+
+| Fixture User | Phone | Video access |
+|---|---|---|
+| Seller (owns the video Listings) | `+99361000001` | upload, owner preview, viewing |
+| Buyer (has favourites and conversations) | `+99361000009` | viewing |
+| Other sellers | `+99361000002`, `+99361000003` | none |
+
+Sign in as these Users instead of making new ones. A fixture User that stays signed in uses no new codes.
+
+For video expiry checks, set `LISTING_VIDEO_GRANT_TTL_SECONDS=30` in `apps/api/.env`, or on the API command line, instead of editing code. It shortens playback grants from five minutes to that many seconds. It applies only when `APP_ENV` is `development` or `test`.
 
 ## 2. Get a sign-in code
 
@@ -55,7 +80,7 @@ Locally `SMS_DRIVER=mock` sends no SMS. The API writes each code to its log:
 Read the newest code for a phone by its last four digits:
 
 ```bash
-grep -o '\[mock\] OTP for \*\*\*0901 (req [0-9a-f]*): [0-9]*' /tmp/carberk-api.log | tail -1 | grep -o '[0-9]*$'
+grep -o '\[mock\] OTP for \*\*\*0901 (req [0-9a-f]*): [0-9]*' /tmp/carberk-api-3006.log | tail -1 | grep -o '[0-9]*$'
 ```
 
 `req` is the first eight characters of the `requestId` that `POST /api/v1/auth/otp/request` returns, so a script can match its own request.
@@ -65,7 +90,7 @@ The code limits are fixed in the API (`SIGN_IN_CODE_RATE_POLICY`), and the `RATE
 - **Per phone:** 5 codes a day. The wait between codes doubles each time: 60, 120, 240, then 480 seconds (`resendInSeconds`).
 - **Per IP:** 10 codes an hour. Every local request comes from the same IP, so all agents on this Mac share those 10.
 
-So use a new made-up number for each app sign-in, and stay signed in instead of signing in again. A refused request answers `RATE_LIMITED` with `details.reason` (`destination_limit`, `ip_limit` or `backoff`). For `ip_limit`, wait for the hour to pass.
+So sign in as a fixture User (section 1a) or a new made-up number, and stay signed in instead of signing in again. Error replies carry a `requestId` too, so check for `RATE_LIMITED` before reading a code. A refused request answers `RATE_LIMITED` with `details.reason` (`destination_limit`, `ip_limit` or `backoff`). For `ip_limit`, wait for the hour to pass.
 
 Use made-up local numbers in the form `+9936500XXXX`. The first sign-in creates the User. Codes, tokens and phone numbers never go into commits, PRs or screenshots.
 
@@ -99,15 +124,23 @@ In T3 Code, drive the Admin page with the preview browser tools and close the ta
 
 Use the iPhone 17 Simulator (iOS 26.2, id `38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`). In T3 Code, every launch, tap, text entry and screenshot goes through the device tools:
 
-1. `device_list`, then `device_open` with the host `local` and that id. It returns an `agent-device` command bound to the device.
-2. Start Metro from your own worktree as a background command, on `8081` or any free port: `pnpm --filter @auto-tm/mobile dev --port 8081`. A Metro started by another worktree serves that worktree's code.
+1. `device_list`, then `device_open` with the host `local` and that id. It returns an `agent-device` command bound to the device. If the iPhone 17 is held by another session, use a spare Simulator instead (below).
+2. Start Metro from your own worktree as a background command, on `8081` or any free port: `pnpm --filter @auto-tm/mobile dev --port 8081`. A Metro started by another worktree serves that worktree's code. If your API is not on `3006`, set the same port in `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WS_URL` in `apps/mobile/.env` first.
 3. Open the development build against your Metro: `<agent-device> open tm.auto.app --relaunch --metro-port 8081`.
 4. `<agent-device> snapshot -i` lists the screen's elements with `@eN` refs. Use `press @eN` and `fill @eN "text"`, and use `device_screenshot` to look. Refs change after every screen change, so take a new snapshot before each press. If the first snapshot warns that the app was not in front, take it again.
 5. To sign in, go to the **Account** tab and press **Sign in, By phone or email**. The phone field already shows `+993`, so `fill` it with the eight digits only (`65000902`), then press **Get code**. Read the code from the API log (section 2). The code screen has the keyboard focused, so `<agent-device> type <code>` enters it, and the app signs in on the sixth digit.
 
 The Simulator reaches the Mac's `localhost`, so the app uses the local API, socket and MinIO from `apps/mobile/.env` with no port forwarding.
 
-If `open` fails with `DEVICE_IN_USE`, another session holds the Simulator. Do not close or reuse that session; tell the founder. Free it yourself when you finish: `device_close` ends your session so the next agent can open the Simulator.
+If `device_open` or `open` fails with `DEVICE_IN_USE`, another session holds the Simulator. Do not wait for it, and do not close or reuse that session. Get your own Simulator:
+
+```bash
+pnpm sim:spare   # prints "<name> <udid>"
+```
+
+It picks a shut-down Simulator that already has the Carberk build, preferring ones named `Carberk …`. If there is none, it creates `Carberk Agent N` from the iPhone 17 and installs the build copied from a Simulator that has it. Then `device_list` and `device_open` with host `local` and that udid, and continue from step 2. It never touches a booted Simulator, because a session may hold it.
+
+If a session from a finished or failed thread still holds a Simulator, tell the founder so they can close it in the T3 Device panel. Free your own when you finish: `device_close` ends your session so the next agent can open the Simulator.
 
 **When to rebuild the development build:** the Carberk Debug build is already installed on the iPhone 17 and loads JavaScript from whichever Metro it opens, so JavaScript and styling changes need no rebuild. Rebuild after a native change, such as a new native package, an Expo upgrade, or a change to app config or plugins. Use the route known to work on this Mac's Xcode: `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <id> --port <port>`, as in the [mobile/Expo checks](mobile-expo.md#guarded-native-development-sessions). The build is the same for every backend. Afterwards, reopen it against your local Metro with step 3.
 

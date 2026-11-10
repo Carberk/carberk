@@ -10,7 +10,8 @@
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run --passWithNoTests",
     "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "video:fixture": "tsx scripts/video-fixture.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",

@@ -552,6 +552,16 @@ async function main(): Promise<void> {
     ...CARS.map((_, index) => listingId(index)),
     NO_PHOTO_LISTING_ID,
   ];
+  // `video:fixture` (apps/worker) attaches videos to these Listings, and a video slot does not
+  // cascade from its Listing. Drop the slots first; rerun `video:fixture` to bring them back.
+  const fixtureSources = await prisma.videoSource.findMany({
+    where: { listingVideo: { listingId: { in: allListingIds } } },
+    select: { id: true },
+  });
+  await prisma.videoOutputReservation.deleteMany({
+    where: { sourceId: { in: fixtureSources.map((source) => source.id) } },
+  });
+  await prisma.listingVideo.deleteMany({ where: { listingId: { in: allListingIds } } });
   await prisma.listing.deleteMany({ where: { id: { in: allListingIds } } });
   await prisma.user.deleteMany({
     where: { id: { in: [...Object.values(SELLER_IDS), BUYER_ID, UNNAMED_ID, LONG_NAME_ID] } },
