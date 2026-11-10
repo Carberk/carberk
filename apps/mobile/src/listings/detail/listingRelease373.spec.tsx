@@ -79,7 +79,7 @@ describe("issue 373 approved detail content", () => {
       />,
     );
     expect(screen.queryByText("1 / 1")).toBeNull();
-    expect(screen.getByRole("button", { name: "Photo 1 of 1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 of 1" })).toBeTruthy();
   });
   it("renders title, price, date/city, specs, description, condition, seller, report and footer in order", async () => {
     const screen = await renderMobile(

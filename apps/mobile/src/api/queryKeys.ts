@@ -53,6 +53,9 @@ export const queryKeys = {
     myDrafts: () => [...queryKeys.listings.all(), "my-drafts"] as const,
     ownerVideo: (userId: string | null, type?: string, id?: string) =>
       [...queryKeys.listings.all(), "owner-video", userId, type, id] as const,
+    /** Per User, audience and generation: a cover grant names its Session and the video it was issued for. */
+    videoCover: (userId: string | null, listingId: string, generationId?: string, audience?: string) =>
+      [...queryKeys.listings.all(), "video-cover", userId, listingId, generationId, audience] as const,
     stagingOwners: (userId: string) =>
       [...queryKeys.listings.all(), "staging-owners", userId] as const,
     myDraftsInfinite: () =>

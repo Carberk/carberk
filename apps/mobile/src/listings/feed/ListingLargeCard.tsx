@@ -10,6 +10,7 @@ import { useOpenListingConversation } from "../../conversations/useOpenListingCo
 import { useDisplayName } from "../../identity/useDisplayName";
 import { formatPrice } from "../formatPrice";
 import { useListingFavorite } from "../useListingFavorite";
+import type { ListingOpenTarget } from "../detail/listingDetailHref";
 
 import { feedCardFields, feedCardPhotoKeys, feedCardPhotoThumbHashes } from "./feedCardFields";
 import { formatListingDate } from "./formatListingDate";
@@ -29,7 +30,8 @@ export { formatListingDate } from "./formatListingDate";
 
 interface ListingLargeCardProps {
   listing: ListingsSchemas.FeedListingSummary;
-  onPress: (id: string) => void;
+  /** `video` when the buyer tapped the video cover: the Listing opens with the video selected. */
+  onPress: (id: string, open?: ListingOpenTarget) => void;
   brandName?: string; modelName?: string; cityName?: string; transmissionName?: string; engineTypeName?: string;
   /** `null` while the session loads: Call and Message wait until the viewer is known. */
   isAuthenticated: boolean | null;
@@ -128,8 +130,8 @@ export const ListingLargeCard = memo(function ListingLargeCard(props: ListingLar
 
   return <EnterOnce order={enterOrder}>
     <MotionView style={press.style} className="overflow-hidden rounded-3xl bg-card">
-      <ListingPhotoStrip photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount} condition={listing.condition}
-        onOpen={() => onPress(listing.id)} {...press.handlers} />
+      <ListingPhotoStrip listingId={listing.id} video={listing.video} status={listing.status} isOwn={viewerId != null && viewerId === listing.sellerId} photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount} condition={listing.condition}
+        onOpen={() => onPress(listing.id)} onOpenVideo={() => onPress(listing.id, { video: true })} {...press.handlers} />
       <Pressable onPress={() => onPress(listing.id)} {...press.handlers} accessibilityRole="button" accessibilityLabel={[title, price].filter(Boolean).join(", ")}>
         <View className="items-start gap-1 px-4 pt-3.5">
           <Text className="mb-0.5 font-heading text-headline font-bold text-foreground" style={tabularFigures} numberOfLines={1}>{price}</Text>

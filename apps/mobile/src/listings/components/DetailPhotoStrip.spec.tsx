@@ -10,7 +10,7 @@ describe("Listing detail photo strip", () => {
     const onPressPhoto = vi.fn();
     const screen = await renderMobile(<DetailPhotoStrip photos={mediaFixture(3)} onPressPhoto={onPressPhoto} />);
 
-    await fireEvent.press(screen.getByRole("button", { name: "Photo 2 of 3" }));
+    await fireEvent.press(screen.getByRole("button", { name: "2 of 3" }));
 
     expect(onPressPhoto).toHaveBeenCalledTimes(1);
     const [index, tile] = onPressPhoto.mock.calls[0] ?? [];
@@ -23,8 +23,8 @@ describe("Listing detail photo strip", () => {
       <DetailPhotoStrip photos={[{ key: "listing-0/original.webp" }, { key: "pending-0", pending: true }]} onPressPhoto={vi.fn()} />,
     );
 
-    expect(screen.getByRole("button", { name: "Photo 1 of 2" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Photo 2 of 2" })).toBeNull();
-    expect(screen.getByLabelText("Photo 2 of 2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 of 2" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "2 of 2" })).toBeNull();
+    expect(screen.getByLabelText("2 of 2")).toBeTruthy();
   });
 });

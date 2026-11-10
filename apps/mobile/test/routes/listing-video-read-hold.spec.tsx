@@ -91,8 +91,8 @@ describe.each(["network", "cached"] as const)("legacy video from %s detail", sou
 
   it("shows only the three photos in the real detail gallery", async () => {
     const screen = await open(<Detail />);
-    expect(await screen.findByLabelText("Photo 1 of 3")).toBeTruthy();
-    expect(screen.queryByLabelText("Photo 1 of 4")).toBeNull();
+    expect(await screen.findByLabelText("1 of 3")).toBeTruthy();
+    expect(screen.queryByLabelText("1 of 4")).toBeNull();
   });
 
   it("seeds only three photos into the real edit session", async () => {

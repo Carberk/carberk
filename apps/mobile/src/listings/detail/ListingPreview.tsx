@@ -11,6 +11,8 @@ import { useTransmissions } from "../../api/catalog/useTransmissions";
 import type { CachedListingSummary } from "../../api/listings/findCachedListingSummary";
 import { ContactCtaBar } from "../components/ContactCtaBar";
 import { DetailPhotoStrip, type StripPhoto } from "../components/DetailPhotoStrip";
+import { useListingVideoCover } from "../video/useListingVideoCover";
+import { isVideoGalleryItem, VIDEO_GALLERY_INDEX, withVideoItem } from "../video/videoGalleryItem";
 import { keySpecs, PENDING, specRows } from "../components/ListingSpecs";
 import { PriceDisplay } from "../components/PriceDisplay";
 import { feedCardPhotoKeys, feedCardPhotoThumbHashes } from "../feed/feedCardFields";
@@ -33,6 +35,8 @@ export interface ListingPreviewProps {
   /** Reporting is on, so a buyer's loaded header will hold ⋯. */
   reportEnabled?: boolean;
   onBack: () => void;
+  /** The buyer tapped the card's video cover: the strip opens on the video. */
+  startOnVideo?: boolean;
 }
 
 /**
@@ -45,7 +49,7 @@ export interface ListingPreviewProps {
  * stay disabled until the full detail replaces this screen. Nothing here is
  * written to the detail cache.
  */
-export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack }: ListingPreviewProps) {
+export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack, startOnVideo = false }: ListingPreviewProps) {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const bar = useStickyActionBar("screen");
@@ -62,7 +66,9 @@ export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack 
   // Every photo the card knows, at the `detail` size the Results strip
   // already decoded, so each paints from memory; the Listing's other photos
   // hold their tiles until detail names them.
-  const photos = useMemo<StripPhoto[]>(() => {
+  // The card's video cover sits second, from the grant the card already holds.
+  const videoCover = useListingVideoCover(summary.id, summary.video, { isOwner, status: summary.status, timedRefresh: true });
+  const known = useMemo<StripPhoto[]>(() => {
     const hashes = feedCardPhotoThumbHashes(summary);
     const known = feedCardPhotoKeys(summary).map((key, index) => ({ key, thumbHash: hashes[index] }));
     const pending = Array.from({ length: Math.max(0, summary.photoCount - known.length) }, (_, index) => ({
@@ -71,6 +77,8 @@ export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack 
     }));
     return [...known, ...pending];
   }, [summary]);
+  const photos = useMemo(() => withVideoItem(known, summary.video?.id, videoCover), [known, summary.video?.id, videoCover]);
+  const startIndex = startOnVideo && isVideoGalleryItem(photos[VIDEO_GALLERY_INDEX]) ? VIDEO_GALLERY_INDEX : 0;
 
   const title = [
     [names.brandName(summary.brandId), names.modelName(summary.modelId)]
@@ -132,7 +140,7 @@ export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack 
       />
 
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bar.space }}>
-        <DetailPhotoStrip photos={photos} banner={bannerKey ? t(bannerKey) : undefined} />
+        <DetailPhotoStrip photos={photos} initialIndex={startIndex} banner={bannerKey ? t(bannerKey) : undefined} />
 
         <View testID="detail-body" className="gap-4 px-4 py-5">
           {isOwner && <OwnerStatusCard status={summary.status} />}

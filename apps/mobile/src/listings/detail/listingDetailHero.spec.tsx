@@ -213,7 +213,7 @@ describe("the Listing detail photo strip from tap to loaded (#864)", () => {
 
     expect(before).toMatchObject({ contentFit: "cover" });
     expect(top(screen).cover).toEqual(before);
-    await fireEvent.press(screen.getByRole("button", { name: "Photo 1 of 3" }));
+    await fireEvent.press(screen.getByRole("button", { name: "1 of 3" }));
     const viewer = getHost(screen.container, "Modal");
     const page = queryAllHosts(viewer, "Image").find((node) => node.props.source?.uri === COVER_DETAIL);
     expect(page?.props.contentFit).toBe("contain");
@@ -244,15 +244,15 @@ describe("the Listing detail photo strip from tap to loaded (#864)", () => {
     ]);
   });
 
-  it("shows no photo counter on detail, while each photo is still read as Photo n of N", async () => {
+  it("shows no photo counter on detail, while each photo is still read by its position", async () => {
     const screen = await renderMobile(<ListingDetailScreen />);
     expect(screen.queryByText(/^\d+ \/ \d+$/)).toBeNull();
-    expect(screen.getByLabelText("Photo 1 of 12")).toBeTruthy();
+    expect(screen.getByLabelText("1 of 12")).toBeTruthy();
 
     await loadDetail(screen, fixture({ media: cardMedia() }));
 
     expect(screen.queryByText(/^\d+ \/ \d+$/)).toBeNull();
-    expect(screen.getByRole("button", { name: "Photo 1 of 3" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "1 of 3" })).toBeTruthy();
   });
 
   it("gives one photo one tile from margin to margin that does not scroll, before and after detail loads", async () => {
@@ -293,8 +293,8 @@ describe("the Listing detail photo strip from tap to loaded (#864)", () => {
     await loadDetail(screen, fixture({ status, media: cardMedia() }));
 
     expect(banners()).toEqual([1, 1, 1]);
-    // A screen reader hears the status with the photo, after "Photo n of N".
-    expect(screen.getByRole("button", { name: "Photo 1 of 3" }).props.accessibilityValue).toEqual({ text: label });
+    // A screen reader hears the status with the photo, after its position.
+    expect(screen.getByRole("button", { name: "1 of 3" }).props.accessibilityValue).toEqual({ text: label });
   });
 
   it("sets every section 16 dp from the screen edges, as the photos are", async () => {

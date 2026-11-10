@@ -8,6 +8,7 @@ import { useViewer } from "../../src/auth/useViewer";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
 import { useEngineTypes } from "../../src/api/catalog/useEngineTypes";
 import { useTransmissions } from "../../src/api/catalog/useTransmissions";
+import { listingDetailHref, type ListingOpenTarget } from "../../src/listings/detail/listingDetailHref";
 import { FavoriteListingCard, FavoriteListingCardSkeleton } from "../../src/listings/favorites/FavoriteListingCard";
 import { useFeedCatalogMaps } from "../../src/listings/feed/useFeedCatalogMaps";
 import { HideSoldToggle } from "../../src/listings/favorites/HideSoldToggle";
@@ -67,8 +68,8 @@ function FavoritesContent({ view }: { view: ReturnType<typeof useFavoritesView> 
   const tabBarSpace = useTabBarSpace();
 
   const handlePress = useCallback(
-    (id: string) => {
-      router.push(`/(public)/listings/${id}`);
+    (id: string, open?: ListingOpenTarget) => {
+      router.push(listingDetailHref(id, open));
     },
     [router],
   );

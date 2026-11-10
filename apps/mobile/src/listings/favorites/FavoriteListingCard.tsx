@@ -13,6 +13,7 @@ import { feedCardPhotoKeys, feedCardPhotoThumbHashes } from "../feed/feedCardFie
 import { SquareAction } from "../feed/ListingLargeCard";
 import { CARD_INSET, ListingPhotoStrip, STRIP_HEIGHT_SHARE, STRIP_INSET } from "../feed/ListingPhotoStrip";
 import { listingSpecLine } from "../feed/listingSpecLine";
+import type { ListingOpenTarget } from "../detail/listingDetailHref";
 
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,8 @@ import { cn } from "@/lib/utils";
 
 interface FavoriteListingCardProps {
   listing: ListingsSchemas.FavoriteListingSummary;
-  onPress: (id: string) => void;
+  /** `video` when the buyer tapped the video cover: the Listing opens with the video selected. */
+  onPress: (id: string, open?: ListingOpenTarget) => void;
   brandName?: string; modelName?: string; cityName?: string; transmissionName?: string; engineTypeName?: string;
   /** The User's own Listing gets no contact buttons. */
   isOwn: boolean;
@@ -106,8 +108,8 @@ export const FavoriteListingCard = memo(function FavoriteListingCard(props: Favo
     <MotionView testID="favorite-card" style={press.style} className="overflow-hidden rounded-3xl bg-card">
       <View>
         <View testID="listing-photos-frame" className={cn(closedLabel && "opacity-50")}>
-          <ListingPhotoStrip photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount}
-            onOpen={() => onPress(listing.id)} {...press.handlers} />
+          <ListingPhotoStrip listingId={listing.id} video={listing.video} status={listing.status} isOwn={isOwn} photoKeys={feedCardPhotoKeys(listing)} thumbHashes={feedCardPhotoThumbHashes(listing)} photoCount={listing.photoCount}
+            onOpen={() => onPress(listing.id)} onOpenVideo={() => onPress(listing.id, { video: true })} {...press.handlers} />
         </View>
         {closedLabel ? <PhotoChip label={closedLabel} tone={sold ? "solid" : "quiet"} className="left-4 top-4" /> : null}
       </View>

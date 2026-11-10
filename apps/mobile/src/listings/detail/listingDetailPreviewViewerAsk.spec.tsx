@@ -159,7 +159,7 @@ describe("photo viewer from Listing detail", () => {
   const viewer = (screen: Awaited<ReturnType<typeof renderMobile>>) =>
     within(getHost(screen.container, "Modal"));
   const openViewer = (screen: Awaited<ReturnType<typeof renderMobile>>, photo = 2) =>
-    fireEvent.press(first(screen.getAllByRole("button", { name: `Photo ${photo} of 3` })));
+    fireEvent.press(first(screen.getAllByRole("button", { name: `${photo} of 3` })));
 
   it("opens at the tapped photo with the counter, thumbnails, ♡ and Call + Message", async () => {
     const screen = await renderMobile(<ListingDetailScreen />);

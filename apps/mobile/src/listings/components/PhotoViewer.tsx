@@ -16,6 +16,9 @@ import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 import Animated from "react-native-reanimated";
 
+import { isVideoGalleryItem, type VideoGalleryItem } from "../video/videoGalleryItem";
+import { VideoCover } from "../video/VideoCover";
+
 import { PhotoTransitionOverlay } from "./PhotoTransitionOverlay";
 import { usePhotoTransition } from "./usePhotoTransition";
 import type { PhotoGeometry } from "./photoTransitionMath";
@@ -29,6 +32,8 @@ import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 
 type ListingMedia = ListingsSchemas.ListingMedia;
+/** A viewer page: a photo, or the Listing's Ready video as its cover. */
+type ViewerItem = ListingMedia | VideoGalleryItem;
 
 const THUMB_WIDTH = 64;
 const THUMB_GAP = 6;
@@ -40,7 +45,9 @@ export interface PhotoViewerProps {
   getReturnGeometry?: (index: number) => PhotoGeometry | null;
   onTileHidden?: (index: number | null) => void;
   onIndexChange?: (index: number) => void;
-  media: ListingMedia[];
+  media: ViewerItem[];
+  /** Play on the video's page, with its index; the caller closes the viewer and opens the player. */
+  onPlayVideo?: (index: number) => void;
   /** The photo to open on. */
   initialIndex: number;
   /** Called with the photo the viewer was left on, so the gallery can follow. */
@@ -61,6 +68,10 @@ export interface PhotoViewerProps {
  * itself never waits for it. A React Native Modal sits above the
  * navigation stack, so anything that leaves this screen must close it first;
  * the slots get `close` for that.
+ *
+ * A Ready video is a page and a thumbnail like a photo, counted in `n / N`
+ * (#1051). Its page is the cover with Play: arriving on it never plays, and
+ * Play hands its index to `onPlayVideo`.
  */
 export function PhotoViewer({
   visible,
@@ -69,6 +80,7 @@ export function PhotoViewer({
   onClose,
   headerAction,
   footer,
+  onPlayVideo,
   ...transitionProps
 }: PhotoViewerProps) {
   // The photo the viewer is on lives in the content, which mounts fresh on
@@ -99,6 +111,7 @@ export function PhotoViewer({
           onClose={onClose}
           headerAction={headerAction}
           footer={footer}
+          onPlayVideo={onPlayVideo}
         />
       </GestureHandlerRootView>
     </Modal>
@@ -113,6 +126,7 @@ function ViewerContent({
   headerAction,
   footer,
   onIndexChange,
+  onPlayVideo,
   showRef,
   closeRef,
   ...transitionProps
@@ -132,11 +146,13 @@ function ViewerContent({
   const [loadedRatios, setLoadedRatios] = useState<Record<string, number>>({});
   // As in the gallery, neighbours start once the opening photo has loaded.
   const openingId = media[initialIndex]?.id;
-  const loadNeighbours =
-    index !== initialIndex || (openingId !== undefined && loadedRatios[openingId] !== undefined);
+  // A video opening item has no photo ratio to wait for: it counts as loaded,
+  // so its neighbour photos load with it instead of staying black.
+  const openingLoaded = isVideoGalleryItem(media[initialIndex]) || (openingId !== undefined && loadedRatios[openingId] !== undefined);
+  const loadNeighbours = index !== initialIndex || openingLoaded;
   const [pagerHeight, setPagerHeight] = useState(height * 0.6);
-  const pagerRef = useRef<FlatList<ListingMedia>>(null);
-  const stripRef = useRef<FlatList<ListingMedia>>(null);
+  const pagerRef = useRef<FlatList<ViewerItem>>(null);
+  const stripRef = useRef<FlatList<ViewerItem>>(null);
 
   const transition = usePhotoTransition({ ...transitionProps, onClose, indexRef, showRef, closeRef });
   const { close: closePhoto } = transition;
@@ -237,6 +253,20 @@ function ViewerContent({
             if (position !== index && !(loadNeighbours && isNearPhoto(position, index))) {
               return <View style={{ width, height: pagerHeight }} />;
             }
+            if (isVideoGalleryItem(item)) {
+              return (
+                <View style={{ width, height: pagerHeight }} className="items-center justify-center">
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("listingVideoPlay", { count: Math.round(item.durationMs / 1000) })}
+                    onPress={() => onPlayVideo?.(position)}
+                    style={{ width, height: Math.min(pagerHeight, (width * 3) / 4) }}
+                  >
+                    <VideoCover uri={item.cover?.detail} durationMs={item.durationMs} size="large" contentFit="contain" />
+                  </Pressable>
+                </View>
+              );
+            }
             const isSharp = sharp.has(item.id);
             return (
               <ZoomableImage
@@ -291,7 +321,9 @@ function ViewerContent({
         renderItem={({ item, index: position }) => (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t("photoOf", { n: position + 1, total: media.length })}
+            accessibilityLabel={isVideoGalleryItem(item)
+              ? t("listingVideoTile", { count: Math.round(item.durationMs / 1000) })
+              : t("photoOf", { n: position + 1, total: media.length })}
             accessibilityState={{ selected: position === index }}
             onPress={() => selectThumbnail(position)}
             className={cn(
@@ -300,12 +332,16 @@ function ViewerContent({
             )}
             style={{ width: THUMB_WIDTH }}
           >
-            <GalleryImage
-              item={item}
-              variant="thumbnail"
-              contentFit="cover"
-              style={{ width: "100%", height: "100%" }}
-            />
+            {isVideoGalleryItem(item) ? (
+              <VideoCover uri={item.cover?.thumbnail} durationMs={item.durationMs} size="small" />
+            ) : (
+              <GalleryImage
+                item={item}
+                variant="thumbnail"
+                contentFit="cover"
+                style={{ width: "100%", height: "100%" }}
+              />
+            )}
           </Pressable>
         )}
       />
