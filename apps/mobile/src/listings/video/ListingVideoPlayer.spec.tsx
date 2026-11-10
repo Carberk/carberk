@@ -4,23 +4,31 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
-import type { FakeVideoPlayer } from "../../../test/native-video";
+import { createdPlayers, type FakeVideoPlayer } from "../../../test/native-video";
 
 import { ListingVideoPlayer } from "./ListingVideoPlayer";
 
 const LISTING_ID = "11111111-1111-4111-8111-111111111111";
 const VIDEO_ID = "22222222-2222-4222-8222-222222222222";
 const GENERATION_ID = "33333333-3333-4333-8333-333333333333";
-const MASTER = "http://localhost:3006/files/master.m3u8?grant=tok";
-const V360 = "http://localhost:3006/files/360.m3u8?grant=tok";
-const V720 = "http://localhost:3006/files/720.m3u8?grant=tok";
-const PLAYLIST = [
-  "#EXTM3U",
-  "#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=640x360",
-  V360,
-  "#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720",
-  V720,
-].join("\n");
+const masterUrl = (grant: string) => `http://localhost:3006/files/master.m3u8?grant=${grant}`;
+const variantUrl = (height: number, grant: string) => `http://localhost:3006/files/${height}.m3u8?grant=${grant}`;
+const MASTER = masterUrl("tok1");
+const V360 = variantUrl(360, "tok1");
+const V720 = variantUrl(720, "tok1");
+
+function playlist(grant: string, orientation: "landscape" | "portrait") {
+  const res = (w: number, h: number) => (orientation === "landscape" ? `${w}x${h}` : `${h}x${w}`);
+  return [
+    "#EXTM3U",
+    `#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=${res(640, 360)}`,
+    variantUrl(360, grant),
+    `#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=${res(1280, 720)}`,
+    variantUrl(720, grant),
+  ].join("\n");
+}
+
+let posts = 0;
 
 function readyBody(overrides: Record<string, unknown> = {}) {
   return {
@@ -37,20 +45,33 @@ function readyBody(overrides: Record<string, unknown> = {}) {
       },
     },
     expiresAt: "2030-01-01T00:05:00.000Z",
-    url: MASTER,
+    // Each grant carries a new token, so a renewal changes the URL.
+    url: masterUrl(`tok${posts}`),
     qualities: [360, 720],
     ...overrides,
   };
 }
 
-function servePlayback(body: () => unknown, status = 200) {
+function servePlayback(
+  body: () => unknown,
+  status = 200,
+  { orientation = "landscape", playlistGate }: {
+    orientation?: "landscape" | "portrait";
+    playlistGate?: Promise<void>;
+  } = {},
+) {
   server.use(
-    http.post("*/listings/video-access/viewer/listing/:id/playback", () =>
-      HttpResponse.json(body() as Record<string, unknown>, { status }),
-    ),
-    http.get("*/files/master.m3u8", () => new HttpResponse(PLAYLIST, {
-      headers: { "Content-Type": "application/vnd.apple.mpegurl" },
-    })),
+    http.post("*/listings/video-access/viewer/listing/:id/playback", () => {
+      posts += 1;
+      return HttpResponse.json(body() as Record<string, unknown>, { status });
+    }),
+    http.get("*/files/master.m3u8", async ({ request }) => {
+      await playlistGate;
+      const grant = new URL(request.url).searchParams.get("grant") ?? "";
+      return new HttpResponse(playlist(grant, orientation), {
+        headers: { "Content-Type": "application/vnd.apple.mpegurl" },
+      });
+    }),
   );
 }
 
@@ -61,17 +82,51 @@ async function renderPlayer(onClose = vi.fn()) {
   return { screen, onClose };
 }
 
-function playerOf(screen: Awaited<ReturnType<typeof renderPlayer>>["screen"]) {
+type Screen = Awaited<ReturnType<typeof renderPlayer>>["screen"];
+
+function playerOf(screen: Screen) {
   return screen.getByTestId("listing-video-player-view").props.player as FakeVideoPlayer;
 }
 
-async function startPlaying(screen: Awaited<ReturnType<typeof renderPlayer>>["screen"]) {
+function uriOf(player: FakeVideoPlayer) {
+  return (player.source as { uri: string } | null)?.uri;
+}
+
+async function startPlaying(screen: Screen) {
+  // Let the grant and the master playlist land.
+  await act(async () => {});
   const player = playerOf(screen);
   await act(async () => { player.emitStatus("readyToPlay"); });
+  await act(async () => {});
   return player;
 }
 
+async function pickQuality(screen: Screen, name: string) {
+  await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
+  await fireEvent.press(screen.getByRole("button", { name }));
+}
+
+/** Waits for the player built after a grant renewal and reloaded. */
+async function nextPlayer(screen: Screen, after: FakeVideoPlayer) {
+  await act(async () => {});
+  await act(async () => {});
+  const player = playerOf(screen);
+  expect(player).not.toBe(after);
+  return player;
+}
+
+function captureAppState() {
+  const listeners: ((state: string) => void)[] = [];
+  const spy = vi.spyOn(AppState, "addEventListener").mockImplementation(((_event: string, cb: (state: string) => void) => {
+    listeners.push(cb);
+    return { remove: () => {} };
+  }) as never);
+  return { emit: (state: string) => listeners.forEach((cb) => cb(state)), restore: () => spy.mockRestore() };
+}
+
 beforeEach(() => {
+  posts = 0;
+  createdPlayers.length = 0;
   servePlayback(() => readyBody());
 });
 
@@ -158,11 +213,9 @@ describe("ListingVideoPlayer", () => {
     expect(screen.queryByText("Buffering")).toBeNull();
   });
 
-  it("lists only this video's qualities and loads the chosen rendition", async () => {
+  it("lists only this video's qualities and loads the chosen rendition on a new player", async () => {
     const { screen } = await renderPlayer();
-    await startPlaying(screen);
-    // Let the master playlist fetch land so variant URLs are known.
-    await act(async () => {});
+    const first = await startPlaying(screen);
 
     await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
     expect(screen.getByRole("button", { name: "Auto" })).toBeTruthy();
@@ -173,28 +226,64 @@ describe("ListingVideoPlayer", () => {
 
     await fireEvent.press(screen.getByRole("button", { name: "720p" }));
     const next = playerOf(screen);
-    expect((next.source as { uri: string }).uri).toBe(V720);
+    expect(next).not.toBe(first);
+    expect(uriOf(next)).toBe(V720);
+    expect(first.released).toBe(true);
   });
 
   it("caps Data saver at 360p", async () => {
     const { screen } = await renderPlayer();
     await startPlaying(screen);
-    await act(async () => {});
 
-    await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
-    await fireEvent.press(screen.getByRole("button", { name: "Data saver · up to 360p" }));
-    expect((playerOf(screen).source as { uri: string }).uri).toBe(V360);
+    await pickQuality(screen, "Data saver · up to 360p");
+    expect(uriOf(playerOf(screen))).toBe(V360);
   });
 
-  it("shows Couldn't play the video with Try again when playback fails, and recovers", async () => {
+  it("picks portrait renditions by their short side", async () => {
+    servePlayback(() => readyBody(), 200, { orientation: "portrait" });
+    const { screen } = await renderPlayer();
+    await startPlaying(screen);
+
+    await pickQuality(screen, "720p");
+    expect(uriOf(playerOf(screen))).toBe(V720);
+    await pickQuality(screen, "Data saver · up to 360p");
+    expect(uriOf(playerOf(screen))).toBe(V360);
+  });
+
+  it("offers only Auto until the renditions are known", async () => {
+    let open = () => {};
+    servePlayback(() => readyBody(), 200, { playlistGate: new Promise<void>((resolve) => { open = resolve; }) });
+    const { screen } = await renderPlayer();
+    await startPlaying(screen);
+
+    await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
+    const saver = screen.getByRole("button", { name: "Data saver · up to 360p" });
+    expect(saver.props.accessibilityState).toMatchObject({ disabled: true });
+    await fireEvent.press(saver);
+    expect(uriOf(playerOf(screen))).toBe(MASTER);
+
+    await act(async () => { open(); });
+    await act(async () => {});
+    await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Data saver · up to 360p" }));
+    expect(uriOf(playerOf(screen))).toBe(V360);
+  });
+
+  it("shows Couldn't play the video with Try again when playback fails, and reloads on a new grant", async () => {
     const { screen } = await renderPlayer();
     const player = await startPlaying(screen);
+    await act(async () => { player.emitTimeUpdate(12); });
 
     await act(async () => { player.emitStatus("error"); });
     expect(screen.getByText("Couldn't play the video")).toBeTruthy();
 
+    // The grant is still valid; Try again must still renew it, because the
+    // same URL would keep the same native player and never reload.
     await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
-    const retried = playerOf(screen);
+    expect(posts).toBe(2);
+    const retried = await nextPlayer(screen, player);
+    expect(uriOf(retried)).toBe(masterUrl("tok2"));
+    expect(retried.currentTime).toBe(12);
     await act(async () => { retried.emitStatus("readyToPlay"); });
     expect(retried.playing).toBe(true);
     expect(screen.queryByText("Couldn't play the video")).toBeNull();
@@ -204,26 +293,70 @@ describe("ListingVideoPlayer", () => {
     const { screen } = await renderPlayer();
     const player = await startPlaying(screen);
     await act(async () => { player.emitTimeUpdate(10); });
-    await act(async () => {});
 
-    await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
-    await fireEvent.press(screen.getByRole("button", { name: "720p" }));
+    await pickQuality(screen, "720p");
 
-    expect((player.source as { uri: string }).uri).toBe(V720);
-    expect(player.currentTime).toBe(10);
-    expect(player.playing).toBe(true);
+    const next = playerOf(screen);
+    expect(uriOf(next)).toBe(V720);
+    expect(next.currentTime).toBe(10);
+    expect(next.playing).toBe(true);
   });
 
-  it("renews an expired grant when Play is tapped after the video ends", async () => {
-    let posts = 0;
-    servePlayback(() => { posts += 1; return readyBody({ expiresAt: "2000-01-01T00:05:00.000Z" }); });
+  it("keeps mute across a quality switch", async () => {
+    const { screen } = await renderPlayer();
+    await startPlaying(screen);
+
+    await fireEvent.press(screen.getByRole("button", { name: "Mute" }));
+    await pickQuality(screen, "720p");
+    expect(playerOf(screen).muted).toBe(true);
+    expect(screen.getByRole("button", { name: "Unmute" })).toBeTruthy();
+  });
+
+  it("renews an expired grant on Play after a pause and resumes from the same place", async () => {
+    servePlayback(() => readyBody({ expiresAt: "2000-01-01T00:05:00.000Z" }));
     const { screen } = await renderPlayer();
     const player = await startPlaying(screen);
-    expect(posts).toBe(1);
+    await act(async () => { player.emitTimeUpdate(30); });
+    await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+    expect(player.playing).toBe(false);
+
+    await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+    expect(posts).toBe(2);
+    const renewed = await nextPlayer(screen, player);
+    expect(uriOf(renewed)).toBe(masterUrl("tok2"));
+    expect(renewed.currentTime).toBe(30);
+    expect(renewed.playing).toBe(true);
+  });
+
+  it("renews an expired grant on a chosen quality without falling back to the master", async () => {
+    servePlayback(() => readyBody({ expiresAt: "2000-01-01T00:05:00.000Z" }));
+    const { screen } = await renderPlayer();
+    await startPlaying(screen);
+    await pickQuality(screen, "720p");
+    const player = playerOf(screen);
+    await act(async () => { player.emitStatus("readyToPlay"); });
+    await act(async () => { player.emitTimeUpdate(20); });
+    await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+
+    await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+    const renewed = await nextPlayer(screen, player);
+    expect(uriOf(renewed)).toBe(variantUrl(720, "tok2"));
+    expect(renewed.currentTime).toBe(20);
+    expect(createdPlayers.some((p) => uriOf(p) === masterUrl("tok2"))).toBe(false);
+  });
+
+  it("restarts from the beginning when Play renews an expired grant after the video ends", async () => {
+    servePlayback(() => readyBody({ expiresAt: "2000-01-01T00:05:00.000Z" }));
+    const { screen } = await renderPlayer();
+    const player = await startPlaying(screen);
+    await act(async () => { player.emitTimeUpdate(42); });
 
     await act(async () => { player.emitPlayToEnd(); });
     await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
     expect(posts).toBe(2);
+    const renewed = await nextPlayer(screen, player);
+    expect(renewed.currentTime).toBe(0);
+    expect(renewed.playing).toBe(true);
   });
 
   it("shows Video unavailable without Try again when playback is refused", async () => {
@@ -252,21 +385,28 @@ describe("ListingVideoPlayer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("stops playback when the app goes to the background", async () => {
-    const listeners: ((state: string) => void)[] = [];
-    const spy = vi.spyOn(AppState, "addEventListener").mockImplementation(((_event: string, cb: (state: string) => void) => {
-      listeners.push(cb);
-      return { remove: () => {} };
-    }) as never);
+  it("unloads the video in the background and comes back paused at the same place", async () => {
+    const appState = captureAppState();
     try {
       const { screen } = await renderPlayer();
       const player = await startPlaying(screen);
-      expect(player.playing).toBe(true);
+      await act(async () => { player.emitTimeUpdate(25); });
 
-      await act(async () => { listeners.forEach((cb) => cb("background")); });
+      await act(async () => { appState.emit("background"); });
       expect(player.playing).toBe(false);
+      expect(player.released).toBe(true);
+      expect(uriOf(playerOf(screen))).toBeUndefined();
+
+      await act(async () => { appState.emit("active"); });
+      const back = playerOf(screen);
+      expect(uriOf(back)).toBe(MASTER);
+      expect(back.currentTime).toBe(25);
+      await act(async () => { back.emitStatus("readyToPlay"); });
+      expect(back.playing).toBe(false);
+      expect(screen.getByTestId("listing-video-player-play-pause").props.accessibilityLabel).toBe("Play");
+      expect(screen.getByText("0:25")).toBeTruthy();
     } finally {
-      spy.mockRestore();
+      appState.restore();
     }
   });
 
@@ -277,5 +417,6 @@ describe("ListingVideoPlayer", () => {
 
     await act(async () => { screen.unmount(); });
     expect(player.playing).toBe(false);
+    expect(player.released).toBe(true);
   });
 });

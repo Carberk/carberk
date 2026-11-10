@@ -45,9 +45,11 @@ export function ListingVideoPlayer({ audience, type, id, onClose }: ListingVideo
   const masterUrl = playback.phase === "ready" ? playback.url : undefined;
   const durationS = playback.phase === "ready" ? playback.durationMs / 1000 : 0;
 
-  const [variants, setVariants] = useState<ReadonlyMap<number, string>>(new Map());
+  // Variants are kept with the master URL they came from, so a renewed
+  // grant never loads a stale variant.
+  const [variants, setVariants] = useState<{ master: string; map: ReadonlyMap<number, string> } | null>(null);
   const [choice, setChoice] = useState<VideoQualityChoice>("auto");
-  const [attempt, setAttempt] = useState(0);
+  const [foreground, setForeground] = useState(true);
   const [status, setStatus] = useState<VideoPlayerStatus>("idle");
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
@@ -60,45 +62,56 @@ export function ListingVideoPlayer({ audience, type, id, onClose }: ListingVideo
   const viewRef = useRef<VideoView | null>(null);
   const positionRef = useRef(0);
   const playingRef = useRef(false);
+  const mutedRef = useRef(false);
   // Explicit user intent: the native player can report `readyToPlay` again
   // after a pause, and that must never undo the pause.
   const intentRef = useRef(true);
   const startedRef = useRef(false);
+  // Position and play intent to apply to the next player that has a source.
   const restoreRef = useRef<{ position: number; playing: boolean } | null>(null);
 
   // Variant URLs come from the granted master playlist itself, so a manual
-  // quality never invents a storage key the server did not publish.
+  // quality never invents a storage key the server did not publish. This is
+  // a grant-authorized media fetch (the token is in the URL), like the
+  // player's own segment requests, not an API call through apiClient.
   useEffect(() => {
-    setVariants(new Map());
     if (!masterUrl) return;
     let live = true;
+    const settle = (map: ReadonlyMap<number, string>) => { if (live) setVariants({ master: masterUrl, map }); };
     fetch(masterUrl)
-      .then((res) => res.text())
-      .then((text) => { if (live) setVariants(parseMasterPlaylist(text)); })
-      .catch(() => { /* Auto keeps the master URL; manual picks fall back too. */ });
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`master playlist ${res.status}`);
+        settle(parseMasterPlaylist(await res.text()));
+      })
+      // Without variants every choice falls back to the master URL.
+      .catch(() => settle(new Map()));
     return () => { live = false; };
   }, [masterUrl]);
 
-  const sourceUri = masterUrl ? variantUrlFor(choice, masterUrl, variants) : undefined;
+  const variantsReady = !!masterUrl && variants?.master === masterUrl;
+  // A manual choice waits for this grant's variants rather than briefly
+  // loading the master, so its player is the one that gets the position.
+  // In the background nothing is loaded at all.
+  const sourceUri = !masterUrl || !foreground ? undefined
+    : choice === "auto" ? masterUrl
+      : variantsReady ? variantUrlFor(choice, masterUrl, variants.map) : undefined;
   const source = useMemo(
     () => (sourceUri ? { uri: sourceUri, contentType: "hls" as const } : null),
-    // `attempt` forces a fresh player when Try again reloads the same URL.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [sourceUri, attempt],
+    [sourceUri],
   );
-  const player = useVideoPlayer(source, (p) => { p.timeUpdateEventInterval = 0.25; });
+  // expo-video builds a new native player whenever the source changes, so
+  // per-player settings are applied here on every one of them.
+  const player = useVideoPlayer(source, (p) => {
+    p.timeUpdateEventInterval = 0.25;
+    p.muted = mutedRef.current;
+  });
   const playerRef = useRef(player);
   playerRef.current = player;
 
   useEffect(() => {
-    const restore = restoreRef.current;
-    if (restore) {
-      restoreRef.current = null;
-      try {
-        player.currentTime = restore.position;
-        if (restore.playing) player.play();
-      } catch { /* native stub */ }
-    }
+    setStatus(player.status ?? "idle");
+    playingRef.current = !!player.playing;
+    setPlaying(!!player.playing);
     const subs = [
       player.addListener?.("statusChange", (e: { status: VideoPlayerStatus }) => {
         setStatus(e.status);
@@ -122,34 +135,32 @@ export function ListingVideoPlayer({ audience, type, id, onClose }: ListingVideo
         setEnded(true);
       }),
     ];
+    // Placeholder players (no grant yet, a pending variant, background)
+    // must not use up the saved position.
+    const restore = restoreRef.current;
+    if (restore && sourceUri) {
+      restoreRef.current = null;
+      try {
+        player.currentTime = restore.position;
+        if (restore.playing) player.play();
+      } catch { /* native stub */ }
+    }
     return () => { subs.forEach((sub) => { try { sub?.remove(); } catch { /* stub */ } }); };
+    // `sourceUri` changes exactly when `player` does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player]);
 
-  // expo-video replaces the source on the same native player, and a
-  // replacement loads paused: re-apply the kept position and play intent.
-  const firstSourceRef = useRef(true);
-  useEffect(() => {
-    if (firstSourceRef.current) {
-      firstSourceRef.current = false;
-      return;
-    }
-    if (!sourceUri) return;
-    const restore = restoreRef.current;
-    if (restore) {
-      restoreRef.current = null;
-      try { player.currentTime = restore.position; } catch { /* native stub */ }
-    }
-    if (intentRef.current) {
-      try { player.play(); } catch { /* native stub */ }
-    }
-  }, [sourceUri, player]);
-
-  // Backgrounding stops playback and downloading; returning never resumes.
+  // Backgrounding stops playback and downloading: the source is unloaded
+  // and the position kept. Returning reloads it paused at that position.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
         intentRef.current = false;
+        restoreRef.current = { position: restoreRef.current?.position ?? positionRef.current, playing: false };
         try { playerRef.current.pause(); } catch { /* native stub */ }
+        setForeground(false);
+      } else {
+        setForeground(true);
       }
     });
     return () => sub.remove();
@@ -165,30 +176,33 @@ export function ListingVideoPlayer({ audience, type, id, onClose }: ListingVideo
     : false;
   const playerError = status === "error";
   const showError = playback.phase === "error" || playerError;
-  const buffering = status === "loading" && startedRef.current && !playerError;
+  const waitingForSource = playback.phase === "loading" || (playback.phase === "ready" && foreground && !sourceUri);
+  const buffering = status === "loading" && startedRef.current && !playerError && !waitingForSource;
   const loading = !showError && playback.phase !== "unavailable"
-    && (playback.phase === "loading" || (status !== "readyToPlay" && !startedRef.current));
+    && (waitingForSource || (status !== "readyToPlay" && !startedRef.current));
 
-  const tryAgain = () => {
+  // Renews the grant and reloads where playback stopped. Always a new grant:
+  // its new token changes the URL, which is what makes expo-video build a
+  // new native player; the same URL would keep the failed one.
+  const renew = (position: number) => {
     intentRef.current = true;
-    restoreRef.current = { position: positionRef.current, playing: true };
+    restoreRef.current = { position, playing: true };
     setEnded(false);
-    if (playback.phase !== "ready" || grantExpired || !masterUrl) {
-      void retry();
-    } else {
-      setStatus("loading");
-      setAttempt((value) => value + 1);
-    }
+    setStatus("loading");
+    void retry();
   };
+
+  const tryAgain = () => renew(restoreRef.current?.position ?? positionRef.current);
 
   const togglePlay = () => {
     // A grant lives five minutes; replaying on an expired one goes nowhere,
     // so a Play tap renews it and restarts from the same place.
     if (!playing && grantExpired) {
-      intentRef.current = true;
-      restoreRef.current = { position: ended ? 0 : positionRef.current, playing: true };
-      if (ended) setEnded(false);
-      void retry();
+      if (ended) {
+        positionRef.current = 0;
+        setPositionS(0);
+      }
+      renew(ended ? 0 : positionRef.current);
       return;
     }
     try {
@@ -211,6 +225,7 @@ export function ListingVideoPlayer({ audience, type, id, onClose }: ListingVideo
 
   const toggleMute = () => {
     const next = !muted;
+    mutedRef.current = next;
     setMuted(next);
     try { player.muted = next; } catch { /* native stub */ }
   };
@@ -395,18 +410,25 @@ export function ListingVideoPlayer({ audience, type, id, onClose }: ListingVideo
             <Text className="text-subhead font-semibold text-white">{t("videoPlayerQuality")}</Text>
             {options.map((option) => {
               const selected = choice === option.choice;
+              // Fixed renditions and Data saver need this grant's variants;
+              // until they load only Auto is real.
+              const disabled = option.choice !== "auto" && !variantsReady;
               return (
                 <Pressable
                   key={String(option.choice)}
                   accessibilityRole="button"
                   accessibilityLabel={choiceLabel(option.choice)}
-                  accessibilityState={{ selected }}
+                  accessibilityState={{ selected, disabled }}
+                  disabled={disabled}
                   onPress={() => {
-                    restoreRef.current = { position: positionRef.current, playing: intentRef.current };
-                    setChoice(option.choice);
+                    // Only a different choice builds a new player to restore into.
+                    if (option.choice !== choice) {
+                      restoreRef.current = { position: positionRef.current, playing: intentRef.current };
+                      setChoice(option.choice);
+                    }
                     setQualityOpen(false);
                   }}
-                  className={`flex-row items-center justify-between rounded-xl px-4 py-3 ${selected ? "bg-white" : "bg-white/10"}`}
+                  className={`flex-row items-center justify-between rounded-xl px-4 py-3 ${selected ? "bg-white" : "bg-white/10"} ${disabled ? "opacity-40" : ""}`}
                 >
                   <Text className={`text-body ${selected ? "font-semibold text-black" : "text-white"}`}>
                     {choiceLabel(option.choice)}

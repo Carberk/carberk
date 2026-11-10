@@ -3,19 +3,17 @@ import { View } from "react-native";
 
 type Listener = (event: never) => void;
 
+/** Every player the fake hook built, oldest first; reset per test. */
+export const createdPlayers: FakeVideoPlayer[] = [];
+
 /** Native playback boundary for component tests; it never decodes video. */
 export class FakeVideoPlayer {
-  source: unknown;
+  readonly source: unknown;
+  released = false;
 
   constructor(source: unknown) {
     this.source = source;
-  }
-
-  /** expo-video replaces the source on the same player; it loads paused at 0. */
-  replaceSource(source: unknown) {
-    this.source = source;
-    this.currentTime = 0;
-    this.playing = false;
+    createdPlayers.push(this);
   }
 
   currentTime = 0;
@@ -68,24 +66,35 @@ export class FakeVideoPlayer {
   }
 
   release() {
+    if (this.released) return;
     this.pause();
     this.listeners.clear();
+    this.released = true;
   }
 }
 
+/**
+ * Mirrors expo-video 55's `useVideoPlayer` (`useReleasingSharedObject`): a
+ * NEW player whenever `JSON.stringify(source)` changes, the same player while
+ * it is identical. The replaced player is released after commit, the last
+ * one on unmount. `setup` runs once per created player.
+ */
 export function useVideoPlayer(source: unknown, setup?: (player: FakeVideoPlayer) => void) {
-  const setupRef = useRef(setup);
-  setupRef.current = setup;
-  const playerRef = useRef<FakeVideoPlayer | null>(null);
-  if (playerRef.current === null) {
-    playerRef.current = new FakeVideoPlayer(source);
-    setupRef.current?.(playerRef.current);
+  const key = JSON.stringify(source);
+  const currentRef = useRef<{ key: string; player: FakeVideoPlayer } | null>(null);
+  const toReleaseRef = useRef<FakeVideoPlayer | null>(null);
+  if (currentRef.current === null || currentRef.current.key !== key) {
+    if (currentRef.current) toReleaseRef.current = currentRef.current.player;
+    const player = new FakeVideoPlayer(source);
+    setup?.(player);
+    currentRef.current = { key, player };
   }
-  const player = playerRef.current;
+  const player = currentRef.current.player;
   useEffect(() => {
-    if (!Object.is(player.source, source)) player.replaceSource(source);
-  }, [player, source]);
-  useEffect(() => () => player.release(), [player]);
+    toReleaseRef.current?.release();
+    toReleaseRef.current = null;
+  }, [player]);
+  useEffect(() => () => currentRef.current?.player.release(), []);
   return player;
 }
 

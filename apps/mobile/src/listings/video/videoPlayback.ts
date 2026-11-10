@@ -22,16 +22,22 @@ export function qualityOptions(qualities: readonly number[]): QualityOption[] {
   return [{ choice: "auto" }, { choice: "data-saver" }, ...fixed];
 }
 
-/** Variant playlist URLs by rendition height, parsed from a master playlist. */
+/**
+ * Variant playlist URLs by rendition tier, parsed from a master playlist.
+ * The tier is the short side: the worker scales portrait video to
+ * `tier` wide (`360x640` is the 360 tier), landscape to `tier` high.
+ */
 export function parseMasterPlaylist(text: string): Map<number, string> {
   const variants = new Map<number, string>();
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]?.trim() ?? "";
     if (!line.startsWith("#EXT-X-STREAM-INF")) continue;
-    const height = /RESOLUTION=\d+x(\d+)/.exec(line)?.[1];
+    const resolution = /RESOLUTION=(\d+)x(\d+)/.exec(line);
     const uri = lines[i + 1]?.trim();
-    if (height && uri && !uri.startsWith("#")) variants.set(Number(height), uri);
+    if (resolution && uri && !uri.startsWith("#")) {
+      variants.set(Math.min(Number(resolution[1]), Number(resolution[2])), uri);
+    }
   }
   return variants;
 }

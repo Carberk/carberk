@@ -43,6 +43,21 @@ describe("parseMasterPlaylist", () => {
     expect(variants.get(360)).toBe(V360);
     expect(variants.get(720)).toBe(V720);
   });
+
+  it("keys a portrait variant by its short side, as the worker scales it", () => {
+    const portrait = [
+      "#EXTM3U",
+      "#EXT-X-STREAM-INF:BANDWIDTH=400000,RESOLUTION=240x426",
+      V240,
+      "#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=360x640",
+      V360,
+      "#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=720x1280",
+      V720,
+    ].join("\n");
+    const variants = parseMasterPlaylist(portrait);
+    expect([...variants.keys()].sort((a, b) => a - b)).toEqual([240, 360, 720]);
+    expect(variantUrlFor("data-saver", MASTER, variants)).toBe(V360);
+  });
 });
 
 describe("variantUrlFor", () => {
