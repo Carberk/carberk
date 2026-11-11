@@ -194,6 +194,12 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
         player.currentTime = restore.position;
         if (restore.playing) player.play();
       } catch { /* native stub */ }
+    } else if (sourceUri && player.status === "readyToPlay" && intentRef.current) {
+      // The native player can become ready before these listeners exist, and
+      // that report is lost; without this the viewer, who already tapped
+      // Play to get here, would have to tap it again.
+      startedRef.current = true;
+      try { player.play(); } catch { /* native stub */ }
     }
     return () => { subs.forEach((sub) => { try { sub?.remove(); } catch { /* stub */ } }); };
     // `sourceUri` changes exactly when `player` does.

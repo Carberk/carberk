@@ -6,6 +6,13 @@ type Listener = (event: never) => void;
 /** Every player the fake hook built, oldest first; reset per test. */
 export const createdPlayers: FakeVideoPlayer[] = [];
 
+/**
+ * When set, a player with a source is already `readyToPlay` when built, and
+ * that report went out before anyone listened, as when the native player
+ * loads before React runs the effects that subscribe to it. Reset per test.
+ */
+export const fakeVideoOptions = { readyBeforeListening: false };
+
 /** Native playback boundary for component tests; it never decodes video. */
 export class FakeVideoPlayer {
   readonly source: unknown;
@@ -14,6 +21,7 @@ export class FakeVideoPlayer {
   constructor(source: unknown) {
     this.source = source;
     createdPlayers.push(this);
+    if (source && fakeVideoOptions.readyBeforeListening) this.status = "readyToPlay";
   }
 
   currentTime = 0;
