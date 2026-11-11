@@ -29,9 +29,10 @@ export function qualityOptions(qualities: readonly number[]): QualityOption[] {
 /**
  * Variant playlist URLs by rendition tier, parsed from a master playlist.
  * The worker lists variants in ascending tier order, so the i-th variant is
- * the i-th granted quality. RESOLUTION is not used: rotated phone clips
- * come out with sizes (202x360, 404x720) that name no tier. When the
- * playlist and the qualities disagree, nothing is mapped.
+ * the i-th granted quality, whatever RESOLUTION says. Generations made
+ * before #1089 list rotated phone clips at sizes (202x360, 404x720) that
+ * name no tier. When the playlist and the qualities disagree, nothing is
+ * mapped.
  */
 export function parseMasterPlaylist(text: string, qualities: readonly number[]): Map<number, string> {
   const uris: string[] = [];
