@@ -24,9 +24,10 @@ Standards and Spec reviewers, so one Sol reviewer covers three things:
   and the docs that [AGENTS.md](../../../AGENTS.md) routes for the touched
   areas. A documented-standard breach is a `should`, or a `blocker` when it
   hides a bug.
-- For user-facing UI changes, check the issue's design evidence and the
-  applicable `ux-heuristics`, `design-everyday-things`, and `impeccable` skill
-  findings (or the documented fallback when a skill was unavailable).
+- **UI**: for user-facing UI changes, run the app and score how it looks
+  and works, separately from the code, as in the
+  [delivery workflow](../../../docs/agents/coding-workflow.md#4-review).
+  Add the UI line to the brief and reply below.
 
 Before round 1, run the checks CI runs for the touched packages (typecheck,
 lint, affected tests) and put the results in the brief. Use the Sol model and
@@ -102,8 +103,13 @@ Skip style unless it hides a bug. Hold to the smallest change. Flag code,
 tests, or guards the intent does not need. Other paths, rare cases, small
 perf, extra compat: nits.
 blocker = intended case wrong. should = real bug callers will hit, in intent. nit = rest.
+[UI changes only] Run the app on a spare Simulator with fixture data,
+screenshot every changed state, and score the look and flow per
+docs/agents/coding-workflow.md#4-review.
 Reply:
 VERDICT: APPROVE or CHANGES
+MERGE CONFIDENCE: N/10
+[UI changes only] UI CONFIDENCE: N/10, then U1.. findings with their screenshot
 S1 [blocker|should|nit] <file>:<line> <claim>. Fix: <suggestion> (stable ids)
 ```
 
