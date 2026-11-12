@@ -27,7 +27,8 @@ Standards and Spec reviewers, so one Sol reviewer covers three things:
 - **UI**: for user-facing UI changes, run the app and score how it looks
   and works, separately from the code, as in the
   [delivery workflow](../../../docs/agents/coding-workflow.md#4-review).
-  Add the UI line to the brief and reply below.
+  Apply the [UI copy rules](../../../docs/agents/coding-standards.md#ui-copy).
+  Add the UI and readability lines to the brief and reply below.
 
 Before round 1, run the checks CI runs for the touched packages (typecheck,
 lint, affected tests) and put the results in the brief. Use the Sol model and
@@ -110,6 +111,7 @@ Reply:
 VERDICT: APPROVE or CHANGES
 MERGE CONFIDENCE: N/10
 [UI changes only] UI CONFIDENCE: N/10, then U1.. findings with their screenshot
+[UI changes only] READABILITY CONFIDENCE: N/10, with observed states/locales/text sizes and copy findings per the delivery workflow. No runtime evidence: neither score.
 S1 [blocker|should|nit] <file>:<line> <claim>. Fix: <suggestion> (stable ids)
 ```
 

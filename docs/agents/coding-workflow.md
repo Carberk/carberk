@@ -15,6 +15,7 @@ One issue is one small PR from current `main`. [ADR-0108](../adr/0108-small-prs-
 1. Branch from current `origin/main` in your own worktree. Name it `t3/<issue>-<slug>` or `agent/issue-<issue>-<slug>`.
 2. Read the issue, [CONTEXT-MAP.md](../../CONTEXT-MAP.md), the owning code and its tests, and the guides [AGENTS.md](../../AGENTS.md) routes for the area.
 3. Work test-first with [tdd](../../.claude/skills/tdd/SKILL.md). Use [diagnosing-bugs](../../.claude/skills/diagnosing-bugs/SKILL.md) for hard failures.
+   For product UI, apply the [UI copy rules](coding-standards.md#ui-copy) before handoff.
 4. Hide unfinished user-visible features behind a feature flag or tester-only switch, so each PR can merge without exposing half a feature.
 5. Keep the PR to its ticket. Note follow-ups in the issue instead of growing the diff.
 
@@ -42,13 +43,16 @@ Every reviewer, whatever its model, reviews without touching another session's c
 
 Every review reply starts with `MERGE CONFIDENCE: N/10` for correctness and the issue's criteria.
 
-**UI changes** (any change a User sees in the app or Admin) get a second, separate score that the founder reads before merging. The reviewer:
+**UI changes** (any change a User sees in the app, Admin or public Web) get separate UI and readability scores that the founder reads before merging. The reviewer:
 
-1. Runs the PR on a spare Simulator, or Admin in the preview browser, with the fixture data, and takes screenshots of every state the PR changes: empty, loading, success, error, and long text in Russian and Turkmen.
+1. Runs the PR on a spare Simulator, or Admin/public Web in the preview browser, with the fixture data, and takes screenshots of every state the PR changes: empty, loading, success, error, and long text in Russian and Turkmen where supported.
 2. Looks at each screenshot with the `impeccable`, `ux-heuristics` and `design-everyday-things` skills: text density, one clear primary action, visual hierarchy, spacing and tokens, consistency with nearby screens, readable errors with a way forward, and touch targets.
-3. Replies with `UI CONFIDENCE: N/10` on its own line after the merge score, then numbered UI findings with the screenshot or state each one comes from.
+3. Applies the [UI copy rules](coding-standards.md#ui-copy) to each changed state, reading headings, helpers, status and actions together. Flag redundant copy and unnecessary explanation, and verify that required meaning survives proposed cuts.
+4. Replies with `UI CONFIDENCE: N/10` and `READABILITY CONFIDENCE: N/10` on separate lines after the merge score, then numbered findings with the screenshot or state each one comes from. Readability covers comprehension, useful copy, hierarchy, contrast, wrapping and locale fit; it is separate from code correctness. State the observed screens, locales and text sizes so a local score is not presented as a whole-product audit.
 
-Screenshots go in the review reply or the PR, never in the repository. A UI score below 8 holds the merge until its findings are fixed or the founder accepts them. If the reviewer cannot run the app, it says so and gives no UI score; reading code is not a UI review.
+For both UI and readability: 1–3 means the task is hard to understand or complete; 4–6 needs material changes; 7 has bounded issues still needing resolution; 8–9 is clear and ready within the observed states; 10 requires exceptional evidence across the relevant states. Give reasons, not a score alone.
+
+Screenshots go in the review reply or the PR, never in the repository. Either score below 8 holds the merge until its findings are fixed or the founder accepts them. If the reviewer cannot run the affected surface, it says so and gives neither UI nor readability score; reading code is not a runtime UI review. Unobserved required states remain missing proof even when the observed states score well.
 
 ## 5. File, watch and merge
 
