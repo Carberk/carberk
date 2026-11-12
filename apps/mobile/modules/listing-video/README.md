@@ -4,8 +4,8 @@ Phone-side preparation for one Listing video: copy a library video into
 app storage, re-encode only the kept interval as H.264/AAC at most
 30 fps, fit 1280x720 / 720x1280 without upscaling, normalise HDR to
 BT.709 SDR, and hand back one staged file of at most 15 MiB — or a
-typed error. Integration into the seller flow is #1044; this module is
-not called by any screen yet.
+typed error. The [seller video flow](../../src/listings/video/ListingVideoCard.tsx)
+calls this module.
 
 ## Interface
 
@@ -58,7 +58,8 @@ does not expose the complete trim/colour/size contract.
 - Android beyond the tested emulator: real phones and hardware encoders
   (including ones without CBR), Android 12 and older, HDR sources,
   180°/270° rotation, and an R8-minified release build (#1106).
-- Real devices, the Carberk development build calling this module,
-  picker/provider recovery, and background interruption: #1044/#1045.
+- Physical-device behavior, picker/provider recovery, and background
+  interruption: #1044/#1045. Development-build caller evidence does not
+  establish these remaining cases.
 - Full founder-sample matrix, physical-device colour fidelity and final
   activation: #1058. Runtime measurements belong in the PR description.

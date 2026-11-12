@@ -41,13 +41,13 @@ Every reviewer, whatever its model, reviews without touching another session's c
 
 - Read the change with `git fetch origin pull/<n>/head:review-<n>`, `git diff` and `git show`. Never `git checkout` or `git switch` in a worktree you did not create; another session may have uncommitted work there.
 - To run tests or the app, make a temporary worktree: `git worktree add /tmp/review-<n> review-<n>`, then `pnpm install --frozen-lockfile` in it. Remove it with `git worktree remove /tmp/review-<n>` when done.
-- For runtime behavior, use the fixture data and a spare Simulator from [local testing](local-testing.md). Use your own ports, and stop the processes and close the devices you started.
+- For runtime behavior, use the fixture data from [local testing](local-testing.md) and follow the [owned-device procedure](native-fixture-signin.md#prepare-one-owned-device) for coordinated selection and handoff. Use your own ports and stop the processes you started.
 
 Every review reply starts with `MERGE CONFIDENCE: N/10` for correctness and the issue's criteria.
 
 **UI changes** (any change a User sees in the app, Admin or public Web) get separate UI and readability scores that the founder reads before merging. The reviewer:
 
-1. Runs the PR on a spare Simulator, or Admin/public Web in the preview browser, with the fixture data, and takes screenshots of every state the PR changes: empty, loading, success, error, and long text in Russian and Turkmen where supported.
+1. Runs the PR on the coordinated owned Simulator, or Admin/public Web in the preview browser, with the fixture data, and takes screenshots of every state the PR changes: empty, loading, success, error, and long text in Russian and Turkmen where supported.
 2. Looks at each screenshot with the `impeccable`, `ux-heuristics` and `design-everyday-things` skills: text density, one clear primary action, visual hierarchy, spacing and tokens, consistency with nearby screens, readable errors with a way forward, and touch targets.
 3. Applies the [UI copy rules](coding-standards.md#ui-copy) to each changed state, reading headings, helpers, status and actions together. Flag redundant copy and unnecessary explanation, and verify that required meaning survives proposed cuts.
 4. Replies with `UI CONFIDENCE: N/10` and `READABILITY CONFIDENCE: N/10` on separate lines after the merge score, then numbered findings with the screenshot or state each one comes from. Readability covers comprehension, useful copy, hierarchy, contrast, wrapping and locale fit; it is separate from code correctness. State the observed screens, locales and text sizes so a local score is not presented as a whole-product audit.
@@ -65,7 +65,7 @@ Screenshots go in the review reply or the PR, never in the repository. Either sc
 
 ## Always ask the founder first
 
-Production deploys, Railway or EAS setting changes, store submissions, paid services, data deletion or resets outside your local stack, force-pushing a branch you do not own, and closing someone else's PR. Product decisions and scope growth go back to the founder too.
+Production deploys and settings, EAS setting changes, store submissions, paid services, data deletion or resets outside your local stack (except Railway staging, governed below), force-pushing a branch you do not own, and closing someone else's PR. For Railway staging operations, including settings and data resets, follow the [environment authority](environment.md#railway) and any explicit task-specific restrictions. Product decisions and scope growth go back to the founder too.
 
 ## Not used any more
 
