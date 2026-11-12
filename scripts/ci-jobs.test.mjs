@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -146,6 +146,66 @@ test("the required check rejects failed, cancelled and unexpectedly skipped jobs
     for (const value of ["failure", "cancelled", "skipped", ""]) {
       assert.equal(status({ [id]: value }), 1, `${id}=${value} must fail the full lane`);
     }
+  }
+});
+
+test("the full PR static job builds the worker and its production prerequisites", () => {
+  const job = jobs(workflow("pr-checks.yml")).get("static");
+  const command = /run: (pnpm exec turbo run build --filter=@auto-tm\/worker --concurrency=1)\n/.exec(job)?.[1];
+  assert.ok(command, "static must run the worker production build through Turbo");
+  assert.doesNotMatch(job, /continue-on-error:/);
+  const graph = spawnSync("pnpm", [...command.split(" ").slice(1), "--dry=json"], {
+    cwd: root, encoding: "utf8", timeout: 30000,
+  });
+  assert.equal(graph.status, 0, graph.stderr);
+  const tasks = JSON.parse(graph.stdout).tasks;
+  const worker = tasks.find(task => task.taskId === "@auto-tm/worker#build");
+  assert.equal(worker.command, "nest build");
+  for (const id of ["@auto-tm/contracts#build", "@auto-tm/db#build"]) {
+    assert.ok(worker.dependencies.includes(id), `worker build must depend on ${id}`);
+    assert.equal(tasks.find(task => task.taskId === id)?.command, "node scripts/build.cjs");
+  }
+});
+
+test("production rootDir errors missed by typecheck fail the required PR gate", t => {
+  const cwd = mkdtempSync(join(tmpdir(), "ci-worker-build-"));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  symlinkSync(join(root, "apps/worker/node_modules"), join(cwd, "node_modules"), "dir");
+  const writeJson = (name, value) => writeFileSync(join(cwd, name), JSON.stringify(value));
+  for (const dir of ["src", "scripts"]) {
+    mkdirSync(join(cwd, dir));
+    writeFileSync(join(cwd, dir, "fixture.ts"), "export const fixture = 1;\n");
+  }
+  // Reuse current worker compiler settings, removing ambient Node types from
+  // this dependency-free fixture. Only the historical scripts exclusion differs.
+  writeJson("tsconfig.json", {
+    extends: join(root, "apps/worker/tsconfig.json"),
+    compilerOptions: { types: [], outDir: "./dist" },
+  });
+  writeJson("nest-cli.json", readJson("apps/worker/nest-cli.json"));
+  const fixed = readJson("apps/worker/tsconfig.build.json");
+  writeJson("tsconfig.fixed.json", fixed);
+  writeJson("tsconfig.broken.json", { ...fixed, exclude: fixed.exclude.filter(path => path !== "scripts") });
+  const run = (binary, args) => spawnSync(process.execPath, [join(root, "apps/worker/node_modules", binary), ...args], {
+    cwd, encoding: "utf8", timeout: 30000,
+  });
+  const typecheck = run("@typescript/native/bin/tsc", ["--noEmit", "-p", "tsconfig.json"]);
+  assert.equal(typecheck.status, 0, typecheck.stdout + typecheck.stderr);
+  t.diagnostic(`ordinary worker typecheck: exit ${typecheck.status}`);
+  const gate = runBlock(jobs(workflow("pr-checks.yml")).get("pr"));
+  for (const [config, expectedBuild, expectedGate] of [["broken", 1, 1], ["fixed", 0, 0]]) {
+    const build = run("@nestjs/cli/bin/nest.js", ["build", "--path", `tsconfig.${config}.json`]);
+    assert.equal(build.status, expectedBuild, build.stdout + build.stderr);
+    if (config === "broken") assert.match(build.stdout + build.stderr, /TS6059/);
+    else assert.ok(readFileSync(join(cwd, "dist/fixture.js"), "utf8").includes("exports.fixture"));
+    const aggregate = spawnSync("bash", ["-c", gate], {
+      env: { ...process.env, LANE: "full", LANE_RESULT: "success", DOCS_RESULT: "skipped",
+        STATIC_RESULT: build.status === 0 ? "success" : "failure",
+        API_RESULT: "success", DB_RESULT: "success", FRONTEND_RESULT: "success" },
+      encoding: "utf8",
+    });
+    assert.equal(aggregate.status, expectedGate, aggregate.stdout + aggregate.stderr);
+    t.diagnostic(`${config} production config: Nest exit ${build.status}${config === "broken" ? " (TS6059)" : " (CommonJS emitted)"}; required pr aggregate exit ${aggregate.status}`);
   }
 });
 
