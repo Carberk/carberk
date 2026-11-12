@@ -77,7 +77,7 @@ jobs:
       - name: Docs checks
         run: pnpm test:agent-docs && pnpm test:glossary
 
-  # Lint, typecheck and the admin build with its runtime smoke. No services.
+  # Lint, typecheck, worker production build and admin runtime smoke. No services.
   static:
     needs: lane
     if: (github.event.pull_request.draft != true || contains(github.event.pull_request.labels.*.name, 'run-full-ci')) && needs.lane.outputs.lane != 'docs'
@@ -108,6 +108,9 @@ jobs:
       - run: pnpm lint
 
       - run: pnpm typecheck
+
+      - name: Build worker production code and workspace prerequisites
+        run: pnpm exec turbo run build --filter=@auto-tm/worker --concurrency=1
 
       - name: Build admin and verify real session/runtime paths
         run: pnpm --filter @auto-tm/admin verify:runtime
