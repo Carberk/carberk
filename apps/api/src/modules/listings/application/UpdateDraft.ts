@@ -108,10 +108,21 @@ export class UpdateDraft {
       ...Object.keys(oldPayload),
       ...Object.keys(newPayload),
     ]);
+    // JSONB reorders object properties. Sort photo properties for comparison,
+    // retaining JSON's handling of undefined and the meaningful array order.
+    const photoProperties = (_key: string, value: unknown): unknown => {
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        return Object.fromEntries(
+          Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
+        );
+      }
+      return value;
+    };
 
     for (const key of relevantKeys) {
       if (key === "validatedSteps" || key === "currentStep") continue;
-      if (JSON.stringify(oldPayload[key]) !== JSON.stringify(newPayload[key])) {
+      const replacer = key === "photos" ? photoProperties : undefined;
+      if (JSON.stringify(oldPayload[key], replacer) !== JSON.stringify(newPayload[key], replacer)) {
         changed.push(key);
       }
     }

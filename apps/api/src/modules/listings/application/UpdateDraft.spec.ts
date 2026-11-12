@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException } from "@nestjs/common";
+import type { ListingsSchemas } from "@auto-tm/contracts";
 import { UpdateDraft } from "./UpdateDraft";
 import type { MediaUpload } from "../domain/MediaUpload";
 import { ListingDraft } from "../domain/ListingDraft";
@@ -130,6 +131,102 @@ describe("UpdateDraft", () => {
     });
 
     expect((result.draft.payload as any).validatedSteps).toEqual(["vehicle"]);
+  });
+
+  it("retains photo validation when JSONB and client photo properties have different orders", async () => {
+    repo.drafts.push(ListingDraft.create({
+      id: "draft-1",
+      userId: "user-1",
+      payload: {
+        photos: [{ key: "pending/front/original.webp", photoId: "front", sortOrder: 0 }],
+        description: "Kept description",
+        currentStep: 3,
+        validatedSteps: ["vehicle", "specs", "photos", "price", "location", "contact", "review"],
+      },
+    }));
+
+    const result = await makeUseCase(repo).execute({
+      draftId: "draft-1",
+      userId: "user-1",
+      payload: {
+        photos: [{ photoId: "front", sortOrder: 0, key: "pending/front/original.webp" }],
+        description: "Kept description",
+        currentStep: 4,
+      },
+    });
+
+    expect(result.draft.payload).toEqual({
+      photos: [{ photoId: "front", sortOrder: 0, key: "pending/front/original.webp" }],
+      description: "Kept description",
+      currentStep: 4,
+      validatedSteps: ["vehicle", "specs", "photos", "price", "location", "contact", "review"],
+    });
+  });
+
+  it.each([
+    ["storage key", [{ photoId: "front", key: "changed.webp", sortOrder: 0 }, { photoId: "rear", sortOrder: 1 }]],
+    ["photo identity", [{ photoId: "other", key: "front.webp", sortOrder: 0 }, { photoId: "rear", sortOrder: 1 }]],
+    ["sort order value", [{ photoId: "front", key: "front.webp", sortOrder: 2 }, { photoId: "rear", sortOrder: 1 }]],
+    ["removed key", [{ photoId: "front", sortOrder: 0 }, { photoId: "rear", sortOrder: 1 }]],
+    ["added key", [{ photoId: "front", key: "front.webp", sortOrder: 0 }, { photoId: "rear", key: "rear.webp", sortOrder: 1 }]],
+    ["array order", [{ photoId: "rear", sortOrder: 1 }, { photoId: "front", key: "front.webp", sortOrder: 0 }]],
+    ["removed photo", [{ photoId: "front", key: "front.webp", sortOrder: 0 }]],
+    ["added photo", [{ photoId: "front", key: "front.webp", sortOrder: 0 }, { photoId: "rear", sortOrder: 1 }, { photoId: "extra", sortOrder: 2 }]],
+  ] satisfies [string, ListingsSchemas.DraftPhoto[]][])(
+    "invalidates Photos and downstream validation after a changed %s",
+    async (_name, photos) => {
+      repo.drafts.push(ListingDraft.create({
+        id: "draft-1",
+        userId: "user-1",
+        payload: {
+          photos: [{ photoId: "front", key: "front.webp", sortOrder: 0 }, { photoId: "rear", sortOrder: 1 }],
+          validatedSteps: ["vehicle", "specs", "photos", "price", "location", "contact", "review"],
+        },
+      }));
+
+      const result = await makeUseCase(repo).execute({ draftId: "draft-1", userId: "user-1", payload: { photos } });
+
+      expect(result.draft.payload).toEqual({ photos, validatedSteps: ["vehicle", "specs"] });
+    },
+  );
+
+  it("treats an undefined optional photo key like a missing key", async () => {
+    repo.drafts.push(ListingDraft.create({
+      id: "draft-1", userId: "user-1",
+      payload: { photos: [{ photoId: "front", sortOrder: 0 }], validatedSteps: ["photos", "price"] },
+    }));
+
+    const result = await makeUseCase(repo).execute({
+      draftId: "draft-1", userId: "user-1",
+      payload: { photos: [{ photoId: "front", key: undefined, sortOrder: 0 }] },
+    });
+
+    expect(result.draft.payload["validatedSteps"]).toEqual(["photos", "price"]);
+  });
+
+  it("keeps omitted photos through merge but retains the existing invalidation contract", async () => {
+    repo.drafts.push(ListingDraft.create({
+      id: "draft-1", userId: "user-1",
+      payload: { photos: [{ photoId: "front", sortOrder: 0 }], validatedSteps: ["vehicle", "specs", "photos", "price"] },
+    }));
+
+    const result = await makeUseCase(repo).execute({ draftId: "draft-1", userId: "user-1", payload: {} });
+
+    expect(result.draft.payload).toEqual({ photos: [{ photoId: "front", sortOrder: 0 }], validatedSteps: ["vehicle", "specs"] });
+  });
+
+  it("does not change property-order comparison for other draft objects", async () => {
+    repo.drafts.push(ListingDraft.create({
+      id: "draft-1", userId: "user-1",
+      payload: { conditionDisclosure: { damaged: true, knownIssuesText: "Scratch" }, validatedSteps: ["vehicle", "specs", "photos"] },
+    }));
+
+    const result = await makeUseCase(repo).execute({
+      draftId: "draft-1", userId: "user-1",
+      payload: { conditionDisclosure: { knownIssuesText: "Scratch", damaged: true } },
+    });
+
+    expect(result.draft.payload["validatedSteps"]).toEqual(["vehicle"]);
   });
 
   it("invalidates downstream steps when a field changes", async () => {
