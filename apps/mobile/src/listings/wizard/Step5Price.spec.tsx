@@ -19,18 +19,6 @@ vi.mock("@/components/ui/input", () => ({
   }),
 }));
 
-vi.mock("@/components/ui/switch", async () => {
-  const { Pressable } = await import("react-native");
-  return {
-    Switch: ({ checked, onCheckedChange, disabled }: {
-      checked: boolean; onCheckedChange: (value: boolean) => void; disabled?: boolean;
-    }) => (
-      <Pressable accessibilityRole="switch" accessibilityState={{ checked, disabled }}
-        disabled={disabled} onPress={() => onCheckedChange(!checked)} />
-    ),
-  };
-});
-
 const updatedAt ="2026-10-01T00:00:00.000Z";
 let rates: { fromCurrency: string; toCurrency: string; rate: number; updatedAt: string }[] = [];
 
@@ -246,5 +234,56 @@ describe("Price step errors", () => {
     const screen = await renderMobile(<ErrorsStep showErrors />);
 
     expect(screen.getByText("Price is required")).toBeTruthy();
+  });
+});
+
+describe("Price seller terms", () => {
+  it.each([
+    ["en", "Exchange possible", "Installment", "Willing to trade for another vehicle", "Buyer can pay in installments"],
+    ["ru", "Возможен обмен", "Рассрочка", "Готовы обменять на другой автомобиль", "Покупатель может платить в рассрочку"],
+    ["tk", "Çalşyk mümkin", "Bölüp töleg", "Başga awtomobil bilen çalşmaga taýyn", "Satyn alyjy bölüp töleg edip biler"],
+  ])("names each switch by its visible label and preserves independent on/off values in %s", async (locale, exchange, installment, exchangeHelper, installmentHelper) => {
+    const onChange = vi.fn();
+    const screen = await renderMobile(<PriceStep onChange={onChange} />, { locale });
+
+    expect(screen.getAllByText(exchange)).toHaveLength(1);
+    expect(screen.getAllByText(installment)).toHaveLength(1);
+    expect(screen.queryByText(exchangeHelper)).toBeNull();
+    expect(screen.queryByText(installmentHelper)).toBeNull();
+    expect(screen.getByRole("switch", { name: exchange, checked: false })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: installment, checked: false })).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole("switch", { name: exchange }));
+    expect(onChange).toHaveBeenLastCalledWith({ acceptsExchange: true });
+    expect(screen.getByRole("switch", { name: exchange, checked: true })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: installment, checked: false })).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole("switch", { name: installment }));
+    expect(onChange).toHaveBeenLastCalledWith({ installmentAvailable: true });
+    expect(screen.getByRole("switch", { name: installment, checked: true })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: exchange, checked: true })).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole("switch", { name: exchange }));
+    expect(onChange).toHaveBeenLastCalledWith({ acceptsExchange: false });
+    expect(screen.getByRole("switch", { name: exchange, checked: false })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: installment, checked: true })).toBeTruthy();
+
+    await fireEvent.press(screen.getByRole("switch", { name: installment }));
+    expect(onChange).toHaveBeenLastCalledWith({ installmentAvailable: false });
+    expect(screen.getByRole("switch", { name: installment, checked: false })).toBeTruthy();
+  });
+
+  it("keeps saved terms checked and prevents changes while read-only", async () => {
+    const onChange = vi.fn();
+    const screen = await renderMobile(
+      <Step5Price payload={{ acceptsExchange: true, installmentAvailable: true }} onChange={onChange} disabled />,
+    );
+
+    for (const name of ["Exchange possible", "Installment"]) {
+      const control = screen.getByRole("switch", { name, checked: true, disabled: true });
+      await fireEvent.press(control);
+      expect(screen.getByRole("switch", { name, checked: true, disabled: true })).toBeTruthy();
+    }
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

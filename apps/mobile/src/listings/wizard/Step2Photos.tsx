@@ -359,12 +359,7 @@ function EmptyState() {
       <View className="h-12 w-12 items-center justify-center rounded-full bg-muted">
         <Icon as={ImageIcon} className="size-6 text-muted-foreground" />
       </View>
-      <View className="items-center gap-1">
-        <Text className="text-callout font-medium text-foreground">{t("noPhotos")}</Text>
-        <Text className="text-caption text-muted-foreground text-center px-8">
-          {t("tapCameraOrLibrary")}
-        </Text>
-      </View>
+      <Text className="text-callout font-medium text-foreground">{t("noPhotos")}</Text>
     </View>
   );
 }

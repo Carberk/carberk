@@ -58,6 +58,18 @@ async function dragPhoto(screen: Awaited<ReturnType<typeof renderMobile>>, index
 }
 
 describe("Step2Photos", () => {
+  it.each([
+    ["en", "No photos", "Camera", "Library", "Tap Camera or Library to add your first photo"],
+    ["ru", "Нет фото", "Камера", "Галерея", "Нажмите Камера или Галерея, чтобы добавить первое фото"],
+    ["tk", "Surat ýok", "Kamera", "Galereýa", "Birinji suraty goşmak üçin Kamera ýa-da Galereýa basyň"],
+  ])("keeps the zero-photo state and add controls without repeated instructions in %s", async (locale, empty, camera, library, helper) => {
+    const screen = await renderMobile(<Step2Photos {...defaults()} />, { locale });
+    expect(screen.getByText(empty)).toBeTruthy();
+    expect(screen.getByRole("button", { name: camera })).toBeTruthy();
+    expect(screen.getByRole("button", { name: library })).toBeTruthy();
+    expect(screen.queryByText(helper)).toBeNull();
+  });
+
   it("shows an empty state and photo validation error", async () => {
     const screen = await renderMobile(<Step2Photos {...defaults()} fieldErrors={{ photos: "Add a photo" }} showErrors />);
     expect(screen.getByText("No photos")).toBeTruthy();
