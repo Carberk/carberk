@@ -154,7 +154,7 @@ describe("Listing video card on the Photos step", () => {
 
     const tester = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo />);
     expect(tester.getByTestId("listing-video-card")).toBeTruthy();
-    expect(tester.getByText("One video, up to 90 seconds, from your library")).toBeTruthy();
+    expect(tester.getByText("One video up to 1:30, from your library")).toBeTruthy();
     expect(tester.getByRole("button", { name: "Choose from library" })).toBeTruthy();
   });
 
@@ -189,7 +189,7 @@ describe("Listing video card on the Photos step", () => {
 
     expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
     expect(screen.getByText("Carberk can't open your videos")).toBeTruthy();
-    expect(screen.getByText("Allow video access in Settings, or carry on with photos. Nothing you entered is lost.")).toBeTruthy();
+    expect(screen.getByText("Allow access in Settings, or carry on with photos.")).toBeTruthy();
     expect(screen.getByLabelText("Photo 1 of 3, Cover, Uploaded")).toBeTruthy();
     expect(screen.getByLabelText("Photo 3 of 3, Uploaded")).toBeTruthy();
 
@@ -429,7 +429,7 @@ describe("Listing video editor", () => {
     expect(await screen.findByText("Video ready")).toBeTruthy();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Continue editing" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Edit" }));
     });
     expect(screen.getByTestId("listing-video-editor")).toBeTruthy();
     await act(async () => {
@@ -509,7 +509,7 @@ describe("Listing video editor", () => {
 });
 
 describe("Listing video preparation (#1044)", () => {
-  it("shows Preparing with an indeterminate bar and Cancel deletes the local files", async () => {
+  it("shows Preparing and Cancel deletes the local files", async () => {
     const gate = deferred<PreparedResult>();
     const native = fakeNative(() => gate.promise);
     const screen = await renderMobile(
@@ -521,8 +521,8 @@ describe("Listing video preparation (#1044)", () => {
     });
 
     expect(await screen.findByText("Preparing video…")).toBeTruthy();
-    expect(screen.getByText("Keep Carberk open. 0:45 selected")).toBeTruthy();
-    expect(screen.getByTestId("listing-video-preparing-bar")).toBeTruthy();
+    expect(screen.getByText("0:45 · keep Carberk open")).toBeTruthy();
+    expect(screen.getByTestId("listing-video-preparing")).toBeTruthy();
     expect(screen.getByLabelText("Photo 1 of 3, Cover, Uploaded")).toBeTruthy();
 
     vi.mocked(FileSystem.deleteAsync).mockClear();
@@ -568,7 +568,7 @@ describe("Listing video preparation (#1044)", () => {
       onBackground?.();
     });
     expect(screen.getByText("Preparing stopped")).toBeTruthy();
-    expect(screen.getByText("Carberk was closed while preparing. Your selection is kept.")).toBeTruthy();
+    expect(screen.getByText("Carberk closed while preparing.")).toBeTruthy();
     expect(native.cancel).toHaveBeenCalled();
 
     await act(async () => {
@@ -595,7 +595,7 @@ describe("Listing video preparation (#1044)", () => {
     });
 
     expect(await screen.findByText("Video no longer available")).toBeTruthy();
-    expect(screen.getByText("The original was moved, deleted or access was removed. Choose another video.")).toBeTruthy();
+    expect(screen.getByText("It was moved or deleted, or access was removed.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Choose another" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Prepare again" })).toBeNull();
     expect(screen.getByLabelText("Photo 1 of 3, Cover, Uploaded")).toBeTruthy();
@@ -626,7 +626,7 @@ describe("Listing video preparation (#1044)", () => {
     });
 
     expect(await screen.findByText("Not enough space on your phone")).toBeTruthy();
-    expect(screen.getByText("Free up some space, then try again. Your selection is kept.")).toBeTruthy();
+    expect(screen.getByText("Free up space, then try again.")).toBeTruthy();
 
     await act(async () => {
       await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
@@ -653,7 +653,8 @@ describe("Listing video preparation (#1044)", () => {
     });
 
     expect(await screen.findByText("Couldn't prepare this video")).toBeTruthy();
-    expect(screen.getByText("Try again, or choose another video.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeTruthy();
     expect(screen.queryByText("Video ready")).toBeNull();
     // An output over the cap is reported as a failure, never as a size.
     await waitFor(() => expect(sentVideoTelemetry).toEqual([
@@ -782,7 +783,7 @@ describe("Listing video preparation (#1044)", () => {
     expect(await screen.findByText("Video ready")).toBeTruthy();
 
     await act(async () => {
-      await fireEvent.press(screen.getByRole("button", { name: "Continue editing" }));
+      await fireEvent.press(screen.getByRole("button", { name: "Edit" }));
     });
     vi.mocked(FileSystem.deleteAsync).mockClear();
     await act(async () => {
@@ -935,7 +936,7 @@ describe("Listing video resumable upload card with the real HTTP client", () => 
     expect(state.sent).toEqual([0, 0, 0]);
     refuse = false;
     vi.mocked(FileSystem.deleteAsync).mockClear();
-    await fireEvent.press(screen.getByRole("button", { name: "Continue upload" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByText("Processing video…")).toBeTruthy();
     expect(state.keys).toHaveLength(1);
     expect(native.prepare).toHaveBeenCalledOnce();
@@ -953,7 +954,7 @@ describe("Listing video resumable upload card with the real HTTP client", () => 
     await pickVideo(screen, 45_000);
     await fireEvent.press(screen.getByRole("button", { name: "Use video" }));
     expect(await screen.findByText("Uploading video")).toBeTruthy();
-    await fireEvent.press(screen.getByRole("button", { name: "Pause upload" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Pause" }));
     expect(await screen.findByText("Upload paused")).toBeTruthy();
     await screen.unmount();
     expect(FileSystem.deleteAsync).not.toHaveBeenCalledWith("file:///documents/listing-video/job-1/prepared.mp4", { idempotent: true });
@@ -961,7 +962,7 @@ describe("Listing video resumable upload card with the real HTTP client", () => 
     expect(await reopened.findByText("Upload paused")).toBeTruthy();
     state.phase = "PROCESSING";
     state.confirmed = true;
-    await fireEvent.press(reopened.getByRole("button", { name: "Continue upload" }));
+    await fireEvent.press(reopened.getByRole("button", { name: "Continue" }));
     expect(await reopened.findByText("Processing video…")).toBeTruthy();
     part.resolve(undefined);
   });

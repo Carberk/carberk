@@ -10,8 +10,9 @@ import { queryKeys } from "../../api/queryKeys";
 import { formatMmss } from "./listingVideo";
 import type { ListingVideoTask } from "./ListingVideoTasks";
 import { useTargetVideo } from "./useTargetVideo";
+import { useListingVideoCover } from "./useListingVideoCover";
+import { VideoCardActions, VideoCardRow } from "./VideoCardRow";
 
-import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
@@ -46,6 +47,7 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
     return () => { current = false; };
   }, [phase, hasTarget, localGeneration, refetch, clear]);
   const active = hidden === "all" ? undefined : status.data?.video;
+  const cover = useListingVideoCover(target?.id ?? "", target ? active : undefined, { isOwner: true, targetType: target?.type });
   const pending = hidden ? undefined : status.data?.pendingVideo;
 
   const reconcile = async () => {
@@ -78,45 +80,57 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
   };
   const hasLocal = task.prep.state.phase !== "idle" || !["idle", "processing"].includes(task.upload.state.phase);
   const removePending = () => void change(active ? "cancel" : "remove");
-  return <View className="gap-3">
-    {active && <View className="gap-1" testID="listing-video-active">
-      <Text className="text-callout font-semibold">{t(target?.type === "draft" ? "listingVideoPrivateReady" : "listingVideoBuyersSee")}</Text>
-      <Text className="text-footnote text-muted-foreground">{formatMmss(active.durationMs / 1000)}</Text>
-    </View>}
-    {active && (pending || hasLocal) && <Text className="text-footnote font-semibold text-muted-foreground">{t("listingVideoReplacement")}</Text>}
-    {pending?.status === "processing" && <View className="gap-2" testID="listing-video-processing">
-      <Text className="text-callout font-semibold" accessibilityLiveRegion="polite">{t("listingVideoProcessing")}</Text>
-      <Text className="text-footnote text-muted-foreground">{t(active ? "listingVideoReplacementWaiting" : "listingVideoPublishNow")}</Text>
-      <Button variant="outline" onPress={removePending} disabled={working}><Text>{t(active ? "listingVideoCancelReplacement" : "cancel")}</Text></Button>
-    </View>}
-    {pending?.status === "failed" && <View className="gap-2">
-      <View accessibilityRole="alert" className="gap-1 rounded-2xl bg-destructive/10 p-3">
-        <Text className="text-callout font-semibold">{t("listingVideoProcessFailed")}</Text>
-        <Text className="text-footnote text-muted-foreground">{t("listingVideoProcessFailedBody")}</Text>
-      </View>
-      {pending.canReprocess && <Button variant="secondary" onPress={() => void change("reprocess")} disabled={working}><Text>{t("listingVideoTryAgain")}</Text></Button>}
+  const replacing = !!active && (!!pending || hasLocal);
+  const pendingMeta = (key: "listingVideoPublishNow" | "listingVideoReplacementWaiting") => t(active ? "listingVideoReplacementWaiting" : key);
+  const cancelPending = { label: t(active ? "listingVideoCancelReplacement" : "cancel"), onPress: removePending, disabled: working };
+  // The dialog's root is a View; keep it out of the gapped column so it adds no space.
+  return <View><View className="gap-4">
+    {active && <VideoCardRow
+      testID="listing-video-active"
+      thumb={{ kind: "cover", uri: cover?.cover?.thumbnail, durationMs: active.durationMs }}
+      title={t(target?.type === "draft" ? "listingVideoPrivateReady" : "listingVideoBuyersSee")}
+      meta={formatMmss(active.durationMs / 1000)}
+    >
+      {!pending && !hasLocal && !uncertain && <VideoCardActions
+        primary={{ label: t("listingVideoReplace"), onPress: onChoose }}
+        secondary={{ label: t("listingVideoRemove"), onPress: () => setConfirm(true) }}
+      />}
+    </VideoCardRow>}
+    {replacing && <View className="h-px bg-border" testID="listing-video-replacement" />}
+    {pending?.status === "processing" && <VideoCardRow testID="listing-video-processing" thumb={{ kind: "busy" }} title={t("listingVideoProcessing")} meta={pendingMeta("listingVideoPublishNow")}>
+      <VideoCardActions secondary={cancelPending} />
+    </VideoCardRow>}
+    {pending?.status === "failed" && <VideoCardRow
+      testID="listing-video-process-failed"
+      alert
+      thumb={{ kind: "error" }}
+      title={t("listingVideoProcessFailed")}
+      meta={pending.canReprocess ? t("listingVideoProcessFailedBody") : t("listingVideoProcessFailedFinal")}
+    >
       {/* Open retires the Failed source atomically after a new clip is accepted and prepared. */}
-      <Button variant="outline" onPress={onChoose} disabled={working}><Text>{t("listingVideoChooseAnother")}</Text></Button>
-      <Button variant="outline" onPress={active ? removePending : () => setConfirm(true)} disabled={working}><Text>{t(active ? "listingVideoCancelReplacement" : "listingVideoRemove")}</Text></Button>
-    </View>}
-    {pending?.status === "uploading" && !hasLocal && <View className="gap-2">
-      <Text className="text-callout font-semibold">{t("listingVideoUploading")}</Text>
-      <Button variant="outline" onPress={removePending} disabled={working}><Text>{t(active ? "listingVideoCancelReplacement" : "cancel")}</Text></Button>
-    </View>}
-    {(status.isError || actionFailed) && <View className="gap-2" accessibilityRole="alert">
-      <Text className="text-callout">{t("listingVideoStatusFailed")}</Text>
-      <Button variant="outline" onPress={() => void reconcile()}><Text>{t("listingVideoCheckAgain")}</Text></Button>
-    </View>}
-    {uncertain && <View className="gap-2" accessibilityRole="alert">
-      <Text className="text-callout">{t(hidden === "all" ? "listingVideoUploadNotConfirmedRemove" : "listingVideoUploadNotConfirmedCancel")}</Text>
-      <Text className="text-footnote text-muted-foreground">{t("listingVideoUploadNotConfirmedBody")}</Text>
-      <Button variant="outline" onPress={() => void reconcile()}><Text>{t("listingVideoCheckAgain")}</Text></Button>
-    </View>}
-    {active && !pending && !hasLocal && !uncertain && <View className="flex-row gap-2">
-      <Button variant="secondary" onPress={onChoose}><Text>{t("listingVideoReplace")}</Text></Button>
-      <Button variant="outline" onPress={() => setConfirm(true)}><Text>{t("listingVideoRemove")}</Text></Button>
-    </View>}
+      <VideoCardActions
+        primary={pending.canReprocess
+          ? { label: t("listingVideoTryAgain"), onPress: () => void change("reprocess"), disabled: working }
+          : { label: t("listingVideoChooseAnother"), onPress: onChoose, disabled: working }}
+        secondary={active ? cancelPending : { label: t("listingVideoRemove"), onPress: () => setConfirm(true), disabled: working }}
+      />
+    </VideoCardRow>}
+    {pending?.status === "uploading" && !hasLocal && <VideoCardRow thumb={{ kind: "busy" }} title={t("listingVideoUploading")} meta={pendingMeta("listingVideoPublishNow")}>
+      <VideoCardActions secondary={cancelPending} />
+    </VideoCardRow>}
+    {(status.isError || actionFailed) && <VideoCardRow alert thumb={{ kind: "error" }} title={t("listingVideoStatusFailed")}>
+      <VideoCardActions primary={{ label: t("listingVideoCheckAgain"), onPress: () => void reconcile() }} />
+    </VideoCardRow>}
+    {uncertain && <VideoCardRow
+      alert
+      thumb={{ kind: "error" }}
+      title={t(hidden === "all" ? "listingVideoUploadNotConfirmedRemove" : "listingVideoUploadNotConfirmedCancel")}
+      meta={t("listingVideoUploadNotConfirmedBody")}
+    >
+      <VideoCardActions primary={{ label: t("listingVideoCheckAgain"), onPress: () => void reconcile() }} />
+    </VideoCardRow>}
     {!uncertain && children?.(!!active || !!pending || !!hidden, !!active, () => setConfirm(true))}
+    </View>
     <AlertDialog open={confirm} onOpenChange={setConfirm}>
       <AlertDialogContent><AlertDialogHeader>
         <AlertDialogTitle>{t("listingVideoRemoveTitle")}</AlertDialogTitle>

@@ -98,7 +98,7 @@ it("keeps existing status and stored-source recovery available to a member with 
   await screen.findByText("Video · Needs attention");
   expect(screen.getByRole("button", { name: "Publish" }).props.disabled).toBeFalsy();
   await fireEvent.press(screen.getByRole("button", { name: /^Photos,.*Change$/ }));
-  await screen.findByText("We couldn’t process this video");
+  await screen.findByText("Couldn’t process this video");
   await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
   expect(await screen.findByText("Processing video…")).toBeTruthy();
   expect(state.retried()).toBe(true);

@@ -24,6 +24,8 @@ export interface ListingVideoCoverOptions {
   status?: string | undefined;
   /** Detail and the gallery keep a mounted tile's grant fresh; cards do not poll. */
   timedRefresh?: boolean;
+  /** An owner's unpublished draft reads its cover by draft id; everything else is a Listing. */
+  targetType?: "listing" | "draft";
 }
 
 /** Renew a little before the grant dies; even a 10-second local grant gets half its life. */
@@ -53,7 +55,7 @@ export function useListingVideoCover(
   options: ListingVideoCoverOptions = {},
 ): ListingVideoCover | undefined {
   const { isAuthenticated, userId } = useAuth();
-  const { isOwner = false, status, timedRefresh = false } = options;
+  const { isOwner = false, status, timedRefresh = false, targetType = "listing" } = options;
   const audience = isOwner ? "owner-preview" : "viewer";
   const visible =
     !!video && status !== "banned" && (isOwner || status === undefined || status === "active" || status === "sold");
@@ -61,7 +63,7 @@ export function useListingVideoCover(
   const { data } = useQuery({
     queryKey: queryKeys.listings.videoCover(userId, listingId, generationId, audience),
     queryFn: () =>
-      apiClient.get(`/listings/video-access/${audience}/listing/${listingId}`, ListingsSchemas.VideoAccessResponseSchema),
+      apiClient.get(`/listings/video-access/${audience}/${targetType}/${listingId}`, ListingsSchemas.VideoAccessResponseSchema),
     enabled: visible && isAuthenticated === true && !!userId,
     staleTime: (query) => msUntilCoverRefresh(query.state.data?.expiresAt) ?? 0,
     refetchInterval: timedRefresh ? (query) => msUntilCoverRefresh(query.state.data?.expiresAt) ?? false : false,
