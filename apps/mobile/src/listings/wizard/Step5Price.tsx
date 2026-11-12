@@ -183,11 +183,9 @@ function SellerTerms({
         {t("sellerTerms")}
       </Text>
       <View className="flex-row items-center justify-between py-2">
-        <View className="gap-0.5">
-          <Text className="text-body text-foreground">{t("exchangePossible")}</Text>
-          <Text className="text-caption text-muted-foreground">{t("willingToTrade")}</Text>
-        </View>
+        <Text className="text-body text-foreground">{t("exchangePossible")}</Text>
         <Switch
+          accessibilityLabel={t("exchangePossible")}
           checked={payload.acceptsExchange ?? false}
           onCheckedChange={(v) => onChange({ acceptsExchange: v })}
           disabled={disabled}
@@ -195,11 +193,9 @@ function SellerTerms({
       </View>
       <View className="h-px bg-border" />
       <View className="flex-row items-center justify-between py-2">
-        <View className="gap-0.5">
-          <Text className="text-body text-foreground">{t("installmentAvailableLabel")}</Text>
-          <Text className="text-caption text-muted-foreground">{t("buyerCanPayInstallments")}</Text>
-        </View>
+        <Text className="text-body text-foreground">{t("installmentAvailableLabel")}</Text>
         <Switch
+          accessibilityLabel={t("installmentAvailableLabel")}
           checked={payload.installmentAvailable ?? false}
           onCheckedChange={(v) => onChange({ installmentAvailable: v })}
           disabled={disabled}
