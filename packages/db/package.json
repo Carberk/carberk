@@ -35,6 +35,7 @@
     "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --exclude '**/tests/**' --passWithNoTests",
     "tester:accounts": "tsx scripts/tester-accounts.ts",
     "canonical:seed": "tsx src/canonical-seed.ts",
+    "gallery:verify": "tsx scripts/verify-ui-gallery.ts",
     "fixture:check": "node --import tsx scripts/local-fixture-readiness.ts"
   },
   "dependencies": {
