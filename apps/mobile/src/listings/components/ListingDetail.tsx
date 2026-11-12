@@ -22,6 +22,7 @@ import { PriceDisplay } from "./PriceDisplay";
 import { SellerBlock } from "./SellerBlock";
 
 import { cn } from "@/lib/utils";
+import { useLargeText } from "@/lib/font-scale";
 import { Text } from "@/components/ui/text";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -135,14 +136,15 @@ export function ListingDetailView({
             : undefined
         }
       />
-      <View testID="detail-body" className="gap-4 px-4 py-5">
+      <View testID="detail-body" className="gap-6 px-4 py-5">
         {isOwner && (
           <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} />
         )}
         {isOwner && <ListingVideoCard videoUploadTarget={{ type: "listing", id: listing.id }} />}
+        <View className="gap-3">
         <Text
+          accessibilityRole="header"
           className="text-headline font-heading font-semibold text-foreground"
-          numberOfLines={2}
         >
           {listingTitle(listing, maps) || t("listing")}
         </Text>
@@ -157,12 +159,13 @@ export function ListingDetailView({
         />
         <Text className="text-callout text-muted-foreground">
           {[
-            detailDate(listing.publishedAt, i18n.language),
             maps.cityName(listing.cityId),
+            listing.locationText,
           ]
             .filter(Boolean)
             .join(" · ")}
         </Text>
+        </View>
         {closed && onSeeSimilar && brandName && modelName && (
           <Button variant="secondary" size="sm" onPress={onSeeSimilar}>
             <Text numberOfLines={1}>
@@ -172,10 +175,24 @@ export function ListingDetailView({
           </Button>
         )}
         <SpecificationsSection specs={specs} rows={rows} />
+        {listing.vinHistory?.decoded === true && (
+          <View className="gap-3">
+            <Separator />
+            <VinHistorySection vinHistory={listing.vinHistory} />
+          </View>
+        )}
+        {listing.conditionDisclosure && (
+          <View className="gap-3">
+            <Separator />
+            <ConditionDisclosureSection
+              disclosure={listing.conditionDisclosure}
+            />
+          </View>
+        )}
         {listing.description && (
           <View className="gap-2">
             <Separator className="mb-3" />
-            <Text className="text-subhead font-semibold">{t("description")}</Text>
+            <Text accessibilityRole="header" className="text-subhead font-heading font-semibold">{t("description")}</Text>
             <Text
               className="text-body leading-6"
               numberOfLines={expanded ? undefined : 3}
@@ -186,12 +203,18 @@ export function ListingDetailView({
               <Button
                 variant="link"
                 size="sm"
-                className="self-start px-0"
+                className="min-h-11 min-w-11 self-start px-0"
                 onPress={() => setExpanded(true)}
               >
                 <Text>{t("detailMore")}</Text>
               </Button>
             )}
+          </View>
+        )}
+        {!isOwner && (
+          <View className="gap-3">
+            <Separator />
+            <SellerBlock seller={listing.seller} />
           </View>
         )}
         {!isOwner && !closed && listing.allowChat && (
@@ -205,35 +228,11 @@ export function ListingDetailView({
             />
           </View>
         )}
-        {listing.conditionDisclosure && (
-          <View className="gap-3">
-            <Separator />
-            <ConditionDisclosureSection
-              disclosure={listing.conditionDisclosure}
-            />
-          </View>
-        )}
-        {listing.vinHistory?.decoded === true && (
-          <View className="gap-3">
-            <Separator />
-            <VinHistorySection vinHistory={listing.vinHistory} />
-          </View>
-        )}
-        {!isOwner && (
-          <View className="gap-3">
-            <Separator />
-            <SellerBlock
-              seller={listing.seller}
-              cityName={maps.cityName(listing.cityId)}
-              locationText={listing.locationText}
-            />
-          </View>
-        )}
         {!isOwner && listing.status === "active" && onReport && (
           <Button
             variant="ghost"
             size="sm"
-            className="self-start"
+            className="min-h-11 self-start"
             onPress={onReport}
           >
             <Icon as={Flag} className="size-4 text-muted-foreground" />
@@ -278,7 +277,7 @@ function VinHistorySection({
   const { t } = useTranslation();
   return (
     <View className="gap-1">
-      <Text className="text-subhead font-semibold">{t("vinHistory")}</Text>
+      <Text accessibilityRole="header" className="text-subhead font-heading font-semibold">{t("vinHistory")}</Text>
       {vinHistory.brand && (
         <VinHistoryRow label={t("brand")} value={vinHistory.brand} />
       )}
@@ -321,18 +320,20 @@ function ConditionDisclosureSection({
   disclosure: ListingsSchemas.ListingDetail["conditionDisclosure"];
 }) {
   const { t } = useTranslation();
+  const largeText = useLargeText();
   if (!disclosure) return null;
 
   return (
-    <View className="gap-1">
-      <Text className="text-callout font-semibold uppercase tracking-wide text-muted-foreground">
+    <View className="gap-3">
+      <Text accessibilityRole="header" className="text-subhead font-heading font-semibold text-foreground">
         {t("conditionAsStatedBySeller")}
       </Text>
-      <View className="flex-row items-start gap-2">
+      <View className={cn("gap-2", !largeText && "flex-row items-start")}>
         <Text className="text-body text-foreground">{t("damaged")}:</Text>
         <Text
           className={cn(
-            "min-w-0 flex-1 text-body font-medium",
+            "min-w-0 text-body font-medium",
+            !largeText && "flex-1",
             disclosure.damaged ? "text-foreground" : "text-muted-foreground",
           )}
         >

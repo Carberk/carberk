@@ -32,14 +32,12 @@ export function SellerBlock({
   const location = [cityName, locationText].filter(Boolean).join(" · ");
   return (
     <View className="gap-3">
-      <Text className="text-subhead font-semibold">{t("seller")}</Text>
+      <Text accessibilityRole="header" className="text-subhead font-heading font-semibold">{t("seller")}</Text>
       <View className="flex-row gap-3 items-center">
         <PublicUserAvatar size={44} user={seller} />
         <View className="min-w-0 flex-1 gap-1">
           <Text
             className="text-body font-semibold"
-            numberOfLines={1}
-            ellipsizeMode="tail"
           >
             {name ?? t("privateSeller")}
           </Text>

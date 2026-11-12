@@ -39,3 +39,19 @@ describe("decoded VIN", () => {
     expect(screen.queryByText(/accident|theft|ownership history/i)).toBeNull();
   });
 });
+
+it("reads specifications, seller condition, description and seller before two draft suggestions", async () => {
+  const screen = await renderMobile(createElement(ListingDetailView, {
+    listing: fixture({ colorId: "white" }), maps,
+  }));
+  expect(screen.getAllByRole("header").map((node) => node.props.children)).toEqual([
+    "Toyota Camry XV70, 2020", "Specifications", "Condition, as stated by the seller",
+    "Description", "Seller", "Ask the seller",
+  ]);
+  expect(screen.getByText("White")).toBeTruthy();
+  expect(screen.getByText("Small scratch")).toBeTruthy();
+  expect(screen.getByText("Opens an unsent draft. Review it before sending.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Can I see the car?" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "What is the final price?" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Is the car still available?" })).toBeNull();
+});

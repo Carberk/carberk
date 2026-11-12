@@ -423,22 +423,11 @@ export default function Step4Specs({
         />
       )}
 
-      {/* Damaged (Used only), then Known issues, so a New car reaches Known issues right after Condition. */}
-      <ConditionDisclosureSection
-        key={specs.condition}
-        showErrors={showErrors}
-        payload={payload}
-        condition={specs.condition}
-        errors={disclosureErrors}
-        onChange={onChange}
-        disabled={disabled}
-      />
-
-      {/* Optional specs, in the prototype's order (bSpecs). */}
-      <View className="gap-5 rounded-xl border border-border p-4">
+      {/* Optional specifications share one group, including Color. */}
+      <View className="gap-5 border-t border-border pt-5">
         <Text
           accessibilityRole="header"
-          className="text-caption font-medium uppercase tracking-widest text-muted-foreground"
+          className="text-subhead font-heading font-semibold text-foreground"
         >
           {t("moreDetails")}
         </Text>
@@ -475,6 +464,17 @@ export default function Step4Specs({
           showErrors={showErrors}
         />
       </View>
+
+      {/* Keep the seller disclosure and known issues together after the specifications. */}
+      <ConditionDisclosureSection
+        key={specs.condition}
+        showErrors={showErrors}
+        payload={payload}
+        condition={specs.condition}
+        errors={disclosureErrors}
+        onChange={onChange}
+        disabled={disabled}
+      />
 
       <SpecSheets payload={payload} onChange={onChange} specs={specs} />
     </View>
@@ -877,9 +877,9 @@ function ConditionDisclosureSection({
   );
 
   return (
-    <View className="gap-5 rounded-xl border border-border p-4">
-      <Text className="text-caption font-medium uppercase tracking-widest text-muted-foreground">
-        {t("conditionDisclosure")}
+    <View className="gap-5 border-t border-border pt-5">
+      <Text accessibilityRole="header" className="text-subhead font-heading font-semibold text-foreground">
+        {t("conditionAsStatedBySeller")}
       </Text>
 
       {!isNew && (

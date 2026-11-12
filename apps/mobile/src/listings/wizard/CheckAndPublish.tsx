@@ -281,7 +281,7 @@ export function EditSectionList({
       <Text className="text-caption text-muted-foreground">{t("editChangesNote")}</Text>
 
       <View className="border-t border-border">
-        {DATA_STEPS.map((step) =>
+        {(["photos", "vehicle", "price", "specs", "location", "contact"] as const).map((step) =>
           step === "vehicle" ? (
             <LockedSectionRow
               key={step}

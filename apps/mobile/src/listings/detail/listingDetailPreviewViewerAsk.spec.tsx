@@ -100,14 +100,14 @@ describe("instant loading from a tapped card", () => {
     state.preview = summaryFixture();
   });
 
-  it("shows the card's photo, title, price, known specifications, city and date before the detail arrives", async () => {
+  it("shows the card's photo, title, price, known specifications, city before the detail arrives", async () => {
     const screen = await renderMobile(<ListingDetailScreen />);
 
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.getByText("35,000 TMT")).toBeTruthy();
     expect(screen.getByText("12,000 km")).toBeTruthy();
     expect(screen.getByText("Automatic")).toBeTruthy();
-    expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
+    expect(screen.getByText("Ashgabat")).toBeTruthy();
     expect(screen.getByTestId("detail-skeleton-body")).toBeTruthy();
   });
 
@@ -243,14 +243,15 @@ describe("photo viewer from Listing detail", () => {
 });
 
 describe("Ask the seller on Listing detail", () => {
-  it("sits after the description and before the seller's condition statement", async () => {
+  it("follows seller identity after condition and description", async () => {
     const screen = await renderMobile(<ListingDetailScreen />);
     const all = texts(screen);
     const order = [
+      "Condition, as stated by the seller",
       "Description",
       fixture().description ?? "",
+      "Seller",
       "Ask the seller",
-      "Condition, as stated by the seller",
     ].map((value) => all.indexOf(value));
 
     expect(order.every((index) => index >= 0)).toBe(true);

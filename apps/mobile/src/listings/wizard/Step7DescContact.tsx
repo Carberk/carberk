@@ -4,8 +4,6 @@ import { Phone, MessageSquare } from "lucide-react-native";
 import type { ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
-import { useBrands } from "../../api/catalog/useBrands";
-import { useModels } from "../../api/catalog/useModels";
 import { useCities } from "../../api/catalog/useCities";
 
 import { ContactPhonePicker } from "./ContactPhonePicker";
@@ -29,21 +27,6 @@ interface Step7DescContactProps {
   publishPhoneError?: boolean;
 }
 
-function useReviewSummary(payload: WizardSchemas.WizardDraftPayload) {
-  const { data: brandsData } = useBrands();
-  const { data: modelsData } = useModels(payload.brandId ?? "");
-  const { data: citiesData } = useCities(payload.regionId ?? "");
-
-  const brandName =
-    brandsData?.items.find((b) => b.id === payload.brandId)?.name ?? "";
-  const modelName =
-    modelsData?.items.find((m) => m.id === payload.modelId)?.name ?? "";
-  const cityName =
-    citiesData?.items.find((c) => c.id === payload.cityId)?.name ?? "";
-
-  return { brandName, modelName, cityName };
-}
-
 function wrapDisabled(children: React.ReactNode, disabled: boolean) {
   if (!disabled) return <>{children}</>;
   return <View className="opacity-50">{children}</View>;
@@ -54,13 +37,11 @@ function ReviewSummary({
 }: {
   payload: WizardSchemas.WizardDraftPayload;
 }) {
-  const { brandName, modelName, cityName } = useReviewSummary(payload);
+  const { data: citiesData } = useCities(payload.regionId ?? "");
+  const cityName = citiesData?.items.find((city) => city.id === payload.cityId)?.name;
 
   return (
-    <View className="gap-1 rounded-lg border-l-4 border-l-primary bg-muted/60 p-3">
-      <Text className="text-callout font-medium text-foreground">
-        {brandName} {modelName} {payload.year}
-      </Text>
+    <View className="gap-1 border-b border-border pb-5">
       <Text className="text-callout text-foreground">
         {payload.priceAmount
           ? `${payload.priceAmount.toLocaleString()} ${payload.priceCurrency}`
@@ -87,22 +68,22 @@ function ContactMethods({
 
   return (
     <>
-      <View className="rounded-xl border border-border p-4 gap-1">
-        <Text className="text-caption font-medium uppercase tracking-widest text-muted-foreground mb-3">
+      <View className="border-t border-border pt-5 gap-3">
+        <Text accessibilityRole="header" className="text-subhead font-heading font-semibold text-foreground">
           {t("contactMethods")}
         </Text>
 
         <View className="flex-row items-center justify-between py-1">
-          <View className="flex-row items-center gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-3 pr-3">
             <View className="h-9 w-9 items-center justify-center rounded-full bg-muted">
               <Icon as={Phone} className="size-4 text-foreground" />
             </View>
-            <View className="gap-0.5">
+            <View className="min-w-0 flex-1 gap-0.5">
               <Text className="text-body text-foreground">{t("phoneCalls")}</Text>
-              <Text className="text-caption text-muted-foreground">{t("callsAllowed")}</Text>
             </View>
           </View>
           <Switch
+            accessibilityLabel={t("phoneCalls")}
             checked={allowCalls}
             onCheckedChange={(v) => onChange({ allowCalls: v })}
             disabled={disabled}
@@ -112,16 +93,16 @@ function ContactMethods({
         <View className="h-px bg-border my-1" />
 
         <View className="flex-row items-center justify-between py-1">
-          <View className="flex-row items-center gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-3 pr-3">
             <View className="h-9 w-9 items-center justify-center rounded-full bg-muted">
               <Icon as={MessageSquare} className="size-4 text-foreground" />
             </View>
-            <View className="gap-0.5">
+            <View className="min-w-0 flex-1 gap-0.5">
               <Text className="text-body text-foreground">{t("inAppChat")}</Text>
-              <Text className="text-caption text-muted-foreground">{t("chatAllowed")}</Text>
             </View>
           </View>
           <Switch
+            accessibilityLabel={t("inAppChat")}
             checked={allowChat}
             onCheckedChange={(v) => onChange({ allowChat: v })}
             disabled={disabled}

@@ -27,7 +27,7 @@ export function DescriptionField({
   return (
     <View className="gap-1.5">
       <View className="flex-row items-center justify-between">
-        <Text className="text-callout font-medium text-foreground">
+        <Text accessibilityRole="header" className="text-subhead font-heading font-semibold text-foreground">
           {t("description")} *
         </Text>
         <Text className="text-caption text-muted-foreground">

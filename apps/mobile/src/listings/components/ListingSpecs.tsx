@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
@@ -85,10 +85,11 @@ export const PENDING_SPEC_ROWS = { condition: PENDING, bodyType: PENDING, color:
 
 function SpecItem({ label, value }: ListingSpec) {
   // Three columns break a value such as "120 000 km" across lines at a large
-  // font size; two columns keep it whole.
+  // font size; two columns, then one at accessibility sizes, keep it readable.
   const largeText = useLargeText();
+  const { fontScale } = useWindowDimensions();
   if (value === undefined) return null;
-  const className = cn(largeText ? "w-1/2" : "w-1/3", "gap-1 py-3 pr-2");
+  const className = cn(fontScale >= 2 ? "w-full" : largeText ? "w-1/2" : "w-1/3", "gap-1 py-3 pr-2");
   if (value === PENDING) {
     return (
       <View testID="spec-cell-loading" className={className}>
@@ -106,8 +107,9 @@ function SpecItem({ label, value }: ListingSpec) {
 }
 
 function SpecRow({ label, value }: ListingSpec) {
+  const largeText = useLargeText();
   if (value === undefined) return null;
-  const className = "flex-row gap-3 py-1.5";
+  const className = cn("py-2", largeText ? "gap-1" : "flex-row gap-3");
   if (value === PENDING) {
     return (
       <View testID="spec-row-loading" className={className}>
@@ -122,8 +124,8 @@ function SpecRow({ label, value }: ListingSpec) {
   }
   return (
     <View testID="spec-row" className={className}>
-      <Text className="w-2/5 text-callout text-muted-foreground">{label}</Text>
-      <Text className="flex-1 text-callout text-foreground">{value}</Text>
+      <Text className={cn(!largeText && "w-2/5", "text-callout text-muted-foreground")}>{label}</Text>
+      <Text className={cn(!largeText && "flex-1", "text-callout text-foreground")}>{value}</Text>
     </View>
   );
 }
@@ -141,7 +143,7 @@ export function SpecificationsSection({ specs, rows }: { specs: ListingSpec[]; r
     <View className="gap-1">
       <Separator className="mb-3" />
       {entries.some((entry) => typeof entry.value === "string") ? (
-        <Text className="text-subhead font-semibold">{t("specifications")}</Text>
+        <Text accessibilityRole="header" className="text-subhead font-heading font-semibold">{t("specifications")}</Text>
       ) : (
         <SkeletonText className="text-subhead font-semibold" width="45%" />
       )}

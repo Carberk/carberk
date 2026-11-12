@@ -53,14 +53,14 @@ function preview(
 }
 
 describe("Listing detail preview, from the tapped card's cached data", () => {
-  it("shows the card's photo, title, price, city, date and known specifications at once", async () => {
+  it("shows the card's photo, title, price, city and known specifications at once", async () => {
     const screen = await preview();
 
     expect(screen.getByText("Toyota Camry, 2020")).toBeTruthy();
     expect(screen.getByText("35,000 TMT")).toBeTruthy();
     for (const value of ["2020", "12,000 km", "Automatic", "Petrol", "Used"])
       expect(screen.getByText(value)).toBeTruthy();
-    expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
+    expect(screen.getByText("Ashgabat")).toBeTruthy();
     // No counter on detail: the photo says where it is to a screen reader only.
     expect(screen.queryByText("1 / 12")).toBeNull();
     expect(screen.getByLabelText("1 of 12")).toBeTruthy();
@@ -125,7 +125,7 @@ describe("Listing detail preview, from the tapped card's cached data", () => {
 
     expect(screen.getByText("Toyota Camry")).toBeTruthy();
     expect(screen.queryByText(/undefined|null|·\s*$/)).toBeNull();
-    expect(screen.getByText("20 Sep · Ashgabat")).toBeTruthy();
+    expect(screen.getByText("Ashgabat")).toBeTruthy();
   });
 
   it("falls back to the No photos tile for a Listing without photos", async () => {

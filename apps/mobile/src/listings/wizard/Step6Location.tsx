@@ -149,7 +149,7 @@ export default function Step6Location({
         disabled={disabled}
       />
 
-      <Text className="pt-2 text-callout text-muted-foreground">{t("placeSection")}</Text>
+      <Text accessibilityRole="header" className="border-t border-border pt-5 text-subhead font-heading font-semibold">{t("placeSection")}</Text>
 
       {/* Picking a city also sets its region, so the Region error is never shown on its own. */}
       <CityPicker
