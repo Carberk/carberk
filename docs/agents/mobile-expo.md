@@ -185,11 +185,11 @@ After each, the app must stay on the same screen, signed in, and Profile > Choos
 
 ## Staging native sessions
 
-Use the guarded `native:metro` and `native:ios` entrypoints above with `--env staging`. Confirm the API, socket and media origins in the served bundle, `/readyz`, and a loaded feed and Listing detail before claiming staging behavior. Login secrets and tokens never belong in screenshots or PRs. Read mock OTPs only from the staging API's logs, matching request ID and time. Deploys, data resets and fixture seeding on staging need the founder's approval ([environment guide](environment.md)).
+Use the guarded `native:metro` and `native:ios` entrypoints above with `--env staging`. Confirm the API, socket and media origins in the served bundle, `/readyz`, and a loaded feed and Listing detail before claiming staging behavior. Login secrets and tokens never belong in screenshots or PRs. Read mock OTPs only from the staging API's logs, matching request ID and time. For staging operations and any task-specific restrictions, follow the [environment authority](environment.md#railway).
 
 The `native-pr-seed` entrypoint only accepts PR environments, which are off, and refuses staging by design. Do not relax its guard to seed staging.
 
-Stop the Metro and device sessions you started before you finish.
+Stop the Metro sessions you started and complete the [owned-device handoff](native-fixture-signin.md#prepare-one-owned-device) before you finish.
 
 ## Android package per build profile
 

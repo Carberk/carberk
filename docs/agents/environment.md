@@ -8,7 +8,7 @@ What exists for Carberk, how to use it, and what an agent may change without ask
 | GitHub Actions CI | Proving every PR | Run and rerun checks | Changing workflows or branch protection |
 | Railway staging | Real phones, testers, a last check before release | Everything: deploy, redeploy, change variables and settings, add or change Buckets, run migrations and seeds, reset data | Nothing; see the staging rules below |
 | Railway production | Real users later | Read status | Everything else |
-| iOS Simulator | Running the app and taking screenshots | Boot, install development builds, drive, screenshot | Nothing |
+| iOS Simulator | Running the app and taking screenshots | Use the coordinated owned device as below | Nothing |
 
 ## Toolchain
 
@@ -64,8 +64,7 @@ Devices on the founder's Mac:
 
 | Device | Platform | Use |
 |---|---|---|
-| iPhone 17 (`38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`) | iOS 26.2 Simulator | Carberk development testing; the Debug build is installed |
-| `Carberk …` Simulators, such as `Carberk Agent 1` | iOS 26.2 Simulator | Spares for parallel agents; `pnpm sim:spare` picks or creates one |
+| iPhone 17 (`38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`) | iOS 26.2 Simulator | Single coordinated Carberk device; selection and handoff follow the [owned-device procedure](native-fixture-signin.md#prepare-one-owned-device) |
 | `Carberk_Shots` | Android 16 emulator | Only for Android-only tickets |
 | `Tayyn_Hyzmat_Test` | Android 16 emulator | Another project; do not use |
 
@@ -74,7 +73,7 @@ Backends from the Simulator:
 - **Local stack:** the Simulator reaches the Mac's `localhost` directly. Start Metro from your worktree and open the installed build against it, as in [local testing](local-testing.md#4-run-the-app-on-the-ios-simulator).
 - **Staging:** run `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <simulator id> --port <port>`. These helpers refuse production. On this Mac's Xcode the `native:ios` route is the one known to work for iOS builds.
 
-Stop the Metro sessions you started and close the devices you opened before you finish.
+Stop the Metro sessions you started and complete the [owned-device handoff](native-fixture-signin.md#prepare-one-owned-device) before you finish.
 
 ## CI on GitHub Actions
 
@@ -115,7 +114,7 @@ railway api '{ project(id: "176ddec0-dd65-4087-b82c-798599fc2ebe") { environment
 
 Never print variable values; they are secrets.
 
-**Staging is the agents' environment (founder, 2026-11-10).** Use it fully, without asking, to build, test and measure:
+**Staging is the agents' environment (founder, 2026-11-10).** Unless explicit task-specific instructions restrict the work, use it fully, without asking, to build, test and measure:
 
 - Set or change staging variables and service settings, including new feature variables such as `LISTING_VIDEO_*`.
 - Create and configure staging Buckets.
