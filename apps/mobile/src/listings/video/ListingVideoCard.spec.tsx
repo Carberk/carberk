@@ -154,7 +154,7 @@ describe("Listing video card on the Photos step", () => {
 
     const tester = await renderMobile(<Step2Photos {...stepProps()} canUploadVideo />);
     expect(tester.getByTestId("listing-video-card")).toBeTruthy();
-    expect(tester.getByText("One video up to 1:30, from your library")).toBeTruthy();
+    expect(tester.getByText("One video up to 1:30")).toBeTruthy();
     expect(tester.getByRole("button", { name: "Choose from library" })).toBeTruthy();
   });
 
