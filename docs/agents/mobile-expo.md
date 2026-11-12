@@ -38,6 +38,9 @@ Install through pnpm so the committed patches and lockfile apply consistently. D
 
 ## Required verification gate
 
+Native implementers, reviewers and delegate briefs first follow [canonical local readiness and session reuse](local-testing.md#1-check-and-reuse-the-local-baseline). Include that check's result and actual build/served-origin evidence; seeding is explicit coordinated setup, not ordinary preparation.
+
+
 For any mobile change, run:
 
 ```bash

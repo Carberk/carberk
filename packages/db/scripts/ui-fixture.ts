@@ -30,8 +30,9 @@
  * (upload.wikimedia.org / thumb.wikimedia.org), for the photo downloads: the
  * fixture downloads covered by ADR-0075, not deployment egress.
  */
-// Keep this import first. It loads `.env` and refuses an unsafe target before any other module
-// (generated Prisma client, sharp, S3) is loaded.
+
+// Guard the explicit replacement entrypoint before loading clients; imports for
+// read-only inspection do not load env files or create connections.
 // eslint-disable-next-line import/order
 import { DATABASE_URL, MINIO_ENDPOINT } from "./ui-fixture-target";
 
@@ -61,7 +62,7 @@ const PHOTO_BUCKET = "listing-photos";
 /** Downloaded originals live here so re-runs don't re-fetch from Commons. */
 const PHOTO_CACHE = path.join(__dirname, "../node_modules/.cache/fixture-photos");
 
-const VARIANTS = ["thumbnail", "list", "detail", "fullscreen"] as const;
+export const VARIANTS = ["thumbnail", "list", "detail", "fullscreen"] as const;
 const VARIANT_WIDTHS: Record<(typeof VARIANTS)[number], number> = {
   thumbnail: 160,
   list: 400,
@@ -69,18 +70,10 @@ const VARIANT_WIDTHS: Record<(typeof VARIANTS)[number], number> = {
   fullscreen: 1600,
 };
 
-const pool = new Pool({ connectionString: DATABASE_URL });
-const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
-
-const s3 = new S3Client({
-  endpoint: MINIO_ENDPOINT,
-  region: "us-east-1",
-  forcePathStyle: true,
-  credentials: {
-    accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin",
-    secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin",
-  },
-});
+// Connections exist only while the explicit replacement entrypoint is running.
+let pool: Pool;
+let prisma: PrismaClient;
+let s3: S3Client;
 
 /** Fetches a photo once and caches it on disk. */
 async function loadPhoto(slug: string): Promise<Buffer> {
@@ -492,6 +485,25 @@ function listingId(index: number): string {
   return `f1000000-0000-4000-8000-0000000001${index.toString(16).padStart(2, "0")}`;
 }
 
+function photoBaseKey(slug: string, order: number): string {
+  return `fixture/${slug}-${order}`;
+}
+
+/** Shared expectations derived from the writer's definitions, without connecting or seeding. */
+export const UI_FIXTURE = {
+  userIds: [...Object.values(SELLER_IDS), BUYER_ID, UNNAMED_ID, LONG_NAME_ID],
+  sellerId: SELLER_IDS.aygul,
+  buyerId: BUYER_ID,
+  conversationIds: Object.values(CONVERSATION_IDS),
+  listings: [
+    ...CARS.map((car, index) => ({
+      id: listingId(index), sellerId: SELLER_IDS[car.sellerKey],
+      photos: car.photos.map((_, order) => `${photoBaseKey(car.slug, order)}/original.webp`),
+    })),
+    { id: NO_PHOTO_LISTING_ID, sellerId: SELLER_IDS.aygul, photos: [] },
+  ],
+} as const;
+
 /** Builds a name -> id map for one reference table. */
 function indexByName<T extends { id: string; nameEn: string }>(
   rows: readonly T[],
@@ -510,6 +522,17 @@ function required(map: Map<string, string>, name: string, table: string): string
 }
 
 async function main(): Promise<void> {
+  if (!DATABASE_URL || !MINIO_ENDPOINT) throw new Error("Explicit fixture target required");
+  pool = new Pool({ connectionString: DATABASE_URL });
+  prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+  s3 = new S3Client({
+    endpoint: MINIO_ENDPOINT, region: "us-east-1", forcePathStyle: true,
+    credentials: {
+      accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "minioadmin",
+      secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "minioadmin",
+    },
+  });
+  try {
   // Reference data must already be seeded (pnpm db:seed). Look everything up by
   // name: the previous fixture used findFirst() for each table, which gave all
   // listings the same colour, body type and transmission and so never exercised
@@ -660,7 +683,7 @@ async function main(): Promise<void> {
     // make impossible to mistake for missing data.
     const media: { key: string; sortOrder: number; width: number; height: number }[] = [];
     for (const [order, slug] of car.photos.entries()) {
-      const baseKey = `fixture/${car.slug}-${order}`;
+      const baseKey = photoBaseKey(car.slug, order);
       const { width, height } = await uploadPhotoSet(baseKey, slug);
       media.push({ key: `${baseKey}/original.webp`, sortOrder: order, width, height });
     }
@@ -820,15 +843,16 @@ async function main(): Promise<void> {
       `No set name +99361000010 · 30-character name +99361000011`,
     ].join("\n"),
   );
-}
-
-main()
-  .catch((error: unknown) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
+  } finally {
     await prisma.$disconnect();
     await pool.end();
     s3.destroy();
+  }
+}
+
+if (DATABASE_URL && MINIO_ENDPOINT) {
+  void main().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
   });
+}

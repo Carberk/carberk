@@ -32,7 +32,7 @@ pnpm db:migrate:deploy     # apply committed migrations locally
 pnpm db:seed               # canonical reference baseline and brand logos, when needed
 ```
 
-For test Users, Listings and Ready videos, run the fixtures in [local testing](local-testing.md#1a-seed-test-data).
+For test Users, Listings and Ready videos, start with [local readiness and reuse](local-testing.md#1-check-and-reuse-the-local-baseline). That guide separates ordinary checks from coordinated initial setup/reset.
 
 Copy each app's `.env.template` to `.env` and keep secrets out of git. The templates point everything at localhost:
 
@@ -58,7 +58,7 @@ Test the app on the iOS Simulator. Android is not used for development testing o
 2. `device_open` with the host and device id returns an `agent-device` command bound to that device.
 3. Run that command for every launch, deep link, tap, text entry and screenshot. `device_screenshot` shows the screen.
 
-Do not use `simctl`, `adb` or `idb` for taps, text or screenshots in T3. They stay fine for builds, installs, logs, Metro and port forwards. If `open` reports `DEVICE_IN_USE`, another session holds the device: do not close or reuse it. Run `pnpm sim:spare` for a free Simulator with the Carberk build, as in [local testing](local-testing.md#4-run-the-app-on-the-ios-simulator). Tell the founder only when a finished or failed thread still holds a device.
+Do not use `simctl`, `adb` or `idb` for taps, text or screenshots in T3. They stay fine for builds, installs, logs, Metro and port forwards. For `DEVICE_IN_USE`, selection and cleanup, follow the [owned native device procedure](native-fixture-signin.md#prepare-one-owned-device); preserve the existing owner/session.
 
 Devices on the founder's Mac:
 

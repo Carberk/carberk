@@ -34,7 +34,8 @@
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --exclude '**/tests/**' --passWithNoTests",
     "tester:accounts": "tsx scripts/tester-accounts.ts",
-    "canonical:seed": "tsx src/canonical-seed.ts"
+    "canonical:seed": "tsx src/canonical-seed.ts",
+    "fixture:check": "node --import tsx scripts/local-fixture-readiness.ts"
   },
   "dependencies": {
     "@auto-tm/contracts": "workspace:*",
