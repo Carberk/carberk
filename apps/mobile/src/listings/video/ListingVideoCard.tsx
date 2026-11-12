@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import type { VideoUploadsSchemas } from "@auto-tm/contracts";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
-import { Plus, Video } from "lucide-react-native";
+import { Plus } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
 import type { ListingVideoNativeModule } from "../../../modules/listing-video/src/prepare";
@@ -20,6 +20,7 @@ import { useLocalListingVideoTask, useSharedListingVideoTask, useListingVideoTas
 import { OwnerVideoStatus } from "./OwnerVideoStatus";
 import { ListingVideoEditor } from "./ListingVideoEditor";
 import { useListingVideoAccess } from "./useListingVideoAccess";
+import { VideoCardActions, VideoCardRow, VideoProgress } from "./VideoCardRow";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -51,36 +52,23 @@ interface ListingVideoCardProps {
 function PermissionNote({ onDismiss }: { onDismiss: () => void }) {
   const { t } = useTranslation();
   return (
-    <View className="gap-2" testID="listing-video-permission-note">
-      <View className="rounded-2xl bg-destructive/10 p-3">
-        <Text className="text-callout font-semibold">{t("listingVideoDeniedTitle")}</Text>
-        <Text className="text-footnote text-muted-foreground">{t("listingVideoDeniedBody")}</Text>
-      </View>
-      <View className="flex-row gap-2">
-        <Button
-          variant="secondary"
-          className="flex-1"
-          onPress={() => void Linking.openSettings()}
-          accessibilityLabel={t("listingVideoOpenSettings")}
-        >
-          <Text>{t("listingVideoOpenSettings")}</Text>
-        </Button>
-        <Button variant="outline" className="flex-1" onPress={onDismiss} accessibilityLabel={t("listingVideoNotNow")}>
-          <Text>{t("listingVideoNotNow")}</Text>
-        </Button>
-      </View>
-    </View>
+    <VideoCardRow testID="listing-video-permission-note" alert thumb={{ kind: "error" }} title={t("listingVideoDeniedTitle")} meta={t("listingVideoDeniedBody")}>
+      <VideoCardActions
+        primary={{ label: t("listingVideoOpenSettings"), onPress: () => void Linking.openSettings() }}
+        secondary={{ label: t("listingVideoNotNow"), onPress: onDismiss }}
+      />
+    </VideoCardRow>
   );
 }
 
 const FAILURE_COPY: Record<
   ListingVideoPrepFailure,
-  { title: string; body: string; retry: string | null }
+  { title: string; body: string | null; retry: string | null }
 > = {
   source: { title: "listingVideoGoneTitle", body: "listingVideoGoneBody", retry: null },
   interrupted: { title: "listingVideoStoppedTitle", body: "listingVideoStoppedBody", retry: "listingVideoPrepareAgain" },
   storage: { title: "listingVideoStorageTitle", body: "listingVideoStorageBody", retry: "listingVideoTryAgain" },
-  preparation: { title: "listingVideoFailedTitle", body: "listingVideoFailedBody", retry: "listingVideoTryAgain" },
+  preparation: { title: "listingVideoFailedTitle", body: null, retry: "listingVideoTryAgain" },
 };
 
 export function ListingVideoCard(props: ListingVideoCardProps) {
@@ -166,7 +154,7 @@ function VideoCardContent({ canUploadVideo, isVideoUploadTester, disabled = fals
     <>
       {checkingAccess && <ActivityIndicator accessibilityLabel={t("loading")} />}
       {!uploadsOn && (
-        <View className="gap-1 rounded-2xl bg-secondary p-3" accessibilityLiveRegion="polite">
+        <View className="gap-0.5" accessibilityLiveRegion="polite">
           <Text className="text-callout font-semibold">{t("listingVideoUploadsPaused")}</Text>
           <Text className="text-footnote text-muted-foreground">{t("listingVideoUploadsPausedBody")}</Text>
         </View>
@@ -209,27 +197,34 @@ function VideoCardContent({ canUploadVideo, isVideoUploadTester, disabled = fals
     setCommittedDraft(null);
   };
 
+  const idle = upload.state.phase === "idle" && prep.state.phase === "idle";
+  const pickAnother = () => {
+    prep.remove();
+    clearSelection();
+    void chooseFromLibrary();
+  };
+
   return (
-    <View className="gap-3 rounded-3xl bg-card p-4" testID="listing-video-card">
+    <View className="gap-4 rounded-2xl bg-card p-4" testID="listing-video-card">
+      <Text className="text-subhead font-semibold">
+        {t("listingVideoTitle")} <Text className="text-callout font-normal text-muted-foreground">{t("listingVideoOptional")}</Text>
+      </Text>
       {accessNote}
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1">
-          <Text className="text-subhead">
-            {t("listingVideoTitle")} <Text className="text-callout text-muted-foreground">{t("listingVideoOptional")}</Text>
-          </Text>
-          <Text className="text-footnote text-muted-foreground">{t("listingVideoSubtitle")}</Text>
-        </View>
-        <Icon as={Video} className="size-6 text-foreground" />
-      </View>
 
       <OwnerVideoStatus key={videoUploadTarget ? `${videoUploadTarget.type}:${videoUploadTarget.id}` : "local"} target={videoUploadTarget} task={task} onClearSelection={clearSelection} onChoose={() => void chooseFromLibrary()}>
-      {(serverBusy, replacing, requestRemove) => <>
-      {(upload.state.phase === "uploading" || upload.state.phase === "paused") && (() => {
+      {(serverBusy, replacing, requestRemove) => {
+        const cancelLabel = replacing ? t("listingVideoCancelReplacement") : t("cancel");
+        const waiting = replacing ? t("listingVideoReplacementWaiting") : t("listingVideoPublishNow");
+        const remove = { label: t("listingVideoRemove"), onPress: requestRemove };
+        const phase = upload.state.phase;
+        return <>
+      {(phase === "uploading" || phase === "paused") && (() => {
         const confirmedMb = (upload.state.confirmedBytes / (1024 * 1024)).toFixed(1);
         const totalMb = (upload.state.totalBytes / (1024 * 1024)).toFixed(1);
         const percent = upload.state.totalBytes > 0
           ? Math.min(100, Math.floor((upload.state.confirmedBytes / upload.state.totalBytes) * 100))
           : 0;
+        const progress = t("listingVideoUploadProgress", { confirmed: confirmedMb, total: totalMb, percent });
         const pausedTitle = upload.state.pauseReason === "network"
           ? t("listingVideoUploadWaiting")
           : upload.state.pauseReason === "background"
@@ -239,196 +234,112 @@ function VideoCardContent({ canUploadVideo, isVideoUploadTester, disabled = fals
           ? t("listingVideoUploadWaitingBody")
           : upload.state.pauseReason === "background"
             ? t("listingVideoUploadBackgroundBody")
-            : t("listingVideoUploadPausedBody");
+            : null;
         return (
-          <View className="gap-2" testID="listing-video-uploading">
-            <Text className="text-callout font-semibold" accessibilityLiveRegion="polite">
-              {upload.state.phase === "uploading" ? t("listingVideoUploading") : pausedTitle}
-            </Text>
-            <Text className="text-footnote text-muted-foreground">
-              {upload.state.phase === "uploading" ? t("listingVideoUploadProgress", { confirmed: confirmedMb, total: totalMb, percent }) : `${t("listingVideoUploadProgress", { confirmed: confirmedMb, total: totalMb, percent })} · ${pausedBody}`}
-            </Text>
-            <View className="h-2 overflow-hidden rounded-full bg-secondary" testID="listing-video-upload-progress">
-              <View className="h-full bg-primary" style={{ width: `${percent}%` }} />
-            </View>
-            <View className="flex-row gap-2">
-              {upload.state.phase === "uploading" ? (
-                <Button variant="secondary" onPress={() => void upload.pause()} accessibilityLabel={t("listingVideoPause")}>
-                  <Text>{t("listingVideoPause")}</Text>
-                </Button>
-              ) : upload.state.pauseReason === "user" ? (
-                <Button variant="secondary" onPress={() => void upload.resume()} accessibilityLabel={t("listingVideoContinueUpload")}>
-                  <Text>{t("listingVideoContinueUpload")}</Text>
-                </Button>
-              ) : null}
-              <Button variant="outline" onPress={() => void upload.cancel()} accessibilityLabel={replacing ? t("listingVideoCancelReplacement") : t("cancel")}>
-                <Text>{replacing ? t("listingVideoCancelReplacement") : t("cancel")}</Text>
-              </Button>
-            </View>
-          </View>
+          <VideoCardRow
+            testID="listing-video-uploading"
+            thumb={{ kind: phase === "uploading" ? "busy" : "empty" }}
+            title={phase === "uploading" ? t("listingVideoUploading") : pausedTitle}
+            meta={phase === "uploading" ? progress : [progress, pausedBody].filter(Boolean).join(" · ")}
+          >
+            <VideoProgress percent={percent} testID="listing-video-upload-progress" />
+            <VideoCardActions
+              primary={phase === "uploading"
+                ? { label: t("listingVideoPause"), onPress: () => void upload.pause() }
+                : upload.state.pauseReason === "user"
+                  ? { label: t("listingVideoContinueUpload"), onPress: () => void upload.resume() }
+                  : null}
+              secondary={{ label: cancelLabel, onPress: () => void upload.cancel() }}
+            />
+          </VideoCardRow>
         );
       })()}
 
-      {upload.state.phase === "failed" && upload.state.failure === "transfer" && (
-        <View className="gap-2" testID="listing-video-upload-failed">
-          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
-            <Text className="text-callout font-semibold">{t("listingVideoUploadInterrupted")}</Text>
-            <Text className="text-footnote text-muted-foreground">{t("listingVideoUploadInterruptedBody")}</Text>
-          </View>
-          <Button variant="secondary" onPress={() => void upload.resume()} accessibilityLabel={t("listingVideoContinueUpload")}>
-            <Text>{t("listingVideoContinueUpload")}</Text>
-          </Button>
-          <Button variant="outline" onPress={requestRemove} accessibilityLabel={t("listingVideoRemove")}>
-            <Text>{t("listingVideoRemove")}</Text>
-          </Button>
-        </View>
+      {phase === "failed" && upload.state.failure === "transfer" && (
+        <VideoCardRow testID="listing-video-upload-failed" alert thumb={{ kind: "error" }} title={t("listingVideoUploadInterrupted")} meta={t("listingVideoUploadInterruptedBody")}>
+          <VideoCardActions primary={{ label: t("listingVideoContinueUpload"), onPress: () => void upload.resume() }} secondary={remove} />
+        </VideoCardRow>
       )}
 
-      {upload.state.phase === "failed" && upload.state.failure === "source" && (
-        <View className="gap-2" testID="listing-video-upload-source-missing">
-          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
-            <Text className="text-callout font-semibold">{t("listingVideoGoneTitle")}</Text>
-            <Text className="text-footnote text-muted-foreground">{t("listingVideoGoneBody")}</Text>
-          </View>
-          <Button variant="outline" onPress={requestRemove} accessibilityLabel={t("listingVideoRemove")}>
-            <Text>{t("listingVideoRemove")}</Text>
-          </Button>
-        </View>
+      {phase === "failed" && upload.state.failure === "source" && (
+        <VideoCardRow testID="listing-video-upload-source-missing" alert thumb={{ kind: "error" }} title={t("listingVideoGoneTitle")} meta={t("listingVideoGoneBody")}>
+          <VideoCardActions primary={remove} />
+        </VideoCardRow>
       )}
 
-      {upload.state.phase === "operation-unknown" && (
-        <View className="gap-2" testID="listing-video-upload-operation-unknown">
-          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
-            <Text className="text-callout font-semibold">
-              {upload.state.operation === "remove" ? t("listingVideoUploadNotConfirmedRemove") : t("listingVideoUploadNotConfirmedCancel")}
-            </Text>
-            <Text className="text-footnote text-muted-foreground">{t("listingVideoUploadNotConfirmedBody")}</Text>
-          </View>
-          <Button variant="outline" onPress={() => void upload.checkStatus()} accessibilityLabel={t("listingVideoCheckStatus")}>
-            <Text>{t("listingVideoCheckStatus")}</Text>
-          </Button>
-        </View>
+      {phase === "operation-unknown" && (
+        <VideoCardRow
+          testID="listing-video-upload-operation-unknown"
+          alert
+          thumb={{ kind: "error" }}
+          title={upload.state.operation === "remove" ? t("listingVideoUploadNotConfirmedRemove") : t("listingVideoUploadNotConfirmedCancel")}
+          meta={t("listingVideoUploadNotConfirmedBody")}
+        >
+          <VideoCardActions primary={{ label: t("listingVideoCheckStatus"), onPress: () => void upload.checkStatus() }} />
+        </VideoCardRow>
       )}
 
-      {upload.state.phase === "processing" && !serverBusy && (
-        <View className="gap-2" testID="listing-video-upload-processing">
-          <Text className="text-callout font-semibold">{t("listingVideoProcessing")}</Text>
-          <Text className="text-footnote text-muted-foreground">{t("listingVideoPublishNow")}</Text>
-        </View>
+      {phase === "processing" && !serverBusy && (
+        <VideoCardRow testID="listing-video-upload-processing" thumb={{ kind: "busy" }} title={t("listingVideoProcessing")} meta={waiting} />
       )}
 
       {prep.state.phase === "preparing" && (
-        <View className="gap-2" testID="listing-video-preparing">
-          <Text className="text-callout font-semibold" accessibilityLiveRegion="polite">
-            {t("listingVideoPreparing")}
-          </Text>
-          <Text className="text-footnote text-muted-foreground">
-            {t("listingVideoPreparingHint", {
-              duration: formatMmss(prep.state.selection.endS - prep.state.selection.startS),
-            })}
-          </Text>
-          <View className="h-2 overflow-hidden rounded-full bg-secondary" testID="listing-video-preparing-bar">
-            <ActivityIndicator accessibilityLabel={t("listingVideoPreparing")} />
-          </View>
-          <Button
-            variant="outline"
-            onPress={() => {
-              prep.cancel();
-              clearSelection();
-            }}
-            accessibilityLabel={t("cancel")}
-          >
-            <Text>{t("cancel")}</Text>
+        <VideoCardRow
+          testID="listing-video-preparing"
+          thumb={{ kind: "busy" }}
+          title={t("listingVideoPreparing")}
+          meta={t("listingVideoPreparingHint", { duration: formatMmss(prep.state.selection.endS - prep.state.selection.startS) })}
+        >
+          <VideoCardActions secondary={{ label: t("cancel"), onPress: () => { prep.cancel(); clearSelection(); } }} />
+        </VideoCardRow>
+      )}
+
+      {prep.state.phase === "failed" && (() => {
+        const copy = FAILURE_COPY[prep.state.failure];
+        return (
+          <VideoCardRow testID="listing-video-failed" alert thumb={{ kind: "error" }} title={t(copy.title)} meta={copy.body ? t(copy.body) : null}>
+            <VideoCardActions
+              primary={copy.retry ? { label: t(copy.retry), onPress: prep.prepareAgain } : { label: t("listingVideoChooseAnother"), onPress: pickAnother }}
+              secondary={copy.retry ? undefined : remove}
+              alternatives={copy.retry ? [{ label: t("listingVideoChooseAnother"), onPress: pickAnother }, remove] : undefined}
+            />
+          </VideoCardRow>
+        );
+      })()}
+
+      {prep.state.phase === "prepared" && phase === "idle" && (
+        <VideoCardRow
+          testID="listing-video-prepared"
+          thumb={{ kind: "frame", uri: prep.state.selection.source.uri, atS: prep.state.selection.posterS }}
+          title={t("listingVideoReady")}
+          meta={formatMmss(prep.state.file.durationS)}
+        >
+          <VideoCardActions primary={{ label: t("listingVideoContinueEditing"), onPress: () => setEditing(true) }} secondary={remove} />
+        </VideoCardRow>
+      )}
+
+      {idle && draft && !editing && (
+        <VideoCardRow
+          thumb={{ kind: "frame", uri: draft.source.uri, atS: toSelection(draft).posterS }}
+          title={t("listingVideoChosen")}
+          meta={formatMmss(draft.endS - draft.startS)}
+        >
+          <VideoCardActions primary={{ label: t("listingVideoContinueEditing"), onPress: () => setEditing(true) }} />
+        </VideoCardRow>
+      )}
+
+      {idle && !draft && !serverBusy && (
+        <View className="gap-3">
+          <Text className="text-footnote text-muted-foreground">{t("listingVideoSubtitle")}</Text>
+          <Button variant="secondary" onPress={() => void chooseFromLibrary()} disabled={disabled || checkingAccess || !uploadsOn} accessibilityLabel={t("listingVideoChoose")}>
+            <Icon as={Plus} className="size-4" />
+            <Text>{t("listingVideoChoose")}</Text>
           </Button>
         </View>
       )}
 
-      {prep.state.phase === "failed" && (
-        <View className="gap-2" testID="listing-video-failed">
-          <View className="rounded-2xl bg-destructive/10 p-3" accessibilityRole="alert">
-            <Text className="text-callout font-semibold">{t(FAILURE_COPY[prep.state.failure].title)}</Text>
-            <Text className="text-footnote text-muted-foreground">{t(FAILURE_COPY[prep.state.failure].body)}</Text>
-          </View>
-          <View className="flex-row flex-wrap gap-2">
-            {FAILURE_COPY[prep.state.failure].retry ? (
-              <Button variant="secondary" onPress={prep.prepareAgain} accessibilityLabel={t(FAILURE_COPY[prep.state.failure].retry ?? "")}>
-                <Text>{t(FAILURE_COPY[prep.state.failure].retry ?? "")}</Text>
-              </Button>
-            ) : null}
-            <Button
-              variant="outline"
-              onPress={() => {
-                prep.remove();
-                clearSelection();
-                void chooseFromLibrary();
-              }}
-              accessibilityLabel={t("listingVideoChooseAnother")}
-            >
-              <Text>{t("listingVideoChooseAnother")}</Text>
-            </Button>
-            <Button
-              variant="outline"
-              onPress={requestRemove}
-              accessibilityLabel={t("listingVideoRemove")}
-            >
-              <Text>{t("listingVideoRemove")}</Text>
-            </Button>
-          </View>
-        </View>
-      )}
-
-      {prep.state.phase === "prepared" && upload.state.phase === "idle" && (
-        <View className="gap-2" testID="listing-video-prepared">
-          <View className="rounded-2xl bg-secondary p-3">
-            <Text className="text-callout font-semibold">{t("listingVideoReady")}</Text>
-            <Text className="text-footnote text-muted-foreground">
-              {t("listingVideoReadySummary", {
-                duration: formatMmss(prep.state.file.durationS),
-                cover: formatMmss(prep.state.selection.posterS),
-              })}
-            </Text>
-          </View>
-          <View className="flex-row gap-2">
-            <Button variant="secondary" className="flex-1" onPress={() => setEditing(true)} accessibilityLabel={t("listingVideoContinueEditing")}>
-              <Text>{t("listingVideoContinueEditing")}</Text>
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onPress={requestRemove}
-              accessibilityLabel={t("listingVideoRemove")}
-            >
-              <Text>{t("listingVideoRemove")}</Text>
-            </Button>
-          </View>
-        </View>
-      )}
-
-      {upload.state.phase === "idle" && prep.state.phase === "idle" && draft && !editing && (
-        <View className="gap-2">
-          <View className="rounded-2xl bg-secondary p-3">
-            <Text className="text-callout font-semibold">{t("listingVideoChosen")}</Text>
-            <Text className="text-footnote text-muted-foreground">
-              {t("listingVideoChosenSummary", {
-                duration: formatMmss(draft.endS - draft.startS),
-                cover: formatMmss(toSelection(draft).posterS),
-              })}
-            </Text>
-          </View>
-          <Button variant="secondary" onPress={() => setEditing(true)} accessibilityLabel={t("listingVideoContinueEditing")}>
-            <Text>{t("listingVideoContinueEditing")}</Text>
-          </Button>
-        </View>
-      )}
-
-      {upload.state.phase === "idle" && prep.state.phase === "idle" && !draft && !serverBusy && (
-        <Button onPress={() => void chooseFromLibrary()} disabled={disabled || checkingAccess || !uploadsOn} accessibilityLabel={t("listingVideoChoose")}>
-          <Icon as={Plus} className="size-4" />
-          <Text>{t("listingVideoChoose")}</Text>
-        </Button>
-      )}
-
-      </>}
+      </>;
+      }}
       </OwnerVideoStatus>
 
       {permissionDenied && <PermissionNote onDismiss={() => setPermissionDenied(false)} />}
