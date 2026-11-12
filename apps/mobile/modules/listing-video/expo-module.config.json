@@ -1,6 +1,9 @@
 {
-  "platforms": ["apple"],
+  "platforms": ["apple", "android"],
   "apple": {
     "modules": ["ListingVideoModule"]
+  },
+  "android": {
+    "modules": ["tm.auto.listingvideo.ListingVideoModule"]
   }
 }

@@ -5,6 +5,7 @@ const eslintConfig = defineConfig([
   ...expo,
   globalIgnores([
     ".expo/**",
+    "modules/listing-video/android/build/**",
     "assets/**",
     "scripts/**",
     "eslint.config.mjs",

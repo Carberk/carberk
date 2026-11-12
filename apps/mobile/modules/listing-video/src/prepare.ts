@@ -4,7 +4,7 @@
  * The phone decodes only the kept interval and re-encodes it as H.264/AAC
  * at most 30 fps, fitted inside 1280x720 (or 720x1280) without upscaling,
  * HDR normalised to SDR, one file of at most 15 MiB. The native side is
- * AVFoundation on iOS; Android (Media3 Transformer) is proven in #1050.
+ * AVFoundation on iOS and Media3 Transformer on Android (#1050).
  */
 
 export const MAX_INTERVAL_S = 90;

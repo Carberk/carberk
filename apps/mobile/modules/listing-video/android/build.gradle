@@ -1,0 +1,28 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'tm.auto.listingvideo'
+version = '0.1.0'
+
+android {
+  namespace "tm.auto.listingvideo"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+  testOptions {
+    unitTests.includeAndroidResources = true
+  }
+}
+
+dependencies {
+  // Same Media3 release as expo-video 55.0.21, so the app links one copy.
+  def androidxMedia3Version = "1.8.0"
+  implementation "androidx.media3:media3-transformer:${androidxMedia3Version}"
+  implementation "androidx.media3:media3-effect:${androidxMedia3Version}"
+  implementation "androidx.media3:media3-common:${androidxMedia3Version}"
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.robolectric:robolectric:4.14.1'
+}
