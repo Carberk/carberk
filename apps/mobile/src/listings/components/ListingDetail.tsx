@@ -214,11 +214,7 @@ export function ListingDetailView({
         {!isOwner && (
           <View className="gap-3">
             <Separator />
-            <SellerBlock
-              seller={listing.seller}
-              cityName={maps.cityName(listing.cityId)}
-              locationText={listing.locationText}
-            />
+            <SellerBlock seller={listing.seller} />
           </View>
         )}
         {!isOwner && !closed && listing.allowChat && (

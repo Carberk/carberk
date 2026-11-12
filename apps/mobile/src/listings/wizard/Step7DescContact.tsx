@@ -4,8 +4,6 @@ import { Phone, MessageSquare } from "lucide-react-native";
 import type { ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
-import { useBrands } from "../../api/catalog/useBrands";
-import { useModels } from "../../api/catalog/useModels";
 import { useCities } from "../../api/catalog/useCities";
 
 import { ContactPhonePicker } from "./ContactPhonePicker";
@@ -29,21 +27,6 @@ interface Step7DescContactProps {
   publishPhoneError?: boolean;
 }
 
-function useReviewSummary(payload: WizardSchemas.WizardDraftPayload) {
-  const { data: brandsData } = useBrands();
-  const { data: modelsData } = useModels(payload.brandId ?? "");
-  const { data: citiesData } = useCities(payload.regionId ?? "");
-
-  const brandName =
-    brandsData?.items.find((b) => b.id === payload.brandId)?.name ?? "";
-  const modelName =
-    modelsData?.items.find((m) => m.id === payload.modelId)?.name ?? "";
-  const cityName =
-    citiesData?.items.find((c) => c.id === payload.cityId)?.name ?? "";
-
-  return { brandName, modelName, cityName };
-}
-
 function wrapDisabled(children: React.ReactNode, disabled: boolean) {
   if (!disabled) return <>{children}</>;
   return <View className="opacity-50">{children}</View>;
@@ -54,13 +37,11 @@ function ReviewSummary({
 }: {
   payload: WizardSchemas.WizardDraftPayload;
 }) {
-  const { brandName, modelName, cityName } = useReviewSummary(payload);
+  const { data: citiesData } = useCities(payload.regionId ?? "");
+  const cityName = citiesData?.items.find((city) => city.id === payload.cityId)?.name;
 
   return (
     <View className="gap-1 border-b border-border pb-5">
-      <Text className="text-callout font-medium text-foreground">
-        {brandName} {modelName} {payload.year}
-      </Text>
       <Text className="text-callout text-foreground">
         {payload.priceAmount
           ? `${payload.priceAmount.toLocaleString()} ${payload.priceCurrency}`
@@ -99,10 +80,10 @@ function ContactMethods({
             </View>
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="text-body text-foreground">{t("phoneCalls")}</Text>
-              <Text className="text-caption text-muted-foreground">{t("callsAllowed")}</Text>
             </View>
           </View>
           <Switch
+            accessibilityLabel={t("phoneCalls")}
             checked={allowCalls}
             onCheckedChange={(v) => onChange({ allowCalls: v })}
             disabled={disabled}
@@ -118,10 +99,10 @@ function ContactMethods({
             </View>
             <View className="min-w-0 flex-1 gap-0.5">
               <Text className="text-body text-foreground">{t("inAppChat")}</Text>
-              <Text className="text-caption text-muted-foreground">{t("chatAllowed")}</Text>
             </View>
           </View>
           <Switch
+            accessibilityLabel={t("inAppChat")}
             checked={allowChat}
             onCheckedChange={(v) => onChange({ allowChat: v })}
             disabled={disabled}
