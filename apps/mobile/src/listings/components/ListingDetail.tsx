@@ -203,7 +203,7 @@ export function ListingDetailView({
               <Button
                 variant="link"
                 size="sm"
-                className="min-h-11 self-start px-0"
+                className="min-h-11 min-w-11 self-start px-0"
                 onPress={() => setExpanded(true)}
               >
                 <Text>{t("detailMore")}</Text>
