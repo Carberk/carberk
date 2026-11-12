@@ -5,7 +5,7 @@ import { waitFor } from "@testing-library/react-native";
 
 import { sentVideoTelemetry, server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
-import { createdPlayers, type FakeVideoPlayer } from "../../../test/native-video";
+import { createdPlayers, fakeVideoOptions, type FakeVideoPlayer } from "../../../test/native-video";
 
 import { ListingVideoPlayer } from "./ListingVideoPlayer";
 
@@ -156,6 +156,63 @@ describe("ListingVideoPlayer", () => {
     expect(screen.queryByText("Loading video")).toBeNull();
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
     expect(screen.getByText("0:42")).toBeTruthy();
+  });
+
+  describe("when the native player is ready before the player screen listens", () => {
+    beforeEach(() => { fakeVideoOptions.readyBeforeListening = true; });
+    afterEach(() => { fakeVideoOptions.readyBeforeListening = false; });
+
+    it("starts playing on open, without a second Play tap", async () => {
+      const { screen } = await renderPlayer();
+      // Only the grant and the master playlist land; no status report follows.
+      await act(async () => {});
+      await act(async () => {});
+      const player = playerOf(screen);
+      expect(uriOf(player)).toBe(MASTER);
+      expect(player.playing).toBe(true);
+      expect(screen.getByTestId("listing-video-player-play-pause").props.accessibilityLabel).toBe("Pause");
+      expect(screen.queryByRole("button", { name: "Play" })).toBeNull();
+
+      // A later ready report is neither a second start nor a stall.
+      await act(async () => { player.emitStatus("readyToPlay"); });
+      await act(async () => { screen.unmount(); });
+      await waitFor(() => expect(sentVideoTelemetry).toEqual([
+        { event: "playback_started", audience: "viewer", quality: "auto", startupMs: expect.any(Number) },
+        { event: "playback_buffering", audience: "viewer", stallCount: 0, stallMs: 0, watchedMs: 0 },
+      ]));
+    });
+
+    it("still comes back paused after the app was in the background", async () => {
+      const appState = captureAppState();
+      try {
+        const { screen } = await renderPlayer();
+        await act(async () => {});
+        await act(async () => {});
+        const player = playerOf(screen);
+        await act(async () => { player.emitTimeUpdate(25); });
+        await act(async () => { appState.emit("background"); });
+        await act(async () => { appState.emit("active"); });
+        const back = playerOf(screen);
+        expect(uriOf(back)).toBe(MASTER);
+        expect(back.currentTime).toBe(25);
+        expect(back.playing).toBe(false);
+        expect(screen.getByTestId("listing-video-player-play-pause").props.accessibilityLabel).toBe("Play");
+      } finally {
+        appState.restore();
+      }
+    });
+
+    it("keeps playing at the same position after a quality switch", async () => {
+      const { screen } = await renderPlayer();
+      await act(async () => {});
+      await act(async () => {});
+      await act(async () => { playerOf(screen).emitTimeUpdate(10); });
+      await pickQuality(screen, "720p");
+      const next = playerOf(screen);
+      expect(uriOf(next)).toBe(V720);
+      expect(next.currentTime).toBe(10);
+      expect(next.playing).toBe(true);
+    });
   });
 
   it("pauses and resumes from the control bar", async () => {
