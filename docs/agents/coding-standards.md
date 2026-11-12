@@ -43,6 +43,18 @@ Implementers satisfy these rules before handoff; Standards reviewers block viola
 - Its setup is longer than its assertions and most of it is mocks of this repository's code.
 - It checks state through a back door, such as a direct database query, when the interface could show it.
 
+## UI copy
+
+Implementers and reviewers apply these rules to product UI in Mobile, Admin and public Web, including localized and accessible text:
+
+1. **Make every line useful.** Keep text that helps a person understand the current state, make a decision, act or recover. Apply the deletion test in the rendered state: if removing a line loses none of that meaning, remove it. Word count alone does not establish usefulness.
+2. **Say each idea once.** Use a clear heading and action. An eyebrow, subhead, helper, status or confirmation earns its place only by adding needed information. For example, “Operation on hold” above “Paused” repeats the state; keep “Paused”. A Resume button needs no sentence explaining how to press it.
+3. **Describe the user's outcome.** Explain consequences when they matter; keep internal mechanics out of product copy unless they change a meaningful choice. Prefer a clear label or layout over prose that explains a confusing control.
+4. **Preserve essential meaning.** Keep relevant limits and eligibility, destructive consequences, privacy/legal disclosures, seller attribution, accessible names and actionable recovery. A helper that prevents a real mistake is useful. Put uncommon detail behind help when it can safely wait; keep immediate constraints next to the decision.
+5. **Check the whole state.** Read heading, body, status and actions together in each supported locale, including empty, loading and error states. Keep only promises the available actions support. Verify readable wrapping and accessible labels; brevity must preserve comprehension.
+
+The [delivery workflow](coding-workflow.md#4-review) owns runtime evidence, readability scoring and the merge gate. Record unrelated existing copy problems as audit findings for a separate ticket.
+
 ## Where this comes from
 
 The vocabulary and tests follow John Ousterhout's deep modules, Michael Feathers's seams, and the `codebase-design`, `improve-codebase-architecture` and `tdd` skills. Test-first work follows the [tdd](../../.claude/skills/tdd/SKILL.md) skill; mobile test mechanics follow [Mobile component tests](mobile-testing.md).
