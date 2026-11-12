@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutBucketPolicyCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import type { Pool } from "pg";
+import { Client, type Pool } from "pg";
 import sharp from "sharp";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -65,14 +65,16 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     // Cleanup is confined to these disposable containers, never the operator's executor.
     await pool.query('DELETE FROM listing_media WHERE id <> $1', ["old-media"]);
     await pool.query('DELETE FROM listings WHERE id <> $1', ["unrelated"]);
-    const page = await s3.send(new ListObjectsV2Command({ Bucket, Prefix: "review-baseline/" }));
-    for (const object of page.Contents ?? []) await s3.send(new DeleteObjectCommand({ Bucket, Key: object.Key }));
+    await pool.query("DELETE FROM listing_drafts WHERE id <> 'draft'");
+    await pool.query("DELETE FROM media_uploads");
+    const page = await s3.send(new ListObjectsV2Command({ Bucket }));
+    for (const object of page.Contents ?? []) if (object.Key !== "existing/original.webp") await s3.send(new DeleteObjectCommand({ Bucket, Key: object.Key }));
     await s3.send(new PutBucketPolicyCommand({ Bucket, Policy: policy() }));
   });
   afterAll(async () => { await pool?.end(); s3?.destroy(); await minio?.stop(); await postgres?.stop(); });
   async function snapshot() {
     const result = [];
-    for (const table of ["users", "sessions", "listing_drafts", "listings", "listing_media", "listing_videos", "favorites"]) {
+    for (const table of ["users", "sessions", "listing_drafts", "listings", "listing_media", "listing_videos", "favorites", "media_uploads"]) {
       result.push((await pool.query(`SELECT row_to_json(t) AS row FROM ${table} t ORDER BY id`)).rows);
     }
     return result;
@@ -81,6 +83,107 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     const plan = await runRichScenarios(target);
     return runRichScenarios({ ...target, mode: "apply", planHash: plan.planHash });
   }
+  it("adds four private Photos-step drafts with accurate AVAILABLE uploads, retaining the existing draft and making repeat apply a no-op", async () => {
+    const selected = { ...target, scenarioSet: "private-drafts" as const };
+    const before = await snapshot();
+    const plan = await runRichScenarios(selected);
+    expect(plan.planned).toEqual({ drafts: 4, uploads: 24, objects: 121 });
+    expect(await snapshot()).toEqual(before);
+    await runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash });
+    const rows = (await pool.query(`SELECT payload FROM listing_drafts WHERE id LIKE 'b1130000-%' ORDER BY id`)).rows;
+    expect(rows.map((row) => row.payload.photos.length)).toEqual([0, 1, 3, 20]);
+    expect(rows.every((row) => row.payload.currentStep === 3)).toBe(true);
+    const uploads = (await pool.query(`SELECT * FROM media_uploads WHERE id LIKE 'b1130000-%'`)).rows;
+    expect(uploads).toHaveLength(24);
+    for (const upload of uploads) {
+      expect(upload.state).toBe("AVAILABLE"); expect(upload.userId).toBe("seller");
+      expect(upload.objectKeys).toHaveLength(5);
+      const object = await s3.send(new GetObjectCommand({ Bucket, Key: upload.key }));
+      expect(object.ContentLength).toBe(upload.sizeBytes);
+      expect(object.ContentType).toBe("image/webp");
+    }
+    const after = await snapshot();
+    const stored = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents;
+    expect((await runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash })).writes).toBe(0);
+    expect((await runRichScenarios({ ...selected, mode: "check" })).state).toBe("installed");
+    expect(await snapshot()).toEqual(after);
+    expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(stored);
+  });
+  it("refuses capacity and stale plans after concurrent creation without evicting drafts", async () => {
+    const selected = { ...target, scenarioSet: "private-drafts" as const };
+    const plan = await runRichScenarios(selected);
+    await pool.query(`INSERT INTO listing_drafts(id,"userId",payload,"updatedAt")VALUES('concurrent','seller','{}',now())`);
+    const before = await snapshot();
+    await expect(runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash })).rejects.toThrow("Draft capacity: existing=2, required=4, cap=5");
+    expect(await snapshot()).toEqual(before);
+    await pool.query("DELETE FROM listing_drafts WHERE id='concurrent'");
+    await pool.query(`UPDATE listing_drafts SET "updatedAt"="updatedAt"+interval '1 second' WHERE id='draft'`);
+    await expect(runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash })).rejects.toThrow("Plan hash changed");
+    expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toHaveLength(1);
+  });
+  it("counts a normal create committed while apply waits for the owner lock", async () => {
+    const selected = { ...target, scenarioSet: "private-drafts" as const };
+    const plan = await runRichScenarios(selected);
+    const creator = new Client({ connectionString: target.databaseUrl });
+    await creator.connect();
+    await creator.query("BEGIN");
+    await creator.query("SELECT id FROM users WHERE id='seller' FOR UPDATE");
+    const applying = runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash }).then(() => "unexpected success", (error: unknown) => String(error));
+    try {
+      // Observe the actual owner-lock wait rather than relying on renderer timing.
+      let blocked = false;
+      for (let attempt = 0; attempt < 500 && !blocked; attempt++) {
+        blocked = Boolean((await pool.query(`SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%FOR UPDATE%' AND pid<>pg_backend_pid()`)).rowCount);
+        if (!blocked) await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(blocked).toBe(true);
+      await creator.query(`INSERT INTO listing_drafts(id,"userId",payload,"updatedAt")VALUES('racing','seller','{}',now())`);
+      await creator.query("COMMIT");
+      expect(await applying).toContain("Draft capacity: existing=2, required=4, cap=5");
+      expect((await pool.query("SELECT id FROM listing_drafts ORDER BY id")).rows).toEqual([{ id: "draft" }, { id: "racing" }]);
+      expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toHaveLength(1);
+    } finally { await creator.query("ROLLBACK"); await creator.end(); await applying; }
+  });
+  it("refuses foreign, modified and consumed private drafts and upload/object collisions", async () => {
+    const selected = { ...target, scenarioSet: "private-drafts" as const };
+    const plan = await runRichScenarios(selected);
+    await runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash });
+    await expect(runRichScenarios({ ...selected, ownerId: "other" })).rejects.toThrow("Modified/foreign private draft");
+    await pool.query(`UPDATE media_uploads SET "userId"='other' WHERE id='b1130000-0000-4003-8000-000000000001'`);
+    await expect(runRichScenarios(selected)).rejects.toThrow("modified/consumed private upload");
+    await pool.query(`UPDATE media_uploads SET "userId"='seller'`);
+    await pool.query(`UPDATE media_uploads SET state='RETIRED',"retiredAt"=now() WHERE id='b1130000-0000-4003-8000-000000000001'`);
+    await expect(runRichScenarios(selected)).rejects.toThrow("modified/consumed private upload");
+    await pool.query(`UPDATE media_uploads SET state='AVAILABLE',"retiredAt"=NULL`);
+    await pool.query(`UPDATE listing_drafts SET payload=jsonb_set(payload,'{currentStep}','4') WHERE id='b1130000-0000-4000-8000-000000000003'`);
+    await expect(runRichScenarios(selected)).rejects.toThrow("Modified/foreign private draft");
+    await pool.query(`DELETE FROM listing_drafts WHERE id='b1130000-0000-4000-8000-000000000003'`);
+    await expect(runRichScenarios(selected)).rejects.toThrow("Partial/consumed private drafts");
+  });
+  it("refuses exact private upload IDs, keys and foreign draft references before writes", async () => {
+    const selected = { ...target, scenarioSet: "private-drafts" as const };
+    const plan = await runRichScenarios(selected);
+    await pool.query(`INSERT INTO media_uploads(id,"userId",key,kind,"contentType")VALUES('b1130000-0000-4003-8000-000000000001','other','foreign/original.webp','image','image/webp')`);
+    await expect(runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash })).rejects.toThrow("Occupied/modified/consumed private upload");
+    await pool.query("DELETE FROM media_uploads");
+    await pool.query(`INSERT INTO listing_drafts(id,"userId",payload,"updatedAt")VALUES('foreign-reference','other','{"photos":[{"key":"pending/b1130000-0000-4003-8000-000000000001/original.webp"}]}',now())`);
+    await expect(runRichScenarios(selected)).rejects.toThrow("referenced by another draft");
+    await pool.query("DELETE FROM listing_drafts WHERE id='foreign-reference'");
+    await s3.send(new PutObjectCommand({ Bucket, Key: "pending/b1130000-0000-4003-8000-000000000001/original.webp", Body: "preserve collision" }));
+    await expect(runRichScenarios(selected)).rejects.toThrow("Occupied object namespace");
+    expect((await pool.query("SELECT id FROM listing_drafts ORDER BY id")).rows).toEqual([{ id: "draft" }]);
+  });
+  it("retains an exact private-object recovery receipt when draft inserts fail", async () => {
+    const selected = { ...target, scenarioSet: "private-drafts" as const };
+    const plan = await runRichScenarios(selected);
+    await pool.query(`ALTER TABLE listing_drafts ADD CONSTRAINT private_test_failure CHECK (id='draft')`);
+    const before = await snapshot();
+    try { await expect(runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash })).rejects.toThrow(/atomic private draft\/upload inserts.*createdObjects.*pending\/b1130000/); }
+    finally { await pool.query("ALTER TABLE listing_drafts DROP CONSTRAINT private_test_failure"); }
+    expect(await snapshot()).toEqual(before);
+    expect((await s3.send(new ListObjectsV2Command({ Bucket, Prefix: "pending/b1130000-" }))).Contents).toHaveLength(120);
+    await expect(runRichScenarios(selected)).rejects.toThrow("Occupied object namespace");
+  });
   it("plans read-only, creates two ten-view scenarios with public credits, and repeats with no timestamp/object changes", async () => {
     const before = await snapshot();
     const plan = await runRichScenarios(target);
