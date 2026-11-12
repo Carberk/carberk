@@ -90,6 +90,7 @@ wrapper; these commands can otherwise expose every application secret.
 1. Merge to `main` only after the required GitHub Actions check (`pr`) passes on the GitHub-hosted runner (ADR-0073).
 2. Railway staging follows `main` with **Wait for CI** enabled (`checkSuites` on each service's deployment trigger). A failed required check must not create a staging deployment; Railway records the trigger as `SKIPPED` and creates no build. A deployment held for a still-running check sits in `WAITING`.
    Railway has **no cross-service deploy ordering**: a green `main` push fans out to every service with a trigger, in parallel. Any release carrying a migration must be ordered by the operator — deploy `api` explicitly, wait for `/readyz`, then deploy the rest.
+   When the API introduces work an older worker cannot process, keep its producer gate closed and stop that old consumer before the API cutover. For Listing video, hold `LISTING_VIDEO_UPLOADS_ENABLED=false` until the selected worker reports the exact release SHA and passes `/readyz`; then restore the explicitly approved upload setting and run an owned disposable upload through Ready. Reconcile jobs created during the cutover through supported domain operations; record affected counts and recovery, preserving queue history. An API health check alone does not prove worker compatibility. The API remains the only migration authority.
    A `SKIPPED` trigger is **final for that SHA**. Railway acts on the check suite's first conclusion, so re-running a flaky failed CI job to green does *not* un-skip the deployment — no new deployment appears. Recover by deploying that SHA explicitly, or by carrying it forward in a later commit. Verify with `list-deployments` rather than assuming the re-run was enough.
 3. Record the git SHA selected by the staging deployment.
 4. Production has no branch autodeploy. Select only the exact SHA that passed the staging smoke and require a human production approval.
@@ -225,7 +226,7 @@ the refresh token in the operator secret store.
 3. Confirm the stable AutoTM-owned API/media domains when producing a store-candidate binary. Railway generated domains are acceptable only for staging/internal builds.
 4. Confirm production-only secret references and feature flags without printing their values.
 5. Approve the production deployment manually.
-6. Repeat the integrated reviewer smoke against production and record SHA, deployment/build identifiers, migration state, timestamps, and result.
+6. Wait for all required services to be healthy on the selected SHA, then repeat the integrated reviewer smoke against production. Apply the [worker cutover gate](#step-1--ci-gate-and-revision-selection) when queue contracts change. Record SHA, deployment/build identifiers, migration state, timestamps, and result.
 
 Production remains reviewer-only: 3–5 reserved buyer/seller demo accounts, no real users, no real SMS, and no admin-capable reviewer identity.
 
