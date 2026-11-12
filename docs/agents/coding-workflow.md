@@ -27,6 +27,8 @@ Proof is what you observed in this session:
 - one focused test that fails without the change, when behavior changed;
 - for UI or runtime behavior, the running app on the iOS Simulator, as described in [local testing](local-testing.md). Use its fixture Users, Listings and videos rather than hand-made data.
 
+Signed-in UI preparation follows the required [native fixture sign-in procedure](native-fixture-signin.md).
+
 Put proof in the PR description. Screenshots go in the PR, never in the repository. Do not commit evidence, receipts or review files.
 
 Draft pull requests run only the lane selector. Their required `pr` check is skipped, so a draft-only run cannot establish a green head for the docs shortcut. Mark a draft ready for review to run the selected docs or full lane; later pushes run it again. Adding the `run-full-ci` label forces the full matrix, including on a draft.
