@@ -234,13 +234,13 @@ function VideoCardContent({ canUploadVideo, isVideoUploadTester, disabled = fals
           ? t("listingVideoUploadWaitingBody")
           : upload.state.pauseReason === "background"
             ? t("listingVideoUploadBackgroundBody")
-            : t("listingVideoUploadPausedBody");
+            : null;
         return (
           <VideoCardRow
             testID="listing-video-uploading"
             thumb={{ kind: phase === "uploading" ? "busy" : "empty" }}
             title={phase === "uploading" ? t("listingVideoUploading") : pausedTitle}
-            meta={phase === "uploading" ? progress : `${progress} · ${pausedBody}`}
+            meta={phase === "uploading" ? progress : [progress, pausedBody].filter(Boolean).join(" · ")}
           >
             <VideoProgress percent={percent} testID="listing-video-upload-progress" />
             <VideoCardActions
