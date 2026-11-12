@@ -7,16 +7,22 @@ const NOW = Date.parse("2026-11-12T06:00:00Z");
 const ID = "abcdef01-1234-4567-89ab-123456789abc";
 const config = "APP_ENV=development\nNODE_ENV=development\nSMS_DRIVER=mock\nOTP_TEST_MODE=false\nOTP_TEST_CODE_RESPONSE=false\nPORT=3006";
 const options = { fixture: "seller", api: "http://127.0.0.1:3006/api/v1", apiEnv: "/tmp/api.env", apiLog: "/tmp/api.log" };
-function boundary({ signedIn = false, log, response } = {}) {
+function boundary({ signedIn = false, log, response, cabinetStates } = {}) {
   const actions = [];
   const inputs = [];
   const requests = [];
+  const reads = [];
+  const waits = [];
+  let cabinetIndex = 0;
   let entered = false;
   return {
-    actions, inputs, requests,
+    actions, inputs, requests, reads, waits,
     now: () => NOW,
-    sleep: async () => {},
-    readFile: async path => path.endsWith(".env") ? config : log ?? `2026-11-12T06:00:00.000Z [mock] OTP for ***0001 (req abcdef01): 709814\n`,
+    sleep: async value => { waits.push(value); },
+    readFile: async path => {
+      reads.push(path);
+      return path.endsWith(".env") ? config : log ?? `2026-11-12T06:00:00.000Z [mock] OTP for ***0001 (req abcdef01): 709814\n`;
+    },
     fetch: async (url, init) => {
       requests.push([String(url), init]);
       if (String(url).endsWith("/healthz")) return Response.json({ service: "api", environment: "development" });
@@ -25,6 +31,11 @@ function boundary({ signedIn = false, log, response } = {}) {
     device: async (args, { input } = {}) => {
       actions.push(args);
       if (args[0] === "fill") { entered = true; inputs.push(input); }
+      if (args[0] === "snapshot" && cabinetStates && !actions.some(a => a[1]?.includes("/otp?"))) {
+        const state = cabinetStates[Math.min(cabinetIndex++, cabinetStates.length - 1)];
+        if (state instanceof Error) throw state;
+        return state;
+      }
       if (args[0] === "snapshot") return { nodes: entered || signedIn
         ? [{ label: "Aýgül Amanowa" }, { label: "+993 61 XX-XX-01" }]
         : actions.some(a => a[1]?.includes("/otp?"))
@@ -44,14 +55,106 @@ test("refuses remote APIs before touching the device or spending a code", async 
 
 test("reuses the seller already confirmed in the native app without requesting a code", async () => {
   const port = boundary({ signedIn: true });
-  assert.deepEqual(await signInFixture(options, port), { fixture: "seller", status: "reused", identityConfirmed: true });
-  assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 0);
-  assert.equal(port.actions.some(([action]) => action === "fill"), false);
+  assert.deepEqual(await signInFixture({ ...options, reuseOnly: true }, port), { fixture: "seller", status: "reused", identityConfirmed: true });
+  assert.deepEqual(port.waits, []);
+  assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
+  assert.deepEqual(port.reads, [options.apiEnv]);
+  assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ["snapshot", "-i"]]);
+});
+
+for (const loading of ["Loading", "Please wait...", "Подождите...", "Garaşyň..."]) {
+  test(`reuses the expected fixture when initial Cabinet loading settles (${loading}), without another invocation or code`, async () => {
+    const port = boundary({ cabinetStates: [
+      { nodes: [{ label: loading }] },
+      { nodes: [{ label: "Aýgül Amanowa, +993 61 XX-XX-01" }] },
+    ] });
+    assert.deepEqual(await signInFixture({ ...options, reuseOnly: true }, port), { fixture: "seller", status: "reused", identityConfirmed: true });
+    assert.deepEqual(port.waits, [500]);
+    assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
+    assert.deepEqual(port.reads, [options.apiEnv]);
+    assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ["snapshot", "-i"], ["snapshot", "-i"]]);
+    assert.deepEqual(port.inputs, []);
+  });
+}
+
+for (const method of ["+993 62 XX-XX-42", "s•••@example.test"]) {
+  test(`refuses a settled wrong identity (${method}) immediately even while another Cabinet row is loading`, async () => {
+    const port = boundary({ cabinetStates: [
+      { nodes: [{ label: `Other seller, ${method}` }, { label: "Please wait..." }] },
+      { nodes: [{ label: "Aýgül Amanowa, +993 61 XX-XX-01" }] },
+    ] });
+    await assert.rejects(signInFixture(options, port), /without switching/);
+    assert.deepEqual(port.waits, []);
+    assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
+    assert.deepEqual(port.reads, [options.apiEnv]);
+    assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ["snapshot", "-i"]]);
+  });
+}
+
+test("reuse-only refuses a settled signed-out Cabinet immediately even while another row is loading", async () => {
+  const port = boundary({ cabinetStates: [{ nodes: [{ label: "Войти, Сохраните избранное и общайтесь" }, { label: "Подождите..." }] }] });
+  await assert.rejects(signInFixture({ ...options, reuseOnly: true }, port), /reuse-only/);
+  assert.deepEqual(port.waits, []);
+  assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
+  assert.deepEqual(port.reads, [options.apiEnv]);
+  assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ["snapshot", "-i"]]);
+});
+
+for (const error of ["Something went wrong", "Что-то пошло не так", "Bir zat ýalňyş boldy"]) {
+  test(`refuses a settled Cabinet error (${error}) immediately instead of waiting on another loading row`, async () => {
+    const port = boundary({ cabinetStates: [{ nodes: [{ label: error }, { label: "Garaşyň..." }] }] });
+    await assert.rejects(signInFixture(options, port), /without switching/);
+    assert.deepEqual(port.waits, []);
+    assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
+    assert.deepEqual(port.reads, [options.apiEnv]);
+    assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ["snapshot", "-i"]]);
+  });
+}
+
+for (const reuseOnly of [false, true]) {
+  test(`persistent initial Cabinet loading times out without any auth action (reuse-only: ${reuseOnly})`, async () => {
+    const port = boundary({ cabinetStates: [{ nodes: [{ label: "Garaşyň..." }, { label: "private-value" }] }] });
+    await assert.rejects(signInFixture({ ...options, reuseOnly }, port), error => {
+      assert.match(error.message, /Cabinet identity loading timed out/);
+      assert.doesNotMatch(error.message, /private-value/);
+      return true;
+    });
+    assert.deepEqual(port.waits, [500, 500, 500, 500, 500, 500, 500, 500, 500]);
+    assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
+    assert.deepEqual(port.reads, [options.apiEnv]);
+    assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ...Array.from({ length: 10 }, () => ["snapshot", "-i"])]);
+  });
+}
+
+test("stops and redacts a device error during initial Cabinet loading without another snapshot or code", async () => {
+  const port = boundary({ cabinetStates: [
+    { nodes: [{ label: "Please wait..." }] },
+    new Error("709814 token=private-value +99361000001"),
+    { nodes: [{ label: "Aýgül Amanowa, +993 61 XX-XX-01" }] },
+  ] });
+  await assert.rejects(signInFixture({ ...options, reuseOnly: true }, port), error => {
+    assert.match(error.message, /raw diagnostics suppressed/);
+    assert.doesNotMatch(error.message, /709814|private-value|99361000001/);
+    return true;
+  });
+  assert.deepEqual(port.waits, [500]);
+  assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
+  assert.deepEqual(port.reads, [options.apiEnv]);
+  assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ["snapshot", "-i"], ["snapshot", "-i"]]);
+});
+
+test("refuses an unreadable settled Cabinet without retrying or requesting a code", async () => {
+  const port = boundary({ cabinetStates: [{ nodes: [] }] });
+  await assert.rejects(signInFixture(options, port), /without switching/);
+  assert.deepEqual(port.waits, []);
+  assert.deepEqual(port.actions, [["open", "tm.auto.app"], ["open", "autotm:///services"], ["snapshot", "-i"]]);
+  assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
 });
 
 test("requests once, enters the correlated code in the genuine OTP UI, and confirms identity", async () => {
-  const port = boundary();
+  const port = boundary({ cabinetStates: [{ nodes: [{ label: "Please wait..." }] }, { nodes: [{ label: "Sign in" }] }] });
   assert.deepEqual(await signInFixture(options, port), { fixture: "seller", status: "signed-in", identityConfirmed: true });
+  assert.deepEqual(port.waits, [500]);
   const requests = port.requests.filter(([url]) => url.endsWith("/otp/request"));
   assert.equal(requests.length, 1);
   assert.deepEqual(JSON.parse(requests[0][1].body), { phone: "+99361000001" });
