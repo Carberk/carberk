@@ -34,6 +34,7 @@ async function main(): Promise<void> {
   }
   if (["RAILWAY_ENVIRONMENT_ID", "RAILWAY_ENVIRONMENT_NAME", "RAILWAY_PROJECT_ID", "RAILWAY_SERVICE_ID"].some((key) => env[key])) fail("Railway targets are outside this local check");
   const database = localUrl(env["DATABASE_URL"], "DATABASE_URL", ["postgresql:", "postgres:"]);
+  localUrl(env["REDIS_URL"], "REDIS_URL", ["redis:", "rediss:"]);
   const photoEndpoint = localUrl(env["MINIO_ENDPOINT"], "MINIO_ENDPOINT", ["http:"]);
   const videoEndpoint = localUrl(env["LISTING_VIDEO_BUCKET_ENDPOINT"] || env["MINIO_ENDPOINT"], "video endpoint", ["http:"]);
   if (env["MINIO_PUBLIC_URL"]) localUrl(env["MINIO_PUBLIC_URL"], "MINIO_PUBLIC_URL", ["http:"]);
@@ -125,9 +126,10 @@ async function main(): Promise<void> {
       await head(videoStorage, videoBucket, entry.key, entry.sizeBytes);
     }
     console.log(`Media available: ${photos.rows.length} photos, ${videos.rows.length} Ready videos; ${objectCount} nonempty objects verified with HEAD`);
+    const members = (key: string) => (env[key] ?? "").split(",").map((id) => id.trim()).filter(Boolean);
     if (env["LISTING_VIDEO_UPLOADS_ENABLED"] !== "true" ||
-      !env["LISTING_VIDEO_UPLOAD_TESTER_USER_IDS"]?.split(",").includes(UI_FIXTURE.sellerId) ||
-      ![UI_FIXTURE.sellerId, UI_FIXTURE.buyerId].every((id) => env["LISTING_VIDEO_VIEW_TESTER_USER_IDS"]?.split(",").includes(id))) {
+      !members("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS").includes(UI_FIXTURE.sellerId) ||
+      ![UI_FIXTURE.sellerId, UI_FIXTURE.buyerId].every((id) => members("LISTING_VIDEO_VIEW_TESTER_USER_IDS").includes(id))) {
       fail("Ready video access configuration missing; coordinate the API tester settings and owner restart (local-testing.md §1a)");
     }
     console.log("READY (local environment only). No data/auth changed. Device sign-in and build/origin are unverified; follow local-testing.md and native:signin --reuse-only.");

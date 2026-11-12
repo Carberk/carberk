@@ -26,7 +26,7 @@ test("unsafe actual database target refuses before contacting even the local API
   const api = createServer((_request, response) => { requests++; response.end(); });
   await new Promise<void>((done) => api.listen(0, "127.0.0.1", done));
   const port = (api.address() as { port: number }).port;
-  const config = `APP_ENV=development\nNODE_ENV=development\nPORT=${port}\nDATABASE_URL=postgresql://private:secret@production.example/app\nMINIO_ENDPOINT=http://127.0.0.1:9000\n`;
+  const config = `APP_ENV=development\nNODE_ENV=development\nPORT=${port}\nREDIS_URL=redis://127.0.0.1:6379\nDATABASE_URL=postgresql://private:secret@production.example/app\nMINIO_ENDPOINT=http://127.0.0.1:9000\n`;
   await writeFile(envFile, config);
   try {
     for (const scenario of [
@@ -35,6 +35,7 @@ test("unsafe actual database target refuses before contacting even the local API
       { env: {}, args: ["--api-origin", "https://production.example"], message: "--api-origin must use loopback" },
       { env: { DATABASE_URL: "postgresql://user:secret@localhost/app?host=production.example" }, args: ["--api-origin", `http://127.0.0.1:${port}`], message: "DATABASE_URL must not contain query" },
       { env: { DATABASE_URL: "postgresql://user:secret@localhost/app", MINIO_ENDPOINT: "http://production.example" }, args: ["--api-origin", `http://127.0.0.1:${port}`], message: "MINIO_ENDPOINT must use loopback" },
+      { env: { DATABASE_URL: "postgresql://user:secret@localhost/app", REDIS_URL: "redis://production.example:6379" }, args: ["--api-origin", `http://127.0.0.1:${port}`], message: "REDIS_URL must use loopback" },
       { env: {}, args: ["--reset"], message: "Invalid arguments" },
     ]) {
       const result = await run([...scenario.args, "--env-file", envFile], scenario.env);
@@ -145,7 +146,7 @@ test("CLI reuses the baseline, checks real object HEAD responses, and fails acti
   const dir = await mkdtemp(join(tmpdir(), "readiness-"));
   const envFile = join(dir, "api.env");
   const db = await databaseBoundary([users, listings, photos, conversations, videos]);
-  const config = `APP_ENV=development\nNODE_ENV=test\nPORT=${port}\nDATABASE_URL=postgresql://user:private@127.0.0.1:${db.port}/local\nMINIO_ENDPOINT=http://127.0.0.1:${port}\nMINIO_ACCESS_KEY=local\nMINIO_SECRET_KEY=private\nLISTING_VIDEO_UPLOADS_ENABLED=true\nLISTING_VIDEO_UPLOAD_TESTER_USER_IDS=${UI_FIXTURE.sellerId}\nLISTING_VIDEO_VIEW_TESTER_USER_IDS=${UI_FIXTURE.sellerId},${UI_FIXTURE.buyerId}\n`;
+  const config = `APP_ENV=development\nNODE_ENV=test\nPORT=${port}\nREDIS_URL=redis://127.0.0.1:6379\nDATABASE_URL=postgresql://user:private@127.0.0.1:${db.port}/local\nMINIO_ENDPOINT=http://127.0.0.1:${port}\nMINIO_ACCESS_KEY=local\nMINIO_SECRET_KEY=private\nLISTING_VIDEO_UPLOADS_ENABLED=true\nLISTING_VIDEO_UPLOAD_TESTER_USER_IDS=" ${UI_FIXTURE.sellerId} "\nLISTING_VIDEO_VIEW_TESTER_USER_IDS=${UI_FIXTURE.sellerId}, ${UI_FIXTURE.buyerId}\n`;
   await writeFile(envFile, config);
   try {
     const scenarios = [
