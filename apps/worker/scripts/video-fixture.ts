@@ -20,6 +20,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
+import { CLIPS, CLIP_SECONDS } from "../../../scripts/local-video-fixture.cjs";
+
 const workerDir = resolve(__dirname, "..");
 const repoDir = resolve(workerDir, "../..");
 process.loadEnvFile(existsSync(join(workerDir, ".env")) ? join(workerDir, ".env") : join(workerDir, ".env.template"));
@@ -34,11 +36,6 @@ function assertLocal(name: string, value: string | undefined): asserts value is 
 /** Fixed `ui:fixture` Users: the seller owns the video Listings, the buyer only watches. */
 export const FIXTURE_SELLER_ID = "f1000000-0000-4000-8000-000000000001";
 export const FIXTURE_BUYER_ID = "f1000000-0000-4000-8000-000000000010";
-const CLIPS = [
-  { name: "portrait", size: "720x1280" },
-  { name: "landscape", size: "1280x720" },
-] as const;
-const CLIP_SECONDS = 30;
 const COVER_OFFSET_MS = 4_000;
 
 const exec = promisify(execFile);

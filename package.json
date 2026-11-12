@@ -51,7 +51,8 @@
     "test:agent-github": "node --test scripts/agent-github.test.mjs",
     "test:native-session": "node --test scripts/native-session*.test.mjs",
     "native:signin": "node scripts/native-fixture-signin.mjs",
-    "test:native-fixture-signin": "node --test scripts/native-fixture-signin.test.mjs"
+    "test:native-fixture-signin": "node --test scripts/native-fixture-signin.test.mjs",
+    "native:ready": "pnpm --filter @auto-tm/db fixture:check"
   },
   "devDependencies": {
     "@typescript/native": "catalog:",

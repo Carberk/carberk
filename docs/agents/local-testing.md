@@ -4,7 +4,23 @@ How an agent runs Carberk on the local stack, signs in to the app and to Admin, 
 
 Test the app on the **iOS Simulator**. The Android emulator is not used for development testing on this Mac; use it only when a ticket is Android-only or the founder asks.
 
-## 1. Start the backend and Admin
+## 1. Check and reuse the local baseline
+
+Implementers, reviewers and delegate briefs use this preparation route before native proof. Coordinate the target API/worktree and process/device ownership first. Preserve an active release verification session. From your checkout, select the running local API and its actual env file explicitly:
+
+```bash
+pnpm native:ready --api-origin http://127.0.0.1:3006 --env-file /absolute/path/to/api/.env
+```
+
+This checks API/Postgres/Redis/MinIO readiness, existing fixture identities and gallery order, and nonempty photo/Ready-video objects (video sizes against the stored processing manifest). Database reads use a read-only snapshot; storage uses HEAD. It preserves Sessions, server/local drafts, videos, user-added Listings and interactions. It never starts services, migrates, seeds, repairs, requests codes or operates a device. Nonlocal and production targets refuse. The selected env file must match the running API; process env overrides it, as for the API itself. Failures identify the bounded missing/configuration step; coordinate any change with its owner instead of treating a failure as permission to reset.
+
+A successful check establishes environment availability, **not device sign-in or the code/build origin**. For native proof, follow [native fixture sign-in](native-fixture-signin.md), first with `--reuse-only`. Confirm Cabinet identity on your owned device. Record the source SHA, API/Metro ports and ownership, the actual served bundle's API/socket/media origins (or release artifact receipt), baseline check result, fixture role/session reuse and device/runtime. A config file or database User alone cannot establish these claims. Android builds and delegate briefs also follow the [bounded build, assigned ABI, explicit origins and scheduling rules](mobile-expo.md#local-android-build-pitfalls).
+
+### Start only missing, owned services
+
+When the check identifies an absent service, coordinate its startup separately. Stop only processes you started. For initial data/schema setup see section 1a.
+
+
 
 The Docker stack usually runs already: `docker ps` lists `compose-postgres-1`, `compose-redis-1` and `compose-minio-1`. If not, run `pnpm compose:up`.
 
@@ -16,7 +32,7 @@ for app in api admin mobile; do cp -n apps/$app/.env.template apps/$app/.env; do
 grep -E '^(DATABASE_URL|MINIO_ENDPOINT|MINIO_ACCESS_KEY|MINIO_SECRET_KEY|MINIO_REGION)=' apps/api/.env > packages/db/.env
 ```
 
-The shared local database can lag behind `main`. Bring it up to date and seed it before testing (section 1a).
+The shared local database can lag behind `main`. A readiness/schema failure requires coordinated setup (section 1a), not an automatic migration or reseed.
 
 Start the API in the background on a free port, with its own log. Several agents share this Mac, so check `lsof -nP -iTCP:<port> -sTCP:LISTEN` first; `3006` is the default. In Claude Code or Codex, use the tool's background mode instead of the trailing `&`:
 
@@ -48,7 +64,9 @@ Starting the API also builds `@auto-tm/db` and contracts, which the scripts belo
 
 ## 1a. Seed test data
 
-Run these from the repository root. Each one is safe to repeat, and the local data is disposable:
+These are **explicit writes**, for initial setup of an agreed local target or a coordinated destructive reset. Ordinary preparation uses section 1 and reuses existing state. Obtain the shared stack owners' exclusion window before migrations, seeding or replacement; preserve any active release proof. There is no reset operation in `native:ready`.
+
+`ui:fixture` replaces its Listings and deletes/recreates its fixture Users. Cascades remove their Sessions, server drafts, favourites, conversations/messages and user-added Listings, including data outside the fixed Listing IDs; it also removes video slots/generations/sources. Local drafts remain on the device but can lose their server/account references. Fixture replacement is not safe routine preparation. Coordinate any intended loss first, then run from the repository root in this order:
 
 ```bash
 pnpm db:migrate:deploy                               # apply migrations main has and the database lacks
@@ -65,7 +83,9 @@ pnpm --filter @auto-tm/worker video:fixture -- --write-env  # Ready portrait and
 | Buyer (has favourites and conversations) | `+99361000009` | viewing |
 | Other sellers | `+99361000002`, `+99361000003` | none |
 
-Sign in as these Users instead of making new ones. A fixture User that stays signed in uses no new codes.
+This is the current sparse UI baseline: mostly one-photo Listings, one two-photo gallery and a deliberate no-photo case. `video:fixture` makes synthetic 30-second test-pattern clips; these are UI/worker checks, not representative media benchmarks. This check does not claim the future richer baseline in #1119 is installed.
+
+Sign in as these Users instead of making new ones. A fixture User that stays signed in uses no new codes. After explicit setup, rerun section 1's readiness check.
 
 To test a real upload rather than the fixture videos, also start the worker, which processes uploads: `pnpm --filter @auto-tm/worker dev > /tmp/carberk-worker.log 2>&1 &`. Only one worker should run against the shared stack, so check `pgrep -fl apps/worker` first and reuse a running one.
 
@@ -107,29 +127,21 @@ In T3 Code, drive the Admin page with the preview browser tools and close the ta
 
 Use the iPhone 17 Simulator (iOS 26.2, id `38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`). In T3 Code, every launch, tap, text entry and screenshot goes through the device tools:
 
-1. `device_list`, then `device_open` with the host `local` and that id. It returns an `agent-device` command bound to the device. If the iPhone 17 is held by another session, use a spare Simulator instead (below).
+1. `device_list`, then `device_open` with the host `local` and that id. It returns an `agent-device` command bound to the device. If the device is held, preserve its owner and follow the contention rule in the native fixture procedure.
 2. Start Metro from your own worktree as a background command, on `8081` or any free port: `pnpm --filter @auto-tm/mobile dev --port 8081`. A Metro started by another worktree serves that worktree's code. If your API is not on `3006`, set the same port in `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WS_URL` in `apps/mobile/.env` first.
 3. Open the development build against your Metro: `<agent-device> open tm.auto.app --relaunch --metro-port 8081`.
 4. `<agent-device> snapshot -i` lists the screen's elements with `@eN` refs. Use `press @eN` and `fill @eN "text"`, and use `device_screenshot` to look. Refs change after every screen change, so take a new snapshot before each press. If the first snapshot warns that the app was not in front, take it again.
-5. To sign in, go to the **Account** tab and press **Sign in, By phone or email**. The phone field already shows `+993`, so `fill` it with the eight digits only (`65000902`), then press **Get code**. Read the code from the API log (section 2). The code screen has the keyboard focused, so `<agent-device> type <code>` enters it, and the app signs in on the sixth digit.
+5. Reuse and confirm the fixture session through the required [native fixture procedure](native-fixture-signin.md); start with `--reuse-only`.
 
 The Simulator reaches the Mac's `localhost`, so the app uses the local API, socket and MinIO from `apps/mobile/.env` with no port forwarding.
 
-If `device_open` or `open` fails with `DEVICE_IN_USE`, another session holds the Simulator. Do not wait for it, and do not close or reuse that session. Get your own Simulator:
-
-```bash
-pnpm sim:spare   # prints "<name> <udid>"
-```
-
-It picks a shut-down Simulator that already has the Carberk build, preferring ones named `Carberk …`. If there is none, it creates `Carberk Agent N` from the iPhone 17 and installs the build copied from a Simulator that has it. Then `device_list` and `device_open` with host `local` and that udid, and continue from step 2. It never touches a booted Simulator, because a session may hold it.
-
-If a session from a finished or failed thread still holds a Simulator, tell the founder so they can close it in the T3 Device panel. Free your own when you finish: `device_close` ends your session so the next agent can open the Simulator.
+For contention and cleanup use the [owned-device procedure](native-fixture-signin.md#prepare-one-owned-device), including the bound command's `close` and confirmed receipt **before** Device-panel cleanup. Preserve signed-in app data.
 
 **When to rebuild the development build:** the Carberk Debug build is already installed on the iPhone 17 and loads JavaScript from whichever Metro it opens, so JavaScript and styling changes need no rebuild. Rebuild after a native change, such as a new native package, an Expo upgrade, or a change to app config or plugins. Use the route known to work on this Mac's Xcode: `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <id> --port <port>`, as in the [mobile/Expo checks](mobile-expo.md#guarded-native-development-sessions). The build is the same for every backend. Afterwards, reopen it against your local Metro with step 3.
 
 ## 5. Finish
 
-Stop the API, Admin and Metro processes you started, close the devices you opened with `device_close`, and close your preview tabs. Leave the Docker stack running.
+Stop the API, Admin and Metro processes you started, close only your owned device sessions in the [required order](native-fixture-signin.md#prepare-one-owned-device), and close your preview tabs. Leave the Docker stack running.
 
 `next dev` rewrites `apps/admin/AGENTS.md` and Metro rewrites `apps/mobile/.expo/types/router.d.ts`. Restore them with `git checkout -- <file>` before committing, unless your change is about them.
 

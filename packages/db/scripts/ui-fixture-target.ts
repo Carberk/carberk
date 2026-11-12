@@ -1,15 +1,13 @@
-/**
- * Loads `.env`, then decides where the UI fixture may write.
- *
- * `ui-fixture.ts` imports this before any other module, so an unsafe target is refused before the
- * generated Prisma client, sharp or an S3 client is loaded, and nothing can connect before the guard
- * has run. The decision itself lives in `native-pr-seed-guard.cjs`, shared with `native:seed`.
- */
-import "dotenv/config";
+/** Guard the destructive CLI before loading clients; definition imports do no I/O. */
+import { join } from "node:path";
+
+import { config } from "dotenv";
 
 import { assertFixtureTarget } from "./native-pr-seed-guard.cjs";
 
-const target = assertFixtureTarget(process.env, process.argv);
+const isReplacementEntrypoint = require.main?.filename === join(__dirname, "ui-fixture.ts");
+if (isReplacementEntrypoint) config({ quiet: true });
+const target = isReplacementEntrypoint ? assertFixtureTarget(process.env, process.argv) : undefined;
 
-export const DATABASE_URL = target.databaseUrl;
-export const MINIO_ENDPOINT = target.minioEndpoint;
+export const DATABASE_URL = target?.databaseUrl;
+export const MINIO_ENDPOINT = target?.minioEndpoint;

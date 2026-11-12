@@ -106,7 +106,7 @@ Skip style unless it hides a bug. Hold to the smallest change. Flag code,
 tests, or guards the intent does not need. Other paths, rare cases, small
 perf, extra compat: nits.
 blocker = intended case wrong. should = real bug callers will hit, in intent. nit = rest.
-[UI changes only] Run the app on a spare Simulator with fixture data,
+[UI changes only] Follow docs/agents/local-testing.md for read-only readiness, session reuse, served-origin proof and owned-device selection/cleanup. Android briefs also include docs/agents/mobile-expo.md bounded build, ABI/origins and scheduling rules. Run the app on your owned Simulator with fixture data,
 screenshot every changed state, and score the look and flow per
 docs/agents/coding-workflow.md#4-review.
 Reply:
