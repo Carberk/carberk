@@ -47,8 +47,8 @@ function controlsInOrder(tree: unknown): string[] {
 
 const noop = () => undefined;
 
-describe("Step4Specs order (prototype bSpecs)", () => {
-  it("reads Condition, Mileage, Damaged, Known issues, then the optional specs, for a Used car", async () => {
+describe("Specifications followed by seller condition", () => {
+  it("keeps Used vehicle specifications before seller condition and known issues", async () => {
     const screen = await renderMobile(
       <Step4Specs payload={{ condition: "used", mileageKm: 1000 }} onChange={noop} />,
     );
@@ -57,19 +57,19 @@ describe("Step4Specs order (prototype bSpecs)", () => {
       "New",
       "Used",
       "e.g. 50000",
-      "Damaged / needs repair: Yes",
-      "Damaged / needs repair: No",
-      "Describe known problems or damage...",
       "Select body type",
       "Select transmission",
       "Select engine type",
       "Select drive type",
       "Select color",
       "e.g. 150",
+      "Damaged / needs repair: Yes",
+      "Damaged / needs repair: No",
+      "Describe known problems or damage...",
     ]);
   });
 
-  it("reaches Known issues right after Condition for a New car", async () => {
+  it("keeps New vehicle specifications before known issues", async () => {
     const screen = await renderMobile(
       <Step4Specs
         payload={{ condition: "new", conditionDisclosure: { damaged: false } }}
@@ -80,13 +80,13 @@ describe("Step4Specs order (prototype bSpecs)", () => {
     expect(controlsInOrder(screen.toJSON())).toEqual([
       "New",
       "Used",
-      "Describe known problems or damage...",
       "Select body type",
       "Select transmission",
       "Select engine type",
       "Select drive type",
       "Select color",
       "e.g. 150",
+      "Describe known problems or damage...",
     ]);
   });
 
@@ -98,8 +98,6 @@ describe("Step4Specs order (prototype bSpecs)", () => {
     const labels = [
       "Condition",
       "Mileage",
-      "Damaged / needs repair",
-      "Known issues",
       "More details (optional)",
       "Body type",
       "Transmission",
@@ -107,6 +105,8 @@ describe("Step4Specs order (prototype bSpecs)", () => {
       "Drive type",
       "Color",
       "Power",
+      "Damaged / needs repair",
+      "Known issues",
     ];
     const positions = labels.map((label) => text.indexOf(`"${label}`));
     expect(positions.every((position) => position >= 0)).toBe(true);

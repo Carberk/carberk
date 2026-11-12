@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Enums } from "@auto-tm/contracts";
+import { http, HttpResponse } from "msw";
+import { waitFor } from "@testing-library/react-native";
 
-import type * as ClientModule from "../../api/client";
+import { server } from "../../../test/msw";
+import { storeAuthSession, clearAuthSession } from "../../auth/session";
 import { useAuthIntentStore } from "../../auth/intentStore";
 import { queryKeys } from "../../api/queryKeys";
 import {
@@ -16,37 +19,35 @@ import { AskSellerChips } from "./AskSellerChips";
 
 const LISTING_ID = "00000000-0000-4000-8000-000000000374";
 const QUESTIONS = [
-  "Is the car still available?",
   "Can I see the car?",
   "What is the final price?",
-  "What is the condition of the car?",
 ];
 
-const state = vi.hoisted(() => ({
-  authenticated: true as boolean | null,
-  post: vi.fn(),
-}));
-vi.mock("../../auth/useAuth", () => ({
-  useAuth: () => ({ isAuthenticated: state.authenticated }),
-}));
-vi.mock("../../api/client", async (importOriginal) => ({
-  ...(await importOriginal<typeof ClientModule>()),
-  apiClient: { post: state.post, get: vi.fn(), delete: vi.fn() },
-}));
-vi.mock("expo-secure-store", () => ({
-  getItemAsync: vi.fn(async () => null),
-  setItemAsync: vi.fn(),
-  deleteItemAsync: vi.fn(),
-}));
+vi.mock("expo-secure-store", () => {
+  const values = new Map<string, string>();
+  return {
+    getItemAsync: async (key: string) => values.get(key) ?? null,
+    setItemAsync: async (key: string, value: string) => { values.set(key, value); },
+    deleteItemAsync: async (key: string) => { values.delete(key); },
+  };
+});
+const requests: unknown[] = [];
+let response: () => Response | Promise<Response>;
+const user = { id: "00000000-0000-4000-8000-000000000001", phone: null, email: "buyer@example.com", displayName: null, role: "seller" as const };
+const signIn = () => storeAuthSession({ accessToken: "test-access", refreshToken: "test-refresh", user });
 
 const conversation = {
-  id: "conversation-1",
-  buyerId: "buyer",
-  sellerId: "seller",
+  id: "00000000-0000-4000-8000-000000000002",
+  buyerId: user.id,
+  sellerId: "00000000-0000-4000-8000-000000000003",
+  myRole: "buyer",
+  peer: { id: "00000000-0000-4000-8000-000000000003", displayName: "Seller", nameNumber: 1234, avatarIndex: 0, avatarKey: null, deleted: false },
+  blockedByMe: false,
+  updatedAt: "2026-11-01T00:00:00Z",
   listing: {
     id: LISTING_ID,
-    brandId: "brand",
-    modelId: "model",
+    brandId: "00000000-0000-4000-8000-000000000004",
+    modelId: "00000000-0000-4000-8000-000000000005",
     year: 2020,
     displayPriceTmt: 35000,
     priceCurrency: "TMT",
@@ -69,15 +70,19 @@ function chips(
   );
 }
 
-beforeEach(() => {
-  state.authenticated = true;
-  state.post.mockReset();
-  state.post.mockResolvedValue(conversation);
+beforeEach(async () => {
+  requests.length = 0;
+  response = () => HttpResponse.json(conversation);
+  server.use(http.post("*/conversations", async ({ request }) => {
+    requests.push({ path: new URL(request.url).pathname, body: await request.json() });
+    return response();
+  }));
+  await signIn();
   useAuthIntentStore.setState({ intent: null, replayAction: null, replayReturnTo: null });
 });
 
 describe("Ask the seller", () => {
-  it("offers the four QuickReplies questions as chips under a heading", async () => {
+  it("offers two draft suggestions under a heading", async () => {
     const screen = await chips();
 
     expect(screen.getByText("Ask the seller")).toBeTruthy();
@@ -92,24 +97,20 @@ describe("Ask the seller", () => {
       void fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
     });
 
-    expect(state.post).toHaveBeenCalledTimes(1);
-    expect(state.post).toHaveBeenCalledWith(
-      "/conversations",
-      { listingId: LISTING_ID },
-      expect.anything(),
-    );
-    expect(routerMock.push).toHaveBeenCalledWith({
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests).toEqual([{ path: "/api/v1/conversations", body: { listingId: LISTING_ID } }]);
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/conversations/[id]",
-      params: { id: "conversation-1", draft: "Can I see the car?" },
-    });
+      params: { id: conversation.id, draft: "Can I see the car?" },
+    }));
     // The Conversation screen reads its header and strip from the seeded by-ID entry.
     expect(
-      screen.queryClient.getQueryData(queryKeys.conversations.detail("conversation-1")),
+      screen.queryClient.getQueryData(queryKeys.conversations.detail(conversation.id)),
     ).toEqual(expect.objectContaining({ listing: conversation.listing }));
   });
 
   it("parks a signed-out question behind sign-in, then finishes it on return", async () => {
-    state.authenticated = false;
+    await clearAuthSession();
     const screen = await chips();
 
     await fireEvent.press(screen.getByRole("button", { name: "What is the final price?" }));
@@ -117,7 +118,7 @@ describe("Ask the seller", () => {
     expect(routerMock.push).toHaveBeenCalledWith(
       expect.objectContaining({ pathname: "/(auth)/phone" }),
     );
-    expect(state.post).not.toHaveBeenCalled();
+    expect(requests).toEqual([]);
     expect(useAuthIntentStore.getState().intent).toEqual({
       returnTo: `/(public)/listings/${LISTING_ID}`,
       action: { kind: "ask", listingId: LISTING_ID, intent: "finalPrice" },
@@ -125,17 +126,18 @@ describe("Ask the seller", () => {
 
     routerMock.push.mockClear();
     await act(async () => {
+      await signIn();
       useAuthIntentStore.getState().completeSignIn({
         push: routerMock.push,
         dismissTo: vi.fn(),
       });
     });
 
-    expect(state.post).toHaveBeenCalledTimes(1);
-    expect(routerMock.push).toHaveBeenCalledWith({
+    await waitFor(() => expect(requests).toHaveLength(1));
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/conversations/[id]",
       params: expect.objectContaining({ draft: "What is the final price?" }),
-    });
+    }));
     expect(useAuthIntentStore.getState().replayAction).toBeNull();
   });
 
@@ -152,22 +154,12 @@ describe("Ask the seller", () => {
       });
     });
 
-    expect(state.post).not.toHaveBeenCalled();
-  });
-
-  it("ignores taps until the session is known", async () => {
-    state.authenticated = null;
-    const screen = await chips();
-
-    await fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
-
-    expect(state.post).not.toHaveBeenCalled();
-    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(requests).toEqual([]);
   });
 
   it("disables every chip while the Conversation opens", async () => {
-    let open: (value: unknown) => void = () => {};
-    state.post.mockReturnValue(new Promise((resolve) => { open = resolve; }));
+    let open = () => {};
+    response = () => new Promise<Response>((resolve) => { open = () => resolve(HttpResponse.json(conversation)); });
     const screen = await chips();
 
     await fireEvent.press(screen.getByRole("button", { name: "Can I see the car?" }));
@@ -176,11 +168,11 @@ describe("Ask the seller", () => {
       expect(
         await screen.findByRole("button", { name: question, disabled: true }),
       ).toBeTruthy();
-    await act(async () => open(conversation));
+    await act(async () => open());
   });
 
   it("retries a failed open with the same question", async () => {
-    state.post.mockRejectedValueOnce(new Error("offline"));
+    response = () => HttpResponse.error();
     const screen = await chips();
 
     await act(async () => {
@@ -188,14 +180,15 @@ describe("Ask the seller", () => {
     });
     expect(routerMock.push).not.toHaveBeenCalled();
 
+    response = () => HttpResponse.json(conversation);
     await act(async () => {
       void fireEvent.press(await screen.findByRole("button", { name: "Retry" }));
     });
 
-    expect(routerMock.push).toHaveBeenCalledWith({
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith({
       pathname: "/conversations/[id]",
       params: expect.objectContaining({ draft: "Can I see the car?" }),
-    });
+    }));
   });
 
   it("is hidden from the owner", async () => {

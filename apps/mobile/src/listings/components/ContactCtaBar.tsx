@@ -30,8 +30,8 @@ interface ContactCtaBarProps {
   pending?: boolean;
   /**
    * `viewer` sits on the black photo viewer: light-on-dark buttons.
-   * `floating` sits inside a `StickyActionBar`: each action is its own glass
-   *  capsule (`GlassButton`), Call tinted brand red and Message clear glass.
+   * `floating` sits inside a `StickyActionBar`: Call uses neutral glass,
+   * while Message uses a solid high-contrast capsule.
    */
   variant?: "bar" | "viewer" | "floating";
   /** Runs before a Message starts, e.g. to close the photo viewer over the screen. */
@@ -111,17 +111,17 @@ export function ContactCtaBar({
   const floatingActions = (
     <>
       {showCall ? (
-        <GlassButton tone={canCall ? "brand" : "neutral"} className={cn(!largeText && "flex-1")}
+        <GlassButton className={cn(!largeText && "flex-1")}
           onPress={handleCall} disabled={!canCall} accessibilityLabel={t("call")}>
           <Icon as={Phone} className="size-5" />
           <Text>{t("call")}</Text>
         </GlassButton>
       ) : null}
-      <GlassButton className={cn(!largeText && "flex-1")} disabled={messageDisabled} onPress={handleMessage}
+      <Button variant={canMessage ? "default" : "secondary"} size="lg" className={cn("rounded-full shadow-floating", !largeText && "flex-1")} disabled={messageDisabled} onPress={handleMessage}
         accessibilityLabel={t("message")} accessibilityState={{ disabled: messageDisabled }}>
-        <Icon as={MessageCircle} className="size-5" />
+        <Icon as={MessageCircle} className={cn("size-5", !messageDisabled ? "text-background" : "text-muted-foreground")} />
         <Text>{t("message")}</Text>
-      </GlassButton>
+      </Button>
     </>
   );
 
@@ -131,7 +131,7 @@ export function ContactCtaBar({
         {floating ? floatingActions : <>
         {showCall ? (
         <Button
-          variant={canCall ? "brand" : "secondary"}
+          variant="secondary"
           size="lg"
           className={cn(
             !largeText && "flex-1",
@@ -152,7 +152,7 @@ export function ContactCtaBar({
           size="lg"
           className={cn(
             !largeText && "flex-1",
-            onDark && "border-transparent bg-white/15 disabled:border-transparent disabled:bg-white/15",
+            onDark && (canMessage ? "bg-white active:bg-white/85" : "border-transparent bg-white/15 disabled:border-transparent disabled:bg-white/15"),
           )}
           disabled={!canMessage || conversation.isPending}
           onPress={handleMessage}
@@ -165,13 +165,13 @@ export function ContactCtaBar({
             as={MessageCircle}
             className={
               onDark
-                ? "size-5 text-white"
+                ? canMessage ? "size-5 text-black" : "size-5 text-white/60"
                 : canMessage
                   ? "size-5 text-background"
                   : "size-5 text-muted-foreground"
             }
           />
-          <Text className={cn(onDark && "text-white")}>
+          <Text className={cn(onDark && (canMessage ? "text-black" : "text-white/60"))}>
             {t("message")}
           </Text>
         </Button>

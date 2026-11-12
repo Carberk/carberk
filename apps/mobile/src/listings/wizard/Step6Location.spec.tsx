@@ -136,6 +136,8 @@ describe("Description and place step", () => {
     expect(order.every((p) => p >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(headerNames(screen)).toEqual([
+      "Description, *",
+      "Where the car can be seen",
       "Ashgabat",
       "Mary region",
       "Lebap",
@@ -171,7 +173,7 @@ describe("Description and place step", () => {
     expect(
       await screen.findByText("Action failed. Pull down to refresh or try again."),
     ).toBeTruthy();
-    expect(screen.queryAllByRole("header")).toHaveLength(0);
+    expect(headerNames(screen)).toEqual(["Description, *", "Where the car can be seen"]);
     expect(screen.queryByRole("button", { name: "Ashgabat" })).toBeNull();
     expect(screen.queryByText("No cities available")).toBeNull();
   });
@@ -186,16 +188,18 @@ describe("Description and place step", () => {
     expect(screen.getByRole("button", { name: "Turkmenabat" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Ashgabat" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Mary" })).toBeNull();
-    expect(screen.getAllByRole("header").length).toBe(3);
+    expect(screen.getAllByRole("header").length).toBe(5);
 
     await fireEvent.changeText(screen.getByPlaceholderText("Search..."), "bayr");
     expect(headerNames(screen)).toEqual([
+      "Description, *",
+      "Where the car can be seen",
       "Mary region",
     ]);
 
     await fireEvent.changeText(screen.getByPlaceholderText("Search..."), "zzz");
     expect(screen.getByText("No cities match your search")).toBeTruthy();
-    expect(screen.queryAllByRole("header")).toHaveLength(0);
+    expect(headerNames(screen)).toEqual(["Description, *", "Where the car can be seen"]);
   });
 
   it("saves the picked city with its region and shows the region muted when the names differ", async () => {

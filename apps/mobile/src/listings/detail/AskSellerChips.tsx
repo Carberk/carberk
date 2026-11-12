@@ -29,7 +29,7 @@ export interface AskSellerChipsProps {
 }
 
 /**
- * "Ask the seller" quick questions on Listing detail. The four chips are the
+ * "Ask the seller" quick questions on Listing detail. The two suggestions reuse the
  * QuickReplies intents; a tap opens the Conversation with that question typed
  * into the composer and unsent. Signed out, the choice is parked behind
  * sign-in and finished on return. Hidden for the owner, for sold and archived
@@ -77,17 +77,19 @@ export function AskSellerChips({
 
   return (
     <View className="gap-3">
-      <Text className="text-subhead font-semibold">{t("askTheSeller")}</Text>
-      <View className="flex-row flex-wrap gap-2">
-        {QUICK_REPLIES.map((reply) => (
+      <Text accessibilityRole="header" className="text-subhead font-heading font-semibold">{t("askTheSeller")}</Text>
+      <Text className="text-callout text-muted-foreground">{t("askSellerDraftHint")}</Text>
+      <View className="gap-2">
+        {QUICK_REPLIES.filter((reply) => reply.key === "seeIt" || reply.key === "finalPrice").map((reply) => (
           <Button
             key={reply.key}
             variant="outline"
             size="sm"
-            className="rounded-full"
+            className="min-h-11 rounded-lg py-3"
             disabled={conversation.isPending}
             onPress={() => ask(reply.key)}
             accessibilityLabel={tConversation(reply.translationKey)}
+            accessibilityHint={t("askSellerDraftHint")}
           >
             <Text>{tConversation(reply.translationKey)}</Text>
           </Button>

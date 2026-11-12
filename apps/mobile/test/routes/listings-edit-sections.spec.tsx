@@ -232,10 +232,10 @@ describe("the section list of a published Listing (#589)", () => {
     // The wizard's step order, VIN under Car and the description under its place.
     expect(screen.getAllByTestId("check-section").map((row) => String(row.props.accessibilityLabel)))
       .toEqual([
-        "Car, Toyota Camry, 2020 · VIN WBA1234567890ABCD, Brand, model, generation, year and VIN cannot be changed after publishing.",
-        "Details and condition, 10,000 km · Damaged / needs repair: No, Change",
         "Photos, Photos: 4, Change",
+        "Car, Toyota Camry, 2020 · VIN WBA1234567890ABCD, Brand, model, generation, year and VIN cannot be changed after publishing.",
         "Price, 100,000 TMT, Change",
+        "Details and condition, 10,000 km · Damaged / needs repair: No, Change",
         "Description and place, One owner, Change",
         "Contact, +99361000000 · Phone calls, In-app chat, Change",
       ]);

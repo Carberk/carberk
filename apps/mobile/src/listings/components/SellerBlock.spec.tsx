@@ -74,10 +74,10 @@ describe("SellerBlock name", () => {
     ["en", "Abdyrahman Gurbanguly Atamyrad"],
     ["ru", "Абдырахман Гурбангулыев Атамыр"],
     ["tk", "Abdyrahman Gurbangulyýew Çaryý"],
-  ])("keeps a 30-character name on one line that ends in an ellipsis in %s", async (locale, name) => {
+  ])("allows a 30-character name to wrap in %s", async (locale, name) => {
     expect(name).toHaveLength(30);
     const view = await renderMobile(<SellerBlock seller={seller({ displayName: name })} />, { locale });
-    expect(view.getByText(name).props).toMatchObject({ numberOfLines: 1, ellipsizeMode: "tail" });
+    expect(view.getByText(name).props.numberOfLines).toBeUndefined();
   });
 });
 

@@ -23,7 +23,6 @@ import { closedListingBannerKey, isClosedForContact } from "./closedListing";
 import { DetailHeader, PendingDetailActions } from "./DetailHeader";
 import { DetailSkeletonBody } from "./DetailSkeleton";
 import { OwnerStatusCard } from "./OwnerStatusCard";
-import { detailDate } from "./presentation";
 
 import { StickyActionBar, useStickyActionBar } from "@/components/navigation/StickyActionBar";
 import { Text } from "@/components/ui/text";
@@ -119,7 +118,6 @@ export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack,
   );
 
   const dateAndCity = [
-    detailDate(summary.publishedAt, i18n.language),
     names.cityName(summary.cityId),
   ]
     .filter(Boolean)
@@ -142,9 +140,9 @@ export function ListingPreview({ summary, isOwner, reportEnabled = true, onBack,
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: bar.space }}>
         <DetailPhotoStrip photos={photos} initialIndex={startIndex} banner={bannerKey ? t(bannerKey) : undefined} />
 
-        <View testID="detail-body" className="gap-4 px-4 py-5">
+        <View testID="detail-body" className="gap-6 px-4 py-5">
           {isOwner && <OwnerStatusCard status={summary.status} />}
-          <Text className="text-headline font-heading font-semibold text-foreground" numberOfLines={2}>
+          <Text accessibilityRole="header" className="text-headline font-heading font-semibold text-foreground">
             {title || t("listing")}
           </Text>
           <PriceDisplay

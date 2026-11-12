@@ -57,7 +57,7 @@ function ReviewSummary({
   const { brandName, modelName, cityName } = useReviewSummary(payload);
 
   return (
-    <View className="gap-1 rounded-lg border-l-4 border-l-primary bg-muted/60 p-3">
+    <View className="gap-1 border-b border-border pb-5">
       <Text className="text-callout font-medium text-foreground">
         {brandName} {modelName} {payload.year}
       </Text>
@@ -87,17 +87,17 @@ function ContactMethods({
 
   return (
     <>
-      <View className="rounded-xl border border-border p-4 gap-1">
-        <Text className="text-caption font-medium uppercase tracking-widest text-muted-foreground mb-3">
+      <View className="border-t border-border pt-5 gap-3">
+        <Text accessibilityRole="header" className="text-subhead font-heading font-semibold text-foreground">
           {t("contactMethods")}
         </Text>
 
         <View className="flex-row items-center justify-between py-1">
-          <View className="flex-row items-center gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-3 pr-3">
             <View className="h-9 w-9 items-center justify-center rounded-full bg-muted">
               <Icon as={Phone} className="size-4 text-foreground" />
             </View>
-            <View className="gap-0.5">
+            <View className="min-w-0 flex-1 gap-0.5">
               <Text className="text-body text-foreground">{t("phoneCalls")}</Text>
               <Text className="text-caption text-muted-foreground">{t("callsAllowed")}</Text>
             </View>
@@ -112,11 +112,11 @@ function ContactMethods({
         <View className="h-px bg-border my-1" />
 
         <View className="flex-row items-center justify-between py-1">
-          <View className="flex-row items-center gap-3">
+          <View className="min-w-0 flex-1 flex-row items-center gap-3 pr-3">
             <View className="h-9 w-9 items-center justify-center rounded-full bg-muted">
               <Icon as={MessageSquare} className="size-4 text-foreground" />
             </View>
-            <View className="gap-0.5">
+            <View className="min-w-0 flex-1 gap-0.5">
               <Text className="text-body text-foreground">{t("inAppChat")}</Text>
               <Text className="text-caption text-muted-foreground">{t("chatAllowed")}</Text>
             </View>
