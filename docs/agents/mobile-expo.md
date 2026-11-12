@@ -116,6 +116,20 @@ Local release builds fail in ways EAS never sees, because EAS starts from a clea
 pnpm --filter @auto-tm/mobile build:android:local
 ```
 
+Agents building an Android release smoke must use this helper, select the assigned device's ABI and set all backend origins explicitly. For the ARM64 `Carberk_Shots` emulator:
+
+```bash
+EXPO_PUBLIC_ENV=development \
+EXPO_PUBLIC_API_URL=http://10.0.2.2:3006/api/v1 \
+EXPO_PUBLIC_WS_URL=http://10.0.2.2:3006/ws/chat \
+EXPO_PUBLIC_MEDIA_URL=http://10.0.2.2:9000 \
+pnpm --filter @auto-tm/mobile build:android:local --abi arm64-v8a
+```
+
+Use the running local API's port. `--abi` is for a single-device smoke; omit it for the full architecture set. The helper bounds Gradle workers, disables parallel projects, uses low scheduling priority and exits its daemon after the build. These settings preserve release/minification configuration; they do not cap every compiler's internal threads. See [Gradle resource options](https://docs.gradle.org/9.0.0/userguide/command_line_interface.html#sec:command_line_performance) and [React Native single-architecture builds](https://reactnative.dev/docs/build-speed#build-only-one-abi-during-development-android-only).
+
+On the 16 GB Mac, finish a native build before starting another heavy build or a full test suite. For ordinary UI checks, reuse the installed development client with Metro; rebuild that client when native dependencies/configuration change. For release smoke, rebuild when bundled JavaScript, native code or embedded environment changes, then reuse that unchanged APK across checks. Record source SHA, artifact hash, ABI and minification evidence. Android delegate briefs must include the selected device/ABI, this helper invocation, the build/test scheduling rule and ownership cleanup; the receiving agent reads this section before starting.
+
 `apps/mobile/scripts/local-android-release.mjs` rebuilds contracts, regenerates `android/` when branding assets changed, forces the JS bundle task to re-run, and verifies the APK embeds a Hermes bundle before it prints the `adb install -r` command. It defaults to the production backend; override `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WS_URL` / `EXPO_PUBLIC_MEDIA_URL` to point at staging. The failure modes it guards, for when you must build by hand:
 
 - **Stale `@auto-tm/contracts` dist crashes the app after sign-in.** Metro resolves the package to its gitignored `dist/` via package exports. If `dist/` is older than a source change, the bundle silently lacks the new exports and the app throws `TypeError: undefined is not a function` at the first caller (logcat's componentStack names the calling screen, not the missing function — a profile row crash can be a contracts miss, not a screen bug). Fix: `pnpm --filter @auto-tm/contracts build`, then re-bundle. EAS is immune; this is local-only and never a store bug.

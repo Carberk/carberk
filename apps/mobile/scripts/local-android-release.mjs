@@ -21,7 +21,7 @@
  * It finishes by verifying the APK actually embeds a Hermes bundle — the red
  * "Unable to load script" box means an APK without one was installed.
  *
- * Usage: pnpm --filter @auto-tm/mobile build:android:local
+ * Usage: pnpm --filter @auto-tm/mobile build:android:local [--abi arm64-v8a]
  * Env overrides: EXPO_PUBLIC_API_URL, EXPO_PUBLIC_WS_URL, EXPO_PUBLIC_MEDIA_URL,
  * EXPO_PUBLIC_ENV (defaults point at the production backend).
  */
@@ -30,6 +30,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import url from "node:url";
+
+const args = process.argv.slice(2);
+const supportedAbis = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"];
+if (args.length && (args.length !== 2 || args[0] !== "--abi" || !supportedAbis.includes(args[1]))) {
+  console.error(`Usage: build:android:local [--abi ${supportedAbis.join("|")}]`);
+  process.exit(1);
+}
+const abi = args[1];
 
 const mobileRoot = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(mobileRoot, "../..");
@@ -105,7 +113,10 @@ for (const stale of [
   fs.rmSync(path.join(androidDir, stale), { recursive: true, force: true });
 }
 
-run("assembleRelease (JS bundle forced to re-run)", "./gradlew", ["assembleRelease"], androidDir);
+run("assembleRelease (JS bundle forced to re-run)", "./gradlew", [
+  "assembleRelease", "--max-workers=2", "--no-parallel", "--priority=low", "--no-daemon",
+  ...(abi ? [`-PreactNativeArchitectures=${abi}`] : []),
+], androidDir);
 
 console.log("\n==> Verify the APK embeds a Hermes bundle");
 let bundle;
