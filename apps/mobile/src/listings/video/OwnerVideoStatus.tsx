@@ -49,6 +49,7 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
   const active = hidden === "all" ? undefined : status.data?.video;
   const cover = useListingVideoCover(target?.id ?? "", target ? active : undefined, { isOwner: true, targetType: target?.type });
   const pending = hidden ? undefined : status.data?.pendingVideo;
+  const statusFailed = status.isError || actionFailed;
 
   const reconcile = async () => {
     const attempt = ++operation.current;
@@ -83,6 +84,9 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
   const replacing = !!active && (!!pending || hasLocal);
   const pendingMeta = (key: "listingVideoPublishNow" | "listingVideoReplacementWaiting") => t(active ? "listingVideoReplacementWaiting" : key);
   const cancelPending = { label: t(active ? "listingVideoCancelReplacement" : "cancel"), onPress: removePending, disabled: working };
+  const stalePendingAction = pending?.status === "failed" && !active
+    ? { label: t("listingVideoRemove"), onPress: () => setConfirm(true), disabled: working }
+    : pending ? cancelPending : undefined;
   // The dialog's root is a View; keep it out of the gapped column so it adds no space.
   return <View><View className="gap-4">
     {active && <VideoCardRow
@@ -97,10 +101,10 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
       />}
     </VideoCardRow>}
     {replacing && <View className="h-px bg-border" testID="listing-video-replacement" />}
-    {pending?.status === "processing" && <VideoCardRow testID="listing-video-processing" thumb={{ kind: "busy" }} title={t("listingVideoProcessing")} meta={pendingMeta("listingVideoPublishNow")}>
+    {!statusFailed && pending?.status === "processing" && <VideoCardRow testID="listing-video-processing" thumb={{ kind: "busy" }} title={t("listingVideoProcessing")} meta={pendingMeta("listingVideoPublishNow")}>
       <VideoCardActions secondary={cancelPending} />
     </VideoCardRow>}
-    {pending?.status === "failed" && <VideoCardRow
+    {!statusFailed && pending?.status === "failed" && <VideoCardRow
       testID="listing-video-process-failed"
       alert
       thumb={{ kind: "error" }}
@@ -119,11 +123,11 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
         ] : undefined}
       />
     </VideoCardRow>}
-    {pending?.status === "uploading" && !hasLocal && <VideoCardRow thumb={{ kind: "busy" }} title={t("listingVideoUploading")} meta={pendingMeta("listingVideoPublishNow")}>
+    {!statusFailed && pending?.status === "uploading" && !hasLocal && <VideoCardRow thumb={{ kind: "busy" }} title={t("listingVideoUploading")} meta={pendingMeta("listingVideoPublishNow")}>
       <VideoCardActions secondary={cancelPending} />
     </VideoCardRow>}
-    {(status.isError || actionFailed) && <VideoCardRow alert thumb={{ kind: "error" }} title={t("listingVideoStatusFailed")}>
-      <VideoCardActions primary={{ label: t("listingVideoCheckAgain"), onPress: () => void reconcile() }} />
+    {statusFailed && <VideoCardRow alert thumb={{ kind: "error" }} title={t("listingVideoStatusFailed")}>
+      <VideoCardActions primary={{ label: t("listingVideoCheckAgain"), onPress: () => void reconcile() }} secondary={stalePendingAction} />
     </VideoCardRow>}
     {uncertain && <VideoCardRow
       alert
@@ -133,7 +137,7 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
     >
       <VideoCardActions primary={{ label: t("listingVideoCheckAgain"), onPress: () => void reconcile() }} />
     </VideoCardRow>}
-    {!uncertain && children?.(!!active || !!pending || !!hidden, !!active, () => setConfirm(true))}
+    {!uncertain && children?.(!!active || !!pending || !!hidden || statusFailed, !!active, () => setConfirm(true))}
     </View>
     <AlertDialog open={confirm} onOpenChange={setConfirm}>
       <AlertDialogContent><AlertDialogHeader>

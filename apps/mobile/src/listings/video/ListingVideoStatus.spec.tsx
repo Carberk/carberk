@@ -92,6 +92,56 @@ it("offers Check again after a failed status read, preserving the last known pro
   expect(await screen.findByText("Processing video…")).toBeTruthy();
 });
 
+it("replaces stale processing with one recoverable status warning after a refresh fails", async () => {
+  let fail = false;
+  server.use(http.get("*/listings/video-uploads/target/draft/:id", () => fail
+    ? HttpResponse.json({ error: { code: "RATE_LIMITED", message: "Try later" } }, { status: 429 })
+    : HttpResponse.json({ pendingVideo: pending })));
+  const screen = await renderMobile(<ListingVideoCard canUploadVideo videoUploadTarget={{ type: "draft", id }} />);
+  await screen.findByText("Processing video…");
+  fail = true;
+  await act(async () => { await screen.queryClient.refetchQueries(); });
+  await screen.findByText("Couldn’t check the video status");
+  expect(screen.queryByText("Processing video…")).toBeNull();
+  expect(screen.getByRole("button", { name: "Check again" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
+  fail = false;
+  await fireEvent.press(screen.getByRole("button", { name: "Check again" }));
+  expect(await screen.findByText("Processing video…")).toBeTruthy();
+  expect(screen.queryByText("Couldn’t check the video status")).toBeNull();
+});
+
+it("keeps the current Ready video and Keep current action when a replacement status refresh fails", async () => {
+  let fail = false;
+  server.use(http.get("*/listings/video-uploads/target/listing/:id", () => fail
+    ? HttpResponse.error()
+    : HttpResponse.json({ video: ready, pendingVideo: pending })));
+  const screen = await renderMobile(<ListingVideoCard canUploadVideo videoUploadTarget={{ type: "listing", id }} />);
+  await screen.findByText("Processing video…");
+  fail = true;
+  await act(async () => { await screen.queryClient.refetchQueries(); });
+  await screen.findByText("Couldn’t check the video status");
+  expect(screen.queryByText("Processing video…")).toBeNull();
+  expect(screen.getByText("Buyers see this video")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Keep current" })).toBeTruthy();
+});
+
+it("retains removal confirmation when a failed upload status refresh cannot be read", async () => {
+  let fail = false;
+  server.use(http.get("*/listings/video-uploads/target/draft/:id", () => fail
+    ? HttpResponse.error()
+    : HttpResponse.json({ pendingVideo: { ...pending, status: "failed", canReprocess: false, failureType: "SOURCE_INVALID" } })));
+  const screen = await renderMobile(<ListingVideoCard canUploadVideo videoUploadTarget={{ type: "draft", id }} />);
+  await screen.findByText("Couldn’t process this video");
+  fail = true;
+  await act(async () => { await screen.queryClient.refetchQueries(); });
+  await screen.findByText("Couldn’t check the video status");
+  expect(screen.queryByText("Couldn’t process this video")).toBeNull();
+  await fireEvent.press(screen.getByRole("button", { name: "Remove" }));
+  expect(screen.getByText("Remove video?")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Remove video" })).toBeTruthy();
+});
+
 it("fences a status response started before Remove so it cannot restore the video", async () => {
   let release!: () => void;
   const late = new Promise<void>((resolve) => { release = resolve; });
