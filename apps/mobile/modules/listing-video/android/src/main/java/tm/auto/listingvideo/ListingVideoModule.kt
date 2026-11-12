@@ -18,6 +18,9 @@ class ListingVideoModule : Module() {
 
     Events("onProgress")
 
+    // A JavaScript reload drops every pending promise; stop their exports.
+    OnDestroy { exporter.cancelAll() }
+
     AsyncFunction("prepare") { sourceUri: String, startS: Double, endS: Double, _: Double, jobId: String, promise: Promise ->
       val uri = Uri.parse(sourceUri)
       val path = uri.path

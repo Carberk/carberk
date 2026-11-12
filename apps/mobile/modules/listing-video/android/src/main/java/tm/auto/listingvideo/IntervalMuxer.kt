@@ -36,6 +36,8 @@ private class IntervalMuxer(private val delegate: Muxer, private val durationUs:
 
   override fun addTrack(format: Format): Int {
     val id = delegate.addTrack(format)
+    // 1024 samples per frame assumes AAC-LC, the only audio we request
+    // (AUDIO_AAC with default profile). HE-AAC would use 2048.
     if (MimeTypes.isAudio(format.sampleMimeType) && format.sampleRate > 0) {
       audioFrameUs[id] = 1024L * 1_000_000L / format.sampleRate
     }

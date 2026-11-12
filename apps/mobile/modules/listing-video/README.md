@@ -37,12 +37,16 @@ remain durable across JavaScript sessions.
 
 One small Expo module owns both platforms behind the TypeScript
 interface above. Android uses the Media3 release that `expo-video`
-already links. Two Android-only choices keep the contract: the video
-encoder runs in CBR, because Android raises a VBR request to a ~2 Mbps
-quality floor at 720p and a 90-second file would pass 15 MiB; and the
-muxer drops AAC frames that would end after the kept interval, because
-the framework muxer keeps the encoder's priming and the file would run
-past 90 seconds.
+already links. Two Android-only choices keep the contract. First, the
+video encoder runs in CBR at ~90% of the 15 MiB budget, because Android
+raises a VBR request to a ~2 Mbps quality floor at 720p and a 90-second
+file would pass 15 MiB. Media3 does not check CBR support, so the module
+offers Media3 only CBR-capable encoders when the phone has any. Without
+one, the encoder runs in its default mode, and an over-cap file is
+re-encoded once at a lower bitrate before `output-too-large`. Second,
+the muxer drops AAC frames that would end after the kept interval,
+because the framework muxer keeps the encoder's priming and the file
+would run past 90 seconds.
 
 [FFmpegKit's upstream](https://github.com/arthenica/ffmpeg-kit#readme)
 points to its source-only successor. The
@@ -51,8 +55,9 @@ does not expose the complete trim/colour/size contract.
 
 ## Still unproven
 
-- Android beyond the tested emulator: real devices, hardware encoders
-  without CBR, Android 12 and older, HDR sources (#1050, #1058).
+- Android beyond the tested emulator: real phones and hardware encoders
+  (including ones without CBR), Android 12 and older, HDR sources,
+  180°/270° rotation, and an R8-minified release build (#1106).
 - Real devices, the Carberk development build calling this module,
   picker/provider recovery, and background interruption: #1044/#1045.
 - Full founder-sample matrix, physical-device colour fidelity and final

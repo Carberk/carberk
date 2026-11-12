@@ -1,7 +1,7 @@
 package tm.auto.listingvideo
 
 import android.content.Context
-import android.media.MediaCodecInfo
+import android.media.MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -20,11 +20,14 @@ import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
+import androidx.media3.transformer.EncoderSelector
+import androidx.media3.transformer.EncoderUtil
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
+import com.google.common.collect.ImmutableList
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -65,11 +68,16 @@ class ListingVideoExporter(private val context: Context) {
     const val MAX_OUTPUT_BYTES: Long = 15L * 1024 * 1024
     const val AUDIO_BITRATE = 128_000
 
-    /** Video bitrate that fits the 15 MiB cap alongside 128 kbps audio. */
+    const val MIN_VIDEO_BITRATE = 400_000
+
+    /**
+     * Video bitrate that fits ~90% of the 15 MiB cap alongside 128 kbps
+     * audio; the margin covers encoder overshoot and container overhead.
+     */
     fun videoBitrate(durationS: Double): Int {
-      val budgetBits = MAX_OUTPUT_BYTES * 8.0 * 0.97
+      val budgetBits = MAX_OUTPUT_BYTES * 8.0 * 0.90
       val perSecond = ((budgetBits - AUDIO_BITRATE * durationS) / durationS).toInt()
-      return max(400_000, min(1_250_000, perSecond))
+      return max(MIN_VIDEO_BITRATE, min(1_250_000, perSecond))
     }
 
     /** Fit inside the 720p envelope without upscaling; even dimensions. */
@@ -82,7 +90,6 @@ class ListingVideoExporter(private val context: Context) {
 
   private val main = Handler(Looper.getMainLooper())
   private val io = Executors.newCachedThreadPool()
-  private val cancelled = ConcurrentHashMap.newKeySet<String>()
   private val running = ConcurrentHashMap<String, Job>()
 
   private inner class Job(
@@ -91,12 +98,18 @@ class ListingVideoExporter(private val context: Context) {
     val onDone: (Result<PreparedVideoInfo>) -> Unit,
   ) {
     private val finished = AtomicBoolean(false)
-    var transformer: Transformer? = null
+    val isFinished get() = finished.get()
+
+    /** Set on the main looper; finish() may clear [poll] from the IO pool. */
+    @Volatile var transformer: Transformer? = null
+    @Volatile var poll: Runnable? = null
 
     fun finish(result: Result<PreparedVideoInfo>) {
       if (!finished.compareAndSet(false, true)) return
       running.remove(jobId)
-      cancelled.remove(jobId)
+      // The progress poll reschedules itself; stop it whatever ended the job.
+      poll?.let { main.removeCallbacks(it) }
+      poll = null
       result.exceptionOrNull()?.let { Log.w("ListingVideo", "prepare failed: ${it.message}") }
       if (result.isFailure) dir.deleteRecursively()
       onDone(result)
@@ -107,13 +120,17 @@ class ListingVideoExporter(private val context: Context) {
   }
 
   fun cancel(jobId: String) {
-    cancelled.add(jobId)
     main.post {
       val job = running[jobId] ?: return@post
       // Transformer.cancel() reports no listener callback; finish here.
       job.transformer?.cancel()
       job.fail("cancelled")
     }
+  }
+
+  /** Cancels every running job, e.g. when the JavaScript runtime reloads. */
+  fun cancelAll() {
+    running.keys.toList().forEach(::cancel)
   }
 
   fun prepare(
@@ -132,7 +149,7 @@ class ListingVideoExporter(private val context: Context) {
     io.execute {
       try {
         val start = readAndCopy(job, source, startS, endS)
-        if (start != null) main.post { startTransformer(job, start, onProgress) }
+        if (start != null) main.post { startTransformer(job, start, onProgress, videoBitrate(start.endS - start.startS), retried = false) }
       } catch (error: ListingVideoExportException) {
         job.finish(Result.failure(error))
       } catch (error: Exception) {
@@ -165,9 +182,8 @@ class ListingVideoExporter(private val context: Context) {
       if (isOutOfSpace(error)) throw ListingVideoExportException("insufficient-storage", "Not enough space")
       throw ListingVideoExportException("source-unreadable", "Source could not be copied")
     }
-    if (job.jobId in cancelled) {
-      job.fail("cancelled"); return null
-    }
+    // cancel() may have finished the job (and removed its directory) mid-copy.
+    if (job.isFinished) return null
 
     val retriever = MediaMetadataRetriever()
     try {
@@ -202,10 +218,8 @@ class ListingVideoExporter(private val context: Context) {
   }
 
   /** Builds and starts the Transformer; must run on the main looper. */
-  private fun startTransformer(job: Job, start: Start, onProgress: (Double) -> Unit) {
-    if (job.jobId in cancelled) {
-      job.fail("cancelled"); return
-    }
+  private fun startTransformer(job: Job, start: Start, onProgress: (Double) -> Unit, bitrate: Int, retried: Boolean) {
+    if (job.isFinished) return
     val durationS = start.endS - start.startS
     val item = MediaItem.Builder()
       .setUri(android.net.Uri.fromFile(start.copied))
@@ -232,23 +246,32 @@ class ListingVideoExporter(private val context: Context) {
       .build()
     val partial = File(job.dir, "prepared.partial.mp4")
     val final = File(job.dir, "prepared.mp4")
+    // Android's quality shaping raises a VBR request to a ~2 Mbps floor at
+    // 720p ("VQApply: raise bitrate"), which breaks the 15 MiB cap for long
+    // clips; CBR keeps the requested bitrate. Media3 writes the requested
+    // mode into the encoder format without checking support, so offer only
+    // CBR-capable encoders when there are any, and request CBR only then.
+    // Otherwise the encoder runs in its default mode, and validateOutput plus
+    // one lower-bitrate retry in promote() keep the cap.
+    val avcEncoders = EncoderSelector.DEFAULT.selectEncoderInfos(MimeTypes.VIDEO_H264)
+    val cbrEncoders = ImmutableList.copyOf(
+      avcEncoders.filter { EncoderUtil.isBitrateModeSupported(it, MimeTypes.VIDEO_H264, BITRATE_MODE_CBR) },
+    )
+    val useCbr = cbrEncoders.isNotEmpty()
+    val videoSettings = VideoEncoderSettings.Builder()
+      .setBitrate(bitrate)
+      .setiFrameIntervalSeconds(1f)
+    if (useCbr) videoSettings.setBitrateMode(BITRATE_MODE_CBR)
+    Log.i("ListingVideo", "encode ${job.jobId}: ${bitrate} bps, cbr=$useCbr, retry=$retried")
     val encoders = DefaultEncoderFactory.Builder(context)
-      .setRequestedVideoEncoderSettings(
-        VideoEncoderSettings.Builder()
-          .setBitrate(videoBitrate(durationS))
-          // Android's quality shaping raises a VBR request to a ~2 Mbps floor
-          // at 720p ("VQApply: raise bitrate"), which breaks the 15 MiB cap
-          // for long clips. CBR keeps the requested bitrate; encoders without
-          // CBR fall back, and validateOutput still enforces the cap.
-          .setBitrateMode(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
-          .setiFrameIntervalSeconds(1f)
-          .build(),
-      )
+      .setVideoEncoderSelector { mime ->
+        if (useCbr && mime == MimeTypes.VIDEO_H264) cbrEncoders else EncoderSelector.DEFAULT.selectEncoderInfos(mime)
+      }
+      .setRequestedVideoEncoderSettings(videoSettings.build())
       .setRequestedAudioEncoderSettings(AudioEncoderSettings.Builder().setBitrate(AUDIO_BITRATE).build())
       .setEnableFallback(true)
       .build()
     val progress = ProgressHolder()
-    lateinit var poll: Runnable
     val transformer = Transformer.Builder(context)
       .setVideoMimeType(MimeTypes.VIDEO_H264)
       .setAudioMimeType(MimeTypes.AUDIO_AAC)
@@ -259,36 +282,67 @@ class ListingVideoExporter(private val context: Context) {
       .setMuxerFactory(IntervalMuxerFactory((durationS * 1_000_000).toLong()))
       .addListener(object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-          main.removeCallbacks(poll)
-          io.execute { promote(job, partial, final, start.copied, durationS, onProgress) }
+          stopPoll(job)
+          io.execute { promote(job, start, partial, final, onProgress, bitrate, retried) }
         }
 
         override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-          main.removeCallbacks(poll)
+          stopPoll(job)
           partial.delete()
           job.fail(codeFor(exportException), exportException.errorCodeName + ": " + (exportException.message ?: ""))
         }
       })
       .build()
     job.transformer = transformer
-    poll = Runnable {
-      if (transformer.getProgress(progress) == Transformer.PROGRESS_STATE_AVAILABLE) {
-        onProgress(min(0.99, max(0.0, progress.progress / 100.0)))
+    val poll = object : Runnable {
+      override fun run() {
+        if (job.isFinished) return        if (transformer.getProgress(progress) == Transformer.PROGRESS_STATE_AVAILABLE) {
+          // A retry restarts the export; scale it into the second half.
+          val fraction = max(0.0, progress.progress / 100.0)
+          onProgress(min(0.99, if (retried) 0.5 + fraction / 2 else fraction))
+        }
+        main.postDelayed(this, 100)
       }
-      main.postDelayed(poll, 100)
     }
+    job.poll = poll
     transformer.start(composition, partial.absolutePath)
     main.postDelayed(poll, 100)
   }
 
-  private fun promote(job: Job, partial: File, final: File, copied: File, durationS: Double, onProgress: (Double) -> Unit) {
+  private fun stopPoll(job: Job) {
+    job.poll?.let { main.removeCallbacks(it) }
+    job.poll = null
+  }
+
+  private fun promote(
+    job: Job,
+    start: Start,
+    partial: File,
+    final: File,
+    onProgress: (Double) -> Unit,
+    bitrate: Int,
+    retried: Boolean,
+  ) {
     try {
-      // Reject half-written output before any caller sees it.
-      val info = validateOutput(partial, durationS)
-      if (job.jobId in cancelled) {
-        job.fail("cancelled"); return
+      if (job.isFinished) {
+        partial.delete(); return
       }
-      copied.delete()
+      val size = partial.length()
+      if (size > MAX_OUTPUT_BYTES && !retried && bitrate > MIN_VIDEO_BITRATE) {
+        // The encoder overshot (or ignored) the requested bitrate. Retry once,
+        // scaled so the same overshoot lands at ~85% of the cap.
+        partial.delete()
+        val lower = max(MIN_VIDEO_BITRATE, (bitrate * (MAX_OUTPUT_BYTES * 0.85 / size)).toInt())
+        Log.w("ListingVideo", "output $size bytes over the cap at $bitrate bps; retrying at $lower bps")
+        main.post { startTransformer(job, start, onProgress, lower, retried = true) }
+        return
+      }
+      // Reject half-written output before any caller sees it.
+      val info = validateOutput(partial, start.endS - start.startS)
+      if (job.isFinished) {
+        partial.delete(); return
+      }
+      start.copied.delete()
       if (!partial.renameTo(final)) throw ListingVideoExportException("export-failed", "promote")
       onProgress(1.0)
       job.finish(Result.success(info.copy(file = final)))
