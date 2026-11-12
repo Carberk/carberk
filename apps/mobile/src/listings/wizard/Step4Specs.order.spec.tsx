@@ -1,14 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { server } from "../../../test/msw";
 import { renderMobile } from "../../../test/render";
 
 import Step4Specs from "./Step4Specs";
 
-vi.mock("../../api/catalog/useColors", () => ({ useColors: () => ({ data: { items: [] } }) }));
-vi.mock("../../api/catalog/useBodyTypes", () => ({ useBodyTypes: () => ({ data: { items: [] } }) }));
-vi.mock("../../api/catalog/useTransmissions", () => ({ useTransmissions: () => ({ data: { items: [] } }) }));
-vi.mock("../../api/catalog/useDriveTypes", () => ({ useDriveTypes: () => ({ data: { items: [] } }) }));
-vi.mock("../../api/catalog/useEngineTypes", () => ({ useEngineTypes: () => ({ data: { items: [] } }) }));
+beforeEach(() => {
+  server.use(
+    ...["colors", "body-types", "transmissions", "drive-types", "engine-types"].map(
+      (catalog) => http.get(`*/catalog/${catalog}`, () => HttpResponse.json({ items: [] })),
+    ),
+  );
+});
 
 interface RenderedNode {
   type: string;
