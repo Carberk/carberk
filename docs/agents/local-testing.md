@@ -73,28 +73,9 @@ For video expiry checks, set `LISTING_VIDEO_GRANT_TTL_SECONDS=30` in `apps/api/.
 
 ## 2. Get a sign-in code
 
-Locally `SMS_DRIVER=mock` sends no SMS. The API writes each code to its log:
+For ordinary native fixture setup, follow the required [native fixture sign-in procedure](native-fixture-signin.md). It reuses an appropriate session and retrieves only the code for the exact successful request; it never prints a code or resends automatically.
 
-```text
-[mock] OTP for ***0901 (req 87ad54b7): 362694
-```
-
-Read the newest code for a phone by its last four digits:
-
-```bash
-grep -o '\[mock\] OTP for \*\*\*0901 (req [0-9a-f]*): [0-9]*' /tmp/carberk-api-3006.log | tail -1 | grep -o '[0-9]*$'
-```
-
-`req` is the first eight characters of the `requestId` that `POST /api/v1/auth/otp/request` returns, so a script can match its own request.
-
-The code limits are fixed in the API (`SIGN_IN_CODE_RATE_POLICY`), and the `RATE_LIMIT_OTP_*` env variables do not change them:
-
-- **Per phone:** 5 codes a day. The wait between codes doubles each time: 60, 120, 240, then 480 seconds (`resendInSeconds`).
-- **Per IP:** 10 codes an hour. Every local request comes from the same IP, so all agents on this Mac share those 10.
-
-So sign in as a fixture User (section 1a) or a new made-up number, and stay signed in instead of signing in again. Error replies carry a `requestId` too, so check for `RATE_LIMITED` before reading a code. A refused request answers `RATE_LIMITED` with `details.reason` (`destination_limit`, `ip_limit` or `backoff`). For `ip_limit`, wait for the hour to pass.
-
-Use made-up local numbers in the form `+9936500XXXX`. The first sign-in creates the User. Codes, tokens and phone numbers never go into commits, PRs or screenshots.
+Locally `SMS_DRIVER=mock` writes codes to the API's private log. For Admin or dedicated auth entry-flow tests, correlate the successful response's `requestId` (the log carries its first eight characters), destination and request time. Never select only the newest matching last four digits. Stop on `RATE_LIMITED`, missing, stale or ambiguous entries. Keep codes, credentials, tokens and raw responses out of screenshots, reports and git.
 
 ## 3. Sign in to Admin
 

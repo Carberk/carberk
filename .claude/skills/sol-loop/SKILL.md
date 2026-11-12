@@ -30,6 +30,8 @@ Standards and Spec reviewers, so one Sol reviewer covers three things:
   Apply the [UI copy rules](../../../docs/agents/coding-standards.md#ui-copy).
   Add the UI and readability lines to the brief and reply below.
 
+For signed-in native UI preparation, follow the required [fixture sign-in procedure](../../../docs/agents/native-fixture-signin.md).
+
 Before round 1, run the checks CI runs for the touched packages (typecheck,
 lint, affected tests) and put the results in the brief. Use the Sol model and
 effort from [models and effort](../../../docs/agents/models.md): medium, or
