@@ -32,8 +32,9 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -63,7 +64,10 @@ data class PreparedVideoInfo(
  * never reaches a caller. Failed and cancelled jobs remove their directory.
  */
 @OptIn(UnstableApi::class)
-class ListingVideoExporter(private val context: Context) {
+class ListingVideoExporter(
+  private val context: Context,
+  private val io: Executor = Executors.newCachedThreadPool(),
+) {
   companion object {
     const val MAX_OUTPUT_BYTES: Long = 15L * 1024 * 1024
     const val AUDIO_BITRATE = 128_000
@@ -89,7 +93,6 @@ class ListingVideoExporter(private val context: Context) {
   }
 
   private val main = Handler(Looper.getMainLooper())
-  private val io = Executors.newCachedThreadPool()
   private val running = ConcurrentHashMap<String, Job>()
 
   private inner class Job(
@@ -97,22 +100,28 @@ class ListingVideoExporter(private val context: Context) {
     val dir: File,
     val onDone: (Result<PreparedVideoInfo>) -> Unit,
   ) {
-    private val finished = AtomicBoolean(false)
-    val isFinished get() = finished.get()
+    private val outcome = AtomicReference<Result<PreparedVideoInfo>?>(null)
+    val isFinished get() = outcome.get() != null
 
     /** Set on the main looper; finish() may clear [poll] from the IO pool. */
     @Volatile var transformer: Transformer? = null
     @Volatile var poll: Runnable? = null
 
     fun finish(result: Result<PreparedVideoInfo>) {
-      if (!finished.compareAndSet(false, true)) return
+      if (!outcome.compareAndSet(null, result)) return
       running.remove(jobId)
       // The progress poll reschedules itself; stop it whatever ended the job.
       poll?.let { main.removeCallbacks(it) }
       poll = null
       result.exceptionOrNull()?.let { Log.w("ListingVideo", "prepare failed: ${it.message}") }
-      if (result.isFailure) dir.deleteRecursively()
+      cleanupFailedFiles()
       onDone(result)
+    }
+
+    // Cancellation may finish before an in-flight copy creates its directory.
+    // Run again after that IO work ends, so it cannot recreate abandoned files.
+    fun cleanupFailedFiles() {
+      if (outcome.get()?.isFailure == true) dir.deleteRecursively()
     }
 
     fun fail(code: String, message: String = code) =
@@ -154,6 +163,8 @@ class ListingVideoExporter(private val context: Context) {
         job.finish(Result.failure(error))
       } catch (error: Exception) {
         job.fail("export-failed", error.message ?: "export-failed")
+      } finally {
+        job.cleanupFailedFiles()
       }
     }
   }
@@ -168,6 +179,7 @@ class ListingVideoExporter(private val context: Context) {
 
   /** Copy into the job directory and check the source; runs off the main thread. */
   private fun readAndCopy(job: Job, source: File, startS: Double, endS: Double): Start? {
+    if (job.isFinished) return null
     if (!source.isFile || !source.canRead()) throw ListingVideoExportException("source-unreadable", "Source is missing")
     if (!job.dir.mkdirs() && !job.dir.isDirectory) throw ListingVideoExportException("export-failed", "job-dir")
     if (job.dir.usableSpace < source.length() + MAX_OUTPUT_BYTES) {
@@ -296,7 +308,8 @@ class ListingVideoExporter(private val context: Context) {
     job.transformer = transformer
     val poll = object : Runnable {
       override fun run() {
-        if (job.isFinished) return        if (transformer.getProgress(progress) == Transformer.PROGRESS_STATE_AVAILABLE) {
+        if (job.isFinished) return
+        if (transformer.getProgress(progress) == Transformer.PROGRESS_STATE_AVAILABLE) {
           // A retry restarts the export; scale it into the second half.
           val fraction = max(0.0, progress.progress / 100.0)
           onProgress(min(0.99, if (retried) 0.5 + fraction / 2 else fraction))

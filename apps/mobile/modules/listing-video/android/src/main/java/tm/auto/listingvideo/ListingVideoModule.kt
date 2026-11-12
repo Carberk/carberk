@@ -3,6 +3,7 @@ package tm.auto.listingvideo
 import android.net.Uri
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
+import expo.modules.kotlin.functions.Queues
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
@@ -21,6 +22,8 @@ class ListingVideoModule : Module() {
     // A JavaScript reload drops every pending promise; stop their exports.
     OnDestroy { exporter.cancelAll() }
 
+    // Register on the same main queue that cancel() posts to, before a later
+    // synchronous JS cancel can run. Copying and probing still run on IO.
     AsyncFunction("prepare") { sourceUri: String, startS: Double, endS: Double, _: Double, jobId: String, promise: Promise ->
       val uri = Uri.parse(sourceUri)
       val path = uri.path
@@ -54,7 +57,7 @@ class ListingVideoModule : Module() {
           )
         },
       )
-    }
+    }.runOnQueue(Queues.MAIN)
 
     Function("cancel") { jobId: String ->
       exporter.cancel(jobId)
