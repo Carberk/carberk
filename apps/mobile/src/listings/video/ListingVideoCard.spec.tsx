@@ -654,6 +654,8 @@ describe("Listing video preparation (#1044)", () => {
 
     expect(await screen.findByText("Couldn't prepare this video")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    await fireEvent.press(screen.getByRole("button", { name: "More options" }));
+    expect(screen.getByRole("button", { name: "Choose another" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove" })).toBeTruthy();
     expect(screen.queryByText("Video ready")).toBeNull();
     // An output over the cap is reported as a failure, never as a size.

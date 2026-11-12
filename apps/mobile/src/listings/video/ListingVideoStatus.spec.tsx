@@ -141,6 +141,19 @@ it.each(["paused", "dismissed", "editor-cancelled"] as const)("preserves the fai
   expect(screen.getByRole("button", { name: "Remove" })).toBeTruthy();
 });
 
+it("keeps Choose another and Remove available from the retryable failure menu", async () => {
+  let picker = false;
+  vi.mocked(ImagePicker.launchImageLibraryAsync).mockImplementation(async () => { picker = true; return { canceled: true, assets: null }; });
+  server.use(http.get("*/listings/video-uploads/target/draft/:id", () => HttpResponse.json({ pendingVideo: { ...pending, status: "failed", canReprocess: true, failureType: "TRANSIENT" } })));
+  const screen = await renderMobile(<ListingVideoCard canUploadVideo videoUploadTarget={{ type: "draft", id }} />);
+  await screen.findByRole("button", { name: "Try again" });
+  await fireEvent.press(screen.getByRole("button", { name: "More options" }));
+  expect(screen.getByRole("button", { name: "Remove" })).toBeTruthy();
+  await fireEvent.press(screen.getByRole("button", { name: "Choose another" }));
+  expect(picker).toBe(true);
+  expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
 // Secure storage is the native boundary; cover grants require an authenticated owner.
 vi.mock("expo-secure-store", () => {
   const values = new Map<string, string>();

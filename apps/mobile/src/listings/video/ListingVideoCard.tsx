@@ -300,7 +300,8 @@ function VideoCardContent({ canUploadVideo, isVideoUploadTester, disabled = fals
           <VideoCardRow testID="listing-video-failed" alert thumb={{ kind: "error" }} title={t(copy.title)} meta={copy.body ? t(copy.body) : null}>
             <VideoCardActions
               primary={copy.retry ? { label: t(copy.retry), onPress: prep.prepareAgain } : { label: t("listingVideoChooseAnother"), onPress: pickAnother }}
-              secondary={remove}
+              secondary={copy.retry ? undefined : remove}
+              alternatives={copy.retry ? [{ label: t("listingVideoChooseAnother"), onPress: pickAnother }, remove] : undefined}
             />
           </VideoCardRow>
         );

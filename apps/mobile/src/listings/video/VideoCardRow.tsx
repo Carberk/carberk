@@ -1,14 +1,15 @@
-import type { ReactNode } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { useState, type ReactNode } from "react";
+import { ActivityIndicator, Modal, View } from "react-native";
 import { Image } from "expo-image";
+import { useTranslation } from "react-i18next";
 import { AlertCircle, Video } from "lucide-react-native";
 
 import { useVideoThumbnails } from "./useVideoThumbnails";
-import { VideoCover } from "./VideoCover";
 
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
+
 
 /** What sits in the row's 4:3 thumbnail: the Ready cover, a frame of the phone's clip, work in progress, or a problem. */
 export type VideoThumb =
@@ -57,7 +58,30 @@ export function VideoCardRow({ thumb, title, meta, alert = false, testID, childr
  * second action onto its own line. A lone action is always the tonal button:
  * a quiet one on its own reads as stray text.
  */
-export function VideoCardActions({ primary, secondary }: { primary?: VideoAction | null; secondary?: VideoAction | null }) {
+export function VideoCardActions({ primary, secondary, alternatives }: {
+  primary?: VideoAction | null;
+  secondary?: VideoAction | null;
+  alternatives?: VideoAction[] | undefined;
+}) {
+  const { t } = useTranslation();
+  const [showOptions, setShowOptions] = useState(false);
+  if (primary && alternatives?.length) {
+    return <View className="flex-row gap-2">
+      <ActionButton action={primary} variant="secondary" className="flex-1 shrink" />
+      <Button variant="ghost" size="sm" className="min-h-11 flex-1 shrink" accessibilityLabel={t("listingVideoMore")} onPress={() => setShowOptions(true)} disabled={alternatives.every((action) => action.disabled)}>
+        <Text>{t("listingVideoMore")}</Text>
+      </Button>
+      <Modal visible={showOptions} transparent animationType="fade" onRequestClose={() => setShowOptions(false)}>
+        <View className="flex-1 items-center justify-center bg-scrim/50 p-6">
+          <View className="w-full max-w-sm gap-3 rounded-3xl bg-popover p-6" accessibilityViewIsModal>
+            <Text className="text-headline font-semibold" accessibilityRole="header">{t("listingVideoMore")}</Text>
+            {alternatives.map((action) => <ActionButton key={action.label} action={{ ...action, onPress: () => { setShowOptions(false); action.onPress(); } }} variant="secondary" />)}
+            <Button variant="ghost" className="min-h-11" onPress={() => setShowOptions(false)}><Text>{t("cancel")}</Text></Button>
+          </View>
+        </View>
+      </Modal>
+    </View>;
+  }
   if (primary && secondary) {
     return (
       <View className="flex-row gap-2">
@@ -90,7 +114,7 @@ export function VideoProgress({ percent, testID }: { percent: number; testID?: s
 function Thumb({ thumb }: { thumb: VideoThumb }) {
   return (
     <View className="h-12 w-16 items-center justify-center overflow-hidden rounded-md bg-secondary" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {thumb.kind === "cover" ? <VideoCover uri={thumb.uri} durationMs={thumb.durationMs} size="small" /> : null}
+      {thumb.kind === "cover" ? thumb.uri ? <Image testID="video-cover-image" source={{ uri: thumb.uri }} style={FILL} contentFit="cover" cachePolicy="memory" /> : <Icon as={Video} className="size-5 text-muted-foreground" /> : null}
       {thumb.kind === "frame" ? <Frame uri={thumb.uri} atS={thumb.atS} /> : null}
       {thumb.kind === "busy" ? <ActivityIndicator testID="listing-video-thumb-busy" /> : null}
       {thumb.kind === "error" ? <Icon as={AlertCircle} className="size-5 text-destructive" /> : null}

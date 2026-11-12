@@ -112,7 +112,11 @@ export function OwnerVideoStatus({ target, task, onChoose, onClearSelection, chi
         primary={pending.canReprocess
           ? { label: t("listingVideoTryAgain"), onPress: () => void change("reprocess"), disabled: working }
           : { label: t("listingVideoChooseAnother"), onPress: onChoose, disabled: working }}
-        secondary={active ? cancelPending : { label: t("listingVideoRemove"), onPress: () => setConfirm(true), disabled: working }}
+        secondary={pending.canReprocess ? undefined : active ? cancelPending : { label: t("listingVideoRemove"), onPress: () => setConfirm(true), disabled: working }}
+        alternatives={pending.canReprocess ? [
+          { label: t("listingVideoChooseAnother"), onPress: onChoose, disabled: working },
+          active ? cancelPending : { label: t("listingVideoRemove"), onPress: () => setConfirm(true), disabled: working },
+        ] : undefined}
       />
     </VideoCardRow>}
     {pending?.status === "uploading" && !hasLocal && <VideoCardRow thumb={{ kind: "busy" }} title={t("listingVideoUploading")} meta={pendingMeta("listingVideoPublishNow")}>
