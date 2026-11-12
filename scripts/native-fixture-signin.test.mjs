@@ -15,6 +15,7 @@ function boundary({ signedIn = false, log, response } = {}) {
   return {
     actions, inputs, requests,
     now: () => NOW,
+    sleep: async () => {},
     readFile: async path => path.endsWith(".env") ? config : log ?? `2026-11-12T06:00:00.000Z [mock] OTP for ***0001 (req abcdef01): 709814\n`,
     fetch: async (url, init) => {
       requests.push([String(url), init]);
@@ -27,7 +28,7 @@ function boundary({ signedIn = false, log, response } = {}) {
       if (args[0] === "snapshot") return { nodes: entered || signedIn
         ? [{ label: "Aýgül Amanowa" }, { label: "+993 61 XX-XX-01" }]
         : actions.some(a => a[1]?.includes("/otp?"))
-          ? [{ type: "TextField", editable: true, ref: "e7" }]
+          ? [{ label: "Enter the code" }, { label: "+993 61 XX-XX-01" }, { type: "TextField", editable: true, ref: "e7" }]
           : [{ label: "Sign in", role: "button" }] };
       return {};
     },
@@ -280,5 +281,104 @@ test("bounds a rejected verification without resending or saving raw UI content"
   await assert.rejects(signInFixture(options, port), /verification did not complete/);
   assert.equal(waits, 10);
   assert.equal(port.actions.filter(([action]) => action === "fill").length, 1);
+  assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 1);
+});
+
+function keyboardBoundary({ wrongReadback = false, missingKey = false, staysOnOtp = false, initialDigits = "", verifiedIdentity = false } = {}) {
+  const port = boundary();
+  const original = port.device;
+  let digits = initialDigits;
+  let generation = 100;
+  port.device = async args => {
+    if (args[0] === "press") {
+      port.actions.push(args);
+      assert.match(args[1], new RegExp(`~s${generation}$`));
+      digits += "709814"[digits.length];
+      return {};
+    }
+    if (verifiedIdentity && digits.length === 6 && args[1] === "autotm:///services") return original(args);
+    if (verifiedIdentity && digits.length === 6 && port.actions.at(-1)?.[1] === "autotm:///services") return { nodes: [{ label: "Aýgül Amanowa" }, { label: "+993 61 XX-XX-01" }] };
+    if (args[0] === "snapshot" && port.actions.some(a => a[1]?.includes("/otp?"))) {
+      generation++;
+      if (digits.length === 6 && !staysOnOtp) return { nodes: [{ label: "Aýgül Amanowa" }, { label: "+993 61 XX-XX-01" }] };
+      return { refsGeneration: generation, nodes: [
+        { label: "Enter the code" }, { label: "+993 61 XX-XX-01" }, { type: "Keyboard" },
+        ...(digits ? [{ type: "Cell", label: [...(wrongReadback ? "0" : digits)].join(", ") }] : []),
+        ...[..."0123456789"].filter(label => !missingKey || label !== "7").map(label => ({ type: "Key", label, ref: `e${10 + Number(label)}`, hittable: true })),
+      ] };
+    }
+    return original(args);
+  };
+  return port;
+}
+
+test("uses fresh semantic native keyboard refs for the transparent OtpCells input", async () => {
+  const port = keyboardBoundary();
+  assert.equal((await signInFixture(options, port)).status, "signed-in");
+  assert.equal(port.actions.filter(([action]) => action === "press").length, 6);
+  assert.equal(port.actions.some(([action]) => action === "fill" || action === "type"), false);
+});
+
+test("resumes an exact request's matching grouped native digit prefix without retyping it", async () => {
+  const port = keyboardBoundary({ initialDigits: "70" });
+  assert.equal((await signInFixture({ ...options, requestId: ID, requestedAt: new Date(NOW).toISOString() }, port)).status, "signed-in");
+  assert.equal(port.actions.filter(([action]) => action === "press").length, 4);
+  assert.equal(port.requests.some(([url]) => url.endsWith("/otp/request")), false);
+});
+
+test("confirms native account identity after successful verification leaves the standalone OTP screen mounted", async () => {
+  const port = keyboardBoundary({ staysOnOtp: true, verifiedIdentity: true });
+  assert.equal((await signInFixture(options, port)).identityConfirmed, true);
+  assert.equal(port.actions.filter(([action]) => action === "press").length, 6);
+});
+
+for (const failure of [{ wrongReadback: true }, { missingKey: true }]) {
+  test(`stops on changed keyboard semantics ${JSON.stringify(failure)} without re-entry or resend`, async () => {
+    const port = keyboardBoundary(failure);
+    await assert.rejects(signInFixture(options, port), /selector or input readback changed/);
+    assert.ok(port.actions.filter(([action]) => action === "press").length <= 1);
+    assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 1);
+  });
+}
+
+test("waits for the OTP screen to leave even when it exposes no editable field", async () => {
+  const port = keyboardBoundary({ staysOnOtp: true });
+  let waits = 0;
+  port.sleep = async () => waits++;
+  await assert.rejects(signInFixture(options, port), /verification did not complete/);
+  assert.equal(waits, 10);
+  assert.equal(port.actions.filter(([action]) => action === "press").length, 6);
+});
+
+test("preserves only resumable safe context after a successful request and later UI boundary failure", async () => {
+  const port = boundary();
+  const original = port.device;
+  port.device = async args => {
+    if (args[0] === "open" && args[1].includes("/otp?")) throw new Error("709814 token=private-value raw response");
+    return original(args);
+  };
+  let context;
+  await assert.rejects(signInFixture(options, port), error => {
+    context = error.requestContext;
+    assert.deepEqual(context, { requestId: ID, requestedAt: new Date(NOW).toISOString(), fixture: "seller", destination: "+993 61 XX-XX-01" });
+    assert.match(error.message, new RegExp(ID));
+    assert.doesNotMatch(error.message, /709814|private-value|99361000001|raw response/);
+    return true;
+  });
+  const resumed = boundary();
+  assert.equal((await signInFixture({ ...options, ...context }, resumed)).status, "signed-in");
+  assert.equal(resumed.requests.some(([url]) => url.endsWith("/otp/request")), false);
+});
+
+test("bounds delayed or missing native OTP readiness without typing or resending", async () => {
+  const port = boundary();
+  const original = port.device;
+  let waits = 0;
+  port.sleep = async () => waits++;
+  port.device = args => args[0] === "snapshot" && port.actions.some(a => a[1]?.includes("/otp?"))
+    ? { nodes: [{ label: "Enter the code" }, { label: "+993 61 XX-XX-01" }] } : original(args);
+  await assert.rejects(signInFixture(options, port), /did not become ready/);
+  assert.equal(waits, 9);
+  assert.equal(port.actions.some(([action]) => ["press", "fill", "type"].includes(action)), false);
   assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 1);
 });

@@ -6,7 +6,7 @@ Implementers and Sol UI reviewers **must use `pnpm native:signin` for ordinary s
 
 1. Use the [local stack and fixture data](local-testing.md), with your API's env file and private mock log. Confirm the installed app is running your intended Metro bundle with the same local API origin. The helper checks the API config and live environment; it cannot identify which Metro bundle an already installed app loaded.
 2. Coordinate a single free iOS 26.2 simulator. In T3, call `device_list`, then `device_open` with its host and ID. Use only its returned `agent-device` command. A held device is a blocker; preserve its owner and session. Do not boot extra devices to work around contention.
-3. Read `help open`, `help snapshot` and `help fill` using that exact command on your session. Open the app with that command before reading its UI. Stop on device errors and follow the documented advice once; repeated failure requires a handoff, not a new session or alternate driver.
+3. Read `help open`, `help snapshot`, `help fill` and `help press` using that exact command on your session. Open the app with that command before reading its UI. Stop on device errors and follow the documented advice once; repeated failure requires a handoff, not a new session or alternate driver.
 4. Put the returned bound executable alone in a JSON array in `/tmp/owned-device.json`, together with `worktree` (your absolute checkout path), `session` and `deviceId` from that command. The T3 wrapper already carries the target/session flags; do not add them. This is structured process input, never shell text. For example, its shape is:
 
 ```json
@@ -18,7 +18,7 @@ Implementers and Sol UI reviewers **must use `pnpm native:signin` for ordinary s
 }
 ```
 
-The helper never selects, boots, closes, resets or takes over another device. All UI operations compose the caller's command with argument arrays, sequential fresh snapshots and current field refs. It passes code text over stdin, suppresses action recording and captures command output in memory so code entry never becomes a saved report. Keep screenshots and recordings off during code entry; take proof only after the code screen has gone.
+The helper never selects, boots, closes, resets or takes over another device. All UI operations compose the caller's command with argument arrays, sequential fresh snapshots and current field refs. It passes code text over stdin when an editable field is exposed. For the transparent iOS OTP input, it uses the focused native number pad with fresh semantic key selectors and digit readback; it stops if focus, selectors or readback change. It suppresses action recording and captures command output in memory so code entry never becomes a saved report. Keep screenshots and recordings off during code entry; take proof only after the code screen has gone.
 
 At handoff, use your own bound command's documented `close` first and confirm `Closed: <your-session>` with exit 0, then close the T3 device panel with `device_close`. Closing only the panel can leave the native automation lock held. Preserve the app's signed-in data: closing automation needs no logout, reset or app reopen. Never close another owner's CLI session or change its locks.
 
@@ -42,7 +42,7 @@ For a code already requested through the real entry flow, add both:
 --request-id FULL_UUID_FROM_THAT_SUCCESSFUL_REQUEST --requested-at ISO_TIMESTAMP_OF_THAT_REQUEST
 ```
 
-This retrieves that exact code and delivers it to the same genuine verification UI without issuing another request. Keep the request context in memory or a private temporary note; never save an unredacted response. No option prints the code.
+This retrieves that exact code and delivers it to the same genuine verification UI without issuing another request. If a successful request is followed by a UI failure, the error includes only the validated request ID, request timestamp, fixture role and masked destination. Reuse that context with these flags before expiry; do not request again just because UI setup failed. Keep the context in memory or a private temporary note; never save an unredacted response. No option prints the code.
 
 ## Refusals and privacy
 

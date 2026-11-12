@@ -12,6 +12,47 @@ const FIXTURES = {
   seller: { phone: "+99361000001", name: "Aýgül Amanowa", masked: "+993 61 XX-XX-01" },
   buyer: { phone: "+99361000009", name: "Öwez Berdiýew", masked: "+993 61 XX-XX-09" },
 };
+const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const editableFields = state => (state.nodes ?? []).filter(node => node.editable === true || /text.?field|edittext/i.test(node.type ?? node.role ?? ""));
+const otpScreen = state => (state.nodes ?? []).some(node => ["Enter the code", "Введите код", "Kody giriziň"].includes(node.label));
+const currentRef = (node, state) => {
+  if (!/^e\d+$/.test(node?.ref ?? "")) throw new FixtureError("Native selector unavailable; stop without resending");
+  return `@${node.ref}${Number.isInteger(state.refsGeneration) ? `~s${state.refsGeneration}` : ""}`;
+};
+
+async function enterCode(device, sleep, fixture, code) {
+  let state;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    state = await device(["snapshot", "-i"]);
+    if (otpScreen(state) && JSON.stringify(state).includes(fixture.masked) &&
+        (editableFields(state).length || (state.nodes ?? []).some(node => node.type === "Keyboard"))) break;
+    if (attempt === 9) throw new FixtureError("OTP UI editable input did not become ready; stop without resending");
+    await sleep(500);
+  }
+  const fields = editableFields(state);
+  if (fields.length === 1) {
+    await device(["fill", currentRef(fields[0], state), "--text-stdin"], { input: code });
+    return;
+  }
+  // OtpCells' transparent TextInput is absent from iOS accessibility snapshots.
+  // Its focused native number pad is observable; never guess a tap coordinate.
+  if (fields.length) throw new FixtureError("OTP UI has ambiguous editable fields; stop without resending");
+  const readDigits = snapshot => (snapshot.nodes ?? []).filter(node => node.type === "Cell")
+    .map(node => /^\d(?:, \d)*$/.test(node.label ?? "") ? node.label.replaceAll(", ", "") : "?").join("");
+  const initial = readDigits(state);
+  if (!code.startsWith(initial) || initial.length >= code.length) throw new FixtureError("OTP input is ambiguous; stop without resending");
+  for (let index = initial.length; index < code.length; index++) {
+    if (index > initial.length) state = await device(["snapshot", "-i"]);
+    const nodes = state.nodes ?? [];
+    const entered = readDigits(state);
+    const keys = nodes.filter(node => node.type === "Key" && node.label === code[index] && node.enabled !== false && node.hittable !== false);
+    if (!otpScreen(state) || !JSON.stringify(state).includes(fixture.masked) || editableFields(state).length ||
+        entered !== code.slice(0, index) || keys.length !== 1) {
+      throw new FixtureError("OTP native keyboard selector or input readback changed; stop without resending");
+    }
+    await device(["press", currentRef(keys[0], state)]);
+  }
+}
 
 function codeFor(log, requestId, fixture, requestedAt, now) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId ?? "") ||
@@ -55,7 +96,7 @@ function localApi(value) {
   return url;
 }
 
-async function run(options, ports) {
+async function run(options, ports, context) {
   const api = localApi(options.api);
   const fixture = FIXTURES[options.fixture];
   if (!fixture) throw new FixtureError("Choose --fixture seller or buyer");
@@ -83,6 +124,12 @@ async function run(options, ports) {
   let requestId = options.requestId;
   let requestedAt = Date.parse(options.requestedAt);
   let resendInSeconds = 60;
+  const rememberRequest = () => {
+    if (REQUEST_ID.test(requestId ?? "") && Number.isFinite(requestedAt)) {
+      context.request = { requestId, requestedAt: new Date(requestedAt).toISOString(), fixture: options.fixture, destination: fixture.masked };
+    }
+  };
+  rememberRequest();
   if (!requestId) {
     requestedAt = ports.now();
     const response = await ports.fetch(`${api}/auth/otp/request`, {
@@ -95,6 +142,7 @@ async function run(options, ports) {
     if (body.code === "RATE_LIMITED") throw new FixtureError("RATE_LIMITED: stop and wait; no resend or quota reset");
     if (body.testCode !== undefined) throw new FixtureError("CI OTP response mode detected; stop");
     requestId = body.requestId;
+    rememberRequest();
     resendInSeconds = body.resendInSeconds;
     if (!Number.isInteger(resendInSeconds) || resendInSeconds < 0) throw new FixtureError("Invalid OTP request metadata; stop without resending");
   }
@@ -102,33 +150,38 @@ async function run(options, ports) {
   const route = new URL("autotm:///otp");
   route.search = new URLSearchParams({ method: "phone", destination: fixture.phone, resendInSeconds: String(resendInSeconds) }).toString();
   await ports.device(["open", route.href]);
-  const otp = await ports.device(["snapshot", "-i"]);
-  const fields = (otp.nodes ?? []).filter(node => node.editable === true || /text.?field|edittext/i.test(node.type ?? node.role ?? ""));
-  if (fields.length !== 1 || !/^e\d+$/.test(fields[0].ref ?? "")) throw new FixtureError("OTP UI must expose one current editable field; stop without resending");
   const code = codeFor(await ports.readFile(options.apiLog, "utf8"), requestId, fixture, requestedAt, ports.now());
-  await ports.device(["fill", `@${fields[0].ref}`, "--text-stdin"], { input: code });
+  await enterCode(ports.device, ports.sleep, fixture, code);
   // Verification is asynchronous. Read fresh snapshots; never re-enter or resend.
   let leftOtp = false;
   for (let attempt = 0; attempt < 10; attempt++) {
     const state = await ports.device(["snapshot", "-i"]);
-    if (!(state.nodes ?? []).some(node => node.editable === true || /text.?field|edittext/i.test(node.type ?? node.role ?? ""))) {
+    if (!otpScreen(state) && !editableFields(state).length) {
       leftOtp = true;
       break;
     }
     await ports.sleep(500);
   }
-  if (!leftOtp) throw new FixtureError("OTP UI verification did not complete; stop without resending");
+  // A standalone OTP deep link can remain mounted after normal verification.
+  // Only the native account identity below establishes success, never timing.
   await ports.device(["open", "autotm:///services"]);
   const identity = JSON.stringify(await ports.device(["snapshot", "-i"]));
-  if (!identity.includes(fixture.name) || !identity.includes(fixture.masked)) throw new FixtureError("OTP UI did not confirm the expected fixture identity; stop without resending");
+  if (!identity.includes(fixture.name) || !identity.includes(fixture.masked)) throw new FixtureError(leftOtp
+    ? "OTP UI did not confirm the expected fixture identity; stop without resending"
+    : "OTP UI verification did not complete; stop without resending");
   return { fixture: options.fixture, status: "signed-in", identityConfirmed: true };
 }
 
 export async function signInFixture(options, ports) {
-  try { return await run(options, ports); }
+  const context = {};
+  try { return await run(options, ports, context); }
   catch (error) {
-    if (error instanceof FixtureError) throw error;
-    throw new FixtureError("Local fixture setup failed at a boundary; raw diagnostics suppressed. Stop without resending.");
+    const safe = error instanceof FixtureError ? error : new FixtureError("Local fixture setup failed at a boundary; raw diagnostics suppressed. Stop without resending.");
+    if (context.request) {
+      safe.requestContext = context.request;
+      safe.message += ` Request context: ${JSON.stringify(context.request)}`;
+    }
+    throw safe;
   }
 }
 
