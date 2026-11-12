@@ -2,6 +2,8 @@
 
 The schema, migration history, generated-client boundary, and seed inputs live here. Inspect `schema.prisma` for fields and relations instead of copying them into documentation. Runtime consumers load the compiled package.
 
+The local additive rich photo operator (`scripts/rich-scenarios.ts`) is separate from fixture replacement and ordinary readiness. It verifies the offline gallery, binds an existing seller and local catalog semantics, and refuses collisions or drift. Its executor only inserts the two declared scenarios and conditionally uploads immutable objects; partial failures retain a bounded resource receipt for explicit recovery. See [local testing](../../docs/agents/local-testing.md#explicit-additive-rich-photo-scenarios).
+
 `Listing.publicNumber` is a unique, database-assigned integer for the public detail footer. Its migration numbers existing Listings; subsequent inserts take the next sequence value. UUIDs remain the internal identity and route key.
 
 `users.nameNumber` (1000 to 9999) and `users.avatarIndex` (0 to 11) have random column defaults and range check constraints that Prisma cannot express; `schema.prisma` mirrors the defaults as `dbgenerated` in PostgreSQL's own rendering, so `prisma migrate diff` stays empty. The defaults numbered existing Users when the columns were added and let an older API still create Users; the API normally draws both values itself.

@@ -20,6 +20,20 @@ A successful check establishes environment availability, **not device sign-in or
 
 When the check identifies an absent service, coordinate its startup separately. Stop only processes you started. For initial data/schema setup see section 1a.
 
+### Explicit additive rich photo scenarios
+
+For the local ten-view Lexus review Listings, select the existing eligible seller explicitly in the DB package's local environment, with `APP_ENV` and `NODE_ENV` set to `development`/`test`, and loopback `DATABASE_URL`, `MINIO_ENDPOINT` and `MINIO_PUBLIC_URL`:
+
+```bash
+pnpm --filter @auto-tm/db rich:scenarios --target local --mode plan --owner-id <existing-seller-id>
+pnpm --filter @auto-tm/db rich:scenarios --target local --mode apply --owner-id <same-id> --plan-hash <reported-hash>
+pnpm --filter @auto-tm/db rich:scenarios --target local --mode check --owner-id <same-id>
+```
+
+`plan` and `check` are read-only; an absent state reports the exact proposed additions and zero writes. Apply requires the plan hash bound to the local target, owner, semantic catalog IDs and rendered version. It adds `rich-es300h-portrait` and `rich-es300h-landscape`, with ten photos each; these names reserve later synthetic-video variants and do not establish video readiness. Identical reapply makes zero writes. The report links public JSON credits retaining broad/reviewer sources and all ten new sources with adaptation notices; anonymous availability is required before new Listings become visible.
+
+The offline pack is verified and rendered through the existing photo pipeline. Missing/corrupt objects, occupied IDs/keys and edited scenarios refuse. Failed writes retain objects and report exact created/attempted keys and scenario IDs for coordinated recovery; no automatic repair, overwrite, cleanup or reset is provided. Do not remove unrelated resources to make a refusal pass. Existing identities, Sessions, drafts, videos and inventories remain outside this command's write set. Ordinary `native:ready` continues checking the sparse baseline; run the explicit rich check separately, then establish live sign-in/build/origin/gallery evidence on the owned simulator.
+
 
 
 The Docker stack usually runs already: `docker ps` lists `compose-postgres-1`, `compose-redis-1` and `compose-minio-1`. If not, run `pnpm compose:up`.
