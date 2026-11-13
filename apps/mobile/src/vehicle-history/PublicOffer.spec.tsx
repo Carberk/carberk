@@ -74,13 +74,16 @@ it("keeps the sample readable after storage failure and retries the real save bo
 it.each([
   ["en", "100 TMT per vehicle", "View fictional sample", "Fictional sample", "The document stays in its original English."],
   ["ru", "100 TMT за автомобиль", "Посмотреть вымышленный пример", "Вымышленный пример", "Документ остаётся на исходном английском языке."],
-  ["tk", "Her ulag üçin 100 TMT", "Toýlama nusgany gör", "Toýlama nusga", "Resminama asyl iňlis dilinde saklanýar."],
+  ["tk", "Her ulag üçin 100 TMT", "Toslama nusgany gör", "Toslama nusga", "Resminama asyl iňlis dilinde saklanýar."],
 ])("localizes the public UI in %s while preserving original document language", async (locale, price, view, title, language) => {
   const screen = await renderMobile(<VehicleHistoryScreen />, { locale });
   expect(screen.getByText(price)).toBeTruthy();
   await fireEvent.press(screen.getByRole("button", { name: view }));
   expect(screen.getByText(title)).toBeTruthy();
   expect(screen.getByText(language)).toBeTruthy();
+  if (locale === "tk") {
+    expect(screen.getByText("Carberk-iň öz okuw nusgasy. Ähli ulaglar we wakalar toslamadyr. Bu üpjün edijiniň hasabaty däldir.")).toBeTruthy();
+  }
   expect(screen.getByText("Illustrative event: 09 January 2024 - damage entry recorded; severity unknown.")).toBeTruthy();
   expect(screen.getByText("CARBERK FICTIONAL EDUCATIONAL SAMPLE").props.accessibilityLanguage).toBe("en");
 });
