@@ -10,7 +10,21 @@ import {
   getRefreshToken,
   setAuthCookies,
 } from "@/lib/cookies";
+import { authCopy, historyAuth, totpPath } from "@/lib/history-auth";
 import { validateReturnTo } from "@/lib/validators";
+
+function scopedError(err: unknown, returnTo: unknown, fallback: string): string {
+  const intent = historyAuth(returnTo);
+  if (!intent) return fallback;
+  const t = authCopy[intent.locale];
+  if (err instanceof ApiError) {
+    if (err.status === 401) return t.expired;
+    if (err.status === 403) return t.denied;
+    if (err.code === ErrorCode.RateLimited) return t.limited;
+    if (err.status === 400 && (err.code === "INVALID_OTP" || err.code === "INVALID_TOTP")) return t.invalid;
+  }
+  return t.network;
+}
 
 // ─── OTP ───
 
@@ -22,17 +36,20 @@ export async function requestOtp(
   | { ok: true; resendInSeconds: number; requestId: string; requestedAt: string; testCode?: string }
 > {
   await rejectExpiredSession();
+  const returnTo = formData.get("returnTo");
+  const intent = historyAuth(returnTo);
+  const t = authCopy[intent?.locale ?? "ru"];
   const phone = formData.get("phone");
   const parsed = AuthSchemas.PhoneTm.safeParse(phone);
   if (!parsed.success) {
-    return { ok: false, error: "Введите номер телефона в формате +993XXXXXXXX" };
+    return { ok: false, error: t.phoneError };
   }
 
   try {
     const requestedAt = new Date().toISOString();
     const result = await apiFetch<AuthSchemas.OtpRequestResponse>(
       "/auth/otp/request",
-      { method: "POST", body: { phone: parsed.data } as unknown },
+      { method: "POST", body: { phone: parsed.data, ...(intent ? { locale: intent.locale } : {}) } as unknown },
     );
     const response: { ok: true; resendInSeconds: number; requestId: string; requestedAt: string; testCode?: string } = {
       ok: true,
@@ -46,6 +63,7 @@ export async function requestOtp(
     return response;
   } catch (err) {
     unstable_rethrow(err);
+    if (historyAuth(returnTo)) return { ok: false, error: scopedError(err, returnTo, t.network) };
     if (err instanceof ApiError) {
       if (err.code === ErrorCode.RateLimited) {
         return { ok: false, error: "Слишком много попыток. Попробуйте позже." };
@@ -57,7 +75,7 @@ export async function requestOtp(
 }
 
 export type VerifyOtpResult =
-  | { ok: false; error: string }
+  | { ok: false; error: string; sessionCreated?: boolean }
   | {
       ok: true;
       next: "totp" | "reports";
@@ -70,19 +88,22 @@ export async function verifyOtp(
   formData: FormData,
 ): Promise<VerifyOtpResult> {
   await rejectExpiredSession();
+  const returnTo = formData.get("returnTo");
+  const t = authCopy[historyAuth(returnTo)?.locale ?? "ru"];
   const phone = formData.get("phone");
   const code = formData.get("code");
 
   const parsedPhone = AuthSchemas.PhoneTm.safeParse(phone);
   if (!parsedPhone.success) {
-    return { ok: false, error: "Неверный формат номера телефона." };
+    return { ok: false, error: t.phoneError };
   }
   if (typeof code !== "string" || !/^\d{6}$/.test(code)) {
-    return { ok: false, error: "Код должен содержать 6 цифр." };
+    return { ok: false, error: t.codeError };
   }
 
+  let sessionCreated = false;
   try {
-    const result = await apiFetch<AuthSchemas.OtpVerifyResponse>(
+    const result = await apiFetchOptional<AuthSchemas.OtpVerifyResponse>(
       "/auth/otp/verify",
       {
         method: "POST",
@@ -90,7 +111,8 @@ export async function verifyOtp(
       },
     );
 
-    if (result.user.role !== "admin") {
+    if (!result) return { ok: false, error: t.expired };
+    if (!historyAuth(returnTo) && result.user.role !== "admin") {
       await clearAuthCookies();
       return {
         ok: false,
@@ -100,17 +122,18 @@ export async function verifyOtp(
     }
 
     await setAuthCookies(result.accessToken, result.refreshToken);
+    sessionCreated = true;
 
     // After OTP, check TOTP status to decide where to send the user
     const totpStatus =
       await apiFetchOptional<AuthSchemas.AdminTotpStatusResponse>(
-        "/auth/admin/totp/status",
+        totpPath("status", returnTo),
       );
 
     if (!totpStatus) {
       // Token expired/invalid between OTP verify and status check (rare)
       await clearAuthCookies();
-      return { ok: false, error: "Сессия истекла. Войдите снова." };
+      return { ok: false, error: t.expired };
     }
 
     if (totpStatus.enrolled && totpStatus.elevated) {
@@ -120,6 +143,7 @@ export async function verifyOtp(
     return { ok: true, next: "totp", totpEnrolled: totpStatus.enrolled };
   } catch (err) {
     unstable_rethrow(err);
+    if (historyAuth(returnTo)) return { ok: false, error: scopedError(err, returnTo, t.network), sessionCreated };
     if (err instanceof ApiError) {
       if (err.code === ErrorCode.RateLimited) {
         return {
@@ -150,12 +174,12 @@ export type TotpStatusResult =
       adminTotpExpiresAt?: string;
     };
 
-export async function getTotpStatus(): Promise<TotpStatusResult> {
+export async function getTotpStatus(returnTo?: string): Promise<TotpStatusResult> {
   await rejectExpiredSession();
   try {
     const status =
       await apiFetchOptional<AuthSchemas.AdminTotpStatusResponse>(
-        "/auth/admin/totp/status",
+        totpPath("status", returnTo),
       );
     if (!status) return { ok: false };
     const result: TotpStatusResult = {
@@ -176,13 +200,15 @@ export type TotpEnrollResult =
   | { ok: false; error: string; reason?: "already-enrolled" }
   | { ok: true; qrCodeDataUrl: string };
 
-export async function enrollTotp(): Promise<TotpEnrollResult> {
+export async function enrollTotp(returnTo?: string): Promise<TotpEnrollResult> {
+  const t = authCopy[historyAuth(returnTo)?.locale ?? "ru"];
   await rejectExpiredSession();
   try {
-    const result = await apiFetch<AuthSchemas.AdminTotpEnrollResponse>(
-      "/auth/admin/totp/enroll",
+    const result = await apiFetchOptional<AuthSchemas.AdminTotpEnrollResponse>(
+      totpPath("enroll", returnTo),
       { method: "POST" },
     );
+    if (!result) return { ok: false, error: t.expired };
     // Generate the QR data URL server-side so the secret never reaches the client
     const { generateTotpQrCodeDataUrl } = await import("@/lib/qrcode");
     const qrCodeDataUrl = await generateTotpQrCodeDataUrl(result.qrCodeUrl);
@@ -198,14 +224,14 @@ export async function enrollTotp(): Promise<TotpEnrollResult> {
         return {
           ok: false,
           reason: "already-enrolled",
-          error: "Двухфакторная аутентификация уже настроена.",
+          error: t.enrolled,
         };
       }
-      return { ok: false, error: err.message };
+      return { ok: false, error: scopedError(err, returnTo, err.message) };
     }
     return {
       ok: false,
-      error: "Не удалось начать настройку 2FA. Попробуйте позже.",
+      error: scopedError(err, returnTo, "Не удалось начать настройку 2FA. Попробуйте позже."),
     };
   }
 }
@@ -219,16 +245,19 @@ export async function verifyTotp(
   formData: FormData,
 ): Promise<TotpVerifyResult> {
   await rejectExpiredSession();
+  const returnTo = formData.get("returnTo");
+  const t = authCopy[historyAuth(returnTo)?.locale ?? "ru"];
   const code = formData.get("code") as string;
-  if (!code || code.length < 1) {
-    return { ok: false, error: "Введите код." };
+  if (!code || code.length < 1 || (historyAuth(returnTo) && !/^(?:[0-9]{6}|[a-fA-F0-9]{16})$/.test(code))) {
+    return { ok: false, error: historyAuth(returnTo) ? t.totpError : "Введите код." };
   }
 
   try {
-    const result = await apiFetch<AuthSchemas.AdminTotpVerifyResponse>(
-      "/auth/admin/totp/verify",
+    const result = await apiFetchOptional<AuthSchemas.AdminTotpVerifyResponse>(
+      totpPath("verify", returnTo),
       { method: "POST", body: { code } as unknown },
     );
+    if (!result) return { ok: false, error: t.expired };
     const response: TotpVerifyResult = {
       ok: true,
       adminTotpExpiresAt: result.adminTotpExpiresAt,
@@ -239,6 +268,7 @@ export async function verifyTotp(
     return response;
   } catch (err) {
     unstable_rethrow(err);
+    if (historyAuth(returnTo)) return { ok: false, error: scopedError(err, returnTo, t.network) };
     if (err instanceof ApiError) {
       if (err.code === ErrorCode.RateLimited) {
         return {

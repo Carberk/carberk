@@ -28,7 +28,7 @@ function DeskContent({ locale, state, actor }: { locale: DeskLocale; state: Desk
           <h3 className="text-lg font-semibold">{t[state]}</h3>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">{t[`${state}Body`]}</p>
           {state !== "loading" && <form action={`/vehicle-history/${locale}`} className="mt-6"><Button type="submit" variant={state === "empty" ? "secondary" : "primary"}>{state === "empty" ? t.refresh : t.retry}</Button></form>}
-          {state === "denied" && <a className="mt-4 rounded-sm p-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring" href={`/login?returnTo=${encodeURIComponent(`/vehicle-history/${locale}`)}`}>{t.signIn}</a>}
+          {state === "denied" && <a className="mt-4 rounded-sm p-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring" href={`/login?reason=history-access&returnTo=${encodeURIComponent(`/vehicle-history/${locale}`)}`}>{t.signIn}</a>}
         </div>
       </section>
     </>

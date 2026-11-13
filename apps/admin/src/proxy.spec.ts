@@ -80,6 +80,13 @@ describe("admin session renewal before request dispatch", () => {
     expect(await response.text()).toContain(title);
   });
 
+  it("preserves a scoped login destination when its action session expires", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
+    const { proxy } = await import("./proxy");
+    const response = await proxy(new NextRequest("http://admin.auto.tm/login?mode=totp&returnTo=%2Fvehicle-history%2Fen", { method: "POST", headers: { origin: "http://admin.auto.tm", "next-action": "synthetic", cookie: `auto_tm_admin_access=${jwt(1)}; auto_tm_admin_refresh=${refresh}` } }));
+    expect(response.headers.get("x-middleware-request-x-admin-return-to")).toBe("/vehicle-history/en");
+  });
+
   it("renews the root GET before its redirect to reports", async () => {
     vi.mocked(fetch).mockResolvedValue(Response.json({ accessToken: jwt(Math.floor(Date.now() / 1000) + 900), refreshToken: rotatedRefresh }));
     const { proxy } = await import("./proxy");
