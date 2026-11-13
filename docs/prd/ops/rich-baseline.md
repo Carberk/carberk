@@ -65,17 +65,19 @@ Never manufacture Ready/Failed state; the actual scheduler/worker settles import
 
 ## Staging first, exact plan, apply, no-op and deep check
 
-Use a shell array so all commands retain the same private context:
+Retain `--silent` on every invocation: pnpm otherwise echoes arguments before
+the CLI can redact them. Credentials and connection URLs belong only in private
+files. Use a shell array so all commands retain the same private context:
 
 ```bash
 rich_context=(--binding /tmp/rich-binding.json --api-env /tmp/rich-api.env --worker-env /tmp/rich-worker.env --database-env /tmp/rich-database.env --storage-env /tmp/rich-storage.env --redis-env /tmp/rich-redis.env)
-pnpm --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode check
-pnpm --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode plan > /tmp/rich-plan-report.json
+pnpm --silent --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode check
+pnpm --silent --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode plan > /tmp/rich-plan-report.json
 node -e 'const fs=require("node:fs");fs.writeFileSync("/tmp/rich-plan.json",JSON.stringify(JSON.parse(fs.readFileSync("/tmp/rich-plan-report.json")).plan))'
-pnpm --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode apply --plan /tmp/rich-plan.json
+pnpm --silent --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode apply --plan /tmp/rich-plan.json
 # For videos, let the existing scheduler/worker settle, then repeat exactly:
-pnpm --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode apply --plan /tmp/rich-plan.json
-pnpm --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode check > /tmp/rich-check.json
+pnpm --silent --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode apply --plan /tmp/rich-plan.json
+pnpm --silent --filter @auto-tm/db rich:deployed "${rich_context[@]}" --mode check > /tmp/rich-check.json
 node -e 'const fs=require("node:fs");fs.writeFileSync("/tmp/rich-staging.json",JSON.stringify(JSON.parse(fs.readFileSync("/tmp/rich-check.json")).stagingEvidence))'
 ```
 

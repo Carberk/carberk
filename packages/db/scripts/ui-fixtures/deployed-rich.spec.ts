@@ -15,9 +15,9 @@ describe("deployed rich target boundary", () => {
       }
     }
   });
-  it("rejects URL overrides at the CLI without echoing private arguments or ambient configuration", () => {
+  it("rejects URL overrides through the documented silent CLI without echoing private arguments or ambient configuration", () => {
     try {
-      execFileSync("pnpm", ["exec", "tsx", "scripts/deployed-rich-scenarios.ts", "--database-url", "postgres://private:secret@private/db"],
+      execFileSync("pnpm", ["--silent", "--filter", "@auto-tm/db", "rich:deployed", "--database-url", "postgres://private:secret@private/db"],
         { env: { ...process.env, DATABASE_URL: "postgres://private:ambient-secret@private/db" }, stdio: "pipe" });
       throw new Error("Unexpected CLI success");
     } catch (error) {
