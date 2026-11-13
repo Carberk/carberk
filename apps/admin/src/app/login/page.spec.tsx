@@ -42,6 +42,24 @@ async function submit() {
 }
 
 describe("operator login errors", () => {
+  it("keeps exact request metadata on the genuine OTP form after a rejected code", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-14T02:00:00.000Z"));
+    try {
+      vi.mocked(fetch).mockResolvedValueOnce(Response.json({ requestId: "abcdef01-1234-4567-89ab-123456789abc", resendInSeconds: 60 }))
+        .mockResolvedValueOnce(Response.json({ code: "INVALID_OTP", message: "Invalid OTP code" }, { status: 400 }));
+      await render();
+      element<HTMLInputElement>('input[name="phone"]').value = "+99365000901";
+      await submit();
+      const form = element<HTMLFormElement>("form[data-otp-request-id]");
+      expect(form.dataset["otpRequestId"]).toBe("abcdef01-1234-4567-89ab-123456789abc");
+      expect(form.dataset["otpRequestedAt"]).toBe("2026-11-14T02:00:00.000Z");
+      expect(container.textContent).not.toContain("abcdef01");
+      element<HTMLInputElement>('input[name="code"]').value = "654321";
+      await submit();
+      expect(element<HTMLFormElement>("form[data-otp-request-id]").dataset["otpRequestId"]).toBe("abcdef01-1234-4567-89ab-123456789abc");
+    } finally { vi.useRealTimers(); }
+  });
   it("resets a mounted TOTP form when an expired action redirects within login", async () => {
     navigation.params.set("mode", "totp");
     await render();

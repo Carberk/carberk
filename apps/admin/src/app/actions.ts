@@ -19,7 +19,7 @@ export async function requestOtp(
   formData: FormData,
 ): Promise<
   | { ok: false; error: string }
-  | { ok: true; resendInSeconds: number; testCode?: string }
+  | { ok: true; resendInSeconds: number; requestId: string; requestedAt: string; testCode?: string }
 > {
   await rejectExpiredSession();
   const phone = formData.get("phone");
@@ -29,13 +29,16 @@ export async function requestOtp(
   }
 
   try {
+    const requestedAt = new Date().toISOString();
     const result = await apiFetch<AuthSchemas.OtpRequestResponse>(
       "/auth/otp/request",
       { method: "POST", body: { phone: parsed.data } as unknown },
     );
-    const response: { ok: true; resendInSeconds: number; testCode?: string } = {
+    const response: { ok: true; resendInSeconds: number; requestId: string; requestedAt: string; testCode?: string } = {
       ok: true,
       resendInSeconds: result.resendInSeconds,
+      requestId: result.requestId,
+      requestedAt,
     };
     if (result.testCode !== undefined) {
       response.testCode = result.testCode;

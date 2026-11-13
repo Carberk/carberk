@@ -20,6 +20,8 @@ Admin must run as exactly **one process and one Railway replica** for the first 
 
 Tests beside the API client, cookies, validators, and server actions cover these boundaries. `/healthz` remains independent of the API and data stores.
 
+For agent access and runtime proof, use the [Admin access procedure](../../docs/agents/admin-access.md). It selects the running local target, reuses sessions and retrieves codes privately through the ordinary login flow.
+
 ## Start here
 
 - [Server-side API bridge and tests](src/lib/api-client.ts)

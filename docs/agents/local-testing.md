@@ -129,29 +129,9 @@ Locally `SMS_DRIVER=mock` writes codes to the API's private log. For Admin or de
 
 ## 3. Sign in to Admin
 
-Admin (`http://localhost:3001`) accepts only Users with role `admin`, and asks for a phone code and then an authenticator (TOTP) code.
+Use the required [Admin access procedure](admin-access.md): select explicit local API/Admin origins and the running API's effective env file, check readiness, reuse the correct browser session, and retrieve request-correlated OTP/TOTP into private temporary files when needed. `pnpm admin:access serve` starts only your owned Admin process with matching API and browser origins. Ordinary preparation never promotes accounts, resets quotas, injects cookies or skips TOTP.
 
-**Local admin:** `+99365000901`. If `admin:totp` below says no such User exists (for example after a database reset), set it up once:
-
-1. Sign in once as that phone: in the app, or with `POST /api/v1/auth/otp/request` and `POST /api/v1/auth/otp/verify`.
-2. Promote it: `pnpm --filter @auto-tm/db admin:promote --phone +99365000901 --reason "local agent admin"`.
-3. Wait for the `resendInSeconds` returned by the first code request before requesting another code for this phone, at least 60 seconds on the first request. Then sign in to Admin again. The role is read from the session, so a session from before the promotion stays non-admin. Admin then shows a QR code to set up the authenticator.
-
-**Each sign-in:**
-
-1. Open `http://localhost:3001/login`, enter the phone and send the code. If you just requested a code for this phone elsewhere, wait for that request's `resendInSeconds` first.
-2. Enter the code from the API log (section 2).
-3. Enter the authenticator code from the local helper:
-
-```bash
-pnpm -s --filter @auto-tm/db admin:totp --phone +99365000901
-```
-
-It prints only the 6-digit code on stdout (status goes to stderr), so `CODE=$(...)` works. It also finishes a pending QR setup, and Admin then shows 10 backup codes that you can ignore locally. The helper reads the secret from the local database with the key in `apps/api/.env`, and refuses any `DATABASE_URL` that is not on localhost. A code lasts 30 seconds; rerun it if Admin rejects one. Admin stays unlocked for 12 hours.
-
-**Only the API?** Skip the browser. Verify a fresh phone code after promotion and take `accessToken` from the response. Use that bearer token for the following requests. Check `GET /api/v1/auth/admin/totp/status`; if `enrolled` is false, send `POST /api/v1/auth/admin/totp/enroll` with no body to create or recover the pending enrollment. Keep its secret and QR response private. Then run `admin:totp` and send `POST /api/v1/auth/admin/totp/verify` with `{"code":"<admin:totp code>"}`. Admin endpoints under `/api/v1/admin` then accept the same token. The same phone-code backoff applies to this path.
-
-In T3 Code, drive the Admin page with the preview browser tools and close the tab when you finish.
+The local-only helper does not grant staging/production authority; those targets follow the [environment guide](environment.md).
 
 ## 4. Run the app on the iOS Simulator
 
@@ -177,4 +157,4 @@ Stop the API, Admin and Metro processes you started, close only your owned devic
 
 ## Staging
 
-Staging sends no SMS either. Read its codes only from the staging API logs (`railway logs`, see the [environment guide](environment.md#railway)), matching the request id and time. `admin:totp` refuses staging, so ask the founder before signing in to staging Admin.
+Staging sends no SMS either. Read its codes only from the staging API logs (`railway logs`, see the [environment guide](environment.md#railway)), matching the request id and time. `admin:access` and `admin:totp` are local-only. Staging Admin preparation follows the staging authority and credential handling in the environment guide.
