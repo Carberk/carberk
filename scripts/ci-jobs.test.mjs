@@ -210,6 +210,16 @@ test("production rootDir errors missed by typecheck fail the required PR gate", 
 });
 
 for (const name of ["pr-checks.yml", "ci.yml"]) {
+  test(`${name} provides runnable video tools before the real database video tests`, () => {
+    const db = jobs(workflow(name)).get("db");
+    const preparation = db.slice(0, db.indexOf("run: pnpm test:db"));
+    assert.match(preparation, /sudo apt-get update/);
+    assert.match(preparation, /sudo apt-get install[^\n]*\bffmpeg\b/);
+    assert.match(preparation, /ffmpeg -version/);
+    assert.match(preparation, /ffprobe -version/);
+    assert.doesNotMatch(db, /continue-on-error:/);
+  });
+
   test(`${name} runs api and db tests in separate jobs, with services only in api`, () => {
     const graph = jobs(workflow(name));
     assert.equal(graph.has("backend"), false, `${name} still has a backend job`);

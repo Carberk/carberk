@@ -19,6 +19,7 @@ export const RICH_SCENARIOS = [
   { key: "rich-es300h-portrait", id: "b1126000-0000-4000-8000-000000000001" },
   { key: "rich-es300h-landscape", id: "b1126000-0000-4000-8000-000000000002" },
 ] as const;
+export const VIDEO_RECOVERY_SCENARIO = { key: "temporary-synthetic-video-recovery", id: "b1131000-0000-4000-8000-000000000005" };
 export const PRIVATE_DRAFT_SCENARIOS = [0, 1, 3, 20].map((count, index) => ({
   key: `private-photos-${count}${count === 20 ? "-synthetic-numbered" : ""}`,
   id: `b1130000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`, count,
@@ -37,7 +38,7 @@ type Row = Record<string, unknown>;
 type ObjectFile = { key: string; body: Buffer; contentType: string };
 
 /** No downloads. Actual renderer output participates in the immutable version. */
-async function prepare(directory: string) {
+async function prepare(directory: string, scenarios: readonly { key: string; id: string }[]) {
   await verifyGallery(directory, ES300H_GALLERY).catch((error: unknown) => refuse(error instanceof Error ? error.message : "Offline gallery invalid"));
   const photos = [];
   for (const photo of ES300H_GALLERY.photos) {
@@ -45,7 +46,7 @@ async function prepare(directory: string) {
     if (digest(bytes) !== photo.sha256) refuse(`Offline gallery changed during verification: ${photo.file}`);
     photos.push(await preparePhoto(bytes));
   }
-  const version = digest(JSON.stringify({ gallery: ES300H_GALLERY, scenarios: RICH_SCENARIOS,
+  const version = digest(JSON.stringify({ gallery: ES300H_GALLERY, scenarios,
     outputs: photos.map((photo) => photo.files.map((file) => digest(file.body))) }));
   const changes = "Auto-oriented; metadata removed; re-encoded as WebP; resized; thumbnail/list variants cropped. Adaptations retain the source licence. No endorsement implied.";
   const credits = Buffer.from(JSON.stringify({ version, photos: [
@@ -58,6 +59,15 @@ async function prepare(directory: string) {
 
 /** Real Postgres + conditional object writes; no identity mutation, delete or convergence. */
 export async function runRichScenarios(target: Target, directory = PACK) {
+  if (target.scenarioSet === "videos" || target.scenarioSet === "video-recovery") {
+    const { runRichVideos } = await import("./rich-videos");
+    return runRichVideos(target);
+  }
+  return runRichPhotos(target, directory);
+}
+
+/** Shared additive photo executor also owns the exact disposable recovery copy. */
+export async function runRichPhotos(target: Target, directory = PACK) {
   let phase = "offline gallery verification";
   let db: Client | undefined;
   let s3: S3Client | undefined;
@@ -65,7 +75,8 @@ export async function runRichScenarios(target: Target, directory = PACK) {
   const plannedUploadIds: string[] = [];
   let attemptedObject: string | undefined;
   try {
-    const pack = await prepare(directory);
+    const scenarios = target.scenarioSet === "video-recovery" ? [VIDEO_RECOVERY_SCENARIO] : RICH_SCENARIOS;
+    const pack = await prepare(directory, scenarios);
     const privateDrafts = target.scenarioSet === "private-drafts";
     // Existing public photo versions remain stable when private scenarios evolve.
     const cards = [];
@@ -74,18 +85,18 @@ export async function runRichScenarios(target: Target, directory = PACK) {
     }
     const version = privateDrafts ? digest(JSON.stringify({ galleryVersion: pack.version, scenarios: PRIVATE_DRAFT_SCENARIOS, payload: PRIVATE_DRAFT_PAYLOAD, protocol: "conditional-v1",
       cards: cards.map((photo) => photo.files.map((file) => digest(file.body))) })) : pack.version;
-    const root = privateDrafts ? DRAFT_ROOT : ROOT;
-    const scenarioIds = (privateDrafts ? PRIVATE_DRAFT_SCENARIOS : RICH_SCENARIOS).map((row) => row.id);
+    const root = privateDrafts ? DRAFT_ROOT : target.scenarioSet === "video-recovery" ? "review-baseline/video-recovery-v1/" : ROOT;
+    const scenarioIds = (privateDrafts ? PRIVATE_DRAFT_SCENARIOS : scenarios).map((row) => row.id);
     const prefix = `${root}${version}/`;
     const creditsKey = `${prefix}credits.json`;
     const creditsUrl = `${target.publicUrl}${BUCKET}/${creditsKey}`;
     const credits = privateDrafts ? Buffer.from(JSON.stringify({ version, galleryCredits: JSON.parse(pack.credits.toString()),
       synthetic: "Twenty deterministic numbered boundary cards generated for private UI testing; not vehicle photography. Never publish these cards." }, null, 2)) : pack.credits;
     const objects: ObjectFile[] = [{ key: creditsKey, body: credits, contentType: "application/json" }];
-    const media = (privateDrafts ? [] : RICH_SCENARIOS).flatMap((scenario, scenarioIndex) => pack.photos.map((photo, index) => {
+    const media = (privateDrafts ? [] : scenarios).flatMap((scenario, scenarioIndex) => pack.photos.map((photo, index) => {
       const base = `${prefix}${scenario.key}/${index + 1}`;
       for (const file of photo.files) objects.push({ key: `${base}/${file.name}.webp`, body: file.body, contentType: "image/webp" });
-      return { id: `b1126000-0000-4000-800${scenarioIndex + 1}-${String(index + 1).padStart(12, "0")}`,
+      return { id: `${target.scenarioSet === "video-recovery" ? "b1131000" : "b1126000"}-0000-4000-800${scenarioIndex + 1}-${String(index + 1).padStart(12, "0")}`,
         listingId: scenario.id, kind: "image", key: `${base}/original.webp`, sortOrder: index,
         width: photo.width, height: photo.height, durationMs: null, posterKey: null, thumbHash: null, uploadId: null };
     }));
@@ -129,7 +140,7 @@ export async function runRichScenarios(target: Target, directory = PACK) {
       WHERE b.slug='lexus' AND m.slug='es' AND c.slug='ashgabat-city' AND t."nameEn"='Sedan'`)).rows;
     if (catalog.length !== 1) refuse("Require unique Lexus/ES, Ashgabat city and Sedan catalog entries; no catalog seed or copied IDs");
     for (const draft of drafts) Object.assign(draft["payload"] as Row, { brandId: catalog[0].brandId, modelId: catalog[0].modelId });
-    const listings = (privateDrafts ? [] : RICH_SCENARIOS).map((scenario) => ({ id: scenario.id, sellerId: target.ownerId, status: "active", ...catalog[0],
+    const listings = (privateDrafts ? [] : scenarios).map((scenario) => ({ id: scenario.id, sellerId: target.ownerId, status: "active", ...catalog[0],
       year: null, mileageKm: null, priceAmount: 1, priceCurrency: "TMT", priceTmt: 1,
       description: `Fictional review scenario: ${scenario.key}. Lexus ES 300h showroom photo study; not an offer for sale. Price is a review placeholder, vehicle year/history unverified. Synthetic ${scenario.key.endsWith("portrait") ? "portrait" : "landscape"} video test purpose reserved for a later slice; no video is ready. Photo version ${pack.version}. Credits and adaptation licences: ${creditsUrl}`,
       generationId: null, colorId: null, vin: null, condition: null, engineTypeId: null, transmissionId: null, driveTypeId: null,
@@ -150,7 +161,7 @@ export async function runRichScenarios(target: Target, directory = PACK) {
     const ids = privateDrafts ? [] : scenarioIds;
     const existing = (await db.query(`SELECT * FROM listings WHERE id=ANY($1::text[])`, [ids])).rows;
     const existingMedia = (await db.query(`SELECT * FROM listing_media WHERE "listingId"=ANY($1::text[]) OR id=ANY($2::text[]) OR key LIKE $3`, [ids, media.map((row) => row.id), `${root}%`])).rows;
-    if (!privateDrafts && (await db.query("SELECT id FROM media_uploads WHERE key LIKE $1 LIMIT 1", [`${ROOT}%`])).rowCount) refuse("Occupied upload ownership namespace; refuse without adoption");
+    if (!privateDrafts && (await db.query("SELECT id FROM media_uploads WHERE key LIKE $1 LIMIT 1", [`${root}%`])).rowCount) refuse("Occupied upload ownership namespace; refuse without adoption");
     if (existing.length !== 0 && existing.length !== listings.length) refuse("Partial scenario rows: refuse; inspect the two declared IDs without resetting");
     const installed = privateDrafts ? draftInstalled : existing.length === listings.length;
     const same = (actual: Row | undefined, expected: Row) => actual && Object.entries(expected).every(([key, value]) => isDeepStrictEqual(actual[key], value));
@@ -182,7 +193,7 @@ export async function runRichScenarios(target: Target, directory = PACK) {
       credentials: { accessKeyId: target.accessKeyId, secretAccessKey: target.secretAccessKey }, maxAttempts: 1 });
     const keys: string[] = [];
     let token: string | undefined;
-    for (const inventoryPrefix of privateDrafts ? [DRAFT_ROOT, "pending/b1130000-"] : [ROOT]) do {
+    for (const inventoryPrefix of privateDrafts ? [DRAFT_ROOT, "pending/b1130000-"] : [root]) do {
       const page = await s3.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: inventoryPrefix, ContinuationToken: token }));
       for (const object of page.Contents ?? []) keys.push(object.Key ?? refuse("Storage returned unnamed object"));
       token = page.IsTruncated ? page.NextContinuationToken : undefined;
@@ -194,9 +205,10 @@ export async function runRichScenarios(target: Target, directory = PACK) {
       if (actual.ContentType !== object.contentType || !actual.Body || digest(Buffer.from(await actual.Body.transformToByteArray())) !== digest(object.body)) refuse(`Corrupt/incompatible object ${object.key}; no overwrite`);
     }
     const report = { version, planHash, scenarioIds, creditsUrl,
+      ...(target.scenarioSet === "video-recovery" ? { objects: objects.map((object) => ({ key: object.key, bytes: object.body.length, sha256: digest(object.body) })) } : {}),
       state: installed ? "installed" : "absent", planned: privateDrafts
         ? { drafts: installed ? 0 : 4, uploads: installed ? 0 : 24, objects: installed ? 0 : objects.length }
-        : installed ? { listings: 0, media: 0, objects: 0 } : { listings: 2, media: 20, objects: objects.length } };
+        : installed ? { listings: 0, media: 0, objects: 0 } : { listings: scenarios.length, media: media.length, objects: objects.length } };
     if (target.mode !== "apply" || installed) {
       if (installed) await verifyPublicCredits(creditsUrl, credits);
       await db.query("ROLLBACK");
@@ -238,7 +250,7 @@ export async function runRichScenarios(target: Target, directory = PACK) {
   } catch (error) {
     await db?.query("ROLLBACK").catch(() => undefined);
     const reason = error instanceof Refusal ? error.message : `Rich scenarios failed at ${phase}`;
-    throw new Error(`${reason}. Recovery: ${JSON.stringify({ scenarioIds: (target.scenarioSet === "private-drafts" ? PRIVATE_DRAFT_SCENARIOS : RICH_SCENARIOS).map((row) => row.id),
+    throw new Error(`${reason}. Recovery: ${JSON.stringify({ scenarioIds: (target.scenarioSet === "private-drafts" ? PRIVATE_DRAFT_SCENARIOS : target.scenarioSet === "video-recovery" ? [VIDEO_RECOVERY_SCENARIO] : RICH_SCENARIOS).map((row) => row.id),
       uploadIds: plannedUploadIds, createdObjects, attemptedObject,
       action: "No resources deleted. Inspect exact rows/keys and retained bytes; coordinate explicit recovery. Identical rerun refuses partial state." })}`);
   } finally {

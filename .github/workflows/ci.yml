@@ -183,6 +183,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Install and verify video test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - run: pnpm test:db
 
   # mobile, web, admin, contracts and sms-gateway tests, then the root
