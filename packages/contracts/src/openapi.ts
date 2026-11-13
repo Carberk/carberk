@@ -33,7 +33,10 @@ import {
   MeResponseSchema,
 } from "./schemas/auth";
 import { SetProfilePhotoRequestSchema } from "./schemas/identity";
-import { HistoryDeskSchema } from "./schemas/vehicle-history";
+import {
+  HistoryDeskSchema, CreateHistoryRequestSchema, HistoryRequestSchema,
+  ListHistoryRequestsQuerySchema, ListHistoryRequestsResponseSchema,
+} from "./schemas/vehicle-history";
 import {
   BrandSummarySchema,
   BrandDetailSchema,
@@ -389,6 +392,39 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
 
   // Reports fake-door schemas
   registry.register("HistoryDesk", HistoryDeskSchema);
+  registry.register("HistoryRequest", HistoryRequestSchema);
+  registry.registerPath({
+    method: "post", path: "/api/v1/vehicle-history/requests", tags: ["Vehicle History"],
+    summary: "Create or retry one private local-synthetic enquiry (same requester and attempt key)",
+    security: [{ bearerAuth: [] }],
+    request: { body: { content: { "application/json": { schema: CreateHistoryRequestSchema } } } },
+    responses: {
+      201: { description: "Created or original retry result; private, no-store", content: { "application/json": { schema: HistoryRequestSchema } } },
+      400: { description: "Invalid request details" }, 401: { description: "Sign in again" },
+      403: { description: "Current requester or local synthetic admission refused" },
+      409: { description: "Attempt key already used with different context" },
+    },
+  });
+  registry.registerPath({
+    method: "get", path: "/api/v1/vehicle-history/requests", tags: ["Vehicle History"],
+    summary: "Read only the current requester's enquiries, newest first, 50 per page",
+    security: [{ bearerAuth: [] }], request: { query: ListHistoryRequestsQuerySchema },
+    responses: {
+      200: { description: "Private, no-store history page", content: { "application/json": { schema: ListHistoryRequestsResponseSchema } } },
+      400: { description: "Invalid cursor" }, 401: { description: "Sign in again" },
+      403: { description: "Current requester, cursor ownership or synthetic admission refused" },
+    },
+  });
+  registry.registerPath({
+    method: "get", path: "/api/v1/vehicle-history/requests/{id}", tags: ["Vehicle History"],
+    summary: "Reopen an owned private enquiry without creating another",
+    security: [{ bearerAuth: [] }], request: { params: z.object({ id: z.string().guid() }) },
+    responses: {
+      200: { description: "Private, no-store enquiry", content: { "application/json": { schema: HistoryRequestSchema } } },
+      401: { description: "Sign in again" },
+      403: { description: "Unavailable request, current requester or synthetic admission refused" },
+    },
+  });
   registry.registerPath({
     method: "get", path: "/api/v1/vehicle-history/desk", tags: ["Vehicle History"],
     summary: "Open the local synthetic Vehicle History desk with current staff access",

@@ -69,6 +69,7 @@ model User {
   otpRequests                  OtpRequest[]
   sessions                     Session[]
   staffGrants                  StaffGrant[]
+  historyRequests              VehicleHistoryRequest[]
   dealershipMemberships        DealershipMember[]
   ownedVehicles                OwnedVehicle[]
   blockedUsers                 BlockedUser[]             @relation("Blocker")
@@ -152,6 +153,22 @@ model StaffGrant {
 
   @@id([userId, purpose])
   @@map("staff_grants")
+}
+
+/// Private enquiry, independent of marketplace Conversations and purchases.
+model VehicleHistoryRequest {
+  id               String   @id @default(uuid())
+  requesterId      String
+  requester        User     @relation(fields: [requesterId], references: [id], onDelete: Restrict)
+  attemptKey       String   @db.Uuid
+  /// Immutable creation facts; session revocation and Listing deletion cannot rewrite them.
+  creatorSessionId String
+  sourceListingId  String?  @db.Uuid
+  createdAt        DateTime @default(now())
+
+  @@unique([requesterId, attemptKey])
+  @@index([requesterId, createdAt, id])
+  @@map("vehicle_history_requests")
 }
 
 enum DealershipMemberRole {
