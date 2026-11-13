@@ -39,6 +39,8 @@ Component tests use a test-only native host adapter with real i18n and Query
 providers. See the [mobile testing guide](../../docs/agents/mobile-testing.md)
 for supported queries, shared helpers and native runtime limitations.
 
+Public Vehicle History information and its fictional educational sample are isolated in [the feature overview](src/vehicle-history/CONTEXT.md). The local build gate defaults off; this surface does not create requests or orders.
+
 ## Start here
 
 - [Routes and root providers](app)

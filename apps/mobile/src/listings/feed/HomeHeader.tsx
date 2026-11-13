@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 
 import { useListingCount } from "../../api/listings/useListingCount";
 import { BrandLogo } from "../../auth/BrandLogo";
-
 import { HistoryEntry } from "../../vehicle-history/HistoryEntry";
 
 import { Button } from "@/components/ui/button";

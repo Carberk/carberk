@@ -14,6 +14,7 @@ import { AskSellerChips } from "../detail/AskSellerChips";
 import { OwnerStatusCard } from "../detail/OwnerStatusCard";
 import { listingTitle, detailDate } from "../detail/presentation";
 import { ViewerFavorite } from "../detail/ViewerFavorite";
+import { HistoryEntry } from "../../vehicle-history/HistoryEntry";
 
 import { ContactCtaBar } from "./ContactCtaBar";
 import { keySpecs, specRows, SpecificationsSection } from "./ListingSpecs";
@@ -21,7 +22,6 @@ import { PhotoGallery } from "./PhotoGallery";
 import { PriceDisplay } from "./PriceDisplay";
 import { SellerBlock } from "./SellerBlock";
 
-import { HistoryEntry } from "../../vehicle-history/HistoryEntry";
 
 import { cn } from "@/lib/utils";
 import { useLargeText } from "@/lib/font-scale";

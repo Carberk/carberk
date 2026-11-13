@@ -29,3 +29,22 @@ it("opens public information from the real Listing component with only its Listi
   expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/vehicle-history", params: { listingId: "00000000-0000-4000-8000-000000000373" } });
   expect(screen.getByText("Toyota Camry XV70, 2020")).toBeTruthy();
 });
+
+it.each(["false", undefined])("keeps existing Home and Listing discovery intact when the feature is %s", async (enabled) => {
+  vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", enabled);
+  const home = await renderMobile(<HomeHeader />);
+  expect(home.queryByRole("button", { name: "Vehicle History · 100 TMT" })).toBeNull();
+  expect(home.getByRole("button", { name: "Brand, model" })).toBeTruthy();
+  const detail = await renderMobile(<ListingDetailView listing={fixture({ allowChat: false })} maps={maps} />);
+  expect(detail.queryByRole("button", { name: "Vehicle History · 100 TMT" })).toBeNull();
+  expect(detail.getByText("Toyota Camry XV70, 2020")).toBeTruthy();
+});
+
+it.each([
+  ["ru", "История автомобиля · 100 TMT"],
+  ["tk", "Ulag taryhy · 100 TMT"],
+])("keeps the compact Home entry localized in %s", async (locale, entry) => {
+  const screen = await renderMobile(<HomeHeader />, { locale });
+  await fireEvent.press(screen.getByRole("button", { name: entry }));
+  expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/vehicle-history", params: {} });
+});

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { fictionalSample } from "./fictionalSample";
 import { vehicleHistoryAvailable } from "./availability";
+import { saveFictionalSample } from "./saveFictionalSample";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
 import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
@@ -18,6 +19,8 @@ export function PublicOffer({ listingId }: { listingId?: string }) {
   const [sampleOpen, setSampleOpen] = useState(false);
   const [downloadState, setDownloadState] = useState<"idle" | "saving" | "failed">("idle");
   const saving = useRef(false);
+  const sampleClose = useRef<View>(null);
+  const sampleTrigger = useRef<View>(null);
   const available = vehicleHistoryAvailable();
   const closeSample = () => {
     setSampleOpen(false);
@@ -28,7 +31,6 @@ export function PublicOffer({ listingId }: { listingId?: string }) {
     saving.current = true;
     setDownloadState("saving");
     try {
-      const { saveFictionalSample } = await import("./saveFictionalSample");
       await saveFictionalSample();
       setDownloadState("idle");
     } catch {
@@ -58,7 +60,7 @@ export function PublicOffer({ listingId }: { listingId?: string }) {
             <Text className="text-callout leading-6 text-muted-foreground">{t("vehicleHistory.coverage")}</Text>
             <Text className="text-callout leading-6 text-muted-foreground">{t("vehicleHistory.condition")}</Text>
           </View>
-          <Button onPress={() => { setDownloadState("idle"); setSampleOpen(true); }}>
+          <Button ref={sampleTrigger} onPress={() => { setDownloadState("idle"); setSampleOpen(true); }}>
             <Text>{t("vehicleHistory.viewSample")}</Text>
           </Button>
           <Separator />
@@ -70,10 +72,17 @@ export function PublicOffer({ listingId }: { listingId?: string }) {
         </ScrollView>
       )}
       <Modal visible={available && sampleOpen} animationType="slide" presentationStyle="fullScreen"
-        onRequestClose={closeSample} onShow={() => AccessibilityInfo.announceForAccessibility(t("vehicleHistory.sampleTitle"))}>
+        onRequestClose={closeSample}
+        onDismiss={() => {
+          if (sampleTrigger.current) AccessibilityInfo.sendAccessibilityEvent(sampleTrigger.current, "focus");
+        }}
+        onShow={() => {
+          if (sampleClose.current) AccessibilityInfo.sendAccessibilityEvent(sampleClose.current, "focus");
+          AccessibilityInfo.announceForAccessibility(t("vehicleHistory.sampleTitle"));
+        }}>
         <SafeScreen accessibilityViewIsModal>
           <StackHeader large title={t("vehicleHistory.sampleTitle")}
-            leading={<BackButton kind="close" onPress={closeSample} accessibilityLabel={t("close")} />} />
+            leading={<BackButton ref={sampleClose} kind="close" onPress={closeSample} accessibilityLabel={t("close")} />} />
           <ScrollView className="flex-1" contentContainerClassName="gap-5 px-5 pb-8 pt-3">
             <Text className="text-callout font-medium">{t("vehicleHistory.fictionNotice")}</Text>
             <Text className="text-callout text-muted-foreground">{t("vehicleHistory.originalLanguage")}</Text>
