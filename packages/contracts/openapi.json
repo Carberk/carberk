@@ -8689,6 +8689,40 @@
           "requests"
         ]
       },
+      "HistoryRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceListingId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enquiry"
+            ]
+          },
+          "assignedOperator": {
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "sourceListingId",
+          "createdAt",
+          "status",
+          "assignedOperator"
+        ]
+      },
       "CreateInspectionInterestRequest": {
         "type": "object",
         "properties": {
@@ -9647,6 +9681,262 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Create or retry one private local-synthetic enquiry (same requester and attempt key)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "attemptKey": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sourceListingId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "attemptKey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created or original retry result; private, no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceListingId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "enquiry"
+                      ]
+                    },
+                    "assignedOperator": {
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sourceListingId",
+                    "createdAt",
+                    "status",
+                    "assignedOperator"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request details"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current requester or local synthetic admission refused"
+          },
+          "409": {
+            "description": "Attempt key already used with different context"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Read only the current requester's enquiries, newest first, 50 per page",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store history page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sourceListingId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "enquiry"
+                            ]
+                          },
+                          "assignedOperator": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sourceListingId",
+                          "createdAt",
+                          "status",
+                          "assignedOperator"
+                        ]
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cursor"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current requester, cursor ownership or synthetic admission refused"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Reopen an owned private enquiry without creating another",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store enquiry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceListingId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "enquiry"
+                      ]
+                    },
+                    "assignedOperator": {
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sourceListingId",
+                    "createdAt",
+                    "status",
+                    "assignedOperator"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Unavailable request, current requester or synthetic admission refused"
           }
         }
       }
