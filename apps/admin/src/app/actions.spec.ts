@@ -30,7 +30,7 @@ vi.mock("next/navigation", async (importOriginal) => ({
   redirect: mockState.redirect,
 }));
 
-import { enrollTotp, requireAuthWithReturnTo, verifyOtp, verifyTotp } from "./actions";
+import { enrollTotp, requestOtp, requireAuthWithReturnTo, verifyOtp, verifyTotp } from "./actions";
 
 function mockFetchQueue(responses: Array<{ status: number; body: unknown }>) {
   const queue = [...responses];
@@ -46,6 +46,24 @@ function mockFetchQueue(responses: Array<{ status: number; body: unknown }>) {
 }
 
 describe("admin auth server actions", () => {
+  it("returns request metadata so local sign-in matches the exact mock code", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-14T02:00:00.000Z"));
+    try {
+      mockFetchQueue([{ status: 200, body: {
+        requestId: "abcdef01-1234-4567-89ab-123456789abc", resendInSeconds: 60,
+      } }]);
+      const form = new FormData();
+      form.set("phone", "+99365000901");
+      await expect(requestOtp(null, form)).resolves.toEqual({
+        ok: true, resendInSeconds: 60,
+        requestId: "abcdef01-1234-4567-89ab-123456789abc",
+        requestedAt: "2026-11-14T02:00:00.000Z",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("cancels a rejected auth action before validation or API work", async () => {
     mockState.requestHeaders.set("x-admin-session-expired", "1");
     mockFetchQueue([]);

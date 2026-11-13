@@ -16,7 +16,8 @@ Every change follows the [delivery workflow](docs/agents/coding-workflow.md): on
 | Mobile screens/navigation/discovery | The affected source, tests, and approved issue or prototype; review the interaction with the installed `ux-heuristics`, `design-everyday-things`, and `impeccable` skills when available |
 | TypeScript imports, exports or shared runtime | [Runtime boundaries](docs/agents/typescript-runtime.md) |
 | Choosing a model or effort for agent work, delegates or reviews | [Models and effort](docs/agents/models.md) |
-| Running the app, the iOS Simulator, or signing in to the app or Admin locally | [Local testing](docs/agents/local-testing.md) |
+| Running the app or signing in on the iOS Simulator | [Local testing](docs/agents/local-testing.md) |
+| Opening, signing in to, or proving Admin UI | [Admin access](docs/agents/admin-access.md) |
 | Railway reads, billing, investigations or changes | [Required Railway tooling and authority](docs/agents/environment.md#railway) |
 | Devices, CI, staging or deploys | [Environment guide](docs/agents/environment.md) and [deployment runbook](docs/prd/ops/80-deployment-runbook.md) |
 

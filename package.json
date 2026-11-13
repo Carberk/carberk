@@ -13,8 +13,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "test": "pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:native-session && pnpm test:native-fixture-signin && pnpm test:worktree-gc && pnpm test:spare-simulator && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
-    "test:unit": "pnpm test:agent-github && pnpm test:native-session && pnpm test:native-fixture-signin && turbo run test:unit",
+    "test": "pnpm test:agent-github && pnpm test:native-pr-seed && pnpm test:native-session && pnpm test:native-fixture-signin && pnpm test:admin-access && pnpm test:worktree-gc && pnpm test:spare-simulator && pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
+    "test:unit": "pnpm test:agent-github && pnpm test:native-session && pnpm test:native-fixture-signin && pnpm test:admin-access && turbo run test:unit",
     "test:api": "turbo run test --filter=@auto-tm/api --filter=@auto-tm/worker",
     "test:api:unit": "DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci pnpm --filter @auto-tm/api... build && pnpm --filter @auto-tm/api test:unit",
     "test:db": "turbo run test --filter=@auto-tm/db",
@@ -52,7 +52,9 @@
     "test:native-session": "node --test scripts/native-session*.test.mjs",
     "native:signin": "node scripts/native-fixture-signin.mjs",
     "test:native-fixture-signin": "node --test scripts/native-fixture-signin.test.mjs",
-    "native:ready": "pnpm --filter @auto-tm/db fixture:check"
+    "native:ready": "pnpm --filter @auto-tm/db fixture:check",
+    "admin:access": "node scripts/admin-access.mjs",
+    "test:admin-access": "node --test scripts/admin-access.test.mjs scripts/admin-access-process.test.mjs"
   },
   "devDependencies": {
     "@typescript/native": "catalog:",

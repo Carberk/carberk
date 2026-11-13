@@ -17,7 +17,7 @@ import { validateReturnTo } from "@/lib/validators";
 
 type Step =
   | { kind: "phone"; phone: string; error?: string }
-  | { kind: "otp"; phone: string; testCode?: string; error?: string }
+  | { kind: "otp"; phone: string; requestId?: string; requestedAt?: string; testCode?: string; error?: string }
   | { kind: "totp-enroll"; phone: string; qrCodeDataUrl: string; error?: string }
   | { kind: "totp-verify"; phone: string; error?: string }
   | { kind: "backup-codes"; codes: string[] };
@@ -85,6 +85,8 @@ function LoginPageContent() {
           const nextStep: Extract<Step, { kind: "otp" }> = {
             kind: "otp",
             phone: String(formData.get("phone") ?? ""),
+            requestId: result.requestId,
+            requestedAt: result.requestedAt,
           };
           if (result.testCode !== undefined) {
             nextStep.testCode = result.testCode;
@@ -237,6 +239,8 @@ function LoginPageContent() {
           {step.kind === "otp" && (
             <form
               action={handleVerifyOtp}
+              data-otp-request-id={step.requestId}
+              data-otp-requested-at={step.requestedAt}
               className="flex flex-col gap-4"
               onSubmit={(e) => {
                 e.preventDefault();
