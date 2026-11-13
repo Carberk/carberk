@@ -8,6 +8,12 @@ describe("admin proxy", () => {
     vi.unstubAllEnvs();
   });
 
+  it("keeps the localized History destination through the existing sign-in bridge", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const response = await proxy(new NextRequest("http://admin.auto.tm/vehicle-history/tk"));
+    expect(response.headers.get("location")).toBe("http://admin.auto.tm/login?reason=session-expired&returnTo=%2Fvehicle-history%2Ftk");
+  });
+
   it("redirects unauthenticated protected routes to login with pathname and search returnTo", async () => {
     vi.stubEnv("NODE_ENV", "development");
     const request = new NextRequest(
@@ -59,6 +65,19 @@ describe("admin session renewal before request dispatch", () => {
   });
   afterEach(() => {
     vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ["tk", "Iş ýeri açylmady"], ["ru", "Не удалось открыть рабочее место"], ["en", "Could not open the desk"],
+  ])("keeps History renewal outages actionable in %s without clearing the session", async (locale, title) => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 503 }));
+    const { proxy } = await import("./proxy");
+    const response = await proxy(new NextRequest(`http://admin.auto.tm/vehicle-history/${locale}`, {
+      headers: { cookie: `auto_tm_admin_access=${jwt(1)}; auto_tm_admin_refresh=${refresh}` },
+    }));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(await response.text()).toContain(title);
   });
 
   it("renews the root GET before its redirect to reports", async () => {

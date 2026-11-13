@@ -1582,6 +1582,10 @@
                 "type": "string",
                 "format": "uuid"
               },
+              "sessionId": {
+                "type": "string",
+                "format": "uuid"
+              },
               "status": {
                 "type": "string",
                 "enum": [
@@ -1606,6 +1610,7 @@
               "id",
               "generationId",
               "sourceId",
+              "sessionId",
               "status",
               "canReprocess"
             ]
@@ -3656,6 +3661,10 @@
                       "type": "string",
                       "format": "uuid"
                     },
+                    "sessionId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -3680,6 +3689,7 @@
                     "id",
                     "generationId",
                     "sourceId",
+                    "sessionId",
                     "status",
                     "canReprocess"
                   ]
@@ -7744,6 +7754,9 @@
           "targetSummary": {
             "type": "object",
             "properties": {
+              "hasVideo": {
+                "type": "boolean"
+              },
               "available": {
                 "type": "boolean"
               },
@@ -7831,6 +7844,9 @@
                 "targetSummary": {
                   "type": "object",
                   "properties": {
+                    "hasVideo": {
+                      "type": "boolean"
+                    },
                     "available": {
                       "type": "boolean"
                     },
@@ -7972,6 +7988,9 @@
           "target": {
             "type": "object",
             "properties": {
+              "hasVideo": {
+                "type": "boolean"
+              },
               "targetType": {
                 "type": "string",
                 "enum": [
@@ -8618,6 +8637,56 @@
           "page",
           "pageSize",
           "totalPages"
+        ]
+      },
+      "HistoryDesk": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "vehicle-history"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "synthetic"
+            ]
+          },
+          "actor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "displayName": {
+                "type": "string",
+                "nullable": true
+              },
+              "nameNumber": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayName",
+              "nameNumber"
+            ]
+          },
+          "requests": {
+            "type": "array",
+            "items": {},
+            "minItems": 0,
+            "maxItems": 0
+          }
+        },
+        "required": [
+          "purpose",
+          "mode",
+          "actor",
+          "requests"
         ]
       },
       "CreateInspectionInterestRequest": {
@@ -9578,6 +9647,84 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/desk": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Open the local synthetic Vehicle History desk with current staff access",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Empty synthetic desk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "purpose": {
+                      "type": "string",
+                      "enum": [
+                        "vehicle-history"
+                      ]
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "synthetic"
+                      ]
+                    },
+                    "actor": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ]
+                    },
+                    "requests": {
+                      "type": "array",
+                      "items": {},
+                      "minItems": 0,
+                      "maxItems": 0
+                    }
+                  },
+                  "required": [
+                    "purpose",
+                    "mode",
+                    "actor",
+                    "requests"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current session, purpose grant or synthetic gate refused"
           }
         }
       }

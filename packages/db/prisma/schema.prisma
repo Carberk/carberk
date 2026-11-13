@@ -68,6 +68,7 @@ model User {
 
   otpRequests                  OtpRequest[]
   sessions                     Session[]
+  staffGrants                  StaffGrant[]
   dealershipMemberships        DealershipMember[]
   ownedVehicles                OwnedVehicle[]
   blockedUsers                 BlockedUser[]             @relation("Blocker")
@@ -136,6 +137,21 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+enum StaffPurpose {
+  vehicle_history @map("vehicle-history")
+}
+
+model StaffGrant {
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   StaffPurpose
+  grantedAt DateTime     @default(now())
+  revokedAt DateTime?
+
+  @@id([userId, purpose])
+  @@map("staff_grants")
 }
 
 enum DealershipMemberRole {

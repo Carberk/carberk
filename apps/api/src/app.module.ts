@@ -15,6 +15,7 @@ import { HealthController } from "./common/health.controller";
 import { ReadinessService } from "./common/readiness.service";
 import { parseEnv } from "./env.schema";
 import { IdentityModule } from "./modules/identity/identity.module";
+import { VehicleHistoryModule } from "./modules/vehicle-history/vehicle-history.module";
 import { ProfilePhotoModule } from "./modules/identity/profile-photo.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { ListingsModule } from "./modules/listings/listings.module";
@@ -51,6 +52,7 @@ import { requestLoggingOptions } from "./common/requestLogging";
       },
     }),
     IdentityModule,
+    VehicleHistoryModule,
     CatalogModule,
     ListingsModule,
     ProfilePhotoModule,

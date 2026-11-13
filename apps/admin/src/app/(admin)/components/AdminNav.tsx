@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
+
+import { apiFetchOptional } from "@/lib/api-client";
 
 const LINKS = [
   { href: "/reports", label: "Жалобы" },
@@ -7,7 +10,13 @@ const LINKS = [
   { href: "/audit", label: "Аудит" },
 ];
 
-export function AdminNav() {
+export async function AdminNav() {
+  let historyAvailable = false;
+  try {
+    historyAvailable = Boolean(await apiFetchOptional("/vehicle-history/desk", { cache: "no-store" }));
+  } catch (error) {
+    unstable_rethrow(error);
+  }
   return (
     <nav className="flex flex-wrap gap-4 border-b px-6 py-3 text-sm md:px-8">
       {LINKS.map((link) => (
@@ -15,6 +24,7 @@ export function AdminNav() {
           {link.label}
         </Link>
       ))}
+      {historyAvailable && <Link href="/vehicle-history/ru" className="text-neutral-600 hover:text-neutral-900">История автомобиля</Link>}
     </nav>
   );
 }
