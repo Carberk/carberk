@@ -28,7 +28,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 | content | [`content/CONTEXT.md`](apps/api/src/modules/content/CONTEXT.md) | BlogPost schema; publishing not implemented |
 | reports | [`reports/CONTEXT.md`](apps/api/src/modules/reports/CONTEXT.md) | InspectionInterest demand capture and admin aggregates |
 | admin | [`admin/CONTEXT.md`](apps/api/src/modules/admin/CONTEXT.md) | Audit log, listing/user/message reports, moderation |
-| vehicle-history | [`vehicle-history/CONTEXT.md`](apps/api/src/modules/vehicle-history/CONTEXT.md) | Synthetic operator desk; identity owns staff authority |
+| vehicle-history | [`vehicle-history/CONTEXT.md`](apps/api/src/modules/vehicle-history/CONTEXT.md) | Private customer enquiries and synthetic staff desk; identity owns actor authority |
 
 ## Mobile feature modules (inside `apps/mobile/src/`)
 
