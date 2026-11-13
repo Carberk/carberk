@@ -124,7 +124,13 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
       try {
         const policy = await storage.send(new GetBucketPolicyCommand({ Bucket: config.bucket }));
         if (policy.Policy && JSON.parse(policy.Policy).Statement?.some((row: { Effect?: string; Principal?: unknown }) => row.Effect === "Allow" && JSON.stringify(row.Principal).includes("*"))) refuse("Public video bucket policy; refuse without policy changes");
-      } catch (error) { if ((error as { name?: string }).name !== "NoSuchBucketPolicy") throw error; }
+      } catch (error) {
+        const failure = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+        // Railway Buckets do not implement policy inspection. Known source
+        // objects must still deny anonymous reads below, before any DB commit.
+        if (failure.name !== "NoSuchBucketPolicy" &&
+            !(failure.name === "NotImplemented" && failure.$metadata?.httpStatusCode === 501)) throw error;
+      }
       const outputHashes: Record<string, string> = {};
       for (const entry of resources) {
         const slot = slots.find((row) => row.id === entry.slotId);
@@ -142,13 +148,14 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
             source.openIdempotencyKey !== `rich-ui-v1:${version}:${entry.sourceId}` || !source.multipartUploadId || generation.id !== entry.generationId || generation.sourceId !== source.id || generation.coverOffsetMs !== coverOffsetMs) refuse(`Modified/foreign source/generation ${entry.sourceId}`);
         const actual = await get(storage, config.bucket, entry.objectKey);
         if (hash(actual.body) !== clip.sha256) refuse(`Modified stored source ${entry.sourceId}`);
+        await verifyPrivateSource(config.endpoint, config.bucket, entry.sourceId);
         if (generation.status === "Processing" || generation.status === "Uploading") refuse(`In-flight generation ${generation.id}; wait for existing scheduler/worker, then check; no retry/import/cleanup`);
         if (generation.status !== entry.expected || generation.processingAttempt !== 1 || generation.processingRetryCount !== 0 || generation.nextRetryAt) refuse(`Replaced/modified generation ${generation.id}`);
         if (entry.expected === "Failed") {
           if (generation.failureType !== "SOURCE_INVALID" || generation.manifest !== null || slot.activeGenerationId || slot.pendingGenerationId !== generation.id || keys.length !== 1 || reservations.length) refuse(`Partial/modified invalid-source failure ${generation.id}`);
         } else {
           if (slot.activeGenerationId !== generation.id || slot.pendingGenerationId || generation.width !== clip.width || generation.height !== clip.height || generation.durationMs !== clip.durationMs || generation.videoCodec !== "h264" || generation.audioCodec !== "aac" || generation.failureType || !generation.completedAt) refuse(`Modified Ready generation ${generation.id}`);
-          Object.assign(outputHashes, await verifyOutputs(storage, config.endpoint, config.bucket, entry, generation.manifest, keys, reservations));
+          Object.assign(outputHashes, await verifyOutputs(storage, config.bucket, entry, generation.manifest, keys, reservations));
         }
       }
       const installed = slots.length === selected.length;
@@ -192,6 +199,7 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
           MultipartUpload: { Parts: [{ ETag: part.ETag, PartNumber: 1 }] }, IfNoneMatch: "*" }));
         createdObjects.push(entry.objectKey); attemptedObject = undefined;
         if (hash((await get(storage, config.bucket, entry.objectKey)).body) !== clip.sha256) refuse(`Source changed after upload ${entry.sourceId}`);
+        await verifyPrivateSource(config.endpoint, config.bucket, entry.sourceId);
         await tx.listingVideo.create({ data: { id: entry.slotId, ownerId: target.ownerId, [entry.type === "listing" ? "listingId" : "draftId"]: entry.targetId } });
         await tx.videoSource.create({ data: { id: entry.sourceId, userId: target.ownerId, listingVideoId: entry.slotId, bucket: config.bucket, objectKey: entry.objectKey,
           multipartUploadId: uploadId, openIdempotencyKey: `rich-ui-v1:${version}:${entry.sourceId}`, contentType: "video/mp4", sizeBytes: clip.bytes, partSizeBytes: clip.bytes, partCount: 1, state: "COMPLETED",
@@ -229,7 +237,12 @@ async function list(storage: S3Client, bucket: string, prefix: string) {
   } while (token);
   return keys.sort();
 }
-async function verifyOutputs(storage: S3Client, endpoint: string, bucket: string, entry: Definition, value: Prisma.JsonValue, keys: string[], reservations: { key: string; generationId: string; attempt: number; started: boolean; settled: boolean }[]) {
+async function verifyPrivateSource(endpoint: string, bucket: string, sourceId: string) {
+  // Called only after a signed read proves this exact source exists.
+  const anonymous = await fetch(new URL(`${bucket}/${encodeURIComponent(`video-sources/${sourceId}/source.mp4`).replaceAll("%2F", "/")}`, endpoint), { method: "HEAD", redirect: "error", signal: AbortSignal.timeout(5000) });
+  if (![401, 403].includes(anonymous.status)) refuse(`Private bucket denial failed for ${sourceId}`);
+}
+async function verifyOutputs(storage: S3Client, bucket: string, entry: Definition, value: Prisma.JsonValue, keys: string[], reservations: { key: string; generationId: string; attempt: number; started: boolean; settled: boolean }[]) {
   if (!value || Array.isArray(value) || typeof value !== "object") refuse(`Missing manifest ${entry.generationId}`);
   const manifest = value as unknown as Manifest;
   const prefix = `video-sources/${entry.sourceId}/processing/1/`;
@@ -250,8 +263,5 @@ async function verifyOutputs(storage: S3Client, endpoint: string, bucket: string
     }
     hashes[record.key] = hash(object.body);
   }
-  // A known existing private object must not be anonymously readable.
-  const anonymous = await fetch(new URL(`${bucket}/${encodeURIComponent(`video-sources/${entry.sourceId}/source.mp4`).replaceAll("%2F", "/")}`, endpoint), { method: "HEAD", redirect: "error", signal: AbortSignal.timeout(5000) });
-  if (![401, 403].includes(anonymous.status)) refuse(`Private bucket denial failed for ${entry.sourceId}`);
   return hashes;
 }

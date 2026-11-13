@@ -2,12 +2,12 @@ import "reflect-metadata";
 
 import { execFile, execFileSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutBucketPolicyCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, DeleteBucketPolicyCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutBucketPolicyCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Client } from "pg";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
@@ -69,7 +69,25 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     }
   }, 120_000);
   // Separate real boundaries: photo fixtures, then Processing import and worker settlement.
-  beforeAll(async () => { imported = await prepareVideoScenarios(); }, 240_000);
+  beforeAll(async () => {
+    await withUnsupportedPolicy(async (selected) => {
+      const before = await fullSnapshot();
+      const plan = await runRichScenarios(selected);
+      try {
+        await allowPublicSources();
+        await expect(runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash }))
+          .rejects.toThrow(/Private bucket denial failed.*createdObjects.*video-sources\/b1131200-0000-4000-8000-000000000001\/source.mp4/);
+        expect(await fullSnapshot()).toEqual(before);
+        // The failed import retains the exact new object for operator recovery.
+        expect((await s3.send(new GetObjectCommand({ Bucket: "listing-videos", Key: "video-sources/b1131200-0000-4000-8000-000000000001/source.mp4" }))).ContentLength).toBe(77621);
+      } finally {
+        await s3.send(new DeleteBucketPolicyCommand({ Bucket: "listing-videos" }));
+        // Remove only this disposable test's retained failed-import object.
+        await s3.send(new DeleteObjectCommand({ Bucket: "listing-videos", Key: "video-sources/b1131200-0000-4000-8000-000000000001/source.mp4" }));
+      }
+    });
+    imported = await prepareVideoScenarios();
+  }, 240_000);
   afterAll(async () => {
     const errors: unknown[] = [];
     for (const close of [() => h?.close(), () => db?.end(), () => s3?.destroy(), () => redis?.stop(), () => minio?.stop(), () => postgres?.stop()]) {
@@ -210,6 +228,45 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     expect((await runDeployedRich(deployedContext, { mode: "check" })).state).toBe("installed");
     expect((await runDeployedRich(deployedContext, { mode: "apply", plan: deployedPlan })).writes).toBe(0);
     expect(await fullSnapshot()).toEqual(before);
+  });
+  async function allowPublicSources() {
+    await s3.send(new PutBucketPolicyCommand({ Bucket: "listing-videos", Policy: JSON.stringify({ Version: "2012-10-17", Statement: [
+      { Effect: "Allow", Principal: "*", Action: "s3:GetObject", Resource: "arn:aws:s3:::listing-videos/*" },
+    ] }) }));
+  }
+  async function withUnsupportedPolicy(run: (selected: typeof target) => Promise<void>) {
+    const proxy = createServer((incoming, response) => {
+      if (new URL(incoming.url ?? "/", target.endpoint).searchParams.has("policy")) {
+        response.writeHead(501, { "Content-Type": "application/xml" });
+        response.end("<Error><Code>NotImplemented</Code><Message>Unsupported policy inspection</Message></Error>");
+        return;
+      }
+      const forwarded = request(new URL(incoming.url ?? "/", target.endpoint), { method: incoming.method, headers: incoming.headers }, (upstream) => {
+        response.writeHead(upstream.statusCode ?? 502, upstream.headers); upstream.pipe(response);
+      });
+      forwarded.on("error", () => { response.writeHead(502); response.end(); });
+      incoming.pipe(forwarded);
+    });
+    await new Promise<void>((resolve) => proxy.listen(0, "127.0.0.1", resolve));
+    const address = proxy.address();
+    if (!address || typeof address === "string" || !target.video) throw new Error("Missing policy proxy target");
+    const selected = { ...target, video: { ...target.video, endpoint: `http://127.0.0.1:${address.port}` } };
+    try { await run(selected); } finally {
+      proxy.closeAllConnections(); await new Promise<void>((resolve) => proxy.close(() => resolve()));
+    }
+  }
+  it("checks private source access when policy inspection is unsupported and refuses public sources without writes", async () => {
+    await withUnsupportedPolicy(async (selected) => {
+      const before = await fullSnapshot();
+      try {
+        expect(await runRichScenarios(selected)).toMatchObject({ state: "installed", writes: 0 });
+        await allowPublicSources();
+        await expect(runRichScenarios(selected)).rejects.toThrow("Private bucket denial failed");
+        expect(await fullSnapshot()).toEqual(before);
+      } finally {
+        await s3.send(new DeleteBucketPolicyCommand({ Bucket: "listing-videos" }));
+      }
+    });
   });
   it("refuses partial output, a changed active pointer, and a foreign slot without writes", async () => {
     const row = (await db.query('SELECT manifest FROM video_generations WHERE id=$1', ["b1131300-0000-4000-8000-000000000001"])).rows[0];
