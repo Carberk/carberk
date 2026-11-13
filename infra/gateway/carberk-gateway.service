@@ -1,0 +1,28 @@
+[Unit]
+Description=Closed Carberk staging API gateway
+After=network-online.target carberk-egress.service
+Wants=network-online.target carberk-egress.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+LoadCredential=gateway.json:/etc/carberk/gateway.json
+ExecStart=/opt/carberk-gateway/current/node/bin/node /opt/carberk-gateway/current/serve.mjs %d/gateway.json
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=10s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+MemoryMax=128M
+CPUQuota=50%
+TasksMax=32
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

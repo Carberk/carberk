@@ -1,5 +1,5 @@
 # Additive virtual host in the existing Snikket nginx http context.
-# PREPARATION ONLY: requires an owned hostname, its certificate, and R02 gateway.
+# Render the owned staging hostname and its certificate before approved activation.
 # Persist as a read-only file mount at /etc/nginx/conf.d/carberk.conf.
 # Leave every existing Snikket server, certificate and port unchanged.
 server {
@@ -9,6 +9,7 @@ server {
     ssl_certificate /run/carberk/tls/fullchain.pem;
     ssl_certificate_key /run/carberk/tls/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    gzip off;
     access_log off; # Signed queries and bearer material must not enter access logs.
     error_log /dev/stderr crit;
     client_max_body_size 16m;
@@ -27,6 +28,7 @@ server {
         proxy_connect_timeout 3s;
         proxy_send_timeout 30s;
         proxy_read_timeout 30s;
+        proxy_redirect off;
         proxy_next_upstream off;
     }
 }

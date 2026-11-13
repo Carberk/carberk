@@ -13,7 +13,9 @@ The following foundation paragraph records the 2026-09-13 evidence, not current 
 
 For bounded VPS outbound validation and the prepared shared-port ingress design,
 use the [R01 staging egress procedure](staging-egress.md). It does not activate a
-production gateway or authorize changes to existing VPS services.
+production gateway or authorize changes to existing VPS services. The
+[R02 closed staging gateway procedure](staging-gateway.md) owns its separately
+approved activation and rollback.
 
 ## Pre-flight checklist
 
