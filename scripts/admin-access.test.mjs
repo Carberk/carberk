@@ -20,7 +20,13 @@ function boundary(overrides = {}) {
       requests.push([String(url), init]);
       return Response.json({ service: String(url).includes(":4301") ? "admin" : "api", environment: "test" });
     },
-    execFile: async (...args) => { executions.push(args); return { stdout: "852013\n", stderr: "Valid for 29s more.\n" }; },
+    spawn: (...args) => {
+      executions.push(args);
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter(); child.stderr = new EventEmitter();
+      queueMicrotask(() => { child.stdout.emit("data", Buffer.from("852013\n")); child.emit("exit", 0); child.emit("close", 0); });
+      return child;
+    },
     ...overrides,
   };
 }
@@ -80,7 +86,7 @@ test("serve preserves another process already listening on the selected Admin po
   const ports = boundary({ spawn: () => {
     started = true;
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("exit", 0));
+    queueMicrotask(() => { child.emit("exit", 0); child.emit("close", 0); });
     return child;
   } });
   const args = [...baseArgs]; args[3] = `http://127.0.0.1:${port}`;
@@ -101,7 +107,7 @@ test("serve starts its own Admin with the exact API and browser origins", async 
   const ports = boundary({ spawn: (...args) => {
     launch = args;
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("exit", 0));
+    queueMicrotask(() => { child.emit("exit", 0); child.emit("close", 0); });
     return child;
   } });
   const args = [...baseArgs]; args[3] = `http://localhost:${port}`;
@@ -124,7 +130,7 @@ test("near-expiry TOTP is refused without creating a code file", async () => {
 });
 
 test("TOTP subprocess diagnostics cannot expose its code or selected key", async () => {
-  const ports = boundary({ execFile: async () => { throw new Error("852013 selected-key private-password"); } });
+  const ports = boundary({ spawn: () => { throw new Error("852013 selected-key private-password"); } });
   assert.equal(await cli(["totp", ...baseArgs, "--phone", "+99365000901"], ports), 1);
   assert.match(ports.errors.join("\n"), /TOTP_UNAVAILABLE/);
   assert.doesNotMatch(JSON.stringify({ output: ports.output, errors: ports.errors }), /852013|selected-key|private-password/);

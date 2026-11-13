@@ -54,7 +54,7 @@
     "test:native-fixture-signin": "node --test scripts/native-fixture-signin.test.mjs",
     "native:ready": "pnpm --filter @auto-tm/db fixture:check",
     "admin:access": "node scripts/admin-access.mjs",
-    "test:admin-access": "node --test scripts/admin-access.test.mjs"
+    "test:admin-access": "node --test scripts/admin-access.test.mjs scripts/admin-access-process.test.mjs"
   },
   "devDependencies": {
     "@typescript/native": "catalog:",

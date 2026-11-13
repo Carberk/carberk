@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-import { parseEnv, promisify } from "node:util";
-import { execFile, spawn } from "node:child_process";
+import { parseEnv } from "node:util";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { connect } from "node:net";
+import { setTimeout as delay } from "node:timers/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { FixtureError, codeFor, localApi } from "./local-signin.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const executeFile = promisify(execFile);
 const HELP = `Usage: pnpm admin:access check|serve|otp|totp --api http://127.0.0.1:3006/api/v1
   --admin http://127.0.0.1:3001 --api-env /absolute/running-api.env
   otp:  --phone <existing-local-admin> --api-log /absolute/private-api.log
@@ -57,24 +57,60 @@ async function health(url, service, ports, environment) {
   if (result.service !== service || !["development", "test"].includes(result.environment) || (environment && result.environment !== environment)) throw new FixtureError(`${service.toUpperCase()}_TARGET_MISMATCH: running service does not match the selected local environment`);
 }
 
+// A detached POSIX group contains pnpm and its descendants, not other agents' servers.
+async function runOwned(args, options, ports, timeoutMs) {
+  const child = ports.spawn("pnpm", args, { cwd: ROOT, detached: true, ...options });
+  let stdout = "", bytes = 0, interrupted = false, stopping;
+  const closed = new Promise(done => child.once("close", done));
+  const exited = new Promise((done, fail) => {
+    child.once("error", fail);
+    child.once("exit", (code, signal) => done({ code: signal ? 1 : code ?? 1 }));
+  });
+  const group = signal => {
+    if (!child.pid) return false; // Spawn failed before a process was created.
+    try { process.kill(-child.pid, signal); return true; }
+    catch (error) { if (error.code === "ESRCH") return false; throw error; }
+  };
+  const stop = () => stopping ??= (async () => {
+    if (!group("SIGTERM")) return;
+    for (let i = 0; i < 10; i++) { await delay(25); if (!group(0)) return; }
+    group("SIGKILL");
+    for (let i = 0; i < 40; i++) { await delay(25); if (!group(0)) return; }
+    throw new Error("Owned process group did not stop");
+  })();
+  const interrupt = () => { interrupted = true; void stop().catch(() => {}); };
+  process.on("SIGINT", interrupt);
+  process.on("SIGTERM", interrupt);
+  const timer = timeoutMs ? setTimeout(interrupt, timeoutMs) : undefined;
+  for (const [stream, capture] of [[child.stdout, true], [child.stderr, false]]) {
+    stream?.on("data", chunk => {
+      bytes += chunk.length;
+      if (bytes > 64 * 1024) interrupt();
+      else if (capture) stdout += chunk.toString();
+    });
+  }
+  try {
+    const result = await exited;
+    await stop();
+    await closed; // Reap the child and close captured pipes before returning.
+    return { ...result, code: interrupted ? 1 : result.code, stdout };
+  } finally {
+    clearTimeout(timer);
+    try { await stop(); }
+    finally {
+      process.removeListener("SIGINT", interrupt);
+      process.removeListener("SIGTERM", interrupt);
+    }
+  }
+}
+
 async function serve(api, admin, ports) {
   const args = ["--filter", "@auto-tm/admin", "exec", "next", "dev", "--hostname", admin.hostname === "[::1]" ? "::1" : "127.0.0.1", "--port", admin.port || "80"];
-  const child = ports.spawn("pnpm", args, { cwd: ROOT, stdio: "inherit", env: {
+  const result = await runOwned(args, { stdio: "inherit", env: {
     ...process.env, NODE_ENV: "development", API_BASE_URL: api.href,
     ADMIN_ORIGIN: admin.origin, PORT: admin.port || "80",
-  } });
-  const stop = () => child.kill("SIGTERM");
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
-  try {
-    return await new Promise((resolveExit, reject) => {
-      child.once("error", reject);
-      child.once("exit", (code, signal) => resolveExit(signal ? 1 : code ?? 1));
-    });
-  } finally {
-    process.removeListener("SIGINT", stop);
-    process.removeListener("SIGTERM", stop);
-  }
+  } }, ports);
+  return result.code;
 }
 
 async function requireFreePort(admin) {
@@ -97,7 +133,7 @@ async function saveCode(code, kind, expiresAt, ports) {
 
 export async function cli(argv, overrides = {}) {
   const { out = console.log, err = console.error } = overrides;
-  const ports = { readFile, fetch, now: Date.now, execFile: executeFile, spawn, ...overrides };
+  const ports = { readFile, fetch, now: Date.now, spawn, ...overrides };
   try {
     if (argv.includes("--help")) { out(HELP); return 0; }
     const options = argumentsFor(argv), api = localApi(options.api);
@@ -122,10 +158,11 @@ export async function cli(argv, overrides = {}) {
       const expiresAt = (Math.floor(ports.now() / 30_000) + 1) * 30_000;
       let result;
       try {
-        result = await ports.execFile("pnpm", ["-s", "--filter", "@auto-tm/db", "admin:totp", "--phone", options.phone], {
-          cwd: ROOT, timeout: 10_000, maxBuffer: 64 * 1024,
+        result = await runOwned(["-s", "--filter", "@auto-tm/db", "admin:totp", "--phone", options.phone], {
+          stdio: ["ignore", "pipe", "pipe"],
           env: { ...process.env, DATABASE_URL: env.DATABASE_URL, TOTP_SECRET_ENCRYPTION_KEY: env.TOTP_SECRET_ENCRYPTION_KEY },
-        });
+        }, ports, ports.totpTimeoutMs ?? 10_000);
+        if (result.code !== 0) throw new Error();
       } catch { throw new FixtureError("TOTP_UNAVAILABLE: check local admin existence/role, compiled DB package, selected key and pending authenticator enrollment; raw diagnostics suppressed"); }
       const code = result.stdout.trim();
       if (!/^\d{6}$/.test(code)) throw new FixtureError("TOTP_INVALID_RESULT: helper output was not a code; raw diagnostics suppressed");

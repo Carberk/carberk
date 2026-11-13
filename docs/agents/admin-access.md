@@ -26,7 +26,7 @@ pnpm admin:access serve \
   --api-env /absolute/path/to/running-api.env
 ```
 
-This starts Admin from the caller's checkout with matching `API_BASE_URL`, `ADMIN_ORIGIN` and explicit port. A busy port refuses; select another owned port. It starts no API/database, performs no migration, and changes no env file. Keep its log private. Run `check` again once it is listening. Stop this owned invocation with Ctrl-C when finished; preserve processes you reused.
+This starts Admin from the caller's checkout with matching `API_BASE_URL`, `ADMIN_ORIGIN` and explicit port. A busy port refuses; select another owned port. It starts no API/database, performs no migration, and changes no env file. Keep its log private. Run `check` again once it is listening. Stop this owned invocation with Ctrl-C when finished; the helper terminates and waits for its own process group, including Next descendants. TOTP timeouts use the same cleanup so they do not leave database connections behind. Preserve processes you reused.
 
 ## 3. Finish the ordinary browser sign-in
 
