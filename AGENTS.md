@@ -17,7 +17,8 @@ Every change follows the [delivery workflow](docs/agents/coding-workflow.md): on
 | TypeScript imports, exports or shared runtime | [Runtime boundaries](docs/agents/typescript-runtime.md) |
 | Choosing a model or effort for agent work, delegates or reviews | [Models and effort](docs/agents/models.md) |
 | Running the app, the iOS Simulator, or signing in to the app or Admin locally | [Local testing](docs/agents/local-testing.md) |
-| Devices, CI, Railway, staging or deploys | [Environment guide](docs/agents/environment.md) and [deployment runbook](docs/prd/ops/80-deployment-runbook.md) |
+| Railway reads, billing, investigations or changes | [Required Railway tooling and authority](docs/agents/environment.md#railway) |
+| Devices, CI, staging or deploys | [Environment guide](docs/agents/environment.md) and [deployment runbook](docs/prd/ops/80-deployment-runbook.md) |
 
 Write only in your own worktree or `/tmp`, and remove your worktree after its PR merges. Preserve unrelated changes and report host guard refusals without retrying through another tool.
 
