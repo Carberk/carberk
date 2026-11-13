@@ -144,7 +144,7 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     expect(await completeSnapshot()).toEqual(after);
     expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(objects);
     expect(JSON.stringify(deep)).not.toMatch(/postgres:|http:|secret|test_pass|minioadmin|private-test-hash/);
-  });
+  }, 240_000); // seven operator runs, each re-rendering the photo set; hosted CI exceeds the 120 s default
   it("requires same-pack successful staging and a fresh target/plan-bound verified production DB/media restore receipt before writes", async () => {
     const stagingContext = await deployed();
     const initial = await runDeployedRich(stagingContext, { mode: "plan" });
@@ -171,7 +171,7 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     }
     expect((await runDeployedRich(context, { mode: "apply", plan, staging, backup })).writes).toBe(123);
     expect((await runDeployedRich(context, { mode: "apply", plan, staging, backup })).writes).toBe(0);
-  });
+  }, 240_000); // passed hosted CI at 116 s of the 120 s default; same re-rendering cost
   it("refuses deployed schema incompatibility, unexpected in-flight work, partial rows, foreign ownership and object collisions without adoption", async () => {
     const context = await deployed();
     const { plan } = await runDeployedRich(context, { mode: "plan" });
