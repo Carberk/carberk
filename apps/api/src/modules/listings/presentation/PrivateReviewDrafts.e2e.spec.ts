@@ -82,9 +82,8 @@ it("real private uploads pass adoption and three-photo publication; zero/one fai
   const originalUploads = await db.mediaUpload.findMany({ where: { userId: ownerId }, orderBy: { id: "asc" } });
   const autosaved = await update.execute({ userId: ownerId, draftId: ids[2]!, payload: { ...savedThree,
     photos: savedThree.photos!.map((photo) => ({ photoId: photo.photoId, key: photo.key, sortOrder: photo.sortOrder })) } });
-  // #1140 tracks the incumbent JSONB/key-order validation invalidation. Only
-  // this exact bookkeeping difference may coexist with an unchanged baseline.
-  expect(autosaved.draft.payload).toEqual({ ...savedThree, validatedSteps: ["vehicle", "specs"] });
+  // An autosave of identical photos keeps the Photos validation (#1140).
+  expect(autosaved.draft.payload).toEqual(savedThree);
   expect(await db.listingDraft.findMany({ where: { userId: ownerId, id: { not: ids[2]! } }, orderBy: { id: "asc" } }))
     .toEqual(original.filter((draft) => draft.id !== ids[2]));
   expect(await db.mediaUpload.findMany({ where: { userId: ownerId }, orderBy: { id: "asc" } })).toEqual(originalUploads);
