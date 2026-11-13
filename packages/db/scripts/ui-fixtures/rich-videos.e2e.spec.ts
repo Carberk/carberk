@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { runRichPhotos, runRichScenarios } from "./rich-scenarios";
 import { richTarget } from "./rich-target";
+import { configurationHash, deployedRichTarget, deployedRichVersion, runDeployedRich, type DeployedBinding, type DeployedPlan } from "./deployed-rich";
 
 // This lane always starts disposable services. Missing Docker/FFmpeg fails it.
 // Corruption tests restore edited rows/objects; recovery retires only its separate copy.
@@ -22,6 +23,8 @@ describe("rich video operator with real processor and storage", { concurrent: fa
   let db: Client;
   let s3: S3Client;
   let target: ReturnType<typeof richTarget>;
+  let deployedContext: ReturnType<typeof deployedRichTarget>;
+  let deployedPlan: DeployedPlan;
   let imported: Awaited<ReturnType<typeof prepareVideoScenarios>>;
   beforeAll(async () => {
     postgres = await new PostgreSqlContainer("postgres:16-alpine").start();
@@ -62,7 +65,8 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     }
   }, 120_000);
   // Separate real boundaries: photo fixtures, then Processing import and worker settlement.
-  beforeAll(async () => { imported = await prepareVideoScenarios(); }, 120_000);
+  // Plan, deployed plan, apply and real worker settlement each re-render the photo set; hosted CI needs more than 120 s.
+  beforeAll(async () => { imported = await prepareVideoScenarios(); }, 240_000);
   afterAll(async () => {
     const errors: unknown[] = [];
     for (const close of [() => h?.close(), () => db?.end(), () => s3?.destroy(), () => redis?.stop(), () => minio?.stop(), () => postgres?.stop()]) {
@@ -86,7 +90,23 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     const inventory = (await fullSnapshot()).slice(0, 6); // Users, Sessions, drafts, Listings, media and uploads.
     const plan = await runRichScenarios(target);
     const afterPlan = await snapshot();
-    const applied = await runRichScenarios({ ...target, mode: "apply", planHash: plan.planHash });
+    const version = await deployedRichVersion();
+    const api = { APP_ENV: "staging", NODE_ENV: "production", RAILWAY_PROJECT_ID: "disposable", RAILWAY_ENVIRONMENT_ID: "disposable-staging",
+      RAILWAY_ENVIRONMENT_NAME: "staging", RAILWAY_SERVICE_ID: "api", RAILWAY_GIT_COMMIT_SHA: "a".repeat(40),
+      DATABASE_URL: target.databaseUrl, MINIO_ENDPOINT: target.endpoint, MINIO_PUBLIC_URL: target.publicUrl, MINIO_ACCESS_KEY: target.accessKeyId,
+      MINIO_SECRET_KEY: target.secretAccessKey, REDIS_URL: `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`,
+      LISTING_VIDEO_API_ORIGIN: "http://localhost:3006", LISTING_VIDEO_UPLOADS_ENABLED: "true", LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: "seller", LISTING_VIDEO_VIEW_TESTER_USER_IDS: "seller,viewer",
+      MINIO_REGION: target.video?.region ?? "us-east-1" };
+    const worker = { ...api, RAILWAY_SERVICE_ID: "worker", LISTING_VIDEO_BUCKET_REGION: target.video?.workerRegion ?? "auto" };
+    const resources = { database: { ...api, RAILWAY_SERVICE_ID: "database" }, storage: { ...api, RAILWAY_SERVICE_ID: "storage" }, redis: { ...api, RAILWAY_SERVICE_ID: "redis" } };
+    const binding: DeployedBinding = { target: "staging", projectId: "disposable", environmentId: "disposable-staging",
+      services: { api: "api", worker: "worker", database: "database", storage: "storage", redis: "redis" }, apiConfigHash: configurationHash(api), workerConfigHash: configurationHash(worker),
+      resourceConfigHashes: { database: configurationHash(resources.database), storage: configurationHash(resources.storage), redis: configurationHash(resources.redis) },
+      ownerId: "seller", viewerId: "viewer", scenarioSet: "videos", component: "scenario", compatibility: { apiCommit: "a".repeat(40), workerCommit: "a".repeat(40),
+        behavior: version.behavior, schema: version.schemaHash, verifiedAt: new Date().toISOString(), ordinaryUploadAndPlayback: true } };
+    deployedContext = deployedRichTarget(binding, api, worker, resources);
+    deployedPlan = (await runDeployedRich(deployedContext, { mode: "plan" })).plan;
+    const applied = await runDeployedRich(deployedContext, { mode: "apply", plan: deployedPlan });
     expect(applied.state).toBe("processing");
     const processing = (await db.query(`SELECT DISTINCT status FROM video_generations WHERE id LIKE 'b1131300-%'`)).rows;
     expect(processing).toEqual([{ status: "Processing" }]);
@@ -126,6 +146,12 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     expect(await snapshot()).toEqual(before);
     await h.assertProjectionAndPlayback();
     expect(await h.priorSnapshot()).toEqual(prior);
+  });
+  it("deep-checks the same deployed video inputs after real worker settlement and makes original-plan reapply write nothing", async () => {
+    const before = await fullSnapshot();
+    expect((await runDeployedRich(deployedContext, { mode: "check" })).state).toBe("installed");
+    expect((await runDeployedRich(deployedContext, { mode: "apply", plan: deployedPlan })).writes).toBe(0);
+    expect(await fullSnapshot()).toEqual(before);
   });
   it("refuses partial output, a changed active pointer, and a foreign slot without writes", async () => {
     const row = (await db.query('SELECT manifest FROM video_generations WHERE id=$1', ["b1131300-0000-4000-8000-000000000001"])).rows[0];

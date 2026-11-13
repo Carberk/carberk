@@ -642,3 +642,9 @@ If restore fails or takes too long for beta operations, private beta launch is b
 - Sprint 11 — Railway deployment
 - `infra/compose/docker-compose.prod.yml`
 - `infra/deploy.sh` (lives on TM server, not in repo)
+
+## Additive rich review baseline
+
+Use the [guarded rich baseline operator](rich-baseline.md) for separately authorized
+staging-first data/media preparation, exact plans, backup/restore verification,
+no-op/deep checks and owned cleanup. It does not deploy or migrate services.

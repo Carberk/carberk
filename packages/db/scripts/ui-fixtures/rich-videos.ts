@@ -11,7 +11,7 @@ import { PrismaClient, type Prisma } from "../../generated/prisma/client/client"
 import { retireVideoGenerations } from "../../src/listing-video";
 
 import { PRIVATE_DRAFT_SCENARIOS, RICH_SCENARIOS, runRichPhotos, VIDEO_RECOVERY_SCENARIO } from "./rich-scenarios";
-import type { richTarget } from "./rich-target";
+import type { RichExecutionTarget } from "./rich-execution";
 import pack from "./synthetic-video/v1/manifest.json";
 
 const hash = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
@@ -30,7 +30,7 @@ const definitions = [
   sourceId: `b1131200-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
   generationId: `b1131300-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 }));
-type Target = ReturnType<typeof richTarget>;
+type Target = RichExecutionTarget;
 type Definition = typeof definitions[number];
 type Manifest = Record<string, { key: string; sizeBytes: number; etag: string }>;
 class Refusal extends Error {}
@@ -80,14 +80,14 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
     const clips = await inputs();
     const version = hash(JSON.stringify({ pack, definitions, coverOffsetMs }));
     phase = "read-only retained photo baseline verification";
-    const base = await runRichPhotos({ ...target, scenarioSet: "photos", mode: "check" });
+    const base = await runRichPhotos({ ...target, authorize: undefined, scenarioSet: "photos", mode: "check" });
     if (base.state !== "installed") refuse("Install the separately planned rich photo baseline first");
     if (target.scenarioSet === "videos") {
-      const drafts = await runRichPhotos({ ...target, scenarioSet: "private-drafts", mode: "check" });
+      const drafts = await runRichPhotos({ ...target, authorize: undefined, scenarioSet: "private-drafts", mode: "check" });
       if (drafts.state !== "installed") refuse("Install the separately planned private photo baseline first");
     }
     // The same executor plans the optional copy. No draft or stable Listing is consumed.
-    const photoPlan = target.scenarioSet === "video-recovery" ? await runRichPhotos({ ...target, mode: "plan" }) : undefined;
+    const photoPlan = target.scenarioSet === "video-recovery" ? await runRichPhotos({ ...target, authorize: undefined, mode: "plan" }) : undefined;
     phase = "owner/target locks and exact generation inventory";
     const result = await db.$transaction(async (tx) => {
       if (target.mode !== "apply") await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
@@ -166,6 +166,8 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
           objects: installed ? 0 : selected.length, ...(photoPlan ? { photos: photoPlan.planned } : {}), ...(retirement ? { retireSource: retirement.sourceId } : {}) },
         resources, outputHashes, retirement, photoCopy: photoPlan, inputs: pack, creditsUrl: base.creditsUrl,
         verification: "deep source hashes/probe and worker manifest objects; authenticated native playback is separate required proof" };
+      await target.authorize?.(report, (sql, values = []) => tx.$queryRawUnsafe(sql, ...values));
+      if (target.authorize && photoPlan?.state === "absent") refuse("Deployed recovery requires a separately authorized photo copy; no multi-phase implicit apply");
       if (target.mode !== "apply") return report;
       if (retirement) {
         // Same domain primitive used by Remove/Delete; never delete bytes/reservations here.
@@ -196,7 +198,7 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
       return { ...report, state: "processing", writes: selected.length * 5 };
     }, { timeout: 120_000, isolationLevel: target.mode === "apply" ? "ReadCommitted" : "RepeatableRead" });
     if (result.state === "awaiting-photo-copy" && photoPlan) {
-      const copied = await runRichPhotos({ ...target, mode: "apply", planHash: photoPlan.planHash });
+      const copied = await runRichPhotos({ ...target, authorize: undefined, mode: "apply", planHash: photoPlan.planHash });
       const imported = await runRichVideos(target);
       return { ...imported, writes: imported.writes + copied.writes };
     }
