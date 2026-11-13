@@ -37,7 +37,8 @@
     "canonical:seed": "tsx src/canonical-seed.ts",
     "gallery:verify": "tsx scripts/verify-ui-gallery.ts",
     "fixture:check": "node --import tsx scripts/local-fixture-readiness.ts",
-    "rich:scenarios": "tsx scripts/rich-scenarios.ts"
+    "rich:scenarios": "tsx scripts/rich-scenarios.ts",
+    "rich:deployed": "tsx scripts/deployed-rich-scenarios.ts"
   },
   "dependencies": {
     "@auto-tm/contracts": "workspace:*",

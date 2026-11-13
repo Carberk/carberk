@@ -12,7 +12,7 @@ import { preparePhoto } from "../demo-inventory/photos";
 import reviewer from "../reviewer-fixtures/photos.manifest.json";
 
 import { ES300H_GALLERY } from "./manifest";
-import type { richTarget } from "./rich-target";
+import type { RichExecutionTarget } from "./rich-execution";
 import { verifyGallery } from "./verify";
 
 export const RICH_SCENARIOS = [
@@ -33,7 +33,7 @@ const PACK = join(__dirname, "es300h-shenzhen-2025-07-17/v1");
 const digest = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 class Refusal extends Error {}
 const refuse = (message: string): never => { throw new Refusal(message); };
-type Target = ReturnType<typeof richTarget>;
+type Target = RichExecutionTarget;
 type Row = Record<string, unknown>;
 type ObjectFile = { key: string; body: Buffer; contentType: string };
 
@@ -209,6 +209,8 @@ export async function runRichPhotos(target: Target, directory = PACK) {
       state: installed ? "installed" : "absent", planned: privateDrafts
         ? { drafts: installed ? 0 : 4, uploads: installed ? 0 : 24, objects: installed ? 0 : objects.length }
         : installed ? { listings: 0, media: 0, objects: 0 } : { listings: scenarios.length, media: media.length, objects: objects.length } };
+    const connection = db;
+    await target.authorize?.(report, async (sql, values) => (await connection.query(sql, values)).rows);
     if (target.mode !== "apply" || installed) {
       if (installed) await verifyPublicCredits(creditsUrl, credits);
       await db.query("ROLLBACK");

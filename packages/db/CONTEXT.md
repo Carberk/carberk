@@ -2,6 +2,8 @@
 
 The schema, migration history, generated-client boundary, and seed inputs live here. Inspect `schema.prisma` for fields and relations instead of copying them into documentation. Runtime consumers load the compiled package.
 
+The separate [deployed rich entrypoint](scripts/deployed-rich-scenarios.ts) adds explicit exported target/mapping/compatibility and production evidence gates around the same executor; [operator guidance](../../docs/prd/ops/rich-baseline.md) owns its private preflight and trust boundary. It cannot widen native/local helper authority.
+
 The local additive rich operator (`scripts/rich-scenarios.ts`) is separate from fixture replacement and ordinary readiness. It verifies offline inputs, binds existing accounts and local catalog semantics, and refuses collisions or drift. The photo executor adds the selected public ten-view Listings or private photo-count drafts with owned AVAILABLE uploads. The video extension imports only Processing work for the existing scheduler/worker, verifies complete private outputs, and keeps its optional disposable recovery Listing separate from the retained baseline. Exact source retirement uses the existing domain lifecycle and cleanup ledger. Partial failures retain bounded resource receipts; no operator resets identities, repairs access, replaces active generations or deletes object prefixes directly. See [local testing](../../docs/agents/local-testing.md#explicit-additive-rich-photo-scenarios).
 
 `Listing.publicNumber` is a unique, database-assigned integer for the public detail footer. Its migration numbers existing Listings; subsequent inserts take the next sequence value. UUIDs remain the internal identity and route key.

@@ -22,6 +22,9 @@ When the check identifies an absent service, coordinate its startup separately. 
 
 ### Explicit additive rich photo scenarios
 
+Deployed targets use the separate [guarded operator](../prd/ops/rich-baseline.md);
+these local commands and all native helpers retain local-only authority.
+
 For the local ten-view Lexus review Listings, select the existing eligible seller explicitly in the DB package's local environment, with `APP_ENV` and `NODE_ENV` set to `development`/`test`, and loopback `DATABASE_URL`, `MINIO_ENDPOINT` and `MINIO_PUBLIC_URL`:
 
 ```bash

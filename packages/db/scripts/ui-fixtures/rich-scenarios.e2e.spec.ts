@@ -16,6 +16,7 @@ import { createTestPool } from "../../tests/testing/create-test-pool";
 
 import { RICH_SCENARIOS, runRichScenarios } from "./rich-scenarios";
 import { richTarget } from "./rich-target";
+import { configurationHash, deployedRichTarget, deployedRichVersion, runDeployedRich, type DeployedBinding, type StagingEvidence, type BackupEvidence } from "./deployed-rich";
 
 // Both services are disposable and owned by this suite; never the shared dev stack.
 describe("additive rich scenarios on real Postgres and conditional MinIO", () => {
@@ -83,6 +84,118 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     const plan = await runRichScenarios(target);
     return runRichScenarios({ ...target, mode: "apply", planHash: plan.planHash });
   }
+  async function deployed(environment: "staging" | "production" = "staging", scenarioSet: DeployedBinding["scenarioSet"] = "photos", photoEndpoint = target.endpoint) {
+    const version = await deployedRichVersion();
+    const api = { NODE_ENV: "production", APP_ENV: environment, RAILWAY_PROJECT_ID: "disposable-project",
+      RAILWAY_ENVIRONMENT_ID: `disposable-${environment}`, RAILWAY_ENVIRONMENT_NAME: environment, RAILWAY_SERVICE_ID: "api-service",
+      RAILWAY_GIT_COMMIT_SHA: "a".repeat(40), DATABASE_URL: target.databaseUrl, MINIO_ENDPOINT: photoEndpoint, MINIO_PUBLIC_URL: target.publicUrl,
+      MINIO_ACCESS_KEY: target.accessKeyId, MINIO_SECRET_KEY: target.secretAccessKey,
+      REDIS_URL: "redis://127.0.0.1:1", LISTING_VIDEO_API_ORIGIN: "http://127.0.0.1:1",
+      LISTING_VIDEO_UPLOADS_ENABLED: "true", LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: "seller", LISTING_VIDEO_VIEW_TESTER_USER_IDS: "seller,other" };
+    const worker = { ...api, RAILWAY_SERVICE_ID: "worker-service" };
+    const resources = { database: { ...api, RAILWAY_SERVICE_ID: "database-service" }, storage: { ...api, RAILWAY_SERVICE_ID: "storage-service" }, redis: { ...api, RAILWAY_SERVICE_ID: "redis-service" } };
+    const binding: DeployedBinding = { target: environment, projectId: "disposable-project", environmentId: `disposable-${environment}`,
+      services: { api: "api-service", worker: "worker-service", database: "database-service", storage: "storage-service", redis: "redis-service" },
+      apiConfigHash: configurationHash(api), workerConfigHash: configurationHash(worker),
+      resourceConfigHashes: { database: configurationHash(resources.database), storage: configurationHash(resources.storage), redis: configurationHash(resources.redis) }, ownerId: "seller", viewerId: "other", scenarioSet, component: "scenario",
+      compatibility: { apiCommit: "a".repeat(40), workerCommit: "a".repeat(40), behavior: version.behavior, schema: version.schemaHash,
+        verifiedAt: new Date().toISOString(), ordinaryUploadAndPlayback: true } };
+    return deployedRichTarget(binding, api, worker, resources);
+  }
+  async function completeSnapshot() {
+    const tables = (await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename`)).rows;
+    const result: Record<string, unknown[]> = {};
+    for (const { tablename } of tables) result[tablename] = (await pool.query(`SELECT to_jsonb(t) AS row FROM "${tablename}" t ORDER BY to_jsonb(t)::text`)).rows;
+    return result;
+  }
+  it("guards deployed apply, binds stale state, preserves the exact DB/object write set and makes original-plan reapply a timestamp-preserving no-op", async () => {
+    const context = await deployed();
+    const before = await completeSnapshot();
+    const oldObjects = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents;
+    for (const override of [{ target: "production" }, { services: { ...context.binding.services, api: "foreign-service" } }, { services: { ...context.binding.services, storage: "foreign-storage" } }, { ownerId: "other" }, { databaseUrl: "postgres://private:secret@private/db" }]) {
+      expect(() => deployedRichTarget({ ...context.binding, ...override }, context.api, context.worker, context.resources)).toThrow("Deployed rich target refused");
+    }
+    expect(() => deployedRichTarget(context.binding, { ...context.api, DATABASE_URL: "postgres://private:secret@private/db" }, context.worker, context.resources)).toThrow("Deployed rich target refused");
+    expect(() => deployedRichTarget(context.binding, context.api, { ...context.worker, RAILWAY_ENVIRONMENT_ID: "foreign" }, context.resources)).toThrow("Deployed rich target refused");
+    const checked = await runDeployedRich(context, { mode: "check" });
+    const planned = await runDeployedRich(context, { mode: "plan" });
+    expect(checked.writes).toBe(0); expect(checked.state).toBe("absent");
+    expect(await completeSnapshot()).toEqual(before);
+    expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(oldObjects);
+    await pool.query(`UPDATE listing_drafts SET payload='{"description":"changed after plan"}' WHERE id='draft'`);
+    const stale = await completeSnapshot();
+    await expect(runDeployedRich(context, { mode: "apply", plan: planned.plan })).rejects.toThrow("Deployed rich target refused");
+    expect(await completeSnapshot()).toEqual(stale);
+    expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(oldObjects);
+    const current = await runDeployedRich(context, { mode: "plan" });
+    const applied = await runDeployedRich(context, { mode: "apply", plan: current.plan });
+    expect(applied.writes).toBe(123); // two Listings, twenty media, one hundred variants and credits
+    const after = await completeSnapshot();
+    expect(Object.keys(after).filter((table) => JSON.stringify(after[table]) !== JSON.stringify(stale[table]))).toEqual(["listing_media", "listings"]);
+    for (const table of ["listings", "listing_media"]) for (const row of stale[table] ?? []) expect(after[table]).toContainEqual(row);
+    const objects = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents ?? [];
+    expect(objects).toHaveLength(102);
+    for (const object of oldObjects ?? []) expect(objects).toContainEqual(object);
+    expect(objects.filter((object) => object.Key !== "existing/original.webp").every((object) => object.Key?.startsWith(`review-baseline/photos-v1/${applied.version}/`))).toBe(true);
+    expect((await runDeployedRich(context, { mode: "apply", plan: current.plan })).writes).toBe(0);
+    const deep = await runDeployedRich(context, { mode: "check" });
+    expect(deep.state).toBe("installed"); expect(deep.writes).toBe(0);
+    expect(deep.stagingEvidence?.success).toBe(true);
+    expect(await completeSnapshot()).toEqual(after);
+    expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(objects);
+    expect(JSON.stringify(deep)).not.toMatch(/postgres:|http:|secret|test_pass|minioadmin|private-test-hash/);
+  });
+  it("requires same-pack successful staging and a fresh target/plan-bound verified production DB/media restore receipt before writes", async () => {
+    const stagingContext = await deployed();
+    const initial = await runDeployedRich(stagingContext, { mode: "plan" });
+    await runDeployedRich(stagingContext, { mode: "apply", plan: initial.plan });
+    const successful = await runDeployedRich(stagingContext, { mode: "check" });
+    // Clear only suite-owned rows/objects, inside its disposable target, so
+    // production authorization is exercised on absent resources as well.
+    await pool.query('DELETE FROM listings WHERE id=ANY($1::text[])', [ids]);
+    for (const object of (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents ?? []) if (object.Key !== "existing/original.webp") await s3.send(new DeleteObjectCommand({ Bucket, Key: object.Key }));
+    const context = await deployed("production");
+    const { plan } = await runDeployedRich(context, { mode: "plan" });
+    const before = await completeSnapshot();
+    const objects = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents;
+    const staging = successful.stagingEvidence as StagingEvidence;
+    expect(staging.success).toBe(true);
+    const backup: BackupEvidence = { target: "production", binding: plan.binding, planHash: plan.planHash, capturedAt: new Date().toISOString(),
+      verifiedAt: new Date().toISOString(), database: true, photos: true, privateVideos: true, restoreVerified: true, receiptId: "disposable-backup" };
+    for (const evidence of [{}, { staging }, { staging: { ...staging, version: "old-pack" }, backup },
+      { staging: { ...staging, success: false }, backup }, { staging, backup: { ...backup, restoreVerified: false } },
+      { staging, backup: { ...backup, capturedAt: "2020-01-01" } }, { staging, backup: { ...backup, binding: "f".repeat(64) } }]) {
+      await expect(runDeployedRich(context, { mode: "apply", plan, ...evidence } as Parameters<typeof runDeployedRich>[1])).rejects.toThrow("Deployed rich target refused");
+      expect(await completeSnapshot()).toEqual(before);
+      expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(objects);
+    }
+    expect((await runDeployedRich(context, { mode: "apply", plan, staging, backup })).writes).toBe(123);
+    expect((await runDeployedRich(context, { mode: "apply", plan, staging, backup })).writes).toBe(0);
+  });
+  it("refuses deployed schema incompatibility, unexpected in-flight work, partial rows, foreign ownership and object collisions without adoption", async () => {
+    const context = await deployed();
+    const { plan } = await runDeployedRich(context, { mode: "plan" });
+    const refuseWithoutWrites = async () => {
+      const before = await completeSnapshot(); const objects = (await s3.send(new ListObjectsV2Command({ Bucket }))).Contents;
+      await expect(runDeployedRich(context, { mode: "apply", plan })).rejects.toThrow("Deployed rich target refused");
+      expect(await completeSnapshot()).toEqual(before);
+      expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(objects);
+    };
+    await pool.query(`UPDATE _prisma_migrations SET checksum='incompatible' WHERE migration_name=(SELECT min(migration_name) FROM _prisma_migrations)`);
+    await refuseWithoutWrites();
+    const version = await deployedRichVersion();
+    await pool.query('UPDATE _prisma_migrations SET checksum=$1 WHERE migration_name=$2', [version.schema[0]?.checksum, version.schema[0]?.migration_name]);
+    await pool.query(`INSERT INTO media_uploads(id,"userId",key,kind,"contentType",state,"claimTargetType","claimTargetId","claimToken","claimDeadline") VALUES ('unexpected','seller','pending/unexpected/original.webp','image','image/webp','PREPARING','listing','unrelated','disposable-claim',now()+interval '1 minute')`);
+    await refuseWithoutWrites();
+    await pool.query("DELETE FROM media_uploads WHERE id='unexpected'");
+    await pool.query(`INSERT INTO listings(id,"sellerId",status,"brandId","modelId","cityId","priceAmount","updatedAt") VALUES ($1,'other','active','local-brand','local-model','local-city',999,now())`, [ids[0]]);
+    await refuseWithoutWrites();
+    await pool.query(`INSERT INTO listings(id,"sellerId",status,"brandId","modelId","cityId","priceAmount","updatedAt") VALUES ($1,'other','active','local-brand','local-model','local-city',999,now())`, [ids[1]]);
+    await refuseWithoutWrites();
+    await pool.query('DELETE FROM listings WHERE id=ANY($1::text[])', [ids]);
+    await s3.send(new PutObjectCommand({ Bucket, Key: "review-baseline/photos-v1/partial/original.webp", Body: "preserve partial" }));
+    await refuseWithoutWrites();
+  });
   it("adds four private Photos-step drafts with accurate AVAILABLE uploads, retaining the existing draft and making repeat apply a no-op", async () => {
     const selected = { ...target, scenarioSet: "private-drafts" as const };
     const before = await snapshot();
@@ -253,7 +366,7 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     await expect(apply()).rejects.toThrow(damage === "missing" ? "Missing/extra" : "Corrupt/incompatible");
     expect(await snapshot()).toEqual(before);
   });
-  it("partial upload failure retains exact recovery objects, no rows, no pre-existing deletion, and refuses retry", async () => {
+  it.each(["local", "deployed"])("partial upload failure retains exact recovery objects, no rows, no pre-existing deletion, and refuses retry (%s)", async (entrypoint) => {
     // Real storage through a faulting network boundary: credits succeed, the next PUT fails.
     const proxy = createServer((incoming, response) => {
       if (incoming.method === "PUT" && incoming.url?.includes("/rich-es300h-portrait/")) {
@@ -271,8 +384,14 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     const faultTarget = { ...target, endpoint: `http://127.0.0.1:${address.port}/` };
     const before = await snapshot();
     try {
-      const plan = await runRichScenarios(faultTarget);
-      await expect(runRichScenarios({ ...faultTarget, mode: "apply", planHash: plan.planHash })).rejects.toThrow(/conditional immutable uploads.*createdObjects.*credits.json.*attemptedObject/);
+      if (entrypoint === "deployed") {
+        const context = await deployed("staging", "photos", faultTarget.endpoint);
+        const { plan } = await runDeployedRich(context, { mode: "plan" });
+        await expect(runDeployedRich(context, { mode: "apply", plan })).rejects.toThrow("Deployed rich target refused");
+      } else {
+        const plan = await runRichScenarios(faultTarget);
+        await expect(runRichScenarios({ ...faultTarget, mode: "apply", planHash: plan.planHash })).rejects.toThrow(/conditional immutable uploads.*createdObjects.*credits.json.*attemptedObject/);
+      }
     } finally { await new Promise<void>((resolve) => proxy.close(() => resolve())); }
     expect(await snapshot()).toEqual(before);
     const page = await s3.send(new ListObjectsV2Command({ Bucket }));
