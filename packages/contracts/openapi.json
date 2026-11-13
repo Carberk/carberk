@@ -8677,9 +8677,7 @@
           },
           "requests": {
             "type": "array",
-            "items": {
-              "anyOf": []
-            },
+            "items": {},
             "minItems": 0,
             "maxItems": 0
           }
@@ -9707,9 +9705,7 @@
                     },
                     "requests": {
                       "type": "array",
-                      "items": {
-                        "anyOf": []
-                      },
+                      "items": {},
                       "minItems": 0,
                       "maxItems": 0
                     }
