@@ -39,6 +39,7 @@ export interface VideoReport {
   version: string; planHash: string; state: string; writes: number; creditsUrl: string;
   planned: Record<string, unknown>; resources: (Definition & { objectKey: string })[];
   outputHashes: Record<string, string>; verification: string;
+  baselines: { photos: { version: string; state: string }; privateDrafts?: { version: string; state: string } };
   retirement?: { sourceId: string; generationId: string; slotId: string; state: string; objectKey: string };
   cleanup?: string;
   photoCopy?: Awaited<ReturnType<typeof runRichPhotos>>;
@@ -80,12 +81,15 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
     const clips = await inputs();
     const version = hash(JSON.stringify({ pack, definitions, coverOffsetMs }));
     phase = "read-only retained photo baseline verification";
-    const base = await runRichPhotos({ ...target, authorize: undefined, scenarioSet: "photos", mode: "check" });
-    if (base.state !== "installed") refuse("Install the separately planned rich photo baseline first");
-    if (target.scenarioSet === "videos") {
-      const drafts = await runRichPhotos({ ...target, authorize: undefined, scenarioSet: "private-drafts", mode: "check" });
-      if (drafts.state !== "installed") refuse("Install the separately planned private photo baseline first");
-    }
+    // Photo executor errors are already bounded; retain their exact drift reason.
+    const retained = (scenarioSet: "photos" | "private-drafts") => runRichPhotos({ ...target, authorize: undefined, scenarioSet, mode: "check" })
+      .catch((error: unknown) => refuse(error instanceof Error ? error.message : "Retained baseline unavailable"));
+    const base = await retained("photos");
+    if (base.state !== "installed") refuse(`Rich photos ${base.version}: absent. Install the separately planned rich photo baseline first`);
+    const drafts = target.scenarioSet === "videos" ? await retained("private-drafts") : undefined;
+    if (drafts && drafts.state !== "installed") refuse(`Private drafts ${drafts.version}: absent. Install the separately planned private photo baseline first`);
+    const baselines = { photos: { version: base.version, state: base.state },
+      ...(drafts ? { privateDrafts: { version: drafts.version, state: drafts.state } } : {}) };
     // The same executor plans the optional copy. No draft or stable Listing is consumed.
     const photoPlan = target.scenarioSet === "video-recovery" ? await runRichPhotos({ ...target, authorize: undefined, mode: "plan" }) : undefined;
     phase = "owner/target locks and exact generation inventory";
@@ -161,7 +165,7 @@ export async function runRichVideos(target: Target): Promise<VideoReport> {
       const planHash = hash(JSON.stringify({ version, database: target.databaseUrl, photoEndpoint: target.endpoint, endpoint: config.endpoint, bucket: config.bucket,
         api: config.apiOrigin, redis: config.redisUrl, configFingerprint: config.configFingerprint, ownerId: target.ownerId, viewerId: config.viewerId, resources, targets: photoPlan ? photoPlan.planHash : targets, slots, outputHashes, retirement, photoPlan: photoPlan?.planHash }));
       if (target.mode === "apply" && target.planHash !== planHash) refuse("Plan changed; rerun plan against exact current target/version/ownership");
-      const report = { version, planHash, state: installed ? "installed" : "absent", writes: 0,
+      const report = { version, baselines, planHash, state: installed ? "installed" : "absent", writes: 0,
         planned: { slots: installed ? 0 : selected.length, sources: installed ? 0 : selected.length, generations: installed ? 0 : selected.length, drafts: 0,
           objects: installed ? 0 : selected.length, ...(photoPlan ? { photos: photoPlan.planned } : {}), ...(retirement ? { retireSource: retirement.sourceId } : {}) },
         resources, outputHashes, retirement, photoCopy: photoPlan, inputs: pack, creditsUrl: base.creditsUrl,

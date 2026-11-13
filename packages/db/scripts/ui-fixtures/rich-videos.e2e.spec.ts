@@ -1,7 +1,11 @@
 import "reflect-metadata";
 
-import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
+import { execFile, execFileSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
 
 import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutBucketPolicyCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
@@ -147,6 +151,61 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     await h.assertProjectionAndPlayback();
     expect(await h.priorSnapshot()).toEqual(prior);
   });
+  it("canonical readiness repeats the deep rich check without writes, then reports changed mapping", async () => {
+    const api = createServer((_request, response) => {
+      response.setHeader("Content-Type", "application/json");
+      response.end(JSON.stringify({ service: "api", status: "ready", environment: "test",
+        checks: { postgres: "ok", redis: "ok", minio: "ok" } }));
+    });
+    await new Promise<void>((done) => api.listen(0, "127.0.0.1", done));
+    const port = (api.address() as { port: number }).port;
+    const dir = await mkdtemp(join(tmpdir(), "canonical-rich-"));
+    const envFile = join(dir, "api.env"); const workerFile = join(dir, "worker.env");
+    const config = Object.entries({ APP_ENV: "test", NODE_ENV: "test", PORT: String(port),
+      DATABASE_URL: target.databaseUrl, REDIS_URL: `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`,
+      MINIO_ENDPOINT: target.endpoint, MINIO_PUBLIC_URL: target.publicUrl, MINIO_ACCESS_KEY: target.accessKeyId,
+      MINIO_SECRET_KEY: target.secretAccessKey, MINIO_REGION: target.video?.region ?? "us-east-1",
+      LISTING_VIDEO_API_ORIGIN: `http://127.0.0.1:${port}`, LISTING_VIDEO_UPLOADS_ENABLED: "true",
+      LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: "seller", LISTING_VIDEO_VIEW_TESTER_USER_IDS: "seller,viewer",
+    }).map(([key, value]) => `${key}=${value}`).join("\n");
+    await writeFile(envFile, config); await writeFile(workerFile, `${config}\nLISTING_VIDEO_BUCKET_REGION=${target.video?.workerRegion ?? "auto"}`);
+    const check = async () => {
+      try {
+        const result = await promisify(execFile)(process.execPath, ["--import", "tsx", resolve(__dirname, "../local-fixture-readiness.ts"),
+          "--api-origin", `http://127.0.0.1:${port}`, "--env-file", envFile,
+          "--worker-env", workerFile, "--owner-id", "seller", "--viewer-id", "viewer"], { env: { PATH: process.env["PATH"] } });
+        return { code: 0, output: result.stdout + result.stderr };
+      } catch (error) {
+        const result = error as { code: number; stdout: string; stderr: string };
+        return { code: result.code, output: result.stdout + result.stderr };
+      }
+    };
+    try {
+      const before = await fullSnapshot();
+      for (let count = 0; count < 2; count++) {
+        const result = await check();
+        expect(result.code, result.output).toBe(0);
+        expect(result.output).toContain("READY (local environment only)");
+        expect(result.output).toContain('"baselines"');
+        expect(result.output).toContain('"privateDrafts"');
+        expect(result.output).toContain('"writes": 0');
+        expect(result.output).toContain("build/origin are unverified");
+        expect(result.output).not.toContain(target.secretAccessKey);
+      }
+      expect(await fullSnapshot()).toEqual(before);
+      await db.query("UPDATE users SET role='admin' WHERE id='viewer'");
+      const changed = await fullSnapshot();
+      const refused = await check();
+      expect(refused.code, refused.output).toBe(1);
+      expect(refused.output).toContain("Existing eligible nonprivileged owner/viewer mapping missing");
+      expect(await fullSnapshot()).toEqual(changed);
+      expect(await readFile(envFile, "utf8")).toBe(config);
+    } finally {
+      await db.query("UPDATE users SET role='buyer' WHERE id='viewer'");
+      api.closeAllConnections(); await new Promise<void>((done) => api.close(() => done()));
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 240_000);
   it("deep-checks the same deployed video inputs after real worker settlement and makes original-plan reapply write nothing", async () => {
     const before = await fullSnapshot();
     expect((await runDeployedRich(deployedContext, { mode: "check" })).state).toBe("installed");

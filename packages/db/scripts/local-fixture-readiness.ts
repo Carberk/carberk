@@ -2,9 +2,9 @@
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 
-import { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { parse } from "dotenv";
-import { Client } from "pg";
+
+import { richTarget } from "./ui-fixtures/rich-target";
 
 const fail = (message: string): never => { throw new Error(message); };
 const localEnvs = ["development", "test"];
@@ -23,6 +23,7 @@ function localUrl(value: string | undefined, name: string, protocols: string[]):
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: {
     "api-origin": { type: "string" }, "env-file": { type: "string" },
+    "owner-id": { type: "string" }, "viewer-id": { type: "string" }, "worker-env": { type: "string" },
   } });
   const api = localUrl(values["api-origin"], "--api-origin", ["http:"]);
   if (api.username || api.password || api.pathname !== "/") fail("--api-origin must be a bare local origin");
@@ -33,7 +34,7 @@ async function main(): Promise<void> {
     fail("APP_ENV and NODE_ENV must explicitly be development/test");
   }
   if (["RAILWAY_ENVIRONMENT_ID", "RAILWAY_ENVIRONMENT_NAME", "RAILWAY_PROJECT_ID", "RAILWAY_SERVICE_ID"].some((key) => env[key])) fail("Railway targets are outside this local check");
-  const database = localUrl(env["DATABASE_URL"], "DATABASE_URL", ["postgresql:", "postgres:"]);
+  localUrl(env["DATABASE_URL"], "DATABASE_URL", ["postgresql:", "postgres:"]);
   localUrl(env["REDIS_URL"], "REDIS_URL", ["redis:", "rediss:"]);
   const photoEndpoint = localUrl(env["MINIO_ENDPOINT"], "MINIO_ENDPOINT", ["http:"]);
   const videoEndpoint = localUrl(env["LISTING_VIDEO_BUCKET_ENDPOINT"] || env["MINIO_ENDPOINT"], "video endpoint", ["http:"]);
@@ -44,103 +45,34 @@ async function main(): Promise<void> {
     if (endpoint.username || endpoint.password || endpoint.pathname !== "/") fail("Media endpoints must be bare local origins");
   }
 
-  let phase = "API readiness: verify the selected API is running; reuse its owner's process";
-  const clients: S3Client[] = [];
-  let db: Client | undefined;
+  if (!/^[a-zA-Z0-9-]{1,80}$/.test(values["owner-id"] ?? "")) fail("Require explicit existing --owner-id");
+  if (!/^[a-zA-Z0-9-]{1,80}$/.test(values["viewer-id"] ?? "") || values["viewer-id"] === values["owner-id"]) fail("Require distinct existing --viewer-id");
+  const workerFile = values["worker-env"];
+  if (!workerFile) return fail("Require --worker-env for the selected local worker config");
+  const worker = parse(await readFile(workerFile, "utf8"));
+  if (!localEnvs.includes(worker["APP_ENV"] ?? "") || !localEnvs.includes(worker["NODE_ENV"] ?? "")) fail("Worker APP_ENV and NODE_ENV must explicitly be development/test");
+  if (["RAILWAY_ENVIRONMENT_ID", "RAILWAY_ENVIRONMENT_NAME", "RAILWAY_PROJECT_ID", "RAILWAY_SERVICE_ID"].some((key) => worker[key])) fail("Railway targets are outside this local check");
+  const target = richTarget(["--target", "local", "--mode", "check", "--scenario-set", "videos",
+    "--owner-id", values["owner-id"] ?? "", "--viewer-id", values["viewer-id"] ?? ""], env, worker);
+
+  // All target, mapping and capability guards precede requests/client loading.
   try {
     const response = await fetch(new URL("/readyz", api), { redirect: "error", signal: AbortSignal.timeout(5000) });
     const readiness = await response.json() as { status?: string; service?: string; environment?: string; checks?: Record<string, string> };
     if (!response.ok || readiness.status !== "ready" || readiness.service !== "api" || readiness.environment !== env["APP_ENV"] ||
       !["postgres", "redis", "minio"].every((key) => readiness.checks?.[key] === "ok")) fail("not ready");
     console.log(`API ready: ${api.origin}; Postgres/Redis/MinIO ok (${readiness.environment})`);
-
-    phase = "Database check: verify this local database/schema belongs to the selected API; coordinate initial setup separately";
-    db = new Client({ connectionString: database.href, connectionTimeoutMillis: 5000, query_timeout: 5000,
-      options: "-c default_transaction_read_only=on -c statement_timeout=5000" });
-    // Prevent asynchronous socket errors from dumping private connection details.
-    db.on("error", () => undefined);
-    await db.connect();
-    await db.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-    const { UI_FIXTURE, VARIANTS } = await import("./ui-fixture");
-    const { CLIPS } = await import("../../../scripts/local-video-fixture.cjs");
-    const users = await db.query<{ id: string }>('SELECT id FROM users WHERE id = ANY($1::text[])', [UI_FIXTURE.userIds]);
-    if (users.rows.length !== UI_FIXTURE.userIds.length) fail("Fixture Users missing; coordinate explicit initial setup (local-testing.md §1a)");
-    const listings = await db.query<{ id: string; sellerId: string; status: string; deletedAt: unknown }>(
-      'SELECT id, "sellerId", status, "deletedAt" FROM listings WHERE id = ANY($1::text[])', [UI_FIXTURE.listings.map((listing) => listing.id)]);
-    const photos = await db.query<{ listingId: string; key: string; sortOrder: number; width: number; height: number }>(
-      'SELECT "listingId", key, "sortOrder", width, height FROM listing_media WHERE kind = \'image\' AND "listingId" = ANY($1::text[]) ORDER BY "sortOrder"', [UI_FIXTURE.listings.map((listing) => listing.id)]);
-    const conversations = await db.query<{ id: string }>('SELECT id FROM conversations WHERE id = ANY($1::text[])', [UI_FIXTURE.conversationIds]);
-    if (conversations.rows.length !== UI_FIXTURE.conversationIds.length) fail("Fixture conversations missing; coordinate baseline repair explicitly");
-    for (const expected of UI_FIXTURE.listings) {
-      const listing = listings.rows.find((row) => row.id === expected.id);
-      const media = photos.rows.filter((row) => row.listingId === expected.id);
-      if (!listing || listing.sellerId !== expected.sellerId || listing.status !== "active" || listing.deletedAt ||
-        media.length !== expected.photos.length || expected.photos.some((key, order) => media[order]?.key !== key || media[order]?.sortOrder !== order || !((media[order]?.width ?? 0) > 0 && (media[order]?.height ?? 0) > 0))) {
-        fail(`Fixture Listing ${expected.id} missing/incompatible; preserve changes and coordinate baseline repair`);
-      }
-    }
-    const videoTargets = UI_FIXTURE.listings.filter((listing) => listing.sellerId === UI_FIXTURE.sellerId).map((listing) => listing.id).sort().slice(0, CLIPS.length);
-    const videos = await db.query<{ listingId: string; status: string; state: string; bucket: string; durationMs: number; width: number; height: number; manifest: Record<string, { key: string; sizeBytes: number }> }>(
-      `SELECT v."listingId", g.status, s.state, s.bucket, g."durationMs", g.width, g.height, g.manifest
-       FROM listing_videos v JOIN video_generations g ON g.id = v."activeGenerationId" AND g."listingVideoId" = v.id
-       JOIN video_sources s ON s.id = g."sourceId" WHERE v."listingId" = ANY($1::text[])`, [videoTargets]);
-    await db.query("ROLLBACK");
-    const videoBucket = env["LISTING_VIDEO_BUCKET_NAME"] || "listing-videos";
-    for (const id of videoTargets) {
-      const video = videos.rows.find((row) => row.listingId === id);
-      if (!video || video.status !== "Ready" || video.state !== "COMPLETED" || video.bucket !== videoBucket ||
-        !(video.durationMs > 0 && video.width > 0 && video.height > 0) || !video.manifest ||
-        !["master", ...VARIANTS.map((variant) => `cover:${variant}`)].every((member) => video.manifest[member]) ||
-        !Object.keys(video.manifest).some((member) => member.startsWith("playlist:")) ||
-        !Object.keys(video.manifest).some((member) => member.startsWith("segment:")) ||
-        Object.values(video.manifest).some((entry) => !entry || typeof entry.key !== "string" || !entry.key || !Number.isSafeInteger(entry.sizeBytes) || entry.sizeBytes <= 0)) {
-        fail(`Ready video missing/incompatible on ${id}; coordinate video:fixture separately, after any explicit UI reset`);
-      }
-    }
-    console.log(`Baseline present: ${users.rows.length} Users, ${listings.rows.length} Listings, ${conversations.rows.length} conversations; database snapshot read-only`);
-    function storage(endpoint: URL, video: boolean) {
-      const client = new S3Client({ endpoint: endpoint.origin, forcePathStyle: true, maxAttempts: 1,
-        region: (video && env["LISTING_VIDEO_BUCKET_REGION"]) || env["MINIO_REGION"] || "us-east-1",
-        credentials: {
-          accessKeyId: (video && env["LISTING_VIDEO_BUCKET_ACCESS_KEY_ID"]) || env["MINIO_ACCESS_KEY"] || "",
-          secretAccessKey: (video && env["LISTING_VIDEO_BUCKET_SECRET_ACCESS_KEY"]) || env["MINIO_SECRET_KEY"] || "",
-        },
-      });
-      clients.push(client);
-      return client;
-    }
-    const photoStorage = storage(photoEndpoint, false);
-    const videoStorage = storage(videoEndpoint, true);
-    let objectCount = 0;
-    async function head(client: S3Client, bucket: string, key: string, bytes?: number) {
-      const result = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: AbortSignal.timeout(5000) });
-      if (!(result.ContentLength && result.ContentLength > 0) || (bytes !== undefined && result.ContentLength !== bytes)) fail("missing or size mismatch");
-      objectCount++;
-    }
-    phase = "Photo objects missing/unavailable: verify local storage credentials/objects; coordinate repair, do not reseed";
-    for (const photo of photos.rows) for (const variant of ["original", ...VARIANTS]) {
-      await head(photoStorage, "listing-photos", photo.key.replace(/original\.webp$/, `${variant}.webp`));
-    }
-    phase = "Ready-video objects missing/inconsistent: verify local bucket/manifest bytes; coordinate explicit video rebuild";
-    for (const video of videos.rows) for (const entry of Object.values(video.manifest)) {
-      await head(videoStorage, videoBucket, entry.key, entry.sizeBytes);
-    }
-    console.log(`Media available: ${photos.rows.length} photos, ${videos.rows.length} Ready videos; ${objectCount} nonempty objects verified with HEAD`);
-    const members = (key: string) => (env[key] ?? "").split(",").map((id) => id.trim()).filter(Boolean);
-    if (env["LISTING_VIDEO_UPLOADS_ENABLED"] !== "true" ||
-      !members("LISTING_VIDEO_UPLOAD_TESTER_USER_IDS").includes(UI_FIXTURE.sellerId) ||
-      ![UI_FIXTURE.sellerId, UI_FIXTURE.buyerId].every((id) => members("LISTING_VIDEO_VIEW_TESTER_USER_IDS").includes(id))) {
-      fail("Ready video access configuration missing; coordinate the API tester settings and owner restart (local-testing.md §1a)");
-    }
-    console.log("READY (local environment only). No data/auth changed. Device sign-in and build/origin are unverified; follow local-testing.md and native:signin --reuse-only.");
-  } catch (error) {
-    // Only our own actionable messages may cross the CLI boundary.
-    if (error instanceof Error && /^(Fixture |Ready video )/.test(error.message)) throw error;
-    fail(phase);
-  } finally {
-    await db?.end().catch(() => undefined);
-    for (const client of clients) client.destroy();
+  } catch {
+    fail("API readiness: verify the selected API is running; reuse its owner's process");
   }
+  const { runRichScenarios } = await import("./ui-fixtures/rich-scenarios");
+  // The video comparator includes the retained photo and private-draft checks.
+  // Never call an apply path, synthesize a fallback, or duplicate its manifest.
+  const report = await runRichScenarios(target);
+  console.log(JSON.stringify({ target: "local", apiOrigin: api.origin, ownerId: target.ownerId,
+    viewerId: target.video?.viewerId, ...report }, null, 2));
+  if (report.state !== "installed" || report.writes !== 0) fail("Rich baseline absent/incompatible; coordinate explicit rich:scenarios plan/apply for the reported scenarios; no automatic repair");
+  console.log("READY (local environment only). No data/auth changed. Device sign-in and build/origin are unverified; follow local-testing.md and native:signin --reuse-only.");
 }
 
 void main().catch((error: unknown) => {

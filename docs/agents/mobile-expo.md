@@ -38,7 +38,7 @@ Install through pnpm so the committed patches and lockfile apply consistently. D
 
 ## Required verification gate
 
-Native implementers, reviewers and delegate briefs first follow [canonical local readiness and session reuse](local-testing.md#1-check-and-reuse-the-local-baseline). Include that check's result and actual build/served-origin evidence; seeding is explicit coordinated setup, not ordinary preparation.
+Native implementers, reviewers and delegate briefs first follow [canonical local readiness and session reuse](local-testing.md#1-check-and-reuse-the-local-baseline). Include its local target, owner/denial-account mapping and rich photo/private-draft/video versions alongside source SHA, actual build/served origins, account/session reuse and device/process ownership. A refused rich check is a preparation blocker, not permission to fall back to sparse data or seed. Explicit additions use the documented check/plan/apply route. Keep the Android assigned ABI, explicit origins and one-heavy-job rules below in delegate briefs.
 
 
 For any mobile change, run:
