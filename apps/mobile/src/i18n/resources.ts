@@ -28,6 +28,30 @@ export function localeTag(language: string): string {
 export const resources: Resource = {
   ru: {
     common: {
+      vehicleHistory: {
+        title: "История автомобиля",
+        entry: "История автомобиля · 100 TMT",
+        entryDetail: "Carfax / AutoCheck · 100 TMT",
+        intro: "Доступная зарубежная история ввезённого автомобиля.",
+        price: "100 TMT за автомобиль",
+        providers: "Достаточно Carfax или AutoCheck. Если доступны оба отчёта, включаем оба.",
+        coverage: "Записи могут различаться или отсутствовать. Полная история и данные из Туркменистана не гарантируются. Свежая или актуальная проверка не обещана.",
+        condition: "История не гарантирует отсутствие ДТП, не заменяет осмотр и не является общей оценкой состояния от Carberk.",
+        viewSample: "Посмотреть вымышленный пример",
+        outside: "Для любого автомобиля, в том числе без объявления на Carberk.",
+        hours: "Часы работы операторов: ежедневно 09:00–20:00 по времени Ашхабада.",
+        informationOnly: "Здесь доступны только информация и учебный пример. Обращения и оплата пока недоступны.",
+        listingContext: "Открыто из объявления. Оно служит только контекстом и не даёт доступа к личным данным продавца.",
+        sampleTitle: "Вымышленный пример",
+        fictionNotice: "Оригинальный учебный пример Carberk. Все автомобили и события вымышлены. Это не отчёт поставщика.",
+        originalLanguage: "Документ остаётся на исходном английском языке.",
+        download: "Скачать учебный файл",
+        saving: "Подготовка файла…",
+        downloadFailed: "Не удалось сохранить или открыть файл. Проверьте свободное место и повторите попытку.",
+        retryDownload: "Повторить скачивание",
+        saveHint: "На iOS выберите «Сохранить в Файлы» в системном меню. Отмена не экспортирует копию. Пример доступен и без интернета.",
+        unavailable: "История автомобиля недоступна в этой сборке.",
+      },
       // Wizard validation messages. Keys come from @auto-tm/contracts
       // (wizardErrors.*) and are translated here — see ADR-0050.
       wizardErrors: {
@@ -970,6 +994,30 @@ export const resources: Resource = {
   },
   tk: {
     common: {
+      vehicleHistory: {
+        title: "Ulag taryhy",
+        entry: "Ulag taryhy · 100 TMT",
+        entryDetail: "Carfax / AutoCheck · 100 TMT",
+        intro: "Daşary ýurtdan getirilen ulagyň elýeterli taryhy.",
+        price: "Her ulag üçin 100 TMT",
+        providers: "Carfax ýa-da AutoCheck ýeterlikdir. Ikisi hem elýeterli bolsa, ikisi hem goşulýar.",
+        coverage: "Ýazgylar tapawutlanyp ýa-da ýetmezçilik edip biler. Doly taryh we Türkmenistandaky ýazgylar kepillendirilmeýär. Täze ýa-da häzirki barlag wada berilmeýär.",
+        condition: "Taryh ulagyň heläkçiliksizdigini kepillendirmeýär, gözden geçirmegi çalyşmaýar we Carberk tarapyndan umumy ýagdaý bahasy däldir.",
+        viewSample: "Toýlama nusgany gör",
+        outside: "Islendik ulag üçin, Carberk-de bildirişi bolmadyk ulag hem bolýar.",
+        hours: "Operatorlaryň iş wagty: her gün Aşgabat wagty bilen 09:00–20:00.",
+        informationOnly: "Bu ýerde diňe maglumat we okuw nusgasy bar. Ýüz tutmak we töleg entek elýeterli däl.",
+        listingContext: "Bildirişden açyldy. Bildiriş diňe goşmaça maglumatdyr, satyjynyň şahsy maglumatlaryna ygtyýar bermeýär.",
+        sampleTitle: "Toýlama nusga",
+        fictionNotice: "Carberk-iň öz okuw nusgasy. Ähli ulaglar we wakalar toýlamadyr. Bu üpjün edijiniň hasabaty däldir.",
+        originalLanguage: "Resminama asyl iňlis dilinde saklanýar.",
+        download: "Okuw faýlyny ýükle",
+        saving: "Faýl taýýarlanýar…",
+        downloadFailed: "Faýly saklap ýa-da açyp bolmady. Boş ýer bardygyny barlap, gaýtadan synanyşyň.",
+        retryDownload: "Gaýtadan ýükle",
+        saveHint: "iOS ulgamynda ulgam menýusyndan «Save to Files» saýlaň. Ýatyrmak nusgany eksport etmeýär. Nusga internetsiz hem elýeterlidir.",
+        unavailable: "Ulag taryhy bu wersiýada elýeterli däl.",
+      },
       // Wizard validation messages. Keys come from @auto-tm/contracts
       // (wizardErrors.*) and are translated here — see ADR-0050.
       wizardErrors: {
@@ -1912,6 +1960,30 @@ export const resources: Resource = {
   },
   en: {
     common: {
+      vehicleHistory: {
+        title: "Vehicle History",
+        entry: "Vehicle History · 100 TMT",
+        entryDetail: "Carfax / AutoCheck · 100 TMT",
+        intro: "Available history abroad for an imported vehicle.",
+        price: "100 TMT per vehicle",
+        providers: "Carfax or AutoCheck is sufficient. Both are included when obtainable.",
+        coverage: "Records can differ or be missing. Complete history and Turkmenistan records are not guaranteed. A fresh or current lookup is not promised.",
+        condition: "History does not guarantee an accident-free vehicle, replace inspection or form a combined Carberk condition verdict.",
+        viewSample: "View fictional sample",
+        outside: "For a vehicle anywhere, including outside Carberk listings.",
+        hours: "Operator hours: daily 09:00–20:00, Ashgabat time.",
+        informationOnly: "Information and educational sample only. Requests and payment are not available here.",
+        listingContext: "Opened from a listing. The listing is context only; it grants no access to the seller’s private information.",
+        sampleTitle: "Fictional sample",
+        fictionNotice: "An original Carberk educational example. Every vehicle and event is invented. This is not a provider report.",
+        originalLanguage: "The document stays in its original English.",
+        download: "Download educational file",
+        saving: "Preparing file…",
+        downloadFailed: "Couldn’t save or open the file. Check available storage and try again.",
+        retryDownload: "Retry download",
+        saveHint: "On iOS, choose Save to Files in the system sheet. Cancelling does not export a copy. The sample is also usable offline.",
+        unavailable: "Vehicle History is not available in this build.",
+      },
       // Wizard validation messages. Keys come from @auto-tm/contracts
       // (wizardErrors.*) and are translated here — see ADR-0050.
       wizardErrors: {

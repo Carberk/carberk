@@ -7,6 +7,8 @@ import { useTranslation } from "react-i18next";
 import { useListingCount } from "../../api/listings/useListingCount";
 import { BrandLogo } from "../../auth/BrandLogo";
 
+import { HistoryEntry } from "../../vehicle-history/HistoryEntry";
+
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/navigation/ScreenHeader";
 import { Icon } from "@/components/ui/icon";
@@ -46,6 +48,8 @@ export function HomeHeader() {
           <Icon as={Search} className="size-5 text-foreground" strokeWidth={2.2} />
         </Button>
       </View>
+
+      <HistoryEntry className="mx-4" />
 
       <PressableScale
         feedback="surface"

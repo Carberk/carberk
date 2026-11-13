@@ -21,6 +21,8 @@ import { PhotoGallery } from "./PhotoGallery";
 import { PriceDisplay } from "./PriceDisplay";
 import { SellerBlock } from "./SellerBlock";
 
+import { HistoryEntry } from "../../vehicle-history/HistoryEntry";
+
 import { cn } from "@/lib/utils";
 import { useLargeText } from "@/lib/font-scale";
 import { Text } from "@/components/ui/text";
@@ -174,6 +176,7 @@ export function ListingDetailView({
             <Icon as={ChevronRight} className="size-4" />
           </Button>
         )}
+        <HistoryEntry listingId={listing.id} />
         <SpecificationsSection specs={specs} rows={rows} />
         {listing.vinHistory?.decoded === true && (
           <View className="gap-3">
