@@ -19,6 +19,7 @@ describe("Vehicle History desk HTTP authorization", () => {
   let app: NestFastifyApplication;
   let prisma: PrismaService;
   let config: ConfigService;
+  let request: ReturnType<typeof supertest>;
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -28,6 +29,7 @@ describe("Vehicle History desk HTTP authorization", () => {
     app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), app.get(JwtService)));
     app.useGlobalFilters(new GlobalErrorFilter());
     await app.listen(0, "127.0.0.1");
+    request = supertest(app.getHttpServer());
     prisma = app.get(PrismaService);
     config = app.get(ConfigService);
   });
@@ -50,7 +52,7 @@ describe("Vehicle History desk HTTP authorization", () => {
     config.set("VEHICLE_HISTORY_SYNTHETIC_ENABLED", true);
     config.set("VEHICLE_HISTORY_SYNTHETIC_USER_IDS", user.id);
     const token = app.get(JwtService).sign({ sub: user.id, sid: session.id, role });
-    const get = (bearer = token, locale = "en") => supertest(app.getHttpServer())
+    const get = (bearer = token, locale = "en") => request
       .get("/api/v1/vehicle-history/desk").set("Authorization", `Bearer ${bearer}`).set("Accept-Language", locale);
     return { user, session, token, get };
   }
@@ -149,7 +151,7 @@ describe("Vehicle History desk HTTP authorization", () => {
   });
 
   it("requires a signed bearer token", async () => {
-    await supertest(app.getHttpServer()).get("/api/v1/vehicle-history/desk").expect(401);
-    await supertest(app.getHttpServer()).get("/api/v1/vehicle-history/desk").set("Authorization", "Bearer invalid").expect(401);
+    await request.get("/api/v1/vehicle-history/desk").expect(401);
+    await request.get("/api/v1/vehicle-history/desk").set("Authorization", "Bearer invalid").expect(401);
   });
 });
