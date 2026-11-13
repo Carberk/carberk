@@ -13,7 +13,8 @@ import { runRichPhotos, runRichScenarios } from "./rich-scenarios";
 import { richTarget } from "./rich-target";
 
 // This lane always starts disposable services. Missing Docker/FFmpeg fails it.
-describe("rich video operator with real processor and storage", () => {
+// Corruption tests restore edited rows/objects; recovery retires only its separate copy.
+describe("rich video operator with real processor and storage", { concurrent: false }, () => {
   let postgres: StartedPostgreSqlContainer;
   let minio: StartedTestContainer;
   let redis: StartedTestContainer;
@@ -21,6 +22,7 @@ describe("rich video operator with real processor and storage", () => {
   let db: Client;
   let s3: S3Client;
   let target: ReturnType<typeof richTarget>;
+  let imported: Awaited<ReturnType<typeof prepareVideoScenarios>>;
   beforeAll(async () => {
     postgres = await new PostgreSqlContainer("postgres:16-alpine").start();
     minio = await new GenericContainer("cgr.dev/chainguard/minio@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285")
@@ -59,7 +61,15 @@ describe("rich video operator with real processor and storage", () => {
       await runRichPhotos({ ...selected, mode: "apply", planHash: plan.planHash });
     }
   }, 120_000);
-  afterAll(async () => { await h?.close(); await db?.end(); s3?.destroy(); await redis?.stop(); await minio?.stop(); await postgres?.stop(); });
+  // Separate real boundaries: photo fixtures, then Processing import and worker settlement.
+  beforeAll(async () => { imported = await prepareVideoScenarios(); }, 120_000);
+  afterAll(async () => {
+    const errors: unknown[] = [];
+    for (const close of [() => h?.close(), () => db?.end(), () => s3?.destroy(), () => redis?.stop(), () => minio?.stop(), () => postgres?.stop()]) {
+      try { await close(); } catch (error) { errors.push(error); }
+    }
+    if (errors.length) throw new AggregateError(errors, "Disposable video fixture cleanup failed");
+  });
   async function fullSnapshot() {
     const rows = [];
     for (const table of ["users", "sessions", "listing_drafts", "listings", "listing_media", "media_uploads", "listing_videos", "video_sources", "video_generations", "video_output_reservations", "video_upload_cleanups"]) {
@@ -70,18 +80,43 @@ describe("rich video operator with real processor and storage", () => {
   async function snapshot() {
     return (await db.query(`SELECT jsonb_agg(row_to_json(t) ORDER BY id) AS rows FROM listing_drafts t`)).rows;
   }
-  it("plans zero draft writes at the five-draft cap, imports only Processing work, then refuses inflight reapply", async () => {
-    const before = await snapshot();
-    const prior = await h.priorSnapshot();
+  async function prepareVideoScenarios() {
+    const before = structuredClone(await snapshot());
+    const prior = structuredClone(await h.priorSnapshot());
+    const inventory = (await fullSnapshot()).slice(0, 6); // Users, Sessions, drafts, Listings, media and uploads.
     const plan = await runRichScenarios(target);
-    expect(plan.planned).toMatchObject({ slots: 4, sources: 4, generations: 4, drafts: 0 });
-    expect(await snapshot()).toEqual(before);
+    const afterPlan = await snapshot();
     const applied = await runRichScenarios({ ...target, mode: "apply", planHash: plan.planHash });
     expect(applied.state).toBe("processing");
-    expect((await db.query(`SELECT DISTINCT status FROM video_generations WHERE id LIKE 'b1131300-%'`)).rows).toEqual([{ status: "Processing" }]);
-    expect(await snapshot()).toEqual(before);
-    await expect(runRichScenarios(target)).rejects.toThrow(/In-flight/);
+    const processing = (await db.query(`SELECT DISTINCT status FROM video_generations WHERE id LIKE 'b1131300-%'`)).rows;
+    expect(processing).toEqual([{ status: "Processing" }]);
+    const afterApply = await snapshot();
+    const inflight = runRichScenarios(target);
+    await expect(inflight).rejects.toThrow(/In-flight/);
+    const refusal = await inflight.catch((error: unknown) => error instanceof Error ? error.message : String(error));
     await h.processPending();
+    // Deep copies retain actual pre-worker observations, independently of test order.
+    return structuredClone({ before, prior, inventory, plan, afterPlan, applied, processing, afterApply, refusal,
+      afterWorker: await snapshot(), priorAfterWorker: await h.priorSnapshot(), inventoryAfterWorker: (await fullSnapshot()).slice(0, 6) });
+  }
+  it("plans zero draft writes at the five-draft cap, imports only Processing work, then refuses inflight reapply", () => {
+    expect(imported.before[0]?.rows).toHaveLength(5);
+    expect(imported.plan.planned).toMatchObject({ slots: 4, sources: 4, generations: 4, drafts: 0 });
+    expect(imported.afterPlan).toEqual(imported.before);
+    expect(imported.applied.state).toBe("processing");
+    expect(imported.processing).toEqual([{ status: "Processing" }]);
+    expect(imported.afterApply).toEqual(imported.before);
+    expect(imported.refusal).toMatch(/In-flight/);
+    expect(imported.afterWorker).toEqual(imported.before);
+    expect(imported.priorAfterWorker).toEqual(imported.prior);
+    expect(imported.inventoryAfterWorker).toEqual(imported.inventory);
+  });
+  it("deep-checks settled worker outputs and repeats apply without writes, with private authenticated playback", async () => {
+    const before = await snapshot();
+    const prior = await h.priorSnapshot();
+    expect((await db.query(`SELECT status,"failureType" FROM video_generations WHERE id LIKE 'b1131300-%' ORDER BY id`)).rows).toEqual([
+      { status: "Ready", failureType: null }, { status: "Ready", failureType: null }, { status: "Ready", failureType: null }, { status: "Failed", failureType: "SOURCE_INVALID" },
+    ]);
     const checked = await runRichScenarios({ ...target, mode: "check" });
     expect(checked.state).toBe("installed");
     const settled = await fullSnapshot();
