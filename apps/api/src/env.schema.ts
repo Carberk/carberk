@@ -84,6 +84,8 @@ const BaseSchema = z.object({
     .transform((v) => v === "true"),
 
   INSPECTION_INTEREST_ENABLED: booleanFlag,
+  VEHICLE_HISTORY_SYNTHETIC_ENABLED: booleanFlag,
+  VEHICLE_HISTORY_SYNTHETIC_USER_IDS: z.string().default(""),
 
   /** Listing video uploads (ADR-0112): off by default; testers are User IDs. */
   LISTING_VIDEO_UPLOADS_ENABLED: booleanFlag,

@@ -2,6 +2,8 @@
 
 The internal web app provides moderation, content-report review, inspection-interest statistics, audit access, and brand logo management. A top navigation in the authenticated layout links these pages. Broader dashboard capability belongs to the product specification, not this overview.
 
+The separate `/vehicle-history/{tk|ru|en}` shell is a synthetic-only empty desk. It uses the same HTTP-only token bridge, but every load checks current purpose-specific staff authority at the API. It does not inherit marketplace permission or expose broader admin navigation; the admin entry appears only when that API permits access.
+
 Browser JavaScript never receives API tokens. Server-side code stores them in HTTP-only cookies and forwards bearer authentication to the API. Preserve production `__Host-` cookie restrictions, origin validation on browser-posted handlers, and local-only `returnTo` validation. The Node `src/proxy.ts` renews expired requests before rendering or Server Actions, forwarding the rotated cookies to the handler and storing both on the response. Layout/API checks still enforce actual authentication and TOTP elevation. Server Components never rotate tokens or write cookies.
 
 Server-side API calls, including proxy renewal, forward the operator address selected by `src/lib/visitor-ip.ts` from the configured trusted ingress header. The private `API_BASE_URL` and `API_CLIENT_IP_HEADER` must match the API's trusted-IP rule. The ingress must overwrite the configured header; missing or malformed values forward no address and share admin's peer budget. A caller-written `X-Forwarded-For` is never a fallback. See [ADR-0078](../../docs/adr/0078-the-api-trusts-one-configured-header-for-the-client-ip.md).

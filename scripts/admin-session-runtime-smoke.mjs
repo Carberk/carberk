@@ -22,6 +22,7 @@ let rotations = 0;
 let mutations = 0;
 const bearerCalls = [];
 let statusUnavailable = false;
+let historyStatus = 200;
 function session(failure) {
   const old = randomBytes(32).toString("hex");
   const pair = { accessToken: jwt(Math.floor(Date.now() / 1000) + 900), refreshToken: randomBytes(32).toString("hex") };
@@ -50,6 +51,12 @@ const api = createServer(async (req, res) => {
   if (req.url === "/api/v1/auth/admin/totp/status") {
     if (statusUnavailable) { res.writeHead(503); res.end("{}"); return; }
     res.end(JSON.stringify({ enrolled: true, elevated: true }));
+  } else if (req.url === "/api/v1/vehicle-history/desk") {
+    res.writeHead(historyStatus);
+    res.end(JSON.stringify(historyStatus === 200 ? {
+      purpose: "vehicle-history", mode: "synthetic", requests: [],
+      actor: { id: "11750000-0000-4000-8000-000000000001", displayName: "Synthetic Runtime Operator", nameNumber: 1175 },
+    } : { code: historyStatus === 403 ? "HISTORY_ACCESS_DENIED" : "UNAVAILABLE" }));
   } else if (req.url === "/api/v1/admin/reports/r1/dismiss" && req.method === "POST") {
     assert(JSON.parse(body).reason === "Runtime renewal proof", "original action arguments must reach mutation");
     mutations++;
@@ -146,6 +153,31 @@ try {
   console.log("PASS expired GET: cookies persisted; rendering uses renewed bearer");
 
   const currentCookie = `__Host-auto_tm_admin_access=${first.pair.accessToken}; __Host-auto_tm_admin_refresh=${first.pair.refreshToken}`;
+  // Real standalone HTTP/rendering seam; the external API response is the
+  // fixture. Current authority itself is covered by API/disposable-DB tests.
+  for (const [locale, loading, empty, denied, error] of [
+    ["tk", "Rugsat barlanýar", "Entek ýüz tutma ýok", "Bu iş ýerine rugsat ýok", "Iş ýeri açylmady"],
+    ["ru", "Проверяем доступ", "Обращений пока нет", "Нет доступа к рабочему месту", "Не удалось открыть рабочее место"],
+    ["en", "Checking access", "No requests yet", "Desk access denied", "Could not open the desk"],
+  ]) {
+    for (const [status, expected] of [[200, empty], [403, denied], [503, error]]) {
+      historyStatus = status;
+      const response = await fetch(`${origin}/vehicle-history/${locale}`, { headers: { cookie: currentCookie } });
+      const html = await response.text();
+      assert.equal(response.status, 200, "the streaming UI renders the API outcome");
+      assert(html.includes(expected) && html.includes(loading), `${locale}: mapped state and loading fallback must render`);
+      assert.equal(html.includes("Synthetic Runtime Operator"), status === 200, "refusals and outages must not render the operator");
+      assert(!html.includes(first.pair.accessToken) && !html.includes(first.pair.refreshToken), "API tokens stay out of browser HTML");
+    }
+    const outage = session(503);
+    const renewal = await fetch(`${origin}/vehicle-history/${locale}`, { redirect: "manual", headers: { cookie: cookie(outage.old) } });
+    assert.equal(renewal.status, 503);
+    assert.equal(renewal.headers.getSetCookie().length, 0);
+    const body = await renewal.text();
+    assert(body.includes(`lang="${locale}"`) && body.includes(error), "renewal outages retain the desk locale and recovery");
+  }
+  historyStatus = 200;
+  console.log("PASS History desk: real TK/RU/EN empty/loading/denied/error rendering, localized renewal503 and no browser API tokens");
   const crafted = await fetch(`${origin}/login?reason=session-expired&mode=totp`, { redirect: "manual", headers: { cookie: currentCookie } });
   assert.equal(crafted.status, 303);
   assert(crafted.headers.get("location")?.endsWith("/login?mode=totp"), "healthy TOTP must ignore a crafted expiry flag");

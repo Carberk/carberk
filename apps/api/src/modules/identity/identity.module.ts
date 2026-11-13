@@ -42,6 +42,8 @@ import { HttpOtpSenderAdapter } from "./infrastructure/HttpOtpSenderAdapter";
 import { RefreshTokenDigestAdapter } from "./infrastructure/RefreshTokenDigestAdapter";
 import { SystemClockAdapter } from "./infrastructure/SystemClockAdapter";
 import { PrismaIdentityCheckAdapter } from "./infrastructure/PrismaIdentityCheckAdapter";
+import { PrismaStaffAccessAdapter } from "./infrastructure/PrismaStaffAccessAdapter";
+import { STAFF_ACCESS_PORT } from "./domain/ports/StaffAccessPort";
 import { PrismaIdentityReadAdapter } from "./infrastructure/PrismaIdentityReadAdapter";
 import { PrismaIdentityAdminRepository } from "./infrastructure/PrismaIdentityAdminRepository";
 import { PrismaBlockedUserRepository } from "./infrastructure/PrismaBlockedUserRepository";
@@ -94,6 +96,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     RefreshTokenDigestAdapter,
     SystemClockAdapter,
     PrismaIdentityCheckAdapter,
+    { provide: STAFF_ACCESS_PORT, useClass: PrismaStaffAccessAdapter },
     PrismaIdentityReadAdapter,
     PrismaSellerProfileReadAdapter,
     PrismaIdentityAdminRepository,
@@ -241,6 +244,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
   ],
   exports: [
+    STAFF_ACCESS_PORT,
     SELLER_PROFILE_READ_PORT,
     IDENTITY_TOKENS.IdentityCheckPort,
     IDENTITY_TOKENS.ContactPhoneCodePort,

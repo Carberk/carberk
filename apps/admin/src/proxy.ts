@@ -4,8 +4,9 @@ import type { NextRequest } from "next/server";
 import { authCookieSettings, SESSION_EXPIRED_HEADER } from "./lib/auth-cookie-options";
 import { hasCurrentAccessToken, renewSession } from "./lib/session-renewal";
 import { ADMIN_RETURN_TO_HEADER, validateOrigin, validateReturnTo } from "./lib/validators";
+import { deskCopy } from "./lib/history-desk-copy";
 
-const PROTECTED_PREFIXES = ["/reports", "/audit", "/listings", "/users", "/catalog"];
+const PROTECTED_PREFIXES = ["/reports", "/audit", "/listings", "/users", "/catalog", "/vehicle-history"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -30,7 +31,12 @@ export async function proxy(request: NextRequest) {
   if (!hasCurrentAccessToken(request.cookies.get(settings.accessName)?.value)) {
     const renewal = refreshToken ? await renewSession(refreshToken, request.headers) : { kind: "rejected" as const };
     if (renewal.kind === "unavailable") {
-      return new NextResponse("<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\"><title>Временно недоступно</title><body><h1>Временно недоступно. Попробуйте ещё раз.</h1><p>Обновите страницу через несколько секунд. Сессия сохранена.</p></body></html>", {
+      const locale = pathname.startsWith("/vehicle-history/") ? pathname.split("/")[2] : undefined;
+      const t = locale === "tk" || locale === "ru" || locale === "en" ? deskCopy[locale] : null;
+      const body = t
+        ? `<!doctype html><html lang="${locale}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${t.error}</title><body><h1>${t.error}</h1><p>${t.errorBody}</p><form><button>${t.retry}</button></form></body></html>`
+        : "<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\"><title>Временно недоступно</title><body><h1>Временно недоступно. Попробуйте ещё раз.</h1><p>Обновите страницу через несколько секунд. Сессия сохранена.</p></body></html>";
+      return new NextResponse(body, {
         status: 503,
         headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "Retry-After": "5" },
       });

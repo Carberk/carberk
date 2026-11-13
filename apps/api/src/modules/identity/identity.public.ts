@@ -28,6 +28,7 @@ export {
   type ProfilePhotoPort,
 } from "./domain/ports/ProfilePhotoPort";
 export type { PublicIdentity } from "./domain/ports/PublicIdentity";
+export { STAFF_ACCESS_PORT, type StaffAccessPort, type StaffActor } from "./domain/ports/StaffAccessPort";
 export {
   SELLER_PROFILE_READ_PORT,
   type SellerProfile,

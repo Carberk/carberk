@@ -33,6 +33,7 @@ import {
   MeResponseSchema,
 } from "./schemas/auth";
 import { SetProfilePhotoRequestSchema } from "./schemas/identity";
+import { HistoryDeskSchema } from "./schemas/vehicle-history";
 import {
   BrandSummarySchema,
   BrandDetailSchema,
@@ -387,6 +388,17 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   registry.register("ListAuditEntriesResponse", ListAuditEntriesResponseSchema);
 
   // Reports fake-door schemas
+  registry.register("HistoryDesk", HistoryDeskSchema);
+  registry.registerPath({
+    method: "get", path: "/api/v1/vehicle-history/desk", tags: ["Vehicle History"],
+    summary: "Open the local synthetic Vehicle History desk with current staff access",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: { description: "Empty synthetic desk", content: { "application/json": { schema: HistoryDeskSchema } } },
+      401: { description: "Authentication required" },
+      403: { description: "Current session, purpose grant or synthetic gate refused" },
+    },
+  });
   registry.register(
     "CreateInspectionInterestRequest",
     CreateInspectionInterestRequestSchema,
