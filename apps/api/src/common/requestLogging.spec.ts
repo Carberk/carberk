@@ -102,6 +102,17 @@ describe("API request logging", () => {
     expect(log).not.toContain("secret-cover-grant");
   });
 
+  it("keeps observed addresses and gateway proofs out of ordinary diagnostics", async () => {
+    const log = await logOneRequest({
+      "x-real-ip": "203.0.113.77", "x-forwarded-for": "203.0.113.78",
+      "x-carberk-client-proof": "private-signed-proof", "cf-connecting-ip": "203.0.113.79",
+      "x-carberk-gateway-key": "private-gateway-access-key",
+    });
+    for (const secret of ["203.0.113.77", "203.0.113.78", "203.0.113.79", "private-signed-proof", "private-gateway-access-key", "remoteAddress", "remotePort"]) {
+      expect(log).not.toContain(secret);
+    }
+  });
+
   it("never writes a bearer token, a cookie or a set-cookie to the log", async () => {
     const log = await logOneRequest({
       authorization: `Bearer ${TOKEN}`,
@@ -151,10 +162,4 @@ describe("API request logging", () => {
     expect(log).not.toContain("sentine1-configured-ip");
   });
 
-  it("still logs the request IP for requests that issue no sign-in code", async () => {
-    const log = await logOneRequest({ "x-real-ip": "sentine1-real-ip" });
-
-    expect(log).toContain("remoteAddress");
-    expect(log).toContain("sentine1-real-ip");
-  });
 });

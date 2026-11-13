@@ -8,9 +8,12 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import { ConfigService } from "@nestjs/config";
+import { Redis } from "ioredis";
 import { Logger } from "nestjs-pino";
 
 import { createMediaConversionMaintenanceServer } from "./common/media-conversion-maintenance";
+import { registerGatewayAttributionHook } from "./common/gateway-attribution";
+import { GatewayReplayStore } from "./common/gateway-replay-store";
 import { AppModule } from "./app.module";
 import { registerAcceptLanguageHook } from "./common/accept-language";
 import { RealtimeIoAdapter } from "./modules/realtime/infrastructure/RealtimeIoAdapter";
@@ -49,6 +52,21 @@ async function bootstrap() {
       req.headers["x-request-id"] = randomUUID();
     }
     done();
+  });
+  const keys = config.get<Record<string, string>>("GATEWAY_ATTRIBUTION_KEYS") ?? {};
+  const nonceStore = Object.keys(keys).length ? new Redis(config.getOrThrow<string>("REDIS_URL"), {
+    commandTimeout: 1_000, connectTimeout: 1_000, maxRetriesPerRequest: 0, enableOfflineQueue: false,
+  }) : undefined;
+  // Deliberately no raw Redis error: connection details can contain credentials.
+  nonceStore?.on("error", () => {});
+  httpAdapter.getInstance().addHook("onClose", async () => { nonceStore?.disconnect(); });
+  const replayStore = nonceStore ? new GatewayReplayStore(nonceStore) : undefined;
+  registerGatewayAttributionHook(httpAdapter.getInstance(), {
+    keys,
+    claimNonce: async (key) => {
+      if (!replayStore) throw new Error("Nonce store unavailable");
+      return replayStore.claim(key);
+    },
   });
   // A Fastify hook, not Nest middleware: see common/accept-language.ts.
   registerAcceptLanguageHook(httpAdapter.getInstance());
