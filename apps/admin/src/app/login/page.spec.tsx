@@ -208,3 +208,33 @@ it("disables repeated submission and announces progress while the real request i
   await act(async () => resolveRequest(Response.json({ resendInSeconds: 60 })));
   expect(container.textContent).toContain("Sign-in code");
 });
+
+it("requires marketplace admin authority for an ordinary user returning to moderation", async () => {
+  navigation.params.set("returnTo", "/reports");
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+    .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }));
+  await render();
+  element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+  await submit();
+  element<HTMLInputElement>('input[name="code"]').value = "123456";
+  await submit();
+  expect(container.textContent).toContain("Доступ к панели администратора ограничен.");
+  expect(navigation.push).not.toHaveBeenCalled();
+});
+
+it("retries the current session when the status response is lost after a successful phone code", async () => {
+  navigation.params.set("returnTo", "/vehicle-history/en");
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+    .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }))
+    .mockRejectedValueOnce(new Error("lost status response"))
+    .mockResolvedValueOnce(Response.json({ code: "CONFLICT", details: { reason: "TOTP_ALREADY_ENROLLED" } }, { status: 409 }));
+  await render();
+  element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+  await submit();
+  element<HTMLInputElement>('input[name="code"]').value = "123456";
+  await submit();
+  expect(container.textContent).toContain("Retry setup");
+  expect(container.querySelector('input[name="code"]')).toBeNull();
+  await act(async () => element<HTMLButtonElement>("button").click());
+  expect(container.textContent).toContain("Authenticator code or backup code");
+});

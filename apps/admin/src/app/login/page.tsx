@@ -112,6 +112,10 @@ function LoginPageContent() {
         try {
           const result = await verifyOtp(null, formData);
           if (!result.ok) {
+            if (result.restart) {
+              setStep({ kind: "phone", phone: String(formData.get("phone") ?? ""), error: result.error });
+              return;
+            }
             if (result.sessionCreated) {
               setStep({ kind: "totp-setup", phone: String(formData.get("phone") ?? ""), error: result.error });
               return;

@@ -49,7 +49,7 @@ export async function requestOtp(
     const requestedAt = new Date().toISOString();
     const result = await apiFetch<AuthSchemas.OtpRequestResponse>(
       "/auth/otp/request",
-      { method: "POST", body: { phone: parsed.data, ...(intent ? { locale: intent.locale } : {}) } as unknown },
+      { method: "POST", headers: intent ? { "Accept-Language": intent.locale } : {}, body: { phone: parsed.data } as unknown },
     );
     const response: { ok: true; resendInSeconds: number; requestId: string; requestedAt: string; testCode?: string } = {
       ok: true,
@@ -75,7 +75,7 @@ export async function requestOtp(
 }
 
 export type VerifyOtpResult =
-  | { ok: false; error: string; sessionCreated?: boolean }
+  | { ok: false; error: string; sessionCreated?: boolean; restart?: boolean }
   | {
       ok: true;
       next: "totp" | "reports";
@@ -143,7 +143,10 @@ export async function verifyOtp(
     return { ok: true, next: "totp", totpEnrolled: totpStatus.enrolled };
   } catch (err) {
     unstable_rethrow(err);
-    if (historyAuth(returnTo)) return { ok: false, error: scopedError(err, returnTo, t.network), sessionCreated };
+    if (historyAuth(returnTo)) {
+      const restart = err instanceof ApiError && (err.status === 401 || err.status === 403);
+      return { ok: false, error: scopedError(err, returnTo, t.network), sessionCreated: sessionCreated && !restart, restart };
+    }
     if (err instanceof ApiError) {
       if (err.code === ErrorCode.RateLimited) {
         return {
