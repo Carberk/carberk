@@ -3,8 +3,8 @@
 Scope: [R01](https://github.com/Carberk/carberk/issues/1154), under the approved
 [architecture proposal](https://github.com/Carberk/carberk/issues/1153). This is an
 operator procedure, not a production activation or a hosting ADR. Runtime receipts
-belong in the PR/issue or private temporary files, never in git. No R02 gateway or
-native routing behavior is implemented here.
+belong in the PR/issue or private temporary files, never in git. The [R02 gateway procedure](staging-gateway.md) owns the API forwarding service;
+this procedure covers outbound proof only.
 
 ## Selected outbound path
 
