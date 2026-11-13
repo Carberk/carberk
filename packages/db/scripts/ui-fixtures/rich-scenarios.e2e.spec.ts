@@ -10,7 +10,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testconta
 import { Client, type Pool } from "pg";
 import sharp from "sharp";
 import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createTestPool } from "../../tests/testing/create-test-pool";
 
@@ -128,12 +128,28 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     await creator.connect();
     await creator.query("BEGIN");
     await creator.query("SELECT id FROM users WHERE id='seller' FOR UPDATE");
+    const creatorPid = (await creator.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]?.pid;
+    if (!creatorPid) throw new Error("Creator backend missing");
+    let connected!: (pid: number) => void;
+    const databaseReady = new Promise<number>((resolve) => { connected = resolve; });
+    const connect: (this: Client) => Promise<Client> = Client.prototype.connect;
+    // Call through at the external DB boundary: the real renderer must finish
+    // before the bounded lock observation starts, regardless of host speed.
+    const connection = vi.spyOn(Client.prototype, "connect").mockImplementationOnce(async function (this: Client) {
+      await connect.call(this);
+      const pid = (await this.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]?.pid;
+      if (!pid) throw new Error("Apply backend missing");
+      connected(pid);
+      return this;
+    });
     const applying = runRichScenarios({ ...selected, mode: "apply", planHash: plan.planHash }).then(() => "unexpected success", (error: unknown) => String(error));
     try {
-      // Observe the actual owner-lock wait rather than relying on renderer timing.
+      const applyingPid = await Promise.race([databaseReady, applying.then((result) => { throw new Error(`Apply exited before connecting: ${result}`); })]);
+      // PostgreSQL must confirm this apply is blocked by this creator, not by
+      // an unrelated query whose text happens to contain FOR UPDATE.
       let blocked = false;
       for (let attempt = 0; attempt < 500 && !blocked; attempt++) {
-        blocked = Boolean((await pool.query(`SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%FOR UPDATE%' AND pid<>pg_backend_pid()`)).rowCount);
+        blocked = (await pool.query<{ blocked: boolean }>("SELECT $1::int = ANY(pg_blocking_pids($2::int)) AS blocked", [creatorPid, applyingPid])).rows[0]?.blocked ?? false;
         if (!blocked) await new Promise((resolve) => setTimeout(resolve, 20));
       }
       expect(blocked).toBe(true);
@@ -142,7 +158,7 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
       expect(await applying).toContain("Draft capacity: existing=2, required=4, cap=5");
       expect((await pool.query("SELECT id FROM listing_drafts ORDER BY id")).rows).toEqual([{ id: "draft" }, { id: "racing" }]);
       expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toHaveLength(1);
-    } finally { await creator.query("ROLLBACK"); await creator.end(); await applying; }
+    } finally { connection.mockRestore(); await creator.query("ROLLBACK"); await creator.end(); await applying; }
   });
   it("refuses foreign, modified and consumed private drafts and upload/object collisions", async () => {
     const selected = { ...target, scenarioSet: "private-drafts" as const };
