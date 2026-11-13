@@ -11,7 +11,7 @@ import { createGateway } from '../infra/gateway/gateway.mjs';
 
 const key = 'controlled-staging-key-0123456789abcdef';
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
-async function setup(t, handler, overrides = {}) {
+async function setup(t, handler, overrides = {}, proxyMode = 'normal') {
   const dir = await mkdtemp(join(tmpdir(), 'gateway-test-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost', '-keyout', join(dir, 'key'), '-out', join(dir, 'cert')], { stdio: 'ignore' });
@@ -20,10 +20,21 @@ async function setup(t, handler, overrides = {}) {
   const port = await listen(upstream);
   let tunnels = 0;
   const sockets = new Set();
+  const peers = new Set();
+  let peakPeers = 0;
   const proxy = http.createServer();
   proxy.on('connect', (req, client, head) => {
     tunnels++;
     assert.equal(req.url, `localhost:${port}`);
+    sockets.add(client); peers.add(client); peakPeers = Math.max(peakPeers, peers.size);
+    client.on('error', () => {});
+    client.on('close', () => { sockets.delete(client); peers.delete(client); });
+    if (proxyMode !== 'normal') {
+      if (proxyMode === 'stall-tls') client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+      client.on('end', () => client.end());
+      client.resume();
+      return;
+    }
     const remote = net.connect(port, '127.0.0.1', () => {
       client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
       if (head.length) remote.write(head);
@@ -52,7 +63,7 @@ async function setup(t, handler, overrides = {}) {
       req.on('error', reject); req.end(body);
     });
   }
-  return { request, logs, tunnels: () => tunnels, upstream, proxy, port: gatewayPort };
+  return { request, logs, tunnels: () => tunnels, upstream, proxy, gateway, port: gatewayPort, peakPeers: () => peakPeers, peerCount: () => peers.size };
 }
 
 test('controlled client preserves method, raw signed target, body and API status through verified TLS', async t => {
@@ -169,4 +180,79 @@ test('an early API rejection closes an unfinished upload instead of retaining an
   assert.match(result, /HTTP\/1.1 403/);
   assert.match(result, /denied/);
   assert.match(result.toLowerCase(), /connection: close/);
+});
+
+test('chunked DELETE, GET and OPTIONS bodies arrive intact with the origin status preserved', async t => {
+  const f = await setup(t, (req, res) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => { const body = Buffer.concat(chunks).toString(); res.writeHead(body === 'chunked-payload' ? 201 : 400); res.end(body); });
+  });
+  for (const method of ['DELETE', 'GET', 'OPTIONS']) {
+    for (const headers of [{ 'transfer-encoding': 'chunked' }, { 'content-length': '15', connection: 'content-length' }]) {
+      const result = await f.request({ method, path: '/api/v1/body', body: 'chunked-payload', headers });
+      assert.equal(result.status, 201, method);
+      assert.equal(result.body.toString(), 'chunked-payload');
+    }
+  }
+});
+
+for (const phase of ['stall-connect', 'stall-tls']) {
+  test(`at most eight proxy connections exist while ${phase} is pending`, async t => {
+    const f = await setup(t, (_req, res) => res.end(), { deadlineMs: 250, connectMs: 2000 }, phase);
+    const responses = await Promise.all(Array.from({ length: 16 }, () => f.request()));
+    assert.ok(responses.every(r => r.status === 504));
+    assert.ok(f.peakPeers() <= 8, `Observed ${f.peakPeers()} simultaneous proxy connections`);
+  });
+
+  test(`client cancellation promptly closes its pending ${phase} transport`, async t => {
+    const f = await setup(t, (_req, res) => res.end(), { connectMs: 3000 }, phase);
+    for (let i = 0; i < 32; i++) {
+      const connected = new Promise(resolve => f.proxy.once('connect', (_req, socket) => resolve(socket)));
+      const req = http.request({ hostname: '127.0.0.1', port: f.port, path: '/healthz',
+        headers: { host: 'gateway.example.test', 'x-carberk-gateway-key': key } });
+      req.on('error', () => {}); req.end();
+      const peer = await connected;
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(Error('Cancelled transport retained')), 500);
+        peer.once('close', () => { clearTimeout(timer); resolve(); });
+        req.destroy();
+      });
+    }
+    assert.equal(f.peerCount(), 0);
+  });
+}
+
+test('cancelled queued clients never dial later and release their admission slots', async t => {
+  const f = await setup(t, (_req, res) => res.end(), { deadlineMs: 1000, connectMs: 2000 }, 'stall-connect');
+  const peers = [];
+  const connected = new Promise(resolve => f.proxy.on('connect', (_req, socket) => {
+    peers.push(socket); if (peers.length === 8) resolve();
+  }));
+  function start(path) {
+    const req = http.request({ hostname: '127.0.0.1', port: f.port, path,
+      headers: { host: 'gateway.example.test', 'x-carberk-gateway-key': key } });
+    req.on('error', () => {}); req.end(); return req;
+  }
+  const running = Array.from({ length: 8 }, () => start('/healthz'));
+  await connected;
+  const serverClosed = [];
+  const received = new Promise(resolve => f.gateway.on('request', (req, res) => {
+    if (req.url.startsWith('/healthz?queued=')) {
+      serverClosed.push(new Promise(r => res.once('close', r)));
+      if (serverClosed.length === 8) resolve();
+    }
+  }));
+  const queued = Array.from({ length: 8 }, (_, i) => start('/healthz?queued=' + i));
+  await received;
+  for (const req of queued) req.destroy();
+  await Promise.all(serverClosed);
+  const peerClosed = peers.map(socket => new Promise(resolve => socket.once('close', resolve)));
+  for (const req of running) req.destroy();
+  await Promise.all(peerClosed);
+  assert.equal(f.tunnels(), 8);
+  // All cancelled work drains; a fresh client is admitted and reaches the proxy.
+  const result = await f.request();
+  assert.equal(result.status, 504);
+  assert.equal(f.tunnels(), 9);
 });

@@ -33,8 +33,10 @@ stays interrupted, rather than ending a truncated body as a successful transfer.
 Requests have a 30-second total deadline, six-second CONNECT/TLS budget, 16 MiB
 upload limit and 16 concurrent-request limit. Streaming uses backpressure and
 bounded stream buffers, with no durable body spool/cache. The upstream agent
-reuses at most eight connections and keeps at most four free. nginx also disables
-request/response buffering, gzip transformation and upstream retry. Logs contain
+counts CONNECT/TLS attempts within its eight-connection limit and keeps at most
+four free. Cancelling a client closes its pending transport; cancelled queued
+requests retain admission slots until cleanup and never initiate a later tunnel.
+nginx also disables request/response buffering, gzip transformation and upstream retry. Logs contain
 only method category, status, outcome and duration; never targets, headers or bodies.
 
 Until R03, Railway sees the relay's ingress address. Do not increase trusted hop
@@ -149,6 +151,7 @@ reloads; it needs the same existing-service authority as activation.
 ## References
 
 - [Node 24 HTTPS](https://nodejs.org/docs/latest-v24.x/api/https.html): agents and TLS.
+- [Node TLS](https://nodejs.org/docs/latest-v24.x/api/tls.html): validated TLS over a Duplex transport.
 - [Node streams](https://nodejs.org/docs/latest-v24.x/api/stream.html): backpressure.
 - [Node release checksums](https://nodejs.org/dist/v24.13.0/SHASUMS256.txt).
 - [nginx proxy module](https://nginx.org/en/docs/http/ngx_http_proxy_module.html).

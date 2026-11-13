@@ -1,6 +1,7 @@
 import http from 'node:http';
 import https from 'node:https';
 import tls from 'node:tls';
+import { Duplex, PassThrough } from 'node:stream';
 import { timingSafeEqual } from 'node:crypto';
 
 const methods = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
@@ -23,28 +24,50 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
       || !/^[a-z0-9.-]+$/.test(hostname) || typeof accessKey !== 'string' || accessKey.length < 32) throw Error('Invalid gateway configuration');
   const expectedKey = Buffer.from(accessKey);
   const agent = new https.Agent({ keepAlive: true, maxSockets: 8, maxTotalSockets: 8, maxFreeSockets: 4, timeout: 15_000 });
-  agent.createConnection = (_options, callback) => {
-    let settled = false;
-    const done = (error, socket) => { if (!settled) { settled = true; callback(error, socket); } };
-    let secure;
-    const tunnel = http.request({ hostname: relay.hostname, port: relay.port || 80, method: 'CONNECT',
-      path: `${upstream.hostname}:${upstream.port || 443}`, headers: { host: upstream.host }, agent: false });
-    const timer = setTimeout(() => {
-      const error = Error('Connect deadline');
-      secure?.destroy(error); tunnel.destroy(error); done(error);
-    }, connectMs);
-    tunnel.once('error', error => { clearTimeout(timer); done(error); });
-    tunnel.once('connect', (response, socket, head) => {
-      if (response.statusCode !== 200 || head.length) {
-        clearTimeout(timer); socket.destroy(); done(Error('Tunnel refused')); return;
-      }
-      secure = tls.connect({ socket, servername: upstream.hostname, rejectUnauthorized: true, ...(ca ? { ca } : {}) });
-      secure.once('error', error => { clearTimeout(timer); done(error); });
-      secure.once('secureConnect', () => { clearTimeout(timer); done(null, secure); });
-      // The same deadline covers CONNECT plus the TLS handshake.
-      tunnel.once('error', () => secure.destroy());
+  const pendingConnections = new WeakMap();
+  agent.createConnection = () => {
+    // Count the TLS socket immediately, but do not dial until Node assigns it
+    // to a live request. Cancelled queued requests never start a transport.
+    let peer;
+    let tunnel;
+    let timer;
+    const outgoing = new PassThrough({ highWaterMark: 64 * 1024 });
+    const stream = new Duplex({
+      highWaterMark: 64 * 1024,
+      read() { peer?.resume(); },
+      write(chunk, encoding, callback) { outgoing.write(chunk, encoding, callback); },
+      final(callback) { outgoing.end(callback); },
+      destroy(error, callback) { outgoing.destroy(); peer?.destroy(); callback(error); },
     });
-    tunnel.end();
+    const secure = tls.connect({ socket: stream, servername: upstream.hostname,
+      rejectUnauthorized: true, ...(ca ? { ca } : {}) });
+    secure.once('secureConnect', () => clearTimeout(timer));
+    secure.once('close', () => {
+      clearTimeout(timer); pendingConnections.delete(secure);
+      tunnel?.destroy(); peer?.destroy(); stream.destroy();
+    });
+    for (const part of [stream, outgoing]) part.on('error', error => secure.destroy(error));
+    pendingConnections.set(secure, () => {
+      pendingConnections.delete(secure);
+      if (secure.destroyed) return;
+      timer = setTimeout(() => secure.destroy(Error('Connect deadline')), connectMs);
+      tunnel = http.request({ hostname: relay.hostname, port: relay.port || 80, method: 'CONNECT',
+        path: `${upstream.hostname}:${upstream.port || 443}`, headers: { host: upstream.host }, agent: false });
+      tunnel.once('error', error => secure.destroy(error));
+      tunnel.once('connect', (response, socket, head) => {
+        peer = socket;
+        peer.once('error', error => secure.destroy(error));
+        peer.once('close', () => secure.destroy());
+        if (secure.destroyed || response.statusCode !== 200 || head.length) {
+          peer.destroy(); secure.destroy(Error('Tunnel refused')); return;
+        }
+        peer.on('data', chunk => { if (!stream.push(chunk)) peer.pause(); });
+        peer.once('end', () => stream.push(null));
+        outgoing.pipe(peer);
+      });
+      tunnel.end();
+    });
+    return secure;
   };
   let active = 0;
   const server = http.createServer({ maxHeaderSize: 16 * 1024, highWaterMark: 64 * 1024 }, (req, res) => {
@@ -52,13 +75,17 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
     let counted = false;
     let outbound;
     let responseStream;
+    let outboundClosed = false;
     let outcome = 'response';
     let done = false;
+    const release = () => {
+      if (counted && done && (!outbound || outboundClosed)) { active--; counted = false; }
+    };
     const timer = setTimeout(() => fail(504, 'deadline'), deadlineMs);
     const finish = () => {
       if (done) return;
       done = true; clearTimeout(timer);
-      if (counted) active--;
+      release();
       if (!req.complete) { req.unpipe(); req.pause(); outbound?.destroy(); }
       if (!res.writableFinished) { outbound?.destroy(); responseStream?.destroy(); }
       log({ method: methods.has(req.method) ? req.method : 'OTHER', status: res.headersSent ? res.statusCode : 0,
@@ -83,6 +110,10 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
     active++; counted = true;
     const headers = headersFor(req.headers);
     headers.host = upstream.host;
+    // Rebuild framing from the parsed message after hop-by-hop filtering. Node
+    // otherwise omits chunked bodies for methods such as DELETE/GET/OPTIONS.
+    if (req.headers['content-length'] !== undefined) headers['content-length'] = req.headers['content-length'];
+    else if (req.headers['transfer-encoding']) headers['transfer-encoding'] = req.headers['transfer-encoding'];
     outbound = https.request({ hostname: upstream.hostname, port: upstream.port || 443, method: req.method,
       path: req.url, headers, agent }, originResponse => {
       responseStream = originResponse;
@@ -103,7 +134,9 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
       originResponse.once('error', () => fail(502, 'upstream_interrupted'));
       originResponse.pipe(res);
     });
+    outbound.once('socket', socket => pendingConnections.get(socket)?.());
     outbound.once('error', () => fail(502, 'upstream_unavailable'));
+    outbound.once('close', () => { outboundClosed = true; release(); });
     let bytes = 0;
     req.on('data', chunk => { bytes += chunk.length; if (bytes > maxBodyBytes) fail(413, 'body_limit'); });
     req.once('aborted', () => { outbound.destroy(); res.destroy(); });
