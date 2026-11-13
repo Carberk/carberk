@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import { authCookieSettings, SESSION_EXPIRED_HEADER } from "./lib/auth-cookie-options";
 import { hasCurrentAccessToken, renewSession } from "./lib/session-renewal";
 import { ADMIN_RETURN_TO_HEADER, validateOrigin, validateReturnTo } from "./lib/validators";
+import { authCopy, historyAuth } from "./lib/history-auth";
 import { deskCopy } from "./lib/history-desk-copy";
 
 const PROTECTED_PREFIXES = ["/reports", "/audit", "/listings", "/users", "/catalog", "/vehicle-history"];
@@ -26,14 +27,22 @@ export async function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 403 });
   }
 
-  const safeReturnTo = validateReturnTo(`${pathname}${request.nextUrl.search}`);
+  const safeReturnTo = validateReturnTo(pathname === "/login" ? request.nextUrl.searchParams.get("returnTo") : `${pathname}${request.nextUrl.search}`);
   let tokens: { accessToken: string; refreshToken: string } | undefined;
   if (!hasCurrentAccessToken(request.cookies.get(settings.accessName)?.value)) {
     const renewal = refreshToken ? await renewSession(refreshToken, request.headers) : { kind: "rejected" as const };
     if (renewal.kind === "unavailable") {
       const locale = pathname.startsWith("/vehicle-history/") ? pathname.split("/")[2] : undefined;
       const t = locale === "tk" || locale === "ru" || locale === "en" ? deskCopy[locale] : null;
-      const body = t
+      const loginCopy = pathname === "/login" ? authCopy[historyAuth(request.nextUrl.searchParams.get("returnTo"))?.locale ?? "ru"] : null;
+      const retry = new URLSearchParams();
+      if (request.nextUrl.searchParams.get("reason") === "session-expired") retry.set("reason", "session-expired");
+      if (request.nextUrl.searchParams.get("mode") === "totp") retry.set("mode", "totp");
+      if (safeReturnTo) retry.set("returnTo", safeReturnTo);
+      const retryUrl = `/login?${retry}`.replaceAll("&", "&amp;");
+      const body = loginCopy
+        ? `<!doctype html><html lang="${historyAuth(request.nextUrl.searchParams.get("returnTo"))?.locale ?? "ru"}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${loginCopy.title}</title><body><h1>${loginCopy.title}</h1><p role="alert">${loginCopy.network}</p><a href="${retryUrl}">${loginCopy.retryAction}</a></body></html>`
+        : t
         ? `<!doctype html><html lang="${locale}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${t.error}</title><body><h1>${t.error}</h1><p>${t.errorBody}</p><form><button>${t.retry}</button></form></body></html>`
         : "<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\"><title>Временно недоступно</title><body><h1>Временно недоступно. Попробуйте ещё раз.</h1><p>Обновите страницу через несколько секунд. Сессия сохранена.</p></body></html>";
       return new NextResponse(body, {

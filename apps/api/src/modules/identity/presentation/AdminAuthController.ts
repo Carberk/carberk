@@ -16,6 +16,11 @@ import { EnrollAdminTotp } from "../application/EnrollAdminTotp";
 import { VerifyAdminTotp } from "../application/VerifyAdminTotp";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
 import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
+import { STAFF_ACCESS_PORT, type StaffAccessPort } from "../domain/ports/StaffAccessPort";
+import { PrismaIdentityCheckAdapter } from "../infrastructure/PrismaIdentityCheckAdapter";
+import type { IdentityCheckPort } from "../domain/ports/IdentityCheckPort";
+import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
+import type { ClockPort } from "../domain/ports/ClockPort";
 
 type AuthenticatedRequest = FastifyRequest & {
   user?: { sub?: string; sid?: string; role?: string };
@@ -32,6 +37,9 @@ export class AdminAuthController {
     private readonly verifyUC: VerifyAdminTotp,
     @Inject(PrismaSessionRepository)
     private readonly sessionRepo: SessionRepository,
+    @Inject(STAFF_ACCESS_PORT) private readonly staff: StaffAccessPort,
+    @Inject(PrismaIdentityCheckAdapter) private readonly identity: IdentityCheckPort,
+    @Inject(SystemClockAdapter) private readonly clock: ClockPort,
   ) {}
 
   @Get("status")
@@ -105,7 +113,13 @@ export class AdminAuthController {
         message: "Admin session required",
       });
     }
-    if (user.role !== "admin") {
+    const purpose = (req.query as { purpose?: unknown }).purpose;
+    if (purpose === "vehicle-history") {
+      const actor = await this.staff.findEligibleActor({ userId: user.sub, sessionId: user.sid, purpose });
+      if (!actor) throw new ForbiddenException({ code: "HISTORY_ACCESS_DENIED", message: "Current History staff session required" });
+      return { userId: actor.id, sessionId: user.sid };
+    }
+    if (purpose !== undefined || !await this.identity.isAdmin(user.sub)) {
       throw new ForbiddenException({
         code: "FORBIDDEN",
         message: "Admin role required",
@@ -113,7 +127,7 @@ export class AdminAuthController {
     }
 
     const session = await this.sessionRepo.findById(user.sid);
-    if (!session || session.userId !== user.sub) {
+    if (!session || session.userId !== user.sub || session.expiresAt <= this.clock.now()) {
       throw new ForbiddenException({
         code: "FORBIDDEN",
         message: "Session ownership mismatch",

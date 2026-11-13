@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { waitFor } from "@testing-library/react";
 import type * as NextNavigation from "next/navigation";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -102,4 +103,195 @@ describe("operator login errors", () => {
     expect(navigation.push).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+});
+
+
+describe("scoped History sign-in", () => {
+  it("takes an explicitly granted ordinary user through phone, TOTP and the preserved English desk", async () => {
+    navigation.params.set("returnTo", "/vehicle-history/en?queue=unpaid");
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+      .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }))
+      .mockResolvedValueOnce(Response.json({ enrolled: true, elevated: false }))
+      .mockResolvedValueOnce(Response.json({ adminTotpExpiresAt: "2026-11-15T12:00:00Z" }));
+    await render();
+    expect(container.textContent).toContain("Sign in to Vehicle History");
+    element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+    await submit();
+    element<HTMLInputElement>('input[name="code"]').value = "123456";
+    await submit();
+    expect(container.textContent).toContain("Authenticator code");
+    element<HTMLInputElement>('input[name="code"]').value = "654321";
+    await submit();
+    expect(navigation.push).toHaveBeenCalledWith("/vehicle-history/en?queue=unpaid");
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url))).toEqual([
+      expect.stringContaining("/auth/otp/request"), expect.stringContaining("/auth/otp/verify"),
+      expect.stringContaining("/auth/admin/totp/status?purpose=vehicle-history"),
+      expect.stringContaining("/auth/admin/totp/verify?purpose=vehicle-history"),
+    ]);
+    expect(container.innerHTML).not.toContain("synthetic-access");
+    expect(container.innerHTML).not.toContain("synthetic-refresh");
+  });
+});
+
+const locales = [
+  ["tk", "Awtoulag taryhyna giriş", "Sessiýanyň möhleti gutardy. Gaýtadan giriň.", "Kod nädogry. Gaýtadan synanyşyň.", "Awtoulag taryhyna häzirki rugsat ýok.", "Baglanyşyk ýok.", "Kod 6 sandan ybarat bolmaly."],
+  ["ru", "Вход в историю автомобиля", "Сессия истекла. Войдите снова.", "Неверный код. Попробуйте ещё раз.", "Нет действующего доступа к истории автомобиля.", "Нет соединения.", "Код должен содержать 6 цифр."],
+  ["en", "Sign in to Vehicle History", "Your session expired. Sign in again.", "Incorrect code. Try again.", "Current Vehicle History access is missing.", "Connection unavailable.", "Enter a 6-digit code."],
+] as const;
+
+describe.each(locales)("real localized History auth: %s", (locale, title, expired, invalid, denied, network, validation) => {
+  beforeEach(() => { navigation.params.set("returnTo", `/vehicle-history/${locale}`); });
+  it("offers a fresh localized form after expiry", async () => {
+    navigation.params.set("reason", "session-expired");
+    await render();
+    expect(container.textContent).toContain(title);
+    expect(container.querySelector("[role=alert]")?.textContent).toContain(expired);
+    expect(element<HTMLElement>("main").lang).toBe(locale);
+  });
+  it.each([400, 401, 403, 503, 0])("keeps API %s recovery actionable without exposing raw errors", async (status) => {
+    navigation.params.set("mode", "totp");
+    if (status === 0) vi.mocked(fetch).mockRejectedValue(new Error("private upstream failure"));
+    else vi.mocked(fetch).mockResolvedValue(Response.json({ code: "INVALID_TOTP", message: "private upstream failure" }, { status }));
+    await render();
+    element<HTMLInputElement>('input[name="code"]').value = "654321";
+    await submit();
+    expect(container.querySelector("[role=alert]")?.textContent).toContain(status === 400 ? invalid : status === 401 ? expired : status === 403 ? denied : network);
+    expect(container.textContent).not.toContain("private upstream failure");
+    expect(navigation.push).not.toHaveBeenCalled();
+    await act(async () => element<HTMLButtonElement>('button[type="button"]').click());
+    expect(container.querySelector('input[name="phone"]')).not.toBeNull();
+  });
+  it("validates the sign-in code on the server in the selected locale", async () => {
+    vi.mocked(fetch).mockResolvedValue(Response.json({ resendInSeconds: 60 }));
+    await render();
+    element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+    await submit();
+    element<HTMLInputElement>('input[name="code"]').value = "123";
+    await submit();
+    expect(container.querySelector("[role=alert]")?.textContent).toContain(validation);
+  });
+  it("recovers enrollment after a network failure and keeps the desk destination through backup codes", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+      .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }))
+      .mockResolvedValueOnce(Response.json({ enrolled: false, elevated: false }))
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(Response.json({ qrCodeUrl: "otpauth://totp/Synthetic?secret=JBSWY3DPEHPK3PXP" }))
+      .mockResolvedValueOnce(Response.json({ adminTotpExpiresAt: "2026-11-15T12:00:00Z", backupCodes: ["abcdef0123456789"] }));
+    await render();
+    element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+    await submit();
+    element<HTMLInputElement>('input[name="code"]').value = "123456";
+    await submit();
+    expect(container.querySelector("[role=alert]")?.textContent).toContain(network);
+    expect(container.querySelector("img")).toBeNull();
+    await act(async () => element<HTMLButtonElement>('button').click());
+    await waitFor(() => {
+      expect(element<HTMLImageElement>("img").src).toMatch(/^data:image\/png/);
+      expect(element<HTMLInputElement>('input[name="code"]').disabled).toBe(false);
+      expect(element<HTMLButtonElement>('button[type="submit"]').disabled).toBe(false);
+    });
+    element<HTMLInputElement>('input[name="code"]').value = "654321";
+    await submit();
+    expect(container.textContent).toContain("abcdef0123456789");
+    const buttons = container.querySelectorAll("button");
+    await act(async () => buttons[buttons.length - 1]?.click());
+    expect(navigation.push).toHaveBeenCalledWith(`/vehicle-history/${locale}`);
+  });
+});
+
+it("disables repeated submission and announces progress while the real request is pending", async () => {
+  navigation.params.set("returnTo", "/vehicle-history/en");
+  let resolveRequest!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
+  await render();
+  element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+  await submit();
+  expect(element<HTMLFormElement>("form").getAttribute("aria-busy")).toBe("true");
+  expect(element<HTMLButtonElement>('button[type="submit"]').disabled).toBe(true);
+  expect(container.textContent).toContain("Sending…");
+  await act(async () => resolveRequest(Response.json({ resendInSeconds: 60 })));
+  expect(container.textContent).toContain("Sign-in code");
+});
+
+it("requires marketplace admin authority for an ordinary user returning to moderation", async () => {
+  navigation.params.set("returnTo", "/reports");
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+    .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }));
+  await render();
+  element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+  await submit();
+  element<HTMLInputElement>('input[name="code"]').value = "123456";
+  await submit();
+  expect(container.textContent).toContain("Доступ к панели администратора ограничен.");
+  expect(navigation.push).not.toHaveBeenCalled();
+});
+
+it("retries the current session when the status response is lost after a successful phone code", async () => {
+  navigation.params.set("returnTo", "/vehicle-history/en");
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+    .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }))
+    .mockRejectedValueOnce(new Error("lost status response"))
+    .mockResolvedValueOnce(Response.json({ code: "CONFLICT", details: { reason: "TOTP_ALREADY_ENROLLED" } }, { status: 409 }));
+  await render();
+  element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+  await submit();
+  element<HTMLInputElement>('input[name="code"]').value = "123456";
+  await submit();
+  expect(container.textContent).toContain("Retry setup");
+  expect(container.querySelector('input[name="code"]')).toBeNull();
+  await act(async () => element<HTMLButtonElement>("button").click());
+  expect(container.textContent).toContain("Authenticator code or backup code");
+});
+
+
+it("switches locale during TOTP without losing the active step or scoped query", async () => {
+  navigation.params = new URLSearchParams("mode=totp&returnTo=%2Fvehicle-history%2Ftk%3Fqueue%3Dunpaid");
+  const replace = vi.spyOn(window.history, "replaceState").mockImplementation((_data, _unused, url) => {
+    navigation.params = new URL(String(url), "http://localhost").searchParams;
+  });
+  try {
+    await render();
+    await act(async () => element<HTMLAnchorElement>('a[lang="ru"]').click());
+    await render();
+    expect(container.textContent).toContain("Код из приложения-аутентификатора или резервный код");
+    expect(container.querySelector('input[type="tel"]')).toBeNull();
+    expect(element<HTMLInputElement>('input[name="returnTo"]').value).toBe("/vehicle-history/ru?queue=unpaid");
+    expect(navigation.params.get("mode")).toBe("totp");
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { replace.mockRestore(); }
+});
+
+it("preserves enrollment and backup acknowledgment when changing languages after an expired entry", async () => {
+  navigation.params = new URLSearchParams("reason=session-expired&returnTo=%2Fvehicle-history%2Fen");
+  const replace = vi.spyOn(window.history, "replaceState").mockImplementation((_data, _unused, url) => {
+    navigation.params = new URL(String(url), "http://localhost").searchParams;
+  });
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+    .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }))
+    .mockResolvedValueOnce(Response.json({ enrolled: false, elevated: false }))
+    .mockResolvedValueOnce(Response.json({ qrCodeUrl: "otpauth://totp/Synthetic?secret=JBSWY3DPEHPK3PXP" }))
+    .mockResolvedValueOnce(Response.json({ adminTotpExpiresAt: "2026-11-15T12:00:00Z", backupCodes: ["abcdef0123456789"] }));
+  try {
+    await render();
+    element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+    await submit();
+    element<HTMLInputElement>('input[name="code"]').value = "123456";
+    await submit();
+    await waitFor(() => expect(element<HTMLInputElement>('input[name="code"]').disabled).toBe(false));
+    const qr = element<HTMLImageElement>("img").src;
+    await act(async () => element<HTMLAnchorElement>('a[lang="ru"]').click());
+    await render();
+    expect(element<HTMLImageElement>("img").src).toBe(qr);
+    expect(container.textContent).toContain("Отсканируйте QR-код");
+    element<HTMLInputElement>('input[name="code"]').value = "654321";
+    await submit();
+    await waitFor(() => expect(container.textContent).toContain("abcdef0123456789"));
+    await act(async () => element<HTMLAnchorElement>('a[lang="tk"]').click());
+    await render();
+    expect(container.textContent).toContain("Ätiýaçlyk kodlar");
+    expect(container.textContent).toContain("abcdef0123456789");
+    const buttons = container.querySelectorAll("button");
+    await act(async () => buttons[buttons.length - 1]?.click());
+    expect(navigation.push).toHaveBeenCalledWith("/vehicle-history/tk");
+  } finally { replace.mockRestore(); }
 });

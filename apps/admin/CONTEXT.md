@@ -10,7 +10,7 @@ Server-side API calls, including proxy renewal, forward the operator address sel
 
 `API_BASE_URL` accepts an http(s) origin or an address ending in `/api/v1`, with an optional trailing slash. Production requires it and validates it at server initialization, before accepting requests. Development retains the public-URL/local fallback. The network regression in `apps/api/src/modules/identity/presentation/AdminApiBridge.spec.ts` uses the real admin client and running API OTP controller; it does not replace `fetch`.
 
-Sign-in creates an ordinary session. Admin access additionally needs TOTP elevation. Pending enrollment reuses the same secret until verification; refresh does not extend the elevation deadline. Logout clears local cookies even if API revocation fails. Keep token and credential values out of logs and errors.
+Sign-in creates an ordinary session. Admin access additionally needs TOTP elevation. The localized History return destination selects a separate sign-in/TOTP intent: an ordinary User needs a current explicit History grant and matching active session. That flow grants no marketplace Admin permission. Pending enrollment reuses the same secret until verification; refresh does not extend the elevation deadline. Logout clears local cookies even if API revocation fails. Keep token and credential values out of logs and errors.
 
 The Brands page (`/catalog/brands`) lists every brand with its logo or a letter fallback and uploads, replaces, or removes a logo through server actions. The browser sends the file to the server action, which checks type and size, asks the API for a presigned PUT, uploads the file to storage from the server, and confirms the key with the API; the API owns the full validation.
 

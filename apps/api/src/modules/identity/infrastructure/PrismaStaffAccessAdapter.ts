@@ -13,12 +13,20 @@ export class PrismaStaffAccessAdapter implements StaffAccessPort {
   ) {}
 
   async findCurrentActor(input: Parameters<StaffAccessPort["findCurrentActor"]>[0]): Promise<StaffActor | null> {
+    return this.findActor(input, true);
+  }
+
+  async findEligibleActor(input: Parameters<StaffAccessPort["findEligibleActor"]>[0]): Promise<StaffActor | null> {
+    return this.findActor(input, false);
+  }
+
+  private async findActor(input: Parameters<StaffAccessPort["findCurrentActor"]>[0], elevated: boolean): Promise<StaffActor | null> {
     if (input.purpose !== "vehicle-history") return null;
     const now = this.clock.now();
     const session = await this.prisma.session.findFirst({
       where: {
         id: input.sessionId, userId: input.userId,
-        expiresAt: { gt: now }, adminTotpExpiresAt: { gt: now },
+        expiresAt: { gt: now }, ...(elevated ? { adminTotpExpiresAt: { gt: now } } : {}),
         user: {
           suspendedAt: null, deletionScheduledAt: null,
           OR: [{ phone: { not: null } }, { email: { not: null } }],
