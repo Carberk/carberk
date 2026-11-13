@@ -11,6 +11,10 @@ The following foundation paragraph records the 2026-09-13 evidence, not current 
 
 [ADR-0108](../../adr/0108-small-prs-with-full-send-replace-integration-delivery.md) retired ADR-0098's shared staging acceptance lane. Staging redeploys from `main` after CI; the [environment guide](../../agents/environment.md) says what agents may do there. Repository tests retain hosted disposable services; production promotion stays a separate release action. Historical evidence below establishes only its dated claims; inspect current deployment IDs, SHAs and readiness for a new release.
 
+For bounded VPS outbound validation and the prepared shared-port ingress design,
+use the [R01 staging egress procedure](staging-egress.md). It does not activate a
+production gateway or authorize changes to existing VPS services.
+
 ## Pre-flight checklist
 
 Before kicking off a release:

@@ -1,0 +1,28 @@
+# Prepared only. Installation/enabling is a separate authorized operation.
+[Unit]
+Description=Carberk fixed outbound relay
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+LoadCredential=relay.json:/etc/carberk/egress.json
+ExecStart=/usr/local/bin/xray run -c %d/relay.json
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+MemoryMax=96M
+CPUQuota=50%
+TasksMax=32
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
