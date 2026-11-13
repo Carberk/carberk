@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Carberk manual wallet payment — disposable prototype</title>
+<style>
+:root{color-scheme:light dark;--background:light-dark(#f4f4f2,#101012);--foreground:light-dark(#171717,#fafaf9);--muted:light-dark(#ececea,#29292d);--muted-foreground:light-dark(#525251,#d2d0cb);--card:light-dark(#fff,#1c1c20);--secondary:light-dark(#f4f4f2,#29292d);--border:light-dark(#dededb,#414145);--ring:light-dark(#c20000,#ff7878);--primary:light-dark(#c20000,#ff7878);--primary-foreground:light-dark(#fff,#171717);--accent:light-dark(#ffebeb,#402427);--success:light-dark(#216443,#9be1b6);--destructive:light-dark(#a13c12,#ffbca0);--radius:14px;--font-sans:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--font-mono:Menlo,monospace}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 var(--font-sans);color:var(--foreground)}button,input,textarea{font:inherit}button{min-height:44px;padding:10px 14px;border:1px solid var(--border);border-radius:9px;background:var(--card);color:var(--foreground);font-weight:600;cursor:pointer}button:hover{background:var(--secondary)}button:disabled{opacity:.48;cursor:not-allowed}.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-foreground)}.primary:hover{filter:brightness(.93);background:var(--primary)}:focus-visible{outline:3px solid var(--ring);outline-offset:3px}::selection{background:var(--accent)}h1{font-size:23px;line-height:1.25;margin:0 0 10px;letter-spacing:-.02em}h2{font-size:18px;margin:0}h3{font-size:16px;margin:0 0 8px}p{margin:0 0 10px}.intro{margin-bottom:22px;max-width:72ch}.muted,small{color:var(--muted-foreground)}small{font-size:12px}.lab{padding:16px;border-radius:var(--radius);background:var(--secondary);margin-bottom:22px}.scenario-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.scenario-tabs button{font-size:13px;padding:8px 11px}.scenario-tabs [aria-pressed=true]{background:var(--foreground);color:var(--card);border-color:var(--foreground)}.guide{display:flex;gap:16px;justify-content:space-between;align-items:center}.guide p{margin:0}.guide button{flex-shrink:0}.surfaces{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}.surface{background:var(--card);padding:16px;border:1px solid var(--border);border-radius:var(--radius);min-width:0}.surface-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:16px}.surface-head small{display:block}.status{padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:16px}.status-label{font-size:18px;font-weight:650;line-height:1.3;margin-bottom:6px}.status-label.paid{color:var(--success)}.status p{font-size:13px;color:var(--muted-foreground)}dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px;margin:12px 0}dt{color:var(--muted-foreground)}dd{margin:0;text-align:right;overflow-wrap:anywhere}.vin{font-family:var(--font-mono);font-size:11px}.block{width:100%;margin-top:8px}.chat{display:flex;flex-direction:column;gap:12px;max-height:320px;overflow:auto;padding:2px 3px 12px 0;scrollbar-color:var(--border) transparent}.bubble{padding:11px 12px;border-radius:12px;background:var(--secondary);font-size:13px;max-width:94%;align-self:flex-start;overflow-wrap:anywhere}.bubble.mine{align-self:flex-end;background:var(--accent)}.bubble p{margin:4px 0 0;white-space:pre-wrap}.bubble small{font-size:11px}.system{font-size:12px;color:var(--muted-foreground);text-align:center;padding:0 8px}.receipt{margin-top:9px;padding:8px 0;border-top:1px solid var(--border)}.receipt strong{display:block}.compose{margin-top:12px;display:flex;gap:8px}.compose input{min-width:0;width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--foreground);caret-color:var(--primary)}.compose input::placeholder{color:var(--muted-foreground)}.compose button{padding:8px 11px}.check{display:flex;gap:10px;align-items:flex-start;padding:12px 0;font-size:13px}.check input{width:19px;height:19px;flex-shrink:0;accent-color:var(--primary)}.actions{margin-bottom:16px}.notice{font-size:13px;color:var(--destructive);padding:10px 0}.audit{margin-top:24px;border-top:1px solid var(--border);padding-top:14px}.audit summary{cursor:pointer;font-weight:600}.audit dl{max-width:520px}.audit ol{padding-left:22px;font-size:13px;color:var(--muted-foreground)}.footer{margin:18px 0 0;font-size:12px;color:var(--muted-foreground)}.flash{min-height:24px;margin:10px 0;font-size:13px;color:var(--muted-foreground)}
+@media(max-width:580px){.surfaces{grid-template-columns:1fr}.guide{align-items:stretch;flex-direction:column;gap:10px}.guide button{width:100%}.surface{padding:16px}.scenario-tabs button{flex:1 1 42%}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="intro"><h1>Pay in chat. Know when it’s confirmed.</h1><p>Can the customer and operator clearly tell receipt submission from confirmed money?</p><small>Disposable Carberk prototype · synthetic data · English interaction study. No wallet connection, real uploads, payments or provider lookups.</small></div>
+<section class="lab" aria-label="Prototype walkthrough controls">
+<strong>Try a walkthrough</strong><div id="scenarios" class="scenario-tabs"></div><div id="guide" class="guide"></div>
+</section>
+<div id="feedback" class="flash" role="status" aria-live="polite"></div>
+<main class="surfaces"><section class="surface" aria-label="Customer view"><div class="surface-head"><div><h2>Vehicle History</h2><small>Customer view · Operator Ayna</small></div></div><div id="customer-status"></div><div id="customer-actions" class="actions"></div><h3>Conversation</h3><div id="customer-chat" class="chat" tabindex="0" aria-label="Customer conversation"></div><button type="button" class="block" id="customer-new" hidden>Show new messages</button><form class="compose" id="customer-form"><input id="customer-message" aria-label="Message to operator" placeholder="Message Ayna…" maxlength="500"><button type="submit">Send</button></form></section>
+<section class="surface" aria-label="Operator view"><div class="surface-head"><div><h2>Payment review</h2><small>Operator view · Assigned to Ayna</small></div><small>DEMO-0142</small></div><div id="operator-status"></div><div id="operator-actions" class="actions"></div><h3>Customer conversation</h3><div id="operator-chat" class="chat" tabindex="0" aria-label="Operator conversation"></div><button type="button" class="block" id="operator-new" hidden>Show new messages</button><form class="compose" id="operator-form"><input id="operator-message" aria-label="Reply to customer" placeholder="Reply to customer…" maxlength="500"><button type="submit">Send</button></form></section></main>
+<details class="audit"><summary>Prototype state and activity</summary><div id="state"></div></details>
+<p class="footer">Scope: quote acceptance → manual wallet payment → operator verification. Time, receipt and wallet checks are simulated. Capacity expiry, late payment, fulfilment, refunds, permissions and native uploads need their separate walkthroughs and implementation evidence.</p>
+<script>
+// Disposable, pure payment-flow model. It has no network or storage integration.
+const initialState=()=>({phase:'quote',receipt:'none',walletChecked:false,confirmations:0,notes:[],events:[],feedback:'Start with the customer’s quote, or use the guided steps.'});
+function transition(state, action){
+ const s={...state,notes:[...state.notes],events:[...state.events]};
+ const event=t=>s.events.push(t);
+ const message=(who,text)=>s.notes.push({who,text});
+ s.feedback='';
+ switch(action.type){
+  case 'accept': if(s.phase!=='quote')break;s.phase='instructions';event('Customer accepted the quote.');message('operator','Send 100 TMT to DEMO WALLET •••• 0142. After transferring, attach your receipt here. Payment instructions are held until 13:00 today.');s.feedback='Quote accepted. The payment instructions are now in the conversation.';break;
+  case 'attach': if(!['instructions','review','checking'].includes(s.phase))break;s.receipt='attached';s.feedback='Synthetic receipt attached. It has not been sent yet.';break;
+  case 'submit':
+   if(s.phase==='paid'){s.feedback='Already confirmed. No second payment or order was created.';break;}
+   if(s.receipt==='sent'){s.feedback='This receipt is already submitted. Payment is still awaiting verification.';break;}
+   if(!['instructions','review','checking'].includes(s.phase)||!['attached','failed'].includes(s.receipt)){s.feedback='Attach the sample receipt first.';break;}
+   if(action.fail){s.receipt='failed';s.feedback='Receipt upload interrupted. The attachment is kept for Retry.';break;}
+   s.receipt='sent';s.phase='review';s.walletChecked=false;event('Receipt submitted; funds not yet verified.');s.notes.push({who:'customer',text:'I’ve transferred 100 TMT. Here is my receipt.',receipt:true});s.feedback='Receipt submitted. The customer sees Awaiting payment verification.';break;
+  case 'notFound':if(!['review','checking'].includes(s.phase))break;s.phase='checking';s.walletChecked=false;message('operator','I haven’t found the transfer in the receiving wallet yet. Please check the destination and send the transfer reference. Don’t send another payment.');event('Operator requested payment details. No funds confirmed.');s.feedback='Payment remains under review. The customer can reply in the same conversation.';break;
+  case 'checkWallet':if(!['review','checking'].includes(s.phase))break;s.walletChecked=action.checked;s.feedback=s.walletChecked?'Operator marked the actual 100 TMT transfer as checked. Confirmation is now available.':'Wallet check cleared.';break;
+  case 'confirm':
+   if(s.phase==='paid'){s.feedback='Already confirmed once. No duplicate confirmation or order.';break;}
+   if(!['review','checking'].includes(s.phase)||!s.walletChecked){s.feedback='The operator must check receipt of 100 TMT in the receiving wallet first.';break;}
+   s.phase='paid';s.confirmations=1;event('Ayna confirmed 100 TMT received.');message('system','Payment confirmed · 100 TMT received. Your report is scheduled for today, 14:00–15:00 Ashgabat time.');s.feedback='Both views now show Payment confirmed.';break;
+  case 'chat':if(action.text.trim()){message(action.who,action.text.trim());s.feedback='Message sent. The payment status has not changed.';}break;
+ }
+ return s;
+}
+const scenarios=[
+ {name:'Payment received',description:'Follow one receipt from the customer to a manual confirmation.',steps:[['Accept the quote','accept'],['Attach a sample receipt','attach'],['Send payment proof','submit'],['Mark wallet checked','checkWallet'],['Confirm 100 TMT received','confirm']]},
+ {name:'Money not found',description:'Keep the conversation open while the operator locates the transfer.',steps:[['Accept the quote','accept'],['Attach a sample receipt','attach'],['Send payment proof','submit'],['Ask for transfer details','notFound'],['Send the sample reference','reference'],['Mark wallet checked','checkWallet'],['Confirm 100 TMT received','confirm']]},
+ {name:'Upload interrupted',description:'An interrupted upload keeps the receipt available for Retry.',steps:[['Accept the quote','accept'],['Attach a sample receipt','attach'],['Simulate interrupted upload','uploadFail'],['Retry receipt upload','submit'],['Mark wallet checked','checkWallet'],['Confirm 100 TMT received','confirm']]},
+ {name:'Repeated submission',description:'Sending proof or confirming twice must leave one order and one confirmation.',steps:[['Accept the quote','accept'],['Attach a sample receipt','attach'],['Send payment proof','submit'],['Repeat the submission','submit'],['Mark wallet checked','checkWallet'],['Confirm 100 TMT received','confirm'],['Repeat confirmation','confirm']]}
+];
+let state=initialState(),scenario=0,step=0,renderedNoteCount=0;
+const unseen={customer:false,operator:false};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const btn=(title,action,primary=false,disabled=false)=>`<button type="button" class="block ${primary?'primary':''}" data-action="${action}" ${disabled?'disabled':''}>${title}</button>`;
+function dispatch(type,extras={}){state=transition(state,{type,...extras});render();}
+function action(type){
+ if(type==='checkWallet')dispatch(type,{checked:true});
+ else if(type==='reference')dispatch('chat',{who:'customer',text:'The transfer reference is DEMO-100-0142.'});
+ else if(type==='uploadFail')dispatch('submit',{fail:true});
+ else dispatch(type);
+}
+function render(){
+ const labels={quote:'Confirm your order',instructions:'Awaiting your payment',review:'Awaiting payment verification',checking:'Payment needs checking',paid:'Payment confirmed'};
+ const hints={quote:'Review the details before receiving payment instructions.',instructions:'Transfer in your wallet, then send the receipt here.',review:'Ayna is checking the receiving wallet. Your receipt is not a confirmation of payment.',checking:'Ayna needs more details to find your transfer. Continue in the conversation.',paid:'100 TMT received. Ayna will prepare your report.'};
+ if(state.receipt==='failed'){labels.instructions='Receipt not sent';hints.instructions='Your receipt could not upload. Retry below. Don’t send another payment.';}
+ const facts=`<dl><dt>Amount</dt><dd><strong>100 TMT</strong></dd><dt>VIN</dt><dd class="vin">1HGBH41JXMN109186</dd><dt>Delivery</dt><dd>Today, 14:00–15:00<br>Ashgabat time</dd></dl>`;
+ const quote=state.phase==='quote'?`<p>Available Carfax or AutoCheck history; both when obtainable. One provider is sufficient.</p><dl><dt>Selected report date</dt><dd>3 October 2026</dd></dl><p>Existing report; no promise of a new lookup. After verified payment, ordinary cancellation is unavailable. Service failures go to refund review.</p>`:'';
+ $('customer-status').innerHTML=`<div class="status"><div class="status-label ${state.phase==='paid'?'paid':''}">${labels[state.phase]}</div><p>${hints[state.phase]}</p>${facts}${quote}</div>`;
+ let customer='';
+ if(state.phase==='quote')customer=btn('Accept quote · 100 TMT','accept',true);
+ else if(state.phase!=='paid'){
+  if(state.receipt==='none')customer=btn('Attach receipt','attach',true);
+  else if(state.receipt==='attached')customer='<p class="muted"><small>Attached: sample-receipt.jpg · 84 KB</small></p>'+btn('I’ve paid · Send receipt','submit',true);
+  else if(state.receipt==='failed')customer='<p class="notice" role="alert">Receipt wasn’t sent. Your attachment is ready to retry.</p>'+btn('Retry receipt upload','submit',true);
+  else customer='<p class="muted"><small>Receipt submitted · No further payment requested</small></p>';
+ }
+ $('customer-actions').innerHTML=customer;
+ const proof={none:'Not submitted',attached:'Customer has not sent it',failed:'Upload not received',sent:'Received · not proof of funds'};
+ $('operator-status').innerHTML=`<div class="status"><div class="status-label ${state.phase==='paid'?'paid':''}">${state.phase==='quote'?'Waiting for quote acceptance':state.phase==='instructions'?'Waiting for payment proof':labels[state.phase]}</div><dl><dt>Order amount</dt><dd>100 TMT</dd><dt>Receipt</dt><dd>${proof[state.receipt]}</dd><dt>Funds</dt><dd>${state.phase==='paid'?'100 TMT confirmed':'Not confirmed'}</dd><dt>Assigned operator</dt><dd>Ayna</dd></dl></div>`;
+ let operator='';
+ if(['review','checking'].includes(state.phase))operator=`<p class="muted"><small>Check the receiving wallet outside Carberk. Match the amount and transfer details.</small></p><label class="check"><input id="wallet-check" type="checkbox" ${state.walletChecked?'checked':''}>I checked the receiving wallet and found this customer’s 100 TMT transfer.</label>`+btn('Confirm 100 TMT received','confirm',true,!state.walletChecked)+btn('Ask for transfer details','notFound');
+ else if(state.phase==='paid')operator='<p><strong>Confirmed by Ayna</strong><br><small>One payment confirmation recorded. Ready for fulfilment.</small></p>';
+ else operator='<p class="muted"><small>Payment review becomes available after the customer submits proof.</small></p>';
+ $('operator-actions').innerHTML=operator;
+ const notes=[{who:'operator',text:'I can provide available history for this VIN for 100 TMT. Please review the quote above.'},...state.notes];
+ const transcript=viewer=>notes.map(n=>n.who==='system'?`<div class="system">${esc(n.text)}</div>`:`<div class="bubble ${n.who===viewer?'mine':''}"><small>${n.who==='operator'?'Ayna · Vehicle History':'Customer'}</small><p>${esc(n.text)}</p>${n.receipt?'<div class="receipt"><strong>sample-receipt.jpg</strong><small>Synthetic receipt · 100 TMT · DEMO-100-0142<br>For this prototype only</small></div>':''}</div>`).join('');
+ for(const viewer of ['customer','operator']){
+  const node=$(viewer+'-chat'),previous=node.scrollTop;
+  const wasAtBottom=node.scrollHeight-node.clientHeight-previous<24;
+  const added=notes.length>renderedNoteCount;
+  node.innerHTML=transcript(viewer);
+  if(renderedNoteCount===0||notes.length<renderedNoteCount||(added&&wasAtBottom)){
+   node.scrollTop=node.scrollHeight;unseen[viewer]=false;
+  }else{node.scrollTop=previous;if(added)unseen[viewer]=true;}
+  $(viewer+'-new').hidden=!unseen[viewer];
+ }
+ renderedNoteCount=notes.length;
+ $('feedback').textContent=state.feedback;
+ $('scenarios').innerHTML=scenarios.map((s,i)=>`<button type="button" data-scenario="${i}" aria-pressed="${i===scenario}">${s.name}</button>`).join('');
+ const selected=scenarios[scenario];
+ $('guide').innerHTML=`<div><p>${selected.description}</p><small>${step<selected.steps.length?`Step ${step+1} of ${selected.steps.length}`:'Walkthrough complete. You can keep chatting or restart.'}</small></div><button type="button" id="next-step" class="primary">${step<selected.steps.length?selected.steps[step][0]:'Restart walkthrough'}</button>`;
+ $('state').innerHTML=`<dl><dt>Orders</dt><dd>1</dd><dt>Payment state</dt><dd>${labels[state.phase]}</dd><dt>Receipt state</dt><dd>${proof[state.receipt]}</dd><dt>Wallet checked by operator</dt><dd>${state.walletChecked?'Yes':'No'}</dd><dt>Payment confirmations</dt><dd>${state.confirmations}</dd></dl><ol>${state.events.map(e=>`<li>${esc(e)}</li>`).join('')||'<li>No payment activity yet.</li>'}</ol>`;
+}
+document.addEventListener('click',e=>{
+ const a=e.target.closest('[data-action]');if(a){action(a.dataset.action);return;}
+ const tab=e.target.closest('[data-scenario]');if(tab){scenario=Number(tab.dataset.scenario);step=0;state=initialState();$('customer-message').value='';$('operator-message').value='';render();return;}
+ if(e.target.closest('#next-step')){if(step>=scenarios[scenario].steps.length){step=0;state=initialState();render();}else{const next=scenarios[scenario].steps[step++][1];action(next);}$('next-step').focus({preventScroll:true});}
+});
+document.addEventListener('change',e=>{if(e.target.id==='wallet-check'){dispatch('checkWallet',{checked:e.target.checked});$('wallet-check')?.focus({preventScroll:true});}});
+for(const viewer of ['customer','operator']){
+ $(viewer+'-new').addEventListener('click',()=>{const chat=$(viewer+'-chat');chat.scrollTop=chat.scrollHeight;unseen[viewer]=false;$(viewer+'-new').hidden=true;chat.focus({preventScroll:true});});
+ $(viewer+'-chat').addEventListener('scroll',()=>{const chat=$(viewer+'-chat');if(chat.scrollHeight-chat.clientHeight-chat.scrollTop<24){unseen[viewer]=false;$(viewer+'-new').hidden=true;}});
+}
+for(const who of ['customer','operator'])$(who+'-form').addEventListener('submit',e=>{e.preventDefault();const input=$(who+'-message');const text=input.value;input.value='';dispatch('chat',{who,text});input.focus();});
+render();
+</script>
+</body></html>
