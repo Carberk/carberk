@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback, useEffect, Suspense } from "react";
+import { useState, useTransition, useCallback, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Input, Card, CardHeader, CardBody } from "@auto-tm/ui/components";
 import { Copy, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -72,9 +72,12 @@ function LoginPageContent() {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
 
+  const previousExpiry = useRef(expiredSession);
+
   // Query-only navigation can preserve this mounted page after a failed action.
   useEffect(() => {
-    if (expiredSession) setStep({ kind: "phone", phone: "", error: t.expired });
+    if (expiredSession && !previousExpiry.current) setStep({ kind: "phone", phone: "", error: t.expired });
+    previousExpiry.current = expiredSession;
   }, [expiredSession, t.expired]);
 
   const handleRequestOtp = useCallback(
@@ -211,7 +214,22 @@ function LoginPageContent() {
 
   return (
     <main lang={locale} className="flex min-h-screen flex-col items-center justify-center gap-4 bg-muted/40 p-4">
-      {intent && <nav aria-label={t.language} className="flex gap-1">{(["tk", "ru", "en"] as const).map((language) => <a key={language} lang={language} aria-current={language === locale ? "page" : undefined} className="rounded-md px-3 py-2 text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:bg-muted" href={`/login?returnTo=${encodeURIComponent(returnTo.replace(`/vehicle-history/${locale}`, `/vehicle-history/${language}`))}`}>{language.toUpperCase()}</a>)}</nav>}
+      {intent && <nav aria-label={t.language} className="flex gap-1">{(["tk", "ru", "en"] as const).map((language) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("returnTo", returnTo.replace(`/vehicle-history/${locale}`, `/vehicle-history/${language}`));
+        const href = `/login?${params}`;
+        return <a key={language} lang={language} aria-current={language === locale ? "page" : undefined} aria-disabled={isPending} tabIndex={isPending ? -1 : undefined} className="rounded-md px-3 py-2 text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:bg-muted aria-disabled:opacity-50" href={href} onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          if (isPending) return;
+          if ("error" in step && step.error) {
+            const key = (Object.keys(t) as Array<keyof AuthCopy>).find((key) => t[key] === step.error);
+            if (key) setStep({ ...step, error: authCopy[language][key] });
+          }
+          // Next synchronizes useSearchParams without remounting the active challenge.
+          window.history.replaceState(null, "", href);
+        }}>{language.toUpperCase()}</a>;
+      })}</nav>}
       <Card className="w-full max-w-md">
         <CardHeader>
           <h1 className="text-xl font-bold text-neutral-900">{getTitle(step, t, Boolean(intent))}</h1>

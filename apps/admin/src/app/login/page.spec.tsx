@@ -185,7 +185,11 @@ describe.each(locales)("real localized History auth: %s", (locale, title, expire
     expect(container.querySelector("[role=alert]")?.textContent).toContain(network);
     expect(container.querySelector("img")).toBeNull();
     await act(async () => element<HTMLButtonElement>('button').click());
-    await waitFor(() => expect(element<HTMLImageElement>("img").src).toMatch(/^data:image\/png/));
+    await waitFor(() => {
+      expect(element<HTMLImageElement>("img").src).toMatch(/^data:image\/png/);
+      expect(element<HTMLInputElement>('input[name="code"]').disabled).toBe(false);
+      expect(element<HTMLButtonElement>('button[type="submit"]').disabled).toBe(false);
+    });
     element<HTMLInputElement>('input[name="code"]').value = "654321";
     await submit();
     expect(container.textContent).toContain("abcdef0123456789");
@@ -237,4 +241,57 @@ it("retries the current session when the status response is lost after a success
   expect(container.querySelector('input[name="code"]')).toBeNull();
   await act(async () => element<HTMLButtonElement>("button").click());
   expect(container.textContent).toContain("Authenticator code or backup code");
+});
+
+
+it("switches locale during TOTP without losing the active step or scoped query", async () => {
+  navigation.params = new URLSearchParams("mode=totp&returnTo=%2Fvehicle-history%2Ftk%3Fqueue%3Dunpaid");
+  const replace = vi.spyOn(window.history, "replaceState").mockImplementation((_data, _unused, url) => {
+    navigation.params = new URL(String(url), "http://localhost").searchParams;
+  });
+  try {
+    await render();
+    await act(async () => element<HTMLAnchorElement>('a[lang="ru"]').click());
+    await render();
+    expect(container.textContent).toContain("Код из приложения-аутентификатора или резервный код");
+    expect(container.querySelector('input[type="tel"]')).toBeNull();
+    expect(element<HTMLInputElement>('input[name="returnTo"]').value).toBe("/vehicle-history/ru?queue=unpaid");
+    expect(navigation.params.get("mode")).toBe("totp");
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { replace.mockRestore(); }
+});
+
+it("preserves enrollment and backup acknowledgment when changing languages after an expired entry", async () => {
+  navigation.params = new URLSearchParams("reason=session-expired&returnTo=%2Fvehicle-history%2Fen");
+  const replace = vi.spyOn(window.history, "replaceState").mockImplementation((_data, _unused, url) => {
+    navigation.params = new URL(String(url), "http://localhost").searchParams;
+  });
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
+    .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }))
+    .mockResolvedValueOnce(Response.json({ enrolled: false, elevated: false }))
+    .mockResolvedValueOnce(Response.json({ qrCodeUrl: "otpauth://totp/Synthetic?secret=JBSWY3DPEHPK3PXP" }))
+    .mockResolvedValueOnce(Response.json({ adminTotpExpiresAt: "2026-11-15T12:00:00Z", backupCodes: ["abcdef0123456789"] }));
+  try {
+    await render();
+    element<HTMLInputElement>('input[name="phone"]').value = "+99365000001";
+    await submit();
+    element<HTMLInputElement>('input[name="code"]').value = "123456";
+    await submit();
+    await waitFor(() => expect(element<HTMLInputElement>('input[name="code"]').disabled).toBe(false));
+    const qr = element<HTMLImageElement>("img").src;
+    await act(async () => element<HTMLAnchorElement>('a[lang="ru"]').click());
+    await render();
+    expect(element<HTMLImageElement>("img").src).toBe(qr);
+    expect(container.textContent).toContain("Отсканируйте QR-код");
+    element<HTMLInputElement>('input[name="code"]').value = "654321";
+    await submit();
+    await waitFor(() => expect(container.textContent).toContain("abcdef0123456789"));
+    await act(async () => element<HTMLAnchorElement>('a[lang="tk"]').click());
+    await render();
+    expect(container.textContent).toContain("Ätiýaçlyk kodlar");
+    expect(container.textContent).toContain("abcdef0123456789");
+    const buttons = container.querySelectorAll("button");
+    await act(async () => buttons[buttons.length - 1]?.click());
+    expect(navigation.push).toHaveBeenCalledWith("/vehicle-history/tk");
+  } finally { replace.mockRestore(); }
 });
