@@ -18,6 +18,7 @@ import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
 
 const path = "/api/v1/vehicle-history/requests";
 describe("Private Vehicle History requests over HTTP", () => {
+  const fixtureUserIds = new Set<string>();
   let app: NestFastifyApplication;
   let prisma: PrismaService;
   let config: ConfigService;
@@ -45,7 +46,15 @@ describe("Private Vehicle History requests over HTTP", () => {
     config = app.get(ConfigService);
     request = supertest(app.getHttpServer());
   });
-  afterAll(async () => { await app?.close(); });
+  afterAll(async () => {
+    try {
+      if (prisma) await prisma.vehicleHistoryRequest.deleteMany({
+        where: { requesterId: { in: [...fixtureUserIds] } },
+      });
+    } finally {
+      await app?.close();
+    }
+  });
 
   async function fixture(role: "buyer" | "seller" | "admin" | "dealer" = "buyer") {
     const user = await prisma.user.create({ data: {
@@ -55,6 +64,7 @@ describe("Private Vehicle History requests over HTTP", () => {
       } } } : {}),
       email: `history-${randomUUID()}@example.invalid`, emailVerifiedAt: new Date(),
     } });
+    fixtureUserIds.add(user.id);
     const session = await prisma.session.create({ data: {
       userId: user.id, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now() + 120_000),
     } });
