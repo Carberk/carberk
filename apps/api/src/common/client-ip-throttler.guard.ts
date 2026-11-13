@@ -18,7 +18,7 @@ export class ClientIpThrottlerGuard extends ThrottlerGuard {
 
   protected override getTracker(req: Record<string, unknown>): Promise<string> {
     const { ip, fellBackToPeer } = resolveClientIpDetails(req as ClientIpRequest);
-    if (fellBackToPeer) this.warnPeerFallback(ip, req["url"]);
+    if (fellBackToPeer) this.warnPeerFallback(req["url"]);
     return Promise.resolve(ip);
   }
 
@@ -28,14 +28,13 @@ export class ClientIpThrottlerGuard extends ThrottlerGuard {
    * The path tells that apart from expected private callers (admin, health
    * checks), which send no header.
    */
-  private warnPeerFallback(peer: string, url: unknown): void {
+  private warnPeerFallback(url: unknown): void {
     const now = Date.now();
     if (now - this.lastPeerFallbackWarning < PEER_FALLBACK_WARNING_INTERVAL_MS) return;
     this.lastPeerFallbackWarning = now;
     this.logger.warn(
       {
         event: "client_ip.peer_fallback",
-        peer,
         path: typeof url === "string" ? url.split("?")[0] : undefined,
       },
       "Trusted client IP header missing or invalid; rate limits count this request against the peer address (ADR-0078)",

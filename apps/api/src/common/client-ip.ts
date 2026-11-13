@@ -63,10 +63,13 @@ export function readClientIpPolicy(
   return { header: header === "none" ? null : header, trustedHops };
 }
 
+export const verifiedGatewayIp = Symbol("verifiedGatewayIp");
+
 /** The parts of a Fastify request that carry the address. */
 export interface ClientIpRequest {
   headers?: Record<string, string | string[] | undefined>;
   ip?: string;
+  [verifiedGatewayIp]?: string;
 }
 
 const FORWARDED_FOR = "x-forwarded-for";
@@ -79,7 +82,7 @@ const IPV4_MAPPED = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/;
  * compressed) and an IPv4-mapped IPv6 address becomes the IPv4 address. Zone
  * ids and ports are refused.
  */
-function normalizeIp(value: string | undefined): string | null {
+export function normalizeIp(value: string | undefined): string | null {
   const candidate = value?.trim();
   if (!candidate || candidate.includes("%")) return null;
 
@@ -135,7 +138,12 @@ export function resolveClientIpDetails(
   req: ClientIpRequest,
   policy: ClientIpPolicy = processClientIpPolicy(),
 ): ResolvedClientIp {
+  if (req[verifiedGatewayIp]) return { ip: req[verifiedGatewayIp], fellBackToPeer: false };
   const peer = normalizeIp(req.ip) ?? "unknown";
+  // Unverified proof metadata must never fall through to a trusted header.
+  if (Object.keys(req.headers ?? {}).some((name) => name.startsWith("x-carberk-client-"))) {
+    return { ip: peer, fellBackToPeer: true };
+  }
   if (policy.header === null) return { ip: peer, fellBackToPeer: false };
 
   const trusted = req.headers

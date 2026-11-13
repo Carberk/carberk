@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
+import { createHmac } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -255,4 +256,27 @@ test('cancelled queued clients never dial later and release their admission slot
   const result = await f.request();
   assert.equal(result.status, 504);
   assert.equal(f.tunnels(), 9);
+});
+
+
+test('gateway replaces spoofed proofs with method/raw-target-bound observed-client attribution', async t => {
+  const signing = { keyId: 'current', secret: 'ab'.repeat(32) };
+  const f = await setup(t, (req, res) => res.end(JSON.stringify(req.headers)), { signing, now: () => 1800000000000 });
+  const target = '/api/v1/echo?x=a%2Fb&x=1+2';
+  const response = await f.request({ method: 'PATCH', path: target, headers: {
+    'x-real-ip': '203.0.113.7', 'x-carberk-client-proof': 'forged', 'x-forwarded-for': '1.1.1.1', 'cf-ipcountry': 'TM',
+  } });
+  assert.equal(response.status, 200);
+  const received = JSON.parse(response.body);
+  const parts = received['x-carberk-client-proof'].split('.');
+  assert.deepEqual(parts.slice(0, 3), ['v1', 'current', '1800000000000']);
+  assert.match(parts[3], /^[0-9a-f]{32}$/);
+  assert.equal(Buffer.from(parts[4], 'base64url').toString(), '203.0.113.7');
+  assert.equal(parts[5], createHmac('sha256', Buffer.from(signing.secret, 'hex')).update(`${parts.slice(0, 5).join('.')}\nPATCH\n${target}`).digest('hex'));
+  assert.equal(received['x-real-ip'], undefined);
+  assert.equal(received['cf-ipcountry'], undefined);
+  assert.equal(received['x-forwarded-for'], undefined);
+  assert.ok(!JSON.stringify(f.logs).includes('203.0.113.7'));
+  assert.ok(!JSON.stringify(f.logs).includes(parts[5]));
+  assert.equal((await f.request()).status, 400);
 });

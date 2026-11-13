@@ -7,7 +7,7 @@ try {
   if (config.origin !== 'https://api-staging-2861.up.railway.app'
       || config.proxy !== 'http://127.0.0.1:11809') throw Error('Unexpected destination');
   const server = createGateway({ origin: config.origin, proxy: config.proxy, hostname: config.hostname,
-    accessKey: config.accessKey, log: row => console.log(JSON.stringify(row)) });
+    accessKey: config.accessKey, signing: config.signing, log: row => console.log(JSON.stringify(row)) });
   server.on('error', () => { console.error('{"event":"gateway_start_failed"}'); process.exitCode = 1; });
   if (process.argv[3] === '--check') { server.close(); console.log('{"configuration_valid":true}'); }
   else {

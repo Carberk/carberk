@@ -3,8 +3,8 @@
 [R02](https://github.com/Carberk/carberk/issues/1155) adds a controlled-client API
 entry on the VPS. [R01](staging-egress.md) owns fixed-relay selection and its
 independence proof. This release forwards only the staging API: media-origin
-mapping, verifiable client attribution, native route selection and sockets remain
-separate tickets. A gateway key does not grant API business permissions.
+mapping, native route selection and sockets remain separate tickets. R03 adds
+optional signed client attribution as described below. A gateway key does not grant API business permissions.
 
 ## Runtime contract
 
@@ -39,7 +39,7 @@ requests retain admission slots until cleanup and never initiate a later tunnel.
 nginx also disables request/response buffering, gzip transformation and upstream retry. Logs contain
 only method category, status, outcome and duration; never targets, headers or bodies.
 
-Until R03, Railway sees the relay's ingress address. Do not increase trusted hop
+Without R03 signing enabled, Railway sees the relay's ingress address. Do not increase trusted hop
 counts or accept unsigned forwarded metadata to compensate. Until later media and
 socket tickets, the API-only entry must stay restricted to controlled clients.
 
@@ -155,3 +155,84 @@ reloads; it needs the same existing-service authority as activation.
 - [Node streams](https://nodejs.org/docs/latest-v24.x/api/stream.html): backpressure.
 - [Node release checksums](https://nodejs.org/dist/v24.13.0/SHASUMS256.txt).
 - [nginx proxy module](https://nginx.org/en/docs/http/ngx_http_proxy_module.html).
+
+## Signed client attribution (R03)
+
+The optional private gateway `signing` object contains `keyId` (1–32 ASCII
+letters/digits/underscore/hyphen) and `secret` (32 random bytes as 64 lowercase
+hex characters). Use a separate secret from `accessKey`, TLS and API bearer keys.
+The API's private `GATEWAY_ATTRIBUTION_KEYS` is a JSON object mapping at most four
+key IDs to these secrets; `{}` disables verification and rejects any presented
+proof. Direct requests keep the existing Railway `X-Real-IP` policy and hop count.
+Never send this configuration to a public issue, command argument or log.
+
+The gateway listens only on loopback. The existing nginx virtual host overwrites
+`X-Real-IP` with `$remote_addr`; do not enable real-IP rewriting from untrusted
+headers. Signing requires that single valid address and a loopback peer. Caller
+`X-Carberk-*`, forwarding and Cloudflare metadata are stripped before rebuilding
+`X-Carberk-Client-Proof`. A missing/malformed observed address fails with 400.
+The header is `v1.<keyId>.<unixMillis>.<nonceHex>.<ipBase64url>.<hmacHex>`.
+The nonce is 16 random bytes. HMAC-SHA256 uses the binary hex-decoded secret over
+`<first five dot-separated fields>\n<METHOD>\n<raw request target>`, encoded as
+UTF-8, with no trailing newline. Query order and percent-escape spelling matter.
+The proof authenticates the observed IP and transport request, never a User or
+business permission. Bearer authorization still applies. Country headers have no
+authorization or rate-limit meaning.
+
+The API hook runs before parsing bodies, guards and controllers. It checks shape,
+key membership, valid IP, constant-time MAC equality, at most 30 seconds of age
+and at most five seconds in the future. Any malformed/unknown/forged proof or
+additional `X-Carberk-Client-*` field returns 403, without direct-header fallback.
+Valid proofs atomically claim `carberk:gateway-proof:v1:<keyId>:<nonce>` in the
+API's shared Redis using `SET NX PX 35001`. Reuse returns 403 across API instances.
+The same normalized IP feeds both the global and Sign-in Code budgets. Two real
+clients behind one NAT still share its observed address, as direct clients do.
+
+Redis commands have a one-second timeout, no offline command queue and no request
+retry. Redis failure returns sanitized 503 for gateway requests; direct requests
+continue. Each API Redis connection/reconnection quarantines signed requests for
+35,001 ms so proofs potentially forgotten by a Redis restart/restore expire first.
+API restarts therefore also have a short signed-entry warmup; a gateway health
+probe truthfully sees 503 during it. Keep clocks synchronized. Never flush replay
+keys while APIs remain connected: stop the signer and wait at least 35,001 ms, or
+restart all API verifier connections to rearm quarantine. This cache is transient
+security state, not a second business dataset.
+
+Rotation: provision a fresh key/ID in the API key ring, deploy and wait for the
+connection warmup, then replace the gateway's private signing object atomically
+and restart only its isolated service. Keep the previous verification key through
+all old gateway instances stopping and the 35,001 ms acceptance window, then remove
+it from the API. Never reuse an ID with a different secret during overlap. Removal
+immediately rejects that key; treat compromise as revocation, not graceful overlap.
+Gateway restarts create fresh random nonces; they never replay requests. Gateway
+and API ordinary logs omit original client addresses and proofs; provider edge
+access logs have a separate retention/configuration boundary.
+
+### Closed-staging upgrade and rollback
+
+R02's installer intentionally refuses upgrades. Before an upgrade, privately save
+`/etc/carberk/gateway.json` and the installed `gateway.mjs`/`serve.mjs`, record their
+hashes/modes, service identity, nginx config hash and live health revision. Prepare
+both replacement and exact rollback files before changing anything. This release
+requires no nginx, certificate, relay, firewall, global route or Snikket change.
+
+Deploy the API verifier with the staging-only key ring first; verify direct
+readiness and wait for warmup. For a bounded pre-activation test, run a disposable
+loopback gateway from an owned `/tmp` directory through the existing fixed relay,
+with the candidate signer and synthetic observed addresses. Prove separate buckets,
+forged proof rejection, bearer denial, replay rejection and recovery without logging
+IPs. Stop only the disposable process and remove its private key copies afterward.
+
+Activation of the running closed gateway is a separate, concrete operator action:
+validate the replacement private config with `serve.mjs --check`, atomically replace
+only the two gateway source files and private config, restart only
+`carberk-gateway.service`, and prove real hostname/443 TLS, bearer denial, forwarding
+and unchanged existing-service/configuration hashes. Obtain existing-service
+authority if the prepared change affects shared production services. Do not infer
+production Carberk rollout authority from this staging procedure.
+
+Rollback restores the two saved gateway files and private configuration, restarts
+only the gateway service and verifies original 443 health. Then remove the added
+staging API verification key if desired. API code with an empty key ring retains
+direct/R02 behavior; signed requests are rejected. Keep the replay namespace intact
+through rollback. Do not run R02's whole-install rollback for a signer-only upgrade.

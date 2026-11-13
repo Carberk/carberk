@@ -16,25 +16,12 @@ const SECRET_HEADER_PATHS = [
   'res.headers["set-cookie"]',
 ];
 
-/**
- * Endpoints that issue a sign-in code. The privacy policy deletes their
- * records — including the request IP — after 30 days, and the hosting log
- * outlives that, so these log lines carry neither the remote address nor
- * the headers a proxy puts the client IP into.
- */
-const SIGN_IN_CODE_PATHS = new Set([
-  "/api/v1/auth/otp/request",
-  "/api/v1/account-deletion/request",
-  "/api/v1/me/sign-in-methods/request",
-  "/api/v1/me/contact-phones/request",
-]);
-
 const FORWARDING_HEADERS = ["x-real-ip", "x-forwarded-for", "forwarded"];
 
 /**
  * Options for the API's HTTP request logger (`LoggerModule.forRoot`).
  * `clientIpHeader` is the header the deployment reads the client IP from
- * (`CLIENT_IP_HEADER`), so a sign-in code line drops it even when it is not
+ * (`CLIENT_IP_HEADER`), so every request drops it even when it is not
  * one of the usual forwarding headers.
  */
 export function requestLoggingOptions(
@@ -60,14 +47,14 @@ export function requestLoggingOptions(
       }) {
         if (typeof req.url === "string") req.url = req.url.split("?")[0] ?? req.url;
         delete req.query;
-        if (SIGN_IN_CODE_PATHS.has(req.url ?? "")) {
-          delete req.remoteAddress;
-          delete req.remotePort;
-          if (req.headers) {
-            req.headers = Object.fromEntries(
-              Object.entries(req.headers).filter(([name]) => !ipHeaders.has(name.toLowerCase())),
-            );
-          }
+        // Original client addresses and signed metadata are never diagnostics.
+        delete req.remoteAddress;
+        delete req.remotePort;
+        if (req.headers) {
+          req.headers = Object.fromEntries(
+            Object.entries(req.headers).filter(([name]) => !ipHeaders.has(name.toLowerCase())
+              && !/^(x-carberk-|x-forwarded-|cf-|true-client-ip$|x-client-ip$)/i.test(name)),
+          );
         }
         return req;
       },

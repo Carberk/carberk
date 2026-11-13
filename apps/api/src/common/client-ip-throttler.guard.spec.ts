@@ -83,8 +83,8 @@ describe("ClientIpThrottlerGuard", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toMatchObject({
       event: "client_ip.peer_fallback",
-      peer: EDGE_HOP,
       path: "/api/v1/auth/otp/request",
     });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(EDGE_HOP);
   });
 });

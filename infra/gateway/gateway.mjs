@@ -2,7 +2,8 @@ import http from 'node:http';
 import https from 'node:https';
 import tls from 'node:tls';
 import { Duplex, PassThrough } from 'node:stream';
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 
 const methods = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 const hopHeaders = ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'expect'];
@@ -16,12 +17,14 @@ function headersFor(headers) {
 
 /** One fixed API origin, reached only through an explicit loopback CONNECT proxy. */
 export function createGateway({ origin, proxy, hostname, accessKey, ca, log = () => {}, now = Date.now,
-  deadlineMs = 30_000, connectMs = 6_000, maxBodyBytes = 16 * 1024 * 1024, maxConcurrent = 16 }) {
+  deadlineMs = 30_000, connectMs = 6_000, maxBodyBytes = 16 * 1024 * 1024, maxConcurrent = 16, signing }) {
   const upstream = new URL(origin);
   const relay = new URL(proxy);
   if (upstream.protocol !== 'https:' || upstream.username || upstream.password || upstream.pathname !== '/' || upstream.search || upstream.hash
       || relay.protocol !== 'http:' || relay.hostname !== '127.0.0.1' || relay.username || relay.password
       || !/^[a-z0-9.-]+$/.test(hostname) || typeof accessKey !== 'string' || accessKey.length < 32) throw Error('Invalid gateway configuration');
+  if (signing !== undefined && (!/^[a-zA-Z0-9_-]{1,32}$/.test(signing?.keyId ?? '')
+      || !/^[0-9a-f]{64}$/.test(signing?.secret ?? ''))) throw Error('Invalid signing configuration');
   const expectedKey = Buffer.from(accessKey);
   const agent = new https.Agent({ keepAlive: true, maxSockets: 8, maxTotalSockets: 8, maxFreeSockets: 4, timeout: 15_000 });
   const pendingConnections = new WeakMap();
@@ -110,6 +113,16 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
     active++; counted = true;
     const headers = headersFor(req.headers);
     headers.host = upstream.host;
+    if (signing) {
+      // The loopback-only listener is behind our nginx, which overwrites this
+      // single address with $remote_addr. Never use caller X-Forwarded-For.
+      const ip = req.headers['x-real-ip'];
+      if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)
+          || typeof ip !== 'string' || ip.includes('%') || !isIP(ip)) { fail(400, 'invalid_observed_client'); return; }
+      const unsigned = `v1.${signing.keyId}.${now()}.${randomBytes(16).toString('hex')}.${Buffer.from(ip).toString('base64url')}`;
+      const signature = createHmac('sha256', Buffer.from(signing.secret, 'hex')).update(`${unsigned}\n${req.method}\n${req.url}`).digest('hex');
+      headers['x-carberk-client-proof'] = `${unsigned}.${signature}`;
+    }
     // Rebuild framing from the parsed message after hop-by-hop filtering. Node
     // otherwise omits chunked bodies for methods such as DELETE/GET/OPTIONS.
     if (req.headers['content-length'] !== undefined) headers['content-length'] = req.headers['content-length'];
