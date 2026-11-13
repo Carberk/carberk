@@ -69,7 +69,6 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     }
   }, 120_000);
   // Separate real boundaries: photo fixtures, then Processing import and worker settlement.
-  // Plan, deployed plan, apply and real worker settlement each re-render the photo set; hosted CI needs more than 120 s.
   beforeAll(async () => { imported = await prepareVideoScenarios(); }, 240_000);
   afterAll(async () => {
     const errors: unknown[] = [];

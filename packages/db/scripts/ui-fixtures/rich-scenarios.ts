@@ -37,6 +37,23 @@ type Target = RichExecutionTarget;
 type Row = Record<string, unknown>;
 type ObjectFile = { key: string; body: Buffer; contentType: string };
 
+// Only the ten verified gallery images and twenty deterministic cards reach
+// this cache. Reuse their rendered bytes across check/plan/apply; source-file
+// verification and live database/storage comparisons still run every time.
+const renderedPhotos = new Map<string, Promise<Awaited<ReturnType<typeof preparePhoto>>>>();
+function prepareImmutablePhoto(source: Buffer) {
+  const key = digest(source);
+  let prepared = renderedPhotos.get(key);
+  if (!prepared) {
+    prepared = preparePhoto(source).catch((error: unknown) => {
+      renderedPhotos.delete(key);
+      throw error;
+    });
+    renderedPhotos.set(key, prepared);
+  }
+  return prepared;
+}
+
 /** No downloads. Actual renderer output participates in the immutable version. */
 async function prepare(directory: string, scenarios: readonly { key: string; id: string }[]) {
   await verifyGallery(directory, ES300H_GALLERY).catch((error: unknown) => refuse(error instanceof Error ? error.message : "Offline gallery invalid"));
@@ -44,7 +61,7 @@ async function prepare(directory: string, scenarios: readonly { key: string; id:
   for (const photo of ES300H_GALLERY.photos) {
     const bytes = await readFile(join(directory, photo.file));
     if (digest(bytes) !== photo.sha256) refuse(`Offline gallery changed during verification: ${photo.file}`);
-    photos.push(await preparePhoto(bytes));
+    photos.push(await prepareImmutablePhoto(bytes));
   }
   const version = digest(JSON.stringify({ gallery: ES300H_GALLERY, scenarios,
     outputs: photos.map((photo) => photo.files.map((file) => digest(file.body))) }));
@@ -81,7 +98,7 @@ export async function runRichPhotos(target: Target, directory = PACK) {
     // Existing public photo versions remain stable when private scenarios evolve.
     const cards = [];
     if (privateDrafts) for (let number = 1; number <= 20; number++) {
-      cards.push(await preparePhoto(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#133344"/><text x="600" y="165" text-anchor="middle" fill="white" font-family="sans-serif" font-size="52">SYNTHETIC PHOTO LIMIT TEST</text><text x="600" y="490" text-anchor="middle" fill="#ffd37a" font-family="sans-serif" font-size="280">${String(number).padStart(2, "0")}</text><text x="600" y="680" text-anchor="middle" fill="white" font-family="sans-serif" font-size="40">${number} / 20 — NOT A VEHICLE PHOTO</text></svg>`)));
+      cards.push(await prepareImmutablePhoto(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#133344"/><text x="600" y="165" text-anchor="middle" fill="white" font-family="sans-serif" font-size="52">SYNTHETIC PHOTO LIMIT TEST</text><text x="600" y="490" text-anchor="middle" fill="#ffd37a" font-family="sans-serif" font-size="280">${String(number).padStart(2, "0")}</text><text x="600" y="680" text-anchor="middle" fill="white" font-family="sans-serif" font-size="40">${number} / 20 — NOT A VEHICLE PHOTO</text></svg>`)));
     }
     const version = privateDrafts ? digest(JSON.stringify({ galleryVersion: pack.version, scenarios: PRIVATE_DRAFT_SCENARIOS, payload: PRIVATE_DRAFT_PAYLOAD, protocol: "conditional-v1",
       cards: cards.map((photo) => photo.files.map((file) => digest(file.body))) })) : pack.version;

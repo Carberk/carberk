@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -144,7 +144,7 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     expect(await completeSnapshot()).toEqual(after);
     expect((await s3.send(new ListObjectsV2Command({ Bucket }))).Contents).toEqual(objects);
     expect(JSON.stringify(deep)).not.toMatch(/postgres:|http:|secret|test_pass|minioadmin|private-test-hash/);
-  }, 240_000); // seven operator runs, each re-rendering the photo set; hosted CI exceeds the 120 s default
+  }, 240_000);
   it("requires same-pack successful staging and a fresh target/plan-bound verified production DB/media restore receipt before writes", async () => {
     const stagingContext = await deployed();
     const initial = await runDeployedRich(stagingContext, { mode: "plan" });
@@ -171,7 +171,7 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     }
     expect((await runDeployedRich(context, { mode: "apply", plan, staging, backup })).writes).toBe(123);
     expect((await runDeployedRich(context, { mode: "apply", plan, staging, backup })).writes).toBe(0);
-  }, 240_000); // passed hosted CI at 116 s of the 120 s default; same re-rendering cost
+  }, 240_000);
   it("refuses deployed schema incompatibility, unexpected in-flight work, partial rows, foreign ownership and object collisions without adoption", async () => {
     const context = await deployed();
     const { plan } = await runDeployedRich(context, { mode: "plan" });
@@ -405,6 +405,23 @@ describe("additive rich scenarios on real Postgres and conditional MinIO", () =>
     await s3.send(new PutObjectCommand({ Bucket, Key: "review-baseline/photos-v1/foreign", Body: "keep" }));
     await expect(apply()).rejects.toThrow("Occupied object namespace");
     expect((await pool.query('SELECT id FROM listings ORDER BY id')).rows).toEqual([{ id: "unrelated" }]);
+  });
+  it("revalidates changed and missing source files after preparing the same gallery", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "rich-source-drift-"));
+    await cp(join(__dirname, "es300h-shenzhen-2025-07-17/v1"), directory, { recursive: true });
+    const file = join(directory, "01-cover-front-three-quarter.jpg");
+    try {
+      expect(await runRichScenarios(target, directory)).toMatchObject({ state: "absent", writes: 0 });
+      const bytes = await readFile(file);
+      bytes[0] = 0;
+      await writeFile(file, bytes);
+      await expect(runRichScenarios(target, directory)).rejects.toThrow("SHA256 mismatch");
+      await unlink(file);
+      await expect(runRichScenarios(target, directory)).rejects.toThrow("missing or unreadable local JPEG");
+      expect((await pool.query('SELECT id FROM listings ORDER BY id')).rows).toEqual([{ id: "unrelated" }]);
+    } finally {
+      await rm(directory, { recursive: true });
+    }
   });
   it("rolls back both new Listings if media insertion fails, retaining exact new objects for bounded recovery", async () => {
     await pool.query(`ALTER TABLE listing_media ADD CONSTRAINT rich_test_failure CHECK ("listingId"='unrelated')`);
