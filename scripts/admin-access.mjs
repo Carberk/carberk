@@ -7,28 +7,31 @@ import { setTimeout as delay } from "node:timers/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { FixtureError, codeFor, localApi } from "./local-signin.mjs";
+import purposes from "../packages/db/src/local-admin-totp-purposes.json" with { type: "json" };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HELP = `Usage: pnpm admin:access check|serve|otp|totp --api http://127.0.0.1:3006/api/v1
   --admin http://127.0.0.1:3001 --api-env /absolute/running-api.env
   otp:  --phone <existing-local-admin> --api-log /absolute/private-api.log
         --request-id UUID --requested-at ISO_TIMESTAMP
-  totp: --phone <existing-local-admin>
+  totp: --phone <existing-local-actor> [--purpose legacyAdmin|vehicle-history|
+        vehicle-history-payment-evidence|vehicle-history-staff-management]
 check is read-only; serve starts only your foreground Admin process with these origins.
 otp/totp write a new private temporary code file. No sign-in request, promotion,
 quota reset, session injection or remote targets. See docs/agents/admin-access.md.`;
 
 function argumentsFor(argv) {
   const options = { command: argv[0] };
-  const names = { "--api": "api", "--admin": "admin", "--api-env": "apiEnv", "--phone": "phone", "--api-log": "apiLog", "--request-id": "requestId", "--requested-at": "requestedAt" };
+  const names = { "--api": "api", "--admin": "admin", "--api-env": "apiEnv", "--phone": "phone", "--api-log": "apiLog", "--request-id": "requestId", "--requested-at": "requestedAt", "--purpose": "purpose" };
   for (let i = 1; i < argv.length; i++) {
     const key = names[argv[i]];
     if (!key || options[key] !== undefined || !argv[i + 1] || argv[i + 1].startsWith("--")) throw new FixtureError("Invalid arguments; use --help");
     options[key] = argv[++i];
   }
   if (!["check", "serve", "otp", "totp"].includes(options.command)) throw new FixtureError("Choose check, serve, otp or totp; use --help");
+  if (options.purpose !== undefined && (options.command !== "totp" || !Object.hasOwn(purposes, options.purpose))) throw new FixtureError("Use a supported --purpose only with totp; use --help");
   if (!isAbsolute(options.apiEnv ?? "")) throw new FixtureError("Use an absolute selected API env path; use --help");
-  if (["otp", "totp"].includes(options.command) && !/^\+993\d{8}$/.test(options.phone ?? "")) throw new FixtureError("Use an existing local admin phone; use --help");
+  if (["otp", "totp"].includes(options.command) && !/^\+993\d{8}$/.test(options.phone ?? "")) throw new FixtureError("Use an existing local actor phone; use --help");
   if (options.command === "otp" && (!isAbsolute(options.apiLog ?? "") || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(options.requestId ?? "") || !Number.isFinite(Date.parse(options.requestedAt)))) throw new FixtureError("OTP needs an absolute log path and exact request ID/time from the current browser form");
   return options;
 }
@@ -158,12 +161,13 @@ export async function cli(argv, overrides = {}) {
       const expiresAt = (Math.floor(ports.now() / 30_000) + 1) * 30_000;
       let result;
       try {
-        result = await runOwned(["-s", "--filter", "@auto-tm/db", "admin:totp", "--phone", options.phone], {
+        result = await runOwned(["-s", "--filter", "@auto-tm/db", "admin:totp", "--phone", options.phone,
+          ...(options.purpose === undefined ? [] : ["--purpose", options.purpose])], {
           stdio: ["ignore", "pipe", "pipe"],
           env: { ...process.env, DATABASE_URL: env.DATABASE_URL, TOTP_SECRET_ENCRYPTION_KEY: env.TOTP_SECRET_ENCRYPTION_KEY },
         }, ports, ports.totpTimeoutMs ?? 10_000);
         if (result.code !== 0) throw new Error();
-      } catch { throw new FixtureError("TOTP_UNAVAILABLE: check local admin existence/role, compiled DB package, selected key and pending authenticator enrollment; raw diagnostics suppressed"); }
+      } catch { throw new FixtureError("TOTP_UNAVAILABLE: check the selected purpose's role/grant and User lifecycle, compiled DB package, selected key and pending authenticator enrollment; raw diagnostics suppressed"); }
       const code = result.stdout.trim();
       if (!/^\d{6}$/.test(code)) throw new FixtureError("TOTP_INVALID_RESULT: helper output was not a code; raw diagnostics suppressed");
       if (expiresAt - ports.now() < 5000) throw new FixtureError("TOTP_WINDOW_ENDING: wait for the next 30-second window, then run totp again; no file saved");

@@ -35,7 +35,7 @@ async function fixture(mode) {
     else net.createServer(s=>s.end()).listen(Number(process.env.PORT),'127.0.0.1',ready);
   `);
   await writeFile(join(directory, "pnpm"), `#!${process.execPath}\nconst fs=require('node:fs'),{spawn}=require('node:child_process');fs.writeFileSync(process.env.ADMIN_TEST_DIR+'/pnpm.pid',String(process.pid));spawn(process.execPath,[process.env.ADMIN_TEST_DIR+'/worker.cjs',process.argv.includes('admin:totp')?'totp':'serve'],{stdio:'inherit'});`, { mode: 0o700 });
-  const args = [mode, "--api", `http://127.0.0.1:${apiPort}/api/v1`, "--admin", `http://127.0.0.1:${adminPort}`, "--api-env", join(directory, "api.env"), ...(mode === "totp" ? ["--phone", "+99365000901"] : [])];
+  const args = [mode, "--api", `http://127.0.0.1:${apiPort}/api/v1`, "--admin", `http://127.0.0.1:${adminPort}`, "--api-env", join(directory, "api.env"), ...(mode === "totp" ? ["--phone", "+99365000901", "--purpose", "vehicle-history"] : [])];
   const entry = new URL("./admin-access.mjs", import.meta.url).href;
   const driver = spawn(process.execPath, ["--input-type=module", "-e", `import {cli} from ${JSON.stringify(entry)};process.exitCode=await cli(${JSON.stringify(args)},{totpTimeoutMs:300});`], {
     env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, ADMIN_TEST_DIR: directory }, stdio: ["ignore", "pipe", "pipe"],
