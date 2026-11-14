@@ -35,11 +35,17 @@ import { HistoryRequestProjection } from "./application/HistoryRequestProjection
 import { ClaimHistoryRequest } from "./application/ClaimHistoryRequest";
 import { GetOperatorHistoryRequest } from "./application/GetOperatorHistoryRequest";
 import { HISTORY_CLOCK, HistoryWaiting, type HistoryClock } from "./domain/HistoryWaiting";
+import { ChangeHistoryWaiting } from "./application/ChangeHistoryWaiting";
+import { HISTORY_WAITING_LIFECYCLE } from "./vehicle-history.public";
+import { SyncHistoryWaiting } from "./application/SyncHistoryWaiting";
 
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
+  exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
   controllers: [VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController],
   providers: [AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
+    SyncHistoryWaiting, ChangeHistoryWaiting,
+    { provide: HISTORY_WAITING_LIFECYCLE, useExisting: ChangeHistoryWaiting },
     { provide: HISTORY_CLOCK, useFactory: (): HistoryClock => ({ now: () => new Date() }) },
     { provide: HistoryWaiting, inject: [HISTORY_CLOCK], useFactory: (clock: HistoryClock) => new HistoryWaiting(clock) },
     CurrentHistoryOperator, ListOperatorHistoryRequests, HistoryQueueProjection, HistoryRequestProjection, ClaimHistoryRequest, GetOperatorHistoryRequest,

@@ -14,7 +14,7 @@ import { VehicleHistoryModule } from "../../src/modules/vehicle-history/vehicle-
 import { bullTestRoot } from "./bullTestRoot";
 
 /** Listening test-only HTTP/auth target; never provisions a browser/device session. */
-export async function historyFixture() {
+export async function historyFixture(configure?: (config: ConfigService) => void) {
   const module = await Test.createTestingModule({ imports: [bullTestRoot(), VehicleHistoryModule,
     JwtModule.register({ global: true, secret: "synthetic-history-assignment-test-secret" }),
   ] }).compile();
@@ -31,6 +31,7 @@ export async function historyFixture() {
   });
   await app.listen(0, "127.0.0.1");
   const prisma = app.get(PrismaService), config = app.get(ConfigService);
+  configure?.(config);
   const request = supertest(app.getHttpServer());
   const users: string[] = [];
   return { app, prisma, config, request,
