@@ -7,7 +7,7 @@ const NOW = Date.parse("2026-11-12T06:00:00Z");
 const ID = "abcdef01-1234-4567-89ab-123456789abc";
 const config = "APP_ENV=development\nNODE_ENV=development\nSMS_DRIVER=mock\nOTP_TEST_MODE=false\nOTP_TEST_CODE_RESPONSE=false\nPORT=3006";
 const options = { fixture: "seller", api: "http://127.0.0.1:3006/api/v1", apiEnv: "/tmp/api.env", apiLog: "/tmp/api.log" };
-function boundary({ signedIn = false, log, response, cabinetStates } = {}) {
+function boundary({ signedIn = false, currentOtp = false, log, response, cabinetStates } = {}) {
   const actions = [];
   const inputs = [];
   const requests = [];
@@ -38,7 +38,7 @@ function boundary({ signedIn = false, log, response, cabinetStates } = {}) {
       }
       if (args[0] === "snapshot") return { nodes: entered || signedIn
         ? [{ label: "Aýgül Amanowa" }, { label: "+993 61 XX-XX-01" }]
-        : actions.some(a => a[1]?.includes("/otp?"))
+        : currentOtp || actions.some(a => a[1]?.includes("/otp?"))
           ? [{ label: "Enter the code" }, { label: "+993 61 XX-XX-01" }, { type: "TextField", editable: true, ref: "e7" }]
           : [{ label: "Sign in", role: "button" }] };
       return {};
@@ -165,9 +165,23 @@ test("requests once, enters the correlated code in the genuine OTP UI, and confi
 });
 
 test("uses an existing exact request without spending another code", async () => {
-  const port = boundary();
-  assert.equal((await signInFixture({ ...options, requestId: ID, requestedAt: "2026-11-12T06:00:00Z" }, port)).status, "signed-in");
+  const port = boundary({ currentOtp: true });
+  assert.deepEqual(await signInFixture({ ...options, requestId: ID, requestedAt: "2026-11-12T06:00:00Z" }, port),
+    { fixture: "seller", status: "verified", identityConfirmed: false });
   assert.equal(port.requests.some(([url]) => url.endsWith("/otp/request")), false);
+  assert.deepEqual(port.actions.slice(0, 2), [["snapshot", "-i"], ["fill", "@e7", "--text-stdin"]]);
+  assert.deepEqual(port.actions.filter(([action]) => action === "open"), []);
+});
+
+test("exact-request delivery refuses a different Code destination without leaving or typing", async () => {
+  const port = boundary();
+  port.device = async args => {
+    port.actions.push(args);
+    return { nodes: [{ label: "Enter the code" }, { label: "+993 61 XX-XX-09" }, { type: "TextField", editable: true, ref: "e7" }] };
+  };
+  await assert.rejects(signInFixture({ ...options, requestId: ID, requestedAt: new Date(NOW).toISOString() }, port), /did not become ready/);
+  assert.equal(port.actions.some(([action]) => action !== "snapshot"), false);
+  assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
 });
 
 test("reads the running API's structured Pino timestamp", async () => {
@@ -387,8 +401,8 @@ test("bounds a rejected verification without resending or saving raw UI content"
   assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 1);
 });
 
-function keyboardBoundary({ wrongReadback = false, missingKey = false, staysOnOtp = false, initialDigits = "", verifiedIdentity = false } = {}) {
-  const port = boundary();
+function keyboardBoundary({ currentOtp = false, wrongReadback = false, missingKey = false, staysOnOtp = false, initialDigits = "", verifiedIdentity = false } = {}) {
+  const port = boundary({ currentOtp });
   const original = port.device;
   let digits = initialDigits;
   let generation = 100;
@@ -401,7 +415,7 @@ function keyboardBoundary({ wrongReadback = false, missingKey = false, staysOnOt
     }
     if (verifiedIdentity && digits.length === 6 && args[1] === "autotm:///services") return original(args);
     if (verifiedIdentity && digits.length === 6 && port.actions.at(-1)?.[1] === "autotm:///services") return { nodes: [{ label: "Aýgül Amanowa" }, { label: "+993 61 XX-XX-01" }] };
-    if (args[0] === "snapshot" && port.actions.some(a => a[1]?.includes("/otp?"))) {
+    if (args[0] === "snapshot" && (currentOtp || port.actions.some(a => a[1]?.includes("/otp?")))) {
       generation++;
       if (digits.length === 6 && !staysOnOtp) return { nodes: [{ label: "Aýgül Amanowa" }, { label: "+993 61 XX-XX-01" }] };
       return { refsGeneration: generation, nodes: [
@@ -423,8 +437,8 @@ test("uses fresh semantic native keyboard refs for the transparent OtpCells inpu
 });
 
 test("resumes an exact request's matching grouped native digit prefix without retyping it", async () => {
-  const port = keyboardBoundary({ initialDigits: "70" });
-  assert.equal((await signInFixture({ ...options, requestId: ID, requestedAt: new Date(NOW).toISOString() }, port)).status, "signed-in");
+  const port = keyboardBoundary({ currentOtp: true, initialDigits: "70" });
+  assert.equal((await signInFixture({ ...options, requestId: ID, requestedAt: new Date(NOW).toISOString() }, port)).status, "verified");
   assert.equal(port.actions.filter(([action]) => action === "press").length, 4);
   assert.equal(port.requests.some(([url]) => url.endsWith("/otp/request")), false);
 });
@@ -468,8 +482,8 @@ test("preserves only resumable safe context after a successful request and later
     assert.doesNotMatch(error.message, /709814|private-value|99361000001|raw response/);
     return true;
   });
-  const resumed = boundary();
-  assert.equal((await signInFixture({ ...options, ...context }, resumed)).status, "signed-in");
+  const resumed = boundary({ currentOtp: true });
+  assert.equal((await signInFixture({ ...options, ...context }, resumed)).status, "verified");
   assert.equal(resumed.requests.some(([url]) => url.endsWith("/otp/request")), false);
 });
 

@@ -11,6 +11,7 @@ import { HOME_HREF } from "../navigation/homeHref";
  * happen while the authentication screens sit on top of the calling screen.
  */
 export type PendingAction =
+  | { kind: "history"; attemptKey: string; sourceListingId: string | null }
   | { kind: "favorite"; listingId: string }
   | { kind: "message"; listingId: string }
   | { kind: "report"; listingId: string }
@@ -128,6 +129,7 @@ export function useReplayAuthAction(
     if (
       replayAction === null ||
       replayAction.kind !== kind ||
+      replayAction.kind === "history" ||
       replayAction.listingId !== listingId
     ) {
       return;
@@ -167,6 +169,7 @@ export function useReplayAuthActionOfKind(
       !enabled ||
       replayAction === null ||
       replayAction.kind !== kind ||
+      replayAction.kind === "history" ||
       replayReturnTo !== returnTo
     ) {
       return;

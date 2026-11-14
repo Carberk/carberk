@@ -18,6 +18,8 @@ requireNative.cache[nativePath] = nativeModule;
 // component import, so this is the array specs read. A setup file shares the
 // module graph with its test file.
 vi.stubGlobal("requestAnimationFrame", (callback: (time: number) => void) => { callback(0); return 0; });
+// Native cleanup also runs after specs restore their stubbed globals.
+globalThis.cancelAnimationFrame = () => {};
 
 const scrollRequests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
 

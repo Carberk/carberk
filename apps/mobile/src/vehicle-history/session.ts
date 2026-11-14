@@ -28,6 +28,8 @@ export function historySessionCurrent(viewer: HistoryViewer) {
   return current?.userId === viewer.userId && current.sessionId === viewer.sessionId;
 }
 
+export const currentHistoryViewer = () => viewerOf(peekAuthSession());
+
 export async function assertHistorySession(viewer: HistoryViewer, signal?: AbortSignal) {
   if (signal?.aborted || !historySessionCurrent(viewer)) throw new ApiError("HISTORY_SESSION_CHANGED", 401);
   const current = viewerOf(await loadAuthSession());

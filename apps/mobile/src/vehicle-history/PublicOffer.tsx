@@ -1,10 +1,12 @@
 import { useRef, useState } from "react";
 import { AccessibilityInfo, Modal, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { router } from "expo-router";
 
 import { fictionalSample } from "./fictionalSample";
 import { vehicleHistoryAvailable } from "./availability";
 import { saveFictionalSample } from "./saveFictionalSample";
+import { ContactActions } from "./ContactActions";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
 import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
@@ -60,7 +62,7 @@ export function PublicOffer({ listingId }: { listingId?: string }) {
             <Text className="text-callout leading-6 text-muted-foreground">{t("vehicleHistory.coverage")}</Text>
             <Text className="text-callout leading-6 text-muted-foreground">{t("vehicleHistory.condition")}</Text>
           </View>
-          <Button ref={sampleTrigger} onPress={() => { setDownloadState("idle"); setSampleOpen(true); }}>
+          <Button variant="secondary" ref={sampleTrigger} onPress={() => { setDownloadState("idle"); setSampleOpen(true); }}>
             <Text>{t("vehicleHistory.viewSample")}</Text>
           </Button>
           <Separator />
@@ -69,6 +71,10 @@ export function PublicOffer({ listingId }: { listingId?: string }) {
             <Text className="text-callout text-muted-foreground">{t("vehicleHistory.hours")}</Text>
             <Text className="text-footnote text-muted-foreground">{t("vehicleHistory.informationOnly")}</Text>
           </View>
+          <ContactActions listingId={listingId} />
+          <Button variant="secondary" onPress={() => router.push("/vehicle-history/requests")}>
+            <Text>{t("vehicleHistory.historyTitle")}</Text>
+          </Button>
         </ScrollView>
       )}
       <Modal visible={available && sampleOpen} animationType="slide" presentationStyle="fullScreen"

@@ -21,7 +21,8 @@ it("lets a signed-out customer read the offer without creating an enquiry", asyn
   expect(screen.getByText("100 TMT per vehicle")).toBeTruthy();
   expect(screen.getByText("Carfax or AutoCheck is sufficient. Both are included when obtainable.")).toBeTruthy();
   expect(screen.getByText("For a vehicle anywhere, including outside Carberk listings.")).toBeTruthy();
-  expect(screen.queryByText(/Sign in|Contact operator|Pay now/)).toBeNull();
+  expect(screen.getByRole("button", { name: "Sign in to contact operator" })).toBeTruthy();
+  expect(screen.queryByText("Pay now")).toBeNull();
   await fireEvent.press(screen.getByRole("button", { name: "View fictional sample" }));
   expect(screen.getByText("CARBERK FICTIONAL EDUCATIONAL SAMPLE")).toBeTruthy();
   const [close] = screen.getAllByRole("button", { name: "Close" });

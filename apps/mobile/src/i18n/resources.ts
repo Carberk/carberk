@@ -29,6 +29,10 @@ export const resources: Resource = {
   ru: {
     common: {
       vehicleHistory: {
+        contact: "Связаться с оператором", opening: "Открываем обращение…",
+        signInContact: "Войти и связаться с оператором", newRequest: "Новое обращение",
+        createFailed: "Не удалось открыть обращение", createDenied: "Для этого сеанса создание обращения недоступно. Вернитесь назад или войдите через Кабинет.",
+        backOffer: "К описанию услуги",
         offline: "Нет подключения",
         reference: "Обращение {{id}}",
         historyTitle: "Ваши обращения", open: "Открыть обращение", older: "Загрузить более ранние обращения",
@@ -50,7 +54,7 @@ export const resources: Resource = {
         viewSample: "Посмотреть вымышленный пример",
         outside: "Для любого автомобиля, в том числе без объявления на Carberk.",
         hours: "Часы работы операторов: ежедневно 09:00–20:00 по времени Ашхабада.",
-        informationOnly: "Здесь доступны только информация и учебный пример. Обращения и оплата пока недоступны.",
+        informationOnly: "Можно открыть обращение без VIN и оплаты. Покупка отчётов пока недоступна.",
         listingContext: "Открыто из объявления. Оно служит только контекстом и не даёт доступа к личным данным продавца.",
         sampleTitle: "Вымышленный пример",
         fictionNotice: "Оригинальный учебный пример Carberk. Все автомобили и события вымышлены. Это не отчёт поставщика.",
@@ -1005,6 +1009,10 @@ export const resources: Resource = {
   tk: {
     common: {
       vehicleHistory: {
+        contact: "Operator bilen habarlaşmak", opening: "Ýüz tutma açylýar…",
+        signInContact: "Giriş edip operator bilen habarlaş", newRequest: "Täze ýüz tutma",
+        createFailed: "Ýüz tutmany açyp bolmady", createDenied: "Şu sessiýada ýüz tutmany açmak elýeterli däl. Yza dolanyň ýa-da Şahsy otagdan giriň.",
+        backOffer: "Hyzmat beýanyna dolan",
         offline: "Baglanyşyk ýok",
         reference: "Ýüz tutma {{id}}",
         historyTitle: "Ýüz tutmalaryňyz", open: "Ýüz tutmany aç", older: "Öňki ýüz tutmalary ýükle",
@@ -1026,7 +1034,7 @@ export const resources: Resource = {
         viewSample: "Toslama nusgany gör",
         outside: "Islendik ulag üçin, Carberk-de bildirişi bolmadyk ulag hem bolýar.",
         hours: "Operatorlaryň iş wagty: her gün Aşgabat wagty bilen 09:00–20:00.",
-        informationOnly: "Bu ýerde diňe maglumat we okuw nusgasy bar. Ýüz tutmak we töleg entek elýeterli däl.",
+        informationOnly: "VIN we tölegsiz ýüz tutup bilersiňiz. Hasabat satyn almak entek elýeterli däl.",
         listingContext: "Bildirişden açyldy. Bildiriş diňe goşmaça maglumatdyr, satyjynyň şahsy maglumatlaryna ygtyýar bermeýär.",
         sampleTitle: "Toslama nusga",
         fictionNotice: "Carberk-iň öz okuw nusgasy. Ähli ulaglar we wakalar toslamadyr. Bu üpjün edijiniň hasabaty däldir.",
@@ -1981,6 +1989,10 @@ export const resources: Resource = {
   en: {
     common: {
       vehicleHistory: {
+        contact: "Contact operator", opening: "Opening request…",
+        signInContact: "Sign in to contact operator", newRequest: "New request",
+        createFailed: "Could not open request", createDenied: "This session cannot open a request. Go back or sign in through Account.",
+        backOffer: "Back to offer",
         offline: "No connection",
         reference: "Request {{id}}",
         historyTitle: "Your requests", open: "Open request", older: "Load older requests",
@@ -2002,7 +2014,7 @@ export const resources: Resource = {
         viewSample: "View fictional sample",
         outside: "For a vehicle anywhere, including outside Carberk listings.",
         hours: "Operator hours: daily 09:00–20:00, Ashgabat time.",
-        informationOnly: "Information and educational sample only. Requests and payment are not available here.",
+        informationOnly: "You can enquire without a VIN or payment. Report purchases are not available yet.",
         listingContext: "Opened from a listing. The listing is context only; it grants no access to the seller’s private information.",
         sampleTitle: "Fictional sample",
         fictionNotice: "An original Carberk educational example. Every vehicle and event is invented. This is not a provider report.",
