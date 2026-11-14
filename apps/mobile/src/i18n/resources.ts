@@ -29,6 +29,16 @@ export const resources: Resource = {
   ru: {
     common: {
       vehicleHistory: {
+        offline: "Нет подключения",
+        reference: "Обращение {{id}}",
+        historyTitle: "Ваши обращения", open: "Открыть обращение", older: "Загрузить более ранние обращения",
+        openRequest: "Открыть обращение {{id}}", backRequests: "К обращениям",
+        enquiry: "Обращение", awaitingOperator: "Оператор ещё не назначен",
+        emptyRequests: "У вас пока нет обращений по истории автомобиля.",
+        emptyEnquiry: "Сообщений пока нет. Это обращение, а не заказ. Оплата не требуется.",
+        privateSignIn: "Войдите через Кабинет, чтобы увидеть свои обращения.",
+        denied: "Обращение недоступно для этого сеанса. Вернитесь к своим обращениям.",
+        historyEntry: "Ваши обращения по истории автомобиля",
         title: "История автомобиля",
         entry: "История автомобиля · 100 TMT",
         entryDetail: "Carfax / AutoCheck · 100 TMT",
@@ -995,6 +1005,16 @@ export const resources: Resource = {
   tk: {
     common: {
       vehicleHistory: {
+        offline: "Baglanyşyk ýok",
+        reference: "Ýüz tutma {{id}}",
+        historyTitle: "Ýüz tutmalaryňyz", open: "Ýüz tutmany aç", older: "Öňki ýüz tutmalary ýükle",
+        openRequest: "{{id}} ýüz tutmany aç", backRequests: "Ýüz tutmalara dolan",
+        enquiry: "Ýüz tutma", awaitingOperator: "Operator entek bellenmedi",
+        emptyRequests: "Ulag taryhy boýunça entek ýüz tutmaňyz ýok.",
+        emptyEnquiry: "Entek habar ýok. Bu ýüz tutma, sargyt däl. Töleg gerek däl.",
+        privateSignIn: "Ýüz tutmalaryňyzy görmek üçin Şahsy otagdan giriň.",
+        denied: "Bu ýüz tutma şu sessiýa üçin elýeterli däl. Ýüz tutmalaryňyza dolanyň.",
+        historyEntry: "Ulag taryhy boýunça ýüz tutmalaryňyz",
         title: "Ulag taryhy",
         entry: "Ulag taryhy · 100 TMT",
         entryDetail: "Carfax / AutoCheck · 100 TMT",
@@ -1961,6 +1981,16 @@ export const resources: Resource = {
   en: {
     common: {
       vehicleHistory: {
+        offline: "No connection",
+        reference: "Request {{id}}",
+        historyTitle: "Your requests", open: "Open request", older: "Load older requests",
+        openRequest: "Open request {{id}}", backRequests: "Back to requests",
+        enquiry: "Enquiry", awaitingOperator: "Awaiting operator",
+        emptyRequests: "You have no Vehicle History requests yet.",
+        emptyEnquiry: "No messages yet. This is an enquiry, not an order. No payment is needed.",
+        privateSignIn: "Sign in through Account to view your requests.",
+        denied: "This request is unavailable for this session. Go back to your requests.",
+        historyEntry: "Your Vehicle History requests",
         title: "Vehicle History",
         entry: "Vehicle History · 100 TMT",
         entryDetail: "Carfax / AutoCheck · 100 TMT",

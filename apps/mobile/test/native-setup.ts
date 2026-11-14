@@ -64,6 +64,7 @@ vi.mock("expo-router", () => ({
   router: routerMock, useRouter: () => routerMock,
   useLocalSearchParams: () => routeParams,
   useFocusEffect: vi.fn(),
+  useNavigation: vi.fn(() => ({ getState: () => undefined })),
   useIsFocused: () => screenFocus.focused,
   Stack: {
     Screen: ({ options }: { options?: Record<string, unknown> }) => {

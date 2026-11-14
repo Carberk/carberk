@@ -12,9 +12,10 @@ interface ErrorStateProps {
   error: unknown;
   onRetry?: () => void;
   compact?: boolean;
+  title?: string;
 }
 
-export function ErrorState({ error, onRetry, compact = false }: ErrorStateProps) {
+export function ErrorState({ error, onRetry, compact = false, title }: ErrorStateProps) {
   const { t } = useTranslation("common");
   const copy = useErrorCopy(error);
 
@@ -26,7 +27,7 @@ export function ErrorState({ error, onRetry, compact = false }: ErrorStateProps)
       >
         <Icon as={AlertTriangle} className="size-4 shrink-0 text-destructive" />
         <Text className="flex-1 text-callout text-destructive" numberOfLines={2}>
-          {copy.title}
+          {title ?? copy.title}
         </Text>
         {copy.retryable && onRetry && (
           <Button variant="ghost" size="sm" onPress={onRetry}>
@@ -44,7 +45,7 @@ export function ErrorState({ error, onRetry, compact = false }: ErrorStateProps)
     >
       <Illustration name="error" className="mb-6" />
       <Text className="text-center font-heading text-headline font-semibold text-foreground" numberOfLines={2}>
-        {copy.title}
+        {title ?? copy.title}
       </Text>
       <Text className="mt-2 text-center text-body text-muted-foreground" numberOfLines={3}>
         {copy.description}
