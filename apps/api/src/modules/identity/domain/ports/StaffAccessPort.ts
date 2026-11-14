@@ -11,11 +11,11 @@ export interface StaffActor {
  * Carries no Sign-in Methods, marketplace role or private staff metadata.
  */
 export interface StaffAccessPort {
-  /** Matching active session/grant, before TOTP enrollment or verification. */
+  /** Active session and any History staff purpose, before scoped TOTP. */
   findEligibleActor(input: {
     userId: string;
     sessionId: string;
-    purpose: StaffPurpose;
+    purpose: "vehicle-history";
   }): Promise<StaffActor | null>;
   findCurrentActor(input: {
     userId: string;

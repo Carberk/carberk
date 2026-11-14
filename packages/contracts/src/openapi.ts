@@ -37,7 +37,7 @@ import {
   HistoryDeskSchema, CreateHistoryRequestSchema, HistoryRequestSchema,
   ListHistoryRequestsQuerySchema, ListHistoryRequestsResponseSchema,
 } from "./schemas/vehicle-history";
-import { HistoryStaffChangeSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
+import { HistoryStaffChangeSchema, HistoryStaffLookupSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
 import {
   BrandSummarySchema,
   BrandDetailSchema,
@@ -428,6 +428,27 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   });
   registry.register("HistoryStaffChange", HistoryStaffChangeSchema);
   registry.register("HistoryStaffResponse", HistoryStaffResponseSchema);
+  registry.registerPath({
+    method: "get", path: "/api/v1/identity/history-staff", tags: ["Identity"],
+    summary: "Inspect one exact named target with current synthetic founder authority",
+    security: [{ bearerAuth: [] }], request: { query: HistoryStaffLookupSchema },
+    responses: {
+      200: { description: "Private, no-store actor and optional target", content: { "application/json": { schema: HistoryStaffResponseSchema } } },
+      400: { description: "Invalid exact target ID" }, 401: { description: "Sign in again" },
+      403: { description: "Current founder session, purpose or synthetic admission refused" },
+    },
+  });
+  registry.registerPath({
+    method: "post", path: "/api/v1/identity/history-staff", tags: ["Identity"],
+    summary: "Grant or revoke an operator/evidence capability with atomic actor, target and reason audit",
+    security: [{ bearerAuth: [] }], request: { body: { content: { "application/json": { schema: HistoryStaffChangeSchema } } } },
+    responses: {
+      201: { description: "Private, no-store current target access", content: { "application/json": { schema: HistoryStaffResponseSchema } } },
+      400: { description: "Invalid capability or missing reason" }, 401: { description: "Sign in again" },
+      403: { description: "Current founder authority missing or self change refused" },
+      404: { description: "Target unavailable" }, 409: { description: "Target lifecycle forbids a grant" },
+    },
+  });
   registry.registerPath({
     method: "get", path: "/api/v1/vehicle-history/desk", tags: ["Vehicle History"],
     summary: "Open the local synthetic Vehicle History desk with current staff access",

@@ -1,12 +1,14 @@
 import { Suspense } from "react";
 import { notFound, unstable_rethrow } from "next/navigation";
 import { HistoryStaffSchemas } from "@auto-tm/contracts";
+
+import { HistoryStaffForm } from "./HistoryStaffForm";
+import type { StaffState } from "./actions";
+
 import { HistoryWorkbench } from "@/components/HistoryWorkbench";
 import { apiFetchOptional, ApiError } from "@/lib/api-client";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 import { staffCopy } from "@/lib/history-staff-copy";
-import { HistoryStaffForm } from "./HistoryStaffForm";
-import type { StaffState } from "./actions";
 
 async function StaffContent({ locale, targetId }: { locale: DeskLocale; targetId: string | undefined }) {
   let initial: StaffState;

@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { waitFor } from "@testing-library/react";
+import { fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+
 vi.mock("next/headers", () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) }));
 vi.mock("next/navigation", () => ({ unstable_rethrow: () => {}, redirect: vi.fn() }));
 import { HistoryStaffForm } from "./HistoryStaffForm";
@@ -24,29 +25,35 @@ it("offers exact named lookup without a directory or permission inheritance", as
   expect(container.querySelector('input[name="targetId"]')).not.toBeNull();
   expect(container.textContent).toContain("Find person");
 });
+function element<T extends Element>(selector: string, index = 0): T {
+  const found = container.querySelectorAll<T>(selector)[index];
+  if (!found) throw new Error(`Missing rendered ${selector}`);
+  return found;
+}
 async function submit(index = 0) {
-  await act(async () => container.querySelectorAll("form")[index]!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  await act(async () => element<HTMLFormElement>("form", index).dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
 it("confirms a named person, then sends the exact capability and reason through the real action", async () => {
   vi.mocked(fetch).mockResolvedValueOnce(Response.json({ actor, target }))
     .mockResolvedValueOnce(Response.json({ actor, target: { ...target, capabilities: { ...target.capabilities, "vehicle-history": true } } }));
   await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor, target: null }} />));
-  container.querySelector<HTMLInputElement>('input[name="targetId"]')!.value = target.id;
+  element<HTMLInputElement>('input[name="targetId"]').value = target.id;
   await submit();
   expect(container.textContent).toContain("Synthetic named operator");
   expect(container.textContent).toContain(target.id);
   expect(container.textContent).toContain("Historical payment evidence");
-  container.querySelectorAll<HTMLInputElement>('input[name="reason"]')[0]!.value = "Synthetic desk assignment";
+  element<HTMLTextAreaElement>('textarea[name="reason"]').value = "Synthetic desk assignment";
   await submit(1);
   expect(container.querySelector('[role="status"]')?.textContent).toBe("Access updated.");
-  expect(container.querySelectorAll("form")[1]!.textContent).toContain("Revoke access");
-  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[1]![1]?.body))).toEqual({ targetId: target.id, capability: "vehicle-history", active: true, reason: "Synthetic desk assignment" });
+  expect(element<HTMLFormElement>("form", 1).textContent).toContain("Revoke access");
+  const mutation = vi.mocked(fetch).mock.calls[1];
+  expect(JSON.parse(String(mutation?.[1]?.body))).toEqual({ targetId: target.id, capability: "vehicle-history", active: true, reason: "Synthetic desk assignment" });
 });
 it("announces pending and prevents double-submit until current access returns", async () => {
   let finish!: (response: Response) => void;
   vi.mocked(fetch).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
   await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor, target }} />));
-  container.querySelector<HTMLInputElement>('input[name="reason"]')!.value = "Synthetic pending assignment";
+  element<HTMLTextAreaElement>('textarea[name="reason"]').value = "Synthetic pending assignment";
   await submit(1);
   expect(container.querySelector("section")?.getAttribute("aria-busy")).toBe("true");
   expect(container.querySelector("button")?.disabled).toBe(true);
@@ -65,6 +72,18 @@ it("rejects a blank reason before any network mutation", async () => {
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("reason of 1–500 characters");
   expect(vi.mocked(fetch).mock.calls).toHaveLength(0);
 });
+it("preserves the written reason after a network failure while requiring access refresh", async () => {
+  vi.mocked(fetch).mockRejectedValue(new Error("synthetic offline"));
+  await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor, target }} />));
+  await act(async () => fireEvent.change(element<HTMLTextAreaElement>('textarea[name="reason"]'), { target: { value: "Keep this synthetic reason" } }));
+  await submit(1);
+  expect(element<HTMLTextAreaElement>('textarea[name="reason"]').value).toBe("Keep this synthetic reason");
+  expect(element<HTMLFieldSetElement>("fieldset").disabled).toBe(true);
+  vi.mocked(fetch).mockResolvedValue(Response.json({ actor, target }));
+  await submit(1);
+  expect(element<HTMLTextAreaElement>('textarea[name="reason"]').value).toBe("Keep this synthetic reason");
+  expect(element<HTMLFieldSetElement>("fieldset").disabled).toBe(false);
+});
 it.each([
   ["tk", "Rugsat täzelendi.", "Esaslandyryjy rugsady elýeterli däl.", "Sessiýanyň möhleti gutardy.", "Rugsady barlap ýa-da täzeläp bolmady.", "Bu ID bilen adam tapylmady."],
   ["ru", "Доступ обновлён.", "Нет доступа основателя.", "Сессия истекла.", "Не удалось проверить или изменить доступ.", "Человек с таким ID не найден."],
@@ -73,7 +92,7 @@ it.each([
   for (const [status, message] of [[201, saved], [403, denied], [401, expired], [503, error], [404, missing]] as const) {
     vi.mocked(fetch).mockResolvedValue(Response.json(status === 201 ? { actor, target } : { code: "FAILURE", message: "private upstream detail" }, { status }));
     await act(async () => root.render(<HistoryStaffForm key={`${locale}-${status}`} locale={locale} initial={{ actor, target }} />));
-    container.querySelector<HTMLInputElement>('input[name="reason"]')!.value = "Synthetic reason";
+    element<HTMLTextAreaElement>('textarea[name="reason"]').value = "Synthetic reason";
     await submit(1);
     expect(container.textContent).toContain(message);
     expect(container.textContent).not.toContain("private upstream detail");

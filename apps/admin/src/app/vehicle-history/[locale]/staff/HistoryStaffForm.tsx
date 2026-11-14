@@ -1,19 +1,29 @@
 "use client";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { IdentitySchemas } from "@auto-tm/contracts";
 import { Button, Input } from "@auto-tm/ui/components";
+
+import { staffAction, type StaffState } from "./actions";
+
 import type { DeskLocale } from "@/lib/history-desk-copy";
 import { staffCopy } from "@/lib/history-staff-copy";
-import { staffAction, type StaffState } from "./actions";
 
 export function HistoryStaffForm({ locale, initial = { status: "empty" } }: { locale: DeskLocale; initial?: StaffState }) {
   const [state, action, pending] = useActionState(staffAction.bind(null, locale), initial);
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const t = staffCopy[locale];
   const target = state.target;
+  const targetId = target?.id;
   const refused = state.status === "denied" || state.status === "expired";
   useEffect(() => {
-    if (target) window.history.replaceState(null, "", `${window.location.pathname}?targetId=${target.id}`);
-  }, [target]);
+    if (targetId) window.history.replaceState(null, "", `${window.location.pathname}?targetId=${targetId}`);
+  }, [targetId]);
+  useEffect(() => {
+    if (state.status === "saved" && state.changed) {
+      const key = `${state.target?.id}:${state.changed}`;
+      setReasons((previous) => ({ ...previous, [key]: "" }));
+    }
+  }, [state]);
   return <>
     <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t.title}</h1>
     {state.actor && <p className="mt-2 break-words text-sm text-muted-foreground">{t.actor}: <span className="font-medium text-foreground">{IdentitySchemas.formatDisplayName(state.actor, locale)}</span></p>}
@@ -25,10 +35,13 @@ export function HistoryStaffForm({ locale, initial = { status: "empty" } }: { lo
         <Button type="submit" disabled={pending || refused} className="min-h-11">{pending ? t.finding : t.find}</Button>
       </form>
       <div role={state.status && !["saved", "empty", "missing"].includes(state.status) ? "alert" : "status"} aria-live="polite" className="mt-5 text-sm leading-6">
-        {pending ? t.saving : state.status ? t[state.status] : null}
+        {pending ? t.finding : state.status ? t[state.status] : null}
       </div>
-      {state.status === "error" && <a href={target ? `?targetId=${target.id}` : "?"} className="mt-3 inline-block rounded-sm py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{t.retry}</a>}
-      {refused && <a href={`/login?reason=history-access&returnTo=${encodeURIComponent(`/vehicle-history/${locale}/staff`)}`} className="mt-3 inline-block rounded-sm py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{t.signIn}</a>}
+      {state.status === "error" && (target ? <form action={action} className="mt-3">
+        <input type="hidden" name="targetId" value={target.id} />
+        <Button type="submit" variant="secondary" disabled={pending} className="min-h-11">{t.retry}</Button>
+      </form> : <a href="?" className="mt-3 inline-block rounded-sm py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{t.retry}</a>)}
+      {refused && <a href={`/login?reason=${state.status === "expired" ? "session-expired" : "history-access"}&returnTo=${encodeURIComponent(`/vehicle-history/${locale}/staff`)}`} className="mt-3 inline-block rounded-sm py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{t.signIn}</a>}
       {target && !refused && <div className="mt-6 border-t pt-6">
         <h2 className="text-sm font-medium text-muted-foreground">{t.target}</h2>
         <p className="mt-2 break-words text-lg font-semibold">{IdentitySchemas.formatDisplayName(target, locale)}</p>
@@ -46,7 +59,7 @@ export function HistoryStaffForm({ locale, initial = { status: "empty" } }: { lo
           {capability !== "vehicle-history" && <p className="mt-3 max-w-prose text-sm leading-6 text-muted-foreground">{t.scope}</p>}
           <fieldset disabled={pending || state.status === "error" || state.actor?.id === target.id || (!target.eligible && !target.capabilities[capability])} className="mt-4">
             <label className="block text-sm font-medium">{t.reason}
-              <Input name="reason" required maxLength={500} className="mt-2 min-h-11" />
+              <textarea name="reason" required maxLength={500} rows={3} value={reasons[`${target.id}:${capability}`] ?? ""} onChange={(event) => setReasons((previous) => ({ ...previous, [`${target.id}:${capability}`]: event.target.value }))} className="mt-2 w-full resize-y rounded-md border bg-surface px-3 py-2 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" />
             </label>
             <Button type="submit" variant={target.capabilities[capability] ? "secondary" : "primary"} className="mt-3 min-h-11">{pending ? t.saving : target.capabilities[capability] ? t.revoke : t.grant}</Button>
           </fieldset>

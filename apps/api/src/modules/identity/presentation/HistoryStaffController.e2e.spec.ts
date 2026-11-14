@@ -13,6 +13,7 @@ import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { VehicleHistoryModule } from "../../vehicle-history/vehicle-history.module";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
+import { STAFF_ACCESS_PORT, type StaffAccessPort } from "../domain/ports/StaffAccessPort";
 
 describe("named History staff authority over HTTP", () => {
   let app: NestFastifyApplication;
@@ -90,6 +91,14 @@ describe("named History staff authority over HTTP", () => {
     await request.get("/api/v1/vehicle-history/desk").auth(target.token, { type: "bearer" }).expect(403);
     await request.get("/api/v1/identity/history-staff").auth(target.token, { type: "bearer" }).expect(403);
     await request.get("/api/v1/auth/admin/totp/status?purpose=vehicle-history").auth(target.token, { type: "bearer" }).expect(200);
+    const access = app.get<StaffAccessPort>(STAFF_ACCESS_PORT);
+    const session = { userId: target.user.id, sessionId: target.session.id };
+    expect(await access.findCurrentActor({ ...session, purpose: "vehicle-history-payment-evidence" })).toEqual({
+      id: target.user.id, displayName: target.user.displayName, nameNumber: target.user.nameNumber,
+    });
+    expect(await access.findCurrentActor({ ...session, purpose: "vehicle-history-staff-management" })).toBeNull();
+    await change({ active: false }).expect(201);
+    expect(await access.findCurrentActor({ ...session, purpose: "vehicle-history-payment-evidence" })).toBeNull();
   });
   it("allows management-only ordinary staff to use scoped TOTP without opening the operator desk", async () => {
     const { founder } = await managementFixture();

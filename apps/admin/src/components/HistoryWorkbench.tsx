@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
+
 import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
 import { staffCopy } from "@/lib/history-staff-copy";
 
