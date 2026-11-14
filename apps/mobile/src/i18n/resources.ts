@@ -29,6 +29,11 @@ export const resources: Resource = {
   ru: {
     common: {
       vehicleHistory: {
+        requestRefreshFailed: "Не удалось обновить обращение.",
+        assignedOperator: "Оператор: {{name}}", you: "Вы",
+        moreMessages: "Загрузить ещё сообщения", pageFailed: "Не удалось загрузить следующие сообщения.",
+        receiptFailed: "Не удалось обновить отметки сообщений.", retryReceipts: "Повторить обновление отметок",
+        threadChanged: "Обращение изменилось. Обновите его и продолжите.",
         contact: "Связаться с оператором", opening: "Открываем обращение…",
         signInContact: "Войти и связаться с оператором", newRequest: "Новое обращение",
         createFailed: "Не удалось открыть обращение", createDenied: "Для этого сеанса создание обращения недоступно. Вернитесь назад или войдите через Кабинет.",
@@ -1009,6 +1014,11 @@ export const resources: Resource = {
   tk: {
     common: {
       vehicleHistory: {
+        requestRefreshFailed: "Ýüz tutmany täzeläp bolmady.",
+        assignedOperator: "Operator: {{name}}", you: "Siz",
+        moreMessages: "Ýene habarlary ýükle", pageFailed: "Indiki habarlary ýükläp bolmady.",
+        receiptFailed: "Habarlaryň ýagdaýyny täzeläp bolmady.", retryReceipts: "Habar ýagdaýyny gaýtadan täzele",
+        threadChanged: "Ýüz tutma üýtgedi. Täzeläp, dowam ediň.",
         contact: "Operator bilen habarlaşmak", opening: "Ýüz tutma açylýar…",
         signInContact: "Giriş edip operator bilen habarlaş", newRequest: "Täze ýüz tutma",
         createFailed: "Ýüz tutmany açyp bolmady", createDenied: "Şu sessiýada ýüz tutmany açmak elýeterli däl. Yza dolanyň ýa-da Şahsy otagdan giriň.",
@@ -1989,6 +1999,11 @@ export const resources: Resource = {
   en: {
     common: {
       vehicleHistory: {
+        requestRefreshFailed: "Could not refresh this request.",
+        assignedOperator: "Operator: {{name}}", you: "You",
+        moreMessages: "Load more messages", pageFailed: "Could not load more messages.",
+        receiptFailed: "Could not update message status.", retryReceipts: "Retry message status",
+        threadChanged: "This request changed. Refresh it to continue.",
         contact: "Contact operator", opening: "Opening request…",
         signInContact: "Sign in to contact operator", newRequest: "New request",
         createFailed: "Could not open request", createDenied: "This session cannot open a request. Go back or sign in through Account.",

@@ -8,10 +8,12 @@ import { mapErrorToCopy } from "../api/getErrorCopy";
 import { ApiError } from "../api/client";
 import { localeTag } from "../i18n/resources";
 import { useSafeBack } from "../navigation/useSafeBack";
+import { useDisplayName } from "../identity/useDisplayName";
 
 import { vehicleHistoryAvailable } from "./availability";
 import { ContactActions } from "./ContactActions";
 import { historySessionCurrent, useHistoryViewer } from "./session";
+import { RequestConversation } from "./RequestConversation";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
 import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
@@ -22,13 +24,14 @@ import { ErrorState } from "@/components/ErrorState";
 type Viewer = ReturnType<typeof useHistoryViewer>;
 const historyPath = "/vehicle-history/requests";
 
-function Reader({ viewer, error, loading, retry, refreshing, detail = false, children }: {
+function Reader({ viewer, error, loading, retry, refreshing, detail = false, scrolling = true, children }: {
   viewer: Viewer;
   error: unknown;
   loading: boolean;
   retry: () => void;
   refreshing: boolean;
   detail?: boolean;
+  scrolling?: boolean;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -101,11 +104,11 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
         onLayout={() => {
           if (heading.current) AccessibilityInfo.sendAccessibilityEvent(heading.current, "focus");
         }} />
-      <ScrollView className="flex-1" contentContainerClassName="gap-5 px-5 pb-8 pt-3"
+      {!scrolling && content === children ? content : <ScrollView className="flex-1" contentContainerClassName="gap-5 px-5 pb-8 pt-3"
         refreshControl={viewer && available
           ? <RefreshControl refreshing={refreshing} onRefresh={retry} /> : undefined}>
         {content}
-      </ScrollView>
+      </ScrollView>}
     </SafeScreen>
   );
 }
@@ -160,18 +163,25 @@ export function HistoryList() {
 
 export function RequestDetail({ id }: { id: string }) {
   const { t, i18n } = useTranslation();
+  const name = useDisplayName();
   const viewer = useHistoryViewer();
   const query = useHistoryRequest(id, viewer, vehicleHistoryAvailable());
   const request = query.data;
+  const transientError = request && query.error instanceof ApiError && (query.error.status === 0 || query.error.status >= 500)
+    ? query.error : null;
   return (
-    <Reader detail viewer={viewer} error={query.error} loading={query.isPending}
+    <Reader detail scrolling={false} viewer={viewer} error={transientError ? null : query.error} loading={query.isPending}
       refreshing={query.isRefetching} retry={() => void query.refetch()}>
-      {request && <>
+      {request && viewer && <RequestConversation
+        key={`${viewer.userId}:${viewer.sessionId}:${id}:${request.assignmentVersion}:${request.assignedOperator?.id}`}
+        viewer={viewer} request={request} metadataError={transientError}
+        metadataCurrent={!query.error && !query.isFetching} metadataRefreshing={query.isFetching} header={<>
         <View className="gap-3 border-b-hairline border-border pb-5">
           <Text accessibilityRole="header" className="text-headline font-semibold">
             {t("vehicleHistory.enquiry")}
           </Text>
-          <Text className="text-body">{t("vehicleHistory.awaitingOperator")}</Text>
+          <Text className="text-body">{request.assignedOperator
+            ? t("vehicleHistory.assignedOperator", { name: name(request.assignedOperator) }) : t("vehicleHistory.awaitingOperator")}</Text>
           <Text className="text-callout text-muted-foreground">
             {new Date(request.createdAt).toLocaleString(localeTag(i18n.language))}
           </Text>
@@ -182,8 +192,7 @@ export function RequestDetail({ id }: { id: string }) {
         {request.sourceListingId && (
           <Text className="text-callout text-muted-foreground">{t("vehicleHistory.listingContext")}</Text>
         )}
-        <Text className="text-body leading-6 text-muted-foreground">{t("vehicleHistory.emptyEnquiry")}</Text>
-      </>}
+      </>} />}
     </Reader>
   );
 }
