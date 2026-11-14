@@ -37,6 +37,7 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
     const state = navigation.getState();
     const previous = state?.routes[(state.index ?? 0) - 1];
     const current = state?.routes[state.index];
+    if (current?.name !== (detail ? "vehicle-history/requests/[id]" : "vehicle-history/requests/index")) return;
     const tabs = previous?.state;
     const routes = tabs?.routes ?? [];
     const chatIndex = routes.findIndex((route) => route.name === "chat");

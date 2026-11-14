@@ -288,3 +288,13 @@ it("keeps Back to the genuine Messages calling tab", async () => {
   expect(routerMock.back).toHaveBeenCalled();
   expect(routerMock.dismissTo).not.toHaveBeenCalled();
 });
+
+it.each(["(tabs)", "vehicle-history/requests/index"])("leaves %s navigation alone when an older detail is behind it", async (name) => {
+  const dispatch = vi.fn();
+  vi.mocked(useNavigation).mockReturnValue({ dispatch, getState: () => ({
+    index: 1, routes: [{ name: "(tabs)" }, { name }],
+  }) } as ReturnType<typeof useNavigation>);
+  vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", undefined);
+  await renderMobile(<RequestScreen />);
+  expect(dispatch).not.toHaveBeenCalled();
+});
