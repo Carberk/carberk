@@ -3,9 +3,8 @@ import { AuthSchemas } from "@auto-tm/contracts";
 
 import { isAccessTokenExpired } from "../auth/accessTokenExpiry";
 import {
-  clearAuthSession,
+  commitRefreshedAuthSession,
   loadAuthSession,
-  storeAuthSession,
 } from "../auth/session";
 import { localeStore } from "../locale/localeStore";
 
@@ -104,13 +103,6 @@ async function refreshOnce(): Promise<void> {
     if (!session) {
       throw new ApiError("UNAUTHENTICATED", 401, "No session to refresh");
     }
-    // Sign-out or new sign-in makes this response stale. Cancelling one
-    // request must not prevent storing the rotated single-use refresh token.
-    const stillOwnsSession = async () => {
-      const current = await loadAuthSession();
-      return current?.user.id === session.user.id && current.refreshToken === session.refreshToken;
-    };
-
     const res = await fetchWithTimeout(
       `${BASE_URL}/auth/refresh`,
       {
@@ -128,8 +120,7 @@ async function refreshOnce(): Promise<void> {
     // contract defines). Any other answer says nothing about the token, so the
     // session stays and the next request retries (ADR-0077).
     if (res.status === 401) {
-      if (!(await stillOwnsSession())) return;
-      await clearAuthSession();
+      if (!(await commitRefreshedAuthSession(session, null))) return;
       throw new ApiError("UNAUTHENTICATED", 401, "Refresh failed");
     }
     if (!res.ok) {
@@ -143,16 +134,12 @@ async function refreshOnce(): Promise<void> {
       throw refreshUnavailable("Refresh answer was not readable");
     }
     const parsed = AuthSchemas.RefreshResponseSchema.safeParse(json);
-    if (!(await stillOwnsSession())) return;
     if (!parsed.success) {
-      await clearAuthSession();
+      if (!(await commitRefreshedAuthSession(session, null))) return;
       throw new ApiError("CONTRACT_VIOLATION", 502, "Bad refresh response");
     }
 
-    await storeAuthSession({
-      ...parsed.data,
-      user: session.user,
-    });
+    await commitRefreshedAuthSession(session, parsed.data);
   })();
 
   try {
