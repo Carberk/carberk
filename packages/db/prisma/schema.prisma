@@ -1047,6 +1047,8 @@ model ServiceMessage {
   senderId        String
   sender          User                @relation(fields: [senderId], references: [id], onDelete: Restrict)
   clientMessageId String
+  /// Trusted server operation; ordinary sender intents leave this null.
+  operationKey    String?
   kind            ServiceMessageKind  @default(TEXT)
   text            String
   streamOrder     BigInt
@@ -1054,6 +1056,7 @@ model ServiceMessage {
 
   @@unique([conversationId, senderId, clientMessageId])
   @@unique([conversationId, streamOrder])
+  @@unique([conversationId, operationKey])
   @@index([senderId])
   @@map("service_messages")
 }

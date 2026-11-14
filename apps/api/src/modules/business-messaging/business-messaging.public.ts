@@ -1,6 +1,7 @@
 import type {
   SendServiceTextInput, ReadServiceMessagesInput, ServiceMessage, ServiceMessagePage,
   AcknowledgeServiceMessagesInput, ServiceReceipt, ServiceStream,
+  SendOnceServiceTextInput, FindServiceTextOperationInput,
 } from "./domain/ServiceMessageRepository";
 
 export {
@@ -8,6 +9,8 @@ export {
   type ServiceMessageErrorCode,
   type ServiceStream,
   type SendServiceTextInput,
+  type SendOnceServiceTextInput,
+  type FindServiceTextOperationInput,
   type ReadServiceMessagesInput,
   type ServiceMessage,
   type ServiceMessagePage,
@@ -28,6 +31,12 @@ export const BUSINESS_MESSAGING_PORT = Symbol("BusinessMessagingPort");
  * generic staff role; 0 is the requester, positive versions are staff epochs.
  */
 export interface BusinessMessagingPort {
+  /** Once across senders/attempts; conflicting text or ordinary-intent adoption refuses.
+   * Recovery preserves the first committed author, attempt, text, order and time.
+   */
+  sendOnceText(input: SendOnceServiceTextInput): Promise<ServiceMessage>;
+  /** Locks/creates the stream; waits for older append commit/rollback, never ACKs. */
+  findTextOperation(input: FindServiceTextOperationInput): Promise<ServiceMessage | null>;
   sendText(input: SendServiceTextInput): Promise<ServiceMessage>;
   readMessages(input: ReadServiceMessagesInput): Promise<ServiceMessagePage>;
   acknowledge(input: AcknowledgeServiceMessagesInput): Promise<ServiceReceipt>;
