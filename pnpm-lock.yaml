@@ -475,6 +475,9 @@ importers:
       otplib:
         specifier: ^13.4.1
         version: 13.4.1
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
       pino-http:
         specifier: ^10.4.0
         version: 10.5.0
@@ -527,6 +530,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       '@types/supertest':
         specifier: ^7.2.0
         version: 7.2.0

@@ -37,6 +37,8 @@ import {
   HistoryDeskSchema, CreateHistoryRequestSchema, HistoryRequestSchema,
   ListHistoryRequestsQuerySchema, ListHistoryRequestsResponseSchema,
   HistoryQueueQuerySchema, HistoryQueueResponseSchema, ClaimHistoryRequestSchema,
+  SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
+  ReadOperatorHistoryMessagesSchema, HistoryMessageSchema, HistoryMessagesPageSchema, HistoryMessageSendQuerySchema,
 } from "./schemas/vehicle-history";
 import { HistoryStaffChangeSchema, HistoryStaffLookupSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
 import {
@@ -395,6 +397,21 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   // Reports fake-door schemas
   registry.register("HistoryDesk", HistoryDeskSchema);
   registry.register("HistoryRequest", HistoryRequestSchema);
+  for (const operator of [false, true]) {
+    const path = `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/messages`;
+    for (const method of ["get", "post"] as const) registry.registerPath({
+      method, path, tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+      summary: "Current requester or exact assignee/version; local synthetic only. Sent facts; ascending pages, maximum 50",
+      request: { params: z.object({ id: z.string().guid() }), ...(method === "get"
+        ? { query: operator ? ReadOperatorHistoryMessagesSchema : ReadHistoryMessagesSchema }
+        : { query: HistoryMessageSendQuerySchema, body: { content: { "application/json": { schema: operator ? SendOperatorHistoryTextSchema : SendHistoryTextSchema } } } }) },
+      responses: { [method === "get" ? 200 : 201]: { description: "Private, no-store text facts; no delivery/read receipt",
+        content: { "application/json": { schema: method === "get" ? HistoryMessagesPageSchema : HistoryMessageSchema } } },
+        400: { description: "Invalid message, query or scoped cursor" }, 401: { description: "Sign in again" },
+        403: { description: "Current authority or object refused" }, 409: { description: "Assignment changed or send intent conflicts" },
+        503: { description: "Temporarily unavailable; retry the same send intent" } },
+    });
+  }
   registry.registerPath({
     method: "get", path: "/api/v1/vehicle-history/operator/requests", tags: ["Vehicle History"],
     summary: "Minimal unassigned/mine enquiry metadata, newest first, 50 per page; local synthetic only",

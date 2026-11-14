@@ -53,6 +53,13 @@ export async function historyFixture() {
     },
     async close() {
       try {
+        const requests = await prisma.vehicleHistoryRequest.findMany({ where: { requesterId: { in: users } }, select: { id: true } });
+        const conversations = await prisma.serviceConversation.findMany({ where: {
+          purpose: "vehicle_history", objectId: { in: requests.map((request) => request.id) },
+        }, select: { id: true } });
+        const scope = { conversationId: { in: conversations.map((conversation) => conversation.id) } };
+        await prisma.serviceMessage.deleteMany({ where: scope });
+        await prisma.serviceConversation.deleteMany({ where: { id: scope.conversationId } });
         await prisma.vehicleHistoryRequest.deleteMany({ where: { requesterId: { in: users } } });
         await prisma.user.deleteMany({ where: { id: { in: users } } });
         await prisma.dealership.deleteMany({ where: { slug: { in: users } } });
