@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "../../common/prisma.module";
 import { SendServiceText } from "./application/SendServiceText";
+import { FindServiceTextOperation } from "./application/FindServiceTextOperation";
 import { ReadServiceMessages } from "./application/ReadServiceMessages";
 import { AcknowledgeServiceMessages } from "./application/AcknowledgeServiceMessages";
 import { ReadServiceReceipts } from "./application/ReadServiceReceipts";
@@ -10,10 +11,11 @@ import { BUSINESS_MESSAGING_PORT, type BusinessMessagingPort } from "./business-
 
 @Module({
   imports: [PrismaModule],
-  providers: [SendServiceText, ReadServiceMessages, AcknowledgeServiceMessages, ReadServiceReceipts,
+  providers: [SendServiceText, FindServiceTextOperation, ReadServiceMessages, AcknowledgeServiceMessages, ReadServiceReceipts,
     { provide: SERVICE_MESSAGE_REPOSITORY, useClass: PrismaServiceMessageRepository },
-    { provide: BUSINESS_MESSAGING_PORT, inject: [SendServiceText, ReadServiceMessages, AcknowledgeServiceMessages, ReadServiceReceipts],
-      useFactory: (send: SendServiceText, read: ReadServiceMessages, ack: AcknowledgeServiceMessages, receipts: ReadServiceReceipts): BusinessMessagingPort => ({
+    { provide: BUSINESS_MESSAGING_PORT, inject: [SendServiceText, FindServiceTextOperation, ReadServiceMessages, AcknowledgeServiceMessages, ReadServiceReceipts],
+      useFactory: (send: SendServiceText, find: FindServiceTextOperation, read: ReadServiceMessages, ack: AcknowledgeServiceMessages, receipts: ReadServiceReceipts): BusinessMessagingPort => ({
+        sendOnceText: (input) => send.executeOnce(input), findTextOperation: (input) => find.execute(input),
         sendText: (input) => send.execute(input), readMessages: (input) => read.execute(input),
         acknowledge: (input) => ack.execute(input), readReceipts: (input) => receipts.execute(input),
       }) },

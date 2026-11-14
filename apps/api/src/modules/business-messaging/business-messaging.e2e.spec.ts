@@ -7,7 +7,7 @@ import { BusinessMessagingModule } from "./business-messaging.module";
 import { BUSINESS_MESSAGING_PORT, ServiceMessageError, type BusinessMessagingPort } from "./business-messaging.public";
 
 let module: TestingModule, prisma: PrismaService, messages: BusinessMessagingPort;
-const senders = [randomUUID(), randomUUID()], objects = [randomUUID(), randomUUID()];
+const senders = Array.from({ length: 8 }, () => randomUUID()), objects = [randomUUID(), randomUUID()];
 const scope = { purpose: "vehicle_history" as const, objectId: objects[0]! };
 const intent = { ...scope, senderId: senders[0]!, clientMessageId: randomUUID(), text: "  Salam\nDünýä  " };
 
@@ -18,8 +18,9 @@ beforeAll(async () => {
   await prisma.user.createMany({ data: senders.map((id) => ({ id })) });
   // Fault injection at the DB boundary pauses an inserted message before commit.
   await prisma.$executeRawUnsafe(`CREATE FUNCTION vh1226_gate() RETURNS trigger LANGUAGE plpgsql AS $$
-    BEGIN IF NEW.text IN (E'  Salam\\nDünýä  ', 'held first') THEN
-      PERFORM pg_advisory_xact_lock(1226); END IF; RETURN NEW; END $$`);
+    BEGIN IF NEW.text IN (E'  Salam\\nDünýä  ', 'held first', E'  Once\\nDünýä  ', 'once rollback') THEN
+      PERFORM pg_advisory_xact_lock(1226); END IF;
+      IF NEW.text = 'once rollback' THEN RAISE EXCEPTION 'owned rollback'; END IF; RETURN NEW; END $$`);
   await prisma.$executeRawUnsafe(`CREATE TRIGGER vh1226_gate AFTER INSERT ON service_messages
     FOR EACH ROW EXECUTE FUNCTION vh1226_gate()`);
 });
@@ -174,4 +175,176 @@ it("retains participant receipts across a messaging module restart without inven
   ] });
   await expect(messages.acknowledge({ ...scope, participant: { ...participant, assignmentVersion: 2 }, cursor, kind: "received" }))
     .rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_CURSOR" });
+});
+
+
+it.each(["same", "different"])("recovers eight overlapping senders with %s client keys as one original", async (attempts) => {
+  const objectId = randomUUID(), operationKey = randomUUID();
+  objects.push(objectId);
+  const input = { ...intent, objectId, operationKey, text: "  Once\nDünýä  " };
+  await gated(async (release) => {
+    const first = messages.sendOnceText(input);
+    await waitForLocks(1);
+    const pending = senders.slice(1).map((senderId) => messages.sendOnceText({
+      ...input, senderId, clientMessageId: attempts === "same" ? input.clientMessageId : randomUUID(),
+    }));
+    await waitForLocks(8);
+    expect(await messages.readMessages({ ...scope, objectId })).toEqual({ items: [], nextCursor: null });
+    release();
+    const [original, ...retries] = await Promise.all([first, ...pending]);
+    expect(retries).toEqual(senders.slice(1).map(() => original));
+    expect(original).toMatchObject({ senderId: intent.senderId, clientMessageId: intent.clientMessageId,
+      text: "  Once\nDünýä  ", order: "1" });
+    expect(await messages.findTextOperation({ ...scope, objectId, operationKey })).toEqual(original);
+    expect(await messages.readMessages({ ...scope, objectId })).toEqual({ items: [original], nextCursor: null });
+    expect(ServiceMessagesSchemas.ServiceMessageSchema.parse(original)).toEqual(original);
+    expect(original).not.toHaveProperty("operationKey");
+    expect(await messages.findTextOperation({ ...scope, objectId: objectId.toUpperCase(), operationKey: operationKey.toUpperCase() }))
+      .toEqual(original);
+  });
+});
+
+it("keeps concurrent different operation keys independent within one stream", async () => {
+  const objectId = randomUUID(); objects.push(objectId);
+  const inputs = senders.map((senderId) => ({ ...intent, objectId, senderId,
+    operationKey: randomUUID(), clientMessageId: randomUUID(), text: "independent operations" }));
+  const results = await Promise.all(inputs.map((input) => messages.sendOnceText(input)));
+  expect(new Set(results.map((message) => message.id)).size).toBe(8);
+  const page = await messages.readMessages({ ...scope, objectId });
+  expect(page.items.map((message) => message.order)).toEqual(["1", "2", "3", "4", "5", "6", "7", "8"]);
+  for (const [index, input] of inputs.entries()) {
+    expect(await messages.findTextOperation({ ...scope, objectId, operationKey: input.operationKey })).toEqual(results[index]);
+  }
+  expect(await messages.readReceipts({ ...scope, objectId })).toEqual({ items: [] });
+});
+
+it("refuses changed exact text and adoption of ordinary or differently keyed intents", async () => {
+  const objectId = randomUUID(), operationKey = randomUUID();
+  objects.push(objectId);
+  const input = { ...intent, objectId, operationKey };
+  const original = await messages.sendOnceText(input);
+  for (const text of ["Salam\nDünýä", "  Salam\r\nDünýä  "]) {
+    await expect(messages.sendOnceText({ ...input, senderId: senders[1]!, clientMessageId: randomUUID(), text }))
+      .rejects.toMatchObject({ code: "SERVICE_MESSAGE_INTENT_CONFLICT" });
+  }
+  const ordinary = await messages.sendText({ ...intent, objectId, clientMessageId: randomUUID() });
+  const adopt = { ...intent, objectId, clientMessageId: ordinary.clientMessageId, operationKey: randomUUID() };
+  await expect(messages.sendOnceText(adopt)).rejects.toMatchObject({ code: "SERVICE_MESSAGE_INTENT_CONFLICT" });
+  await expect(messages.sendOnceText({ ...input, operationKey: randomUUID() }))
+    .rejects.toMatchObject({ code: "SERVICE_MESSAGE_INTENT_CONFLICT" });
+  expect(await messages.findTextOperation({ ...scope, objectId, operationKey: adopt.operationKey })).toBeNull();
+  expect(await messages.sendText({ ...intent, objectId, clientMessageId: ordinary.clientMessageId })).toEqual(ordinary);
+  const otherKey = await messages.sendOnceText({ ...input, operationKey: randomUUID(), clientMessageId: randomUUID() });
+  const otherObject = randomUUID(); objects.push(otherObject);
+  const otherStream = await messages.sendOnceText({ ...input, objectId: otherObject });
+  expect([original.order, ordinary.order, otherKey.order, otherStream.order]).toEqual(["1", "2", "3", "1"]);
+  expect(new Set([original.id, otherKey.id, otherStream.id]).size).toBe(3);
+  const page = await messages.readMessages({ ...scope, objectId, limit: 1 });
+  expect(page).toEqual({ items: [original], nextCursor: original.id });
+  expect(await messages.readMessages({ ...scope, objectId, cursor: original.id, limit: 1 }))
+    .toEqual({ items: [ordinary], nextCursor: ordinary.id });
+});
+
+it.each([
+  [false, false], [false, true], [true, false], [true, true],
+])("settles an in-flight append before lookup (existing stream %s, rollback %s)", async (existing, rollback) => {
+  const objectId = randomUUID(), operationKey = randomUUID();
+  objects.push(objectId);
+  const stream = { ...scope, objectId };
+  if (existing) await messages.sendText({ ...intent, objectId, text: "before operation" });
+  const input = { ...intent, objectId, operationKey, clientMessageId: randomUUID(), text: rollback ? "once rollback" : "held first" };
+  await gated(async (release) => {
+    const append = messages.sendOnceText(input);
+    const outcome = append.then((message) => ({ message }), (error: unknown) => ({ error }));
+    await waitForLocks(1);
+    let settled = false;
+    const lookup = messages.findTextOperation({ ...stream, operationKey }).then((value) => { settled = true; return value; });
+    await waitForLocks(2);
+    expect(settled).toBe(false);
+    // Nonparticipant transcript reads must remain nonblocking during this wait.
+    expect((await messages.readMessages(stream)).items.map((item) => item.text)).toEqual(existing ? ["before operation"] : []);
+    release();
+    const [result, found] = await Promise.all([outcome, lookup]);
+    if (rollback) {
+      expect(result).toMatchObject({ error: { code: "SERVICE_MESSAGE_UNAVAILABLE" } });
+      expect(found).toBeNull();
+    } else {
+      expect(result).toEqual({ message: found });
+      expect(found?.order).toBe(existing ? "2" : "1");
+    }
+    if (rollback) {
+      const retry = await messages.sendOnceText({ ...input, text: "after rollback" });
+      expect(retry.order).toBe(existing ? "2" : "1");
+    }
+  });
+});
+
+it.each([false, true])("settles first-stream creation before absence (rollback %s)", async (rollback) => {
+  const objectId = randomUUID(), operationKey = randomUUID();
+  objects.push(objectId);
+  let created!: () => void, release!: () => void;
+  const ready = new Promise<void>((resolve) => { created = resolve; });
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const creator = prisma.$transaction(async (tx) => {
+    await tx.serviceConversation.create({ data: { ...scope, objectId } });
+    created(); await gate;
+    if (rollback) throw new Error("owned creation rollback");
+  }, { timeout: 15_000 });
+  const outcome = rollback ? expect(creator).rejects.toThrow("owned creation rollback") : creator;
+  try {
+    await ready;
+    let settled = false;
+    const lookup = messages.findTextOperation({ ...scope, objectId, operationKey }).then((value) => { settled = true; return value; });
+    await waitForLocks(1);
+    expect(settled).toBe(false);
+    release();
+    expect(await lookup).toBeNull();
+  } finally { release(); await outcome; }
+});
+
+it("keeps lookup and nonparticipant pages from offering or acknowledging messages, including after restart", async () => {
+  const objectId = randomUUID(), operationKey = randomUUID();
+  objects.push(objectId);
+  const stream = { ...scope, objectId };
+  const input = { ...intent, objectId, operationKey };
+  const first = await messages.sendOnceText(input);
+  const session = await prisma.session.create({ data: { userId: senders[0]!, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now() + 600_000) } });
+  const participant = { participantId: senders[0]!, sessionId: session.id, assignmentVersion: 0 };
+  await messages.findTextOperation({ ...stream, operationKey });
+  await messages.readMessages(stream);
+  await expect(messages.acknowledge({ ...stream, participant, cursor: first.id, kind: "received" }))
+    .rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_CURSOR" });
+  await messages.readMessages({ ...stream, participant });
+  await messages.acknowledge({ ...stream, participant, cursor: first.id, kind: "received" });
+  await messages.acknowledge({ ...stream, participant, cursor: first.id, kind: "read" });
+  const secondKey = randomUUID();
+  const second = await messages.sendOnceText({ ...input, operationKey: secondKey, clientMessageId: randomUUID() });
+  await module.close();
+  module = await Test.createTestingModule({ imports: [BusinessMessagingModule] }).compile();
+  prisma = module.get(PrismaService); messages = module.get(BUSINESS_MESSAGING_PORT);
+  expect(await messages.findTextOperation({ ...stream, operationKey })).toEqual(first);
+  expect(await messages.sendOnceText({ ...input, senderId: senders[1]!, clientMessageId: randomUUID() })).toEqual(first);
+  expect(await messages.findTextOperation({ ...stream, operationKey: secondKey })).toEqual(second);
+  expect(await messages.readReceipts(stream)).toEqual({ items: [
+    { participantId: senders[0], assignmentVersion: 0, receivedOrder: "1", readOrder: "1" },
+  ] });
+  await expect(messages.acknowledge({ ...stream, participant, cursor: second.id, kind: "received" }))
+    .rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_CURSOR" });
+  expect(await messages.readMessages(stream)).toEqual({ items: [first, second], nextCursor: null });
+});
+
+it("keeps normal validation strict and validates the trusted UUID key without leaking storage errors", async () => {
+  const operationKey = randomUUID(), objectId = randomUUID(); objects.push(objectId);
+  const input = { ...intent, objectId, operationKey };
+  await expect(messages.sendText(input)).rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_INPUT" });
+  for (const key of ["", "forged", " ", "a".repeat(500)]) {
+    await expect(messages.sendOnceText({ ...input, operationKey: key })).rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_INPUT" });
+    await expect(messages.findTextOperation({ ...scope, operationKey: key })).rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_INPUT" });
+  }
+  for (const text of ["", " \n\t", "a".repeat(4001)]) {
+    await expect(messages.sendOnceText({ ...input, text })).rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_INPUT" });
+  }
+  await expect(messages.findTextOperation({ ...input })).rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_INPUT" });
+  await expect(messages.sendOnceText({ ...input, senderId: randomUUID() })).rejects.toMatchObject({ code: "SERVICE_MESSAGE_UNAVAILABLE" });
+  expect(await messages.findTextOperation({ ...scope, objectId, operationKey })).toBeNull();
 });
