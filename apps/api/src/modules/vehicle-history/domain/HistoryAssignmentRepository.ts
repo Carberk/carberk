@@ -1,4 +1,11 @@
 import type { HistoryRequest } from "./HistoryRequestRepository";
+import type { HistoryWaitingFacts } from "./HistoryWaiting";
+
+/** Valid only inside the existing request-lock callback; all work must be awaited. */
+export interface HistoryWaitingStore {
+  read(): Promise<HistoryWaitingFacts>;
+  save(facts: HistoryWaitingFacts): Promise<void>;
+}
 
 export interface HistoryQueueQuery { filter?: "unassigned" | "mine" | undefined; search?: string | undefined; cursor?: string | undefined }
 export interface HistoryQueueItem {
@@ -11,9 +18,12 @@ export interface HistoryQueueItem {
 export interface HistoryMessageRequest {
   id: string; requesterId: string; assignedOperatorId: string | null; assignmentVersion: number;
 }
+export interface HistoryMessageAuthority { userId: string; sessionId: string; purpose: "vehicle-history" | null }
 export interface HistoryAssignmentRepository {
-  /** Retain the request row fence until the message operation has settled. */
-  withMessageLock<T>(id: string, operation: (request: HistoryMessageRequest | null) => Promise<T>): Promise<T>;
+  /** Retain request and public Identity fences through the same-connection commit.
+   * The callback must revalidate authority after both lock waits. */
+  withMessageLock<T>(id: string, authority: HistoryMessageAuthority,
+    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore) => Promise<T>): Promise<T>;
   list(operatorId: string, query: HistoryQueueQuery): Promise<{ items: HistoryQueueItem[]; nextCursor: string | null; anchor: HistoryQueueItem | null }>;
   confirmQueue(operatorId: string, query: HistoryQueueQuery, items: HistoryQueueItem[]): Promise<void>;
   /** The database arbitrates competing claims; no prior read grants a write. */
