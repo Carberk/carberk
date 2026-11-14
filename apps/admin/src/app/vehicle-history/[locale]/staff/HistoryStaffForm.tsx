@@ -13,6 +13,7 @@ import { historyAuth } from "@/lib/history-auth";
 export function HistoryStaffForm({ locale: initialLocale, initial = { status: "empty" }, lookupId }: { locale: DeskLocale; initial?: StaffState; lookupId?: string | undefined }) {
   const locale = historyAuth(usePathname())?.locale ?? initialLocale;
   const [state, action, pending] = useActionState(staffAction.bind(null, locale), initial);
+  const [lookupValue, setLookupValue] = useState(initial.target?.id ?? lookupId ?? "");
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const t = staffCopy[locale];
   const target = state.target;
@@ -33,12 +34,12 @@ export function HistoryStaffForm({ locale: initialLocale, initial = { status: "e
     <section className="mt-8 max-w-3xl rounded-lg border bg-background p-5 sm:p-6" aria-busy={pending}>
       <form action={action} className="flex flex-wrap items-end gap-3">
         <label className="min-w-0 flex-1 text-sm font-medium">{t.targetId}
-          <Input name="targetId" defaultValue={target?.id ?? lookupId} required disabled={pending || refused} className="mt-2 min-h-11" />
+          <Input name="targetId" value={lookupValue} onChange={(event) => setLookupValue(event.target.value)} required disabled={pending || refused} className="mt-2 min-h-11" />
         </label>
         <Button type="submit" disabled={pending || refused} className="min-h-11">{pending ? t.finding : t.find}</Button>
       </form>
-      <div role={state.status && !["saved", "empty", "missing"].includes(state.status) ? "alert" : "status"} aria-live="polite" className="mt-5 text-sm leading-6">
-        {pending ? t.finding : state.status ? t[state.status] : null}
+      <div role={state.status && !["found", "saved", "empty", "missing"].includes(state.status) ? "alert" : "status"} aria-live="polite" className="mt-5 text-sm leading-6">
+        {pending ? t.finding : state.status === "found" && target ? `${t.found} ${IdentitySchemas.formatDisplayName(target, locale)}` : state.status ? t[state.status] : null}
       </div>
       {state.status === "error" && (target ? <form action={action} className="mt-3">
         <input type="hidden" name="targetId" value={target.id} />

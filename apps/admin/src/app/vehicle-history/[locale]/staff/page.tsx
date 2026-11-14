@@ -16,7 +16,7 @@ async function StaffContent({ locale, targetId }: { locale: DeskLocale; targetId
     const parsed = HistoryStaffSchemas.HistoryStaffLookupSchema.safeParse({ targetId });
     const result = await apiFetchOptional<unknown>(`/identity/history-staff${parsed.success && targetId ? `?targetId=${targetId}` : ""}`, { cache: "no-store" });
     initial = result ? { ...HistoryStaffSchemas.HistoryStaffResponseSchema.parse(result),
-      status: !parsed.success ? "validation" : targetId ? undefined : "empty" } : { status: "expired" };
+      status: !parsed.success ? "validation" : targetId ? "found" : "empty" } : { status: "expired" };
     if (result && targetId && parsed.success && !initial.target) initial.status = "missing";
   } catch (error) {
     unstable_rethrow(error);

@@ -1,7 +1,7 @@
 export const staffCopy = {
   en: {
     title: "History staff access", actor: "Current founder", targetId: "Exact user ID", find: "Find person", finding: "Checking access…",
-    empty: "Find a person by their exact user ID to review their History access.", missing: "No person has this ID. Check it and try again.",
+    empty: "Find a person by their exact user ID to review their History access.", found: "Access checked for", missing: "No person has this ID. Check it and try again.",
     target: "Confirmed person", operator: "History operator", evidence: "Historical payment evidence", active: "Granted", inactive: "Not granted",
     scope: "Evidence access is limited to authorized payment objects. It grants no refund decisions, exports or general conversation access.",
     reason: "Reason for this change", grant: "Grant access", revoke: "Revoke access", saving: "Saving…", saved: "Access updated.",
@@ -12,7 +12,7 @@ export const staffCopy = {
   },
   tk: {
     title: "Taryh işgärleriniň rugsatlary", actor: "Häzirki esaslandyryjy", targetId: "Ulanyjynyň takyk ID-si", find: "Adamy tap", finding: "Rugsat barlanýar…",
-    empty: "Taryh rugsatlaryny görmek üçin adamy ulanyjynyň takyk ID-si boýunça tapyň.", missing: "Bu ID bilen adam tapylmady. ID-ni barlaň we gaýtadan synanyşyň.",
+    empty: "Taryh rugsatlaryny görmek üçin adamy ulanyjynyň takyk ID-si boýunça tapyň.", found: "Rugsat barlandy:", missing: "Bu ID bilen adam tapylmady. ID-ni barlaň we gaýtadan synanyşyň.",
     target: "Tassyklanan adam", operator: "Taryh operatory", evidence: "Öňki töleg subutnamalary", active: "Rugsat berlen", inactive: "Rugsat berilmedik",
     scope: "Subutnamalara rugsat diňe rugsatly töleg obýektlerine degişlidir. Ol puly yzyna gaýtarmak kararyna, eksporta ýa-da umumy hat alyşmalara rugsat bermeýär.",
     reason: "Bu üýtgeşmäniň sebäbi", grant: "Rugsat ber", revoke: "Rugsady aýyr", saving: "Saklanýar…", saved: "Rugsat täzelendi.",
@@ -23,7 +23,7 @@ export const staffCopy = {
   },
   ru: {
     title: "Доступ сотрудников к истории", actor: "Текущий основатель", targetId: "Точный ID пользователя", find: "Найти человека", finding: "Проверяем доступ…",
-    empty: "Найдите человека по точному ID пользователя, чтобы проверить его доступ к истории.", missing: "Человек с таким ID не найден. Проверьте ID и попробуйте снова.",
+    empty: "Найдите человека по точному ID пользователя, чтобы проверить его доступ к истории.", found: "Доступ проверен для", missing: "Человек с таким ID не найден. Проверьте ID и попробуйте снова.",
     target: "Подтверждённый пользователь", operator: "Оператор истории", evidence: "Исторические подтверждения платежей", active: "Предоставлен", inactive: "Не предоставлен",
     scope: "Доступ к подтверждениям ограничен разрешёнными платёжными объектами. Он не даёт права решать о возврате денег, экспортировать данные или читать все переписки.",
     reason: "Причина изменения", grant: "Предоставить доступ", revoke: "Отозвать доступ", saving: "Сохраняем…", saved: "Доступ обновлён.",

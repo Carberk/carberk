@@ -58,11 +58,35 @@ function element<T extends Element>(selector: string, index = 0): T {
 async function submit(index = 0) {
   await act(async () => element<HTMLFormElement>("form", index).dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
 }
+it.each([
+  ["en", "Access checked for Synthetic named operator"],
+  ["ru", "Доступ проверен для Synthetic named operator"],
+  ["tk", "Rugsat barlandy: Synthetic named operator"],
+] as const)("announces the named lookup result in %s", async (locale, announcement) => {
+  vi.mocked(fetch).mockResolvedValue(Response.json({ actor, target }));
+  await act(async () => root.render(<HistoryStaffForm locale={locale} initial={{ actor, target: null }} />));
+  await act(async () => fireEvent.change(element<HTMLInputElement>('input[name="targetId"]'), { target: { value: target.id } }));
+  await submit();
+  expect(element<HTMLElement>('[role="status"][aria-live="polite"]').textContent).toBe(announcement);
+});
+it.each(["en", "ru", "tk"] as const)("keeps a missing submitted ID editable in %s", async (locale) => {
+  const missingId = "11760000-0000-4000-8000-000000000099";
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ actor, target: null }))
+    .mockResolvedValueOnce(Response.json({ actor, target }));
+  await act(async () => root.render(<HistoryStaffForm locale={locale} initial={{ actor, target: null }} />));
+  await act(async () => fireEvent.change(element<HTMLInputElement>('input[name="targetId"]'), { target: { value: missingId } }));
+  await submit();
+  expect(element<HTMLInputElement>('input[name="targetId"]').value).toBe(missingId);
+  expect(container.querySelector("fieldset")).toBeNull();
+  await act(async () => fireEvent.change(element<HTMLInputElement>('input[name="targetId"]'), { target: { value: target.id } }));
+  await submit();
+  expect(element<HTMLElement>('[role="status"][aria-live="polite"]').textContent).toContain("Synthetic named operator");
+});
 it("confirms a named person, then sends the exact capability and reason through the real action", async () => {
   vi.mocked(fetch).mockResolvedValueOnce(Response.json({ actor, target }))
     .mockResolvedValueOnce(Response.json({ actor, target: { ...target, capabilities: { ...target.capabilities, "vehicle-history": true } } }));
   await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor, target: null }} />));
-  element<HTMLInputElement>('input[name="targetId"]').value = target.id;
+  await act(async () => fireEvent.change(element<HTMLInputElement>('input[name="targetId"]'), { target: { value: target.id } }));
   await submit();
   expect(container.textContent).toContain("Synthetic named operator");
   expect(container.textContent).toContain(target.id);

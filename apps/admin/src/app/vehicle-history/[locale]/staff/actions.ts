@@ -7,7 +7,7 @@ import { rejectExpiredSession } from "@/lib/action-session";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
 export type StaffState = Partial<HistoryStaffSchemas.HistoryStaffResponse> & {
-  status?: "empty" | "missing" | "saved" | "validation" | "self" | "unavailable" | "denied" | "expired" | "error" | undefined;
+  status?: "empty" | "found" | "missing" | "saved" | "validation" | "self" | "unavailable" | "denied" | "expired" | "error" | undefined;
   changed?: HistoryStaffSchemas.HistoryCapability;
 };
 export async function staffAction(locale: DeskLocale, previous: StaffState, data: FormData): Promise<StaffState> {
@@ -29,7 +29,7 @@ export async function staffAction(locale: DeskLocale, previous: StaffState, data
     if (!response) return { status: "expired" };
     const result = HistoryStaffSchemas.HistoryStaffResponseSchema.parse(response);
     return { ...result, ...(change.success && capability !== null ? { changed: change.data.capability } : {}),
-      status: result.target ? capability === null ? undefined : "saved" : "missing" };
+      status: result.target ? capability === null ? "found" : "saved" : "missing" };
   } catch (error) {
     unstable_rethrow(error);
     if (error instanceof ApiError) {
