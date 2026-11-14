@@ -15,3 +15,7 @@ The old desk response stays empty for its existing Admin consumer. Actual inbox,
 native assigned header/composer and handover remain separate delivery slices.
 
 [Message HTTP](presentation/HistoryMessagesController.ts) uses business messaging's public port for exact-text sends and ascending bounded pages. History retains a request row lock and Identity's public authority fence through each operation, rechecking identity after lock waits and enforcing requester or current assignee/version. Separate lock pools leave operation connections available. Messages expose public authors and Sent facts. The receipt HTTP boundary uses the same current-authority fence and returns received/read orders attributed to actual participants and assignment versions, with requester version 0. Only explicit acknowledgements advance them; fetching alone does not. Connected customer/operator UI remains separate.
+
+[Waiting policy](domain/HistoryWaiting.ts) owns dormant UTC/replay/suppression facts.
+The locked semantic facet saves on the request connection, retaining Identity's public fence through commit.
+Ordinary-message synchronization, external lifecycle and reminder/stop HTTP consumers are not connected yet.

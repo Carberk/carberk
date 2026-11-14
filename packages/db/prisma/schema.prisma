@@ -176,6 +176,23 @@ model VehicleHistoryRequest {
   assignedOperator   User? @relation("HistoryAssignee", fields: [assignedOperatorId], references: [id], onDelete: Restrict)
   assignmentVersion  Int @default(0)
 
+  waitingReason          String?
+  waitingSince           DateTime? @db.Timestamptz(3)
+  waitingVersion         Int @default(0)
+  publicMessageId        String?
+  publicMessageOrder     BigInt @default(0)
+  reminderUsed           Boolean @default(false)
+  reminderMessageId      String?
+  reminderSenderId       String?
+  reminderClientMessageIdString?
+  reminderText           String?
+  reminderOrder          BigInt?
+  reminderSentAt         DateTime? @db.Timestamptz(3)
+  declined               Boolean @default(false)
+  remindersStopped       Boolean @default(false)
+  lifecycleSourceId      String?
+  lifecycleSourceVersion Int @default(0)
+
   @@index([assignedOperatorId, createdAt, id])
   @@unique([requesterId, attemptKey])
   @@index([requesterId, createdAt, id])
