@@ -184,7 +184,7 @@ model VehicleHistoryRequest {
   reminderUsed           Boolean @default(false)
   reminderMessageId      String?
   reminderSenderId       String?
-  reminderClientMessageIdString?
+  reminderClientMessageId String?
   reminderText           String?
   reminderOrder          BigInt?
   reminderSentAt         DateTime? @db.Timestamptz(3)
