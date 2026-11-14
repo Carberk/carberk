@@ -5,18 +5,38 @@ import { fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) }));
-vi.mock("next/navigation", () => ({ unstable_rethrow: () => {}, redirect: vi.fn() }));
+const navigation = vi.hoisted(() => ({ path: "/vehicle-history/en/staff" }));
+vi.mock("next/navigation", () => ({ unstable_rethrow: () => {}, redirect: vi.fn(),
+  usePathname: () => navigation.path, useSearchParams: () => new URLSearchParams(window.location.search) }));
 import { HistoryStaffForm } from "./HistoryStaffForm";
+
+import { HistoryWorkbench } from "@/components/HistoryWorkbench";
 const actor = { id: "11760000-0000-4000-8000-000000000001", displayName: "Synthetic founder", nameNumber: 1176 };
 const target = { id: "11760000-0000-4000-8000-000000000002", displayName: "Synthetic named operator", nameNumber: 1177, eligible: true,
   capabilities: { "vehicle-history": false, "vehicle-history-payment-evidence": true } };
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
+  navigation.path = "";
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("fetch", vi.fn());
   container = document.createElement("div"); document.body.append(container);
   root = createRoot(container);
+});
+it("keeps the confirmed target and written reason while changing the workbench language", async () => {
+  navigation.path = "/vehicle-history/en/staff";
+  window.history.replaceState(null, "", `/vehicle-history/en/staff?targetId=${target.id}`);
+  const view = <HistoryWorkbench locale="en" section="staff"><HistoryStaffForm locale="en" initial={{ actor, target }} /></HistoryWorkbench>;
+  await act(async () => root.render(view));
+  await act(async () => fireEvent.change(element<HTMLTextAreaElement>('textarea[name="reason"]'), { target: { value: "Preserve this reason across languages" } }));
+  const replace = vi.spyOn(window.history, "replaceState");
+  await act(async () => element<HTMLAnchorElement>('a[lang="ru"]').click());
+  expect(replace.mock.calls.at(-1)?.[2]).toContain(`/vehicle-history/ru/staff?targetId=${target.id}`);
+  navigation.path = "/vehicle-history/ru/staff";
+  await act(async () => root.render(<HistoryWorkbench locale="en" section="staff"><HistoryStaffForm locale="en" initial={{ actor, target }} /></HistoryWorkbench>));
+  expect(container.querySelector("h1")?.textContent).toBe("Доступ сотрудников к истории");
+  expect(element<HTMLTextAreaElement>('textarea[name="reason"]').value).toBe("Preserve this reason across languages");
+  replace.mockRestore();
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 it("offers exact named lookup without a directory or permission inheritance", async () => {

@@ -2,13 +2,16 @@
 import { useActionState, useEffect, useState } from "react";
 import { IdentitySchemas } from "@auto-tm/contracts";
 import { Button, Input } from "@auto-tm/ui/components";
+import { usePathname } from "next/navigation";
 
 import { staffAction, type StaffState } from "./actions";
 
 import type { DeskLocale } from "@/lib/history-desk-copy";
 import { staffCopy } from "@/lib/history-staff-copy";
+import { historyAuth } from "@/lib/history-auth";
 
-export function HistoryStaffForm({ locale, initial = { status: "empty" }, lookupId }: { locale: DeskLocale; initial?: StaffState; lookupId?: string | undefined }) {
+export function HistoryStaffForm({ locale: initialLocale, initial = { status: "empty" }, lookupId }: { locale: DeskLocale; initial?: StaffState; lookupId?: string | undefined }) {
+  const locale = historyAuth(usePathname())?.locale ?? initialLocale;
   const [state, action, pending] = useActionState(staffAction.bind(null, locale), initial);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const t = staffCopy[locale];
