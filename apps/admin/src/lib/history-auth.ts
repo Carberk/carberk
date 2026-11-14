@@ -3,7 +3,7 @@ import { validateReturnTo } from "./validators";
 /** Intent selects a flow, never authority. The API rechecks the stored grant. */
 export function historyAuth(returnTo: unknown): { locale: "tk" | "ru" | "en"; returnTo: string } | null {
   const safe = typeof returnTo === "string" ? validateReturnTo(returnTo) : null;
-  const locale = safe?.match(/^\/vehicle-history\/(tk|ru|en)(?:\?|$)/)?.[1];
+  const locale = safe?.match(/^\/vehicle-history\/(tk|ru|en)(?:\/staff)?(?:\?|$)/)?.[1];
   return (locale === "tk" || locale === "ru" || locale === "en") && safe ? { locale, returnTo: safe } : null;
 }
 

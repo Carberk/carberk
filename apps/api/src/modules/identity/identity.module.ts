@@ -9,6 +9,10 @@ import { IdentityController } from "./presentation/identity.controller";
 import { AuthController } from "./presentation/AuthController";
 import { MeController } from "./presentation/MeController";
 import { AdminAuthController } from "./presentation/AdminAuthController";
+import { HistoryStaffController } from "./presentation/HistoryStaffController";
+import { ManageHistoryStaff } from "./application/ManageHistoryStaff";
+import { HISTORY_STAFF_REPOSITORY } from "./domain/ports/HistoryStaffRepository";
+import { PrismaHistoryStaffRepository } from "./infrastructure/PrismaHistoryStaffRepository";
 import { AccountDeletionController } from "./presentation/AccountDeletionController";
 import { RequestOtp } from "./application/RequestOtp";
 import { VerifyOtp } from "./application/VerifyOtp";
@@ -85,9 +89,12 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     AuthController,
     MeController,
     AdminAuthController,
+    HistoryStaffController,
     AccountDeletionController,
   ],
   providers: [
+    ManageHistoryStaff,
+    { provide: HISTORY_STAFF_REPOSITORY, useClass: PrismaHistoryStaffRepository },
     PrismaOtpRequestRepository,
     PrismaUserRepository,
     PrismaSessionRepository,

@@ -107,8 +107,8 @@ describe("operator login errors", () => {
 
 
 describe("scoped History sign-in", () => {
-  it("takes an explicitly granted ordinary user through phone, TOTP and the preserved English desk", async () => {
-    navigation.params.set("returnTo", "/vehicle-history/en?queue=unpaid");
+  it.each(["/vehicle-history/en?queue=unpaid", "/vehicle-history/en/staff?targetId=11760000-0000-4000-8000-000000000002"])("takes an explicitly granted ordinary user through phone and TOTP to %s", async (destination) => {
+    navigation.params.set("returnTo", destination);
     vi.mocked(fetch).mockResolvedValueOnce(Response.json({ resendInSeconds: 60 }))
       .mockResolvedValueOnce(Response.json({ user: { role: "buyer" }, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }))
       .mockResolvedValueOnce(Response.json({ enrolled: true, elevated: false }))
@@ -122,7 +122,7 @@ describe("scoped History sign-in", () => {
     expect(container.textContent).toContain("Authenticator code");
     element<HTMLInputElement>('input[name="code"]').value = "654321";
     await submit();
-    expect(navigation.push).toHaveBeenCalledWith("/vehicle-history/en?queue=unpaid");
+    expect(navigation.push).toHaveBeenCalledWith(destination);
     expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url))).toEqual([
       expect.stringContaining("/auth/otp/request"), expect.stringContaining("/auth/otp/verify"),
       expect.stringContaining("/auth/admin/totp/status?purpose=vehicle-history"),

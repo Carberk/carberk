@@ -1,4 +1,5 @@
 export const STAFF_ACCESS_PORT = Symbol("StaffAccessPort");
+export type StaffPurpose = "vehicle-history" | "vehicle-history-payment-evidence" | "vehicle-history-staff-management";
 
 export interface StaffActor {
   id: string;
@@ -10,7 +11,7 @@ export interface StaffActor {
  * Carries no Sign-in Methods, marketplace role or private staff metadata.
  */
 export interface StaffAccessPort {
-  /** Matching active session/grant, before TOTP enrollment or verification. */
+  /** Active session and any History staff purpose, before scoped TOTP. */
   findEligibleActor(input: {
     userId: string;
     sessionId: string;
@@ -19,6 +20,6 @@ export interface StaffAccessPort {
   findCurrentActor(input: {
     userId: string;
     sessionId: string;
-    purpose: "vehicle-history";
+    purpose: StaffPurpose;
   }): Promise<StaffActor | null>;
 }

@@ -8723,6 +8723,109 @@
           "assignedOperator"
         ]
       },
+      "HistoryStaffChange": {
+        "type": "object",
+        "properties": {
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "vehicle-history",
+              "vehicle-history-payment-evidence"
+            ]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "targetId",
+          "capability",
+          "active",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "HistoryStaffResponse": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "displayName": {
+                "type": "string",
+                "nullable": true
+              },
+              "nameNumber": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayName",
+              "nameNumber"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "displayName": {
+                "type": "string",
+                "nullable": true
+              },
+              "nameNumber": {
+                "type": "integer"
+              },
+              "eligible": {
+                "type": "boolean"
+              },
+              "capabilities": {
+                "type": "object",
+                "properties": {
+                  "vehicle-history": {
+                    "type": "boolean"
+                  },
+                  "vehicle-history-payment-evidence": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "vehicle-history",
+                  "vehicle-history-payment-evidence"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "displayName",
+              "nameNumber",
+              "eligible",
+              "capabilities"
+            ]
+          }
+        },
+        "required": [
+          "actor",
+          "target"
+        ]
+      },
       "CreateInspectionInterestRequest": {
         "type": "object",
         "properties": {
@@ -9937,6 +10040,264 @@
           },
           "403": {
             "description": "Unavailable request, current requester or synthetic admission refused"
+          }
+        }
+      }
+    },
+    "/api/v1/identity/history-staff": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Inspect one exact named target with current synthetic founder authority",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "targetId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store actor and optional target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "actor": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ]
+                    },
+                    "target": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        },
+                        "eligible": {
+                          "type": "boolean"
+                        },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "vehicle-history": {
+                              "type": "boolean"
+                            },
+                            "vehicle-history-payment-evidence": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "vehicle-history",
+                            "vehicle-history-payment-evidence"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber",
+                        "eligible",
+                        "capabilities"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "actor",
+                    "target"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid exact target ID"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current founder session, purpose or synthetic admission refused"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Grant or revoke an operator/evidence capability with atomic actor, target and reason audit",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "capability": {
+                    "type": "string",
+                    "enum": [
+                      "vehicle-history",
+                      "vehicle-history-payment-evidence"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "targetId",
+                  "capability",
+                  "active",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store current target access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "actor": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ]
+                    },
+                    "target": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        },
+                        "eligible": {
+                          "type": "boolean"
+                        },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "vehicle-history": {
+                              "type": "boolean"
+                            },
+                            "vehicle-history-payment-evidence": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "vehicle-history",
+                            "vehicle-history-payment-evidence"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber",
+                        "eligible",
+                        "capabilities"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "actor",
+                    "target"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid capability or missing reason"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current founder authority missing or self change refused"
+          },
+          "404": {
+            "description": "Target unavailable"
+          },
+          "409": {
+            "description": "Target lifecycle forbids a grant"
           }
         }
       }
