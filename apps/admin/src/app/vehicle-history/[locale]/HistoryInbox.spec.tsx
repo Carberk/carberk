@@ -1,5 +1,8 @@
 // @vitest-environment happy-dom
-import { act } from "react";
+import { PassThrough } from "node:stream";
+
+import { act, cloneElement, isValidElement, type ReactNode } from "react";
+import { renderToPipeableStream } from "react-dom/server";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -319,14 +322,14 @@ it("disposes the old inbox on a same-actor new-session page render, even with fi
     }
     return network(input, init);
   });
-  const mounted = render(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }));
+  const mounted = render(await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) })));
   await screen.findByText("Old session private text");
   phase = "old-page";
   platform.requestCookies.run(platform.token, () => fireEvent.click(screen.getByRole("button", { name: "More messages" })));
   await waitFor(() => expect(capturedOld).toBe(true));
   platform.token = token(actor.id);
   phase = "new-session";
-  await act(async () => mounted.rerender(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) })));
+  await act(async () => mounted.rerender(await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }))));
   expect(screen.queryByText("Old session private text")).toBeNull();
   await act(async () => newPage.resolve(Response.json({ items: [message("Current session private text")], nextCursor: null })));
   await screen.findByText("Current session private text");
@@ -334,3 +337,36 @@ it("disposes the old inbox on a same-actor new-session page render, even with fi
   expect(screen.queryByText("Late old session private text")).toBeNull();
   expect(screen.getByText("Current session private text")).toBeDefined();
 });
+
+it("streams the first-entry loading state before the queue bootstrap resolves", async () => {
+  const delayed = deferred<Response>();
+  const network = networkHandler();
+  vi.mocked(fetch).mockImplementation((input, init) => new URL(String(input)).pathname.endsWith("/requests")
+    ? delayed.promise : network(input, init));
+  let html = "";
+  const finished = HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }).then((tree) => new Promise<void>((resolve, reject) => {
+    const output = new PassThrough();
+    output.on("data", (chunk) => { html += String(chunk); });
+    output.on("end", resolve);
+    output.on("error", reject);
+    const stream = renderToPipeableStream(tree, { onShellReady: () => stream.pipe(output), onError: reject });
+  }));
+  try {
+    await waitFor(() => expect(html).toContain("Checking access…"));
+    expect(html).not.toContain("Merdan");
+  } finally {
+    delayed.resolve(Response.json({ items: [row], nextCursor: null }));
+    await finished;
+  }
+  expect(html).toContain("Merdan");
+});
+
+async function resolveServerTree(node: ReactNode): Promise<ReactNode> {
+  if (Array.isArray(node)) return Promise.all(node.map(resolveServerTree));
+  if (!isValidElement<{ children?: ReactNode }>(node)) return node;
+  if (typeof node.type === "function" && node.type.constructor.name === "AsyncFunction") {
+    const serverComponent = node.type as (props: unknown) => Promise<ReactNode>;
+    return resolveServerTree(await serverComponent(node.props));
+  }
+  return cloneElement(node, {}, await resolveServerTree(node.props.children));
+}
