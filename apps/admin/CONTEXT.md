@@ -2,12 +2,12 @@
 
 The internal web app provides moderation, content-report review, inspection-interest statistics, audit access, and brand logo management. A top navigation in the authenticated layout links these pages. Broader dashboard capability belongs to the product specification, not this overview.
 
-The separate `/vehicle-history/{tk|ru|en}` shell is a synthetic-only empty desk. It uses the same HTTP-only token bridge, but every load checks current purpose-specific staff authority at the API. It does not inherit marketplace permission or expose broader admin navigation; the admin entry appears only when that API permits access.
+The separate `/vehicle-history/{tk|ru|en}` [inbox](src/app/vehicle-history/[locale]/HistoryInbox.tsx) is a synthetic-only enquiry desk. It uses the same HTTP-only token bridge, but every load checks current purpose-specific staff authority at the API. It does not inherit marketplace permission or expose broader admin navigation; the admin entry appears only when that API permits access.
 
 The [inbox actions](src/app/vehicle-history/[locale]/actions.ts) provide scoped
-queue/context/transcript reads and Claim for the later connected inbox. They
+queue/context/transcript reads and atomic Claim for the connected inbox. They
 bind outcomes to the API-confirmed actor and stable session without exposing
-tokens; they add no visible controls or receipt acknowledgements.
+tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) reads transcripts only for the current assignment; reply, notes, receipt controls and full Listing viewing belong to their separate slices.
 
 Browser JavaScript never receives API tokens. Server-side code stores them in HTTP-only cookies and forwards bearer authentication to the API. Preserve production `__Host-` cookie restrictions, origin validation on browser-posted handlers, and local-only `returnTo` validation. The Node `src/proxy.ts` renews expired requests before rendering or Server Actions, forwarding the rotated cookies to the handler and storing both on the response. Layout/API checks still enforce actual authentication and TOTP elevation. Server Components never rotate tokens or write cookies.
 

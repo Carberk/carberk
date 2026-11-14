@@ -9,7 +9,10 @@ import { historyAuth } from "@/lib/history-auth";
 export function HistoryWorkbench({ locale: initialLocale, section, children }: { locale: DeskLocale; section: "desk" | "staff"; children: ReactNode }) {
   const locale = historyAuth(usePathname())?.locale ?? initialLocale;
   const t = deskCopy[locale];
-  const query = useSearchParams().toString();
+  const params = useSearchParams();
+  const query = section === "staff" ? params.toString() : new URLSearchParams(
+    [...params].filter(([name]) => ["filter", "search", "cursor", "selected", "v"].includes(name)),
+  ).toString();
   return <div lang={locale} className="min-h-screen bg-muted/40">
     <a href="#history-content" className="sr-only focus:not-sr-only focus:block focus:p-4">{t.skip}</a>
     <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-background px-5 py-4 sm:px-8">
