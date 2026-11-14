@@ -42,7 +42,7 @@ For a code already requested through the real entry flow, add both:
 --request-id FULL_UUID_FROM_THAT_SUCCESSFUL_REQUEST --requested-at ISO_TIMESTAMP_OF_THAT_REQUEST
 ```
 
-This retrieves that exact code and delivers it to the same genuine verification UI without issuing another request. If a successful request is followed by a UI failure, the error includes only the validated request ID, request timestamp, fixture role and masked destination. Reuse that context with these flags before expiry; do not request again just because UI setup failed. Keep the context in memory or a private temporary note; never save an unredacted response. No option prints the code.
+This retrieves that exact code and delivers it to the currently focused genuine verification UI without issuing another request or navigating away from its auth intent first. If a successful request is followed by a UI failure, the error includes only the validated request ID, request timestamp, fixture role and masked destination. Reuse that context with these flags before expiry; do not request again just because UI setup failed. Keep the context in memory or a private temporary note; never save an unredacted response. No option prints the code.
 
 ## Refusals and privacy
 

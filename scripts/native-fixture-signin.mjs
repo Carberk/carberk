@@ -68,27 +68,30 @@ async function run(options, ports, context) {
   if (!health.ok) throw new FixtureError("Local API health check failed");
   const metadata = await health.json();
   if (metadata.service !== "api" || metadata.environment !== env.APP_ENV) throw new FixtureError("Running API environment does not match local config");
-  await ports.device(["open", "tm.auto.app"]);
-  await ports.device(["open", "autotm:///services"]);
-  let cabinet;
-  // Initial Cabinet preparation only: at most 10 fresh snapshots, 500 ms apart
-  // (4.5 s of sleeps). Device commands keep their separate boundary timeout.
-  for (let attempt = 0; attempt < 10; attempt++) {
-    cabinet = await ports.device(["snapshot", "-i"]);
-    const snapshot = JSON.stringify(cabinet);
-    if (snapshot.includes(fixture.name) && snapshot.includes(fixture.masked)) {
-      return { fixture: options.fixture, status: "reused", identityConfirmed: true };
+  // Exact-request delivery stays on the genuine Code screen and preserves auth intent.
+  if (!options.requestId) {
+    await ports.device(["open", "tm.auto.app"]);
+    await ports.device(["open", "autotm:///services"]);
+    let cabinet;
+    // Initial Cabinet preparation only: at most 10 fresh snapshots, 500 ms apart
+    // (4.5 s of sleeps). Device commands keep their separate boundary timeout.
+    for (let attempt = 0; attempt < 10; attempt++) {
+      cabinet = await ports.device(["snapshot", "-i"]);
+      const snapshot = JSON.stringify(cabinet);
+      if (snapshot.includes(fixture.name) && snapshot.includes(fixture.masked)) {
+        return { fixture: options.fixture, status: "reused", identityConfirmed: true };
+      }
+      const loading = (cabinet.nodes ?? []).some(node => ["Loading", "Please wait...", "Подождите...", "Garaşyň..."].includes(node.label));
+      const settled = (cabinet.nodes ?? []).some(node => /\+993 \d{2} XX-XX-\d{2}|•••@/.test(node.label ?? "") ||
+        ["Sign in", "Войти", "Giriş", "Something went wrong", "Что-то пошло не так", "Bir zat ýalňyş boldy"].includes(node.label?.split(", ")[0]));
+      if (settled || !loading) break;
+      if (attempt === 9) throw new FixtureError("Cabinet identity loading timed out; stop without switching accounts or requesting a code");
+      await ports.sleep(500);
     }
-    const loading = (cabinet.nodes ?? []).some(node => ["Loading", "Please wait...", "Подождите...", "Garaşyň..."].includes(node.label));
-    const settled = (cabinet.nodes ?? []).some(node => /\+993 \d{2} XX-XX-\d{2}|•••@/.test(node.label ?? "") ||
-      ["Sign in", "Войти", "Giriş", "Something went wrong", "Что-то пошло не так", "Bir zat ýalňyş boldy"].includes(node.label?.split(", ")[0]));
-    if (settled || !loading) break;
-    if (attempt === 9) throw new FixtureError("Cabinet identity loading timed out; stop without switching accounts or requesting a code");
-    await ports.sleep(500);
-  }
-  if (options.reuseOnly) throw new FixtureError("Expected fixture session unavailable; reuse-only spent no code");
-  if (!(cabinet.nodes ?? []).some(node => ["Sign in", "Войти", "Giriş"].includes(node.label?.split(", ")[0]))) {
-    throw new FixtureError("Expected fixture identity not confirmed in app; stop without switching accounts");
+    if (options.reuseOnly) throw new FixtureError("Expected fixture session unavailable; reuse-only spent no code");
+    if (!(cabinet.nodes ?? []).some(node => ["Sign in", "Войти", "Giriş"].includes(node.label?.split(", ")[0]))) {
+      throw new FixtureError("Expected fixture identity not confirmed in app; stop without switching accounts");
+    }
   }
   let requestId = options.requestId;
   let requestedAt = Date.parse(options.requestedAt);
@@ -118,7 +121,7 @@ async function run(options, ports, context) {
   codeFor(await ports.readFile(options.apiLog, "utf8"), requestId, fixture, requestedAt, ports.now());
   const route = new URL("autotm:///otp");
   route.search = new URLSearchParams({ method: "phone", destination: fixture.phone, resendInSeconds: String(resendInSeconds) }).toString();
-  await ports.device(["open", route.href]);
+  if (!options.requestId) await ports.device(["open", route.href]);
   const code = codeFor(await ports.readFile(options.apiLog, "utf8"), requestId, fixture, requestedAt, ports.now());
   await enterCode(ports.device, ports.sleep, fixture, code);
   // Verification is asynchronous. Read fresh snapshots; never re-enter or resend.
