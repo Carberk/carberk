@@ -34,6 +34,7 @@ export * as UploadsSchemas from "./schemas/uploads";
 export * as VideoUploadsSchemas from "./schemas/video-uploads";
 export * as ListingVideoTelemetrySchemas from "./schemas/listing-video-telemetry";
 export * as ExchangeRatesSchemas from "./schemas/exchange-rates";
+export * as RoutingPolicySchemas from "./schemas/routing-policy";
 export * as SubscriptionsSchemas from "./schemas/subscriptions";
 export * as ConversationsSchemas from "./schemas/conversations";
 export * as NotificationsSchemas from "./schemas/notifications";

@@ -1,0 +1,24 @@
+[Unit]
+Description=Independent closed staging gateway API and media probes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+LoadCredential=monitor.json:/etc/carberk/monitor.json
+ExecStart=/opt/carberk-gateway/current/node/bin/node /opt/carberk-gateway/current/monitor-probe.mjs %d/monitor.json
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+MemoryMax=96M
+CPUQuota=10%
+TasksMax=16
+LimitNOFILE=128
+
+[Install]
+WantedBy=multi-user.target

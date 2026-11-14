@@ -26,6 +26,8 @@ const BaseSchema = z.object({
   /** Operator-only startup mode: no business request handlers or queue consumers run. */
   PHOTO_CONVERSION_MAINTENANCE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   LOG_LEVEL: z.enum(["error", "warn", "info", "debug"]).default("info"),
+  /** Preference only. Embedded routes and local reachability remain authoritative. */
+  ROUTING_DISABLE_TM_PREFERENCE: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
 
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),

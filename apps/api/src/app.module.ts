@@ -24,6 +24,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
 import { ReportsModule } from "./modules/reports/reports.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
+import { RoutingPolicyModule } from "./modules/routing-policy/routing-policy.module";
 import { requestLoggingOptions } from "./common/requestLogging";
 
 @Module({
@@ -61,6 +62,7 @@ import { requestLoggingOptions } from "./common/requestLogging";
     ReportsModule,
     AdminModule,
     RealtimeModule,
+    RoutingPolicyModule,
   ],
   controllers: [HealthController],
   providers: [

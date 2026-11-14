@@ -14,6 +14,17 @@ const baseEnv = {
   TOTP_SECRET_ENCRYPTION_KEY: "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
 };
 
+describe("routing preference configuration", () => {
+  it("defaults enabled preference and accepts only explicit booleans", () => {
+    expect(EnvSchema.parse(baseEnv).ROUTING_DISABLE_TM_PREFERENCE).toBe(false);
+    expect(EnvSchema.parse({ ...baseEnv, ROUTING_DISABLE_TM_PREFERENCE: "true" }).ROUTING_DISABLE_TM_PREFERENCE).toBe(true);
+    expect(EnvSchema.parse({ ...baseEnv, ROUTING_DISABLE_TM_PREFERENCE: "false" }).ROUTING_DISABLE_TM_PREFERENCE).toBe(false);
+    for (const value of ["TRUE", "0", "", "off"]) {
+      expect(EnvSchema.safeParse({ ...baseEnv, ROUTING_DISABLE_TM_PREFERENCE: value }).success).toBe(false);
+    }
+  });
+});
+
 describe("EnvSchema socket defaults", () => {
   it("defaults Socket.IO settings to single-node mode", () => {
     const env = EnvSchema.parse(baseEnv);
