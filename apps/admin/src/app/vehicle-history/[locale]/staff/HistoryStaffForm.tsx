@@ -8,7 +8,7 @@ import { staffAction, type StaffState } from "./actions";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 import { staffCopy } from "@/lib/history-staff-copy";
 
-export function HistoryStaffForm({ locale, initial = { status: "empty" } }: { locale: DeskLocale; initial?: StaffState }) {
+export function HistoryStaffForm({ locale, initial = { status: "empty" }, lookupId }: { locale: DeskLocale; initial?: StaffState; lookupId?: string | undefined }) {
   const [state, action, pending] = useActionState(staffAction.bind(null, locale), initial);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const t = staffCopy[locale];
@@ -30,7 +30,7 @@ export function HistoryStaffForm({ locale, initial = { status: "empty" } }: { lo
     <section className="mt-8 max-w-3xl rounded-lg border bg-background p-5 sm:p-6" aria-busy={pending}>
       <form action={action} className="flex flex-wrap items-end gap-3">
         <label className="min-w-0 flex-1 text-sm font-medium">{t.targetId}
-          <Input name="targetId" defaultValue={target?.id} required disabled={pending || refused} className="mt-2 min-h-11" />
+          <Input name="targetId" defaultValue={target?.id ?? lookupId} required disabled={pending || refused} className="mt-2 min-h-11" />
         </label>
         <Button type="submit" disabled={pending || refused} className="min-h-11">{pending ? t.finding : t.find}</Button>
       </form>
@@ -40,7 +40,7 @@ export function HistoryStaffForm({ locale, initial = { status: "empty" } }: { lo
       {state.status === "error" && (target ? <form action={action} className="mt-3">
         <input type="hidden" name="targetId" value={target.id} />
         <Button type="submit" variant="secondary" disabled={pending} className="min-h-11">{t.retry}</Button>
-      </form> : <a href="?" className="mt-3 inline-block rounded-sm py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{t.retry}</a>)}
+      </form> : <a href={lookupId ? `?targetId=${encodeURIComponent(lookupId)}` : "?"} className="mt-3 inline-block rounded-sm py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{t.retry}</a>)}
       {refused && <a href={`/login?reason=${state.status === "expired" ? "session-expired" : "history-access"}&returnTo=${encodeURIComponent(`/vehicle-history/${locale}/staff`)}`} className="mt-3 inline-block rounded-sm py-2 text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">{t.signIn}</a>}
       {target && !refused && <div className="mt-6 border-t pt-6">
         <h2 className="text-sm font-medium text-muted-foreground">{t.target}</h2>

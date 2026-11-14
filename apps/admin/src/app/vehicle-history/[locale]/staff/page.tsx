@@ -22,7 +22,7 @@ async function StaffContent({ locale, targetId }: { locale: DeskLocale; targetId
     unstable_rethrow(error);
     initial = { status: error instanceof ApiError && error.status === 403 ? "denied" : "error" };
   }
-  return <HistoryStaffForm locale={locale} initial={initial} />;
+  return <HistoryStaffForm locale={locale} initial={initial} lookupId={targetId} />;
 }
 export default async function HistoryStaffPage({ params, searchParams }: {
   params: Promise<{ locale: string }>; searchParams: Promise<{ targetId?: string }>;

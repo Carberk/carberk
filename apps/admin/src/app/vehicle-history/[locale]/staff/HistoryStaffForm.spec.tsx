@@ -25,6 +25,11 @@ it("offers exact named lookup without a directory or permission inheritance", as
   expect(container.querySelector('input[name="targetId"]')).not.toBeNull();
   expect(container.textContent).toContain("Find person");
 });
+it("retains the requested target when the initial access check needs retry", async () => {
+  await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ status: "error" }} lookupId={target.id} />));
+  expect(container.querySelector<HTMLInputElement>('input[name="targetId"]')?.value).toBe(target.id);
+  expect(container.querySelector("a")?.href).toContain(`?targetId=${target.id}`);
+});
 function element<T extends Element>(selector: string, index = 0): T {
   const found = container.querySelectorAll<T>(selector)[index];
   if (!found) throw new Error(`Missing rendered ${selector}`);
