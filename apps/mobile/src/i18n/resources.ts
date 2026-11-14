@@ -839,6 +839,14 @@ export const resources: Resource = {
       signInToManageDescription: "Войдите, чтобы управлять объявлениями и черновиками.",
     },
     account: {
+      testerRoute: {
+        title: "Тест подключения", scope: "Закрытый staging · только API. Фото, видео и чат пока используют обычный путь.",
+        global: "Global", tm: "TM-шлюз", reset: "Выбор действует для новых запросов. При перезапуске — Global.",
+        configured: "Доступ к шлюзу настроен", unconfigured: "Доступ к шлюзу не настроен", key: "Ключ доступа к шлюзу",
+        save: "Сохранить ключ доступа", remove: "Удалить ключ доступа", check: "Проверить подключение",
+        connected: "Подключение работает", failed: "Не удалось подключиться. Проверьте доступ к шлюзу или выберите Global.",
+        saveFailed: "Не удалось сохранить доступ. Проверьте ключ и повторите попытку.",
+      },
       photoPreparing: "Подготовка фото...",
       photoAttached: "Это фото уже используется в объявлении. Повторите загрузку новой копии.",
       photoRemoved: "Фото удалено",
@@ -1831,6 +1839,14 @@ export const resources: Resource = {
       signInToManageDescription: "Bildirişleri we garalamalary dolandyrmak üçin giriň.",
     },
     account: {
+      testerRoute: {
+        title: "Birikmäni barlamak", scope: "Ýapyk staging · diňe API. Suratlar, wideolar we çat adaty ýoly ulanýar.",
+        global: "Global", tm: "TM şlýuz", reset: "Saýlaw täze talaplara degişli. Täzeden açylanda — Global.",
+        configured: "Şlýuza giriş sazlandy", unconfigured: "Şlýuza giriş sazlanmady", key: "Şlýuza giriş açary",
+        save: "Giriş açaryny ýatda sakla", remove: "Giriş açaryny aýyr", check: "Birikmäni barla",
+        connected: "Birikme işleýär", failed: "Birikdirip bolmady. Şlýuza girişi barlaň ýa-da Global saýlaň.",
+        saveFailed: "Girişi ýatda saklap bolmady. Açary barlap, gaýtadan synanyşyň.",
+      },
       photoPreparing: "Surat taýýarlanýar...",
       photoAttached: "Bu surat bildirişde ulanylýar. Täze nusgasyny ýükläp, täzeden synanyşyň.",
       photoRemoved: "Surat aýryldy",
@@ -2821,6 +2837,14 @@ export const resources: Resource = {
       signInToManageDescription: "Sign in to manage your listings and drafts.",
     },
     account: {
+      testerRoute: {
+        title: "Connection test", scope: "Closed staging · API only. Photos, video and chat still use their usual path.",
+        global: "Global", tm: "TM gateway", reset: "Applies to new requests. Restarts on Global.",
+        configured: "Gateway access configured", unconfigured: "Gateway access not configured", key: "Gateway access key",
+        save: "Save access key", remove: "Remove access key", check: "Check connection",
+        connected: "Connection working", failed: "Couldn't connect. Check gateway access or use Global.",
+        saveFailed: "Couldn't save access. Check the key and try again.",
+      },
       photoPreparing: "Preparing photo...",
       photoAttached: "This upload belongs to a listing. Retry to upload a new copy.",
       photoRemoved: "Photo removed",
