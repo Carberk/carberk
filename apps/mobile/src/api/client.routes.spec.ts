@@ -197,3 +197,27 @@ it("never refreshes a pending separate session or attaches supplied gateway acce
   expect(seen).toEqual([["Bearer pending-token", null]]);
   expect((await loadAuthSession())?.refreshToken).toBe("refresh-a");
 });
+
+it("lets a new session rotate independently while the previous session's refresh is pending", async () => {
+  await storeAuthSession(session());
+  const entered = deferred(), release = deferred();
+  server.use(
+    http.get(`${globalEntry}/me`, ({ request }) => request.headers.get("authorization") === `Bearer ${token("session-b", 1800)}`
+      ? HttpResponse.json({ session: "b" }) : HttpResponse.json({}, { status: 401 })),
+    http.post(`${globalEntry}/auth/refresh`, async ({ request }) => {
+      const body = await request.json() as { refreshToken: string };
+      if (body.refreshToken === "refresh-a") {
+        entered.resolve(); await release.promise;
+        return HttpResponse.json({ accessToken: token("session-a", 1800), refreshToken: "stale-rotation" });
+      }
+      return HttpResponse.json({ accessToken: token("session-b", 1800), refreshToken: "refresh-c" });
+    }),
+  );
+  const old = apiClient.get("/me").catch(error => error);
+  await entered.promise;
+  await storeAuthSession({ ...session(), accessToken: token("session-b", 1), refreshToken: "refresh-b" });
+  expect(await apiClient.get("/me")).toEqual({ session: "b" });
+  release.resolve();
+  expect(await old).toMatchObject({ code: "SESSION_CHANGED" });
+  expect((await loadAuthSession())?.refreshToken).toBe("refresh-c");
+});
