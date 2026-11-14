@@ -4,8 +4,10 @@ import { createGateway } from './gateway.mjs';
 try {
   const config = JSON.parse(await readFile(process.argv[2], 'utf8'));
   // This release is a closed staging gateway. Production requires its own rollout.
+  const transport = config.transport ?? 'relay';
+  const proxy = { relay: 'http://127.0.0.1:11809', reverse: 'http://127.0.0.1:11819' }[transport];
   if (config.origin !== 'https://api-staging-2861.up.railway.app'
-      || config.proxy !== 'http://127.0.0.1:11809') throw Error('Unexpected destination');
+      || !proxy || config.proxy !== proxy) throw Error('Unexpected destination');
   const server = createGateway({ origin: config.origin, proxy: config.proxy, hostname: config.hostname,
     accessKey: config.accessKey, signing: config.signing, log: row => console.log(JSON.stringify(row)) });
   server.on('error', () => { console.error('{"event":"gateway_start_failed"}'); process.exitCode = 1; });

@@ -1,0 +1,33 @@
+[Unit]
+Description=Carberk Railway-initiated authenticated reverse transport
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+DynamicUser=yes
+LoadCredential=auth.json:/etc/carberk/reverse-auth.json
+LoadCredential=key:/etc/carberk/reverse-key
+LoadCredential=tls-cert:/var/lib/docker/volumes/snikket_snikket_data/_data/carberk-staging-tls/fullchain.pem
+LoadCredential=tls-key:/var/lib/docker/volumes/snikket_snikket_data/_data/carberk-staging-tls/privkey.pem
+ExecStart=/opt/carberk-reverse/chisel server --host 0.0.0.0 --port 24443 --reverse --keepalive 10s --authfile %d/auth.json --keyfile %d/key --tls-cert %d/tls-cert --tls-key %d/tls-key
+Environment=CHISEL_PING_TIMEOUT=10s
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=5s
+StandardOutput=null
+StandardError=null
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+MemoryMax=128M
+CPUQuota=50%
+TasksMax=32
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

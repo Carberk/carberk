@@ -1,11 +1,157 @@
-# Staging transport proof (R01 / #1212)
+# Staging gateway transport
 
 Scope: [R01](https://github.com/Carberk/carberk/issues/1154) and the
 [transport prerequisite](https://github.com/Carberk/carberk/issues/1212), under the approved
 [architecture proposal](https://github.com/Carberk/carberk/issues/1153). This is an
 operator procedure, not a production activation or a hosting ADR. Runtime receipts
 belong in the PR/issue or private temporary files, never in git. The [R02 gateway procedure](staging-gateway.md) owns the API forwarding service;
-this procedure covers outbound proof only.
+this procedure covers transport preparation, proof and closed-staging reverse adoption.
+
+## Persistent reverse connector (#1224)
+
+Use the dedicated Railway `gateway-connector` service beside the API, built from
+[the Dockerfile](../../../infra/egress/Dockerfile) and
+[supervised client](../../../infra/egress/reverse-client.mjs). It initiates one
+authenticated TLS/WebSocket/SSH connection per fixed origin to isolated VPS port
+24443. Separate connections keep bulk media queues out of the API tunnel. Consumer
+bytes return inside that connection. Existing API/database/Redis/storage placement
+stays unchanged. The Mac runs operator commands and client tests only.
+
+```text
+Railway connector -- verified TLS + pinned SSH identity --> VPS :24443
+VPS fixed CONNECT :11819 --> loopback :11901/2/3 --> that connection
+                       --> Railway connector --> fixed origin HTTPS :443
+```
+
+Immutable client remotes select API, photo and video, respectively. The VPS
+[CONNECT adapter](../../../infra/egress/reverse-connector.mjs) accepts only those
+three exact hostnames with port 443 and dials only their reverse loopback listeners.
+The consuming gateway/probe still verifies upstream TLS hostname/certificate,
+including signed media. No database, S3 signing key, body spool, shared content
+cache, replay or automatic alternate transport is installed on the VPS.
+
+Chisel's auth file restricts **listener addresses**, not client-side destination
+names. Render exactly these anchored patterns for one generated username/password;
+never grant wildcards, SOCKS or public listener addresses:
+
+```json
+["^R:127\\.0\\.0\\.1:11901$", "^R:127\\.0\\.0\\.1:11902$", "^R:127\\.0\\.0\\.1:11903$"]
+```
+
+Fixed client code, the CONNECT allowlist and upstream TLS bound destination
+selection. Someone controlling connector code/credentials is inside that trust
+boundary; do not describe Chisel as enforcing an origin ACL. Changing origins
+requires a reviewed code/configuration release.
+
+### Pins and supervision
+
+Chisel v1.12.0's official Linux amd64 gzip SHA-256 is
+`f3f180f1d93aa72cce4e6386f98cc06569a0146fbd65eb4423cf83e6434bcfe6`.
+Verify both the official release asset digest and checksum file before extracting
+the VPS binary. Docker verifies the same digest during build. The Node 24.13.0
+image is pinned by digest in the Dockerfile. Install its OS CA bundle: Node's
+bundled fetch roots do not provide the Go client's OS trust store. Never disable
+outer certificate or inner fingerprint verification.
+
+Provision only `GATEWAY_HOST`, `TUNNEL_AUTH` and `TUNNEL_FINGERPRINT` on the staging
+connector. Generate transport credentials independently of gateway access and
+attribution keys. Set root directory `/infra/egress`, Dockerfile `Dockerfile`, one
+`sfo` replica, 0.25 GB memory, 0.25 CPU, sleep disabled, restart `ALWAYS`, overlap
+five seconds and draining zero. No public domain, TCP proxy or volume is needed.
+Upload reviewed source with explicit project, staging environment and service IDs:
+
+```sh
+railway up --project "$PROJECT_ID" --environment "$STAGING_ID" \
+  --service "$CONNECTOR_ID" --detach --message 'Reviewed staging connector'
+```
+
+Read the exact returned deployment ID to `SUCCESS`, then separately prove runtime
+region, source hashes and actual reverse-listener TLS forwarding. Deployment state
+and `tunnel_authenticated` logs are not origin readiness. There is deliberately no
+HTTP healthcheck waiting for exclusive listener ownership: that would deadlock
+overlap while the old deployment owns the ports. The new client retries until
+Railway retires the previous deployment. This handoff can interrupt requests; it
+does not promise zero downtime. Inspect actual deployment retry/authentication
+timestamps and a continuous HTTPS probe across the transition. Verify the new
+runtime identity and all three listeners afterward. Never fall back when unready.
+
+Heartbeats run every ten seconds with a ten-second ping timeout. Reconnect backs
+off from one to five seconds. Any premature child exit, including zero, fails its
+supervisor and stops its other children. SIGTERM reaps all three children, with
+SIGKILL after one second. Raw child logs are suppressed. Each process has a
+256-file ceiling; the supervisor has a 64 MiB Node heap cap. All four processes
+share the container's memory and CPU limits.
+
+Install only the isolated [server unit](../../../infra/egress/carberk-reverse.service)
+and [adapter unit](../../../infra/egress/carberk-reverse-connector.service). Each
+uses dynamic users, read-only system protection, 128 MiB memory, 50% CPU, 32 tasks
+and 4,096 files. Server secrets use systemd credentials. The adapter admits 32
+tunnels and at most 40 accepted sockets, with a six-second connection budget,
+30-second idle limit and stream backpressure. Consumers retain total transfer
+deadlines. Server diagnostics are suppressed because they can contain addresses.
+
+### Prepare exact activation and rollback
+
+1. Coordinate a bounded staging deployment/load window. Re-read services, API
+   revision and pending environment patches before each Railway mutation. Never
+   accept unrelated staged changes or relocate data/services to force success.
+2. Recheck 24443, 11819 and 11901–11903 are free. Record installed services,
+   listeners, certificate expiry, complete nginx configuration hash and original
+   service/configuration identities. Use the existing owned certificate through
+   credentials; make no shared ingress, firewall, DNS, route or SSH change.
+   Certificate renewal requires a restart of only the reverse server to reload its
+   credentials; coordinate that bounded reconnect separately from nginx renewal.
+3. In a new mode-0700 private directory, retain exact old gateway source/config,
+   modes/hashes, unit identities and enabled states. Prepare replacement files,
+   generated inner key/restricted auth file, exact apply and rollback scripts and
+   their hashes before installation. Keep local and VPS rollback copies. R02's
+   initial installer and whole-install rollback must never perform this upgrade.
+4. Validate `serve.mjs --check`, binary digest, listener patterns, certificate and
+   an isolated authenticated/TLS candidate. Install new files only under
+   `/opt/carberk-reverse`, `/etc/carberk/reverse-*` and the two new unit paths.
+   Record every owned file and refuse identity mismatches before replacement.
+5. Activate the API verifier first using the signer procedure. Start the isolated
+   server/adapter and Railway connector. Prove wrong auth/fingerprint, disallowed
+   listeners, unsupported CONNECT destinations and competing clients fail while
+   the owner remains usable. Prove actual deployment handoff before adoption.
+6. Atomically replace only gateway source/private config, explicitly select
+   reverse, restart only `carberk-gateway.service`, and prove hostname:443 TLS,
+   gateway-key/bearer denials, anonymous read and an owned authenticated write/read.
+   Preserve nginx, original Xray and relay hashes.
+
+Rollback restores exact saved gateway files/configuration/modes, restarts only
+that gateway and proves the former relay path. Stop/remove only owned reverse
+server/adapter/client resources after file/service identity checks. Keep the
+original relay enabled and unchanged. Preserve the API replay namespace and
+existing verification keys. Removing a newly added key is separate, after stopping
+the signer and waiting out its acceptance window.
+
+### Acceptance proof
+
+Use the maintained byte harness for signed GET/PUT/readback and HEAD/Range through
+the installed listeners. Add authenticated WebSocket, rate-limited long transfer
+and cancellation. Prove gateway/adapter/server restarts separately and actual API
+deployment/restart with direct readiness and signed quarantine/recovery. Never
+reboot the shared VPS, restart protected services, flush Redis or reset quotas.
+Record process/listener cleanup, resources and source/configuration identities.
+
+Declare payload, endpoint mix, concurrency, warmup, sample count, pacing/duration,
+vantage and byte budget before sustained comparison. Include enough warm ordinary
+API samples to assess the two-second p95 target and repeated signed media transfers
+against both stores. The installed relay permits only API; identify an isolated
+same-outbound media allowlist separately. Report failures, resource/egress use and
+uncertainty. Tiny/unmatched samples establish neither capacity nor added relay
+penalty. Ten transport sessions do not replace R12's ten mixed native sessions;
+VPS/operator probes do not establish TM handset behavior.
+
+Remove only owned fixtures/sessions/objects, temporary units, processes and copied
+credentials. Read back exact final deployment/runtime and installed hashes. Retain
+private rollback, publish sanitized PR proof only. R04–R12 and T01 remain separate.
+
+References: [Chisel release](https://github.com/jpillora/chisel/releases/tag/v1.12.0),
+[pinned README](https://github.com/jpillora/chisel/blob/v1.12.0/README.md),
+[Railway deployment teardown](https://docs.railway.com/deployments/deployment-teardown),
+[healthchecks](https://docs.railway.com/deployments/healthchecks).
 
 ## Target and temporary safety transport
 

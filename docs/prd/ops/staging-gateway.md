@@ -9,15 +9,21 @@ optional signed client attribution as described below. A gateway key does not gr
 ## Runtime contract
 
 `infra/gateway/serve.mjs` reads a private JSON file containing `origin`, `proxy`,
-`hostname` and a random `accessKey` of at least 32 characters. Its CLI permits only
-the staging API origin and the isolated loopback CONNECT proxy. The configured
+`hostname` and a random `accessKey` of at least 32 characters. `transport` selects
+`relay` (loopback 11809, also the default for existing configuration) or `reverse`
+(loopback 11819). `proxy` must exactly match that selection. Unknown or mismatched
+settings fail `--check`; unavailable transport fails requests without fallback.
+The [reverse procedure](staging-egress.md#persistent-reverse-connector-1224) owns the
+supervised Railway connector and isolated VPS listener/adapter. The CLI permits
+only the staging API origin and these fixed loopback proxies. The configured
 hostname must match the request Host. A client supplies `X-Carberk-Gateway-Key` in
 addition to its normal API bearer token. Never put the gateway key in a URL, git,
 logs or a public build. Generate it into a mode-0600 file in a private directory.
 
 nginx terminates validated client TLS on the dedicated SNI hostname and streams
-to loopback port 11880. The gateway uses an explicit HTTP CONNECT tunnel on
-loopback 11809 and validates the fixed API origin's TLS hostname/certificate.
+to loopback port 11880. The gateway uses an explicit HTTP CONNECT tunnel through
+the selected loopback transport and validates the fixed API origin's TLS
+hostname/certificate.
 The [runtime pin](../../../infra/gateway/runtime.json) identifies the official
 Linux x64 Node archive and SHA-256. There are no npm runtime dependencies.
 
@@ -223,7 +229,8 @@ with the candidate signer and synthetic observed addresses. Prove separate bucke
 forged proof rejection, bearer denial, replay rejection and recovery without logging
 IPs. Stop only the disposable process and remove its private key copies afterward.
 
-Activation of the running closed gateway is a separate, concrete operator action:
+Activation of the running closed gateway is a concrete operator action within the
+closed-staging grant:
 validate the replacement private config with `serve.mjs --check`, atomically replace
 only the two gateway source files and private config, restart only
 `carberk-gateway.service`, and prove real hostname/443 TLS, bearer denial, forwarding
