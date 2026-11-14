@@ -1,10 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import { ClaimHistoryRequestSchema, HistoryQueueQuerySchema, HistoryRequestSchema,
+  HistoryQueueResponseSchema, OperatorHistoryRequestSchema, HistoryInboxActionSchema,
   SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
   ReadOperatorHistoryMessagesSchema, HistoryMessageSchema } from "./vehicle-history";
 
 describe("History assignment HTTP contracts", () => {
+  it("keeps public operator context separate from customer contracts and rejects private fields", () => {
+    const item = { id: "10000000-0000-4000-8000-000000001231", createdAt: "2026-11-15T00:00:00.000Z", status: "enquiry",
+      mine: false, assignmentVersion: 0, requester: { displayName: null, nameNumber: 4837, deleted: true }, assignedOperator: null };
+    expect(HistoryQueueResponseSchema.parse({ items: [item], nextCursor: null })).toEqual({ items: [item], nextCursor: null });
+    expect(OperatorHistoryRequestSchema.parse({ ...item, sourceListingId: null })).toEqual({ ...item, sourceListingId: null });
+    for (const extra of [{ requesterId: item.id }, { phone: "private" }, { role: "admin" }, { grants: [] }]) {
+      expect(OperatorHistoryRequestSchema.safeParse({ ...item, sourceListingId: null, ...extra }).success).toBe(false);
+      expect(HistoryQueueResponseSchema.safeParse({ items: [{ ...item, requester: { ...item.requester, ...extra } }], nextCursor: null }).success).toBe(false);
+    }
+    const selection = { kind: "claim", id: item.id, scope: "a".repeat(64), expectedAssignmentVersion: 0 };
+    expect(HistoryInboxActionSchema.parse(selection)).toEqual(selection);
+    for (const input of [{ ...selection, scope: "token" }, { ...selection, expectedAssignmentVersion: "0" },
+      { ...selection, scope: undefined }, { ...selection, kind: "receipts" }, { ...selection, actorId: item.id }]) {
+      expect(HistoryInboxActionSchema.safeParse(input).success).toBe(false);
+    }
+  });
   it("keeps the existing unassigned reader valid and accepts only a real public operator summary", () => {
     const request = { id: "10000000-0000-4000-8000-000000000001", sourceListingId: null,
       createdAt: "2026-11-14T08:00:00.000Z", status: "enquiry", assignedOperator: null };

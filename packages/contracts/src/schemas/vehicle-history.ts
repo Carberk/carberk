@@ -1,6 +1,7 @@
 import { z, DateTimeSchema } from "../zod";
 
 import { ServiceMessageSchema, ServiceTextSchema, ServiceReceiptSchema, ServiceReceiptsSchema } from "./service-messages";
+import { PublicIdentitySchema } from "./identity";
 
 export const HistoryOperatorSchema = z.object({ id: z.string().guid(), displayName: z.string().nullable(), nameNumber: z.number().int() });
 export const HistoryDeskSchema = z.object({
@@ -41,11 +42,17 @@ export const HistoryQueueQuerySchema = z.object({
   search: z.string().trim().min(1).max(64).optional(),
   cursor: z.string().guid().optional(),
 }).strict();
+export const HistoryRequesterIdentitySchema = PublicIdentitySchema.pick({ displayName: true, nameNumber: true, deleted: true }).strict();
+export const HistoryQueueItemSchema = z.object({
+  id: z.string().guid(), createdAt: DateTimeSchema, status: z.literal("enquiry"),
+  assignmentVersion: z.number().int().min(0).max(2147483647), mine: z.boolean(),
+  requester: HistoryRequesterIdentitySchema.nullable(), assignedOperator: HistoryOperatorSchema.strict().nullable(),
+}).strict();
+export const OperatorHistoryRequestSchema = HistoryQueueItemSchema.extend({ sourceListingId: z.string().guid().nullable() }).strict();
 export const HistoryQueueResponseSchema = z.object({
-  items: z.array(z.object({ id: z.string().guid(), createdAt: DateTimeSchema, status: z.literal("enquiry"),
-    assignmentVersion: z.number().int().min(0), mine: z.boolean() })),
+  items: z.array(HistoryQueueItemSchema).max(50),
   nextCursor: z.string().guid().nullable(),
-});
+}).strict();
 
 const MessageKeySchema = ServiceMessageSchema.shape.id;
 const AssignmentVersionSchema = ClaimHistoryRequestSchema.shape.expectedAssignmentVersion;
@@ -72,3 +79,14 @@ export const ReadHistoryReceiptsSchema = HistoryMessageSendQuerySchema;
 export const ReadOperatorHistoryReceiptsSchema = ReadOperatorHistoryMessagesSchema.pick({ expectedAssignmentVersion: true });
 export const HistoryReceiptSchema = ServiceReceiptSchema;
 export const HistoryReceiptsSchema = ServiceReceiptsSchema;
+
+// Admin-only commands. Scope is an opaque correlation fence, never authority.
+const InboxScopeSchema = z.string().regex(/^[a-f0-9]{64}$/);
+const InboxSelectionSchema = z.object({ id: z.string().guid(), scope: InboxScopeSchema,
+  expectedAssignmentVersion: AssignmentVersionSchema }).strict();
+export const HistoryInboxActionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("queue"), query: HistoryQueueQuerySchema, scope: InboxScopeSchema.optional() }).strict(),
+  InboxSelectionSchema.extend({ kind: z.literal("detail") }).strict(),
+  InboxSelectionSchema.extend({ kind: z.literal("claim") }).strict(),
+  InboxSelectionSchema.extend({ kind: z.literal("transcript"), cursor: MessageKeySchema.optional() }).strict(),
+]);
