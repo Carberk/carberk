@@ -5,10 +5,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import socket
 import subprocess
 import tempfile
 from urllib.parse import urlsplit
+from diagnose import load_answers
 
 
 def emit(value):
@@ -23,7 +23,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', required=True)
     parser.add_argument('--proxy', help='Explicit loopback HTTP CONNECT proxy; omitted means direct')
-    parser.add_argument('--resolve-file', help='Private JSON array of curl host:port:IP overrides')
+    parser.add_argument('--reverse-ports', help='Private label-to-loopback-port map for an already established reverse tunnel')
+    parser.add_argument('--public-answers', help='Fresh validated private DoH receipt from diagnose.py')
+    parser.add_argument('--protocol-checks', action='store_true', help='Require signed HEAD and a verified 1 KiB Range response per store')
     parser.add_argument('--read-only', action='store_true')
     parser.add_argument('--samples', type=int, choices=range(1, 4), default=1)
     parser.add_argument('--timeout', type=int, choices=range(6, 61), default=30)
@@ -39,7 +41,18 @@ def main():
     storage = manifest['storage']
     if not 1 <= len(storage) <= 2:
         raise ValueError('expected one or two storage origins')
-    resolves = json.loads(Path(args.resolve_file).read_text()) if args.resolve_file else []
+    hosts = [urlsplit(s['downloadUrl']).hostname for s in storage]
+    if manifest.get('api'):
+        hosts.append(urlsplit(manifest['api']['origin']).hostname)
+    if args.proxy and args.public_answers:
+        raise ValueError('public answers are direct diagnostics only')
+    resolves = load_answers(args.public_answers, hosts) if args.public_answers else []
+    reverse = json.loads(Path(args.reverse_ports).read_text()) if args.reverse_ports else {}
+    labels = {'api'} if manifest.get('api') else set()
+    labels.update(s['label'] for s in storage)
+    if args.reverse_ports and (args.proxy or args.public_answers or set(reverse) != labels
+                    or any(type(port) is not int or not 1024 <= port <= 65535 for port in reverse.values())):
+        raise ValueError('one fixed loopback reverse listener per target required')
     failures = 0
     with tempfile.TemporaryDirectory(prefix='carberk-egress-') as directory:
         directory = Path(directory)
@@ -47,7 +60,7 @@ def main():
         upload.write_bytes(os.urandom(size))
         upload_hash = digest(upload.read_bytes())
 
-        def request(url, label, kind, method='GET', body=None, token=None, expected=200, checksum=None):
+        def request(url, label, kind, method='GET', body=None, token=None, expected=200, checksum=None, byte_range=None):
             nonlocal failures
             u = urlsplit(url)
             if u.scheme != 'https' or u.username or u.password or any(ord(c) < 32 for c in url):
@@ -57,6 +70,12 @@ def main():
                        '--max-redirs', '0', '--connect-timeout', '6', '--max-time', str(args.timeout),
                        '--max-filesize', str(8 * 1024 * 1024), '--output', str(output),
                        '--write-out', '%{json}', '--request', method, '--noproxy', '' if args.proxy else '*']
+            if method == 'HEAD':
+                command += ['--head']
+            if byte_range:
+                command += ['--range', byte_range]
+            if reverse:
+                command += ['--connect-to', u.hostname + ':' + str(u.port or 443) + ':127.0.0.1:' + str(reverse[label])]
             if args.proxy:
                 command += ['--proxy', args.proxy]
             for value in resolves:
@@ -77,7 +96,7 @@ def main():
             content = output.read_bytes() if output.exists() else b''
             ok = result.returncode == 0 and metrics.get('http_code') == expected and metrics.get('ssl_verify_result') == 0
             row = {'kind': kind, 'target': label, 'curl_exit': result.returncode,
-                   **{k: metrics.get(k) for k in ['http_code', 'ssl_verify_result', 'time_total', 'size_download', 'size_upload']}}
+                   **{k: metrics.get(k) for k in ['http_code', 'ssl_verify_result', 'time_total', 'time_connect', 'time_appconnect', 'time_starttransfer', 'size_download', 'size_upload']}}
             if checksum:
                 row['checksum_ok'] = digest(content) == checksum and len(content) == size
                 ok = ok and row['checksum_ok']
@@ -105,25 +124,26 @@ def main():
                 emit({'kind': 'api-integrity', 'ok': ok, 'sha256': digest(api['description'].encode())})
                 failures += not ok
         for entry in storage:
-            host = urlsplit(entry['downloadUrl']).hostname
-            try:
-                addresses = sorted({item[4][0] for item in socket.getaddrinfo(host, 443)})
-            except OSError:
-                addresses = []
-            emit({'kind': 'dns', 'target': entry['label'], 'addresses': addresses})
             for _ in range(args.samples):
-                request(entry['downloadUrl'], entry['label'], 'download', checksum=manifest['sha256'])
+                content = request(entry['downloadUrl'], entry['label'], 'download', checksum=manifest['sha256'])
+                if args.protocol_checks:
+                    request(entry['headUrl'], entry['label'], 'head', method='HEAD')
+                    partial = request(entry['downloadUrl'], entry['label'], 'range', expected=206,
+                                      byte_range='0-' + str(min(size, 1024) - 1))
+                    ok = content is not None and partial == content[:1024]
+                    emit({'kind': 'range-integrity', 'target': entry['label'], 'ok': ok})
+                    failures += not ok
             if not args.read_only:
                 request(entry['uploadUrl'], entry['label'], 'upload', method='PUT', body=upload)
                 request(entry['uploadReadUrl'], entry['label'], 'upload-readback', checksum=upload_hash)
         emit({'kind': 'summary', 'ok': failures == 0, 'failures': failures,
-              'route': 'explicit-proxy' if args.proxy else 'direct', 'bytes_per_file': size})
+              'route': 'railway-initiated' if reverse else 'explicit-proxy' if args.proxy else 'direct', 'bytes_per_file': size})
     return int(failures != 0)
 
 
 if __name__ == '__main__':
     try:
         raise SystemExit(main())
-    except (ValueError, KeyError, OSError, subprocess.TimeoutExpired):
+    except (ValueError, KeyError, TypeError, OSError, subprocess.TimeoutExpired):
         emit({'kind': 'error', 'ok': False, 'message': 'Invalid input or bounded probe failure; raw details suppressed'})
         raise SystemExit(1)
