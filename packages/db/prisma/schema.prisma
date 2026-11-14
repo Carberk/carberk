@@ -69,6 +69,7 @@ model User {
   otpRequests                  OtpRequest[]
   sessions                     Session[]
   staffGrants                  StaffGrant[]
+  serviceMessages              ServiceMessage[]
   historyRequests              VehicleHistoryRequest[] @relation("HistoryRequester")
   assignedHistoryRequests      VehicleHistoryRequest[] @relation("HistoryAssignee")
   dealershipMemberships        DealershipMember[]
@@ -1012,4 +1013,43 @@ model VideoOutputReservation {
   settled      Boolean @default(false)
   @@index([sourceId])
   @@map("video_output_reservations")
+}
+
+/// Service communications; object authority remains with the owning service.
+enum ServiceMessagePurpose {
+  vehicle_history
+}
+
+enum ServiceMessageKind {
+  TEXT
+}
+
+model ServiceConversation {
+  id        String                @id @default(uuid())
+  purpose   ServiceMessagePurpose
+  objectId  String
+  lastOrder BigInt                @default(0)
+  createdAt DateTime              @default(now()) @db.Timestamptz(3)
+  messages  ServiceMessage[]
+
+  @@unique([purpose, objectId])
+  @@map("service_conversations")
+}
+
+model ServiceMessage {
+  id              String              @id @default(uuid())
+  conversationId  String
+  conversation    ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  senderId        String
+  sender          User                @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  clientMessageId String
+  kind            ServiceMessageKind  @default(TEXT)
+  text            String
+  streamOrder     BigInt
+  createdAt       DateTime            @default(now()) @db.Timestamptz(3)
+
+  @@unique([conversationId, senderId, clientMessageId])
+  @@unique([conversationId, streamOrder])
+  @@index([senderId])
+  @@map("service_messages")
 }
