@@ -198,6 +198,47 @@ describe("ListingsController e2e", () => {
       return { token, listingId, slot, source, generation };
     }
 
+    it.each(["active", "sold", "archived"] as const)("keeps %s detail public and photo-only without authenticated video authority", async (status) => {
+      const { token, listingId } = await videoFixture();
+      const owner = await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);
+      expect(owner.body.video).toBeDefined();
+      await prisma.listing.update({ where: { id: listingId }, data: { status } });
+      const anonymous = await request.get(`/api/v1/listings/${listingId}`).expect(200);
+      expect(anonymous.body).toMatchObject({
+        id: listingId, status, brandId: suite.catalog.brandId, modelId: suite.catalog.modelId,
+        priceAmount: 100000, displayPriceTmt: 100000, description: "Great car",
+        conditionDisclosure: { damaged: true, knownIssuesText: "Small scratch" },
+      });
+      expect(anonymous.body.media).toEqual(owner.body.media);
+      expect(anonymous.body.media).toHaveLength(3);
+      expect(anonymous.body.media.every((item: { kind: string }) => item.kind === "image")).toBe(true);
+      expect(anonymous.body).not.toHaveProperty("video");
+      expect(anonymous.body).not.toHaveProperty("pendingVideo");
+    });
+
+    it("refuses a banned Listing anonymously even when its owner can read it", async () => {
+      const { token, listingId } = await videoFixture();
+      const other = await createUser("user-2");
+      await prisma.listing.update({ where: { id: listingId }, data: { status: "banned" } });
+      const owner = await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${token}`).expect(200);
+      expect(owner.body).toMatchObject({ id: listingId, status: "banned" });
+      await request.get(`/api/v1/listings/${listingId}`).expect(404);
+      await request.get(`/api/v1/listings/${listingId}`).set("Authorization", `Bearer ${other}`).expect(404);
+    });
+
+    it("never resolves deleted, unknown or private Draft IDs as public Listings", async () => {
+      const { token, listingId } = await videoFixture();
+      const draft = await seedDraft("user-1", validPayload);
+      await prisma.listing.update({ where: { id: listingId }, data: { deletedAt: new Date() } });
+      for (const id of [listingId, draft.id, suite.id("unknown-public-source")]) {
+        await request.get(`/api/v1/listings/${id}`).expect(404);
+        await request.get(`/api/v1/listings/${id}`).set("Authorization", `Bearer ${token}`).expect(404);
+      }
+      const retainedDrafts = await request.get("/api/v1/me/drafts")
+        .set("Authorization", `Bearer ${token}`).expect(200);
+      expect(retainedDrafts.body.items.map((item: { id: string }) => item.id)).toContain(draft.id);
+    });
+
     it("reopens private Draft Ready video only for its authorized owner", async () => {
       const { token, listingId, slot, generation } = await videoFixture();
       const other = await createUser("user-2");
