@@ -1,7 +1,9 @@
+
 import { ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 
+import { HistoryEntry } from "../../src/vehicle-history/HistoryEntry";
 import { useAuth } from "../../src/auth/useAuth";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
 import { ConversationList } from "../../src/conversations/components/ConversationList";
@@ -60,6 +62,7 @@ export default function ChatScreen() {
     <TabScreen underTabBar>
       <LargeTitle title={t("messages")} />
 
+      <HistoryEntry requests className="mx-4 mb-4" />
       <ChatContent isAuthenticated={isAuthenticated} />
     </TabScreen>
   );
