@@ -14,7 +14,8 @@ export class ReadServiceMessages {
   ) {}
 
   async execute(input: ReadServiceMessagesInput) {
-    const parsed = ServiceMessagesSchemas.ReadServiceMessagesSchema.safeParse(input);
+    const parsed = (input.participant ? ServiceMessagesSchemas.ReadParticipantMessagesSchema
+      : ServiceMessagesSchemas.ReadServiceMessagesSchema).safeParse(input);
     if (!parsed.success) throw new ServiceMessageError("SERVICE_MESSAGE_INVALID_INPUT");
     return this.repository.page(parsed.data).catch((error: unknown) => {
       if (error instanceof ServiceMessageError) throw error;

@@ -10426,6 +10426,403 @@
         }
       }
     },
+    "/api/v1/vehicle-history/requests/{id}/receipts": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Explicit participant/assignment receipt facts; GET never acknowledges. Read requires prior Received",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store progress by actual participant and assignment version; requester version 0",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "participantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "assignmentVersion": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647
+                          },
+                          "receivedOrder": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,18})$"
+                          },
+                          "readOrder": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,18})$"
+                          }
+                        },
+                        "required": [
+                          "participantId",
+                          "assignmentVersion",
+                          "receivedOrder",
+                          "readOrder"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, foreign, unfetched or unreceived cursor; fetch contiguous pages in the current session first"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry acknowledgement"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Explicit participant/assignment receipt facts; GET never acknowledges. Read requires prior Received",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cursor": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "received",
+                      "read"
+                    ]
+                  }
+                },
+                "required": [
+                  "cursor",
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store progress by actual participant and assignment version; requester version 0",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "participantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "receivedOrder": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,18})$"
+                    },
+                    "readOrder": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,18})$"
+                    }
+                  },
+                  "required": [
+                    "participantId",
+                    "assignmentVersion",
+                    "receivedOrder",
+                    "readOrder"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, foreign, unfetched or unreceived cursor; fetch contiguous pages in the current session first"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry acknowledgement"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/receipts": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Explicit participant/assignment receipt facts; GET never acknowledges. Read requires prior Received",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store progress by actual participant and assignment version; requester version 0",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "participantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "assignmentVersion": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647
+                          },
+                          "receivedOrder": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,18})$"
+                          },
+                          "readOrder": {
+                            "type": "string",
+                            "pattern": "^(0|[1-9][0-9]{0,18})$"
+                          }
+                        },
+                        "required": [
+                          "participantId",
+                          "assignmentVersion",
+                          "receivedOrder",
+                          "readOrder"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, foreign, unfetched or unreceived cursor; fetch contiguous pages in the current session first"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry acknowledgement"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Explicit participant/assignment receipt facts; GET never acknowledges. Read requires prior Received",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cursor": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "received",
+                      "read"
+                    ]
+                  },
+                  "expectedAssignmentVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  }
+                },
+                "required": [
+                  "cursor",
+                  "kind",
+                  "expectedAssignmentVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store progress by actual participant and assignment version; requester version 0",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "participantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "receivedOrder": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,18})$"
+                    },
+                    "readOrder": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]{0,18})$"
+                    }
+                  },
+                  "required": [
+                    "participantId",
+                    "assignmentVersion",
+                    "receivedOrder",
+                    "readOrder"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, foreign, unfetched or unreceived cursor; fetch contiguous pages in the current session first"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry acknowledgement"
+          }
+        }
+      }
+    },
     "/api/v1/vehicle-history/operator/requests": {
       "get": {
         "tags": [

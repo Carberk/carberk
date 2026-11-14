@@ -58,6 +58,8 @@ export async function historyFixture() {
           purpose: "vehicle_history", objectId: { in: requests.map((request) => request.id) },
         }, select: { id: true } });
         const scope = { conversationId: { in: conversations.map((conversation) => conversation.id) } };
+        await prisma.serviceMessageOffer.deleteMany({ where: scope });
+        await prisma.serviceReceipt.deleteMany({ where: scope });
         await prisma.serviceMessage.deleteMany({ where: scope });
         await prisma.serviceConversation.deleteMany({ where: { id: scope.conversationId } });
         await prisma.vehicleHistoryRequest.deleteMany({ where: { requesterId: { in: users } } });

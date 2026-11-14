@@ -11,9 +11,9 @@ export class ReadHistoryMessages {
     @Inject(HistoryMessageProjection) private readonly projection: HistoryMessageProjection,
   ) {}
   async execute(actor: HistoryMessageActor, id: string, query: { cursor?: string | undefined; limit: number }) {
-    const { page, requesterId } = await this.access.run(actor, id, async (requesterId, _senderId, objectId) => ({
+    const { page, requesterId } = await this.access.run(actor, id, async (requesterId, _senderId, objectId, participant) => ({
       requesterId, page: await this.messages.readMessages({ purpose: "vehicle_history", objectId,
-        ...(query.cursor ? { cursor: query.cursor } : {}), limit: query.limit }),
+        ...(query.cursor ? { cursor: query.cursor } : {}), limit: query.limit, participant }),
     }));
     return { items: await this.projection.many(page.items, requesterId), nextCursor: page.nextCursor };
   }

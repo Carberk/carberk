@@ -20,6 +20,9 @@ import { ListOperatorHistoryRequests } from "./application/ListOperatorHistoryRe
 import { HISTORY_ASSIGNMENT_REPOSITORY } from "./domain/HistoryAssignmentRepository";
 import { PrismaHistoryAssignmentRepository, HistoryMessageLocks } from "./infrastructure/PrismaHistoryAssignmentRepository";
 import { BusinessMessagingModule } from "../business-messaging/business-messaging.module";
+import { HistoryReceiptsController } from "./presentation/HistoryReceiptsController";
+import { AcknowledgeHistoryMessages } from "./application/AcknowledgeHistoryMessages";
+import { ReadHistoryReceipts } from "./application/ReadHistoryReceipts";
 import { HistoryMessagesController } from "./presentation/HistoryMessagesController";
 import { HistoryMessageAccess } from "./application/HistoryMessageAccess";
 import { HistoryMessageProjection } from "./application/HistoryMessageProjection";
@@ -33,8 +36,8 @@ import { GetOperatorHistoryRequest } from "./application/GetOperatorHistoryReque
 
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
-  controllers: [VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController],
-  providers: [HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
+  controllers: [VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController],
+  providers: [AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
     CurrentHistoryOperator, ListOperatorHistoryRequests, HistoryRequestProjection, ClaimHistoryRequest, GetOperatorHistoryRequest,
     { provide: HISTORY_ASSIGNMENT_REPOSITORY, useClass: PrismaHistoryAssignmentRepository },
     CurrentHistoryRequester, CreateHistoryRequest, ListHistoryRequests, GetHistoryRequest,
@@ -45,7 +48,7 @@ export class VehicleHistoryModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     const fastify: FastifyInstance = this.adapter.httpAdapter.getInstance();
     fastify.addHook("onRoute", (route) => {
-      if (!/^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/messages$/.test(route.url)) return;
+      if (!/^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(messages|receipts)$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
       route.errorHandler = (error, request, reply) => {
         const response = historyRequestFailure(new HistoryRequestError(error.statusCode && error.statusCode < 500
@@ -56,6 +59,6 @@ export class VehicleHistoryModule implements NestModule {
     // Runs before JSON parsing, so malformed payloads are private as well.
     consumer.apply((_request: unknown, response: ServerResponse, next: () => void) => {
       response.setHeader("Cache-Control", "private, no-store"); next();
-    }).forRoutes(HistoryMessagesController);
+    }).forRoutes(HistoryMessagesController, HistoryReceiptsController);
   }
 }

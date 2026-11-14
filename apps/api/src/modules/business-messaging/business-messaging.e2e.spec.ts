@@ -28,6 +28,10 @@ afterAll(async () => {
   try {
     await prisma.$executeRawUnsafe("DROP TRIGGER IF EXISTS vh1226_gate ON service_messages");
     await prisma.$executeRawUnsafe("DROP FUNCTION IF EXISTS vh1226_gate()");
+    const conversations = await prisma.serviceConversation.findMany({ where: { objectId: { in: objects } }, select: { id: true } });
+    const receiptScope = { conversationId: { in: conversations.map((row) => row.id) } };
+    await prisma.serviceMessageOffer.deleteMany({ where: receiptScope });
+    await prisma.serviceReceipt.deleteMany({ where: receiptScope });
     await prisma.serviceMessage.deleteMany({ where: { senderId: { in: senders } } });
     await prisma.serviceConversation.deleteMany({ where: { purpose: scope.purpose, objectId: { in: objects } } });
     await prisma.user.deleteMany({ where: { id: { in: senders } } });
@@ -150,4 +154,24 @@ it("bounds full default pages at fifty communication facts", async () => {
   const last = await messages.readMessages({ ...stream, cursor: first.nextCursor! });
   expect(last.items.map((item) => item.order)).toEqual(["51"]);
   expect(last.nextCursor).toBeNull();
+});
+
+it("retains participant receipts across a messaging module restart without inventing another participant's Read", async () => {
+  const session = await prisma.session.create({ data: { userId: senders[1]!, refreshTokenHash: randomUUID(), expiresAt: new Date(Date.now() + 600_000) } });
+  const participant = { participantId: senders[1]!, sessionId: session.id, assignmentVersion: 1 };
+  const page = await messages.readMessages({ ...scope, participant });
+  const cursor = page.items.at(-1)!.id;
+  expect(await messages.readReceipts(scope)).toEqual({ items: [] });
+  await expect(messages.acknowledge({ ...scope, participant, cursor, kind: "read" })).rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_CURSOR" });
+  await messages.acknowledge({ ...scope, participant, cursor, kind: "received" });
+  await messages.acknowledge({ ...scope, participant, cursor, kind: "read" });
+  await module.close();
+  module = await Test.createTestingModule({ imports: [BusinessMessagingModule] }).compile();
+  prisma = module.get(PrismaService); messages = module.get(BUSINESS_MESSAGING_PORT);
+  expect(await messages.readMessages(scope)).toEqual(page);
+  expect(await messages.readReceipts(scope)).toEqual({ items: [
+    { participantId: senders[1], assignmentVersion: 1, receivedOrder: "5", readOrder: "5" },
+  ] });
+  await expect(messages.acknowledge({ ...scope, participant: { ...participant, assignmentVersion: 2 }, cursor, kind: "received" }))
+    .rejects.toMatchObject({ code: "SERVICE_MESSAGE_INVALID_CURSOR" });
 });

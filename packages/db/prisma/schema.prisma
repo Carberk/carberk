@@ -70,6 +70,7 @@ model User {
   sessions                     Session[]
   staffGrants                  StaffGrant[]
   serviceMessages              ServiceMessage[]
+  serviceReceipts              ServiceReceipt[]
   historyRequests              VehicleHistoryRequest[] @relation("HistoryRequester")
   assignedHistoryRequests      VehicleHistoryRequest[] @relation("HistoryAssignee")
   dealershipMemberships        DealershipMember[]
@@ -137,6 +138,7 @@ model Session {
   createdAt          DateTime  @default(now())
   lastSeenAt         DateTime  @default(now())
   adminTotpExpiresAt DateTime?
+  serviceOffers      ServiceMessageOffer[]
 
   @@index([userId])
   @@map("sessions")
@@ -1031,6 +1033,8 @@ model ServiceConversation {
   lastOrder BigInt                @default(0)
   createdAt DateTime              @default(now()) @db.Timestamptz(3)
   messages  ServiceMessage[]
+  receipts  ServiceReceipt[]
+  offers    ServiceMessageOffer[]
 
   @@unique([purpose, objectId])
   @@map("service_conversations")
@@ -1052,4 +1056,34 @@ model ServiceMessage {
   @@unique([conversationId, streamOrder])
   @@index([senderId])
   @@map("service_messages")
+}
+
+model ServiceReceipt {
+  conversationId    String
+  conversation      ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  participantId     String
+  participant       User @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  /// Requester uses 0; staff facts belong to the actual assignment epoch.
+  assignmentVersion Int
+  receivedOrder     BigInt @default(0)
+  readOrder         BigInt @default(0)
+
+  @@id([conversationId, participantId, assignmentVersion])
+  @@index([participantId])
+  @@map("service_receipts")
+}
+
+/// Fetch evidence only, never delivery. Gaps cannot advance the contiguous offer.
+model ServiceMessageOffer {
+  conversationId    String
+  conversation      ServiceConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  participantId     String
+  sessionId         String
+  session           Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  assignmentVersion Int
+  offeredOrder      BigInt @default(0)
+
+  @@id([conversationId, participantId, sessionId, assignmentVersion])
+  @@index([sessionId])
+  @@map("service_message_offers")
 }
