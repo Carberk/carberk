@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ListingsSchemas } from "@auto-tm/contracts";
@@ -21,6 +21,7 @@ export default function TesterRouteScreen() {
 function TesterControls() {
   const { t } = useTranslation(["account", "common"]);
   const back = useSafeBack("/(tabs)/services");
+  const connectionCheck = useRef<AbortController | null>(null);
   const [entry, setEntry] = useState(captureRouteSnapshot().entry);
   const [configured, setConfigured] = useState(false);
   const [key, setKey] = useState("");
@@ -31,7 +32,7 @@ function TesterControls() {
     void gatewayConfigured().then(value => { if (active) setConfigured(value); })
       .catch(() => { if (active) setStatus("saveFailed"); })
       .finally(() => { if (active) setBusy(false); });
-    return () => { active = false; };
+    return () => { active = false; connectionCheck.current?.abort(); };
   }, []);
 
   const choose = (value: RouteEntry) => {
@@ -51,12 +52,18 @@ function TesterControls() {
     finally { setBusy(false); }
   };
   const check = async () => {
+    if (connectionCheck.current) return;
+    const controller = new AbortController();
+    connectionCheck.current = controller;
     setBusy(true); setStatus(null);
     try {
-      await apiClient.get("/listings?limit=1", ListingsSchemas.FeedResponseSchema, { auth: false, timeout: 10_000 });
-      setStatus("connected");
-    } catch { setStatus("failed"); }
-    finally { setBusy(false); }
+      await apiClient.get("/listings?limit=1", ListingsSchemas.FeedResponseSchema, { auth: false, timeout: 10_000, signal: controller.signal });
+      if (!controller.signal.aborted) setStatus("connected");
+    } catch { if (!controller.signal.aborted) setStatus("failed"); }
+    finally {
+      connectionCheck.current = null;
+      if (!controller.signal.aborted) setBusy(false);
+    }
   };
 
   return (

@@ -37,3 +37,27 @@ it("saves masked access, selects TM, shows truthful failure and returns to Globa
   await fireEvent.press(screen.getByRole("radio", { name: "Global" }));
   expect(captureRouteSnapshot().entry).toBe("global");
 });
+
+it("cancels the connection check when the tester leaves", async () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  selectTesterRoute("global");
+  let started!: () => void, release!: () => void;
+  const entered = new Promise<void>(resolve => { started = resolve; });
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let canceled = false;
+  server.use(http.get("https://api-staging-2861.up.railway.app/api/v1/listings", async ({ request }) => {
+    request.signal.addEventListener("abort", () => { canceled = true; });
+    started(); await held;
+    return HttpResponse.json({ items: [], nextCursor: null });
+  }));
+  const screen = await renderMobile(<TesterRouteScreen />);
+  const pressing = fireEvent.press(screen.getByRole("button", { name: "Check connection" }));
+  await entered;
+  await screen.unmount();
+  const abandoned = canceled;
+  release(); await pressing;
+  expect(abandoned).toBe(true);
+});
