@@ -41,6 +41,7 @@ import {
   ReadOperatorHistoryReceiptsSchema, HistoryReceiptSchema, HistoryReceiptsSchema,
   SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
   ReadOperatorHistoryMessagesSchema, HistoryMessageSchema, HistoryMessagesPageSchema, HistoryMessageSendQuerySchema,
+  ReadHistoryReminderSchema, ReadOperatorHistoryReminderSchema, StopHistoryRemindersSchema, HistoryReminderSchema,
 } from "./schemas/vehicle-history";
 import { HistoryStaffChangeSchema, HistoryStaffLookupSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
 import {
@@ -399,6 +400,31 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   // Reports fake-door schemas
   registry.register("HistoryDesk", HistoryDeskSchema);
   registry.register("HistoryRequest", HistoryRequestSchema);
+  registry.register("HistoryReminder", HistoryReminderSchema);
+  for (const operator of [false, true]) registry.registerPath({
+    method: "get", path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/reminder`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: "Current requester or exact assignee/version reminder state; local synthetic only, no fetch offer or ACK",
+    request: { params: z.object({ id: z.string().guid() }), query: operator ? ReadOperatorHistoryReminderSchema : ReadHistoryReminderSchema },
+    responses: { 200: { description: "Private, no-store safe waiting/suppression state and immutable original public message",
+      content: { "application/json": { schema: HistoryReminderSchema } } },
+      400: { description: "Invalid ID or strict query" }, 401: { description: "Sign in again" },
+      403: { description: "Current authority or object refused; private, no-store" },
+      409: { description: "Assignment changed" }, 503: { description: "Temporarily unavailable; refresh the enquiry" } },
+  });
+  registry.registerPath({
+    method: "post", path: "/api/v1/vehicle-history/requests/{id}/reminder/stop",
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: "Current requester permanently stops reminders; an already-stopped retry does not advance the version",
+    request: { params: z.object({ id: z.string().guid() }), query: ReadHistoryReminderSchema,
+      body: { content: { "application/json": { schema: StopHistoryRemindersSchema } } } },
+    responses: { 201: { description: "Private, no-store current state; Stop never appends text or clears decline/used/outcome",
+      content: { "application/json": { schema: HistoryReminderSchema } } },
+      400: { description: "Invalid ID, strict query or bounded integer expectedWaitingVersion" },
+      401: { description: "Sign in again" }, 403: { description: "Current requester authority refused; private, no-store" },
+      409: { description: "Waiting version changed before the first Stop; refresh" },
+      503: { description: "Temporarily unavailable; refresh and retry Stop" } },
+  });
   for (const operator of [false, true]) {
     const path = `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/messages`;
     for (const method of ["get", "post"] as const) registry.registerPath({

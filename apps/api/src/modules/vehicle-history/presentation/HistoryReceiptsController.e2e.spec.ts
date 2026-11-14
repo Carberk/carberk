@@ -32,11 +32,15 @@ describe("Explicit History receipts over listening HTTP", () => {
   it("keeps saved and fetched text Sent until explicit other-participant received and visible-thread read acknowledgements", async () => {
     const { customer, operator, id } = await enquiry();
     const first = await send(customer, id), second = await send(customer, id);
+    const reminder = () => f.request.get(path(id) + "/reminder").auth(customer.token, { type: "bearer" }).expect(200);
+    const waiting = (await reminder()).body;
+    expect(waiting).toMatchObject({ reason: null, since: null, version: 2, used: false, outcome: null });
     expect((await receipts(customer, id).expect(200)).body).toEqual({ items: [] });
     await ack(operator, id, second.id, "received", true).expect(400);
     await page(operator, id, true).expect(200);
     expect((await receipts(customer, id).expect(200)).body).toEqual({ items: [] });
     await ack(operator, id, second.id, "read", true).expect(400);
+    expect((await reminder()).body).toEqual(waiting);
     const received = await ack(operator, id, second.id, "received", true).expect(201);
     expect(received.body).toEqual({ participantId: operator.user.id, assignmentVersion: 1, receivedOrder: "2", readOrder: "0" });
     await ack(operator, id, second.id, "read", true).expect(201);
@@ -45,6 +49,8 @@ describe("Explicit History receipts over listening HTTP", () => {
     expect((await receipts(customer, id).expect(200)).body).toEqual({ items: [
       { participantId: operator.user.id, assignmentVersion: 1, receivedOrder: "2", readOrder: "2" },
     ] });
+    await page(customer, id).expect(200);
+    expect((await reminder()).body).toEqual(waiting);
   });
 
   it("serializes more concurrent acknowledgements than the operation pool and never regresses reversed progress", async () => {

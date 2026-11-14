@@ -38,13 +38,17 @@ import { HISTORY_CLOCK, HistoryWaiting, type HistoryClock } from "./domain/Histo
 import { ChangeHistoryWaiting } from "./application/ChangeHistoryWaiting";
 import { HISTORY_WAITING_LIFECYCLE } from "./vehicle-history.public";
 import { SyncHistoryWaiting } from "./application/SyncHistoryWaiting";
+import { ReadHistoryReminder } from "./application/ReadHistoryReminder";
+import { StopHistoryReminders } from "./application/StopHistoryReminders";
+import { HistoryReminderProjection } from "./application/HistoryReminderProjection";
+import { HistoryRemindersController } from "./presentation/HistoryRemindersController";
 
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
-  controllers: [VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController],
+  controllers: [VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController],
   providers: [AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
-    SyncHistoryWaiting, ChangeHistoryWaiting,
+    SyncHistoryWaiting, ChangeHistoryWaiting, ReadHistoryReminder, StopHistoryReminders, HistoryReminderProjection,
     { provide: HISTORY_WAITING_LIFECYCLE, useExisting: ChangeHistoryWaiting },
     { provide: HISTORY_CLOCK, useFactory: (): HistoryClock => ({ now: () => new Date() }) },
     { provide: HistoryWaiting, inject: [HISTORY_CLOCK], useFactory: (clock: HistoryClock) => new HistoryWaiting(clock) },
@@ -59,17 +63,19 @@ export class VehicleHistoryModule implements NestModule {
     const fastify: FastifyInstance = this.adapter.httpAdapter.getInstance();
     fastify.addHook("onRoute", (route) => {
       const message = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(messages|receipts)$/.test(route.url);
-      if (!message && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
+      const reminder = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/reminder(?:\/stop)?$/.test(route.url);
+      if (!message && !reminder && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
       route.errorHandler = (error, request, reply) => {
         const response = historyRequestFailure(new HistoryRequestError(error.statusCode && error.statusCode < 500
-          ? message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
+          ? reminder ? "HISTORY_REMINDER_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
+          : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
         void reply.header("Cache-Control", "private, no-store").status(response.statusCode).send(response);
       };
     });
     // Runs before JSON parsing, so malformed payloads are private as well.
     consumer.apply((_request: unknown, response: ServerResponse, next: () => void) => {
       response.setHeader("Cache-Control", "private, no-store"); next();
-    }).forRoutes(HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController);
+    }).forRoutes(HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController);
   }
 }

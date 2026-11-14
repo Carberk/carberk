@@ -4,6 +4,9 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_REMINDER_INVALID: "Check the reminder details and try again.",
+    HISTORY_REMINDER_CONFLICT: "Reminder state changed. Refresh the enquiry before trying again.",
+    HISTORY_REMINDER_UNAVAILABLE: "Reminders are temporarily unavailable. Reopen the enquiry and retry.",
     HISTORY_MESSAGE_INVALID: "Check the message and page details. Text must contain 1–4,000 characters.",
     HISTORY_MESSAGE_CURSOR: "This message page is unavailable. Reopen the enquiry.",
     HISTORY_MESSAGE_CONFLICT: "This send attempt already saved different text. Reopen the enquiry before sending again.",
@@ -15,6 +18,9 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_REMINDER_INVALID: "Проверьте параметры напоминания и повторите попытку.",
+    HISTORY_REMINDER_CONFLICT: "Состояние напоминания изменилось. Обновите обращение и повторите попытку.",
+    HISTORY_REMINDER_UNAVAILABLE: "Напоминания временно недоступны. Откройте обращение заново и повторите попытку.",
     HISTORY_MESSAGE_INVALID: "Проверьте сообщение и параметры страницы. Текст должен содержать от 1 до 4 000 символов.",
     HISTORY_MESSAGE_CURSOR: "Эта страница сообщений недоступна. Откройте обращение заново.",
     HISTORY_MESSAGE_CONFLICT: "Эта попытка уже сохранила другой текст. Откройте обращение перед повторной отправкой.",
@@ -26,6 +32,9 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_REMINDER_INVALID: "Ýatlatmanyň maglumatlaryny barlap, gaýtadan synanyşyň.",
+    HISTORY_REMINDER_CONFLICT: "Ýatlatmanyň ýagdaýy üýtgedi. Täzeden synanyşmazdan öň ýüz tutmany täzeläň.",
+    HISTORY_REMINDER_UNAVAILABLE: "Ýatlatmalar wagtlaýyn elýeterli däl. Ýüz tutmany täzeden açyp synanyşyň.",
     HISTORY_MESSAGE_INVALID: "Habary we sahypanyň maglumatlaryny barlaň. Tekst 1–4 000 nyşandan ybarat bolmaly.",
     HISTORY_MESSAGE_CURSOR: "Bu habar sahypasy elýeterli däl. Ýüz tutmany täzeden açyň.",
     HISTORY_MESSAGE_CONFLICT: "Bu iberiş synanyşygy başga teksti eýýäm saklady. Täzeden ibermezden öň ýüz tutmany açyň.",
@@ -50,12 +59,23 @@ export class HistoryRequestExceptionFilter implements ExceptionFilter {
 @Catch()
 export class HistoryMessagesExceptionFilter extends HistoryRequestExceptionFilter {}
 
+@Catch()
+export class HistoryRemindersExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    const code = error instanceof HistoryRequestError ? error.code : null;
+    super.catch(code === "HISTORY_MESSAGE_INVALID" ? new HistoryRequestError("HISTORY_REMINDER_INVALID")
+      : code === "HISTORY_MESSAGE_CONFLICT" ? new HistoryRequestError("HISTORY_REMINDER_CONFLICT")
+        : code === "HISTORY_MESSAGE_UNAVAILABLE" || (!code && !(error instanceof HttpException))
+          ? new HistoryRequestError("HISTORY_REMINDER_UNAVAILABLE") : error, host);
+  }
+}
+
 export function historyRequestFailure(error: unknown, language: string | undefined) {
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_MESSAGE_UNAVAILABLE" ? 503
-    : code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" ? 409
-      : code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" ? 400 : 403;
+  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" ? 503
+    : code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" ? 409
+      : code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
 }

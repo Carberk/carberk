@@ -32,8 +32,12 @@ export class HistoryMessageAccess {
         if (actor.operator && request.assignmentVersion !== actor.expectedAssignmentVersion) {
           throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
         }
-        return operation(request.requesterId, senderId, request.id, { participantId: senderId,
+        const result = await operation(request.requesterId, senderId, request.id, { participantId: senderId,
           sessionId: actor.claims.sid ?? "", assignmentVersion: actor.operator ? request.assignmentVersion : 0 }, waiting);
+        // Row fences prevent revocation writes; elapsed Session/TOTP deadlines
+        // still require current authority after messaging waits, before commit.
+        await authorize();
+        return result;
       });
     } catch (error) {
       if (error instanceof HistoryRequestError) throw error;
