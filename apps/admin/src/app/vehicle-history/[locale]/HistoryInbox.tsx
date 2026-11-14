@@ -79,13 +79,13 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
         {(["unassigned", "mine"] as const).map((filter) => <Button key={filter} variant={query.success && query.data.filter === filter ? "primary" : "secondary"}
           aria-pressed={query.success && query.data.filter === filter} onClick={() => navigate({ filter, cursor: null, selected: null, v: null })}>{t[filter]}</Button>)}
       </div>
-      <form className="min-w-0 flex-1 sm:max-w-md" onSubmit={(event) => {
+      <form className="w-full min-w-0 sm:max-w-md sm:flex-1" onSubmit={(event) => {
         event.preventDefault(); const search = String(new FormData(event.currentTarget).get("search") ?? "").trim();
         navigate({ search: search || null, cursor: null, selected: null, v: null });
       }}>
       <label htmlFor="history-search" className="mb-1 block text-sm font-medium">{t.search}</label>
         <div className="flex gap-2">
-      <Input id="history-search" name="search" type="search" maxLength={64} defaultValue={query.success ? query.data.search : ""} key={raw} />
+      <Input id="history-search" name="search" type="search" className="min-w-0 flex-1" maxLength={64} defaultValue={query.success ? query.data.search : ""} key={raw} />
       <Button type="submit" variant="secondary">{t.find}</Button>
       </div>
       </form>
