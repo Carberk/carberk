@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -108,4 +109,31 @@ test('media success requires exact bytes and redirects never leak the gateway ke
   } });
   assert.deepEqual(result.routes.map(row => row.reason), ['integrity', 'integrity', 'http']);
   assert.equal(leaked, false);
+});
+
+test('fixed photo buckets and socket indicators never expose arbitrary targets', async t => {
+  const server = http.createServer((_req, res) => { res.writeHead(403); res.end(); });
+  server.on('upgrade', (_req, socket) => socket.end('HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\n\r\n'));
+  const monitor = observeGateway(server);
+  const baseUrl = await listen(server);
+  t.after(() => { monitor.close(); server.closeAllConnections(); server.close(); });
+  await (await fetch(baseUrl + '/photos/chat-attachments/private-user-key?secret=private')).text();
+  await (await fetch(baseUrl + '/arbitrary-private-path')).text();
+  const upgradeClosed = new Promise(resolve => server.once('upgrade', (_req, peer) => peer.once('close', resolve)));
+  const socket = net.connect({ host: '127.0.0.1', port: server.address().port });
+  socket.resume();
+  socket.write('GET /private-socket-path HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n');
+  await once(socket, 'close');
+  await upgradeClosed;
+  const result = monitor.snapshot();
+  assert.equal(result.routes.photo.denied, 1);
+  assert.equal(result.routes.other.denied, 1);
+  assert.equal(result.sockets.upgrades, 1);
+  assert.equal(result.sockets.upgradedOpen, 0);
+  assert.ok(result.sockets.connections >= 1);
+  assert.ok(result.resources.rssBytes > 0);
+  assert.ok(result.resources.hostTotalBytes > 0);
+  for (const value of ['private-user-key', 'secret=', 'private-socket-path', 'arbitrary-private-path']) {
+    assert.ok(!JSON.stringify(result).includes(value));
+  }
 });
