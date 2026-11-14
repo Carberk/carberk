@@ -56,15 +56,47 @@ test("TOTP uses the selected API database/key and never prints the process outpu
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test("explicit History purpose reaches the DB child and returns only a private expiring file", async () => {
+  const directory = await mkdtemp(join("/tmp", "admin-access-test-"));
+  const ports = boundary({ tempRoot: directory });
+  try {
+    assert.equal(await cli(["totp", ...baseArgs, "--phone", "+99365000901", "--purpose", "vehicle-history"], ports), 0);
+    const result = JSON.parse(ports.output[0]);
+    assert.deepEqual(ports.executions[0][1], ["-s", "--filter", "@auto-tm/db", "admin:totp", "--phone", "+99365000901", "--purpose", "vehicle-history"]);
+    assert.equal(await readFile(result.codeFile, "utf8"), "852013");
+    assert.equal((await stat(result.codeFile)).mode & 0o777, 0o600);
+    assert.equal((await stat(result.directory)).mode & 0o777, 0o700);
+    assert.doesNotMatch(JSON.stringify(ports.output), /852013|selected-key/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("invalid, duplicate or unrelated purpose flags refuse before env, HTTP or subprocess access", async () => {
+  for (const [command, flags] of [
+    ...["unknown", "", "vehicle_history", "toString", "__proto__"].map(value => ["totp", ["--purpose", value]]),
+    ["totp", ["--purpose"]], ["totp", ["--purpose", "vehicle-history", "--purpose", "legacyAdmin"]],
+    ...["check", "serve", "otp"].map(command => [command, ["--purpose", "vehicle-history"]]),
+  ]) {
+    const ports = boundary({ readFile: async () => { throw new Error("env must not be read"); } });
+    assert.equal(await cli([command, ...baseArgs, "--phone", "+99365000901", ...flags], ports), 1);
+    assert.match(ports.errors.join(""), /purpose|arguments/);
+    assert.equal(ports.requests.length, 0);
+    assert.equal(ports.executions.length, 0);
+  }
+});
+
 test("refuses remote and production targets before credential retrieval", async () => {
-  for (const variant of ["remote-api", "remote-admin", "production", "remote-db", "CI-bypass"]) {
+  for (const variant of ["remote-api", "remote-admin", "production", "remote-db", "database-query", "CI-bypass", "CI-response", "real-SMS", "node-production"]) {
     let reads = 0;
     const config = await boundary().readFile();
     const ports = boundary({ readFile: async () => {
       reads++;
       return config.replace("APP_ENV=test", variant === "production" ? "APP_ENV=production" : "APP_ENV=test")
         .replace("@127.0.0.1:5432", variant === "remote-db" ? "@example.com:5432" : "@127.0.0.1:5432")
-        .replace("OTP_TEST_MODE=false", variant === "CI-bypass" ? "OTP_TEST_MODE=true" : "OTP_TEST_MODE=false");
+        .replace("OTP_TEST_MODE=false", variant === "CI-bypass" ? "OTP_TEST_MODE=true" : "OTP_TEST_MODE=false")
+        .replace("OTP_TEST_CODE_RESPONSE=false", variant === "CI-response" ? "OTP_TEST_CODE_RESPONSE=true" : "OTP_TEST_CODE_RESPONSE=false")
+        .replace("SMS_DRIVER=mock", variant === "real-SMS" ? "SMS_DRIVER=gateway" : "SMS_DRIVER=mock")
+        .replace("NODE_ENV=test", variant === "node-production" ? "NODE_ENV=production" : "NODE_ENV=test")
+        .replace("/selected\n", variant === "database-query" ? "/selected?host=example.com\n" : "/selected\n");
     } });
     const args = [...baseArgs];
     if (variant === "remote-api") args[1] = "https://example.com/api/v1";

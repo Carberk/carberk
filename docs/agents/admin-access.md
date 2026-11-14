@@ -30,7 +30,7 @@ This starts Admin from the caller's checkout with matching `API_BASE_URL`, `ADMI
 
 ## 3. Finish the ordinary browser sign-in
 
-Use an existing local admin fixture. The documented shared-local admin is `+99365000901`; an owned disposable database can have its own explicitly prepared fixture. The helper does not promote an account. For a missing fixture, follow the explicit setup branch below.
+Use an existing local actor authorized for the selected flow. The documented shared-local legacy Admin fixture is `+99365000901`; an owned disposable database can have its own explicitly prepared fixture. The helper does not promote an account. For a missing fixture, follow the explicit setup branch below.
 
 1. In the real `/login` form, request a phone code **once**. On refusal/rate limit, retain the error and wait for the applicable backoff; never clear quotas or request again just to repair automation.
 2. Read the non-secret request metadata from the current OTP form using the browser tool:
@@ -63,11 +63,24 @@ Use an existing local admin fixture. The documented shared-local admin is `+9936
 
    Fill the authenticator field with the private file using the same handoff and cleanup. The existing TOTP helper also supports completing pending enrollment; the real browser verify action performs it. If the window is ending, generate a new TOTP after the boundary rather than sending an expired code. Never inject tokens/cookies, skip TOTP or use CI code-return flags for UI preparation.
 
+   For an existing purpose-granted History staff actor, keep the same explicit targets and effective env, and select the browser flow's purpose:
+
+   ```bash
+   pnpm admin:access totp \
+     --api http://127.0.0.1:3006/api/v1 --admin http://127.0.0.1:4301 \
+     --api-env /absolute/path/to/running-api.env --phone <existing-staff-phone> \
+     --purpose vehicle-history
+   ```
+
+   History purposes are `vehicle-history`, `vehicle-history-payment-evidence` and `vehicle-history-staff-management`. Each requires its exact current nonrevoked, nonfuture grant and an eligible User. Marketplace admin role or another purpose's grant does not substitute. Omitted purpose defaults to `legacyAdmin`, which requires the admin role. Both pending and verified enrollment use the same private-file handoff; only the real browser verification elevates the session.
+
 5. Confirm the intended signed-in actor and target page, then capture proof. Preserve the session for reuse. Close only your preview tab; stop only your owned server. Record worktree/revision, API/Admin origins and observed identity/elevation, with codes/tokens/QR/backup codes excluded.
 
 ## Explicit fixture setup, only when missing
 
-For an agreed local target, create the fixture through ordinary phone sign-in, then run the existing `admin:promote` command against that same explicit local database with a reason. Promotion is a separate, explicit write; it is not part of `check` or code retrieval. Use a fresh sign-in after promotion, respecting `resendInSeconds`, because the older session retains its role. Reaching the QR step establishes pending enrollment; `admin:access totp` can then supply its code. Preserve any active shared fixture owner and coordinate changes rather than replacing Users.
+For a missing History staff fixture or grant, coordinate separately with its owner through the approved staff setup procedure. Code retrieval creates no authority; a legitimate History actor needs no marketplace role promotion.
+
+For an agreed local legacy Admin target, create the fixture through ordinary phone sign-in, then run the existing `admin:promote` command against that same explicit local database with a reason. Promotion is a separate, explicit write; it is not part of `check` or code retrieval. Use a fresh sign-in after promotion, respecting `resendInSeconds`, because the older session retains its role. Reaching the QR step establishes pending enrollment; `admin:access totp` can then supply its code. Preserve any active shared fixture owner and coordinate changes rather than replacing Users.
 
 ## Refusals and proof limits
 
@@ -75,6 +88,6 @@ For an agreed local target, create the fixture through ordinary phone sign-in, t
 - `API_NOT_READY`: coordinate the failed dependency; do not reset a shared stack to make the check green.
 - Target/config mismatch: use the running API's effective env file. Production, remote databases/endpoints, redirects and CI OTP bypasses refuse.
 - Missing/stale/ambiguous/superseded OTP: stop without resending; inspect the exact request metadata and selected log. A new request needs the normal backoff and a deliberate fresh sign-in attempt.
-- `TOTP_UNAVAILABLE`: check local fixture role, pending enrollment, selected key/database and compiled DB prerequisites. Never print subprocess diagnostics that might contain codes or credentials.
+- `TOTP_UNAVAILABLE`: check the selected purpose's role/grant, User lifecycle, pending enrollment, selected key/database and compiled DB prerequisites. Coordinate missing authority with the fixture owner. Never print subprocess diagnostics that might contain codes or credentials.
 
 These helpers prove preparation only. Authorization, session rotation, wrong-code handling and expired/revoked elevation still need their real application tests. Staging/production access follows the [environment authority](environment.md); this helper is deliberately local-only and refuses those targets.

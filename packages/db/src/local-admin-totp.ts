@@ -1,7 +1,8 @@
 import { createDecipheriv, createHmac } from "node:crypto";
 
-// Local development only: prints a local admin's current authenticator code
-// so an agent can finish admin sign-in without scanning the setup QR code.
+import purposes from "./local-admin-totp-purposes.json";
+
+// Local development only: reads a legitimately authorized actor's code.
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const STEP_SECONDS = 30;
@@ -10,7 +11,12 @@ const BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 export interface LocalAdminTotpUser {
   id: string;
   role: string;
-  /** The `totp_enrollments` row, or null before the admin reaches the QR step. */
+  phone: string | null;
+  email: string | null;
+  suspendedAt: Date | null;
+  deletionScheduledAt: Date | null;
+  staffGrants: { purpose: string; grantedAt: Date; revokedAt: Date | null }[];
+  /** The `totp_enrollments` row, or null before the actor reaches the QR step. */
   enrollment: { encryptedSecret: string; verifiedAt: Date | null } | null;
 }
 
@@ -23,6 +29,7 @@ export interface LocalAdminTotpOptions {
   keyBase64: string | undefined;
   phone: string;
   now: Date;
+  purpose?: string;
 }
 
 export type LocalAdminTotpResult =
@@ -33,6 +40,10 @@ export async function runLocalAdminTotp(
   deps: LocalAdminTotpDeps,
   options: LocalAdminTotpOptions,
 ): Promise<LocalAdminTotpResult> {
+  const purpose = options.purpose === undefined ? "legacyAdmin" : options.purpose;
+  if (typeof purpose !== "string" || !Object.hasOwn(purposes, purpose)) {
+    return { exitCode: 1, message: "Refusing: unknown TOTP purpose." };
+  }
   if (!isLocalDatabase(options.databaseUrl)) {
     return { exitCode: 1, message: "Refusing: DATABASE_URL must point at localhost. This helper is for the local Docker stack only." };
   }
@@ -42,13 +53,19 @@ export async function runLocalAdminTotp(
 
   const user = await deps.findUserByPhone(options.phone);
   if (!user) {
-    return { exitCode: 1, message: `No user has phone ${options.phone}. Sign in once with it, then run admin:promote.` };
+    return { exitCode: 1, message: "No local User found. Sign in once, then coordinate the selected purpose's fixture with its owner." };
   }
-  if (user.role !== "admin") {
-    return { exitCode: 1, message: `User ${user.id} is ${user.role}, not admin. Run admin:promote first.` };
+  if (purpose === "legacyAdmin") {
+    if (user.role !== "admin") return { exitCode: 1, message: "Refusing: legacyAdmin requires the admin role." };
+  } else {
+    const grantPurpose = purposes[purpose as keyof typeof purposes];
+    const eligible = !user.suspendedAt && !user.deletionScheduledAt && (user.phone !== null || user.email !== null);
+    if (!eligible || !user.staffGrants.some(grant => grant.purpose === grantPurpose && grant.revokedAt === null && grant.grantedAt <= options.now)) {
+      return { exitCode: 1, message: "Refusing: selected History purpose requires an eligible User and its exact current grant. Coordinate the fixture with its owner." };
+    }
   }
   if (!user.enrollment) {
-    return { exitCode: 1, message: "No authenticator yet. Sign in to admin until it shows the QR code, then run this again." };
+    return { exitCode: 1, message: "No authenticator yet. Sign in for the selected purpose until it shows the QR code, then run this again." };
   }
 
   const secret = decryptTotpSecret(user.enrollment.encryptedSecret, options.keyBase64);
@@ -73,6 +90,7 @@ function isLocalDatabase(databaseUrl: string | undefined): boolean {
       url.href === databaseUrl &&
       (url.protocol === "postgres:" || url.protocol === "postgresql:") &&
       url.search === "" &&
+      url.hash === "" &&
       LOCAL_HOSTS.has(url.hostname)
     );
   } catch {
