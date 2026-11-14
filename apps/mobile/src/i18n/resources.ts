@@ -29,6 +29,13 @@ export const resources: Resource = {
   ru: {
     common: {
       vehicleHistory: {
+        replyLabel: "Ваше сообщение", replyPlaceholder: "Задайте вопрос, даже без VIN",
+        sendMessage: "Отправить сообщение", sendNew: "Отправить как новое сообщение",
+        sending: "Отправляется…", sendUncertain: "Отправка не подтверждена. Повторите то же сообщение.",
+        sendFailed: "Не удалось отправить сообщение.", retryMessage: "Повторить сообщение: {{text}}",
+        newIntentHint: "Исходное сообщение уже могло дойти.",
+        refreshRequest: "Обновить запрос", recentSends: "Недавно отправленные",
+
         requestRefreshFailed: "Не удалось обновить обращение.",
         assignedOperator: "Оператор: {{name}}", you: "Вы",
         moreMessages: "Загрузить ещё сообщения", pageFailed: "Не удалось загрузить следующие сообщения.",
@@ -1014,6 +1021,13 @@ export const resources: Resource = {
   tk: {
     common: {
       vehicleHistory: {
+        replyLabel: "Habaryňyz", replyPlaceholder: "VIN bolmasa-da sorag beriň",
+        sendMessage: "Habar iber", sendNew: "Täze habar hökmünde iber",
+        sending: "Iberilýär…", sendUncertain: "Iberilendigi tassyklanmady. Şol habary gaýtadan iberiň.",
+        sendFailed: "Habary iberip bolmady.", retryMessage: "Habary gaýtadan iber: {{text}}",
+        newIntentHint: "Asyl habar eýýäm baran bolmagy mümkin.",
+        refreshRequest: "Ýüz tutmany täzele", recentSends: "Soňky iberilenler",
+
         requestRefreshFailed: "Ýüz tutmany täzeläp bolmady.",
         assignedOperator: "Operator: {{name}}", you: "Siz",
         moreMessages: "Ýene habarlary ýükle", pageFailed: "Indiki habarlary ýükläp bolmady.",
@@ -1999,6 +2013,13 @@ export const resources: Resource = {
   en: {
     common: {
       vehicleHistory: {
+        replyLabel: "Your message", replyPlaceholder: "Ask a question, even without a VIN",
+        sendMessage: "Send message", sendNew: "Send as new message",
+        sending: "Sending…", sendUncertain: "Send not confirmed. Retry the same message.",
+        sendFailed: "Could not send this message.", retryMessage: "Retry message: {{text}}",
+        newIntentHint: "The original may already have arrived.",
+        refreshRequest: "Refresh request", recentSends: "Recent sends",
+
         requestRefreshFailed: "Could not refresh this request.",
         assignedOperator: "Operator: {{name}}", you: "You",
         moreMessages: "Load more messages", pageFailed: "Could not load more messages.",

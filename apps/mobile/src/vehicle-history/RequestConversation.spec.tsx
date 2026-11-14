@@ -438,6 +438,342 @@ it.each([
   expect(view.getByText(sent ?? "")).toBeTruthy();
   await act(() => onlineManager.setOnline(false));
   expect(await view.findByText(offline ?? "")).toBeTruthy();
-  expect(view.queryByRole("textbox")).toBeNull();
+  expect(view.getByLabelText(locale === "ru" ? "Ваше сообщение" : locale === "tk" ? "Habaryňyz" : "Your message")).toBeTruthy();
   await view.unmount();
+});
+
+it("sends exact text once during rapid taps and keeps a newer draft after commitment", async () => {
+  const response = deferred<Response>();
+  const sends: unknown[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as { clientMessageId: string; text: string };
+    sends.push(body);
+    return response.promise;
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  const input = await view.findByLabelText("Your message");
+  await fireEvent.changeText(input, "  Salam\nDünýä  ");
+  const send = view.getByRole("button", { name: "Send message" });
+  await act(async () => { void fireEvent.press(send); void fireEvent.press(send); });
+  await vi.waitFor(() => expect(sends).toHaveLength(1));
+  expect(sends[0]).toEqual({ clientMessageId: expect.any(String), text: "  Salam\nDünýä  " });
+  expect(view.getAllByText("Sending…").length).toBeGreaterThan(0);
+  await fireEvent.changeText(input, "A newer question");
+  await act(() => response.resolve(HttpResponse.json({ ...message(nextId, "2", true),
+    ...(sends[0] as object) })));
+  expect(await view.findByText("Sent")).toBeTruthy();
+  expect(view.getByDisplayValue("A newer question")).toBeTruthy();
+  expect(view.getByText("  Salam\nDünýä  ")).toBeTruthy();
+});
+
+it("retries a response-lost commit with the same ID and original exact text, then clears only its unchanged draft", async () => {
+  const sends: { clientMessageId: string; text: string }[] = [];
+  let committed: ReturnType<typeof message> | undefined;
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as { clientMessageId: string; text: string };
+    sends.push(body);
+    committed ??= { ...message(nextId, "2", true), ...body };
+    return sends.length === 1 ? HttpResponse.error() : HttpResponse.json(committed);
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "  VIN?\nÝ / Ж  ");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  expect(await view.findByText("Send not confirmed. Retry the same message.")).toBeTruthy();
+  expect(view.getByDisplayValue("  VIN?\nÝ / Ж  ")).toBeTruthy();
+  await fireEvent.press(view.getByRole("button", { name: /Retry message:.*VIN/s }));
+  await vi.waitFor(() => expect(sends).toHaveLength(2));
+  expect(sends).toEqual([sends[0], sends[0]]);
+  expect(sends[0]?.text).toBe("  VIN?\nÝ / Ж  ");
+  expect(view.getByDisplayValue("")).toBeTruthy();
+  expect(view.getAllByText("  VIN?\nÝ / Ж  ")).toHaveLength(1);
+  expect(view.getByText("Sent")).toBeTruthy();
+});
+
+it("makes a newer edited send an explicit new intent while preserving the uncertain original for retry", async () => {
+  const sends: { clientMessageId: string; text: string }[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as { clientMessageId: string; text: string };
+    sends.push(body);
+    return sends.length === 1 ? HttpResponse.error() : HttpResponse.json({ ...message(nextId, "2", true), ...body });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  const input = await view.findByLabelText("Your message");
+  await fireEvent.changeText(input, "Original");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  await view.findByText("Send not confirmed. Retry the same message.");
+  await fireEvent.changeText(input, "New question");
+  await fireEvent.press(view.getByRole("button", { name: "Send as new message" }));
+  expect(sends.map((send) => send.text)).toEqual(["Original", "New question"]);
+  expect(sends[1]?.clientMessageId).not.toBe(sends[0]?.clientMessageId);
+  expect(view.getByRole("button", { name: "Retry message: Original" })).toBeTruthy();
+  expect(view.getByText("New question")).toBeTruthy();
+});
+
+it("keeps sent results outside contiguous page evidence until exact forward pages arrive, without duplicates or lookahead ACK", async () => {
+  const middleId = "20000000-0000-4000-8000-000000000003";
+  let committed: ReturnType<typeof message> | undefined;
+  let failPage = true;
+  const cursors: (string | null)[] = [];
+  server.use(http.get("*/vehicle-history/requests/:id/messages", ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get("cursor");
+    cursors.push(cursor);
+    return !cursor ? HttpResponse.json({ items: [message()], nextCursor: firstId })
+      : failPage ? HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 })
+        : HttpResponse.json({ items: [message(middleId, "2"), committed], nextCursor: null });
+  }), http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    committed = { ...message(nextId, "3", true), ...await request.json() as object };
+    return HttpResponse.json(committed);
+  }), http.post("*/vehicle-history/requests/:id/receipts", async ({ request }) => {
+    const body = await request.json() as { cursor: string; kind: string };
+    acknowledgements.push(body);
+    return HttpResponse.json({ participantId: userId, assignmentVersion: 0,
+      receivedOrder: body.cursor === firstId ? "1" : "3", readOrder: body.kind === "read" ? "3" : "0" });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Sent past a gap");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  await view.findByText("Sent");
+  await visible(view, [nextId]);
+  await vi.waitFor(() => expect(acknowledgements).toEqual([{ cursor: firstId, kind: "received" }]));
+  expect(getHost(view.container, "RCTScrollView").props.data.map((row: { id: string }) => row.id)).toEqual([firstId]);
+  await fireEvent.press(view.getByRole("button", { name: "Load more messages" }));
+  await view.findByText("Could not load more messages.");
+  expect(view.getAllByText("Sent past a gap")).toHaveLength(1);
+  failPage = false;
+  await fireEvent.press(view.getByRole("button", { name: "Retry" }));
+  await vi.waitFor(() => expect(getHost(view.container, "RCTScrollView").props.data.map((row: { id: string }) => row.id))
+    .toEqual([firstId, middleId, nextId]));
+  expect(view.getAllByText("Sent past a gap")).toHaveLength(1);
+  expect(cursors.slice(-2)).toEqual([firstId, firstId]);
+  await vi.waitFor(() => expect(acknowledgements).toContainEqual({ cursor: nextId, kind: "received" }));
+});
+
+it.each(["account", "session", "request", "assignment", "unmount"])("fences a late send result after %s replacement", async (change) => {
+  const response = deferred<Response>();
+  const posted = deferred<{ clientMessageId: string; text: string }>();
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    posted.resolve(await request.json() as { clientMessageId: string; text: string });
+    return response.promise;
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Original request only");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Send message" })); });
+  const body = await posted.promise;
+  if (change === "account") await act(() => storeAuthSession(session("different", operatorId)));
+  if (change === "session") await act(() => storeAuthSession(session("session-two")));
+  if (change === "request") {
+    routeParams.id = "10000000-0000-4000-8000-000000000102";
+    server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, id: routeParams.id })));
+    await view.rerender(<RequestScreen />);
+  }
+  if (change === "assignment") {
+    server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, assignmentVersion: 2 })));
+    await act(() => view.queryClient.invalidateQueries({ queryKey: ["vehicle-history", userId, "session-one", "requests", requestId], exact: true }));
+  }
+  if (change === "unmount") await view.unmount();
+  else {
+    await vi.waitFor(() => expect(view.queryByText("Original request only")).toBeNull());
+    await fireEvent.changeText(await view.findByLabelText("Your message"), "New scope draft");
+  }
+  await act(() => response.resolve(HttpResponse.json({ ...message(nextId, "2", true), ...body })));
+  if (change !== "unmount") {
+    expect(view.queryByText("Original request only")).toBeNull();
+    expect(view.getByDisplayValue("New scope draft")).toBeTruthy();
+    expect(view.queryByText("Sent")).toBeNull();
+  }
+});
+
+it.each(["account", "session", "request", "assignment", "blur", "background", "unmount"])("does not replay a send across %s during shared refresh", async (change) => {
+  const refresh = deferred<Response>();
+  const refreshing = deferred<undefined>();
+  const sends: string[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", ({ request }) => {
+    sends.push(request.headers.get("Authorization") ?? "");
+    return HttpResponse.json({ code: "UNAUTHENTICATED" }, { status: 401 });
+  }), http.post("*/auth/refresh", () => { refreshing.resolve(undefined); return refresh.promise; }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Do not replay");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Send message" })); });
+  await refreshing.promise;
+  if (change === "account") await act(() => storeAuthSession(session("different", operatorId)));
+  if (change === "request") {
+    routeParams.id = "10000000-0000-4000-8000-000000000102";
+    server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, id: routeParams.id })));
+    await view.rerender(<RequestScreen />);
+  }
+  if (change === "blur") { screenFocus.focused = false; await view.rerender(<RequestScreen />); }
+  if (change === "background") await act(() => focusManager.setFocused(false));
+  if (change === "session") await act(() => storeAuthSession(session("session-two")));
+  if (change === "assignment") {
+    server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, assignmentVersion: 2 })));
+    await act(() => view.queryClient.invalidateQueries({ queryKey: ["vehicle-history", userId, "session-one", "requests", requestId], exact: true }));
+  }
+  if (change === "unmount") await view.unmount();
+  await act(() => refresh.resolve(HttpResponse.json({ accessToken: session().accessToken, refreshToken: "rotated" })));
+  expect(sends).toEqual([`Bearer ${session().accessToken}`]);
+});
+
+it.each([
+  [400, "HISTORY_MESSAGE_INVALID", "Could not send this message."],
+  [403, "FORBIDDEN", "This request is unavailable for this session. Go back to your requests."],
+  [409, "HISTORY_ASSIGNMENT_CONFLICT", "This request changed. Refresh it to continue."],
+  [503, "UNAVAILABLE", "Send not confirmed. Retry the same message."],
+  [200, "malformed", "Send not confirmed. Retry the same message."],
+])("preserves text and truthful recovery after send status %s", async (status, code, copy) => {
+  server.use(http.post("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ code }, { status })));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Keep my question");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  expect(await view.findByText(copy)).toBeTruthy();
+  expect(view.getByDisplayValue("Keep my question")).toBeTruthy();
+  expect(view.queryByText("Sent")).toBeNull();
+  expect(view.getByRole("button", { name: status === 403 || status === 409 ? "Refresh request" : "Retry message: Keep my question" })).toBeTruthy();
+});
+
+it("keeps the multiline composer outside the stable reader and prevents empty, offline and hidden sends", async () => {
+  const view = await renderMobile(<RequestScreen />);
+  const input = await view.findByLabelText("Your message");
+  const list = getHost(view.container, "RCTScrollView");
+  expect(list.props.maintainVisibleContentPosition).toEqual({ minIndexForVisible: 0 });
+  expect(list.props.keyboardShouldPersistTaps).toBe("handled");
+  expect(list.props.keyboardDismissMode).toBe("interactive");
+  expect(input.props.multiline).toBe(true);
+  expect(input.props.maxLength).toBe(4000);
+  expect(input.parent).not.toBe(list);
+  expect(getHost(view.container, "KeyboardAvoidingView").props.behavior).toBe("padding");
+  await fireEvent.changeText(input, " \n ");
+  expect(view.getByRole("button", { name: "Send message" }).props.accessibilityState.disabled).toBe(true);
+  await fireEvent.changeText(input, "Valid question");
+  await act(() => onlineManager.setOnline(false));
+  expect(view.getByRole("button", { name: "Send message" }).props.accessibilityState.disabled).toBe(true);
+  await act(() => onlineManager.setOnline(true));
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Send message" }).props.accessibilityState.disabled).toBe(false));
+  screenFocus.focused = false;
+  await view.rerender(<RequestScreen />);
+  expect(view.getByRole("button", { name: "Send message" }).props.accessibilityState.disabled).toBe(true);
+  expect(view.getByDisplayValue("Valid question")).toBeTruthy();
+});
+
+it.each([
+  ["en", "Your message", "Send message", "Send not confirmed. Retry the same message."],
+  ["ru", "Ваше сообщение", "Отправить сообщение", "Отправка не подтверждена. Повторите то же сообщение."],
+  ["tk", "Habaryňyz", "Habar iber", "Iberilendigi tassyklanmady. Şol habary gaýtadan iberiň."],
+])("supports long exact questions without VIN or an assigned operator in %s", async (locale, label, send, uncertain) => {
+  const sends: unknown[] = [];
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, assignedOperator: null, assignmentVersion: 0 })),
+    http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+      sends.push(await request.json());
+      return HttpResponse.error();
+    }));
+  const view = await renderMobile(<RequestScreen />, { locale });
+  const text = "  Ж / Ý / 🚗\n".repeat(200);
+  await fireEvent.changeText(await view.findByLabelText(label), text);
+  await fireEvent.press(view.getByRole("button", { name: send }));
+  expect(await view.findByText(uncertain)).toBeTruthy();
+  expect(sends).toEqual([{ clientMessageId: expect.stringMatching(/^[a-f0-9-]{36}$/), text }]);
+  expect(view.getByDisplayValue(text)).toBeTruthy();
+});
+
+it.each([["0", "0", "Sent"], ["2", "0", "Delivered"], ["2", "2", "Read"]])(
+  "uses actual current-assignment receipts for committed sends (%s/%s)", async (receivedOrder, readOrder, label) => {
+    server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) =>
+      HttpResponse.json({ ...message(nextId, "2", true), ...await request.json() as object })),
+    http.get("*/vehicle-history/requests/:id/receipts", () => HttpResponse.json({ items: [
+      { participantId: operatorId, assignmentVersion: 1, receivedOrder, readOrder },
+    ] })));
+    const view = await renderMobile(<RequestScreen />);
+    await fireEvent.changeText(await view.findByLabelText("Your message"), "Receipt facts only");
+    await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+    expect(await view.findByText(label)).toBeTruthy();
+    expect(acknowledgements.every((ack) => ack.cursor === firstId)).toBe(true);
+  },
+);
+
+it("keeps the draft and pending text through a failed metadata refresh, then reconciles without inventing commitment", async () => {
+  const response = deferred<Response>();
+  const posted = deferred<undefined>();
+  server.use(http.post("*/vehicle-history/requests/:id/messages", () => { posted.resolve(undefined); return response.promise; }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Original text");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Send message" })); });
+  await posted.promise;
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Newer text");
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 })));
+  await act(() => onlineManager.setOnline(false));
+  await act(() => onlineManager.setOnline(true));
+  await view.findByText("Could not refresh this request.");
+  await act(() => response.resolve(HttpResponse.error()));
+  expect(await view.findByText("Send not confirmed. Retry the same message.")).toBeTruthy();
+  expect(view.getByDisplayValue("Newer text")).toBeTruthy();
+  expect(view.getByText("Original text")).toBeTruthy();
+});
+
+it("reconciles a lost response from fetched pages without leaving the original text ready to send twice", async () => {
+  let committed: ReturnType<typeof message> | undefined;
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    committed = { ...message(nextId, "2", true), ...await request.json() as object };
+    return HttpResponse.error();
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Committed despite response loss");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  await view.findByText("Send not confirmed. Retry the same message.");
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [message(), committed], nextCursor: null })));
+  await act(() => onlineManager.setOnline(false));
+  await act(() => onlineManager.setOnline(true));
+  await view.findByText("Sent");
+  expect(view.getByDisplayValue("")).toBeTruthy();
+  expect(view.queryByRole("button", { name: /Retry message:/ })).toBeNull();
+  expect(view.getAllByText("Committed despite response loss")).toHaveLength(1);
+});
+
+it("requires a current request refresh after a send refusal before allowing another intent", async () => {
+  server.use(http.post("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ code: "FORBIDDEN" }, { status: 403 })));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Private request");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  await view.findByText("This request is unavailable for this session. Go back to your requests.");
+  expect(view.getByRole("button", { name: "Send as new message" }).props.accessibilityState.disabled).toBe(true);
+  await fireEvent.press(view.getByRole("button", { name: "Refresh request" }));
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Send as new message" }).props.accessibilityState.disabled).toBe(false));
+});
+
+it("retries only the original intent while later edits survive its delayed result", async () => {
+  const response = deferred<Response>();
+  const sends: { clientMessageId: string; text: string }[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    sends.push(await request.json() as { clientMessageId: string; text: string });
+    return sends.length === 1 ? HttpResponse.error() : response.promise;
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "  Original\n ");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  await view.findByText("Send not confirmed. Retry the same message.");
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Newer before retry");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: /Retry message:/ })); });
+  await vi.waitFor(() => expect(sends).toHaveLength(2));
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Newer during retry");
+  await act(() => response.resolve(HttpResponse.json({ ...message(nextId, "2", true), ...sends[0] })));
+  expect(await view.findByText("Sent")).toBeTruthy();
+  expect(sends).toEqual([sends[0], sends[0]]);
+  expect(sends[1]?.text).toBe("  Original\n ");
+  expect(view.getByDisplayValue("Newer during retry")).toBeTruthy();
+});
+
+it.each(["different text", "foreign author", "staff field"])("rejects a send response with %s instead of inventing Sent", async (fault) => {
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as { clientMessageId: string; text: string };
+    const result = { ...message(nextId, "2", true), ...body };
+    return HttpResponse.json(fault === "different text" ? { ...result, text: "Changed by transport" }
+      : fault === "foreign author" ? { ...result, author: { ...operator, kind: "operator" } }
+        : { ...result, privateNote: "Never show staff material" });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Only my exact reply");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  expect(await view.findByText("Send not confirmed. Retry the same message.")).toBeTruthy();
+  expect(view.queryByText("Sent")).toBeNull();
+  expect(view.queryByText("Never show staff material")).toBeNull();
+  expect(view.queryByText("Changed by transport")).toBeNull();
+  expect(view.getByDisplayValue("Only my exact reply")).toBeTruthy();
 });

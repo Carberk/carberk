@@ -86,7 +86,7 @@ export function useRequestConversation(viewer: HistoryViewer, request: VehicleHi
       }
     })();
   }, [active, metadataCurrent, connected, pages.isFetching, pages.error, receiptAccessDenied, tail, visible, receiptError, retry, stream]);
-  return { messages, pages, receipts, receiptError, connected, setVisibleIds,
+  return { messages, pages, receipts, receiptError, connected, active, setVisibleIds,
     refresh: () => reconcile.current(),
     retryReceipt: () => { setReceiptError(null); setRetry((value) => value + 1); },
   };
