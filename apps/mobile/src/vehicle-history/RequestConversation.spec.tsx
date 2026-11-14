@@ -777,3 +777,33 @@ it.each(["different text", "foreign author", "staff field"])("rejects a send res
   expect(view.queryByText("Changed by transport")).toBeNull();
   expect(view.getByDisplayValue("Only my exact reply")).toBeTruthy();
 });
+
+it.each(["blur", "background"])("requires explicit same-intent retry after %s and return before token refresh completes", async (hidden) => {
+  const refresh = deferred<Response>();
+  const refreshing = deferred<undefined>();
+  const sends: { clientMessageId: string; text: string }[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as { clientMessageId: string; text: string };
+    sends.push(body);
+    return sends.length === 1 ? HttpResponse.json({ code: "UNAUTHENTICATED" }, { status: 401 })
+      : HttpResponse.json({ ...message(nextId, "2", true), ...body });
+  }), http.post("*/auth/refresh", () => { refreshing.resolve(undefined); return refresh.promise; }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "  Original\n ");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Send message" })); });
+  await refreshing.promise;
+  if (hidden === "blur") { screenFocus.focused = false; await view.rerender(<RequestScreen />); }
+  else await act(() => focusManager.setFocused(false));
+  if (hidden === "blur") { screenFocus.focused = true; await view.rerender(<RequestScreen />); }
+  else await act(() => focusManager.setFocused(true));
+  await act(() => refresh.resolve(HttpResponse.json({ accessToken: session().accessToken, refreshToken: "rotated" })));
+  expect(await view.findByText("Send not confirmed. Retry the same message.")).toBeTruthy();
+  expect(sends).toEqual([{ clientMessageId: expect.any(String), text: "  Original\n " }]);
+  await fireEvent.changeText(view.getByLabelText("Your message"), "A newer draft");
+  const retry = await view.findByRole("button", { name: /Retry message:/ });
+  await vi.waitFor(() => expect(retry.props.accessibilityState.disabled).toBe(false));
+  await fireEvent.press(retry);
+  expect(await view.findByText("Sent")).toBeTruthy();
+  expect(sends).toEqual([sends[0], sends[0]]);
+  expect(view.getByDisplayValue("A newer draft")).toBeTruthy();
+});

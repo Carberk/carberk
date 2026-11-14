@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { focusManager, useQueryClient } from "@tanstack/react-query";
 import { VehicleHistorySchemas } from "@auto-tm/contracts";
 
 import { queryKeys } from "../api/queryKeys";
@@ -20,7 +20,7 @@ type Outgoing = Intent & { state: "pending" | "uncertain" | "failed" | "sent";
   message?: VehicleHistorySchemas.HistoryMessage; error?: unknown; draftRevision?: number };
 
 /** Mounted exact-text intents; durable account drafts belong to the aggregate. */
-export function useHistoryReply(viewer: HistoryViewer, request: VehicleHistorySchemas.HistoryRequest, ready: boolean, messages: VehicleHistorySchemas.HistoryMessage[], reconcile: () => Promise<unknown>) {
+export function useHistoryReply(viewer: HistoryViewer, request: VehicleHistorySchemas.HistoryRequest, ready: boolean, active: boolean, messages: VehicleHistorySchemas.HistoryMessage[], reconcile: () => Promise<unknown>) {
   const client = useQueryClient();
   const { userId, sessionId } = viewer;
   const requestId = request.id;
@@ -34,6 +34,12 @@ export function useHistoryReply(viewer: HistoryViewer, request: VehicleHistorySc
   const alive = useRef(true);
   const readiness = useRef(ready);
   readiness.current = ready;
+  const visibility = useRef({ active, generation: 0 });
+  if (visibility.current.active && !active) visibility.current.generation++;
+  visibility.current.active = active;
+  useEffect(() => focusManager.subscribe(() => {
+    if (!focusManager.isFocused()) visibility.current.generation++;
+  }), []);
   const controller = useMemo(() => new AbortController(), []);
   const stream = useMemo(() => historyTranscript({ userId, sessionId }, requestId, controller.signal), [userId, sessionId, requestId, controller]);
   useEffect(() => () => { alive.current = false; controller.abort(); }, [controller]);
@@ -59,13 +65,15 @@ export function useHistoryReply(viewer: HistoryViewer, request: VehicleHistorySc
   }, [messages, outgoing, userId]);
   async function submit(intent: Intent, draftRevision?: number) {
     if (busy.current || !current()) return;
+    const generation = visibility.current.generation;
+    const ownsSend = () => generation === visibility.current.generation && current();
     busy.current = true;
     setPending(true);
     const replace = (value: Outgoing) => setOutgoing((items) => [...items.filter((item) => item.clientMessageId !== intent.clientMessageId), value]);
     replace({ ...intent, draftRevision, state: "pending" });
     try {
-      const message = await stream.send(intent, current);
-      if (!alive.current || !historySessionCurrent(viewer)) return;
+      const message = await stream.send(intent, ownsSend);
+      if (!ownsSend()) throw new ApiError("HISTORY_READER_CHANGED", 409);
       replace({ ...intent, state: "sent", message });
       if (draftRevision !== undefined && revision.current === draftRevision) edit("");
       void reconcile();

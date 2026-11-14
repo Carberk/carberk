@@ -32,7 +32,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const denied = [pages.error, receipts.error, thread.receiptError].some((error) =>
     error instanceof ApiError && [401, 403, 404].includes(error.status));
   const ready = metadataCurrent && thread.connected && thread.active && !denied && !pages.isPending && !pages.error;
-  const reply = useHistoryReply(viewer, request, ready, thread.messages, thread.refresh);
+  const reply = useHistoryReply(viewer, request, ready, thread.active, thread.messages, thread.refresh);
   const outgoing = reply.outgoing.filter((intent) => !thread.messages.some((message) =>
     message.author.kind === "requester" && message.author.id === viewer.userId
     && message.clientMessageId === intent.clientMessageId && message.text === intent.text))
