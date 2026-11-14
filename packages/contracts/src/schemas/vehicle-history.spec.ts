@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import { ClaimHistoryRequestSchema, HistoryQueueQuerySchema, HistoryRequestSchema,
   HistoryQueueResponseSchema, OperatorHistoryRequestSchema, HistoryInboxActionSchema,
   SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
-  ReadOperatorHistoryMessagesSchema, HistoryMessageSchema } from "./vehicle-history";
+  ReadOperatorHistoryMessagesSchema, HistoryMessageSchema,
+  ReadHistoryReminderSchema, ReadOperatorHistoryReminderSchema, StopHistoryRemindersSchema, HistoryReminderSchema } from "./vehicle-history";
 
 describe("History assignment HTTP contracts", () => {
   it("keeps public operator context separate from customer contracts and rejects private fields", () => {
@@ -40,6 +41,39 @@ describe("History assignment HTTP contracts", () => {
     for (const query of [{ filter: "paid" }, { search: "a".repeat(65) }, { requesterId: "forged" }, { cursor: "bad" }]) {
       expect(HistoryQueueQuerySchema.safeParse(query).success).toBe(false);
     }
+  });
+});
+
+describe("History reminder HTTP contracts", () => {
+  it("accepts only bounded versions and refuses caller clocks, identity, outcome and policy facts", () => {
+    expect(ReadHistoryReminderSchema.parse({})).toEqual({});
+    expect(ReadOperatorHistoryReminderSchema.parse({ expectedAssignmentVersion: "2147483647" })).toEqual({ expectedAssignmentVersion: 2147483647 });
+    expect(StopHistoryRemindersSchema.parse({ expectedWaitingVersion: 0 })).toEqual({ expectedWaitingVersion: 0 });
+    for (const version of [-1, 0.5, 2147483648, "0", null, Infinity]) {
+      expect(StopHistoryRemindersSchema.safeParse({ expectedWaitingVersion: version }).success).toBe(false);
+    }
+    for (const expectedAssignmentVersion of [undefined, "", "01", "-1", "1.5", "2147483648", 1, ["1", "1"]]) {
+      expect(ReadOperatorHistoryReminderSchema.safeParse({ expectedAssignmentVersion }).success).toBe(false);
+    }
+    for (const extra of [{ now: "2030-01-01" }, { actorId: "private" }, { grant: "vehicle-history" }, { sourceVersion: 1 },
+      { outcome: "forged" }, { text: "forged" }, { stopped: false }, { publicMessageOrder: "1" }]) {
+      expect(ReadHistoryReminderSchema.safeParse(extra).success).toBe(false);
+      expect(ReadOperatorHistoryReminderSchema.safeParse({ expectedAssignmentVersion: "1", ...extra }).success).toBe(false);
+      expect(StopHistoryRemindersSchema.safeParse({ expectedWaitingVersion: 0, ...extra }).success).toBe(false);
+    }
+  });
+  it("allows only safe reminder state and the original public message", () => {
+    const id = "10000000-0000-4000-8000-000000001250";
+    const outcome = { id, clientMessageId: id, kind: "TEXT", text: "  Original\n  ", order: "57", createdAt: "2026-11-14T00:00:00.000Z",
+      author: { id, displayName: "Ayna", nameNumber: 1250, kind: "operator" } };
+    const state = { reason: null, since: null, version: 58, eligibleAt: null, eligible: false, ineligibleReason: "used",
+      declined: false, stopped: false, used: true, outcome };
+    expect(HistoryReminderSchema.parse(state)).toEqual(state);
+    for (const extra of [{ sourceId: "private" }, { publicMessageId: id }, { requesterId: id }, { notes: [] }, { contacts: [] }]) {
+      expect(HistoryReminderSchema.safeParse({ ...state, ...extra }).success).toBe(false);
+      expect(HistoryReminderSchema.safeParse({ ...state, outcome: { ...outcome, ...extra } }).success).toBe(false);
+    }
+    expect(HistoryReminderSchema.safeParse({ ...state, outcome: { ...outcome, author: { ...outcome.author, email: "private" } } }).success).toBe(false);
   });
 });
 

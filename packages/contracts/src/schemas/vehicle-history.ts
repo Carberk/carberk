@@ -80,6 +80,21 @@ export const ReadOperatorHistoryReceiptsSchema = ReadOperatorHistoryMessagesSche
 export const HistoryReceiptSchema = ServiceReceiptSchema;
 export const HistoryReceiptsSchema = ServiceReceiptsSchema;
 
+export const ReadHistoryReminderSchema = HistoryMessageSendQuerySchema;
+export const ReadOperatorHistoryReminderSchema = ReadOperatorHistoryReceiptsSchema;
+export const StopHistoryRemindersSchema = z.object({ expectedWaitingVersion: AssignmentVersionSchema }).strict();
+export const HistoryReminderSchema = z.object({
+  reason: z.enum(["customer_answer", "quote_choice"]).nullable(),
+  since: DateTimeSchema.nullable(),
+  version: AssignmentVersionSchema,
+  eligibleAt: DateTimeSchema.nullable(),
+  eligible: z.boolean(),
+  ineligibleReason: z.enum(["declined", "stopped", "used", "not_waiting", "too_early"]).nullable(),
+  declined: z.boolean(), stopped: z.boolean(), used: z.boolean(),
+  outcome: HistoryMessageSchema.nullable(),
+}).strict();
+export type HistoryReminder = z.infer<typeof HistoryReminderSchema>;
+
 // Admin-only commands. Scope is an opaque correlation fence, never authority.
 const InboxScopeSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const InboxSelectionSchema = z.object({ id: z.string().guid(), scope: InboxScopeSchema,

@@ -15,7 +15,7 @@ describe("History message identity commit fence over listening HTTP", () => {
       return row && row.count >= count ? true : null;
     }, { timeoutMs: 2500, intervalMs: 20, description: "HTTP operations waiting on owned identity rows" });
   }
-  it.each(["send", "received", "read"].flatMap((operation) => ["grant", "session", "totp", "lifecycle"].map((state) => [operation, state])))
+  it.each(["send", "received", "read", "reminder"].flatMap((operation) => ["grant", "session", "totp", "lifecycle"].map((state) => [operation, state])))
     ("commits a fenced %s before a later %s writer without deadlocking foreign keys", async (operation, state) => {
     const customer = await f.actor(null), operator = await f.actor(), founder = await f.actor("vehicle_history_staff_management");
     const id = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })
@@ -30,9 +30,10 @@ describe("History message identity commit fence over listening HTTP", () => {
     let pending: Promise<unknown> | undefined, revoke: Promise<unknown> | undefined;
     await f.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM service_conversations WHERE "objectId" = ${id} FOR UPDATE`;
-      pending = f.request.post(staffPath + (operation === "send" ? "/messages" : "/receipts")).auth(operator.token, { type: "bearer" })
-        .send(operation === "send" ? { clientMessageId: randomUUID(), text: "authorized before revoke", expectedAssignmentVersion: 1 }
-          : { cursor: original.id, kind: operation, expectedAssignmentVersion: 1 }).expect(201).then((response) => response.body);
+      pending = (operation === "reminder" ? f.request.get(staffPath + "/reminder?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" })
+        : f.request.post(staffPath + (operation === "send" ? "/messages" : "/receipts")).auth(operator.token, { type: "bearer" })
+          .send(operation === "send" ? { clientMessageId: randomUUID(), text: "authorized before revoke", expectedAssignmentVersion: 1 }
+            : { cursor: original.id, kind: operation, expectedAssignmentVersion: 1 })).expect(operation === "reminder" ? 200 : 201).then((response) => response.body);
       await waiting(1); // The send owns both fences and waits inside messaging.
       revoke = state === "grant" ? f.request.post("/api/v1/identity/history-staff").auth(founder.token, { type: "bearer" })
         .send({ targetId: operator.user.id, capability: "vehicle-history", active: false, reason: "End synthetic messaging duty" })
@@ -51,7 +52,7 @@ describe("History message identity commit fence over listening HTTP", () => {
     expect(facts.items).toEqual([{ participantId: operator.user.id, assignmentVersion: 1, receivedOrder: "1", readOrder: operation === "read" ? "1" : "0" }]);
     await f.request.get(staffPath + "/messages?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" }).expect(403);
   });
-  it.each(["send", "received", "read", "receipts"].flatMap((operation) => ["grant", "session", "lifecycle"].map((state) => [operation, state])))
+  it.each(["send", "received", "read", "receipts", "reminder"].flatMap((operation) => ["grant", "session", "lifecycle"].map((state) => [operation, state])))
     ("refuses %s whose identity wait is followed by committed %s revocation", async (operation, state) => {
     const customer = await f.actor(null), operator = await f.actor(), founder = await f.actor("vehicle_history_staff_management");
     const id = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })
@@ -75,8 +76,8 @@ describe("History message identity commit fence over listening HTTP", () => {
           .expect(201).then((response) => { expect(response.body.target.capabilities["vehicle-history"]).toBe(false); });
         await waiting(1); // The real grant writer queues before the send.
       }
-      pending = (operation === "send" ? send("UNAUTHORIZED AFTER REVOCATION", randomUUID()) : operation === "receipts"
-        ? f.request.get(staffPath + "/receipts?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" })
+      pending = (operation === "send" ? send("UNAUTHORIZED AFTER REVOCATION", randomUUID()) : operation === "receipts" || operation === "reminder"
+        ? f.request.get(staffPath + `/${operation}?expectedAssignmentVersion=1`).auth(operator.token, { type: "bearer" })
         : acknowledge(operation!)).expect(403).then((response) => {
         expect(response.headers["cache-control"]).toBe("private, no-store");
       });
@@ -94,5 +95,91 @@ describe("History message identity commit fence over listening HTTP", () => {
     expect(transcript.body).toEqual({ items: [original], nextCursor: null });
     const facts = (await f.request.get(`/api/v1/vehicle-history/requests/${id}/receipts`).auth(customer.token, { type: "bearer" }).expect(200)).body;
     expect(facts.items).toEqual(operation === "read" ? [{ participantId: operator.user.id, assignmentVersion: 1, receivedOrder: "1", readOrder: "0" }] : []);
+  });
+
+  it.each(["request", "identity"].flatMap((lock) => ["operator-read", "customer-read", "stop"].flatMap((operation) =>
+    (operation === "operator-read" ? ["session", "grant", "totp", "lifecycle", ...(lock === "request" ? ["assignment", "version"] : [])]
+      : ["session", "lifecycle", ...(lock === "request" ? ["ownership"] : [])]).map((lost) => [lock, operation, lost]))))
+    ("refuses reminder %s-waited %s after committed %s loss", async (lock, operation, lost) => {
+    const customer = await f.actor(null), operator = await f.actor(), other = await f.actor(null);
+    const id = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })
+      .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
+    const customerPath = `/api/v1/vehicle-history/requests/${id}`, staffPath = `/api/v1/vehicle-history/operator/requests/${id}`;
+    await f.request.post(staffPath + "/claim").auth(operator.token, { type: "bearer" }).send({ expectedAssignmentVersion: 0 }).expect(201);
+    const actor = operation === "operator-read" ? operator : customer;
+    let pending: Promise<unknown> | undefined;
+    await f.prisma.$transaction(async (tx) => {
+      if (lock === "request") await tx.$queryRaw`SELECT id FROM vehicle_history_requests WHERE id = ${id} FOR UPDATE`;
+      else await tx.$queryRaw`SELECT id FROM users WHERE id = ${actor.user.id} FOR UPDATE`;
+      pending = (operation === "stop" ? f.request.post(customerPath + "/reminder/stop").send({ expectedWaitingVersion: 0 })
+        : f.request.get(operation === "operator-read" ? staffPath + "/reminder?expectedAssignmentVersion=1" : customerPath + "/reminder"))
+        .auth(actor.token, { type: "bearer" }).expect(lost === "version" ? 409 : 403)
+        .expect("Cache-Control", "private, no-store").then((response) => response.body);
+      await waiting(1); // The actual HTTP operation is blocked before the authority change commits.
+      if (lost === "session") await tx.session.delete({ where: { id: actor.session.id } });
+      if (lost === "grant") await tx.staffGrant.update({ where: { userId_purpose: { userId: actor.user.id, purpose: "vehicle_history" } }, data: { revokedAt: new Date() } });
+      if (lost === "totp") await tx.session.update({ where: { id: actor.session.id }, data: { adminTotpExpiresAt: null } });
+      if (lost === "lifecycle") await tx.user.update({ where: { id: actor.user.id }, data: { suspendedAt: new Date() } });
+      if (lost === "assignment" || lost === "version") await tx.vehicleHistoryRequest.update({ where: { id },
+        data: { assignedOperatorId: lost === "assignment" ? other.user.id : operator.user.id, assignmentVersion: 2 } });
+      if (lost === "ownership") await tx.vehicleHistoryRequest.update({ where: { id }, data: { requesterId: other.user.id } });
+    }, { timeout: 10_000 });
+    await pending;
+    const observer = operation === "operator-read" ? customer : operator;
+    const observerPath = operation === "operator-read" ? customerPath + "/reminder" : staffPath + "/reminder?expectedAssignmentVersion=1";
+    expect((await f.request.get(observerPath).auth(observer.token, { type: "bearer" }).expect(200)).body)
+      .toMatchObject({ version: 0, stopped: false, used: false, outcome: null });
+  });
+
+  it.each(["session", "lifecycle"])("commits customer Stop before a later %s writer, then refuses retry", async (lost) => {
+    const customer = await f.actor(null), operator = await f.actor();
+    const id = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })
+      .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
+    const path = `/api/v1/vehicle-history/requests/${id}`;
+    const staffPath = `/api/v1/vehicle-history/operator/requests/${id}`;
+    await f.request.post(staffPath + "/claim").auth(operator.token, { type: "bearer" }).send({ expectedAssignmentVersion: 0 }).expect(201);
+    await f.request.get(path + "/reminder").auth(customer.token, { type: "bearer" }).expect(200); // Establish the BM stream.
+    let pending: Promise<unknown> | undefined, revoke: Promise<unknown> | undefined;
+    await f.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM service_conversations WHERE "objectId" = ${id} FOR UPDATE`;
+      pending = f.request.post(path + "/reminder/stop").auth(customer.token, { type: "bearer" })
+        .send({ expectedWaitingVersion: 0 }).expect(201).then((response) => {
+          expect(response.body).toMatchObject({ version: 1, stopped: true, ineligibleReason: "stopped" });
+        });
+      await waiting(1);
+      revoke = lost === "session" ? f.prisma.session.delete({ where: { id: customer.session.id } }).then((row) => row)
+        : f.prisma.user.update({ where: { id: customer.user.id }, data: { suspendedAt: new Date() } }).then((row) => row);
+      await waiting(2); // The later Identity writer waits until Stop's request transaction commits.
+    }, { timeout: 10_000 });
+    await pending; await revoke;
+    expect((await f.request.get(staffPath + "/reminder?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" }).expect(200)).body)
+      .toMatchObject({ version: 1, stopped: true, used: false, outcome: null });
+    await f.request.post(path + "/reminder/stop").auth(customer.token, { type: "bearer" }).send({ expectedWaitingVersion: 0 }).expect(403);
+  });
+
+  it.each([["operator-read", "session"], ["operator-read", "totp"], ["stop", "session"]])
+    ("refuses %s when its real %s deadline passes during the messaging lock wait", async (operation, deadline) => {
+    const customer = await f.actor(null), operator = await f.actor();
+    const id = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })
+      .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
+    const path = `/api/v1/vehicle-history/requests/${id}`, staffPath = `/api/v1/vehicle-history/operator/requests/${id}`;
+    await f.request.post(staffPath + "/claim").auth(operator.token, { type: "bearer" }).send({ expectedAssignmentVersion: 0 }).expect(201);
+    await f.request.get(path + "/reminder").auth(customer.token, { type: "bearer" }).expect(200);
+    const actor = operation === "stop" ? customer : operator, expiresAt = new Date(Date.now() + 1500);
+    await f.prisma.session.update({ where: { id: actor.session.id }, data: deadline === "totp" ? { adminTotpExpiresAt: expiresAt } : { expiresAt } });
+    let pending: Promise<unknown> | undefined;
+    await f.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM service_conversations WHERE "objectId" = ${id} FOR UPDATE`;
+      pending = (operation === "stop" ? f.request.post(path + "/reminder/stop").send({ expectedWaitingVersion: 0 })
+        : f.request.get(staffPath + "/reminder?expectedAssignmentVersion=1"))
+        .auth(actor.token, { type: "bearer" }).then((response) => response);
+      await waiting(1);
+      await eventually(async () => Date.now() >= expiresAt.getTime() ? true : null,
+        { timeoutMs: 2500, intervalMs: 20, description: "owned fixture Session expires on real time, without changing Identity's clock" });
+    }, { timeout: 10_000 });
+    expect(await pending).toMatchObject({ status: 403, headers: { "cache-control": "private, no-store" } });
+    const observer = operation === "stop" ? operator : customer;
+    expect((await f.request.get(operation === "stop" ? staffPath + "/reminder?expectedAssignmentVersion=1" : path + "/reminder")
+      .auth(observer.token, { type: "bearer" }).expect(200)).body).toMatchObject({ stopped: false, version: 0 });
   });
 });
