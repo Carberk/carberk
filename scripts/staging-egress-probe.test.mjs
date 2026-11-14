@@ -189,3 +189,38 @@ test('an empty reverse listener map fails closed instead of taking the direct ro
   assert.notEqual(await new Promise(r => child.on('close', r)), 0, output);
   assert.ok(!output.includes('"kind": "download"'), output);
 });
+
+test('reverse preflight fails when its required configuration is missing', async () => {
+  const env = { ...process.env };
+  for (const key of ['GATEWAY_HOST', 'TUNNEL_AUTH', 'TUNNEL_FINGERPRINT']) delete env[key];
+  const child = spawn(process.execPath, ['infra/egress/reverse-probe.mjs'], { env });
+  let output = ''; child.stdout.on('data', b => output += b); child.stderr.on('data', b => output += b);
+  assert.notEqual(await new Promise(r => child.on('close', r)), 0, output);
+  assert.deepEqual(JSON.parse(output.trim()), { kind: 'configuration', ready: false });
+});
+
+for (const ending of ['exit-zero', 'exit-failure', 'signal']) {
+  test(`a tunnel child that ends early (${ending}) cannot pass its observation`, async () => {
+    const { observeTunnel } = await import('../infra/egress/reverse-probe.mjs');
+    const end = ending === 'signal' ? "process.kill(process.pid, 'SIGTERM')" : `process.exit(${ending === 'exit-zero' ? 0 : 1})`;
+    const child = spawn(process.execPath, ['-e', `process.stdout.write('Connected\\n'); setTimeout(() => { ${end}; }, 80)`], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const result = await observeTunnel(child, 2000);
+    assert.equal(result.connectedDuringObservation, true);
+    assert.equal(result.ok, false);
+    assert.equal(result.stillRunning, false);
+    assert.equal(result.completedObservation, false);
+    assert.ok(result.observationSeconds < 1, JSON.stringify(result));
+    assert.equal(result.requestedObservationSeconds, 2);
+  });
+}
+
+test('a connected tunnel must survive the observation and its owned child is then stopped', async () => {
+  const { observeTunnel } = await import('../infra/egress/reverse-probe.mjs');
+  const child = spawn(process.execPath, ['-e', "process.stdout.write('Connected\\n'); setInterval(() => {}, 1000)"], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const result = await observeTunnel(child, 2000);
+  assert.equal(result.ok, true);
+  assert.equal(result.completedObservation, true);
+  assert.equal(result.stillRunning, true);
+  assert.ok(result.observationSeconds > 1.9);
+  assert.ok(child.exitCode !== null || child.signalCode !== null);
+});

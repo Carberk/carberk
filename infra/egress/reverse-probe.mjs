@@ -6,12 +6,47 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const emit = row => console.log(JSON.stringify(row));
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 const artifact = 'https://github.com/jpillora/chisel/releases/download/v1.12.0/chisel_1.12.0_linux_amd64.gz';
 const checksum = 'f3f180f1d93aa72cce4e6386f98cc06569a0146fbd65eb4423cf83e6434bcfe6';
 const origins = ['api-staging-2861.up.railway.app', 'minio-staging-5795.up.railway.app', 't3.storageapi.dev'];
+
+// Own the subprocess from observation through bounded termination. Never treat an early exit as survival.
+export async function observeTunnel(child, durationMs) {
+  const started = performance.now();
+  let log = '';
+  let connected = false;
+  let ended = false;
+  const capture = b => {
+    log = (log + b.toString()).slice(-8192);
+    connected ||= /Connected/.test(log);
+  };
+  child.stdout.on('data', capture); child.stderr.on('data', capture);
+  const exited = new Promise(resolve => {
+    const finish = () => { ended = true; resolve('exited'); };
+    child.once('exit', finish); child.once('error', finish);
+  });
+  let timer;
+  try {
+    const outcome = await Promise.race([exited, new Promise(resolve => { timer = setTimeout(() => resolve('elapsed'), durationMs); })]);
+    const stillRunning = !ended && child.exitCode === null && child.signalCode === null;
+    const completed = outcome === 'elapsed' && stillRunning;
+    return { kind: 'authenticated-tunnel', ok: connected && completed,
+      connectedDuringObservation: connected, completedObservation: completed, stillRunning,
+      observationSeconds: (performance.now() - started) / 1000,
+      requestedObservationSeconds: durationMs / 1000, adoptionProven: false };
+  } finally {
+    clearTimeout(timer);
+    if (!ended) child.kill('SIGTERM');
+    let killTimer;
+    await Promise.race([exited, new Promise(resolve => { killTimer = setTimeout(() => { child.kill('SIGKILL'); resolve(); }, 1000); })]);
+    clearTimeout(killTimer);
+    await exited;
+  }
+}
 
 async function health(host, port, agent, sample) {
   const start = performance.now();
@@ -40,7 +75,7 @@ async function health(host, port, agent, sample) {
 
 async function main() {
   const { GATEWAY_HOST: host, TUNNEL_AUTH: auth, TUNNEL_FINGERPRINT: fingerprint, EXPIRES_AT: expires } = process.env;
-  if (!host || !auth || !fingerprint) { emit({ kind: 'configuration', ready: false }); return; }
+  if (!host || !auth || !fingerprint) { emit({ kind: 'configuration', ready: false }); process.exitCode = 1; return; }
   const basePort = Number(process.env.TUNNEL_BASE_PORT || 11901);
   if (![11901, 11911].includes(basePort)) throw Error('invalid fixed listener slot');
   const remotes = origins.map((origin, i) => `R:127.0.0.1:${basePort + i}:${origin}:443`);
@@ -77,28 +112,9 @@ async function main() {
     child = spawn(binary, ['client', '--fingerprint', fingerprint, '--keepalive', '10s',
       '--max-retry-interval', '5s', `https://${host}:24443`, ...remotes],
       { env: { ...process.env, AUTH: auth, HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '', NO_PROXY: '*', http_proxy: '', https_proxy: '', all_proxy: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
-    let log = '';
-    let connected = false;
-    const capture = b => {
-      log = (log + b.toString()).slice(-8192);
-      connected ||= /Connected/.test(log);
-    };
-    child.stdout.on('data', capture); child.stderr.on('data', capture);
-    const exited = new Promise(resolve => {
-      child.once('exit', () => resolve());
-      child.once('error', () => resolve());
-    });
-    let timer;
-    await Promise.race([exited, new Promise(resolve => { timer = setTimeout(resolve, observe * 1000); })]);
-    clearTimeout(timer);
-    emit({ kind: 'authenticated-tunnel', connectedDuringObservation: connected, stillRunning: child.exitCode === null,
-      observationSeconds: observe, adoptionProven: false });
-    if (!connected) process.exitCode = 1;
-    child.kill('SIGTERM');
-    let killTimer;
-    await Promise.race([exited, new Promise(resolve => { killTimer = setTimeout(() => { child.kill('SIGKILL'); resolve(); }, 1000); })]);
-    clearTimeout(killTimer);
-    await exited;
+    const result = await observeTunnel(child, observe * 1000);
+    emit(result);
+    if (!result.ok) process.exitCode = 1;
     emit({ kind: 'cleanup', childStopped: true, rssBytes: process.memoryUsage().rss });
   } finally {
     child?.kill('SIGKILL');
@@ -107,4 +123,6 @@ async function main() {
     clearTimeout(deadline);
   }
 }
-main().catch(() => { emit({ kind: 'error', ok: false, message: 'Bounded preflight failed; raw details suppressed' }); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(() => { emit({ kind: 'error', ok: false, message: 'Bounded preflight failed; raw details suppressed' }); process.exitCode = 1; });
+}
