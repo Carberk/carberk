@@ -1,6 +1,6 @@
 import { z, DateTimeSchema } from "../zod";
 
-import { ServiceMessageSchema, ServiceTextSchema } from "./service-messages";
+import { ServiceMessageSchema, ServiceTextSchema, ServiceReceiptSchema, ServiceReceiptsSchema } from "./service-messages";
 
 export const HistoryOperatorSchema = z.object({ id: z.string().guid(), displayName: z.string().nullable(), nameNumber: z.number().int() });
 export const HistoryDeskSchema = z.object({
@@ -65,3 +65,10 @@ export type HistoryMessage = z.infer<typeof HistoryMessageSchema>;
 export const HistoryMessagesPageSchema = z.object({
   items: z.array(HistoryMessageSchema).max(50), nextCursor: MessageKeySchema.nullable(),
 }).strict();
+
+export const AcknowledgeHistoryMessagesSchema = z.object({ cursor: MessageKeySchema, kind: z.enum(["received", "read"]) }).strict();
+export const AcknowledgeOperatorHistoryMessagesSchema = AcknowledgeHistoryMessagesSchema.extend({ expectedAssignmentVersion: AssignmentVersionSchema }).strict();
+export const ReadHistoryReceiptsSchema = HistoryMessageSendQuerySchema;
+export const ReadOperatorHistoryReceiptsSchema = ReadOperatorHistoryMessagesSchema.pick({ expectedAssignmentVersion: true });
+export const HistoryReceiptSchema = ServiceReceiptSchema;
+export const HistoryReceiptsSchema = ServiceReceiptsSchema;

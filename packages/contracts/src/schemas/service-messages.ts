@@ -40,3 +40,22 @@ export const ServiceMessagePageSchema = z.object({
   nextCursor: KeySchema.nullable(),
 }).strict();
 export type ServiceMessagePage = z.infer<typeof ServiceMessagePageSchema>;
+
+// 0 identifies the requester; positive versions identify the actual staff epoch.
+export const ServiceParticipantSchema = z.object({
+  participantId: KeySchema, sessionId: KeySchema,
+  assignmentVersion: z.number().int().min(0).max(2147483647),
+}).strict();
+export type ServiceParticipant = z.infer<typeof ServiceParticipantSchema>;
+export const ReadParticipantMessagesSchema = ReadServiceMessagesSchema.extend({ participant: ServiceParticipantSchema }).strict();
+export type ReadParticipantMessages = z.input<typeof ReadParticipantMessagesSchema>;
+export const AcknowledgeServiceMessagesSchema = ServiceStreamSchema.extend({
+  participant: ServiceParticipantSchema, cursor: KeySchema, kind: z.enum(["received", "read"]),
+}).strict();
+export type AcknowledgeServiceMessages = z.infer<typeof AcknowledgeServiceMessagesSchema>;
+const PositionSchema = z.string().regex(/^(0|[1-9][0-9]{0,18})$/);
+export const ServiceReceiptSchema = ServiceParticipantSchema.omit({ sessionId: true }).extend({
+  receivedOrder: PositionSchema, readOrder: PositionSchema,
+}).strict().refine((value) => BigInt(value.readOrder) <= BigInt(value.receivedOrder));
+export type ServiceReceipt = z.infer<typeof ServiceReceiptSchema>;
+export const ServiceReceiptsSchema = z.object({ items: z.array(ServiceReceiptSchema) }).strict();

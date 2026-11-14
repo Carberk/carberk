@@ -37,6 +37,8 @@ import {
   HistoryDeskSchema, CreateHistoryRequestSchema, HistoryRequestSchema,
   ListHistoryRequestsQuerySchema, ListHistoryRequestsResponseSchema,
   HistoryQueueQuerySchema, HistoryQueueResponseSchema, ClaimHistoryRequestSchema,
+  AcknowledgeHistoryMessagesSchema, AcknowledgeOperatorHistoryMessagesSchema, ReadHistoryReceiptsSchema,
+  ReadOperatorHistoryReceiptsSchema, HistoryReceiptSchema, HistoryReceiptsSchema,
   SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
   ReadOperatorHistoryMessagesSchema, HistoryMessageSchema, HistoryMessagesPageSchema, HistoryMessageSendQuerySchema,
 } from "./schemas/vehicle-history";
@@ -412,6 +414,20 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
         503: { description: "Temporarily unavailable; retry the same send intent" } },
     });
   }
+  for (const operator of [false, true]) for (const method of ["get", "post"] as const) registry.registerPath({
+    method, path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/receipts`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: "Explicit participant/assignment receipt facts; GET never acknowledges. Read requires prior Received",
+    request: { params: z.object({ id: z.string().guid() }), ...(method === "get"
+      ? { query: operator ? ReadOperatorHistoryReceiptsSchema : ReadHistoryReceiptsSchema }
+      : { query: ReadHistoryReceiptsSchema, body: { content: { "application/json": {
+        schema: operator ? AcknowledgeOperatorHistoryMessagesSchema : AcknowledgeHistoryMessagesSchema } } } }) },
+    responses: { [method === "get" ? 200 : 201]: { description: "Private, no-store progress by actual participant and assignment version; requester version 0",
+      content: { "application/json": { schema: method === "get" ? HistoryReceiptsSchema : HistoryReceiptSchema } } },
+      400: { description: "Invalid, foreign, unfetched or unreceived cursor; fetch contiguous pages in the current session first" },
+      401: { description: "Sign in again" }, 403: { description: "Current authority or object refused" },
+      409: { description: "Assignment changed" }, 503: { description: "Temporarily unavailable; retry acknowledgement" } },
+  });
   registry.registerPath({
     method: "get", path: "/api/v1/vehicle-history/operator/requests", tags: ["Vehicle History"],
     summary: "Minimal unassigned/mine enquiry metadata, newest first, 50 per page; local synthetic only",

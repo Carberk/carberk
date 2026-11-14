@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ServiceMessagesSchemas } from "@auto-tm/contracts";
-import { ServiceMessageError } from "../../business-messaging/business-messaging.public";
+import { ServiceMessageError, type ServiceParticipant } from "../../business-messaging/business-messaging.public";
 import { MESSAGE_AUTHORITY_FENCE_PORT, type MessageAuthorityFencePort } from "../../identity/identity.public";
 import { CurrentHistoryRequester, type HistoryRequesterClaims } from "./CurrentHistoryRequester";
 import { CurrentHistoryOperator } from "./CurrentHistoryOperator";
@@ -16,7 +16,7 @@ export class HistoryMessageAccess {
     @Inject(HISTORY_ASSIGNMENT_REPOSITORY) private readonly assignments: HistoryAssignmentRepository,
     @Inject(MESSAGE_AUTHORITY_FENCE_PORT) private readonly identityFence: MessageAuthorityFencePort,
   ) {}
-  async run<T>(actor: HistoryMessageActor, id: string, operation: (requesterId: string, senderId: string, objectId: string) => Promise<T>) {
+  async run<T>(actor: HistoryMessageActor, id: string, operation: (requesterId: string, senderId: string, objectId: string, participant: ServiceParticipant) => Promise<T>) {
     const authorize = async () => actor.operator ? (await this.operator.require(actor.claims)).id
       : (await this.requester.require(actor.claims)).requesterId;
     const userId = await authorize();
@@ -34,7 +34,8 @@ export class HistoryMessageAccess {
         if (actor.operator && request.assignmentVersion !== actor.expectedAssignmentVersion) {
           throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
         }
-        return operation(request.requesterId, senderId, request.id);
+        return operation(request.requesterId, senderId, request.id, { participantId: senderId,
+          sessionId: actor.claims.sid ?? "", assignmentVersion: actor.operator ? request.assignmentVersion : 0 });
       }));
     } catch (error) {
       if (error instanceof HistoryRequestError) throw error;

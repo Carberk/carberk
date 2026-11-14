@@ -225,11 +225,14 @@ describe("Current History text over listening HTTP", () => {
       const original = (await send(operator, id, "PRIVATE STORED", key, true).expect(201)).body;
       await refuse(state, operator);
       for (const [index, pending] of [send(operator, id, "PRIVATE STORED", key, true), send(operator, id, "new", randomUUID(), true),
-        page(operator, id, true), page(operator, id, true, `cursor=${original.id}`)].entries()) {
+        page(operator, id, true), page(operator, id, true, `cursor=${original.id}`),
+        f.request.post(path(id, true).replace("/messages", "/receipts")).auth(operator.token, { type: "bearer" })
+          .send({ cursor: original.id, kind: "received", expectedAssignmentVersion: 1 }),
+        f.request.get(path(id, true).replace("/messages", "/receipts") + "?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" })].entries()) {
         const denied = await pending.expect(403);
         expect(denied.headers["cache-control"]).toBe("private, no-store");
         expect(Object.keys(denied.body).sort()).toEqual(["code", "message", "statusCode"]);
-        expect(denied.body.code).toBe(state === "deleting" && index < 2 ? "HISTORY_REQUEST_DENIED" : "HISTORY_OPERATOR_DENIED");
+        expect(denied.body.code).toBe(state === "deleting" && (index < 2 || index === 4) ? "HISTORY_REQUEST_DENIED" : "HISTORY_OPERATOR_DENIED");
         expect(JSON.stringify(denied.body)).not.toContain("PRIVATE STORED");
       }
     });
@@ -238,7 +241,9 @@ describe("Current History text over listening HTTP", () => {
       const { customer, id } = await enquiry(), key = randomUUID();
       const original = (await send(customer, id, "PRIVATE CUSTOMER", key).expect(201)).body;
       await refuse(state, customer);
-      for (const pending of [send(customer, id, "PRIVATE CUSTOMER", key), send(customer, id, "new"), page(customer, id), page(customer, id, false, `cursor=${original.id}`)]) {
+      for (const pending of [send(customer, id, "PRIVATE CUSTOMER", key), send(customer, id, "new"), page(customer, id), page(customer, id, false, `cursor=${original.id}`),
+        f.request.post(path(id, false).replace("/messages", "/receipts")).auth(customer.token, { type: "bearer" }).send({ cursor: original.id, kind: "received" }),
+        f.request.get(path(id, false).replace("/messages", "/receipts")).auth(customer.token, { type: "bearer" })]) {
         const denied = await pending.expect(403);
         expect(denied.headers["cache-control"]).toBe("private, no-store");
         expect(Object.keys(denied.body).sort()).toEqual(["code", "message", "statusCode"]);
@@ -252,7 +257,9 @@ describe("Current History text over listening HTTP", () => {
     const original = (await send(customer, id, "private original", key).expect(201)).body;
     const intruder = state === "assigned-staff" ? operator : await f.actor();
     if (state !== "assigned-staff") await refuse(state, intruder);
-    for (const pending of [send(intruder, id, "private original", key), page(intruder, id), page(intruder, id, false, `cursor=${original.id}`)]) {
+    for (const pending of [send(intruder, id, "private original", key), page(intruder, id), page(intruder, id, false, `cursor=${original.id}`),
+      f.request.post(path(id, false).replace("/messages", "/receipts")).auth(intruder.token, { type: "bearer" }).send({ cursor: original.id, kind: "received" }),
+      f.request.get(path(id, false).replace("/messages", "/receipts")).auth(intruder.token, { type: "bearer" })]) {
       const denied = await pending.expect(403);
       expect(denied.body.code).toBe("HISTORY_REQUEST_DENIED");
       expect(denied.headers["cache-control"]).toBe("private, no-store");
