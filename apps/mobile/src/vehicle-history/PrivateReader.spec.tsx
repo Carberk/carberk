@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
+import { useNavigation } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { onlineManager } from "@tanstack/react-query";
 
@@ -26,6 +27,7 @@ const session = (sid = "session-one", id = userId) => ({
 const enquiry = (id = requestId) => ({ id, sourceListingId: null, createdAt: "2026-11-14T08:00:00.000Z", status: "enquiry", assignedOperator: null });
 let stored: string | null;
 beforeEach(async () => {
+  vi.mocked(useNavigation).mockReturnValue({ getState: () => undefined } as ReturnType<typeof useNavigation>);
   stored = null;
   vi.mocked(SecureStore.getItemAsync).mockImplementation(async () => stored);
   vi.mocked(SecureStore.deleteItemAsync).mockImplementation(async () => { stored = null; });
@@ -128,7 +130,7 @@ it("shows offline and server failures and retries without creating a request", a
   routeParams.id = requestId;
   onlineManager.setOnline(false);
   const view = await renderMobile(<RequestScreen />);
-  expect(await view.findByText("No internet connection. Try again when you are online.")).toBeTruthy();
+  expect(await view.findByText("No connection")).toBeTruthy();
   onlineManager.setOnline(true);
   server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 })));
   await fireEvent.press(view.getByRole("button", { name: "Retry" }));
@@ -255,4 +257,28 @@ it("rejects malformed API replies instead of rendering an invented enquiry", asy
   expect(await view.findByText("Something went wrong")).toBeTruthy();
   expect(view.queryByText("Invented")).toBeNull();
   expect(view.queryByText("Awaiting operator")).toBeNull();
+});
+
+
+it.each([false, true])("returns an anchored cold link to its feature destination (detail=%s)", async (detail) => {
+  vi.mocked(useNavigation).mockReturnValue({ getState: () => ({
+    index: 1, routes: [{ name: "(tabs)" }, { name: detail ? "vehicle-history/requests/[id]" : "vehicle-history/requests/index" }],
+  }) } as ReturnType<typeof useNavigation>);
+  routeParams.id = requestId;
+  vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", undefined);
+  const view = await renderMobile(detail ? <RequestScreen /> : <HistoryScreen />);
+  await fireEvent.press(view.getByRole("button", { name: detail ? "Back to requests" : "Back" }));
+  expect(routerMock.dismissTo).toHaveBeenCalledWith(detail ? "/vehicle-history/requests" : "/(tabs)/chat");
+  expect(routerMock.back).not.toHaveBeenCalled();
+});
+
+it("keeps Back to the genuine Messages calling tab", async () => {
+  vi.mocked(useNavigation).mockReturnValue({ getState: () => ({
+    index: 1, routes: [{ name: "(tabs)", state: { index: 0, routes: [{ name: "chat" }] } }, { name: "vehicle-history/requests/index" }],
+  }) } as ReturnType<typeof useNavigation>);
+  vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", undefined);
+  const view = await renderMobile(<HistoryScreen />);
+  await fireEvent.press(view.getByRole("button", { name: "Back" }));
+  expect(routerMock.back).toHaveBeenCalled();
+  expect(routerMock.dismissTo).not.toHaveBeenCalled();
 });

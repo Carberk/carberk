@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { AccessibilityInfo, ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { useHistoryRequest, useHistoryRequests } from "../api/vehicle-history/requests";
@@ -31,7 +31,21 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const back = useSafeBack(detail ? historyPath : "/(tabs)/chat");
+  const fallback = detail ? historyPath : "/(tabs)/chat";
+  const safeBack = useSafeBack(fallback);
+  const navigation = useNavigation();
+  const back = () => {
+    const state = navigation.getState();
+    const previous = state?.routes[(state.index ?? 0) - 1];
+    const tabs = previous?.state;
+    const fromMessages = tabs?.routes[tabs.index ?? 0]?.name === "chat";
+    // Expo cold links have a root tabs anchor, even though canGoBack() is true.
+    if (state?.index === 1 && previous?.name === "(tabs)" && (detail || !fromMessages)) {
+      router.dismissTo(fallback);
+    } else {
+      safeBack();
+    }
+  };
   const heading = useRef<View>(null);
   const available = vehicleHistoryAvailable();
   const denied = error instanceof ApiError && [401, 403, 404].includes(error.status);
@@ -41,7 +55,8 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
   else if (!viewer) notice = t("vehicleHistory.privateSignIn");
   else if (denied) notice = t("vehicleHistory.denied");
 
-  const announcement = notice ?? (error ? mapErrorToCopy(error, t).title : loading ? t("loading") : null);
+  const offlineTitle = error instanceof ApiError && error.status === 0 ? t("vehicleHistory.offline") : undefined;
+  const announcement = notice ?? offlineTitle ?? (error ? mapErrorToCopy(error, t).title : loading ? t("loading") : null);
   useEffect(() => {
     if (announcement) AccessibilityInfo.announceForAccessibility(announcement);
   }, [announcement]);
@@ -55,7 +70,7 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
       </Text>
     );
   } else if (error) {
-    content = <ErrorState error={error} onRetry={retry} />;
+    content = <ErrorState error={error} title={offlineTitle} onRetry={retry} />;
   } else if (loading) {
     content = (
       <View accessibilityLiveRegion="polite" className="gap-3">

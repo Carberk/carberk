@@ -29,6 +29,7 @@ export const resources: Resource = {
   ru: {
     common: {
       vehicleHistory: {
+        offline: "Нет подключения",
         reference: "Обращение {{id}}",
         historyTitle: "Ваши обращения", open: "Открыть обращение", older: "Загрузить более ранние обращения",
         openRequest: "Открыть обращение {{id}}", backRequests: "К обращениям",
@@ -1004,6 +1005,7 @@ export const resources: Resource = {
   tk: {
     common: {
       vehicleHistory: {
+        offline: "Baglanyşyk ýok",
         reference: "Ýüz tutma {{id}}",
         historyTitle: "Ýüz tutmalaryňyz", open: "Ýüz tutmany aç", older: "Öňki ýüz tutmalary ýükle",
         openRequest: "{{id}} ýüz tutmany aç", backRequests: "Ýüz tutmalara dolan",
@@ -1979,6 +1981,7 @@ export const resources: Resource = {
   en: {
     common: {
       vehicleHistory: {
+        offline: "No connection",
         reference: "Request {{id}}",
         historyTitle: "Your requests", open: "Open request", older: "Load older requests",
         openRequest: "Open request {{id}}", backRequests: "Back to requests",
