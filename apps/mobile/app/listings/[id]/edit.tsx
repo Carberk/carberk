@@ -1,10 +1,11 @@
 import { router, Stack, useIsFocused, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AccessibilityInfo, BackHandler, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { useListingDetail } from "../../../src/api/listings/useListingDetail";
+import { listingDetailQueryOptions, useListingDetail } from "../../../src/api/listings/useListingDetail";
 import { useMyContactPhones } from "../../../src/api/listings/useMyContactPhones";
 import { useAuth } from "../../../src/auth/useAuth";
 import { useViewer } from "../../../src/auth/useViewer";
@@ -96,12 +97,14 @@ function buildPayloadPhotos(
 function EditSaveErrorBanner({
   opStates,
   onRetry,
+  uncertain,
 }: {
   opStates: Record<string, OpState>;
   onRetry: () => void;
+  uncertain: boolean;
 }) {
   const { t } = useTranslation();
-  const message = t("couldNotSaveAllChanges");
+  const message = t(uncertain ? "editResultUncertain" : "couldNotSaveAllChanges");
   // The seller just asked to save, so the failure interrupts a screen reader.
   // Announced on both platforms, like a failed publish: iOS has no live regions.
   useEffect(() => {
@@ -112,7 +115,7 @@ function EditSaveErrorBanner({
       <Text accessibilityRole="alert" className="text-callout font-medium text-destructive">
         {message}
       </Text>
-      {Object.entries(opStates).map(([opId, state]) => (
+      {uncertain ? null : Object.entries(opStates).map(([opId, state]) => (
         <Text key={opId} className="text-caption text-muted-foreground">
           {state === "succeeded"
             ? "✓"
@@ -122,12 +125,12 @@ function EditSaveErrorBanner({
           {opLabel(opId)}
         </Text>
       ))}
-      <Button
+      {uncertain ? null : <Button
         size="pill"
         onPress={onRetry}
       >
         <Text className="text-background">{t("retry")}</Text>
-      </Button>
+      </Button>}
     </View>
   );
 }
@@ -141,6 +144,9 @@ export default function EditListingScreen() {
 
 function EditListingSession({ listingId }: { listingId: string }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [isInspecting, setIsInspecting] = useState(false);
+  const inspectingRef = useRef(false);
   const { show } = useToast();
   const isFocused = useIsFocused();
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
@@ -321,9 +327,20 @@ function EditListingSession({ listingId }: { listingId: string }) {
   );
 
   const handleSave = useCallback(async () => {
+    if (saveEdit.isUncertain) {
+      if (inspectingRef.current) return;
+      inspectingRef.current = true;
+      setIsInspecting(true);
+      try {
+        await queryClient.fetchQuery({ ...listingDetailQueryOptions(listingId), staleTime: 0, retry: false, networkMode: "always" });
+        router.push(`/(public)/listings/${listingId}`);
+      } catch { /* No authoritative read: retain the uncertain plan and staged photos. */ }
+      finally { inspectingRef.current = false; setIsInspecting(false); }
+      return;
+    }
     if (!photosReady || !ctx.canPublish || !hasChanges || contactBlocksSave) return;
     await finishSave(saveEdit.save);
-  }, [photosReady, ctx.canPublish, hasChanges, contactBlocksSave, saveEdit.save, finishSave]);
+  }, [photosReady, ctx.canPublish, hasChanges, contactBlocksSave, saveEdit.save, saveEdit.isUncertain, finishSave, listingId, queryClient]);
 
   const handleRetrySave = useCallback(
     () => finishSave(saveEdit.retry),
@@ -400,7 +417,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
   const contactPhoneReturn = `/listings/${listingId}/edit`;
 
   const saveStatus: "idle" | "saving" | "saved" | "error" =
-    saveEdit.isPending ? "saving" : saveEdit.status === "failed" ? "error" : "idle";
+    saveEdit.isPending ? "saving" : saveEdit.status === "failed" && !saveEdit.isUncertain ? "error" : "idle";
 
   return (
     <>
@@ -426,12 +443,13 @@ function EditListingSession({ listingId }: { listingId: string }) {
           !saveEdit.isPending
         }
         canPublish={
+          !isInspecting && (saveEdit.isUncertain || (
           photosReady &&
           ctx.canPublish &&
           hasChanges &&
           !contactBlocksSave &&
           uploadQueue.publishGate.canPublish &&
-          !saveEdit.isPending
+          !saveEdit.isPending))
         }
         canGoBack={ctx.canGoBack && !saveEdit.isPending}
         isLastStep={ctx.isLastStep}
@@ -442,7 +460,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
         progressPercent={ctx.progressPercent}
         disabledReason={disabledReason}
         uploadStatus={uploadStatus}
-        publishLabel={t("saveChanges")}
+        publishLabel={t(isInspecting ? "loading" : saveEdit.isUncertain ? "checkListing" : "saveChanges")}
       >
         {currentStep === "photos" && (
           <Step2Photos
@@ -510,6 +528,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
             {saveEdit.status === "failed" && (
               <View className="mt-4">
                 <EditSaveErrorBanner
+                  uncertain={saveEdit.isUncertain}
                   opStates={saveEdit.opStates}
                   onRetry={handleRetrySave}
                 />

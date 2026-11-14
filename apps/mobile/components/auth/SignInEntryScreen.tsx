@@ -4,7 +4,6 @@ import { BackHandler, type TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 
-import { ApiError } from "../../src/api/client";
 import { useRequestOtp } from "../../src/api/identity/useRequestOtp";
 import { closeAuth } from "../../src/auth/closeAuth";
 import { normalizeEmail } from "../../src/auth/email";
@@ -123,9 +122,7 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
         },
       });
     } catch (error) {
-      const copy = error instanceof ApiError
-        ? getRequestOtpErrorCopy(error, t, isPhone ? "phoneFormatError" : "emailFormatError")
-        : t("offline");
+      const copy = getRequestOtpErrorCopy(error, t, isPhone ? "phoneFormatError" : "emailFormatError");
       if (isPhone) phone.setRequestError(copy); else setEmailError(copy);
     }
   }

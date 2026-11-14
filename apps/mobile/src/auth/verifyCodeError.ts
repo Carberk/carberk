@@ -1,4 +1,5 @@
 import { ApiError } from "../api/client";
+import { isUncertainWrite } from "../api/uncertainWrite";
 
 import { isDailyCodeLimit } from "./requestOtpError";
 
@@ -9,6 +10,7 @@ export interface VerifyCodeErrorCopy {
   // A terminal error cannot be fixed by entering or resending a code; the
   // User has to change the phone or email.
   terminal: boolean;
+  uncertain?: boolean;
 }
 
 export function getVerifyCodeErrorCopy(
@@ -16,8 +18,8 @@ export function getVerifyCodeErrorCopy(
   t: Translate,
   method: "phone" | "email",
 ): VerifyCodeErrorCopy {
-  if (!(error instanceof ApiError)) {
-    return { message: t("offline"), terminal: false };
+  if (!(error instanceof ApiError) || isUncertainWrite(error)) {
+    return { message: t("codeVerificationUncertain"), terminal: false, uncertain: true };
   }
 
   switch (error.code) {
@@ -40,9 +42,6 @@ export function getVerifyCodeErrorCopy(
   if (error.code === "RATE_LIMITED" || error.status === 429) {
     return { message: t("rateLimitedCode"), terminal: false };
   }
-  if (error.code === "NETWORK_ERROR" || error.status === 0) {
-    return { message: t("offline"), terminal: false };
-  }
   return { message: error.message || t("verifyFailed"), terminal: false };
 }
 
@@ -57,11 +56,8 @@ export function getResendCodeErrorCopy(
   error: unknown,
   t: Translate,
 ): ResendCodeErrorCopy {
-  if (!(error instanceof ApiError)) {
-    return { message: t("offline"), dailyLimit: false };
-  }
-  if (error.code === "NETWORK_ERROR" || error.status === 0) {
-    return { message: t("offline"), dailyLimit: false };
+  if (!(error instanceof ApiError) || isUncertainWrite(error)) {
+    return { message: t("codeRequestUncertain"), dailyLimit: false };
   }
   if (isDailyCodeLimit(error)) {
     return { message: t("dailyCodeLimit"), dailyLimit: true };

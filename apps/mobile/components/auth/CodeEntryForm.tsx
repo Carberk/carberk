@@ -79,6 +79,7 @@ export function CodeEntryForm({
   const [secondsRemaining, setSecondsRemaining] = useState(initialResendSeconds);
   const [error, setError] = useState<string | null>(null);
   const [terminalError, setTerminalError] = useState(false);
+  const [verificationUncertain, setVerificationUncertain] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(false);
@@ -87,7 +88,7 @@ export function CodeEntryForm({
   // A focus call lands only once the cells are editable again; focusing the
   // disabled input after a wrong code is a silent no-op on Android (#781).
   const refocusWhenEnabled = useRef(false);
-  const cellsDisabled = isVerifying || isResending || terminalError || dailyLimit;
+  const cellsDisabled = isVerifying || isResending || terminalError || dailyLimit || verificationUncertain;
 
   useEffect(() => {
     if (refocusWhenEnabled.current && !cellsDisabled) {
@@ -136,7 +137,8 @@ export function CodeEntryForm({
       const copy = getVerifyCodeErrorCopy(verifyError, t, method);
       setError(copy.message);
       setTerminalError(copy.terminal);
-      if (!copy.terminal) {
+      setVerificationUncertain(copy.uncertain === true);
+      if (!copy.terminal && !copy.uncertain) {
         refocusWhenEnabled.current = true;
       }
     } finally {
@@ -170,6 +172,7 @@ export function CodeEntryForm({
       setSecondsRemaining(result.resendInSeconds);
       setHasResent(true);
       setTestCode(__DEV__ ? result.testCode : undefined);
+      setVerificationUncertain(false);
       refocusWhenEnabled.current = true;
     } catch (resendError) {
       const copy = getResendCodeErrorCopy(resendError, t);

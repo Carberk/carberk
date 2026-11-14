@@ -435,7 +435,7 @@ describe("Save changes (#589)", () => {
     expect(screen.getByText("Changes saved")).toBeTruthy();
   });
 
-  it("a failed save stays on the list with Retry and keeps every change", async () => {
+  it("an unconfirmed field save keeps every change and offers an authoritative read", async () => {
     const api = createListingApi();
     api.failEdits = 1;
     const screen = await openEdit();
@@ -443,7 +443,7 @@ describe("Save changes (#589)", () => {
 
     await act(async () => { void fireEvent.press(saveButton(screen)); });
 
-    await screen.findByText("Couldn't save all changes. Try again.");
+    await screen.findByText("Save was not confirmed. Some changes may have been saved. Check the listing before editing again.");
     expect(screen.getByRole("header", { name: "Edit listing" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Price, 179,000 TMT, Change" })).toBeTruthy();
     expect(routerMock.replace).not.toHaveBeenCalled();
@@ -453,10 +453,9 @@ describe("Save changes (#589)", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Keep editing" }));
     expect(routerMock.back).not.toHaveBeenCalled();
 
-    await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Retry" })); });
-
-    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith(`/(public)/listings/${id}`));
-    expect(api.patches).toEqual([expect.objectContaining({ priceAmount: 179000 })]);
+    await fireEvent.press(screen.getByRole("button", { name: "Check listing" }));
+    expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${id}`);
+    expect(api.patches).toEqual([]);
   });
 
   it("a failed save still counts as unsaved after the fields match the Listing again", async () => {
@@ -465,21 +464,21 @@ describe("Save changes (#589)", () => {
     const screen = await openEdit();
     await changePrice(screen, "100000", "179000");
     await act(async () => { void fireEvent.press(saveButton(screen)); });
-    await screen.findByText("Couldn't save all changes. Try again.");
+    await screen.findByText("Save was not confirmed. Some changes may have been saved. Check the listing before editing again.");
 
     // Part of the edit may have reached the server (ADR-0025), so the seller can
     // still save, and leaving still asks.
     await changePrice(screen, "179000", "100000");
 
-    expect(isDisabled(saveButton(screen))).toBe(false);
+    expect(screen.getByRole("button", { name: "Check listing", disabled: false })).toBeTruthy();
     await fireEvent.press(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByText("Leave edit mode?")).toBeTruthy();
     expect(routerMock.back).not.toHaveBeenCalled();
   });
 
   it.each([
-    ["ru", "Редактировать объявление", "Сохранить изменения", "Не удалось сохранить все изменения. Попробуйте ещё раз."],
-    ["tk", "Bildirişi redaktirle", "Üýtgeşmeleri sakla", "Ähli üýtgeşmeleri saklap bolmady. Täzeden synanyşyň."],
+    ["ru", "Редактировать объявление", "Сохранить изменения", "Сохранение не подтверждено. Часть изменений могла сохраниться. Проверьте объявление перед новым редактированием."],
+    ["tk", "Bildirişi redaktirle", "Üýtgeşmeleri sakla", "Saklanandygy tassyklanmady. Üýtgeşmeleriň käbiri saklanan bolmagy mümkin. Täzeden üýtgetmezden öň bildirişi barlaň."],
   ])("words a failed save in %s", async (locale, heading, save, message) => {
     const api = createListingApi({ conditionDisclosure: { damaged: true } });
     api.failEdits = 1;

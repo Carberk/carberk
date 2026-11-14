@@ -6,6 +6,7 @@ import { useAttachMedia } from "../../api/listings/useAttachMedia";
 import { useRemoveMedia } from "../../api/listings/useRemoveMedia";
 import { useReorderMedia } from "../../api/listings/useReorderMedia";
 import type { StagedPhoto } from "../uploadStaging/types";
+import { isUncertainWrite } from "../../api/uncertainWrite";
 
 import { EDITABLE_FIELDS } from "./editChanges";
 
@@ -284,6 +285,7 @@ export function useSaveListingEdit(
     ledger: createLedger(),
   });
   const planRef = useRef<EditPlan | null>(null);
+  const uncertainListing = useRef<string | null>(null);
 
   const currentLedger = useCallback((): MediaLedger => {
     if (ledgerRef.current.listingId !== listingId) {
@@ -307,6 +309,12 @@ export function useSaveListingEdit(
           opStates[opId] = "succeeded";
           dispatch({ type: "OP_SUCCESS", opId });
         } catch (err) {
+          // Attach returns the existing row for the same upload key; reorder
+          // sets the same order for fixed media IDs. Their explicit Retry keeps
+          // those identities. Fields/removal require inspection after loss.
+          if (isUncertainWrite(err) && !opId.startsWith("attach:") && opId !== "reorder") {
+            uncertainListing.current = listingId;
+          }
           opStates[opId] = "failed";
           dispatch({ type: "OP_FAIL", opId, cause: err });
           throw new EditSessionError({ ...opStates }, opId, err);
@@ -382,14 +390,14 @@ export function useSaveListingEdit(
   // Two presses in the same render would both run the plan and attach a photo twice.
   const inFlightRef = useRef(false);
   const runExclusive = useCallback(async (work: () => Promise<boolean>) => {
-    if (inFlightRef.current) return false;
+    if (inFlightRef.current || uncertainListing.current === listingId) return false;
     inFlightRef.current = true;
     try {
       return await work();
     } finally {
       inFlightRef.current = false;
     }
-  }, []);
+  }, [listingId]);
 
   const runFreshPlan = useCallback(
     async (plan: EditPlan) => {
@@ -454,6 +462,7 @@ export function useSaveListingEdit(
     status: state.status,
     opStates: state.opStates,
     error: state.error,
+    isUncertain: state.status === "failed" && uncertainListing.current === listingId,
     isPending: state.status === "saving",
   };
 }

@@ -107,7 +107,7 @@ describe("Sell publish toasts", () => {
     const { screen } = await renderWizard();
     await act(async () => { void fireEvent.press(screen.getByRole("button", { name: "Publish" })); });
 
-    const message = "Could not publish. Your draft is saved. Try again.";
+    const message = "Publication was not confirmed. The listing may be in My listings. Check before publishing again.";
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
     expect(screen.getAllByText(message)).toHaveLength(1);
     expect(screen.queryByText("Publish failed")).toBeNull();

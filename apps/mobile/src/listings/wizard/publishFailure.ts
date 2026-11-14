@@ -2,9 +2,10 @@ import { ListingsSchemas } from "@auto-tm/contracts";
 import type { TFunction } from "i18next";
 
 import { ApiError } from "../../api/client";
+import { isUncertainWrite } from "../../api/uncertainWrite";
 
 /** Why a publish did not go through, as Check and publish words it. */
-export type PublishFailure = "offline" | "rateMissing" | "photos" | "photoUnavailable" | "server";
+export type PublishFailure = "offline" | "uncertain" | "rateMissing" | "photos" | "photoUnavailable" | "server";
 
 /**
  * Sorts a publish error into the three failures Check and publish explains. The
@@ -15,6 +16,7 @@ export type PublishFailure = "offline" | "rateMissing" | "photos" | "photoUnavai
  * calling this and sends the seller to Contact, so they never reach Check.
  */
 export function publishFailureOf(error: unknown): PublishFailure {
+  if (isUncertainWrite(error)) return "uncertain";
   if (error instanceof ApiError) {
     const details = error.details as { formErrors?: unknown } | undefined;
     if (error.code === ListingsSchemas.ListingsErrorCode.PhotoMinimumRequired ||
@@ -31,6 +33,7 @@ export function publishFailureOf(error: unknown): PublishFailure {
 
 /** The line shown above Publish. `currency` is the draft's, for the missing-rate message. */
 export function publishFailureMessage(t: TFunction, failure: PublishFailure | null, currency = "USD"): string {
+  if (failure === "uncertain") return t("publishResultUncertain");
   if (failure === "photos") return t("wizardErrors.photosRequired", { minimum: ListingsSchemas.MIN_LISTING_PHOTOS });
   if (failure === "offline") return t("publishErrorOffline");
   if (failure === "rateMissing") return t("publishErrorRateMissing", { currency });

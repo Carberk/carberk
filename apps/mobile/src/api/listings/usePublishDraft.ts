@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { DateTimeSchema } from "@auto-tm/contracts";
 import { z } from "zod";
+import { useRef } from "react";
 
 import { apiClient } from "../client";
 import { queryKeys } from "../queryKeys";
+import { isUncertainWrite } from "../uncertainWrite";
 
 const PublishDraftResponseSchema = z.object({
   id: z.string().guid(),
@@ -18,17 +20,26 @@ const PublishDraftResponseSchema = z.object({
 
 export function usePublishDraft() {
   const queryClient = useQueryClient();
+  const uncertain = useRef(new Map<string, unknown>());
 
   return useMutation({
     // Offline, fail now instead of pausing: a paused publish never settles, and
     // Check and publish would read "Publishing..." until the network came back.
     networkMode: "always",
-    mutationFn: (draftId: string) =>
-      apiClient.post(
-        `/listings/drafts/${draftId}/publish`,
-        {},
-        PublishDraftResponseSchema,
-      ),
+    retry: false,
+    mutationFn: async (draftId: string) => {
+      // Publication has no draft-to-Listing lookup or replay contract. Retain
+      // the draft identity across step/route changes and require inspection.
+      if (uncertain.current.has(draftId)) throw uncertain.current.get(draftId);
+      try {
+        return await apiClient.post(
+          `/listings/drafts/${draftId}/publish`, {}, PublishDraftResponseSchema,
+        );
+      } catch (error) {
+        if (isUncertainWrite(error)) uncertain.current.set(draftId, error);
+        throw error;
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.all() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.listings.myListings() });

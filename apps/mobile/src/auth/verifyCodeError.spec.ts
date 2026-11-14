@@ -51,17 +51,17 @@ describe("getVerifyCodeErrorCopy", () => {
     ["OTP_LOCKED", 400, "lockedCode"],
     ["RATE_LIMITED", 400, "rateLimitedCode"],
     ["TOO_MANY", 429, "rateLimitedCode"],
-    ["NETWORK_ERROR", 0, "offline"],
   ])("maps %s to retryable copy", (code, status, key) => {
     expect(
       getVerifyCodeErrorCopy(new ApiError(code, status), t, "phone"),
     ).toEqual({ message: key, terminal: false });
   });
 
-  it("shows offline copy for a non-API failure", () => {
+  it("does not call an unreadable result a rejected code", () => {
     expect(getVerifyCodeErrorCopy(new Error("boom"), t, "email")).toEqual({
-      message: "offline",
+      message: "codeVerificationUncertain",
       terminal: false,
+      uncertain: true,
     });
   });
 });
@@ -72,8 +72,8 @@ describe("getResendCodeErrorCopy", () => {
     ["RATE_LIMITED", 429, { reason: "backoff", retryInSeconds: 120 }, "rateLimitedCode"],
     ["RATE_LIMITED", 429, { reason: "ip_limit", retryInSeconds: 0 }, "rateLimitedCode"],
     ["RATE_LIMITED", 429, { reason: "unknown_reason" }, "rateLimitedCode"],
-    ["NETWORK_ERROR", 0, undefined, "offline"],
-    ["SERVER", 500, undefined, "verifyFailed"],
+    ["NETWORK_ERROR", 0, undefined, "codeRequestUncertain"],
+    ["SERVER", 500, undefined, "codeRequestUncertain"],
   ])("maps %s %s %j to retryable copy", (code, status, details, key) => {
     expect(
       getResendCodeErrorCopy(new ApiError(code, status, undefined, details), t),
@@ -92,9 +92,9 @@ describe("getResendCodeErrorCopy", () => {
     ).toEqual({ message: "dailyCodeLimit", dailyLimit: true });
   });
 
-  it("shows offline copy for a non-API failure", () => {
+  it("keeps a missing resend response uncertain", () => {
     expect(getResendCodeErrorCopy(new Error("boom"), t)).toEqual({
-      message: "offline",
+      message: "codeRequestUncertain",
       dailyLimit: false,
     });
   });

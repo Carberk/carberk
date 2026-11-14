@@ -270,29 +270,29 @@ describe("Check and publish: a publish that fails (#588)", () => {
   }
 
   /** The wizard is still on Check, the draft was saved, and the error is the only message. */
-  function expectStillOnCheck(screen: Screen, message: string) {
+  function expectStillOnCheck(screen: Screen, message: string, action = "Publish") {
     header(screen, "Check and publish, Step 7 of 7");
     expect(within(screen.getByRole("alert")).getByText(message)).toBeTruthy();
     expect(announcements).toContain(message);
     expect(savedPayloads().at(-1)).toMatchObject({ photos: fixture.savedPhotos });
     expect(routerMock.replace).not.toHaveBeenCalled();
     expect(fixture.show).not.toHaveBeenCalled();
-    expect(publish(screen).props.accessibilityState).toMatchObject({ disabled: false });
+    expect(screen.getByRole("button", { name: action }).props.accessibilityState).toMatchObject({ disabled: false });
     expect(screen.getAllByTestId("check-section")).toHaveLength(6);
   }
 
-  it("a server error keeps the wizard on Check and says the draft is saved", async () => {
+  it("a server error keeps the publication uncertain and offers My listings", async () => {
     const screen = await publishAndFail(new ApiError("INTERNAL_ERROR", 500, "Internal server error"));
 
-    expectStillOnCheck(screen, "Could not publish. Your draft is saved. Try again.");
+    expectStillOnCheck(screen, "Publication was not confirmed. The listing may be in My listings. Check before publishing again.", "My listings");
     // The server's own text is never shown.
     expect(screen.queryByText(/Internal server error/)).toBeNull();
   });
 
-  it("being offline keeps the wizard on Check and says to publish when back online", async () => {
+  it("a lost response keeps the wizard on Check without promising a server draft", async () => {
     const screen = await publishAndFail(new ApiError("NETWORK_ERROR", 0, "Network request failed"));
 
-    expectStillOnCheck(screen, "No internet. Your draft is saved. Publish when you are back online.");
+    expectStillOnCheck(screen, "Publication was not confirmed. The listing may be in My listings. Check before publishing again.", "My listings");
   });
 
   it("a missing exchange rate names the draft's currency", async () => {
@@ -305,7 +305,7 @@ describe("Check and publish: a publish that fails (#588)", () => {
   });
 
   it("publishes on the next try, and the error is gone while it runs", async () => {
-    const screen = await publishAndFail(new ApiError("INTERNAL_ERROR", 500));
+    const screen = await publishAndFail(new ApiError("INVALID_DRAFT_PAYLOAD", 400));
     let finish = (_listing: { id: string }) => {};
     fixture.mutation.mutateAsync.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
 

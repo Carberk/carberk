@@ -8,6 +8,8 @@ export function useEditListing() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    retry: false,
+    networkMode: "always",
     mutationFn: ({
       listingId,
       patch,

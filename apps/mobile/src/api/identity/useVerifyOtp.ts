@@ -5,6 +5,8 @@ import { apiClient } from "../client";
 
 export function useVerifyOtp() {
   return useMutation({
+    retry: false,
+    networkMode: "always",
     mutationFn: (input: AuthSchemas.OtpVerifyRequest) =>
       apiClient.post(
         "/auth/otp/verify",

@@ -8,6 +8,8 @@ export function useAttachMedia(listingId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    retry: false,
+    networkMode: "always",
     mutationFn: (input: ListingsSchemas.AttachMediaRequest) =>
       apiClient.post(
         `/listings/${listingId}/media/attach`,

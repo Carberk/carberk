@@ -8,6 +8,8 @@ export function useRemoveMedia(listingId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    retry: false,
+    networkMode: "always",
     mutationFn: (mediaId: string) =>
       apiClient.delete(
         `/listings/${listingId}/media/${mediaId}`,

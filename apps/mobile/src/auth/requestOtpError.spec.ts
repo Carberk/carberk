@@ -50,8 +50,8 @@ describe("getRequestOtpErrorCopy", () => {
 
   it.each([
     [new ApiError("VALIDATION_FAILED", 400), "emailFormatError"],
-    [new ApiError("NETWORK_ERROR", 0), "offline"],
-    [new ApiError("INTERNAL", 500), "requestFailed"],
+    [new ApiError("NETWORK_ERROR", 0), "codeRequestUncertain"],
+    [new ApiError("INTERNAL", 500), "codeRequestUncertain"],
   ])("maps %s", (error, key) => {
     expect(getRequestOtpErrorCopy(error, t, "emailFormatError")).toBe(key);
   });

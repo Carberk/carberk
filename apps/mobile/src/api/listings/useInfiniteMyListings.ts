@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { infiniteQueryOptions, useInfiniteQuery } from "@tanstack/react-query";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
 import { apiClient } from "../client";
@@ -9,10 +9,8 @@ interface UseInfiniteMyListingsOptions {
   enabled?: boolean;
 }
 
-export function useInfiniteMyListings(opts?: UseInfiniteMyListingsOptions) {
-  const limit = opts?.limit ?? 20;
-
-  return useInfiniteQuery({
+export function myListingsQueryOptions(limit = 20) {
+  return infiniteQueryOptions({
     queryKey: queryKeys.listings.myListingsInfinite(),
     queryFn: async ({ pageParam }) => {
       const params = new URLSearchParams();
@@ -28,6 +26,9 @@ export function useInfiniteMyListings(opts?: UseInfiniteMyListingsOptions) {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 30_000,
-    enabled: opts?.enabled,
   });
+}
+
+export function useInfiniteMyListings(opts?: UseInfiniteMyListingsOptions) {
+  return useInfiniteQuery({ ...myListingsQueryOptions(opts?.limit), enabled: opts?.enabled });
 }
