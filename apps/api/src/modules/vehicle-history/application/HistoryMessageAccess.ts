@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ServiceMessagesSchemas } from "@auto-tm/contracts";
 import { ServiceMessageError } from "../../business-messaging/business-messaging.public";
+import { MESSAGE_AUTHORITY_FENCE_PORT, type MessageAuthorityFencePort } from "../../identity/identity.public";
 import { CurrentHistoryRequester, type HistoryRequesterClaims } from "./CurrentHistoryRequester";
 import { CurrentHistoryOperator } from "./CurrentHistoryOperator";
 import { HISTORY_ASSIGNMENT_REPOSITORY, type HistoryAssignmentRepository } from "../domain/HistoryAssignmentRepository";
@@ -13,15 +14,18 @@ export class HistoryMessageAccess {
     @Inject(CurrentHistoryRequester) private readonly requester: CurrentHistoryRequester,
     @Inject(CurrentHistoryOperator) private readonly operator: CurrentHistoryOperator,
     @Inject(HISTORY_ASSIGNMENT_REPOSITORY) private readonly assignments: HistoryAssignmentRepository,
+    @Inject(MESSAGE_AUTHORITY_FENCE_PORT) private readonly identityFence: MessageAuthorityFencePort,
   ) {}
   async run<T>(actor: HistoryMessageActor, id: string, operation: (requesterId: string, senderId: string, objectId: string) => Promise<T>) {
     const authorize = async () => actor.operator ? (await this.operator.require(actor.claims)).id
       : (await this.requester.require(actor.claims)).requesterId;
-    await authorize();
+    const userId = await authorize();
     const key = ServiceMessagesSchemas.ServiceStreamSchema.shape.objectId.safeParse(id);
     if (!key.success) throw new HistoryRequestError("HISTORY_MESSAGE_INVALID");
     try {
-      return await this.assignments.withMessageLock(key.data, async (request) => {
+      return await this.assignments.withMessageLock(key.data, (request) => this.identityFence.withSession({
+        userId, sessionId: actor.claims.sid ?? "", purpose: actor.operator ? "vehicle-history" : null,
+      }, async () => {
         // Authority is current after any DB wait, before intent/cursor lookup.
         const senderId = await authorize();
         if (!request || (actor.operator ? request.assignedOperatorId !== senderId : request.requesterId !== senderId)) {
@@ -31,7 +35,7 @@ export class HistoryMessageAccess {
           throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
         }
         return operation(request.requesterId, senderId, request.id);
-      });
+      }));
     } catch (error) {
       if (error instanceof HistoryRequestError) throw error;
       const code = error instanceof ServiceMessageError ? error.code : "SERVICE_MESSAGE_UNAVAILABLE";

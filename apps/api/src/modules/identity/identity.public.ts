@@ -3,6 +3,7 @@
  * itself. It mirrors the providers `IdentityModule` exports; lint enforces it.
  */
 import { IDENTITY_TOKENS } from "./identity.tokens";
+export { MESSAGE_AUTHORITY_FENCE_PORT, type MessageAuthorityFencePort } from "./domain/ports/MessageAuthorityFencePort";
 
 export { accountDeletionPendingException } from "./application/accountDeletionPendingException";
 export { contactPhoneCodeException } from "./presentation/contactPhoneCodeException";

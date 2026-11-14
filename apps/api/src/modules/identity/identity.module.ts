@@ -45,6 +45,8 @@ import { PrismaTotpEnrollmentRepository } from "./infrastructure/PrismaTotpEnrol
 import { HttpOtpSenderAdapter } from "./infrastructure/HttpOtpSenderAdapter";
 import { RefreshTokenDigestAdapter } from "./infrastructure/RefreshTokenDigestAdapter";
 import { SystemClockAdapter } from "./infrastructure/SystemClockAdapter";
+import { MESSAGE_AUTHORITY_FENCE_PORT } from "./domain/ports/MessageAuthorityFencePort";
+import { PostgresMessageAuthorityFence } from "./infrastructure/PostgresMessageAuthorityFence";
 import { PrismaIdentityCheckAdapter } from "./infrastructure/PrismaIdentityCheckAdapter";
 import { PrismaStaffAccessAdapter } from "./infrastructure/PrismaStaffAccessAdapter";
 import { STAFF_ACCESS_PORT } from "./domain/ports/StaffAccessPort";
@@ -93,6 +95,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     AccountDeletionController,
   ],
   providers: [
+    { provide: MESSAGE_AUTHORITY_FENCE_PORT, useClass: PostgresMessageAuthorityFence },
     ManageHistoryStaff,
     { provide: HISTORY_STAFF_REPOSITORY, useClass: PrismaHistoryStaffRepository },
     PrismaOtpRequestRepository,
@@ -251,6 +254,7 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
   ],
   exports: [
+    MESSAGE_AUTHORITY_FENCE_PORT,
     STAFF_ACCESS_PORT,
     SELLER_PROFILE_READ_PORT,
     IDENTITY_TOKENS.IdentityCheckPort,
