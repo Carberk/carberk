@@ -40,6 +40,7 @@ export * as NotificationsSchemas from "./schemas/notifications";
 export * as ContentSchemas from "./schemas/content";
 export * as ReportsSchemas from "./schemas/reports";
 export * as VehicleHistorySchemas from "./schemas/vehicle-history";
+export * as HistoryStaffSchemas from "./schemas/history-staff";
 export * as AdminSchemas from "./schemas/admin";
 
 export { DateTimeSchema } from "./zod";

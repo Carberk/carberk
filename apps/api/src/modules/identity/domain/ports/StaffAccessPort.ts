@@ -1,4 +1,5 @@
 export const STAFF_ACCESS_PORT = Symbol("StaffAccessPort");
+export type StaffPurpose = "vehicle-history" | "vehicle-history-payment-evidence" | "vehicle-history-staff-management";
 
 export interface StaffActor {
   id: string;
@@ -14,11 +15,11 @@ export interface StaffAccessPort {
   findEligibleActor(input: {
     userId: string;
     sessionId: string;
-    purpose: "vehicle-history";
+    purpose: StaffPurpose;
   }): Promise<StaffActor | null>;
   findCurrentActor(input: {
     userId: string;
     sessionId: string;
-    purpose: "vehicle-history";
+    purpose: StaffPurpose;
   }): Promise<StaffActor | null>;
 }

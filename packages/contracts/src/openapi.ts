@@ -37,6 +37,7 @@ import {
   HistoryDeskSchema, CreateHistoryRequestSchema, HistoryRequestSchema,
   ListHistoryRequestsQuerySchema, ListHistoryRequestsResponseSchema,
 } from "./schemas/vehicle-history";
+import { HistoryStaffChangeSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
 import {
   BrandSummarySchema,
   BrandDetailSchema,
@@ -425,6 +426,8 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       403: { description: "Unavailable request, current requester or synthetic admission refused" },
     },
   });
+  registry.register("HistoryStaffChange", HistoryStaffChangeSchema);
+  registry.register("HistoryStaffResponse", HistoryStaffResponseSchema);
   registry.registerPath({
     method: "get", path: "/api/v1/vehicle-history/desk", tags: ["Vehicle History"],
     summary: "Open the local synthetic Vehicle History desk with current staff access",

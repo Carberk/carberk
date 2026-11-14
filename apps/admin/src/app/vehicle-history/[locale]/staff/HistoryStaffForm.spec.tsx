@@ -1,0 +1,83 @@
+// @vitest-environment happy-dom
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+vi.mock("next/headers", () => ({ headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) }));
+vi.mock("next/navigation", () => ({ unstable_rethrow: () => {}, redirect: vi.fn() }));
+import { HistoryStaffForm } from "./HistoryStaffForm";
+const actor = { id: "11760000-0000-4000-8000-000000000001", displayName: "Synthetic founder", nameNumber: 1176 };
+const target = { id: "11760000-0000-4000-8000-000000000002", displayName: "Synthetic named operator", nameNumber: 1177, eligible: true,
+  capabilities: { "vehicle-history": false, "vehicle-history-payment-evidence": true } };
+let root: Root;
+let container: HTMLDivElement;
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("fetch", vi.fn());
+  container = document.createElement("div"); document.body.append(container);
+  root = createRoot(container);
+});
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+it("offers exact named lookup without a directory or permission inheritance", async () => {
+  await act(async () => root.render(<HistoryStaffForm locale="en" />));
+  expect(container.textContent).toContain("Exact user ID");
+  expect(container.querySelector('input[name="targetId"]')).not.toBeNull();
+  expect(container.textContent).toContain("Find person");
+});
+async function submit(index = 0) {
+  await act(async () => container.querySelectorAll("form")[index]!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+}
+it("confirms a named person, then sends the exact capability and reason through the real action", async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(Response.json({ actor, target }))
+    .mockResolvedValueOnce(Response.json({ actor, target: { ...target, capabilities: { ...target.capabilities, "vehicle-history": true } } }));
+  await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor, target: null }} />));
+  container.querySelector<HTMLInputElement>('input[name="targetId"]')!.value = target.id;
+  await submit();
+  expect(container.textContent).toContain("Synthetic named operator");
+  expect(container.textContent).toContain(target.id);
+  expect(container.textContent).toContain("Historical payment evidence");
+  container.querySelectorAll<HTMLInputElement>('input[name="reason"]')[0]!.value = "Synthetic desk assignment";
+  await submit(1);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("Access updated.");
+  expect(container.querySelectorAll("form")[1]!.textContent).toContain("Revoke access");
+  expect(JSON.parse(String(vi.mocked(fetch).mock.calls[1]![1]?.body))).toEqual({ targetId: target.id, capability: "vehicle-history", active: true, reason: "Synthetic desk assignment" });
+});
+it("announces pending and prevents double-submit until current access returns", async () => {
+  let finish!: (response: Response) => void;
+  vi.mocked(fetch).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor, target }} />));
+  container.querySelector<HTMLInputElement>('input[name="reason"]')!.value = "Synthetic pending assignment";
+  await submit(1);
+  expect(container.querySelector("section")?.getAttribute("aria-busy")).toBe("true");
+  expect(container.querySelector("button")?.disabled).toBe(true);
+  expect(container.querySelector("fieldset")?.disabled).toBe(true);
+  await act(async () => finish(Response.json({ actor, target })));
+  await waitFor(() => expect(container.querySelector("section")?.getAttribute("aria-busy")).toBe("false"));
+});
+it("keeps self capabilities visible but makes changing them unavailable", async () => {
+  await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor: target, target }} />));
+  expect(container.textContent).toContain("You cannot change your own capabilities.");
+  expect([...container.querySelectorAll("fieldset")].every((f) => f.disabled)).toBe(true);
+});
+it("rejects a blank reason before any network mutation", async () => {
+  await act(async () => root.render(<HistoryStaffForm locale="en" initial={{ actor, target }} />));
+  await submit(1);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("reason of 1–500 characters");
+  expect(vi.mocked(fetch).mock.calls).toHaveLength(0);
+});
+it.each([
+  ["tk", "Rugsat täzelendi.", "Esaslandyryjy rugsady elýeterli däl.", "Sessiýanyň möhleti gutardy.", "Rugsady barlap ýa-da täzeläp bolmady.", "Bu ID bilen adam tapylmady."],
+  ["ru", "Доступ обновлён.", "Нет доступа основателя.", "Сессия истекла.", "Не удалось проверить или изменить доступ.", "Человек с таким ID не найден."],
+  ["en", "Access updated.", "Founder access is unavailable.", "Your session expired.", "Could not check or update access.", "No person has this ID."],
+] as const)("localizes real action outcomes and recovery in %s", async (locale, saved, denied, expired, error, missing) => {
+  for (const [status, message] of [[201, saved], [403, denied], [401, expired], [503, error], [404, missing]] as const) {
+    vi.mocked(fetch).mockResolvedValue(Response.json(status === 201 ? { actor, target } : { code: "FAILURE", message: "private upstream detail" }, { status }));
+    await act(async () => root.render(<HistoryStaffForm key={`${locale}-${status}`} locale={locale} initial={{ actor, target }} />));
+    container.querySelector<HTMLInputElement>('input[name="reason"]')!.value = "Synthetic reason";
+    await submit(1);
+    expect(container.textContent).toContain(message);
+    expect(container.textContent).not.toContain("private upstream detail");
+    if (status === 401 || status === 403) expect(container.querySelector("a")?.href).toContain(encodeURIComponent(`/vehicle-history/${locale}/staff`));
+    if (status === 503) expect(container.querySelector("fieldset")?.disabled).toBe(true);
+  }
+});

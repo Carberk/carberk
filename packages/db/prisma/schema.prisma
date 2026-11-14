@@ -142,6 +142,8 @@ model Session {
 
 enum StaffPurpose {
   vehicle_history @map("vehicle-history")
+  vehicle_history_staff_management @map("vehicle-history-staff-management")
+  vehicle_history_payment_evidence @map("vehicle-history-payment-evidence")
 }
 
 model StaffGrant {

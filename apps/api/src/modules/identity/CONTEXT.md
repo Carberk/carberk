@@ -2,7 +2,9 @@
 
 Identity owns Users, Sign-in Methods, sessions, admin elevation, account deletion, and identity checks consumed by other contexts. Marketplace Role and Dealership Member role are different concepts. Listing contact verification belongs to Listings and cannot authenticate a User.
 
-Private service authority is separate from marketplace roles. [`StaffAccessPort`](domain/ports/StaffAccessPort.ts), exported through the public boundary, reads the current session/TOTP, lifecycle and explicit purpose grant together and returns only the operator's public name/id. Grant management is outside this boundary.
+Private service authority is separate from marketplace roles. [`StaffAccessPort`](domain/ports/StaffAccessPort.ts), exported through the public boundary, reads current session/TOTP, lifecycle and explicit purpose grants. Scoped sign-in eligibility accepts any History staff purpose; protected reads require the exact capability. It returns only public name/id.
+
+[`ManageHistoryStaff`](application/ManageHistoryStaff.ts) owns exact-target operator/evidence grant changes. Its repository locks current founder authority and commits each change with actor/target/reason audit. Founder management is an explicit stored purpose that this form cannot change; marketplace Admin grants nothing. The synthetic HTTP boundary is covered by [real database tests](presentation/HistoryStaffController.e2e.spec.ts).
 
 Sign-in checks the User's current suspension through `IdentityCheckPort` before consuming a code and again before creating a Session. Phone and email Sign-in Codes, reviewer and tester bypass all refuse suspended Users with `USER_SUSPENDED`; presentation maps the shared `UserSuspendedError`. Suspension through `IdentityAdminPort` deletes the User's Sessions in the same moderation transaction. Refresh also refuses a suspended User before rotating a remaining Session. Unsuspension permits new sign-in and never restores revoked Sessions (founder decision in [#749's fix round](https://github.com/bagtyyarkovusov/auto.tm-rewrite/pull/749#issuecomment-6050075951), consistent with ADR-0012).
 

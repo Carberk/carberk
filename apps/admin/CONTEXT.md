@@ -22,6 +22,8 @@ Tests beside the API client, cookies, validators, and server actions cover these
 
 For agent access and runtime proof, use the [Admin access procedure](../../docs/agents/admin-access.md). It selects the running local target, reuses sessions and retrieves codes privately through the ordinary login flow.
 
+History staff controls at `/vehicle-history/{locale}/staff` use the existing workbench and scoped auth destination. Exact-ID lookup confirms a named person before reasoned capability changes; Identity owns current founder authority and atomic audit. The controls do not provide a User directory, evidence reader or refund decisions.
+
 ## Start here
 
 - [Server-side API bridge and tests](src/lib/api-client.ts)
