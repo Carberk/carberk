@@ -9,14 +9,29 @@ const userChangeListeners = new Set<() => void>();
 // The last User signed in on this device since the app started. Their data may
 // still be in memory after their session ends, so it outlives the session.
 let lastUserId: string | null = null;
+let identityIntent = 0;
+let storageOperations: Promise<void> = Promise.resolve();
+
+// Keep native reads/commits ordered with sign-in and sign-out. Failed native
+// operations reject their caller without poisoning subsequent storage work.
+function withSessionStorage<T>(operation: () => Promise<T>): Promise<T> {
+  const result = storageOperations.then(operation);
+  storageOperations = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 export type StoredAuthSession = AuthSchemas.OtpVerifyResponse & {
   storedAt: string;
 };
 
-export async function storeAuthSession(
+export function storeAuthSession(
   session: AuthSchemas.OtpVerifyResponse,
 ): Promise<void> {
+  identityIntent++;
+  return withSessionStorage(() => writeSession(session));
+}
+
+async function writeSession(session: AuthSchemas.OtpVerifyResponse): Promise<void> {
   const value: StoredAuthSession = {
     ...session,
     storedAt: new Date().toISOString(),
@@ -41,7 +56,11 @@ export async function storeAuthSession(
   notifySessionChanged();
 }
 
-export async function loadAuthSession(): Promise<StoredAuthSession | null> {
+export function loadAuthSession(): Promise<StoredAuthSession | null> {
+  return withSessionStorage(readSession);
+}
+
+async function readSession(): Promise<StoredAuthSession | null> {
   const value = await SecureStore.getItemAsync(AUTH_SESSION_KEY);
   if (!value) {
     rememberAuthSession(null);
@@ -54,13 +73,13 @@ export async function loadAuthSession(): Promise<StoredAuthSession | null> {
     parsed === null ||
     !("storedAt" in parsed)
   ) {
-    await clearAuthSession();
+    await clearSession();
     return null;
   }
 
   const session = AuthSchemas.OtpVerifyResponseSchema.safeParse(parsed);
   if (!session.success) {
-    await clearAuthSession();
+    await clearSession();
     return null;
   }
 
@@ -77,26 +96,50 @@ export async function loadAuthSession(): Promise<StoredAuthSession | null> {
  * Keeps the stored session's copy of the User's Sign-in Methods in step with
  * the server after one is added or replaced. Tokens are left untouched.
  */
-export async function updateStoredSessionUser(
+export function updateStoredSessionUser(
   user: Pick<AuthSchemas.OtpVerifyResponse["user"], "phone" | "email">,
 ): Promise<void> {
-  const session = await loadAuthSession();
-  if (!session) return;
+  return withSessionStorage(async () => {
+    const session = await readSession();
+    if (!session) return;
 
-  const value: StoredAuthSession = {
-    ...session,
-    user: { ...session.user, phone: user.phone, email: user.email },
-  };
+    const value: StoredAuthSession = {
+      ...session,
+      user: { ...session.user, phone: user.phone, email: user.email },
+    };
 
-  await SecureStore.setItemAsync(AUTH_SESSION_KEY, JSON.stringify(value));
-  rememberAuthSession(value);
-  notifySessionChanged();
+    await SecureStore.setItemAsync(AUTH_SESSION_KEY, JSON.stringify(value));
+    rememberAuthSession(value);
+    notifySessionChanged();
+  });
 }
 
-export async function clearAuthSession(): Promise<void> {
+export function clearAuthSession(): Promise<void> {
+  identityIntent++;
+  return withSessionStorage(clearSession);
+}
+
+async function clearSession(): Promise<void> {
   await SecureStore.deleteItemAsync(AUTH_SESSION_KEY);
   rememberAuthSession(null);
   notifySessionChanged();
+}
+
+/** Commit a refresh only while its stored owner and sign-in/out intent remain current. */
+export function commitRefreshedAuthSession(
+  owner: StoredAuthSession,
+  tokens: AuthSchemas.RefreshResponse | null,
+): Promise<boolean> {
+  const intent = identityIntent;
+  return withSessionStorage(async () => {
+    if (intent !== identityIntent) return false;
+    const current = await readSession();
+    if (intent !== identityIntent || current?.user.id !== owner.user.id ||
+        current.refreshToken !== owner.refreshToken) return false;
+    if (tokens === null) await clearSession();
+    else await writeSession({ ...tokens, user: current.user });
+    return intent === identityIntent;
+  });
 }
 
 export function subscribeAuthSession(listener: () => void): () => void {
