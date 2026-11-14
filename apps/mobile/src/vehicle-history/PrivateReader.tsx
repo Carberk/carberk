@@ -31,21 +31,28 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const fallback = detail ? historyPath : "/(tabs)/chat";
-  const safeBack = useSafeBack(fallback);
+  const back = useSafeBack(detail ? historyPath : "/(tabs)/chat");
   const navigation = useNavigation();
-  const back = () => {
+  useEffect(() => {
     const state = navigation.getState();
     const previous = state?.routes[(state.index ?? 0) - 1];
+    const current = state?.routes[state.index];
     const tabs = previous?.state;
-    const fromMessages = tabs?.routes[tabs.index ?? 0]?.name === "chat";
-    // Expo cold links have a root tabs anchor, even though canGoBack() is true.
-    if (state?.index === 1 && previous?.name === "(tabs)" && (detail || !fromMessages)) {
-      router.dismissTo(fallback);
-    } else {
-      safeBack();
-    }
-  };
+    const routes = tabs?.routes ?? [];
+    const chatIndex = routes.findIndex((route) => route.name === "chat");
+    const fromMessages = routes[tabs?.index ?? 0]?.name === "chat";
+    if (state?.index !== 1 || previous?.name !== "(tabs)" || !current || (!detail && fromMessages)) return;
+    // Cold links need real parents so header, gesture and system Back agree.
+    navigation.dispatch({ type: "RESET", payload: { ...state,
+      index: detail ? 2 : 1,
+      routes: [
+        { ...previous, state: { ...tabs, index: chatIndex < 0 ? routes.length : chatIndex,
+          routes: chatIndex < 0 ? [...routes, { name: "chat" }] : routes } },
+        ...(detail ? [{ name: "vehicle-history/requests/index" }] : []),
+        current,
+      ],
+    } });
+  }, [detail, navigation]);
   const heading = useRef<View>(null);
   const available = vehicleHistoryAvailable();
   const denied = error instanceof ApiError && [401, 403, 404].includes(error.status);

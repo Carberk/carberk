@@ -260,16 +260,22 @@ it("rejects malformed API replies instead of rendering an invented enquiry", asy
 });
 
 
-it.each([false, true])("returns an anchored cold link to its feature destination (detail=%s)", async (detail) => {
-  vi.mocked(useNavigation).mockReturnValue({ getState: () => ({
+it.each([
+  [false, ["(tabs)", "vehicle-history/requests/index"]],
+  [true, ["(tabs)", "vehicle-history/requests/index", "vehicle-history/requests/[id]"]],
+] as const)("gives native Back the cold-link destinations (detail=%s)", async (detail, names) => {
+  const dispatch = vi.fn();
+  vi.mocked(useNavigation).mockReturnValue({ dispatch, getState: () => ({
     index: 1, routes: [{ name: "(tabs)" }, { name: detail ? "vehicle-history/requests/[id]" : "vehicle-history/requests/index" }],
   }) } as ReturnType<typeof useNavigation>);
   routeParams.id = requestId;
   vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", undefined);
-  const view = await renderMobile(detail ? <RequestScreen /> : <HistoryScreen />);
-  await fireEvent.press(view.getByRole("button", { name: detail ? "Back to requests" : "Back" }));
-  expect(routerMock.dismissTo).toHaveBeenCalledWith(detail ? "/vehicle-history/requests" : "/(tabs)/chat");
-  expect(routerMock.back).not.toHaveBeenCalled();
+  await renderMobile(detail ? <RequestScreen /> : <HistoryScreen />);
+  expect(dispatch).toHaveBeenCalled();
+  expect(dispatch.mock.calls[0]?.[0].type).toBe("RESET");
+  const result = dispatch.mock.calls[0]?.[0].payload;
+  expect(result.routes.map((route: { name: string }) => route.name)).toEqual(names);
+  expect(result.routes[0].state.routes).toEqual([{ name: "chat" }]);
 });
 
 it("keeps Back to the genuine Messages calling tab", async () => {
