@@ -167,12 +167,15 @@ export function RequestDetail({ id }: { id: string }) {
   const viewer = useHistoryViewer();
   const query = useHistoryRequest(id, viewer, vehicleHistoryAvailable());
   const request = query.data;
+  const transientError = request && query.error instanceof ApiError && (query.error.status === 0 || query.error.status >= 500)
+    ? query.error : null;
   return (
-    <Reader detail scrolling={false} viewer={viewer} error={query.error} loading={query.isPending}
+    <Reader detail scrolling={false} viewer={viewer} error={transientError ? null : query.error} loading={query.isPending}
       refreshing={query.isRefetching} retry={() => void query.refetch()}>
       {request && viewer && <RequestConversation
         key={`${viewer.userId}:${viewer.sessionId}:${id}:${request.assignmentVersion}:${request.assignedOperator?.id}`}
-        viewer={viewer} request={request} header={<>
+        viewer={viewer} request={request} metadataError={transientError}
+        metadataCurrent={!query.error && !query.isFetching} metadataRefreshing={query.isFetching} header={<>
         <View className="gap-3 border-b-hairline border-border pb-5">
           <Text accessibilityRole="header" className="text-headline font-semibold">
             {t("vehicleHistory.enquiry")}

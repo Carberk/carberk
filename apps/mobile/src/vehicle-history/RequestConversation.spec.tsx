@@ -6,6 +6,7 @@ import { focusManager, onlineManager } from "@tanstack/react-query";
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
 import { act, fireEvent, getHost, renderMobile, routeParams, screenFocus } from "../../test/render";
 import { server } from "../../test/msw";
+import { NativeViewability } from "../../test/native-viewability";
 import { storeAuthSession } from "../auth/session";
 
 vi.mock("react-native-safe-area-context", async () => ({
@@ -105,6 +106,67 @@ it("keeps the reading position and arrived messages when reconciliation fails", 
   await fireEvent.press(view.getByRole("button", { name: "Retry" }));
   await vi.waitFor(() => expect(view.queryByText("Something went wrong")).toBeNull());
   expect(view.getByText("Questions are welcome.")).toBeTruthy();
+});
+
+it("reads a final long message when it fills the viewport, without reading it offscreen", async () => {
+  const text = "Ж / Ý / a question without VIN. ".repeat(100);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [{ ...message(), text }], nextCursor: null })),
+    http.post("*/vehicle-history/requests/:id/receipts", async ({ request }) => {
+      const body = await request.json() as { cursor: string; kind: string };
+      acknowledgements.push(body);
+      return HttpResponse.json({ participantId: userId, assignmentVersion: 0, receivedOrder: "1", readOrder: body.kind === "read" ? "1" : "0" });
+    }));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(text);
+  await vi.waitFor(() => expect(acknowledgements).toHaveLength(1));
+  const list = getHost(view.container, "RCTScrollView");
+  const native = new NativeViewability(list.props.viewabilityConfig);
+  const update = (offset: number) => native.onUpdate(
+    { data: list.props.data, getItemCount: (rows: unknown[]) => rows.length }, offset, 600,
+    { getCellMetrics: () => ({ offset: 0, length: 2000, index: 0, isMounted: true }) },
+    (index: number, isViewable: boolean) => ({ item: list.props.data[index], key: firstId, index, isViewable }),
+    list.props.onViewableItemsChanged,
+  );
+  try {
+    await act(() => update(2100));
+    expect(acknowledgements).toEqual([{ cursor: firstId, kind: "received" }]);
+    await act(() => update(700));
+    await vi.waitFor(() => expect(acknowledgements).toEqual([
+      { cursor: firstId, kind: "received" }, { cursor: firstId, kind: "read" },
+    ]));
+  } finally { native.dispose(); }
+});
+
+it("retains both pages through a metadata outage and resumes receipts only after recovery", async () => {
+  const cursors: (string | null)[] = [];
+  server.use(http.get("*/vehicle-history/requests/:id/messages", ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get("cursor");
+    cursors.push(cursor);
+    return HttpResponse.json(cursor ? { items: [message(nextId, "2")], nextCursor: null }
+      : { items: [message(firstId, "1", true)], nextCursor: firstId });
+  }), http.post("*/vehicle-history/requests/:id/receipts", async ({ request }) => {
+    const body = await request.json() as { cursor: string; kind: string };
+    acknowledgements.push(body);
+    return HttpResponse.json({ participantId: userId, assignmentVersion: 0, receivedOrder: "2", readOrder: body.kind === "read" ? "2" : "0" });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Can I ask without a VIN?");
+  await fireEvent.press(view.getByRole("button", { name: "Load more messages" }));
+  await view.findByText("Questions are welcome.");
+  await vi.waitFor(() => expect(acknowledgements).toHaveLength(2));
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 })));
+  await act(() => onlineManager.setOnline(false));
+  await act(() => onlineManager.setOnline(true));
+  await view.findByText(/Something went wrong|Could not refresh this request\./);
+  expect(view.getByText("Can I ask without a VIN?")).toBeTruthy();
+  expect(view.getByText("Questions are welcome.")).toBeTruthy();
+  await visible(view, [nextId]);
+  expect(acknowledgements).toEqual([{ cursor: firstId, kind: "received" }, { cursor: nextId, kind: "received" }]);
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry)));
+  await fireEvent.press(view.getByRole("button", { name: "Retry" }));
+  await vi.waitFor(() => expect(acknowledgements.at(-1)).toEqual({ cursor: nextId, kind: "read" }));
+  expect(cursors).toEqual([null, firstId, null, firstId]);
+  expect(view.getByText("Can I ask without a VIN?")).toBeTruthy();
 });
 
 it("waits for Received before Read, and acknowledges only a genuinely visible loaded row", async () => {

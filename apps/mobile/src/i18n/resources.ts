@@ -29,6 +29,7 @@ export const resources: Resource = {
   ru: {
     common: {
       vehicleHistory: {
+        requestRefreshFailed: "Не удалось обновить обращение.",
         assignedOperator: "Оператор: {{name}}", you: "Вы",
         moreMessages: "Загрузить ещё сообщения", pageFailed: "Не удалось загрузить следующие сообщения.",
         receiptFailed: "Не удалось обновить отметки сообщений.", retryReceipts: "Повторить обновление отметок",
@@ -1013,6 +1014,7 @@ export const resources: Resource = {
   tk: {
     common: {
       vehicleHistory: {
+        requestRefreshFailed: "Ýüz tutmany täzeläp bolmady.",
         assignedOperator: "Operator: {{name}}", you: "Siz",
         moreMessages: "Ýene habarlary ýükle", pageFailed: "Indiki habarlary ýükläp bolmady.",
         receiptFailed: "Habarlaryň ýagdaýyny täzeläp bolmady.", retryReceipts: "Habar ýagdaýyny gaýtadan täzele",
@@ -1997,6 +1999,7 @@ export const resources: Resource = {
   en: {
     common: {
       vehicleHistory: {
+        requestRefreshFailed: "Could not refresh this request.",
         assignedOperator: "Operator: {{name}}", you: "You",
         moreMessages: "Load more messages", pageFailed: "Could not load more messages.",
         receiptFailed: "Could not update message status.", retryReceipts: "Retry message status",

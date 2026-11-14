@@ -16,7 +16,7 @@ const focused = () => focusManager.isFocused();
 const online = () => onlineManager.isOnline();
 const options = { retry: false, staleTime: 0, networkMode: "always" as const };
 
-export function useRequestConversation(viewer: HistoryViewer, request: VehicleHistorySchemas.HistoryRequest) {
+export function useRequestConversation(viewer: HistoryViewer, request: VehicleHistorySchemas.HistoryRequest, metadataCurrent: boolean) {
   const readerId = useId();
   const { userId, sessionId } = viewer;
   const client = useQueryClient();
@@ -39,8 +39,8 @@ export function useRequestConversation(viewer: HistoryViewer, request: VehicleHi
   const [receiptError, setReceiptError] = useState<unknown>(null);
   const [retry, setRetry] = useState(0);
   const alive = useRef(true);
-  const visibility = useRef({ active, visibleIds });
-  visibility.current = { active: active && !pages.error && !receiptAccessDenied, visibleIds };
+  const visibility = useRef({ active, visibleIds, metadataCurrent });
+  visibility.current = { active: active && metadataCurrent && !pages.error && !receiptAccessDenied, visibleIds, metadataCurrent };
   const received = useRef<string | undefined>(undefined);
   const read = useRef<string | undefined>(undefined);
   const busy = useRef(false);
@@ -64,13 +64,13 @@ export function useRequestConversation(viewer: HistoryViewer, request: VehicleHi
   const tail = messages.at(-1)?.id;
   const visible = messages.filter((message) => visibleIds.includes(message.id)).at(-1)?.id;
   useEffect(() => {
-    if (!active || !connected || pages.isFetching || pages.error || receiptAccessDenied || !tail || receiptError || busy.current) return;
+    if (!active || !metadataCurrent || !connected || pages.isFetching || pages.error || receiptAccessDenied || !tail || receiptError || busy.current) return;
     if (received.current === tail && (!visible || read.current === visible)) return;
     busy.current = true;
     void (async () => {
       try {
         if (received.current !== tail) {
-          await stream.acknowledge(tail, "received");
+          await stream.acknowledge(tail, "received", () => visibility.current.metadataCurrent);
           received.current = tail;
         }
         if (visible && read.current !== visible && visibility.current.active && visibility.current.visibleIds.includes(visible)) {
@@ -85,7 +85,7 @@ export function useRequestConversation(viewer: HistoryViewer, request: VehicleHi
         if (alive.current) setRetry((value) => value + 1);
       }
     })();
-  }, [active, connected, pages.isFetching, pages.error, receiptAccessDenied, tail, visible, receiptError, retry, stream]);
+  }, [active, metadataCurrent, connected, pages.isFetching, pages.error, receiptAccessDenied, tail, visible, receiptError, retry, stream]);
   return { messages, pages, receipts, receiptError, connected, setVisibleIds,
     refresh: () => reconcile.current(),
     retryReceipt: () => { setReceiptError(null); setRetry((value) => value + 1); },
