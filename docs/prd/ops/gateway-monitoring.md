@@ -1,9 +1,11 @@
 # Closed staging gateway monitoring and preference rollback
 
-[R11](https://github.com/Carberk/carberk/issues/1164) keeps monitoring local to the
-gateway. It does not send external messages or depend on the broader diagnostics
-platform. The [gateway runbook](staging-gateway.md) owns transport, signing and
-ingress. Production changes require a separate approved rollout.
+[The foundation](https://github.com/Carberk/carberk/issues/1259) keeps monitoring
+local to the gateway. [R11](https://github.com/Carberk/carberk/issues/1164) retains
+durable API/photo/video monitoring through the actual merged media mappings.
+Neither sends external messages or depends on the broader diagnostics platform.
+The [gateway runbook](staging-gateway.md) owns transport, signing and ingress.
+Production changes require a separate approved rollout.
 
 ## Signals
 

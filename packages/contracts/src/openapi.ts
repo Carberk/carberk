@@ -4,6 +4,7 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 
 import { DateTimeSchema, z } from "./zod";
+import { RoutingPolicySchema } from "./schemas/routing-policy";
 import {
   ErrorResponseSchema,
   UploadObjectInvalidDetailsSchema,
@@ -348,6 +349,21 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     "AccountDeletionConfirmRequest",
     AccountDeletionConfirmRequestSchema,
   );
+
+  registry.register("RoutingPolicy", RoutingPolicySchema);
+  registry.registerPath({
+    method: "get", path: "/api/v1/routing/policy", tags: ["Routing"],
+    summary: "Read the bounded routing preference policy",
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: "Preference only; embedded routes and reachability remain available",
+        headers: { "Cache-Control": { schema: { type: "string", enum: ["private, no-store"] } } },
+        content: { "application/json": { schema: RoutingPolicySchema } },
+      },
+      401: { description: "Bearer authentication required" },
+    },
+  });
 
   // Admin report schemas
   registry.register("CreateReportRequest", CreateReportRequestSchema);

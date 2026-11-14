@@ -7706,6 +7706,32 @@
           }
         ]
       },
+      "RoutingPolicy": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "enum": [
+              1
+            ]
+          },
+          "disableTmPreference": {
+            "type": "boolean"
+          },
+          "maxAgeSeconds": {
+            "type": "number",
+            "enum": [
+              60
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "disableTmPreference",
+          "maxAgeSeconds"
+        ],
+        "additionalProperties": false
+      },
       "CreateReportRequest": {
         "type": "object",
         "properties": {
@@ -9854,6 +9880,67 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/routing/policy": {
+      "get": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Read the bounded routing preference policy",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preference only; embedded routes and reachability remain available",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "private, no-store"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "number",
+                      "enum": [
+                        1
+                      ]
+                    },
+                    "disableTmPreference": {
+                      "type": "boolean"
+                    },
+                    "maxAgeSeconds": {
+                      "type": "number",
+                      "enum": [
+                        60
+                      ]
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "disableTmPreference",
+                    "maxAgeSeconds"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bearer authentication required"
           }
         }
       }
