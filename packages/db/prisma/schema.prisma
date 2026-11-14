@@ -69,7 +69,8 @@ model User {
   otpRequests                  OtpRequest[]
   sessions                     Session[]
   staffGrants                  StaffGrant[]
-  historyRequests              VehicleHistoryRequest[]
+  historyRequests              VehicleHistoryRequest[] @relation("HistoryRequester")
+  assignedHistoryRequests      VehicleHistoryRequest[] @relation("HistoryAssignee")
   dealershipMemberships        DealershipMember[]
   ownedVehicles                OwnedVehicle[]
   blockedUsers                 BlockedUser[]             @relation("Blocker")
@@ -161,13 +162,18 @@ model StaffGrant {
 model VehicleHistoryRequest {
   id               String   @id @default(uuid())
   requesterId      String
-  requester        User     @relation(fields: [requesterId], references: [id], onDelete: Restrict)
+  requester        User     @relation("HistoryRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   attemptKey       String   @db.Uuid
   /// Immutable creation facts; session revocation and Listing deletion cannot rewrite them.
   creatorSessionId String
   sourceListingId  String?  @db.Uuid
   createdAt        DateTime @default(now())
 
+  assignedOperatorId String?
+  assignedOperator   User? @relation("HistoryAssignee", fields: [assignedOperatorId], references: [id], onDelete: Restrict)
+  assignmentVersion  Int @default(0)
+
+  @@index([assignedOperatorId, createdAt, id])
   @@unique([requesterId, attemptKey])
   @@index([requesterId, createdAt, id])
   @@map("vehicle_history_requests")

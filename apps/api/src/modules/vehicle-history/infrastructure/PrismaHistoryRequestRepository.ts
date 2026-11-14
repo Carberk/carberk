@@ -3,7 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
 import { type HistoryRequest, type HistoryRequestRepository } from "../domain/HistoryRequestRepository";
 
-const select = { id: true, sourceListingId: true, createdAt: true } as const;
+const select = { id: true, sourceListingId: true, createdAt: true, assignedOperatorId: true, assignmentVersion: true } as const;
 @Injectable()
 export class PrismaHistoryRequestRepository implements HistoryRequestRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}

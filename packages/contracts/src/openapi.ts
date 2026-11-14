@@ -36,6 +36,7 @@ import { SetProfilePhotoRequestSchema } from "./schemas/identity";
 import {
   HistoryDeskSchema, CreateHistoryRequestSchema, HistoryRequestSchema,
   ListHistoryRequestsQuerySchema, ListHistoryRequestsResponseSchema,
+  HistoryQueueQuerySchema, HistoryQueueResponseSchema, ClaimHistoryRequestSchema,
 } from "./schemas/vehicle-history";
 import { HistoryStaffChangeSchema, HistoryStaffLookupSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
 import {
@@ -394,6 +395,29 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   // Reports fake-door schemas
   registry.register("HistoryDesk", HistoryDeskSchema);
   registry.register("HistoryRequest", HistoryRequestSchema);
+  registry.registerPath({
+    method: "get", path: "/api/v1/vehicle-history/operator/requests", tags: ["Vehicle History"],
+    summary: "Minimal unassigned/mine enquiry metadata, newest first, 50 per page; local synthetic only",
+    security: [{ bearerAuth: [] }], request: { query: HistoryQueueQuerySchema },
+    responses: { 200: { description: "Private, no-store metadata page", content: { "application/json": { schema: HistoryQueueResponseSchema } } },
+      400: { description: "Invalid queue query" }, 401: { description: "Sign in again" }, 403: { description: "Current operator or cursor scope refused" } },
+  });
+  registry.registerPath({
+    method: "post", path: "/api/v1/vehicle-history/operator/requests/{id}/claim", tags: ["Vehicle History"],
+    summary: "Atomically claim an unassigned enquiry at its version; uncertain same-owner retries are safe",
+    security: [{ bearerAuth: [] }], request: { params: z.object({ id: z.string().guid() }),
+      body: { content: { "application/json": { schema: ClaimHistoryRequestSchema } } } },
+    responses: { 201: { description: "Private, no-store current assignment", content: { "application/json": { schema: HistoryRequestSchema } } },
+      400: { description: "Invalid version" }, 401: { description: "Sign in again" }, 403: { description: "Current operator refused" },
+      409: { description: "Assignment unavailable or version changed; refresh the inbox" } },
+  });
+  registry.registerPath({
+    method: "get", path: "/api/v1/vehicle-history/operator/requests/{id}", tags: ["Vehicle History"],
+    summary: "Selected enquiry for its current assignee only; local synthetic only",
+    security: [{ bearerAuth: [] }], request: { params: z.object({ id: z.string().guid() }) },
+    responses: { 200: { description: "Private, no-store assigned enquiry", content: { "application/json": { schema: HistoryRequestSchema } } },
+      401: { description: "Sign in again" }, 403: { description: "Unavailable enquiry or current assignee authority refused" } },
+  });
   registry.registerPath({
     method: "post", path: "/api/v1/vehicle-history/requests", tags: ["Vehicle History"],
     summary: "Create or retry one private local-synthetic enquiry (same requester and attempt key)",

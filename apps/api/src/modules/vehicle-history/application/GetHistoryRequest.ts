@@ -1,3 +1,4 @@
+import { HistoryRequestProjection } from "./HistoryRequestProjection";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { Inject, Injectable } from "@nestjs/common";
 import { CurrentHistoryRequester, type HistoryRequesterClaims } from "./CurrentHistoryRequester";
@@ -6,6 +7,7 @@ import { HISTORY_REQUEST_REPOSITORY, type HistoryRequestRepository } from "../do
 @Injectable()
 export class GetHistoryRequest {
   constructor(
+    @Inject(HistoryRequestProjection) private readonly projection: HistoryRequestProjection,
     @Inject(CurrentHistoryRequester) private readonly requester: CurrentHistoryRequester,
     @Inject(HISTORY_REQUEST_REPOSITORY) private readonly requests: HistoryRequestRepository,
   ) {}
@@ -13,6 +15,6 @@ export class GetHistoryRequest {
     const { requesterId } = await this.requester.require(claims);
     const result = await this.requests.find(requesterId, id);
     if (!result) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
-    return result;
+    return this.projection.one(result);
   }
 }

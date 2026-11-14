@@ -1,9 +1,10 @@
 import { z, DateTimeSchema } from "../zod";
 
+export const HistoryOperatorSchema = z.object({ id: z.string().guid(), displayName: z.string().nullable(), nameNumber: z.number().int() });
 export const HistoryDeskSchema = z.object({
   purpose: z.literal("vehicle-history"),
   mode: z.literal("synthetic"),
-  actor: z.object({ id: z.string().guid(), displayName: z.string().nullable(), nameNumber: z.number().int() }),
+  actor: HistoryOperatorSchema,
   // The OpenAPI adapter emits an invalid empty anyOf for an empty tuple.
   requests: z.tuple([]).openapi({ items: {} }),
 });
@@ -21,12 +22,25 @@ export const HistoryRequestSchema = z.object({
   sourceListingId: z.string().guid().nullable(),
   createdAt: DateTimeSchema,
   status: z.literal("enquiry"),
-  assignedOperator: z.null(),
+  assignedOperator: HistoryOperatorSchema.nullable(),
+  assignmentVersion: z.number().int().min(0).max(2147483647).default(0),
 });
 export type HistoryRequest = z.infer<typeof HistoryRequestSchema>;
 
 export const ListHistoryRequestsQuerySchema = z.object({ cursor: z.string().guid().optional() }).strict();
 export const ListHistoryRequestsResponseSchema = z.object({
   items: z.array(HistoryRequestSchema),
+  nextCursor: z.string().guid().nullable(),
+});
+
+export const ClaimHistoryRequestSchema = z.object({ expectedAssignmentVersion: z.number().int().min(0).max(2147483647) }).strict();
+export const HistoryQueueQuerySchema = z.object({
+  filter: z.enum(["unassigned", "mine"]).optional(),
+  search: z.string().trim().min(1).max(64).optional(),
+  cursor: z.string().guid().optional(),
+}).strict();
+export const HistoryQueueResponseSchema = z.object({
+  items: z.array(z.object({ id: z.string().guid(), createdAt: DateTimeSchema, status: z.literal("enquiry"),
+    assignmentVersion: z.number().int().min(0), mine: z.boolean() })),
   nextCursor: z.string().guid().nullable(),
 });

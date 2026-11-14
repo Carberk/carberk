@@ -6,12 +6,12 @@ import { CreateHistoryRequest } from "../application/CreateHistoryRequest";
 import { GetHistoryRequest } from "../application/GetHistoryRequest";
 import { ListHistoryRequests } from "../application/ListHistoryRequests";
 import type { HistoryRequesterClaims } from "../application/CurrentHistoryRequester";
-import { type HistoryRequest } from "../domain/HistoryRequestRepository";
+import type { HistoryRequestProjection } from "../application/HistoryRequestProjection";
 import { HistoryRequestExceptionFilter } from "./HistoryRequestExceptionFilter";
 
 type Request = FastifyRequest & { user?: HistoryRequesterClaims };
-const present = (item: HistoryRequest): VehicleHistorySchemas.HistoryRequest => ({
-  ...item, createdAt: item.createdAt.toISOString(), status: "enquiry", assignedOperator: null,
+const present = (item: Awaited<ReturnType<HistoryRequestProjection["one"]>>): VehicleHistorySchemas.HistoryRequest => ({
+  ...item, createdAt: item.createdAt.toISOString(), status: "enquiry",
 });
 
 @Controller("api/v1/vehicle-history/requests")

@@ -1,5 +1,6 @@
 export class HistoryRequestError extends Error {
-  constructor(readonly code: "HISTORY_REQUEST_DENIED" | "HISTORY_REQUEST_CONFLICT" | "HISTORY_REQUEST_INVALID") {
+  constructor(readonly code: "HISTORY_REQUEST_DENIED" | "HISTORY_REQUEST_CONFLICT" | "HISTORY_REQUEST_INVALID"
+    | "HISTORY_OPERATOR_DENIED" | "HISTORY_ASSIGNMENT_CONFLICT") {
     super(code);
   }
 }
