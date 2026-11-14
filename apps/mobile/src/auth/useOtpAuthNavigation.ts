@@ -32,51 +32,49 @@ export function useOtpAuthNavigation(router: Router) {
       return;
     }
 
-    // Publish the disabled native guard before dispatching the chosen exit.
-    const frame = requestAnimationFrame(() => {
-      if (exit === "change-method") {
-        router.back();
-        return;
-      }
-
-      // Reuse the entry already beneath Code, even when its route is email.
-      // A standalone code link still falls back to the valid phone entry.
-      if (exit === "use-phone") {
-        if (selectMountedSignInEntry("phone")) router.back();
-        else router.dismissTo("/(auth)/phone");
-        return;
-      }
-
-      if (typeof exit === "object") {
-        router.replace(
-          exit.invalidDestination === "email"
-            ? "/(auth)/email"
-            : "/(auth)/phone",
-        );
-        return;
-      }
-
-      // Code Back edits the method already under it. Only leaving that entry
-      // abandons sign-in; a standalone Code route retains its legacy fallback.
-      if (exit === "cancel" && hasMountedSignInEntry()) {
-        router.back();
-        return;
-      }
-
-      const authIntent = useAuthIntentStore.getState();
-      if (exit === "complete") {
-        authIntent.completeSignIn(router);
-        return;
-      }
-
-      if (authIntent.intent) {
-        authIntent.cancelSignIn(router);
-        return;
-      }
-
+    // The guard is disabled in this committed render. A native remount can
+    // cancel an animation frame before it delivers the chosen exit.
+    if (exit === "change-method") {
       router.back();
-    });
-    return () => cancelAnimationFrame(frame);
+      return;
+    }
+
+    // Reuse the entry already beneath Code, even when its route is email.
+    // A standalone code link still falls back to the valid phone entry.
+    if (exit === "use-phone") {
+      if (selectMountedSignInEntry("phone")) router.back();
+      else router.dismissTo("/(auth)/phone");
+      return;
+    }
+
+    if (typeof exit === "object") {
+      router.replace(
+        exit.invalidDestination === "email"
+          ? "/(auth)/email"
+          : "/(auth)/phone",
+      );
+      return;
+    }
+
+    // Code Back edits the method already under it. Only leaving that entry
+    // abandons sign-in; a standalone Code route retains its legacy fallback.
+    if (exit === "cancel" && hasMountedSignInEntry()) {
+      router.back();
+      return;
+    }
+
+    const authIntent = useAuthIntentStore.getState();
+    if (exit === "complete") {
+      authIntent.completeSignIn(router);
+      return;
+    }
+
+    if (authIntent.intent) {
+      authIntent.cancelSignIn(router);
+      return;
+    }
+
+    router.back();
   }, [exit, router]);
 
   const cancel = useCallback(() => setExit((current) => current ?? "cancel"), []);
