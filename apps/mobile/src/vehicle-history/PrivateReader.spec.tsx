@@ -35,6 +35,10 @@ beforeEach(async () => {
   vi.stubEnv("EXPO_PUBLIC_ENV", "development");
   vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", "true");
   server.use(http.get("*/catalog/brands", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })));
+  server.use(
+    http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })),
+    http.get("*/vehicle-history/requests/:id/receipts", () => HttpResponse.json({ items: [] })),
+  );
   await storeAuthSession(session());
 });
 

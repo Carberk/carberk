@@ -109,6 +109,8 @@ export const queryKeys = {
     list: (viewerId?: string, sessionId?: string) => ["vehicle-history", viewerId, sessionId, "requests"] as const,
     detail: (viewerId: string | undefined, sessionId: string | undefined, id: string) =>
       [...queryKeys.vehicleHistory.list(viewerId, sessionId), id] as const,
+    transcript: (viewerId: string, sessionId: string, id: string, version: number, operatorId: string | undefined, readerId: string) =>
+      [...queryKeys.vehicleHistory.detail(viewerId, sessionId, id), "transcript", version, operatorId, readerId] as const,
   },
 
   reports: {

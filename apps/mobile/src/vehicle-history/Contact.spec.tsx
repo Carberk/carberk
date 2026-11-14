@@ -56,6 +56,10 @@ beforeEach(async () => {
     bodies.push(body);
     return HttpResponse.json(enquiry(body.sourceListingId));
   }));
+  server.use(
+    http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })),
+    http.get("*/vehicle-history/requests/:id/receipts", () => HttpResponse.json({ items: [] })),
+  );
   await storeAuthSession(session());
 });
 afterEach(() => { onlineManager.setOnline(true); vi.unstubAllEnvs(); });
