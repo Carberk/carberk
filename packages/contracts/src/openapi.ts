@@ -42,7 +42,7 @@ import {
   ReadOperatorHistoryReceiptsSchema, HistoryReceiptSchema, HistoryReceiptsSchema,
   SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
   ReadOperatorHistoryMessagesSchema, HistoryMessageSchema, HistoryMessagesPageSchema, HistoryMessageSendQuerySchema,
-  ReadHistoryReminderSchema, ReadOperatorHistoryReminderSchema, StopHistoryRemindersSchema, HistoryReminderSchema,
+  ReadHistoryReminderSchema, ReadOperatorHistoryReminderSchema, StopHistoryRemindersSchema, SendHistoryReminderSchema, HistoryReminderSchema,
 } from "./schemas/vehicle-history";
 import { HistoryStaffChangeSchema, HistoryStaffLookupSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
 import {
@@ -436,6 +436,19 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   registry.register("HistoryDesk", HistoryDeskSchema);
   registry.register("HistoryRequest", HistoryRequestSchema);
   registry.register("HistoryReminder", HistoryReminderSchema);
+  registry.registerPath({
+    method: "post", path: "/api/v1/vehicle-history/operator/requests/{id}/reminder",
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: "Current assignee manually sends once after 24 elapsed UTC hours; local synthetic only",
+    request: { params: z.object({ id: z.string().guid() }), query: ReadHistoryReminderSchema,
+      body: { content: { "application/json": { schema: SendHistoryReminderSchema } } } },
+    responses: { 201: { description: "Private, no-store safe state; authorized retries return the immutable original before waiting-version/eligibility arbitration",
+      content: { "application/json": { schema: HistoryReminderSchema } } },
+      400: { description: "Invalid ID, strict query, attempt UUID or bounded versions; no caller text/clock/policy" },
+      401: { description: "Sign in again" }, 403: { description: "Current exact-purpose/assignment authority refused; private, no-store" },
+      409: { description: "Assignment/wait changed, ineligible or attempt already belongs to ordinary text; refresh reminder state" },
+      503: { description: "Temporarily unavailable; retry the original attempt" } },
+  });
   for (const operator of [false, true]) registry.registerPath({
     method: "get", path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/reminder`,
     tags: ["Vehicle History"], security: [{ bearerAuth: [] }],

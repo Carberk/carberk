@@ -10321,7 +10321,220 @@
         }
       }
     },
-    "/api/v1/vehicle-history/requests/{id}/reminder": {
+    "/api/v1/vehicle-history/operator/requests/{id}/reminder": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Current assignee manually sends once after 24 elapsed UTC hours; local synthetic only",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedWaitingVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "expectedAssignmentVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "clientMessageId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "expectedWaitingVersion",
+                  "expectedAssignmentVersion",
+                  "clientMessageId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store safe state; authorized retries return the immutable original before waiting-version/eligibility arbitration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reason": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "customer_answer",
+                        "quote_choice"
+                      ]
+                    },
+                    "since": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "eligibleAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "eligible": {
+                      "type": "boolean"
+                    },
+                    "ineligibleReason": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "declined",
+                        "stopped",
+                        "used",
+                        "not_waiting",
+                        "too_early"
+                      ]
+                    },
+                    "declined": {
+                      "type": "boolean"
+                    },
+                    "stopped": {
+                      "type": "boolean"
+                    },
+                    "used": {
+                      "type": "boolean"
+                    },
+                    "outcome": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "TEXT"
+                          ]
+                        },
+                        "clientMessageId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "text": {
+                          "type": "string",
+                          "maxLength": 4000
+                        },
+                        "order": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]{0,18}$"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "author": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "nameNumber": {
+                              "type": "integer"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "requester",
+                                "operator"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "displayName",
+                            "nameNumber",
+                            "kind"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "clientMessageId",
+                        "text",
+                        "order",
+                        "createdAt",
+                        "author"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "reason",
+                    "since",
+                    "version",
+                    "eligibleAt",
+                    "eligible",
+                    "ineligibleReason",
+                    "declined",
+                    "stopped",
+                    "used",
+                    "outcome"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ID, strict query, attempt UUID or bounded versions; no caller text/clock/policy"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current exact-purpose/assignment authority refused; private, no-store"
+          },
+          "409": {
+            "description": "Assignment/wait changed, ineligible or attempt already belongs to ordinary text; refresh reminder state"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry the original attempt"
+          }
+        }
+      },
       "get": {
         "tags": [
           "Vehicle History"
@@ -10341,6 +10554,15 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
           }
         ],
         "responses": {
@@ -10505,7 +10727,7 @@
         }
       }
     },
-    "/api/v1/vehicle-history/operator/requests/{id}/reminder": {
+    "/api/v1/vehicle-history/requests/{id}/reminder": {
       "get": {
         "tags": [
           "Vehicle History"
@@ -10525,15 +10747,6 @@
             "required": true,
             "name": "id",
             "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^(0|[1-9][0-9]*)$"
-            },
-            "required": true,
-            "name": "expectedAssignmentVersion",
-            "in": "query"
           }
         ],
         "responses": {

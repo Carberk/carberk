@@ -83,6 +83,10 @@ export const HistoryReceiptsSchema = ServiceReceiptsSchema;
 export const ReadHistoryReminderSchema = HistoryMessageSendQuerySchema;
 export const ReadOperatorHistoryReminderSchema = ReadOperatorHistoryReceiptsSchema;
 export const StopHistoryRemindersSchema = z.object({ expectedWaitingVersion: AssignmentVersionSchema }).strict();
+export const SendHistoryReminderSchema = StopHistoryRemindersSchema.extend({
+  expectedAssignmentVersion: AssignmentVersionSchema,
+  clientMessageId: MessageKeySchema,
+}).strict();
 export const HistoryReminderSchema = z.object({
   reason: z.enum(["customer_answer", "quote_choice"]).nullable(),
   since: DateTimeSchema.nullable(),

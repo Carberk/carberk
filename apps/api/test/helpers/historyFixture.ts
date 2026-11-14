@@ -14,7 +14,8 @@ import { VehicleHistoryModule } from "../../src/modules/vehicle-history/vehicle-
 import { bullTestRoot } from "./bullTestRoot";
 
 /** Listening test-only HTTP/auth target; never provisions a browser/device session. */
-export async function historyFixture(configure?: (config: ConfigService) => void) {
+export async function historyFixture(configure?: (config: ConfigService) => void,
+  beforeListen?: (app: NestFastifyApplication) => void) {
   const module = await Test.createTestingModule({ imports: [bullTestRoot(), VehicleHistoryModule,
     JwtModule.register({ global: true, secret: "synthetic-history-assignment-test-secret" }),
   ] }).compile();
@@ -29,6 +30,7 @@ export async function historyFixture(configure?: (config: ConfigService) => void
     if (--current.remaining === 0) { barrier = undefined; current.release(); }
     await current.ready;
   });
+  beforeListen?.(app);
   await app.listen(0, "127.0.0.1");
   const prisma = app.get(PrismaService), config = app.get(ConfigService);
   configure?.(config);

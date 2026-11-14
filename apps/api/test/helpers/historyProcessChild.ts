@@ -1,15 +1,23 @@
 import "reflect-metadata";
 import { historyFixture } from "./historyFixture";
-import { HISTORY_WAITING_LIFECYCLE, type HistoryWaitingActor, type HistoryWaitingLifecycle, type HistoryWaitTransition } from "../../src/modules/vehicle-history/vehicle-history.public";
+import { HISTORY_CLOCK, HISTORY_WAITING_LIFECYCLE, type HistoryClock, type HistoryWaitingActor, type HistoryWaitingLifecycle, type HistoryWaitTransition } from "../../src/modules/vehicle-history/vehicle-history.public";
 
 // Test entrypoint only: real HTTP/Identity/History/Business Messaging composition.
-// No fault switches: the parent controls barriers solely in its disposable DB.
+// DB barriers and a test-only real response gate; never imported by the API.
 async function main() {
   const fixture = await historyFixture((config) => {
     config.set("APP_ENV", "test");
     config.set("VEHICLE_HISTORY_SYNTHETIC_ENABLED", true);
     config.set("VEHICLE_HISTORY_SYNTHETIC_USER_IDS", process.env["HISTORY_PROCESS_TESTERS"]);
+  }, (app) => {
+    app.getHttpAdapter().getInstance().addHook("onSend", async (request) => {
+      if (request.headers["x-history-response"] !== "hold") return;
+      process.send?.({ type: "response-held" });
+      await new Promise<void>(() => { /* SIGKILL interrupts the actual unsent response. */ });
+    });
   });
+  const historyNow = process.env["HISTORY_PROCESS_NOW"];
+  if (historyNow) fixture.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date(historyNow);
   process.on("message", async (message: { type: string; actor: HistoryWaitingActor; id: string; transition: HistoryWaitTransition }) => {
     if (message.type === "close") {
       await fixture.app.close();

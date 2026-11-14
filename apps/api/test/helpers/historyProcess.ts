@@ -5,10 +5,10 @@ import type { HistoryWaitingActor, HistoryWaitingState, HistoryWaitTransition } 
 type Reply = { type: string; port: number; pid: number; value: HistoryWaitingState; code?: string };
 
 /** Each call owns one actual listener/process on this worker's explicit targets. */
-export async function historyProcess(testers: string[]) {
+export async function historyProcess(testers: string[], options?: { historyNow: string }) {
   const child = fork(resolve(__dirname, "historyProcessChild.ts"), [], {
     execArgv: ["--import", "tsx"], serialization: "advanced",
-    env: { ...process.env, HISTORY_PROCESS_TESTERS: testers.join(",") },
+    env: { ...process.env, HISTORY_PROCESS_TESTERS: testers.join(","), HISTORY_PROCESS_NOW: options?.historyNow },
     stdio: ["ignore", "ignore", "ignore", "ipc"],
   });
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((done) => {
@@ -34,6 +34,7 @@ export async function historyProcess(testers: string[]) {
   catch (error) { child.kill("SIGKILL"); await exited; throw error; }
   return {
     pid: ready.pid, url: `http://127.0.0.1:${ready.port}`,
+    responseHeld: () => response("response-held"),
     async change(actor: HistoryWaitingActor, id: string, transition: HistoryWaitTransition) {
       const pending = response("result");
       child.send({ type: "change", actor, id, transition });

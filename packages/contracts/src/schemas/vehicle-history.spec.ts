@@ -4,7 +4,7 @@ import { ClaimHistoryRequestSchema, HistoryQueueQuerySchema, HistoryRequestSchem
   HistoryQueueResponseSchema, OperatorHistoryRequestSchema, HistoryInboxActionSchema,
   SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
   ReadOperatorHistoryMessagesSchema, HistoryMessageSchema,
-  ReadHistoryReminderSchema, ReadOperatorHistoryReminderSchema, StopHistoryRemindersSchema, HistoryReminderSchema } from "./vehicle-history";
+  ReadHistoryReminderSchema, ReadOperatorHistoryReminderSchema, StopHistoryRemindersSchema, SendHistoryReminderSchema, HistoryReminderSchema } from "./vehicle-history";
 
 describe("History assignment HTTP contracts", () => {
   it("keeps public operator context separate from customer contracts and rejects private fields", () => {
@@ -45,6 +45,19 @@ describe("History assignment HTTP contracts", () => {
 });
 
 describe("History reminder HTTP contracts", () => {
+  it("accepts only a bounded manual attempt and versions, never caller text, clock or once identity", () => {
+    const input = { clientMessageId: "10000000-0000-4000-8000-000000001218", expectedWaitingVersion: 0, expectedAssignmentVersion: 1 };
+    expect(SendHistoryReminderSchema.parse(input)).toEqual(input);
+    for (const version of [-1, 0.5, 2147483648, "0", null, Infinity]) {
+      expect(SendHistoryReminderSchema.safeParse({ ...input, expectedWaitingVersion: version }).success).toBe(false);
+      expect(SendHistoryReminderSchema.safeParse({ ...input, expectedAssignmentVersion: version }).success).toBe(false);
+    }
+    for (const extra of [{ clientMessageId: "bad" }, { clientMessageId: undefined }, { expectedWaitingVersion: undefined },
+      { expectedAssignmentVersion: undefined }, { text: "forged" }, { locale: "ru" }, { operationKey: input.clientMessageId },
+      { now: "2030" }, { policy: {} }, { actorId: input.clientMessageId }, { outcome: {} }]) {
+      expect(SendHistoryReminderSchema.safeParse({ ...input, ...extra }).success).toBe(false);
+    }
+  });
   it("accepts only bounded versions and refuses caller clocks, identity, outcome and policy facts", () => {
     expect(ReadHistoryReminderSchema.parse({})).toEqual({});
     expect(ReadOperatorHistoryReminderSchema.parse({ expectedAssignmentVersion: "2147483647" })).toEqual({ expectedAssignmentVersion: 2147483647 });

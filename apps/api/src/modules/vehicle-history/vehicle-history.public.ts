@@ -10,7 +10,7 @@ export const HISTORY_WAITING_LIFECYCLE = Symbol("HistoryWaitingLifecycle");
  * and assignment version; stop requires the current requester. Revisions are
  * monotonically ordered per request, with stable source identity on retry.
  * Synchronizes committed messages before applying the expected waiting version.
- * Reminder read/Stop HTTP consumes this policy; manual send remains #1218.
+ * Reminder read/send/Stop HTTP consumes this policy under the same fence.
  * This lifecycle seam exposes no quote transport or reminder append.
  */
 export interface HistoryWaitingLifecycle {
