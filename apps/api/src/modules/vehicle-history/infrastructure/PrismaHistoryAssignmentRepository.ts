@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
-import type { HistoryAssignmentRepository, HistoryQueueQuery, HistoryMessageRequest } from "../domain/HistoryAssignmentRepository";
+import type { HistoryAssignmentRepository, HistoryQueueQuery, HistoryQueueItem, HistoryMessageRequest } from "../domain/HistoryAssignmentRepository";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { ConfigService } from "@nestjs/config";
 import { Pool } from "pg";
@@ -49,10 +49,10 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
     const scope: Prisma.VehicleHistoryRequestWhereInput = {
       ...(query.filter === "mine" ? { assignedOperatorId: operatorId } : query.filter === "unassigned"
         ? { assignedOperatorId: null } : { OR: [{ assignedOperatorId: null }, { assignedOperatorId: operatorId }] }),
-      ...(query.search ? { id: { contains: query.search, mode: "insensitive" } } : {}),
     };
+    const select = { id: true, createdAt: true, requesterId: true, assignmentVersion: true, assignedOperatorId: true } as const;
     const after = query.cursor ? await this.prisma.vehicleHistoryRequest.findFirst({
-      where: { AND: [scope, { id: query.cursor }] }, select: { id: true, createdAt: true },
+      where: { AND: [scope, { id: query.cursor }] }, select,
     }) : null;
     if (query.cursor && !after) throw new HistoryRequestError("HISTORY_OPERATOR_DENIED");
     const rows = await this.prisma.vehicleHistoryRequest.findMany({
@@ -60,10 +60,19 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
         { createdAt: { lt: after.createdAt } }, { createdAt: after.createdAt, id: { lt: after.id } },
       ] }] : [])] },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51,
-      select: { id: true, createdAt: true, assignmentVersion: true, assignedOperatorId: true },
+      select,
     });
-    return { items: rows.slice(0, 50).map(({ assignedOperatorId, ...row }) => ({ ...row, mine: assignedOperatorId === operatorId })),
-      nextCursor: rows.length > 50 ? rows[49]?.id ?? null : null };
+    return { items: rows.slice(0, 50), anchor: after, nextCursor: rows.length > 50 ? rows[49]?.id ?? null : null };
+  }
+
+  async confirmQueue(operatorId: string, query: HistoryQueueQuery, items: HistoryQueueItem[]) {
+    if (!items.length) return;
+    const count = await this.prisma.vehicleHistoryRequest.count({ where: {
+      AND: [{ OR: items.map(({ id, assignmentVersion, assignedOperatorId }) => ({ id, assignmentVersion, assignedOperatorId })) },
+        query.filter === "mine" ? { assignedOperatorId: operatorId } : query.filter === "unassigned"
+          ? { assignedOperatorId: null } : { OR: [{ assignedOperatorId: null }, { assignedOperatorId: operatorId }] }],
+    } });
+    if (count !== items.length) throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
   }
 
   async claimUnassigned(operatorId: string, id: string, expectedVersion: number, confirmAuthority: () => Promise<void>) {
@@ -80,6 +89,6 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
 
   async findAssigned(operatorId: string, id: string) {
     return this.prisma.vehicleHistoryRequest.findFirst({ where: { id, assignedOperatorId: operatorId },
-      select: { id: true, createdAt: true, sourceListingId: true, assignedOperatorId: true, assignmentVersion: true } });
+      select: { id: true, requesterId: true, createdAt: true, sourceListingId: true, assignedOperatorId: true, assignmentVersion: true } });
   }
 }

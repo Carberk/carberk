@@ -31,6 +31,7 @@ export class HistoryAssignmentController {
   @Get(":id")
   @Header("Cache-Control", "private, no-store")
   async detail(@Req() request: Request, @Param("id") id: string) {
+    if (!VehicleHistorySchemas.HistoryRequestSchema.shape.id.safeParse(id).success) throw new HistoryRequestError("HISTORY_REQUEST_INVALID");
     const item = await this.getRequest.execute(request.user ?? {}, id);
     return { ...item, createdAt: item.createdAt.toISOString(), status: "enquiry" };
   }
@@ -39,7 +40,7 @@ export class HistoryAssignmentController {
   @Header("Cache-Control", "private, no-store")
   async claim(@Req() request: Request, @Param("id") id: string, @Body() body: unknown) {
     const input = VehicleHistorySchemas.ClaimHistoryRequestSchema.safeParse(body);
-    if (!input.success) throw new HistoryRequestError("HISTORY_REQUEST_INVALID");
+    if (!input.success || !VehicleHistorySchemas.HistoryRequestSchema.shape.id.safeParse(id).success) throw new HistoryRequestError("HISTORY_REQUEST_INVALID");
     const item = await this.claimRequest.execute(request.user ?? {}, id, input.data.expectedAssignmentVersion);
     return { ...item, createdAt: item.createdAt.toISOString(), status: "enquiry" };
   }

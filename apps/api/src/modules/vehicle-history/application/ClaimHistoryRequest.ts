@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { CurrentHistoryOperator } from "./CurrentHistoryOperator";
 import type { HistoryRequesterClaims } from "./CurrentHistoryRequester";
-import { HistoryRequestProjection } from "./HistoryRequestProjection";
+import { HistoryQueueProjection } from "./HistoryQueueProjection";
 import { HISTORY_ASSIGNMENT_REPOSITORY, type HistoryAssignmentRepository } from "../domain/HistoryAssignmentRepository";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 
@@ -10,7 +10,7 @@ export class ClaimHistoryRequest {
   constructor(
     @Inject(CurrentHistoryOperator) private readonly operator: CurrentHistoryOperator,
     @Inject(HISTORY_ASSIGNMENT_REPOSITORY) private readonly assignments: HistoryAssignmentRepository,
-    @Inject(HistoryRequestProjection) private readonly projection: HistoryRequestProjection,
+    @Inject(HistoryQueueProjection) private readonly projection: HistoryQueueProjection,
   ) {}
   async execute(claims: HistoryRequesterClaims, id: string, expectedVersion: number) {
     const actor = await this.operator.require(claims);
@@ -23,6 +23,10 @@ export class ClaimHistoryRequest {
     if (!current || (current.assignmentVersion !== expectedVersion && !(expectedVersion === 0 && current.assignmentVersion === 1))) {
       throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
     }
-    return this.projection.one(current);
+    const result = await this.projection.one(current, actor.id);
+    const final = await this.assignments.findAssigned(actor.id, id);
+    await this.operator.require(claims);
+    if (!final || final.assignmentVersion !== current.assignmentVersion) throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
+    return result;
   }
 }

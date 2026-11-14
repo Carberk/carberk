@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { JwtService } from "@nestjs/jwt";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { historyFixture } from "../../../../test/helpers/historyFixture";
 import { eventually } from "../../../../test/helpers/eventually";
 
@@ -22,15 +22,85 @@ describe("Current History assignment over listening HTTP", () => {
       .send({ attemptKey, sourceListingId: randomUUID() }).expect(201)).body;
     return { customer, body, attemptKey };
   }
-  it("exposes only minimal unassigned metadata and requires a claim before selected reads", async () => {
+  it("exposes public enquiry metadata and requires a claim before selected reads", async () => {
     const customer = await f.actor(null), operator = await f.actor();
     const created = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })
       .send({ attemptKey: randomUUID(), sourceListingId: randomUUID() }).expect(201)).body;
     const page = await f.request.get(path).auth(operator.token, { type: "bearer" }).expect(200);
     expect(page.headers["cache-control"]).toBe("private, no-store");
     expect(page.body).toEqual({ items: [{ id: created.id, createdAt: created.createdAt,
-      status: "enquiry", assignmentVersion: 0, mine: false }], nextCursor: null });
+      status: "enquiry", assignmentVersion: 0, mine: false, assignedOperator: null,
+      requester: { displayName: "Ayna", nameNumber: 1213, deleted: false } }], nextCursor: null });
     await f.request.get(`${path}/${created.id}`).auth(operator.token, { type: "bearer" }).expect(403);
+  });
+
+  it("fills sparse name-search pages across all eligible candidates without gaps or private fields", async () => {
+    const match = await f.actor(null), noise = await f.actor(null), operator = await f.actor(), other = await f.actor();
+    await f.prisma.user.update({ where: { id: match.user.id }, data: { displayName: "Dünýä Sparse", role: "admin" } });
+    const rows = Array.from({ length: 230 }, (_, index) => ({ id: randomUUID(), requesterId: index >= 65 && index % 3 === 2
+      ? match.user.id : noise.user.id, attemptKey: randomUUID(), creatorSessionId: noise.session.id, createdAt: new Date(Date.UTC(2026, 10, 15, 0, 0, 230 - index)) }));
+    await f.prisma.vehicleHistoryRequest.createMany({ data: rows });
+    const hidden = await f.prisma.vehicleHistoryRequest.create({ data: { requesterId: match.user.id, creatorSessionId: match.session.id, attemptKey: randomUUID(),
+      assignedOperatorId: other.user.id, assignmentVersion: 1 } });
+    const first = (await get(operator, "?filter=unassigned&search=SPARSE").expect(200)).body;
+    expect(first.items).toHaveLength(50);
+    const second = (await get(operator, `?filter=unassigned&search=SPARSE&cursor=${first.nextCursor}`).expect(200)).body;
+    expect(second.items).toHaveLength(5);
+    expect(second.nextCursor).toBeNull();
+    const all = [...first.items, ...second.items];
+    expect(all.map((item: { id: string }) => item.id)).toEqual(rows.filter((row) => row.requesterId === match.user.id).map((row) => row.id));
+    expect(new Set(all.map((item: { id: string }) => item.id)).size).toBe(55);
+    expect(all[0]).toEqual({ id: rows[65]!.id, createdAt: "2026-11-15T00:02:45.000Z", status: "enquiry",
+      assignmentVersion: 0, mine: false, assignedOperator: null, requester: { displayName: "Dünýä Sparse", nameNumber: 1213, deleted: false } });
+    expect((await get(operator, `?search=${hidden.id}`).expect(200)).body.items).toEqual([]);
+    await get(operator, `?search=Ayna&cursor=${first.nextCursor}`).expect(403);
+    expect((await get(operator, "?search=no-such-public-name").expect(200)).body).toEqual({ items: [], nextCursor: null });
+    await f.prisma.user.update({ where: { id: match.user.id }, data: { displayName: null, nameNumber: 4837 } });
+    expect((await get(operator, "?search=Sparse").expect(200)).body.items).toEqual([]);
+    for (const name of ["Driver 4837", "Водитель 4837", "Sürüji 4837"]) {
+      expect((await get(operator, `?search=${encodeURIComponent(name)}`).expect(200)).body.items).toHaveLength(50);
+    }
+    const reference = rows[65]!.id;
+    expect((await get(operator, `?search=${reference.toUpperCase()}`).expect(200)).body.items).toHaveLength(1);
+  });
+
+  it("uses Identity's deleted presentation and immutable untrusted source context only for the current assignee", async () => {
+    const { customer, body } = await enquiry(), operator = await f.actor();
+    await f.prisma.user.update({ where: { id: customer.user.id }, data: { email: null, emailVerifiedAt: null, displayName: "Old private name" } });
+    const queue = (await get(operator, `?search=${body.id}`).expect(200)).body.items[0];
+    expect(queue.requester).toEqual({ displayName: null, nameNumber: 1213, deleted: true });
+    const selected = (await claim(operator, body.id).expect(201)).body;
+    expect(selected).toEqual({ ...queue, mine: true, assignmentVersion: 1, sourceListingId: body.sourceListingId,
+      assignedOperator: { id: operator.user.id, displayName: "Ayna", nameNumber: 1213 } });
+    expect((await get(operator, `/${body.id}`).expect(200)).body).toEqual(selected);
+    expect((await get(operator, "?search=Old%20private%20name").expect(200)).body.items).toEqual([]);
+  });
+
+  it.each(["queue", "detail", "claim"])("refuses delayed %s projection after real session, grant or assignment loss", async (kind) => {
+    for (const lost of ["session", "grant", "assignment"]) {
+      const { body } = await enquiry(), operator = await f.actor(), other = await f.actor();
+      if (kind !== "claim") await claim(operator, body.id).expect(201);
+      let arrive!: () => void, release!: () => void;
+      const arrived = new Promise<void>((resolve) => { arrive = resolve; });
+      const ready = new Promise<void>((resolve) => { release = resolve; });
+      const original = f.prisma.user.findMany.bind(f.prisma.user);
+      // Delay only the database boundary; public identity and all authority reads remain real.
+      const delay = vi.spyOn(f.prisma.user, "findMany").mockImplementationOnce(((...args: Parameters<typeof original>) =>
+        (async () => { arrive(); await ready; return original(...args); })()) as typeof original);
+      const pending = (kind === "queue" ? get(operator, `?filter=mine&search=${body.id}`) : kind === "detail"
+        ? get(operator, `/${body.id}`) : claim(operator, body.id)).then((response) => response);
+      try {
+        await arrived;
+        if (lost === "session") await f.prisma.session.delete({ where: { id: operator.session.id } });
+        if (lost === "grant") await f.prisma.staffGrant.update({ where: { userId_purpose: { userId: operator.user.id, purpose: "vehicle_history" } }, data: { revokedAt: new Date() } });
+        if (lost === "assignment") await f.prisma.vehicleHistoryRequest.update({ where: { id: body.id }, data: { assignedOperatorId: other.user.id, assignmentVersion: 2 } });
+      } finally { release(); }
+      const response = await pending;
+      delay.mockRestore();
+      expect(response.status).toBe(lost === "assignment" ? 409 : 403);
+      expect(response.headers["cache-control"]).toBe("private, no-store");
+      expect(Object.keys(response.body).sort()).toEqual(["code", "message", "statusCode"]);
+    }
   });
 
   it("arbitrates competing operators, safely retries the owner and projects only public identity to the requester", async () => {
@@ -40,12 +110,13 @@ describe("Current History assignment over listening HTTP", () => {
     const responses = await Promise.all([a, b].map((actor) => claim(actor, body.id).set("x-history-concurrency", "claim")));
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     const winner = responses[0]!.status === 201 ? a : b, loser = winner === a ? b : a;
-    const assigned = responses.find((response) => response.status === 201)!.body;
-    expect(assigned).toEqual({ ...body, assignmentVersion: 1,
-      assignedOperator: { id: winner.user.id, displayName: "Ayna", nameNumber: 1213 } });
-    expect((await claim(winner, body.id).expect(201)).body).toEqual(assigned);
-    expect((await claim(winner, body.id, 1).expect(201)).body).toEqual(assigned);
-    expect((await get(winner, `/${body.id}`).expect(200)).body).toEqual(assigned);
+    const assigned = { ...body, assignmentVersion: 1,
+      assignedOperator: { id: winner.user.id, displayName: "Ayna", nameNumber: 1213 } };
+    const context = { ...assigned, mine: true, requester: { displayName: "Ayna", nameNumber: 1213, deleted: false } };
+    expect(responses.find((response) => response.status === 201)!.body).toEqual(context);
+    expect((await claim(winner, body.id).expect(201)).body).toEqual(context);
+    expect((await claim(winner, body.id, 1).expect(201)).body).toEqual(context);
+    expect((await get(winner, `/${body.id}`).expect(200)).body).toEqual(context);
     const stale = await claim(winner, body.id, 2).expect(409);
     expect(stale.body).toEqual({ statusCode: 409, code: "HISTORY_ASSIGNMENT_CONFLICT",
       message: "Assignment changed. Refresh the History inbox before trying again." });
@@ -61,7 +132,8 @@ describe("Current History assignment over listening HTTP", () => {
       .toEqual((await get(loser, `?cursor=${randomUUID()}`).expect(403)).body);
     expect((await get(loser, `?search=${body.id}`).expect(200)).body.items).toEqual([]);
     expect((await get(winner, `?filter=mine&search=${body.id}`).expect(200)).body.items)
-      .toEqual([{ id: body.id, createdAt: body.createdAt, status: "enquiry", assignmentVersion: 1, mine: true }]);
+      .toEqual([{ id: body.id, createdAt: body.createdAt, status: "enquiry", assignmentVersion: 1, mine: true, requester: { displayName: "Ayna", nameNumber: 1213, deleted: false },
+        assignedOperator: assigned.assignedOperator }]);
     expect((await get(winner, `?filter=unassigned&search=${body.id}`).expect(200)).body.items).toEqual([]);
     // Handover has no action in A. Seed its future durable state to prove old-owner fences.
     await f.prisma.vehicleHistoryRequest.update({ where: { id: body.id },
@@ -115,7 +187,8 @@ describe("Current History assignment over listening HTTP", () => {
     expect((await response)?.status).toBe(403);
     const other = await f.actor();
     expect((await get(other, `?search=${body.id}`).expect(200)).body.items).toEqual([
-      { id: body.id, createdAt: body.createdAt, status: "enquiry", assignmentVersion: 0, mine: false },
+      { id: body.id, createdAt: body.createdAt, status: "enquiry", assignmentVersion: 0, mine: false, assignedOperator: null,
+        requester: { displayName: "Ayna", nameNumber: 1213, deleted: false } },
     ]);
   });
 
@@ -175,6 +248,11 @@ describe("Current History assignment over listening HTTP", () => {
     expect(new Set([...first.items, ...last.items].map((item: { id: string }) => item.id))).toEqual(new Set(ids));
     await get(operator, `?filter=unassigned&cursor=${first.nextCursor}`).expect(403);
     for (const query of ["?cursor=bad", "?filter=paid", `?search=${"a".repeat(65)}`, "?search=", "?requesterId=forged"]) await get(operator, query).expect(400);
+    await get(operator, "/bad").expect(400);
+    const malformed = await f.request.post(`${path}/${body.id}/claim`).auth(operator.token, { type: "bearer" })
+      .set("Content-Type", "application/json").send('{"expectedAssignmentVersion":').expect(400);
+    expect(malformed.headers["cache-control"]).toBe("private, no-store");
+    expect(malformed.body.code).toBe("HISTORY_REQUEST_INVALID");
     for (const input of [{}, { expectedAssignmentVersion: -1 }, { expectedAssignmentVersion: 0.5 },
       { expectedAssignmentVersion: 2147483648 }, { expectedAssignmentVersion: 0, assignedOperatorId: operator.user.id }]) {
       await f.request.post(`${path}/${body.id}/claim`).auth(operator.token, { type: "bearer" }).send(input).expect(400);

@@ -10828,7 +10828,7 @@
         "tags": [
           "Vehicle History"
         ],
-        "summary": "Minimal unassigned/mine enquiry metadata, newest first, 50 per page; local synthetic only",
+        "summary": "Public unassigned/mine enquiry metadata and complete name/reference search, newest first, 50 per page; local synthetic only",
         "security": [
           {
             "bearerAuth": []
@@ -10896,10 +10896,58 @@
                           },
                           "assignmentVersion": {
                             "type": "integer",
-                            "minimum": 0
+                            "minimum": 0,
+                            "maximum": 2147483647
                           },
                           "mine": {
                             "type": "boolean"
+                          },
+                          "requester": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "displayName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "nameNumber": {
+                                "type": "integer",
+                                "minimum": 1000,
+                                "maximum": 9999
+                              },
+                              "deleted": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "displayName",
+                              "nameNumber",
+                              "deleted"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "assignedOperator": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "nameNumber": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "displayName",
+                              "nameNumber"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -10907,9 +10955,13 @@
                           "createdAt",
                           "status",
                           "assignmentVersion",
-                          "mine"
-                        ]
-                      }
+                          "mine",
+                          "requester",
+                          "assignedOperator"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 50
                     },
                     "nextCursor": {
                       "type": "string",
@@ -10920,7 +10972,8 @@
                   "required": [
                     "items",
                     "nextCursor"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -10933,6 +10986,9 @@
           },
           "403": {
             "description": "Current operator or cursor scope refused"
+          },
+          "409": {
+            "description": "Assignment changed while enriching the page; refresh the inbox"
           }
         }
       }
@@ -10981,7 +11037,7 @@
         },
         "responses": {
           "201": {
-            "description": "Private, no-store current assignment",
+            "description": "Private, no-store current operator context",
             "content": {
               "application/json": {
                 "schema": {
@@ -10989,11 +11045,6 @@
                   "properties": {
                     "id": {
                       "type": "string",
-                      "format": "uuid"
-                    },
-                    "sourceListingId": {
-                      "type": "string",
-                      "nullable": true,
                       "format": "uuid"
                     },
                     "createdAt": {
@@ -11005,6 +11056,38 @@
                       "enum": [
                         "enquiry"
                       ]
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "mine": {
+                      "type": "boolean"
+                    },
+                    "requester": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer",
+                          "minimum": 1000,
+                          "maximum": 9999
+                        },
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "displayName",
+                        "nameNumber",
+                        "deleted"
+                      ],
+                      "additionalProperties": false
                     },
                     "assignedOperator": {
                       "type": "object",
@@ -11026,22 +11109,26 @@
                         "id",
                         "displayName",
                         "nameNumber"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
-                    "assignmentVersion": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 2147483647,
-                      "default": 0
+                    "sourceListingId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
                     }
                   },
                   "required": [
                     "id",
-                    "sourceListingId",
                     "createdAt",
                     "status",
-                    "assignedOperator"
-                  ]
+                    "assignmentVersion",
+                    "mine",
+                    "requester",
+                    "assignedOperator",
+                    "sourceListingId"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -11085,7 +11172,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Private, no-store assigned enquiry",
+            "description": "Private, no-store assigned operator context; source Listing ID conveys no access",
             "content": {
               "application/json": {
                 "schema": {
@@ -11093,11 +11180,6 @@
                   "properties": {
                     "id": {
                       "type": "string",
-                      "format": "uuid"
-                    },
-                    "sourceListingId": {
-                      "type": "string",
-                      "nullable": true,
                       "format": "uuid"
                     },
                     "createdAt": {
@@ -11109,6 +11191,38 @@
                       "enum": [
                         "enquiry"
                       ]
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "mine": {
+                      "type": "boolean"
+                    },
+                    "requester": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer",
+                          "minimum": 1000,
+                          "maximum": 9999
+                        },
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "displayName",
+                        "nameNumber",
+                        "deleted"
+                      ],
+                      "additionalProperties": false
                     },
                     "assignedOperator": {
                       "type": "object",
@@ -11130,31 +11244,41 @@
                         "id",
                         "displayName",
                         "nameNumber"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
-                    "assignmentVersion": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 2147483647,
-                      "default": 0
+                    "sourceListingId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
                     }
                   },
                   "required": [
                     "id",
-                    "sourceListingId",
                     "createdAt",
                     "status",
-                    "assignedOperator"
-                  ]
+                    "assignmentVersion",
+                    "mine",
+                    "requester",
+                    "assignedOperator",
+                    "sourceListingId"
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid request reference"
           },
           "401": {
             "description": "Sign in again"
           },
           "403": {
             "description": "Unavailable enquiry or current assignee authority refused"
+          },
+          "409": {
+            "description": "Assignment changed during the read"
           }
         }
       }
