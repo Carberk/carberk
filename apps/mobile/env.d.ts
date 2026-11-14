@@ -5,6 +5,7 @@ declare const process: {
     EXPO_PUBLIC_WS_URL?: string;
     EXPO_PUBLIC_MEDIA_URL?: string;
     EXPO_PUBLIC_ENV?: string;
+    EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC?: string;
     EXPO_PUBLIC_PUSH_TRANSPORT?: string;
     EXPO_PUBLIC_APP_VERSION?: string;
     EXPO_PUBLIC_CUSTOM_SCHEME?: string;
