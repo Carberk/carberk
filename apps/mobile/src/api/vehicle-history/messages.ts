@@ -54,6 +54,16 @@ export function historyTranscript(viewer: HistoryViewer, requestId: string, sign
       for (const message of page.items) offered.set(message.id, message.order);
       return page;
     },
+    async send(input: { clientMessageId: string; text: string }, current: () => boolean) {
+      const body = VehicleHistorySchemas.SendHistoryTextSchema.parse(input);
+      const message = await transport("/messages", VehicleHistorySchemas.HistoryMessageSchema, body, current);
+      if (message.clientMessageId !== body.clientMessageId || message.text !== body.text
+        || message.author.kind !== "requester" || message.author.id !== viewer.userId) {
+        throw new ApiError("HISTORY_SEND_INVALID", 502);
+      }
+      // A committed send is not contiguous fetched-page or receipt evidence.
+      return message;
+    },
     receipts: () => transport("/receipts", VehicleHistorySchemas.HistoryReceiptsSchema),
     async acknowledge(cursor: string, kind: "received" | "read", visible = () => true) {
       const revision = generation;
