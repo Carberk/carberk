@@ -23,6 +23,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 | listings | [`listings/CONTEXT.md`](apps/api/src/modules/listings/CONTEXT.md) | Listing, ListingMedia, Favorite, Draft |
 | subscriptions | [`subscriptions/CONTEXT.md`](apps/api/src/modules/subscriptions/CONTEXT.md) | SavedSearch schema; matching/fanout not implemented |
 | conversations | [`conversations/CONTEXT.md`](apps/api/src/modules/conversations/CONTEXT.md) | Per-listing rich chat, messages, participant watermarks, mute, delete, report context |
+| business-messaging | [`business-messaging/CONTEXT.md`](apps/api/src/modules/business-messaging/CONTEXT.md) | Internal service text, retry-safe intents and durable ordered pages; History owns authority |
 | realtime | [`realtime/CONTEXT.md`](apps/api/src/modules/realtime/CONTEXT.md) | Authenticated Socket.IO adapter, user rooms, online/last-seen presence port |
 | notifications | [`notifications/CONTEXT.md`](apps/api/src/modules/notifications/CONTEXT.md) | Native device tokens, direct-message push decision/history, worker enqueue |
 | content | [`content/CONTEXT.md`](apps/api/src/modules/content/CONTEXT.md) | BlogPost schema; publishing not implemented |

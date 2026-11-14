@@ -45,3 +45,5 @@ export * as AdminSchemas from "./schemas/admin";
 
 export { DateTimeSchema } from "./zod";
 export { generateOpenApiDocument } from "./openapi";
+
+export * as ServiceMessagesSchemas from "./schemas/service-messages";
