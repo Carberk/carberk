@@ -287,6 +287,7 @@ it("pages the queue and transcript through real cursor URLs without receipt writ
   await screen.findByText("Can you check this car?");
   fireEvent.click(screen.getByRole("button", { name: "More messages" }));
   await screen.findByText("Second page text");
+  expect(document.activeElement?.textContent).toContain("Second page text");
   expect(screen.getByText("Can you check this car?")).toBeDefined();
   expect(requests.filter((r) => r.method === "POST")).toEqual([]);
 });
@@ -370,3 +371,20 @@ async function resolveServerTree(node: ReactNode): Promise<ReactNode> {
   }
   return cloneElement(node, {}, await resolveServerTree(node.props.children));
 }
+it("retries a server failure without losing the selected enquiry URL", async () => {
+  assigned = true;
+  window.history.replaceState(null, "", `?filter=mine&selected=${id}&v=1`);
+  const network = networkHandler();
+  let unavailable = false;
+  vi.mocked(fetch).mockImplementation((input, init) => unavailable && String(input).includes("/operator/")
+    ? Promise.resolve(Response.json({}, { status: 503 })) : network(input, init));
+  render(view()); await screen.findByText("Can you check this car?");
+  unavailable = true;
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await screen.findByText("Could not open the desk");
+  expect(screen.queryByText("Can you check this car?")).toBeNull();
+  unavailable = false;
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  expect(window.location.search).toBe(`?filter=mine&selected=${id}&v=1`);
+  await screen.findByText("Can you check this car?");
+});

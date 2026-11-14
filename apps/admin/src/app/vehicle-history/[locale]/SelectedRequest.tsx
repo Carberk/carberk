@@ -17,6 +17,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, refres
 }) {
   const t = deskCopy[locale];
   const heading = useRef<HTMLHeadingElement>(null);
+  const nextMessageFocus = useRef<string | null>(null);
   const lifecycle = useRef({ active: true, generation: 0 });
   const [detail, setDetail] = useState<Detail | null>(null);
   const [messages, setMessages] = useState<V.HistoryMessage[]>([]);
@@ -51,6 +52,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, refres
         setMessages(page.data.items);
         setCursor(page.data.nextCursor);
       } else if (result.kind === "transcript") {
+        nextMessageFocus.current = result.data.items[0]?.id ?? null;
         setMessages([...previous, ...result.data.items]);
         setCursor(result.data.nextCursor);
       }
@@ -66,6 +68,11 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, refres
     // This component is keyed by the complete queue, selection and session context.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    if (state !== "ready" || !nextMessageFocus.current) return;
+    document.getElementById(`history-message-${nextMessageFocus.current}`)?.focus();
+    nextMessageFocus.current = null;
+  }, [messages, state]);
   const selected = detail ?? row;
   const name = selected?.requester ? IdentitySchemas.formatDisplayName(selected.requester, locale) : t.unavailablePerson;
   return <>
@@ -85,8 +92,8 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, refres
         : state !== "ready" ? <InboxNotice locale={locale} state={state} retry={() => refresh(state === "conflict")} />
           : <div className="p-5">
             {!messages.length && <p role="status" className="py-8 text-sm text-muted-foreground">{t.noMessages}</p>}
-            <ol aria-label={t.conversation} className="max-h-[30rem] space-y-4 overflow-y-auto pr-1">{messages.map((message) => <li key={message.id}
-              className={`max-w-[95%] break-words rounded-lg p-3 text-sm ${message.author.kind === "operator" ? "ml-auto bg-primary/10" : "bg-muted"}`}>
+            <ol aria-label={t.conversation} className="max-h-[30rem] space-y-4 overflow-y-auto pr-1">{messages.map((message) => <li key={message.id} id={`history-message-${message.id}`} tabIndex={-1}
+              className={`max-w-[95%] break-words rounded-lg p-3 text-sm focus-visible:outline-2 focus-visible:outline-ring ${message.author.kind === "operator" ? "ml-auto bg-primary/10" : "bg-muted"}`}>
               <p className="mb-2 text-xs text-muted-foreground">{IdentitySchemas.formatDisplayName(message.author, locale)} · <time dateTime={message.createdAt}>{formatTime(message.createdAt, locale)}</time>
       </p>
               <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.text}</p>

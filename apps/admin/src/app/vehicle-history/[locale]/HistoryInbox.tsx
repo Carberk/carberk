@@ -92,7 +92,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
       <Button variant="secondary" onClick={() => refresh()}>{t.refresh}</Button>
     </div>
     {!query.success ? <InboxNotice locale={locale} state="validation" retry={() => navigate({ filter: "unassigned", search: null, cursor: null, selected: null, v: null }, true)} />
-      : !admitted ? <InboxNotice locale={locale} state={offline ? "offline" : current?.status ?? "loading"} retry={refresh} />
+      : !admitted ? <InboxNotice locale={locale} state={offline ? "offline" : current?.status ?? "loading"} retry={() => refresh()} />
         : <div className="grid min-h-[34rem] overflow-hidden rounded-lg border bg-background lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_15rem]">
           <section aria-labelledby="enquiry-queue" className="min-w-0 border-b p-3 lg:border-r lg:border-b-0">
             <h2 id="enquiry-queue" className="mb-3 px-2 text-base font-semibold">{t.requests}</h2>
