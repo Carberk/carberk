@@ -1,14 +1,22 @@
-# VPS → staging transport proof (R01)
+# Staging transport proof (R01 / #1212)
 
-Scope: [R01](https://github.com/Carberk/carberk/issues/1154), under the approved
+Scope: [R01](https://github.com/Carberk/carberk/issues/1154) and the
+[transport prerequisite](https://github.com/Carberk/carberk/issues/1212), under the approved
 [architecture proposal](https://github.com/Carberk/carberk/issues/1153). This is an
 operator procedure, not a production activation or a hosting ADR. Runtime receipts
 belong in the PR/issue or private temporary files, never in git. The [R02 gateway procedure](staging-gateway.md) owns the API forwarding service;
 this procedure covers outbound proof only.
 
-## Selected outbound path
+## Target and temporary safety transport
 
-Use a separate Xray process with one fixed, founder-controlled VLESS/Reality relay,
+The target is a **Railway-initiated persistent authenticated reverse connection** to
+TM. Requests from TM flow toward the fixed origins inside that connection. A VPS
+proxy that initiates its own Railway connection does not meet this direction.
+Direct-origin probes are diagnostics, not permission to select another architecture.
+Keep the installed fixed relay unchanged as temporary safety transport and rollback
+until the reverse replacement passes every adoption gate below. No Mac data plane.
+
+The temporary relay uses a separate Xray process with one fixed, founder-controlled VLESS/Reality relay,
 loopback HTTP CONNECT entry, and an exact HTTPS-origin allowlist. The founder
 confirmed control of the existing relay. Provider identity, subscription renewal,
 quota and upstream availability remain external operational dependencies; the
@@ -30,7 +38,7 @@ for diagnostics but cannot establish route attribution.
 
 The prepared [unit](../../../infra/egress/carberk-egress.service) uses a private
 systemd credential, a dynamic user, bounded resources, and restart-on-failure.
-It is **not installed or enabled by this PR**. After separately authorized installation,
+Installation and persistence are separate from this proof. After authorized installation,
 it starts at boot when enabled; a crash retries after five seconds, with five starts
 per minute. A persistent configuration error stops at the start limit. A relay
 outage leaves the local process alive but requests fail within caller deadlines;
@@ -68,16 +76,16 @@ long-term relay reliability are not established by a short disposable probe.
    It never creates a bucket, changes policies, seeds users or publishes a Listing.
    Preserve the private manifest even if setup fails; do not retry an uncertain
    create automatically. Existing draft limits and authentication refusals stand.
-4. Transfer `probe.py`, `run-isolated.py`, `relay-config.py` and a **redacted private manifest copy** to
+4. Transfer `probe.py`, `diagnose.py`, `run-isolated.py`, `relay-config.py` and a **redacted private manifest copy** to
    a unique mode-0700 VPS `/tmp` directory using the existing pinned SSH access.
    Remove `api.refreshToken` from the VPS copy. Keep its short-lived bearer and
    signed URLs mode 0600; no S3 keys, fixed sign-in codes or Railway environment
-   variables go to the VPS. Confirm loopback port 11809 is free.
+   variables go to the VPS. Choose a free candidate loopback port (for example 11819); preserve installed 11809.
 5. Prepare the isolated config (substitute the private source path and selected tag):
 
    ```sh
    python3 relay-config.py --source "$XRAY_SOURCE" --tag "$RELAY_TAG" \
-     --host api-staging-2861.up.railway.app \
+     --port 11819 --host api-staging-2861.up.railway.app \
      --host minio-staging-5795.up.railway.app --host t3.storageapi.dev \
      --output /tmp/carberk-egress-owned/relay.json
    /usr/local/bin/xray run -test -c /tmp/carberk-egress-owned/relay.json
@@ -96,18 +104,29 @@ long-term relay reliability are not established by a short disposable probe.
    ```sh
    python3 probe.py --manifest manifest.json --read-only --timeout 8
    python3 probe.py --manifest manifest.json \
-     --proxy http://127.0.0.1:11809 --samples 3 --timeout 45
+     --proxy http://127.0.0.1:11819 --samples 3 --timeout 45
    ```
 
-   Optional corrected-DNS diagnostics take `--resolve-file` containing a JSON array
-   of `hostname:443:public-IP` entries. Obtain fresh answers through validated DoH;
-   reject non-global/synthetic addresses (including `198.18.0.0/15`). Record this
-   resolver dependency separately. Overrides preserve URL hostname, Host and SNI;
-   they do not alter system DNS/routes. Do not use Mac VPN fake-IP answers.
+   Diagnose DNS independently of the byte proof:
 
-   Local DNS diagnostics use the system resolver without their own deadline.
-   Run the complete procedure inside the bounded transient unit; the standalone
-   CLI does not provide a total deadline if that resolver stalls.
+   ```sh
+   python3 diagnose.py --manifest manifest.json --dns-only --output public-answers.json
+   python3 diagnose.py --manifest manifest.json --public-answers public-answers.json --samples 2
+   python3 probe.py --manifest manifest.json --read-only --public-answers public-answers.json
+   ```
+
+   DoH uses validated HTTPS with no ambient proxy or redirects, bounded time/body,
+   and a CNAME-linked A answer for each exact origin. Non-global/fake addresses
+   (including loopback and `198.18.0.0/15`) are refused. Receipts are private,
+   exclusively created, and expire after five minutes. If VPS DoH is unavailable,
+   collect on the operator host and transfer only that fresh receipt; the operator
+   never transfers application bytes for the VPS. This independent resolver remains
+   a dependency, not a DNS change. `--public-answers` supplies per-request overrides
+   preserving hostname, Host and SNI. It cannot combine with either relay mode.
+   System DNS runs in a six-second child process; receipts contain counts/verdicts,
+   never addresses. TCP and verified TLS have separate verdicts. A diagnostic HEAD
+   response, including a root redirect or signed-method refusal, proves no media
+   capability. Only the signed GET/PUT/readback and checksum assertions do that.
 
    All requests disable redirects and implicit proxy/environment selection, retain
    TLS verification and have explicit time/size limits. Every failed HTTP/TLS/hash
@@ -130,6 +149,78 @@ long-term relay reliability are not established by a short disposable probe.
    through the supported staging API. Verify the transient unit stopped, remove its
    owned scratch directory, and retain sanitized receipts. A nonzero cleanup is an
    outstanding task, not successful completion.
+
+## Disposable Railway-initiated proof
+
+1. Resolve live staging project, service, deployment and region with direct Railway
+   MCP reads. CLI SSH failure before execution leaves direction unknown. A separate
+   function is a different network vantage from the actual API container. Never apply
+   unrelated staged changes, copy business credentials into the function, or relocate
+   existing services. Discover region availability with `railway api search region`
+   and its live schema. Compare allowed disposable US/Amsterdam/Singapore candidates
+   on the existing plan; confirm the **runtime** region, not only saved settings.
+   A redeploy may reuse an older region snapshot; a fresh function-code deployment
+   must still be checked against its exact deployment and logged region.
+2. Prepare exact private apply/rollback files and SHA-256 hashes before starting
+   anything. Recheck free ports: example TLS 24443 and loopback slots 11901–11903
+   (optional independent comparison slot 11911–11913). Never alter shared 443,
+   firewall, DNS, routes, Snikket or original Xray to force success. Use the existing
+   valid certificate for the server hostname, without changing its mounts/renewal.
+3. Chisel is one disposable example, not a persistent selection. Verify v1.12.0
+   archives against the [official checksums](https://github.com/jpillora/chisel/releases/tag/v1.12.0)
+   and release asset digests on **both** hosts. Keep the new inner key, auth file and
+   credentials private. The server uses `--reverse --authfile --keyfile --tls-cert
+   --tls-key --keepalive 10s`; auth patterns must be anchored exact reverse addresses
+   such as `^R:127\.0\.0\.1:11901$`, never wildcard, forward or SOCKS grants.
+   Run only this candidate in a transient systemd cgroup with `RuntimeMaxSec=1800`,
+   `MemoryMax=128M`, `CPUQuota=50%`, `TasksMax=32`, `Restart=no` and private logs.
+   The auth file restricts listener addresses; the fixed Railway client code owns
+   remote target selection. It does not establish a general server-side target ACL.
+4. Deploy [reverse-probe.mjs](../../../infra/egress/reverse-probe.mjs) as a one-shot
+   staging-only Railway Function, without a public domain, TCP proxy or volumes.
+   Set only `GATEWAY_HOST`, `TUNNEL_AUTH`, `TUNNEL_FINGERPRINT`, `EXPIRES_AT` and,
+   optionally, `OBSERVE_SECONDS` (30–600) / `TUNNEL_BASE_PORT` (11901 or 11911).
+   `EXPIRES_AT` is epoch seconds, at most 30 minutes ahead and enough for the run.
+   Disable restarts, set 0.25 GB / 0.25 CPU limits, and record the exact deployment.
+   The function checks outer TLS, pins inner identity, downloads/checksums its binary,
+   opens only three fixed reverse targets, bounds logs and kills its owned child.
+   Its `adoptionProven:false` is deliberate: a connected log is only preflight.
+5. Wait for all three owned loopback listeners before byte checks. A private
+   `reverse-ports.json` contains `{"api":11901,"photo":11902,"video":11903}`:
+
+   ```sh
+   python3 probe.py --manifest manifest.json --reverse-ports reverse-ports.json --protocol-checks
+   ```
+
+   Each signed request connects to its loopback listener with the **original** URL,
+   Host, TLS SNI and certificate verification. There is no proxy/direct fallback.
+   Fresh fixture manifests include separately signed HEAD grants. GET bytes, PUT
+   readback and a 1 KiB Range must match. An initial missing listener is preparation
+   failure; do not cite it as origin reachability failure.
+6. Before adoption, also prove raw path/duplicate-query preservation, authenticated
+   WebSocket upgrade, slow-consumer/backpressure with bounded memory, transfer
+   cancellation without false success, idle heartbeat survival, loss/reconnect,
+   isolated VPS process restart, actual API deployment/client restart, and competing
+   client listener ownership. Check wrong auth/fingerprint and disallowed listeners.
+   A short function observation or a disposable function restart does **not** prove
+   actual API deployment handoff. Keep these missing gates explicit; do not adopt
+   while any remain unproved.
+7. Match endpoints/payload sizes/concurrency, cold/warm conditions and sample counts
+   across relay and reverse candidates. Record connect/TTFB/total, GET/PUT throughput,
+   idle/fault behavior and observed CPU/memory/network usage. Do not call a small
+   sequential sample capacity, a stable p95, TM handset evidence or R12 completion.
+   Without a working matched candidate, do not invent relay overhead. Billing metrics
+   are not an invoice or incremental dollar cost. Region relocation would need a
+   separate reviewed cutover/rollback including API-to-DB/Redis/storage and user flows.
+8. Stop/delete only owned functions, deployments, units and private scratch files.
+   Read back service absence, released listeners and original config/source hashes;
+   verify original services remain active. Run the fixture cleanup above, retaining
+   the local ownership manifest until absence and session revocation are confirmed.
+   Keep sanitized receipts in the issue/PR or private `/tmp`, never committed.
+
+Persistent apply/rollback must name exact gateway connector/config changes and
+hashes before mutation. Until that reviewed change and all gates pass, keep the
+working installed relay. R04–R12 and later real-TM measurement remain required.
 
 ## Port 443 coexistence design
 

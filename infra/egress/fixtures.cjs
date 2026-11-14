@@ -45,6 +45,7 @@ async function main() {
       m.storage.push(entry); save(m); // Record ownership before writing.
       await send(c, new s3.PutObjectCommand({ Bucket: d.bucket, Key: entry.downloadKey, Body: body, ContentType: 'application/octet-stream', CacheControl: 'no-store' }));
       entry.downloadUrl = await getSignedUrl(c, new s3.GetObjectCommand({ Bucket: d.bucket, Key: entry.downloadKey }), { expiresIn: 3600 });
+      entry.headUrl = await getSignedUrl(c, new s3.HeadObjectCommand({ Bucket: d.bucket, Key: entry.downloadKey }), { expiresIn: 3600 });
       entry.uploadUrl = await getSignedUrl(c, new s3.PutObjectCommand({ Bucket: d.bucket, Key: entry.uploadKey, ContentType: 'application/octet-stream', CacheControl: 'no-store' }), { expiresIn: 3600 });
       entry.uploadReadUrl = await getSignedUrl(c, new s3.GetObjectCommand({ Bucket: d.bucket, Key: entry.uploadKey }), { expiresIn: 3600 });
       save(m);
