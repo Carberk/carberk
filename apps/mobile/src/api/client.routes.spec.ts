@@ -259,3 +259,38 @@ it("treats gateway access denial as unavailable while preserving API permission 
   await expect(apiClient.get("/me")).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
   expect((await loadAuthSession())?.refreshToken).toBe("refresh-a");
 });
+
+it.each(["success", "rejected", "contract"].flatMap(response =>
+  ["sign-out", "new-user", "new-session"].map(change => ({ response, change })),
+))("keeps $change when a $response refresh's native ownership read returns late", async ({ response, change }) => {
+  await storeAuthSession(session());
+  const entered = deferred(), release = deferred();
+  let holdGuard = false;
+  vi.mocked(SecureStore.getItemAsync).mockImplementation(async name => {
+    const value = storage.get(name) ?? null;
+    if (holdGuard && name === "auto_tm_auth_session") {
+      holdGuard = false; entered.resolve(); await release.promise;
+    }
+    return value;
+  });
+  server.use(
+    http.get(`${globalEntry}/me`, ({ request }) => request.headers.get("authorization") === `Bearer ${token()}`
+      ? HttpResponse.json({}, { status: 401 }) : HttpResponse.json({ id: user.id })),
+    http.post(`${globalEntry}/auth/refresh`, () => {
+      holdGuard = true;
+      return HttpResponse.json(response === "success"
+        ? { accessToken: token("session-a", 1200), refreshToken: "late-rotation" } : {},
+      { status: response === "rejected" ? 401 : 201 });
+    }),
+  );
+  const pending = apiClient.get("/me").catch((error: unknown) => error);
+  await entered.promise;
+  const replacement = { ...session(), user: change === "new-user"
+    ? { ...user, id: "22222222-2222-4222-8222-222222222222" } : user,
+    accessToken: token("session-b"), refreshToken: "replacement-session" };
+  const newerIntent = change === "sign-out" ? clearAuthSession() : storeAuthSession(replacement);
+  release.resolve();
+  await newerIntent;
+  expect(await pending).toMatchObject({ code: "SESSION_CHANGED" });
+  expect((await loadAuthSession())?.refreshToken ?? null).toBe(change === "sign-out" ? null : "replacement-session");
+});
