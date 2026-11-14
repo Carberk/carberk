@@ -1,11 +1,49 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
-import type { HistoryAssignmentRepository, HistoryQueueQuery } from "../domain/HistoryAssignmentRepository";
+import type { HistoryAssignmentRepository, HistoryQueueQuery, HistoryMessageRequest } from "../domain/HistoryAssignmentRepository";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
+import { ConfigService } from "@nestjs/config";
+import { Pool } from "pg";
+import type { Env } from "../../../env.schema";
+
+/** Separate from the operation pool: row-lock waiters cannot starve identity or
+ * messaging. No callback timeout may release this fence before messaging settles. */
+@Injectable()
+export class HistoryMessageLocks {
+  private readonly pool: Pool;
+  constructor(@Inject(ConfigService) config: ConfigService<Env, true>) {
+    this.pool = new Pool({ connectionString: config.get("DATABASE_URL", { infer: true }), max: 2, connectionTimeoutMillis: 5000 });
+    this.pool.on("error", () => { /* A lost idle connection holds no request fence. */ });
+  }
+  async withRequest<T>(id: string, operation: (request: HistoryMessageRequest | null) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect();
+    // pg emits a checked-out connection failure on the client rather than pool.
+    const connectionError = () => { /* Subsequent query/commit rejects safely. */ };
+    client.on("error", connectionError);
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      const { rows } = await client.query<HistoryMessageRequest>(`SELECT id, "requesterId", "assignedOperatorId", "assignmentVersion"
+        FROM vehicle_history_requests WHERE id = $1 FOR UPDATE`, [id]);
+      const result = await operation(rows[0] ?? null);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally { client.removeListener("error", connectionError); client.release(); }
+  }
+  async onModuleDestroy() { await this.pool.end(); }
+}
 
 @Injectable()
 export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepository {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(HistoryMessageLocks) private readonly messageLocks: HistoryMessageLocks) {}
+
+  withMessageLock<T>(id: string, operation: (request: HistoryMessageRequest | null) => Promise<T>): Promise<T> {
+    return this.messageLocks.withRequest<T>(id, operation);
+  }
 
   async list(operatorId: string, query: HistoryQueueQuery) {
     const scope: Prisma.VehicleHistoryRequestWhereInput = {

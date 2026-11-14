@@ -1,5 +1,7 @@
 import { z, DateTimeSchema } from "../zod";
 
+import { ServiceMessageSchema, ServiceTextSchema } from "./service-messages";
+
 export const HistoryOperatorSchema = z.object({ id: z.string().guid(), displayName: z.string().nullable(), nameNumber: z.number().int() });
 export const HistoryDeskSchema = z.object({
   purpose: z.literal("vehicle-history"),
@@ -44,3 +46,22 @@ export const HistoryQueueResponseSchema = z.object({
     assignmentVersion: z.number().int().min(0), mine: z.boolean() })),
   nextCursor: z.string().guid().nullable(),
 });
+
+const MessageKeySchema = ServiceMessageSchema.shape.id;
+const AssignmentVersionSchema = ClaimHistoryRequestSchema.shape.expectedAssignmentVersion;
+export const HistoryMessageSendQuerySchema = z.object({}).strict();
+export const SendHistoryTextSchema = z.object({ clientMessageId: MessageKeySchema, text: ServiceTextSchema }).strict();
+export const SendOperatorHistoryTextSchema = SendHistoryTextSchema.extend({ expectedAssignmentVersion: AssignmentVersionSchema }).strict();
+export const ReadHistoryMessagesSchema = z.object({
+  cursor: MessageKeySchema.optional(), limit: z.coerce.number().int().min(1).max(50).default(50),
+}).strict();
+export const ReadOperatorHistoryMessagesSchema = ReadHistoryMessagesSchema.extend({
+  expectedAssignmentVersion: z.string().regex(/^(0|[1-9][0-9]*)$/).transform(Number).pipe(AssignmentVersionSchema),
+}).strict();
+export const HistoryMessageSchema = ServiceMessageSchema.omit({ purpose: true, objectId: true, senderId: true }).extend({
+  author: HistoryOperatorSchema.extend({ kind: z.enum(["requester", "operator"]) }).strict(),
+}).strict();
+export type HistoryMessage = z.infer<typeof HistoryMessageSchema>;
+export const HistoryMessagesPageSchema = z.object({
+  items: z.array(HistoryMessageSchema).max(50), nextCursor: MessageKeySchema.nullable(),
+}).strict();

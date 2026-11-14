@@ -9813,6 +9813,619 @@
         }
       }
     },
+    "/api/v1/vehicle-history/requests/{id}/messages": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Current requester or exact assignee/version; local synthetic only. Sent facts; ascending pages, maximum 50",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store text facts; no delivery/read receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "TEXT"
+                            ]
+                          },
+                          "clientMessageId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "order": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]{0,18}$"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "author": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "nameNumber": {
+                                "type": "integer"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "requester",
+                                  "operator"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "displayName",
+                              "nameNumber",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "clientMessageId",
+                          "text",
+                          "order",
+                          "createdAt",
+                          "author"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 50
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid message, query or scoped cursor"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed or send intent conflicts"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry the same send intent"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Current requester or exact assignee/version; local synthetic only. Sent facts; ascending pages, maximum 50",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientMessageId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "clientMessageId",
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store text facts; no delivery/read receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "TEXT"
+                      ]
+                    },
+                    "clientMessageId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "text": {
+                      "type": "string",
+                      "maxLength": 4000
+                    },
+                    "order": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]{0,18}$"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "requester",
+                            "operator"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber",
+                        "kind"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "clientMessageId",
+                    "text",
+                    "order",
+                    "createdAt",
+                    "author"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid message, query or scoped cursor"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed or send intent conflicts"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry the same send intent"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/messages": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Current requester or exact assignee/version; local synthetic only. Sent facts; ascending pages, maximum 50",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store text facts; no delivery/read receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "TEXT"
+                            ]
+                          },
+                          "clientMessageId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "order": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]{0,18}$"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "author": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "nameNumber": {
+                                "type": "integer"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "requester",
+                                  "operator"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "displayName",
+                              "nameNumber",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "clientMessageId",
+                          "text",
+                          "order",
+                          "createdAt",
+                          "author"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 50
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid message, query or scoped cursor"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed or send intent conflicts"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry the same send intent"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Current requester or exact assignee/version; local synthetic only. Sent facts; ascending pages, maximum 50",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientMessageId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "expectedAssignmentVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  }
+                },
+                "required": [
+                  "clientMessageId",
+                  "text",
+                  "expectedAssignmentVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store text facts; no delivery/read receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "TEXT"
+                      ]
+                    },
+                    "clientMessageId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "text": {
+                      "type": "string",
+                      "maxLength": 4000
+                    },
+                    "order": {
+                      "type": "string",
+                      "pattern": "^[1-9][0-9]{0,18}$"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "requester",
+                            "operator"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber",
+                        "kind"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "clientMessageId",
+                    "text",
+                    "order",
+                    "createdAt",
+                    "author"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid message, query or scoped cursor"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current authority or object refused"
+          },
+          "409": {
+            "description": "Assignment changed or send intent conflicts"
+          },
+          "503": {
+            "description": "Temporarily unavailable; retry the same send intent"
+          }
+        }
+      }
+    },
     "/api/v1/vehicle-history/operator/requests": {
       "get": {
         "tags": [
