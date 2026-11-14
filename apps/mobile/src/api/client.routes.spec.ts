@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as SecureStore from "expo-secure-store";
+import { AuthSchemas } from "@auto-tm/contracts";
 
 import { server } from "../../test/msw";
 import { clearAuthSession, loadAuthSession, storeAuthSession } from "../auth/session";
@@ -39,11 +40,15 @@ it.each([["global", globalEntry], ["tm", tmEntry]] as const)("browses and signs 
       seen.push([request.headers.get("authorization"), request.headers.get("x-carberk-gateway-key")]);
       return HttpResponse.json({ items: ["same-listing"] });
     }),
-    http.post(`${base}/auth/otp/verify`, () => HttpResponse.json(session())),
+    http.post(`${base}/auth/otp/verify`, async ({ request }) => {
+      expect(await request.json()).toEqual({ phone: "+99361000001", code: "123456" });
+      expect(request.headers.get("authorization")).toBeNull();
+      return HttpResponse.json(session());
+    }),
     http.get(`${base}/me`, ({ request }) => HttpResponse.json({ id: user.id, bearer: request.headers.get("authorization"), gateway: request.headers.get("x-carberk-gateway-key") })),
   );
   expect(await apiClient.get("/listings", undefined, { auth: false })).toEqual({ items: ["same-listing"] });
-  await storeAuthSession(await apiClient.post("/auth/otp/verify", {}, undefined, { auth: false }));
+  await storeAuthSession(await apiClient.post("/auth/otp/verify", { phone: user.phone, code: "123456" }, AuthSchemas.OtpVerifyResponseSchema, { auth: false }));
   expect(await apiClient.get("/me")).toEqual({ id: user.id, bearer: `Bearer ${token()}`, gateway: entry === "tm" ? key : null });
   expect((await loadAuthSession())?.user.id).toBe(user.id);
   expect(seen).toEqual([[null, entry === "tm" ? key : null]]);
@@ -241,5 +246,16 @@ it("does no network work after cancellation during private gateway preparation",
   release.resolve();
   await new Promise(resolve => setImmediate(resolve));
   expect(received).toEqual([]);
+  expect((await loadAuthSession())?.refreshToken).toBe("refresh-a");
+});
+
+it("treats gateway access denial as unavailable while preserving API permission errors", async () => {
+  selectTesterRoute("tm");
+  await storeAuthSession(session());
+  server.use(http.get(`${tmEntry}/me`, () => HttpResponse.json({ error: "gateway_access_denied" }, { status: 403 })));
+  await expect(apiClient.get("/me")).rejects.toMatchObject({ code: "ROUTE_UNAVAILABLE", status: 503 });
+  expect((await loadAuthSession())?.refreshToken).toBe("refresh-a");
+  server.use(http.get(`${tmEntry}/me`, () => HttpResponse.json({ code: "FORBIDDEN" }, { status: 403 })));
+  await expect(apiClient.get("/me")).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
   expect((await loadAuthSession())?.refreshToken).toBe("refresh-a");
 });
