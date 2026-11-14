@@ -12,6 +12,7 @@ export async function probeGateway(config, { fetchImpl = fetch, now = () => perf
       || typeof config.accessKey !== 'string' || !config.accessKey.length) throw Error('Invalid monitor configuration');
   for (const route of routes) {
     const target = config.targets?.[route];
+    if (!target && route !== 'api') continue;
     if (!target || typeof target.path !== 'string' || !target.path.startsWith('/') || target.path.startsWith('//')
         || /[\\#\r\n]/.test(target.path) || (route === 'api' ? target.path !== '/readyz' : !/^[a-f0-9]{64}$/.test(target.sha256 ?? '')))
       throw Error('Invalid monitor target');
@@ -19,6 +20,7 @@ export async function probeGateway(config, { fetchImpl = fetch, now = () => perf
   return { event: 'gateway_probe', routes: await Promise.all(routes.map(async route => {
     const started = now();
     const target = config.targets[route];
+    if (!target) return { route, healthy: false, reason: 'unconfigured', durationMs: 0 };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4_000);
     let reason = 'unavailable';

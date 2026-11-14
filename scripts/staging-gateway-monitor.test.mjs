@@ -137,3 +137,15 @@ test('fixed photo buckets and socket indicators never expose arbitrary targets',
     assert.ok(!JSON.stringify(result).includes(value));
   }
 });
+
+test('an unconfigured media path stays visibly unhealthy while API probes still run', async t => {
+  const server = http.createServer((_req, res) => res.end('{"status":"ready","service":"api"}'));
+  const baseUrl = await listen(server);
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const result = await probeGateway({ baseUrl, accessKey: 'synthetic', targets: { api: { path: '/readyz' } } });
+  assert.equal(result.routes[0].healthy, true);
+  assert.deepEqual(result.routes.slice(1), [
+    { route: 'photo', healthy: false, reason: 'unconfigured', durationMs: 0 },
+    { route: 'video', healthy: false, reason: 'unconfigured', durationMs: 0 },
+  ]);
+});

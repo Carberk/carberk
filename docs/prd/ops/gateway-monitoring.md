@@ -31,6 +31,9 @@ redirects, bounds each request to four seconds, and caps response data at 64 KiB
 for readiness and 1 MiB for media. API, photo and video results remain separate.
 No canary is raw user content. The process emits `gateway_probe` with fixed route,
 health, reason category and duration, never request details or body bytes.
+An absent media target reports unhealthy with reason `unconfigured`; it never
+prevents the API check or implies a working media path. Zero traffic counters are
+not evidence of health. The one-shot command fails until all three paths pass.
 Two consecutive failures emit `gateway_alarm` with `state: firing`; the first
 healthy observation emits `state: recovered`. An unavailable gateway process
 therefore cannot hide its failure by ceasing its own logs.
@@ -55,7 +58,8 @@ Never put access details or signed queries in commands, URLs in receipts, git or
 public issues. Do not provision S3 signing credentials on the VPS. Short-lived
 canary grants require fresh private manifests; expiry is a failure, not proof
 that the transport is broken. A continuously supervised signed canary needs an
-approved grant-renewal owner before it can claim durable media coverage.
+approved grant-renewal owner before it can claim durable media coverage. Do not
+install an expiring static video grant as permanent monitoring configuration.
 
 Run `node monitor-probe.mjs PRIVATE_MANIFEST --once` for a bounded check (exit 1
 on any unhealthy path). Without `--once`, it checks every fifteen seconds after
