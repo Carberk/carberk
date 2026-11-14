@@ -162,7 +162,9 @@ async function rawRequest<TResponse>(
 ): Promise<TResponse> {
   assertActive(opts.signal);
   routeHeaders ??= await apiRouteHeaders(route).catch(() => { throw new ApiError("ROUTE_UNAVAILABLE", 503); });
+  assertActive(opts.signal);
   await opts.assertSession?.();
+  assertActive(opts.signal);
   const headers: Record<string, string> = {
     Accept: "application/json",
     ...Object.fromEntries(Object.entries(opts.headers ?? {}).filter(([key]) => key.toLowerCase() !== "x-carberk-gateway-key")),
@@ -181,6 +183,7 @@ async function rawRequest<TResponse>(
     headers["Authorization"] = `Bearer ${opts.accessToken}`;
   } else if (opts.auth !== false) {
     let session = await loadAuthSession();
+    assertActive(opts.signal);
     if (owner !== undefined) assertOwner(owner, session);
     owner ??= session;
     // Public routes that personalise their response (the feed's `isFavorited`)

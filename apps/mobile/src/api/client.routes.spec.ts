@@ -221,3 +221,25 @@ it("lets a new session rotate independently while the previous session's refresh
   expect(await old).toMatchObject({ code: "SESSION_CHANGED" });
   expect((await loadAuthSession())?.refreshToken).toBe("refresh-c");
 });
+
+it("does no network work after cancellation during private gateway preparation", async () => {
+  selectTesterRoute("tm");
+  await storeAuthSession({ ...session(), accessToken: token("session-a", 1) });
+  const entered = deferred(), release = deferred();
+  vi.mocked(SecureStore.getItemAsync).mockImplementation(async name => {
+    if (name === "carberk_staging_gateway_key") { entered.resolve(); await release.promise; }
+    return storage.get(name) ?? null;
+  });
+  const received: string[] = [];
+  server.use(http.post(`${tmEntry}/auth/refresh`, () => { received.push("refresh"); return HttpResponse.json({ accessToken: token(), refreshToken: "unexpected-rotation" }); }),
+    http.get(`${tmEntry}/me`, () => { received.push("read"); return HttpResponse.json({ ok: true }); }));
+  const controller = new AbortController();
+  const pending = apiClient.get("/me", undefined, { signal: controller.signal }).catch(error => error);
+  await entered.promise;
+  controller.abort();
+  expect(await pending).toMatchObject({ code: "NETWORK_ERROR" });
+  release.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+  expect(received).toEqual([]);
+  expect((await loadAuthSession())?.refreshToken).toBe("refresh-a");
+});
