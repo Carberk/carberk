@@ -37,7 +37,7 @@ const session = (sid = "one", id = userId) => ({
   user: { id, phone: null, email: "synthetic@example.test", displayName: null, role: "buyer" as const },
 });
 
-const enquiry = (sourceListingId: string | null = null) => ({ id: requestId, sourceListingId, createdAt: "2026-11-14T08:00:00.000Z", status: "enquiry", assignedOperator: null });
+const enquiry = (sourceListingId: string | null = null) => ({ id: requestId, sourceListingId, createdAt: "2026-11-14T08:00:00.000Z", status: "enquiry", assignedOperator: null, assignmentVersion: 0 });
 let stored: string | null;
 let bodies: { attemptKey: string; sourceListingId: string | null }[];
 beforeEach(async () => {

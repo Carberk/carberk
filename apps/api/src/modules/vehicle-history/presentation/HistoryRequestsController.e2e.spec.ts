@@ -84,7 +84,7 @@ describe("Private Vehicle History requests over HTTP", () => {
     expect(created.headers["cache-control"]).toBe("private, no-store");
     expect(created.body).toEqual({
       id: expect.any(String), createdAt: expect.any(String), sourceListingId: null,
-      status: "enquiry", assignedOperator: null,
+      status: "enquiry", assignedOperator: null, assignmentVersion: 0,
     });
     expect((await actor.get(`/${created.body.id}`).expect(200)).body).toEqual(created.body);
     expect((await actor.get().expect(200)).body).toEqual({ items: [created.body], nextCursor: null });

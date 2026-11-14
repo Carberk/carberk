@@ -8712,7 +8712,32 @@
             ]
           },
           "assignedOperator": {
-            "nullable": true
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "displayName": {
+                "type": "string",
+                "nullable": true
+              },
+              "nameNumber": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "displayName",
+              "nameNumber"
+            ]
+          },
+          "assignmentVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "default": 0
           }
         },
         "required": [
@@ -9788,6 +9813,342 @@
         }
       }
     },
+    "/api/v1/vehicle-history/operator/requests": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Minimal unassigned/mine enquiry metadata, newest first, 50 per page; local synthetic only",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "unassigned",
+                "mine"
+              ]
+            },
+            "required": false,
+            "name": "filter",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store metadata page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "enquiry"
+                            ]
+                          },
+                          "assignmentVersion": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "mine": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "createdAt",
+                          "status",
+                          "assignmentVersion",
+                          "mine"
+                        ]
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid queue query"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current operator or cursor scope refused"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/claim": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Atomically claim an unassigned enquiry at its version; uncertain same-owner retries are safe",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedAssignmentVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  }
+                },
+                "required": [
+                  "expectedAssignmentVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store current assignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceListingId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "enquiry"
+                      ]
+                    },
+                    "assignedOperator": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ]
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sourceListingId",
+                    "createdAt",
+                    "status",
+                    "assignedOperator"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid version"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current operator refused"
+          },
+          "409": {
+            "description": "Assignment unavailable or version changed; refresh the inbox"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Selected enquiry for its current assignee only; local synthetic only",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store assigned enquiry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "sourceListingId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "enquiry"
+                      ]
+                    },
+                    "assignedOperator": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ]
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647,
+                      "default": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "sourceListingId",
+                    "createdAt",
+                    "status",
+                    "assignedOperator"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Unavailable enquiry or current assignee authority refused"
+          }
+        }
+      }
+    },
     "/api/v1/vehicle-history/requests": {
       "post": {
         "tags": [
@@ -9851,7 +10212,32 @@
                       ]
                     },
                     "assignedOperator": {
-                      "nullable": true
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ]
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647,
+                      "default": 0
                     }
                   },
                   "required": [
@@ -9933,7 +10319,32 @@
                             ]
                           },
                           "assignedOperator": {
-                            "nullable": true
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "nameNumber": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "displayName",
+                              "nameNumber"
+                            ]
+                          },
+                          "assignmentVersion": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647,
+                            "default": 0
                           }
                         },
                         "required": [
@@ -10021,7 +10432,32 @@
                       ]
                     },
                     "assignedOperator": {
-                      "nullable": true
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ]
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647,
+                      "default": 0
                     }
                   },
                   "required": [
