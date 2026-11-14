@@ -10,6 +10,7 @@ import { localeTag } from "../i18n/resources";
 import { useSafeBack } from "../navigation/useSafeBack";
 
 import { vehicleHistoryAvailable } from "./availability";
+import { ContactActions } from "./ContactActions";
 import { historySessionCurrent, useHistoryViewer } from "./session";
 
 import { SafeScreen } from "@/components/navigation/SafeScreen";
@@ -33,6 +34,9 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
   const { t } = useTranslation();
   const back = useSafeBack(detail ? historyPath : "/(tabs)/chat");
   const navigation = useNavigation();
+  const state = navigation.getState();
+  const previous = state?.routes[(state.index ?? 0) - 1];
+  const fromOffer = detail && previous?.name === "vehicle-history/index";
   useEffect(() => {
     const state = navigation.getState();
     const previous = state?.routes[(state.index ?? 0) - 1];
@@ -93,7 +97,7 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, chi
       <StackHeader large
         title={detail ? `Carberk · ${t("vehicleHistory.title")}` : t("vehicleHistory.historyTitle")}
         leading={<BackButton ref={heading} onPress={back}
-          accessibilityLabel={t(detail ? "vehicleHistory.backRequests" : "back")} />}
+          accessibilityLabel={t(fromOffer ? "vehicleHistory.backOffer" : detail ? "vehicleHistory.backRequests" : "back")} />}
         onLayout={() => {
           if (heading.current) AccessibilityInfo.sendAccessibilityEvent(heading.current, "focus");
         }} />
@@ -120,6 +124,7 @@ export function HistoryList() {
   return (
     <Reader viewer={viewer} error={query.error} loading={query.isPending}
       refreshing={query.isRefetching} retry={() => void query.refetch()}>
+      <ContactActions fromHistory />
       {items.length === 0 ? (
         <Text className="text-body text-muted-foreground">{t("vehicleHistory.emptyRequests")}</Text>
       ) : items.map((request) => (

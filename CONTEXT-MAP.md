@@ -36,7 +36,7 @@ Find the owning area, read its short overview, then inspect source and tests. Th
 |---|---|---|
 | listings | [`listings/CONTEXT.md`](apps/mobile/src/listings/CONTEXT.md) | Create `sell` reducer + staging queue vs edit-route shell; uploads, autosave, wizard documentation |
 | conversations | [`conversations/CONTEXT.md`](apps/mobile/src/conversations/CONTEXT.md) | Conversation screen loaded by ID, socket and HTTP caches, local pending Messages, push entry |
-| vehicle-history | [`vehicle-history/CONTEXT.md`](apps/mobile/src/vehicle-history/CONTEXT.md) | Local synthetic public offer and original fictional educational sample; no request or payment flow |
+| vehicle-history | [`vehicle-history/CONTEXT.md`](apps/mobile/src/vehicle-history/CONTEXT.md) | Synthetic public offer/sample and private customer enquiry creation/history; no payment flow |
 
 ## Packages
 

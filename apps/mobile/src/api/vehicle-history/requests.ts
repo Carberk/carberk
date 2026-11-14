@@ -26,6 +26,23 @@ async function read<T>(path: string, schema: ZodSchema<T>, viewer: HistoryViewer
 
 const options = { retry: false, staleTime: 0, networkMode: "always" as const };
 
+export async function createHistoryRequest(input: VehicleHistorySchemas.CreateHistoryRequest, viewer: HistoryViewer, signal: AbortSignal) {
+  const assertSession = () => assertHistorySession(viewer, signal);
+  await assertSession();
+  if (!onlineManager.isOnline()) throw new ApiError("NETWORK_ERROR", 0);
+  try {
+    const result = await apiClient.post("/vehicle-history/requests",
+      VehicleHistorySchemas.CreateHistoryRequestSchema.parse(input), VehicleHistorySchemas.HistoryRequestSchema, { assertSession });
+    await assertSession();
+    return result;
+  } catch (error) {
+    await assertSession();
+    if (error instanceof ApiError && error.status === 401) throw new ApiError("HISTORY_CREATE_DENIED", 401);
+    if (error instanceof TypeError) throw new ApiError("NETWORK_ERROR", 0);
+    throw error;
+  }
+}
+
 export function useHistoryRequests(viewer: HistoryViewer | null | undefined, enabled: boolean) {
   return useInfiniteQuery({
     ...options,
