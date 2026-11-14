@@ -15,7 +15,8 @@ assert(routes["/page"] && !routes["/(admin)/page"], "only src/app/page.tsx must 
 const manifest = JSON.parse(await readFile(resolve(root, "apps/admin/.next/server/server-reference-manifest.json"), "utf8"));
 const actionId = Object.entries(manifest.node).find(([, value]) => value.exportedName === "dismissReport")?.[0];
 assert(actionId, "built dismissReport Server Action must exist");
-const jwt = (exp) => `e30.${Buffer.from(JSON.stringify({ exp, jti: randomBytes(8).toString("hex") })).toString("base64url")}.test-signature`;
+const historyActor = { id: "11750000-0000-4000-8000-000000000001", displayName: "Synthetic Runtime Operator", nameNumber: 1175 };
+const jwt = (exp) => `e30.${Buffer.from(JSON.stringify({ exp, sub: historyActor.id, sid: "11750000-0000-4000-8000-000000000002", jti: randomBytes(8).toString("hex") })).toString("base64url")}.test-signature`;
 const expired = jwt(1);
 const sessions = new Map();
 let rotations = 0;
@@ -55,8 +56,10 @@ const api = createServer(async (req, res) => {
     res.writeHead(historyStatus);
     res.end(JSON.stringify(historyStatus === 200 ? {
       purpose: "vehicle-history", mode: "synthetic", requests: [],
-      actor: { id: "11750000-0000-4000-8000-000000000001", displayName: "Synthetic Runtime Operator", nameNumber: 1175 },
+      actor: historyActor,
     } : { code: historyStatus === 403 ? "HISTORY_ACCESS_DENIED" : "UNAVAILABLE" }));
+  } else if (req.url?.startsWith("/api/v1/vehicle-history/operator/requests?")) {
+    res.end(JSON.stringify({ items: [], nextCursor: null }));
   } else if (req.url === "/api/v1/admin/reports/r1/dismiss" && req.method === "POST") {
     assert(JSON.parse(body).reason === "Runtime renewal proof", "original action arguments must reach mutation");
     mutations++;
@@ -156,9 +159,9 @@ try {
   // Real standalone HTTP/rendering seam; the external API response is the
   // fixture. Current authority itself is covered by API/disposable-DB tests.
   for (const [locale, loading, empty, denied, error] of [
-    ["tk", "Rugsat barlanýar", "Entek ýüz tutma ýok", "Bu iş ýerine rugsat ýok", "Iş ýeri açylmady"],
-    ["ru", "Проверяем доступ", "Обращений пока нет", "Нет доступа к рабочему месту", "Не удалось открыть рабочее место"],
-    ["en", "Checking access", "No requests yet", "Desk access denied", "Could not open the desk"],
+    ["tk", "Rugsat barlanýar", "Entek ýüz tutma ýok", "Rugsat ýok", "Iş ýeri açylmady"],
+    ["ru", "Проверяем доступ", "Обращений пока нет", "Нет доступа", "Не удалось открыть рабочее место"],
+    ["en", "Checking access", "No enquiries yet", "Access denied", "Could not open the desk"],
   ]) {
     for (const [status, expected] of [[200, empty], [403, denied], [503, error]]) {
       historyStatus = status;
