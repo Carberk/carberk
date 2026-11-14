@@ -233,6 +233,7 @@ export default function RootLayout() {
                 />
                 <Stack.Screen name="(public)" />
                 <Stack.Screen name="profile" />
+                <Stack.Screen name="tester-route" />
                 <Stack.Screen name="conversations/[id]" />
                 <Stack.Screen name="conversations/open-listing" />
                 <Stack.Screen name="(auth)/phone" />

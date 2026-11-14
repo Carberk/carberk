@@ -5,12 +5,12 @@ import { isAccessTokenExpired } from "../auth/accessTokenExpiry";
 import {
   commitRefreshedAuthSession,
   loadAuthSession,
+  type StoredAuthSession,
 } from "../auth/session";
+import { peekAuthSession } from "../auth/sessionSnapshot";
 import { localeStore } from "../locale/localeStore";
 
-const BASE_URL = (
-  process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3006/api/v1"
-).replace(/\/$/, "");
+import { apiRouteHeaders, captureRouteSnapshot, type RouteSnapshot } from "./routes";
 
 export class ApiError extends Error {
   constructor(
@@ -39,50 +39,53 @@ interface RequestOptions<TResponse> {
   accessToken?: string;
   // Per-request timeout override (defaults to 30s)
   timeout?: number;
+  signal?: AbortSignal;
   // Additional headers for idempotency or other endpoint-specific contracts.
   headers?: Record<string, string>;
   // Fence this request before sending or retrying, never the shared refresh.
   assertSession?: () => Promise<unknown>;
 }
 
-type ClientOptions = Pick<RequestOptions<unknown>, "auth" | "accessToken" | "timeout" | "assertSession" | "headers">;
+type ClientOptions = Pick<RequestOptions<unknown>, "auth" | "accessToken" | "timeout" | "assertSession" | "headers" | "signal">;
 
-let refreshInFlight: Promise<void> | null = null;
+let refreshInFlight: { session: StoredAuthSession; promise: Promise<void> } | null = null;
 
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  // React Native 0.83's AbortController polyfill does not reliably cancel
-  // fetch requests (facebook/react-native#55247). We use Promise.race so
-  // the timeout always wins even if fetch ignores the abort signal.
+// Session-ID is stable across rotation; the API alone establishes authority.
+function sameSession(a: StoredAuthSession | null, b: StoredAuthSession | null): boolean {
+  const sid = (session: StoredAuthSession) => {
+    try {
+      const payload = session.accessToken.split(".")[1] ?? "";
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      return (JSON.parse(atob(base64 + "=".repeat((4 - base64.length % 4) % 4))) as { sid?: string }).sid;
+    } catch { return undefined; }
+  };
+  return a === null ? b === null : b !== null && a.user?.id === b.user?.id && sid(a) === sid(b);
+}
+function assertOwner(expected: StoredAuthSession | null, current: StoredAuthSession | null) {
+  if (!sameSession(expected, current)) throw new ApiError("SESSION_CHANGED", 401);
+}
+function assertActive(signal?: AbortSignal) {
+  if (signal?.aborted) throw new ApiError("NETWORK_ERROR", 0, "Request canceled");
+}
+
+async function withDeadline<T>(run: (signal: AbortSignal) => Promise<T>, timeoutMs: number, external?: AbortSignal): Promise<T> {
+  assertActive(external);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(
-      () => reject(new ApiError("NETWORK_ERROR", 0, "Request timed out")),
-      timeoutMs,
-    ),
-  );
-
+  let reject!: (error: ApiError) => void;
+  const canceled = new Promise<never>((_, fail) => { reject = fail; });
+  const abort = (message: string) => {
+    reject(new ApiError("NETWORK_ERROR", 0, message));
+    controller.abort();
+  };
+  const onAbort = () => abort("Request canceled");
+  external?.addEventListener("abort", onAbort, { once: true });
+  const timer = setTimeout(() => abort("Request timed out"), timeoutMs);
   try {
-    const res = await Promise.race([
-      fetch(url, { ...init, signal: controller.signal }),
-      timeoutPromise,
-    ]);
-    return res;
-  } catch (err) {
-    if (err instanceof ApiError && err.code === "NETWORK_ERROR") {
-      throw err;
-    }
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new ApiError("NETWORK_ERROR", 0, "Request timed out");
-    }
-    throw err;
+    // The race also bounds native fetch implementations which ignore abort.
+    return await Promise.race([run(controller.signal), canceled]);
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timer);
+    external?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -93,27 +96,29 @@ function refreshUnavailable(message: string): ApiError {
   return new ApiError("REFRESH_UNAVAILABLE", 503, message);
 }
 
-async function refreshOnce(): Promise<void> {
-  if (refreshInFlight) {
-    return refreshInFlight;
-  }
-
-  refreshInFlight = (async () => {
+async function refreshOnce(route: RouteSnapshot, routeHeaders: Record<string, string>, owner: StoredAuthSession): Promise<void> {
+  if (refreshInFlight && sameSession(owner, refreshInFlight.session)) return refreshInFlight.promise;
+  const promise = withDeadline(async signal => {
     const session = await loadAuthSession();
     if (!session) {
       throw new ApiError("UNAUTHENTICATED", 401, "No session to refresh");
     }
-    const res = await fetchWithTimeout(
-      `${BASE_URL}/auth/refresh`,
+    assertOwner(owner, session);
+    // Another caller already rotated the bearer that this request sent.
+    if (session.refreshToken !== owner.refreshToken) return;
+    const res = await fetch(
+      `${route.apiBaseUrl}/auth/refresh`,
       {
         method: "POST",
+        signal,
+        redirect: "error",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
+          ...routeHeaders,
         },
         body: JSON.stringify({ refreshToken: session.refreshToken }),
       },
-      REFRESH_TIMEOUT_MS,
     );
 
     // Only a 401 is the API rejecting the refresh token (the one rejection the
@@ -140,25 +145,30 @@ async function refreshOnce(): Promise<void> {
     }
 
     await commitRefreshedAuthSession(session, parsed.data);
-  })();
-
-  try {
-    await refreshInFlight;
-  } finally {
-    refreshInFlight = null;
-  }
+  }, REFRESH_TIMEOUT_MS);
+  const flight = { session: owner, promise };
+  refreshInFlight = flight;
+  try { await promise; }
+  finally { if (refreshInFlight === flight) refreshInFlight = null; }
 }
 
 async function rawRequest<TResponse>(
   path: string,
   opts: RequestOptions<TResponse>,
   isRetry: boolean,
+  route: RouteSnapshot = captureRouteSnapshot(),
+  routeHeaders?: Record<string, string>,
+  owner?: StoredAuthSession | null,
 ): Promise<TResponse> {
+  assertActive(opts.signal);
+  routeHeaders ??= await apiRouteHeaders(route).catch(() => { throw new ApiError("ROUTE_UNAVAILABLE", 503); });
   await opts.assertSession?.();
   const headers: Record<string, string> = {
     Accept: "application/json",
-    ...(opts.headers ?? {}),
+    ...Object.fromEntries(Object.entries(opts.headers ?? {}).filter(([key]) => key.toLowerCase() !== "x-carberk-gateway-key")),
+    ...routeHeaders,
   };
+
 
   const locale = localeStore.getState().locale ?? "ru";
   headers["Accept-Language"] = locale;
@@ -171,13 +181,16 @@ async function rawRequest<TResponse>(
     headers["Authorization"] = `Bearer ${opts.accessToken}`;
   } else if (opts.auth !== false) {
     let session = await loadAuthSession();
+    if (owner !== undefined) assertOwner(owner, session);
+    owner ??= session;
     // Public routes that personalise their response (the feed's `isFavorited`)
     // ignore an expired bearer instead of answering 401, so the 401 refresh
     // below would never run for them. Refresh an expired token up front.
     if (session && !isRetry && isAccessTokenExpired(session)) {
       try {
-        await refreshOnce();
-      } catch {
+        await refreshOnce(route, routeHeaders, session);
+      } catch (error) {
+        if (error instanceof ApiError && ["UNAUTHENTICATED", "CONTRACT_VIOLATION"].includes(error.code)) owner = null;
         // A refresh the API rejected with 401, or whose 2xx JSON answer broke
         // the contract, has cleared the session, so the request goes out
         // anonymous. Any other failure (5xx, network, timeout, unreadable
@@ -186,22 +199,30 @@ async function rawRequest<TResponse>(
         // below.
       }
       session = await loadAuthSession();
+      await opts.assertSession?.();
+      assertOwner(owner, session);
     }
+    owner = session;
     if (session) {
       headers["Authorization"] = `Bearer ${session.accessToken}`;
     }
   }
 
   await opts.assertSession?.();
-  const res = await fetchWithTimeout(
-    `${BASE_URL}${path}`,
+  assertActive(opts.signal);
+  if (owner !== undefined) assertOwner(owner, await loadAuthSession());
+  assertActive(opts.signal);
+  const res = await fetch(
+    `${route.apiBaseUrl}${path}`,
     {
+      signal: opts.signal,
+      redirect: "error",
       method: opts.method ?? "GET",
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     },
-    opts.timeout ?? DEFAULT_TIMEOUT_MS,
   );
+  assertActive(opts.signal);
 
   if (
     res.status === 401 &&
@@ -210,8 +231,11 @@ async function rawRequest<TResponse>(
     !isRetry
   ) {
     await opts.assertSession?.();
-    await refreshOnce();
-    return rawRequest(path, opts, true);
+    assertActive(opts.signal);
+    if (!owner) throw new ApiError("UNAUTHENTICATED", 401);
+    await refreshOnce(route, routeHeaders, owner);
+    assertActive(opts.signal);
+    return rawRequest(path, opts, true, route, routeHeaders, owner);
   }
 
   if (res.status === 204) {
@@ -229,14 +253,15 @@ async function rawRequest<TResponse>(
   }
 
   if (!res.ok) {
-    const errorBody = json as { code?: string; message?: string; details?: unknown } | null;
+    const errorBody = json as { code?: string; message?: string; details?: unknown; error?: string } | null;
+    if (route.entry === "tm" && errorBody?.error === "gateway_access_denied") throw new ApiError("ROUTE_UNAVAILABLE", 503);
     const code = errorBody?.code ?? "UNKNOWN_ERROR";
     const message =
       errorBody?.message ??
       (rawText ? `Non-JSON error (${res.status}): ${rawText.slice(0, 200)}` : `HTTP ${res.status}`);
 
     console.error("[apiClient] request failed", {
-      url: `${BASE_URL}${path}`,
+      url: `${route.apiBaseUrl}${path}`,
       status: res.status,
       code,
       rawText: rawText?.slice(0, 500),
@@ -261,20 +286,26 @@ async function rawRequest<TResponse>(
   return json as TResponse;
 }
 
+function request<T>(path: string, opts: RequestOptions<T>): Promise<T> {
+  const route = captureRouteSnapshot();
+  const owner = opts.auth !== false && opts.accessToken === undefined ? peekAuthSession() : undefined;
+  return withDeadline(signal => rawRequest(path, { ...opts, signal }, false, route, undefined, owner), opts.timeout ?? DEFAULT_TIMEOUT_MS, opts.signal);
+}
+
 export const apiClient = {
   get<T>(path: string, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
-    return rawRequest<T>(path, { method: "GET", schema, ...opts }, false);
+    return request<T>(path, { method: "GET", schema, ...opts });
   },
   post<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
-    return rawRequest<T>(path, { method: "POST", body, schema, ...opts }, false);
+    return request<T>(path, { method: "POST", body, schema, ...opts });
   },
   patch<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
-    return rawRequest<T>(path, { method: "PATCH", body, schema, ...opts }, false);
+    return request<T>(path, { method: "PATCH", body, schema, ...opts });
   },
   put<T>(path: string, body: unknown, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
-    return rawRequest<T>(path, { method: "PUT", body, schema, ...opts }, false);
+    return request<T>(path, { method: "PUT", body, schema, ...opts });
   },
   delete<T>(path: string, schema?: ZodSchema<T>, opts: ClientOptions = {}) {
-    return rawRequest<T>(path, { method: "DELETE", schema, ...opts }, false);
+    return request<T>(path, { method: "DELETE", schema, ...opts });
   },
 };

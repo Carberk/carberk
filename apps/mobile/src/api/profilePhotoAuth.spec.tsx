@@ -110,7 +110,7 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
       http.get("*/probe", () => HttpResponse.json({ ok: true })),
       http.put("*/me/photo", () => { sets += 1; return HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/new/original.webp" }); }),
     );
-    const publicRequest = apiClient.get("/probe");
+    const publicRequest = apiClient.get("/probe").catch((error: unknown) => error);
     await vi.waitFor(() => expect(started).toBe(true));
     const session = await capturePhotoSession();
     const { result } = await setupPhotoHook(useSetProfilePhoto);
@@ -125,7 +125,7 @@ describe("Profile photo uses the shared authentication lifecycle", () => {
     await storeAuthSession(next);
     await act(async () => { complete(HttpResponse.json({ accessToken: "old-fresh", refreshToken: "old-refresh" })); });
     expect(await photoRequest).toBeInstanceOf(PhotoSessionEnded);
-    expect(await publicRequest).toEqual({ ok: true });
+    expect(await publicRequest).toMatchObject({ code: "SESSION_CHANGED" });
     expect(sets).toBe(0);
     expect((await loadAuthSession())?.user.id).toBe(next.user.id);
     session.dispose();
@@ -212,7 +212,7 @@ describe("Shared refresh belongs to the stored auth session, independently of ph
       http.post("*/auth/refresh", () => { started = true; return new Promise<Response>((resolve) => { complete = resolve; }); }),
       http.get("*/probe", () => HttpResponse.json({ ok: true })),
     );
-    const request = apiClient.get("/probe");
+    const request = apiClient.get("/probe").catch((error: unknown) => error);
     await vi.waitFor(() => expect(started).toBe(true));
     await clearAuthSession();
     if (transition !== "signed-out") {
@@ -224,7 +224,8 @@ describe("Shared refresh belongs to the stored auth session, independently of ph
     const expectedSession = await loadAuthSession();
     complete(response === "success" ? HttpResponse.json({ accessToken: "old-fresh", refreshToken: "old-refresh" })
       : response === "rejected" ? HttpResponse.json({ code: "UNAUTHENTICATED" }, { status: 401 }) : HttpResponse.json({ wrong: true }));
-    expect(await request).toEqual({ ok: true });
+    if (transition === "same-user-new-token") expect(await request).toEqual({ ok: true });
+    else expect(await request).toMatchObject({ code: "SESSION_CHANGED" });
     expect(await loadAuthSession()).toEqual(expectedSession);
   });
 });
