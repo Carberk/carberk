@@ -166,10 +166,11 @@ test("requests once, enters the correlated code in the genuine OTP UI, and confi
 
 test("uses an existing exact request without spending another code", async () => {
   const port = boundary({ currentOtp: true });
-  assert.equal((await signInFixture({ ...options, requestId: ID, requestedAt: "2026-11-12T06:00:00Z" }, port)).status, "signed-in");
+  assert.deepEqual(await signInFixture({ ...options, requestId: ID, requestedAt: "2026-11-12T06:00:00Z" }, port),
+    { fixture: "seller", status: "verified", identityConfirmed: false });
   assert.equal(port.requests.some(([url]) => url.endsWith("/otp/request")), false);
   assert.deepEqual(port.actions.slice(0, 2), [["snapshot", "-i"], ["fill", "@e7", "--text-stdin"]]);
-  assert.deepEqual(port.actions.filter(([action]) => action === "open"), [["open", "autotm:///services"]]);
+  assert.deepEqual(port.actions.filter(([action]) => action === "open"), []);
 });
 
 test("exact-request delivery refuses a different Code destination without leaving or typing", async () => {
@@ -437,7 +438,7 @@ test("uses fresh semantic native keyboard refs for the transparent OtpCells inpu
 
 test("resumes an exact request's matching grouped native digit prefix without retyping it", async () => {
   const port = keyboardBoundary({ currentOtp: true, initialDigits: "70" });
-  assert.equal((await signInFixture({ ...options, requestId: ID, requestedAt: new Date(NOW).toISOString() }, port)).status, "signed-in");
+  assert.equal((await signInFixture({ ...options, requestId: ID, requestedAt: new Date(NOW).toISOString() }, port)).status, "verified");
   assert.equal(port.actions.filter(([action]) => action === "press").length, 4);
   assert.equal(port.requests.some(([url]) => url.endsWith("/otp/request")), false);
 });
@@ -482,7 +483,7 @@ test("preserves only resumable safe context after a successful request and later
     return true;
   });
   const resumed = boundary({ currentOtp: true });
-  assert.equal((await signInFixture({ ...options, ...context }, resumed)).status, "signed-in");
+  assert.equal((await signInFixture({ ...options, ...context }, resumed)).status, "verified");
   assert.equal(resumed.requests.some(([url]) => url.endsWith("/otp/request")), false);
 });
 

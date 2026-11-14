@@ -134,6 +134,12 @@ async function run(options, ports, context) {
     }
     await ports.sleep(500);
   }
+  if (options.requestId) {
+    if (!leftOtp) throw new FixtureError("OTP UI verification did not complete; stop without resending");
+    // The caller may be replaying a mutation. Moving to Cabinet here would
+    // correctly cancel that work on focus loss before it reaches the API.
+    return { fixture: options.fixture, status: "verified", identityConfirmed: false };
+  }
   // A standalone OTP deep link can remain mounted after normal verification.
   // Only the native account identity below establishes success, never timing.
   await ports.device(["open", "autotm:///services"]);
