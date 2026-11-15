@@ -233,7 +233,10 @@ describe("sender-bound chat renewal through authenticated HTTP and S3", () => {
     const attempted = Date.now();
     expect(attempted - issued).toBeGreaterThanOrEqual(602000); expect((await put(original)).status).toBe(403);
     const grant = await grantFor(original.key); expect(grant.key).toBe(original.key); expect((await put(grant)).status).toBe(200);
-    expect(await read(grant.key)).toEqual(bytes); await send(grant.key, randomUUID()).expect(201); await renew(grant.key).expect(400);
+    expect(await read(grant.key)).toEqual(bytes);
+    const clientId = randomUUID(), sent = await send(grant.key, clientId).expect(201);
+    expect((await send(grant.key, clientId).expect(201)).body.id).toBe(sent.body.id);
+    expect(events.filter(id => id === sent.body.id)).toHaveLength(1); await renew(grant.key).expect(400);
     process.stdout.write(JSON.stringify({ proof: "1258-real-expiry", issuedUtc: new Date(issued).toISOString(), attemptedUtc: new Date(attempted).toISOString(), elapsedMs: attempted - issued, payloadBytes: bytes.length, oldPut: 403, renewedPut: 200, committedRenewal: 400 }) + "\n");
   }, 630000);
 });
