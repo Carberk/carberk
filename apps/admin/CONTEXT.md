@@ -12,8 +12,12 @@ tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.
 The dormant [source Listing reader](src/lib/history-source-listing.ts) projects
 only anonymous public display facts; its [catalog resolver](src/lib/history-listing-catalog.ts)
 resolves all present references and lets a caller reauthorize after every read/page.
-These internal readers grant no History, owner or media authority and expose no
-Server Action or mounted viewer. Request-bound viewing belongs to its separate slice.
+These internal readers grant no History, owner or media authority. The dormant
+[Listing action](src/app/vehicle-history/[locale]/listing-actions.ts) derives its
+source from the existing authorized selected-request action, rechecks that
+selection after each read/page or failure, and uses only authenticated viewer
+cover/explicit Play controls. It has no mounted viewer; connected viewing and
+return remain separate slices.
 
 The same action module has a strict, currently unmounted message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. Connected reader and reply controls remain separate slices.
 
