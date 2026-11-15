@@ -15,12 +15,14 @@ function headersFor(headers) {
     && !/^(forwarded$|x-forwarded-|x-real-ip$|x-carberk-|x-railway-|cf-|true-client-ip$|x-client-ip$|refresh$)/i.test(name)));
 }
 
-/** One fixed API origin, reached only through an explicit loopback CONNECT proxy. */
-export function createGateway({ origin, proxy, hostname, accessKey, ca, log = () => {}, now = Date.now,
+/** Fixed API/photo origins, reached only through an explicit loopback CONNECT proxy. */
+export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey, ca, log = () => {}, now = Date.now,
   deadlineMs = 30_000, connectMs = 6_000, maxBodyBytes = 16 * 1024 * 1024, maxConcurrent = 16, signing }) {
-  const upstream = new URL(origin);
+  const api = new URL(origin);
+  const photos = photoOrigin ? new URL(photoOrigin) : undefined;
+  const origins = [api, ...(photos ? [photos] : [])];
   const relay = new URL(proxy);
-  if (upstream.protocol !== 'https:' || upstream.username || upstream.password || upstream.pathname !== '/' || upstream.search || upstream.hash
+  if (origins.some(upstream => upstream.protocol !== 'https:' || upstream.username || upstream.password || upstream.pathname !== '/' || upstream.search || upstream.hash)
       || relay.protocol !== 'http:' || relay.hostname !== '127.0.0.1' || relay.username || relay.password
       || !/^[a-z0-9.-]+$/.test(hostname) || typeof accessKey !== 'string' || accessKey.length < 32) throw Error('Invalid gateway configuration');
   if (signing !== undefined && (!/^[a-zA-Z0-9_-]{1,32}$/.test(signing?.keyId ?? '')
@@ -28,7 +30,9 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
   const expectedKey = Buffer.from(accessKey);
   const agent = new https.Agent({ keepAlive: true, maxSockets: 8, maxTotalSockets: 8, maxFreeSockets: 4, timeout: 15_000 });
   const pendingConnections = new WeakMap();
-  agent.createConnection = () => {
+  agent.createConnection = options => {
+    const upstream = origins.find(value => value.hostname === options.host && (value.port || '443') === String(options.port));
+    if (!upstream) throw Error('Unconfigured origin');
     // Count the TLS socket immediately, but do not dial until Node assigns it
     // to a live request. Cancelled queued requests never start a transport.
     let peer;
@@ -74,6 +78,12 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
   };
   let active = 0;
   const server = http.createServer({ maxHeaderSize: 16 * 1024, highWaterMark: 64 * 1024 }, (req, res) => {
+    const photo = Boolean(photos && req.url.startsWith('/photos/'));
+    const upstream = photo ? photos : api;
+    // Slice the alias only. URL parsing/rebuilding would alter signed S3 targets.
+    const target = photo ? req.url.slice('/photos'.length) : req.url;
+    const permitted = photo ? ['GET', 'HEAD', 'PUT'].includes(req.method)
+      && /^\/(listing-photos|chat-attachments)\//.test(target) : allowedPath(target);
     const started = now();
     let counted = false;
     let outbound;
@@ -105,7 +115,7 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
       res.end(JSON.stringify({ error: reason }));
     }
     if (req.headers.host !== hostname || !methods.has(req.method) || !req.url.startsWith('/') || req.url.startsWith('//')
-        || req.url.includes('\\') || !allowedPath(req.url)) { fail(400, 'invalid_target'); return; }
+        || req.url.includes('\\') || !permitted) { fail(400, 'invalid_target'); return; }
     const supplied = Buffer.from(req.headers['x-carberk-gateway-key'] ?? '');
     if (supplied.length !== expectedKey.length || !timingSafeEqual(supplied, expectedKey)) { fail(403, 'gateway_access_denied'); return; }
     if (Number(req.headers['content-length'] ?? 0) > maxBodyBytes) { fail(413, 'body_limit'); return; }
@@ -113,7 +123,8 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
     active++; counted = true;
     const headers = headersFor(req.headers);
     headers.host = upstream.host;
-    if (signing) {
+    if (photo) { delete headers.authorization; delete headers.cookie; }
+    if (signing && !photo) {
       // The loopback-only listener is behind our nginx, which overwrites this
       // single address with $remote_addr. Never use caller X-Forwarded-For.
       const ip = req.headers['x-real-ip'];
@@ -128,12 +139,14 @@ export function createGateway({ origin, proxy, hostname, accessKey, ca, log = ()
     if (req.headers['content-length'] !== undefined) headers['content-length'] = req.headers['content-length'];
     else if (req.headers['transfer-encoding']) headers['transfer-encoding'] = req.headers['transfer-encoding'];
     outbound = https.request({ hostname: upstream.hostname, port: upstream.port || 443, method: req.method,
-      path: req.url, headers, agent }, originResponse => {
+      path: target, headers, agent }, originResponse => {
       responseStream = originResponse;
       const responseHeaders = headersFor(originResponse.headers);
+      if (photo) delete responseHeaders['set-cookie'];
       const location = responseHeaders.location;
       if (location !== undefined) {
         try {
+          if (photo) throw Error('Photo redirects are not supported');
           const target = new URL(location, upstream.origin + req.url);
           if (target.origin !== upstream.origin || target.username || target.password || !allowedPath(target.pathname)) throw Error('Unapproved redirect');
           responseHeaders.location = target.pathname + target.search + target.hash;

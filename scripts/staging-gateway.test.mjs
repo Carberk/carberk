@@ -12,13 +12,15 @@ import { createGateway } from '../infra/gateway/gateway.mjs';
 
 const key = 'controlled-staging-key-0123456789abcdef';
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
-async function setup(t, handler, overrides = {}, proxyMode = 'normal') {
+async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHandler) {
   const dir = await mkdtemp(join(tmpdir(), 'gateway-test-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost', '-keyout', join(dir, 'key'), '-out', join(dir, 'cert')], { stdio: 'ignore' });
   const ca = await readFile(join(dir, 'cert'));
   const upstream = https.createServer({ key: await readFile(join(dir, 'key')), cert: ca }, handler);
   const port = await listen(upstream);
+  const photos = photoHandler ? https.createServer({ key: await readFile(join(dir, 'key')), cert: ca }, photoHandler) : undefined;
+  const photoPort = photos ? await listen(photos) : undefined;
   let tunnels = 0;
   const sockets = new Set();
   const peers = new Set();
@@ -26,7 +28,8 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal') {
   const proxy = http.createServer();
   proxy.on('connect', (req, client, head) => {
     tunnels++;
-    assert.equal(req.url, `localhost:${port}`);
+    assert.ok([`localhost:${port}`, ...(photoPort ? [`localhost:${photoPort}`] : [])].includes(req.url));
+    const destination = Number(req.url.split(':')[1]);
     sockets.add(client); peers.add(client); peakPeers = Math.max(peakPeers, peers.size);
     client.on('error', () => {});
     client.on('close', () => { sockets.delete(client); peers.delete(client); });
@@ -36,7 +39,7 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal') {
       client.resume();
       return;
     }
-    const remote = net.connect(port, '127.0.0.1', () => {
+    const remote = net.connect(destination, '127.0.0.1', () => {
       client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
       if (head.length) remote.write(head);
       remote.pipe(client); client.pipe(remote);
@@ -47,12 +50,14 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal') {
   const proxyPort = await listen(proxy);
   const logs = [];
   const gateway = createGateway({ origin: `https://localhost:${port}`, proxy: `http://127.0.0.1:${proxyPort}`,
+    ...(photoPort ? { photoOrigin: `https://localhost:${photoPort}` } : {}),
     hostname: 'gateway.example.test', accessKey: key, ca, log: row => logs.push(row), ...overrides });
   const gatewayPort = await listen(gateway);
   t.after(async () => {
     gateway.closeAllConnections(); await new Promise(r => gateway.close(r));
     for (const s of sockets) s.destroy();
     upstream.closeAllConnections(); await Promise.all([new Promise(r => upstream.close(r)), new Promise(r => proxy.close(r))]);
+    if (photos) { photos.closeAllConnections(); await new Promise(r => photos.close(r)); }
   });
   async function request({ path = '/healthz', method = 'GET', body, headers = {} } = {}) {
     return new Promise((resolve, reject) => {
@@ -75,6 +80,66 @@ test('controlled client preserves method, raw signed target, body and API status
   const result = await f.request({ method: 'PATCH', path: '/api/v1/echo?x=a%2Fb&x=1+2', body: 'exact\nbody', headers: { authorization: 'Bearer synthetic' } });
   assert.equal(result.status, 422);
   assert.deepEqual(JSON.parse(result.body), { method: 'PATCH', target: '/api/v1/echo?x=a%2Fb&x=1+2', body: 'exact\nbody', auth: 'Bearer synthetic' });
+});
+
+test('photo alias preserves signed raw target, TLS identity, conditional headers and bytes without API credentials', async t => {
+  let photoHost;
+  let photoTls;
+  const f = await setup(t, (_req, res) => res.end('api'), {
+    signing: { keyId: 'current', secret: 'ab'.repeat(32) },
+  }, 'normal', (req, res) => {
+    const chunks = [];
+    photoHost = req.headers.host;
+    photoTls = req.socket.servername;
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => res.end(JSON.stringify({ target: req.url, method: req.method,
+      headers: req.headers, bytes: Buffer.concat(chunks).toString('hex') })));
+  });
+  const response = await f.request({ method: 'PUT',
+    path: '/photos/listing-photos/pending/a%2Fb/original.webp?X-Amz-Signature=synthetic&x=1+2&x=%2f',
+    body: Buffer.from([0, 255, 13, 10, 42]), headers: {
+      authorization: 'Bearer must-not-reach-storage', cookie: 'api-session=private',
+      'content-type': 'image/webp', 'if-match': '"signed-etag"', 'cache-control': 'no-store',
+      'x-carberk-client-proof': 'forged',
+    } });
+  assert.equal(response.status, 200);
+  const received = JSON.parse(response.body);
+  assert.equal(received.target, '/listing-photos/pending/a%2Fb/original.webp?X-Amz-Signature=synthetic&x=1+2&x=%2f');
+  assert.equal(received.method, 'PUT');
+  assert.equal(received.bytes, '00ff0d0a2a');
+  assert.equal(received.headers['content-type'], 'image/webp');
+  assert.equal(received.headers['if-match'], '"signed-etag"');
+  assert.equal(received.headers['cache-control'], 'no-store');
+  for (const name of ['authorization', 'cookie', 'x-carberk-gateway-key', 'x-carberk-client-proof']) assert.equal(received.headers[name], undefined);
+  assert.match(photoHost, /^localhost:\d+$/);
+  assert.equal(photoTls, 'localhost');
+  assert.equal((await f.request({ headers: { 'x-real-ip': '203.0.113.7' } })).body.toString(), 'api');
+  assert.equal(f.tunnels(), 2);
+  assert.ok(!JSON.stringify(f.logs).includes('synthetic'));
+});
+
+test('photo entry preserves storage refusals and refuses other destinations, methods and redirects', async t => {
+  let status = 403;
+  const f = await setup(t, (_req, res) => res.end('api'), {}, 'normal', (_req, res) => {
+    res.writeHead(status, status === 307 ? { location: '/listing-photos/redirect.webp' } : {});
+    res.end('storage-result');
+  });
+  const path = '/photos/chat-attachments/chat-attachments/conversation/photo/original.webp';
+  for (const refused of [403, 412]) {
+    status = refused;
+    const result = await f.request({ path, method: 'PUT', body: 'photo' });
+    assert.equal(result.status, refused);
+    assert.equal(result.body.toString(), 'storage-result');
+  }
+  status = 307;
+  assert.equal((await f.request({ path })).status, 502);
+  const before = f.tunnels();
+  for (const input of [
+    { path, method: 'DELETE' }, { path, method: 'POST' },
+    { path: '/photos/private-history/secret.webp' }, { path: '/photos/https://other.test/photo.webp' },
+    { path, headers: { 'x-carberk-gateway-key': '' } },
+  ]) assert.ok([400, 403].includes((await f.request(input)).status));
+  assert.equal(f.tunnels(), before);
 });
 
 test('closed entry refuses missing keys and arbitrary targets without contacting an upstream', async t => {
