@@ -19,7 +19,7 @@ selection after each read/page or failure, and uses only authenticated viewer
 cover/explicit Play controls. It has no mounted viewer; connected viewing and
 return remain separate slices.
 
-The same action module has a strict, currently unmounted message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. Connected reader and reply controls remain separate slices.
+The same action module has a strict, currently unmounted message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. Receipt and reply controls remain separate slices.
 
 Browser JavaScript never receives API tokens. Server-side code stores them in HTTP-only cookies and forwards bearer authentication to the API. Preserve production `__Host-` cookie restrictions, origin validation on browser-posted handlers, and local-only `returnTo` validation. The Node `src/proxy.ts` renews expired requests before rendering or Server Actions, forwarding the rotated cookies to the handler and storing both on the response. Layout/API checks still enforce actual authentication and TOTP elevation. Server Components never rotate tokens or write cookies.
 

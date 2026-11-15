@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button, Input } from "@auto-tm/ui/components";
 import { IdentitySchemas, VehicleHistorySchemas as V } from "@auto-tm/contracts";
@@ -20,6 +20,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   const version = V.ClaimHistoryRequestSchema.shape.expectedAssignmentVersion.safeParse(Number(url.get("v") ?? 0));
   const [revision, setRevision] = useState(0);
   const [readerRevision, setReaderRevision] = useState(0);
+  const queueGeneration = useRef(0);
   const key = `${locale}?${raw}`;
   const [queue, setQueue] = useState<{ key: string; source: HistoryInboxResult | undefined; result: HistoryInboxResult } | null>(
     initial ? { key, source: initial, result: initial } : null,
@@ -61,17 +62,19 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   }, []);
   useEffect(() => {
     let active = true;
+    const generation = ++queueGeneration.current;
+    const valid = () => active && generation === queueGeneration.current;
     const parsed = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned",
       ...Object.fromEntries([...new URLSearchParams(raw)].filter(([name]) => ["filter", "search", "cursor"].includes(name))) });
     if (!parsed.success || offline) return;
     void historyInboxAction(locale, { kind: "queue", query: parsed.data,
       ...(initial?.status === "ok" ? { scope: initial.scope } : {}),
     }).then((result) => {
-      if (!active) return;
+      if (!valid()) return;
       setFailure(result.status === "unavailable" ? { key, state: "unavailable" } : null);
-      setQueue((previous) => result.status === "unavailable" && previous?.key === key && previous.source === initial && previous.result.status === "ok"
+      setQueue((previous) => !valid() || result.status === "unavailable" && previous?.key === key && previous.source === initial && previous.result.status === "ok"
         ? previous : { key, source: initial, result });
-    }).catch(() => { if (active) setFailure({ key, state: "unavailable" }); });
+    }).catch(() => { if (valid()) setFailure({ key, state: "unavailable" }); });
     return () => { active = false; };
   }, [key, locale, raw, revision, offline, initial]);
   const admitted = current?.status === "ok" && current.kind === "queue" ? current : null;
@@ -128,7 +131,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
           </section>
           {id.success && version.success ? <SelectedRequest key={`${locale}:${id.data}:${version.data}:${admitted.scope}:${admitted.actor.id}:${!!assignmentLost}`} locale={locale} id={id.data} version={version.data} revision={readerRevision}
             row={selectedRow} scope={admitted.scope} actor={admitted.actor}
-            refresh={refresh} invalidate={(result) => setQueue({ key, source: initial, result })}
+            refresh={refresh} invalidate={(result) => { queueGeneration.current++; setQueue({ key, source: initial, result }); }}
             claimed={(assignmentVersion) => navigate({ selected: id.data, v: String(assignmentVersion) }, true)} />
             : <p className="p-6 text-sm text-muted-foreground lg:col-span-1 xl:col-span-2">{t.select}</p>}
         </div>}

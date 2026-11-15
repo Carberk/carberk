@@ -671,3 +671,27 @@ it.each([
   failed = false; fireEvent.click(screen.getByRole("button", { name: retry }));
   await screen.findByText(empty);
 });
+
+it("does not let an older queue response re-admit a reader after an observed refusal", async () => {
+  selectAssigned();
+  const network = networkHandler(), queue = deferred<Response>(), detailRead = deferred<Response>();
+  let phase: "initial" | "refusing" | "refused" = "initial", queuePending = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (phase === "refusing" && path.endsWith("/requests")) { queuePending = true; return queue.promise; }
+    if (phase === "refusing" && path.endsWith("/messages")) return Promise.resolve(Response.json({}, { status: 403 }));
+    if (phase === "refused" && path.endsWith(id)) return detailRead.promise;
+    return network(input, init);
+  });
+  render(view()); await screen.findByText("Can you check this car?");
+  phase = "refusing";
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  await waitFor(() => expect(queuePending).toBe(true));
+  await screen.findByText("Access denied");
+  expect(document.querySelector("#selected-enquiry")).toBeNull();
+  phase = "refused";
+  await act(async () => queue.resolve(Response.json({ items: [{ ...row, mine: true, assignmentVersion: 1, assignedOperator: actor }], nextCursor: null })));
+  expect(screen.getByText("Access denied")).toBeDefined();
+  expect(document.querySelector("#selected-enquiry")).toBeNull();
+  await act(async () => detailRead.resolve(Response.json(detail())));
+});
