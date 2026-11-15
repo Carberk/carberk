@@ -112,6 +112,7 @@ import {
 import {
   PresignRequestSchema,
   PresignResponseSchema,
+  RenewPhotoUploadRequestSchema,
 } from "./schemas/uploads";
 import {
   ExchangeRateSchema,
@@ -194,6 +195,7 @@ const S = (schema: z.ZodTypeAny) => schema as unknown as Record<string, unknown>
 
 export function buildOpenApiRegistry(): OpenAPIRegistry {
   const registry = new OpenAPIRegistry();
+  registry.registerComponent("securitySchemes", "bearerAuth", { type: "http", scheme: "bearer", bearerFormat: "JWT" });
 
   registry.register("ErrorResponse", ErrorResponseSchema);
   const uploadDetails = registry.register("UploadObjectInvalidDetails", UploadObjectInvalidDetailsSchema);
@@ -261,6 +263,21 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   // Uploads schemas
   registry.register("PresignRequest", PresignRequestSchema);
   registry.register("PresignResponse", PresignResponseSchema);
+  registry.register("RenewPhotoUploadRequest", RenewPhotoUploadRequestSchema);
+  registry.registerPath({
+    method: "post",
+    path: "/api/v1/uploads/renew",
+    summary: "Renew the signed-in User's untouched conditional photo upload",
+    description: "Retains the recorded key, metadata and empty-object If-Match fence. Completed, changed, missing, claimed or retired uploads cannot be renewed.",
+    tags: ["Uploads"], security: [{ bearerAuth: [] }],
+    request: { body: { required: true, content: { "application/json": { schema: S(RenewPhotoUploadRequestSchema) } } } },
+    responses: {
+      201: { description: "Fresh authority for the same pending photo", content: { "application/json": { schema: S(PresignResponseSchema) } } },
+      400: { description: "Invalid request or UPLOAD_NOT_AVAILABLE; no renewed authority", content: { "application/json": { schema: S(ErrorResponseSchema) } } },
+      401: { description: "Authentication required", content: { "application/json": { schema: S(ErrorResponseSchema) } } },
+      403: { description: "Suspended User or pending account deletion", content: { "application/json": { schema: S(ErrorResponseSchema) } } },
+    },
+  });
 
   // Exchange-rates schemas
   registry.register("ExchangeRate", ExchangeRateSchema);
