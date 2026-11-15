@@ -83,12 +83,12 @@ it("retains queue, search, page and selection in locale links and restores Back/
   fireEvent.submit(searchForm());
   expect(window.location.search).toBe("?filter=mine&search=New+name");
 });
-it("clears the transcript when offline and retries after reconnect", async () => {
+it("retains the transcript when offline and reconciles after reconnect", async () => {
   assigned = true; window.history.replaceState(null, "", `?selected=${id}&v=1`);
   render(view()); await screen.findByText("Can you check this car?");
   vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
   await act(async () => window.dispatchEvent(new Event("offline")));
-  expect(screen.queryByText("Can you check this car?")).toBeNull();
+  expect(screen.getByText("Can you check this car?")).toBeDefined();
   await screen.findByText("You’re offline. Check your connection and retry.");
   vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
   await act(async () => window.dispatchEvent(new Event("online")));
@@ -287,7 +287,7 @@ it("pages the queue and transcript through real cursor URLs without receipt writ
   await screen.findByText("Can you check this car?");
   fireEvent.click(screen.getByRole("button", { name: "More messages" }));
   await screen.findByText("Second page text");
-  expect(document.activeElement?.textContent).toContain("Second page text");
+  await waitFor(() => expect(document.activeElement?.textContent).toContain("Second page text"));
   expect(screen.getByText("Can you check this car?")).toBeDefined();
   expect(requests.filter((r) => r.method === "POST")).toEqual([]);
 });
@@ -305,7 +305,7 @@ it.each([
   if (locale === "tk") expect(screen.getByText("15/11/2026, 06:00 GMT+5")).toBeDefined();
 });
 
-it("disposes the old inbox on a same-actor new-session page render, even with fixed old request cookies", async () => {
+it.each(["page", "refresh"])("disposes the old inbox on a same-actor new-session render during %s, even with fixed old request cookies", async (work) => {
   assigned = true;
   window.history.replaceState(null, "", `?selected=${id}&v=1`);
   const network = networkHandler();
@@ -326,7 +326,7 @@ it("disposes the old inbox on a same-actor new-session page render, even with fi
   const mounted = render(await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) })));
   await screen.findByText("Old session private text");
   phase = "old-page";
-  platform.requestCookies.run(platform.token, () => fireEvent.click(screen.getByRole("button", { name: "More messages" })));
+  platform.requestCookies.run(platform.token, () => fireEvent.click(screen.getByRole("button", { name: work === "page" ? "More messages" : "Refresh" })));
   await waitFor(() => expect(capturedOld).toBe(true));
   platform.token = token(actor.id);
   phase = "new-session";
@@ -381,10 +381,337 @@ it("retries a server failure without losing the selected enquiry URL", async () 
   render(view()); await screen.findByText("Can you check this car?");
   unavailable = true;
   fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-  await screen.findByText("Could not open the desk");
-  expect(screen.queryByText("Can you check this car?")).toBeNull();
+  await screen.findByText("Could not update messages. Showing previously loaded messages.");
+  expect(screen.getByText("Can you check this car?")).toBeDefined();
   unavailable = false;
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   expect(window.location.search).toBe(`?filter=mine&selected=${id}&v=1`);
   await screen.findByText("Can you check this car?");
+});
+
+const message = (index: number, text = `Reader message ${index}`) => ({
+  id: `12670000-0000-4000-8000-${String(index).padStart(12, "0")}`, clientMessageId: id,
+  order: String(index), kind: "TEXT", text, author: { ...actor, kind: "requester" }, createdAt: row.createdAt,
+});
+function selectAssigned() {
+  assigned = true;
+  window.history.replaceState(null, "", `?filter=mine&selected=${id}&v=1`);
+}
+
+it("keeps the clipped tall-message anchor and focus while a pending page serializes focus and manual refresh", async () => {
+  selectAssigned();
+  const network = networkHandler(), page = deferred<Response>();
+  const cursors: (string | null)[] = [];
+  let incoming = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (!url.pathname.endsWith("/messages")) return network(input, init);
+    const cursor = url.searchParams.get("cursor"); cursors.push(cursor);
+    if (cursor === message(2).id) return page.promise;
+    if (cursor === message(3).id) return Promise.resolve(Response.json({ items: [message(4)], nextCursor: null }));
+    if (cursor === message(4).id) return Promise.resolve(Response.json({ items: incoming ? [message(5)] : [], nextCursor: null }));
+    return Promise.resolve(Response.json({ items: [message(1), message(2, "Uzyn tekst\nДлинный текст\n".repeat(60))], nextCursor: message(2).id }));
+  });
+  // happy-dom has no layout. Substitute only browser geometry; the whole caller,
+  // production actions and HTTP/schema/authority checks above remain real.
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const pane = this.closest("ol") as HTMLOListElement | null;
+    const index = Number(this.id.slice(-12));
+    const top = this.tagName === "OL" ? 100 : pane ? 100 + (index === 1 ? 0 : index === 2 ? 80 : 880 + (index - 3) * 80) - pane.scrollTop : 0;
+    return { top, bottom: top + (this.tagName === "OL" ? 300 : index === 2 ? 800 : 80), height: 80, left: 0, right: 400, width: 400, x: 0, y: top, toJSON: () => ({}) };
+  });
+  render(view()); await screen.findByText("Reader message 1");
+  const pane = screen.getByRole("list", { name: "Enquiry conversation" });
+  pane.scrollTop = 150; fireEvent.scroll(pane);
+  const tall = pane.children[1] as HTMLElement;
+  tall.focus();
+  const more = screen.getByRole("button", { name: "More messages" }); more.focus();
+  fireEvent.click(more);
+  await waitFor(() => expect(cursors).toEqual([null, message(2).id]));
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  expect(screen.getByText("Reader message 1")).toBeDefined();
+  expect(cursors).toEqual([null, message(2).id]);
+  await act(async () => page.resolve(Response.json({ items: [message(3)], nextCursor: null })));
+  await screen.findByText("Reader message 4");
+  await waitFor(() => expect(document.activeElement?.textContent).toContain("Reader message 3"));
+  expect(cursors).toEqual([null, message(2).id, message(3).id]);
+  expect(screen.getByRole("list", { name: "Enquiry conversation" })).toBe(pane);
+  expect(tall.getBoundingClientRect().top - pane.getBoundingClientRect().top).toBe(-70);
+  expect(pane.scrollTop).toBe(150);
+  tall.focus(); incoming = true;
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  await screen.findByText("Reader message 5");
+  expect(document.activeElement).toBe(tall);
+  expect(pane.scrollTop).toBe(150);
+  expect([...pane.children].map((node) => node.id)).toEqual([1, 2, 3, 4, 5].map((n) => `history-message-${message(n).id}`));
+});
+
+it.each(["gap", "duplicate", "reversed", "cursor"])("retains its contiguous prefix after an invalid %s page and retries from the same frontier", async (fault) => {
+  selectAssigned();
+  const network = networkHandler();
+  let broken = true;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (!url.pathname.endsWith("/messages")) return network(input, init);
+    if (!url.searchParams.has("cursor")) return Promise.resolve(Response.json({ items: [message(1), message(2)], nextCursor: message(2).id }));
+    const items = !broken || fault === "cursor" ? [message(3)] : fault === "gap" ? [message(4)] : fault === "duplicate" ? [message(3), message(3)] : [message(4), message(3)];
+    return Promise.resolve(Response.json({ items, nextCursor: broken && fault === "cursor" ? message(1).id : null }));
+  });
+  render(view()); await screen.findByText("Reader message 2");
+  fireEvent.click(screen.getByRole("button", { name: "More messages" }));
+  await screen.findByText("Could not update messages. Showing previously loaded messages.");
+  expect(screen.queryByText("Reader message 3")).toBeNull();
+  expect(screen.queryByText("Reader message 4")).toBeNull();
+  expect(screen.getByText("Reader message 2")).toBeDefined();
+  broken = false; fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await screen.findByText("Reader message 3");
+  expect(screen.getByRole("list", { name: "Enquiry conversation" }).children).toHaveLength(3);
+});
+
+it.each(["page", "refresh"] as const)("retains prior pages through a transient %s failure and reconnects without replacing the pane", async (work) => {
+  selectAssigned();
+  const network = networkHandler();
+  let failed = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (!url.pathname.endsWith("/messages")) return network(input, init);
+    if (failed) return Promise.resolve(Response.json({}, { status: 503 }));
+    if (url.searchParams.get("cursor") === message(2).id) return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    return Promise.resolve(Response.json(url.searchParams.has("cursor") ? { items: [message(2)], nextCursor: null }
+      : { items: [message(1)], nextCursor: message(1).id }));
+  });
+  render(view()); await screen.findByText("Reader message 1");
+  const pane = screen.getByRole("list", { name: "Enquiry conversation" });
+  pane.scrollTop = 34;
+  const first = pane.firstElementChild as HTMLElement; first.focus();
+  failed = true; fireEvent.click(screen.getByRole("button", { name: work === "page" ? "More messages" : "Refresh" }));
+  await screen.findByText("Could not update messages. Showing previously loaded messages.");
+  expect(pane.scrollTop).toBe(34);
+  expect(document.activeElement).toBe(first);
+  failed = false;
+  await act(async () => window.dispatchEvent(new Event("online")));
+  await screen.findByText("Connection restored. Messages updated.");
+  expect(screen.getByRole("list", { name: "Enquiry conversation" })).toBe(pane);
+  expect(screen.getByText("Reader message 2")).toBeDefined();
+  expect(document.activeElement).toBe(first);
+});
+
+it.each([403, 409, 401])("immediately hides loaded text after an observed HTTP %s during refresh", async (status) => {
+  selectAssigned();
+  const network = networkHandler();
+  let refused = false;
+  vi.mocked(fetch).mockImplementation((input, init) => refused && String(input).includes("/messages")
+    ? Promise.resolve(Response.json({}, { status })) : network(input, init));
+  render(view()); await screen.findByText("Can you check this car?");
+  refused = true; fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await screen.findByText(status === 409 ? "Assignment changed. Refresh before continuing." : "Access denied");
+  expect(screen.queryByRole("list", { name: "Enquiry conversation" })).toBeNull();
+  expect(screen.queryByText("Can you check this car?")).toBeNull();
+});
+
+it.each(["actor", "session", "assignment", "request", "disposal"] as const)("excludes a delayed refresh after current %s changes", async (change) => {
+  selectAssigned();
+  const network = networkHandler(), delayed = deferred<Response>();
+  let refreshing = false, captured = false, changed = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (refreshing && path.endsWith("/messages") && !captured) { captured = true; return delayed.promise; }
+    if (changed && change === "actor" && path.endsWith("/desk")) return Promise.resolve(Response.json({ purpose: "vehicle-history", mode: "synthetic", actor: { ...actor, id }, requests: [] }));
+    if (changed && change === "assignment" && path.endsWith(id)) return Promise.resolve(Response.json({ ...detail(), assignmentVersion: 2 }));
+    if (path.endsWith("/messages")) return Promise.resolve(Response.json({ items: [message(1)], nextCursor: null }));
+    return network(input, init);
+  });
+  const mounted = render(view()); await screen.findByText("Reader message 1");
+  refreshing = true; fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await waitFor(() => expect(captured).toBe(true));
+  changed = true;
+  if (change === "actor") platform.token = token(id, id);
+  if (change === "session") platform.token = token(actor.id);
+  if (change === "request") fireEvent.click(screen.getByRole("button", { name: "Unassigned" }));
+  if (change === "disposal") mounted.unmount();
+  await act(async () => delayed.resolve(Response.json({ items: [message(2, "Late private refresh")], nextCursor: null })));
+  if (change === "actor" || change === "session") await screen.findByText("Access denied");
+  if (change === "assignment") await screen.findByText("Assignment changed. Refresh before continuing.");
+  expect(screen.queryByText("Late private refresh")).toBeNull();
+  expect(screen.queryByText("Reader message 1")).toBeNull();
+});
+
+it.each([
+  ["tk", "Rugsat barlanýar…", "Entek habar ýok.", "Habarlar täzelenmedi. Öň ýüklenen habarlar görkezilýär.", "Gaýtadan synanyş", "Baglanyşyk dikeldilýär…", "Baglanyşyk dikeldildi. Habarlar täzelendi.", "Tor ýok. Baglanyşygy barlaň we gaýtadan synanyşyň."],
+  ["ru", "Проверяем доступ…", "Сообщений пока нет.", "Не удалось обновить сообщения. Показаны ранее загруженные.", "Попробовать ещё раз", "Восстанавливаем соединение…", "Соединение восстановлено. Сообщения обновлены.", "Нет сети. Проверьте соединение и повторите попытку."],
+  ["en", "Checking access…", "No messages yet.", "Could not update messages. Showing previously loaded messages.", "Try again", "Reconnecting…", "Connection restored. Messages updated.", "You’re offline. Check your connection and retry."],
+] as const)("announces first-entry, empty, transient Retry and reconnection in %s", async (locale, loading, empty, error, retry, reconnecting, recovered, offline) => {
+  selectAssigned(); platform.path = `/vehicle-history/${locale}`;
+  const network = networkHandler();
+  let pending = deferred<Response>(), phase: "pending" | "failed" = "pending";
+  vi.mocked(fetch).mockImplementation((input, init) => String(input).includes("/messages")
+    ? phase === "failed" ? Promise.resolve(Response.json({}, { status: 503 })) : pending.promise : network(input, init));
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  await screen.findByText(loading);
+  await act(async () => pending.resolve(Response.json({ items: [], nextCursor: null })));
+  await screen.findByText(empty);
+  phase = "failed"; fireEvent.click(screen.getByRole("button", { name: locale === "tk" ? "Täzele" : locale === "ru" ? "Обновить" : "Refresh" }));
+  await screen.findByText(error);
+  phase = "pending"; pending = deferred<Response>();
+  fireEvent.click(screen.getByRole("button", { name: retry }));
+  await screen.findByText(reconnecting);
+  expect(screen.getByText(empty)).toBeDefined();
+  await act(async () => pending.resolve(Response.json({ items: [], nextCursor: null })));
+  await screen.findByText(recovered);
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+  await act(async () => window.dispatchEvent(new Event("offline")));
+  await screen.findByText(offline);
+  expect(screen.getByText(empty)).toBeDefined();
+});
+
+it("reconciles missed incoming text on the poll clock without push or a focus event", async () => {
+  selectAssigned();
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  const network = networkHandler();
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    return url.pathname.endsWith("/messages") ? Promise.resolve(Response.json({
+      items: [message(url.searchParams.has("cursor") ? 2 : 1)], nextCursor: null,
+    })) : network(input, init);
+  });
+  try {
+    render(view()); await screen.findByText("Reader message 1");
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    await screen.findByText("Reader message 2");
+    expect(screen.getByRole("list", { name: "Enquiry conversation" }).children).toHaveLength(2);
+    expect(requests.some((request) => request.method === "POST")).toBe(false);
+  } finally { vi.useRealTimers(); }
+});
+
+it.each(["version", "owner", "mine"])("hides text as soon as the queue observes %s loss while a page is pending", async (change) => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  let lost = false, captured = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/requests") && lost) return Promise.resolve(Response.json({ items: [{ ...row, mine: true, assignmentVersion: 1, assignedOperator: actor,
+      ...(change === "version" ? { assignmentVersion: 2 } : change === "mine" ? { mine: false } : { assignedOperator: { ...actor, id } }),
+    }], nextCursor: null }));
+    if (url.pathname.endsWith("/messages")) {
+      if (url.searchParams.has("cursor")) { captured = true; return pending.promise; }
+      return Promise.resolve(Response.json({ items: [message(1)], nextCursor: message(1).id }));
+    }
+    return network(input, init);
+  });
+  render(view()); await screen.findByText("Reader message 1");
+  fireEvent.click(screen.getByRole("button", { name: "More messages" }));
+  await waitFor(() => expect(captured).toBe(true));
+  lost = true;
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  await screen.findByText("Assignment changed. Refresh before continuing.");
+  expect(screen.queryByText("Reader message 1")).toBeNull();
+  await act(async () => pending.resolve(Response.json({ items: [message(2)], nextCursor: null })));
+  expect(screen.queryByText("Reader message 2")).toBeNull();
+});
+
+it("does not steal keyboard focus moved to search while a page is pending", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  let captured = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (!url.pathname.endsWith("/messages")) return network(input, init);
+    if (url.searchParams.has("cursor")) { captured = true; return pending.promise; }
+    return Promise.resolve(Response.json({ items: [message(1)], nextCursor: message(1).id }));
+  });
+  render(view()); await screen.findByText("Reader message 1");
+  fireEvent.click(screen.getByRole("button", { name: "More messages" }));
+  await waitFor(() => expect(captured).toBe(true));
+  const search = screen.getByRole("searchbox"); search.focus();
+  await act(async () => pending.resolve(Response.json({ items: [message(2)], nextCursor: null })));
+  await screen.findByText("Reader message 2");
+  expect(document.activeElement).toBe(search);
+});
+
+it("announces loss of connection before an unclaimed enquiry can be claimed", async () => {
+  render(view()); fireEvent.click(await screen.findByRole("link", { name: /Merdan/ }));
+  await screen.findByRole("button", { name: "Claim enquiry" });
+  vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+  await act(async () => window.dispatchEvent(new Event("offline")));
+  await screen.findByText("You’re offline. Check your connection and retry.");
+  expect(requests.some((request) => request.method === "POST")).toBe(false);
+});
+
+it("uses one reader reconciliation for a single focus event while the queue also refreshes", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  const cursors: (string | null)[] = [];
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (!url.pathname.endsWith("/messages")) return network(input, init);
+    const cursor = url.searchParams.get("cursor"); cursors.push(cursor);
+    return cursor ? pending.promise : Promise.resolve(Response.json({ items: [message(1)], nextCursor: null }));
+  });
+  render(view()); await screen.findByText("Reader message 1");
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  await waitFor(() => expect(cursors).toEqual([null, message(1).id]));
+  await act(async () => pending.resolve(Response.json({ items: [], nextCursor: null })));
+  expect(cursors).toEqual([null, message(1).id]);
+  expect(screen.getByText("Reader message 1")).toBeDefined();
+});
+
+it.each([
+  ["tk", "Hat alyşma ýüklenmedi.", "Gaýtadan synanyş", "Entek habar ýok."],
+  ["ru", "Не удалось загрузить переписку.", "Попробовать ещё раз", "Сообщений пока нет."],
+  ["en", "Could not load the conversation.", "Try again", "No messages yet."],
+] as const)("recovers a first-entry conversation failure with a specific %s error", async (locale, error, retry, empty) => {
+  selectAssigned();
+  const network = networkHandler(); let failed = true;
+  vi.mocked(fetch).mockImplementation((input, init) => String(input).includes("/messages")
+    ? Promise.resolve(failed ? Response.json({}, { status: 503 }) : Response.json({ items: [], nextCursor: null })) : network(input, init));
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  await screen.findByText(error);
+  expect(screen.queryByRole("list", { name: /hat alyşmasy|Переписка|Enquiry conversation/ })).toBeNull();
+  failed = false; fireEvent.click(screen.getByRole("button", { name: retry }));
+  await screen.findByText(empty);
+});
+
+it("does not let an older queue response re-admit a reader after an observed refusal", async () => {
+  selectAssigned();
+  const network = networkHandler(), queue = deferred<Response>(), detailRead = deferred<Response>();
+  let phase: "initial" | "refusing" | "refused" = "initial", queuePending = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const path = new URL(String(input)).pathname;
+    if (phase === "refusing" && path.endsWith("/requests")) { queuePending = true; return queue.promise; }
+    if (phase === "refusing" && path.endsWith("/messages")) return Promise.resolve(Response.json({}, { status: 403 }));
+    if (phase === "refused" && path.endsWith(id)) return detailRead.promise;
+    return network(input, init);
+  });
+  render(view()); await screen.findByText("Can you check this car?");
+  phase = "refusing";
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  await waitFor(() => expect(queuePending).toBe(true));
+  await screen.findByText("Access denied");
+  expect(document.querySelector("#selected-enquiry")).toBeNull();
+  phase = "refused";
+  await act(async () => queue.resolve(Response.json({ items: [{ ...row, mine: true, assignmentVersion: 1, assignedOperator: actor }], nextCursor: null })));
+  expect(screen.getByText("Access denied")).toBeDefined();
+  expect(document.querySelector("#selected-enquiry")).toBeNull();
+  await act(async () => detailRead.resolve(Response.json(detail())));
+});
+
+it("returns keyboard focus to the conversation when recovery removes the focused Retry button", async () => {
+  selectAssigned();
+  const network = networkHandler(); let failed = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages") && failed) return Promise.resolve(Response.json({}, { status: 503 }));
+    if (url.pathname.endsWith("/messages") && url.searchParams.has("cursor")) return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    return network(input, init);
+  });
+  render(view()); await screen.findByText("Can you check this car?");
+  const pane = screen.getByRole("list", { name: "Enquiry conversation" });
+  failed = true; fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  const retry = await screen.findByRole("button", { name: "Try again" }); retry.focus();
+  failed = false; fireEvent.click(retry);
+  await screen.findByText("Connection restored. Messages updated.");
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Try again" })).toBeNull());
+  await waitFor(() => expect(document.activeElement).toBe(pane));
+  expect(screen.getByText("Can you check this car?")).toBeDefined();
 });

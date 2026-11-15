@@ -7,7 +7,7 @@ The separate `/vehicle-history/{tk|ru|en}` [inbox](src/app/vehicle-history/[loca
 The [inbox actions](src/app/vehicle-history/[locale]/actions.ts) provide scoped
 queue/context/transcript reads and atomic Claim for the connected inbox. They
 bind outcomes to the API-confirmed actor and stable session without exposing
-tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) reads transcripts only for the current assignment; reply, notes, receipt controls and full Listing viewing belong to their separate slices.
+tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) uses a [serialized reader](src/app/vehicle-history/[locale]/useOperatorConversation.ts) to retain contiguous pages and reading position through refresh and recoverable failures, and remove them on observed authority loss. Reply, notes, receipt controls and full Listing viewing belong to their separate slices.
 
 The dormant [source Listing reader](src/lib/history-source-listing.ts) projects
 only anonymous public display facts; its [catalog resolver](src/lib/history-listing-catalog.ts)
@@ -19,7 +19,7 @@ selection after each read/page or failure, and uses only authenticated viewer
 cover/explicit Play controls. It has no mounted viewer; connected viewing and
 return remain separate slices.
 
-The same action module has a strict, currently unmounted message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. Connected reader and reply controls remain separate slices.
+The same action module has a strict, currently unmounted message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. Receipt and reply controls remain separate slices.
 
 Browser JavaScript never receives API tokens. Server-side code stores them in HTTP-only cookies and forwards bearer authentication to the API. Preserve production `__Host-` cookie restrictions, origin validation on browser-posted handlers, and local-only `returnTo` validation. The Node `src/proxy.ts` renews expired requests before rendering or Server Actions, forwarding the rotated cookies to the handler and storing both on the response. Layout/API checks still enforce actual authentication and TOTP elevation. Server Components never rotate tokens or write cookies.
 

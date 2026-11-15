@@ -1,78 +1,54 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@auto-tm/ui/components";
 import { IdentitySchemas, type VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
-import { historyInboxAction, type HistoryInboxResult } from "./actions";
+import type { HistoryInboxResult } from "./actions";
+import { useOperatorConversation } from "./useOperatorConversation";
 
 
 import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
 
 type Row = Extract<HistoryInboxResult, { kind: "queue" }>["data"]["items"][number];
-type Detail = Extract<HistoryInboxResult, { kind: "detail" | "claim" }>["data"];
-export function SelectedRequest({ locale, id, version, row, scope, actor, refresh, invalidate, claimed }: {
+export function SelectedRequest({ locale, id, version, row, scope, actor, revision, refresh, invalidate, claimed }: {
   locale: DeskLocale; id: string; version: number; row: Row | undefined; scope: string; actor: V.HistoryDesk["actor"];
-  refresh: (resetSelection?: boolean) => void; invalidate: (result: HistoryInboxResult) => void; claimed: (version: number) => void;
+  revision: number; refresh: (resetSelection?: boolean) => void; invalidate: (result: HistoryInboxResult) => void; claimed: (version: number) => void;
 }) {
   const t = deskCopy[locale];
   const heading = useRef<HTMLHeadingElement>(null);
-  const nextMessageFocus = useRef<string | null>(null);
-  const lifecycle = useRef({ active: true, generation: 0 });
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [messages, setMessages] = useState<V.HistoryMessage[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [state, setState] = useState(row ? row.mine ? "loading" : "unclaimed" : version === 0 ? "missing" : "loading");
-  async function run(kind: "claim" | "detail" | "transcript") {
-    const generation = ++lifecycle.current.generation;
-    const previous = messages;
-    setMessages([]);
-    setState("loading");
-    const valid = () => lifecycle.current.active && generation === lifecycle.current.generation;
-    const accept = (result: HistoryInboxResult) => {
-      if (!valid()) return false;
-      if (result.status !== "ok") {
-        setDetail(null);
-        setState(result.status);
-        if (["stale", "expired", "denied"].includes(result.status)) invalidate(result);
-        return false;
-      }
-      if (result.scope !== scope || result.actor.id !== actor.id) { invalidate({ status: "stale" }); return false; }
-      return true;
-    };
-    try {
-      const result = await historyInboxAction(locale, { kind, id, scope, expectedAssignmentVersion: version,
-        ...(kind === "transcript" && cursor ? { cursor } : {}) });
-      if (!accept(result) || result.status !== "ok") return;
-      if (result.kind === "claim") { claimed(result.data.assignmentVersion); return; }
-      if (result.kind === "detail") {
-        setDetail(result.data);
-        const page = await historyInboxAction(locale, { kind: "transcript", id, scope, expectedAssignmentVersion: version });
-        if (!accept(page) || page.status !== "ok" || page.kind !== "transcript") return;
-        setMessages(page.data.items);
-        setCursor(page.data.nextCursor);
-      } else if (result.kind === "transcript") {
-        nextMessageFocus.current = result.data.items[0]?.id ?? null;
-        setMessages([...previous, ...result.data.items]);
-        setCursor(result.data.nextCursor);
-      }
-      setState("ready");
-    } catch { if (valid()) { setDetail(null); setState(navigator.onLine ? "unavailable" : "offline"); } }
+  const pane = useRef<HTMLOListElement>(null);
+  const pageFocus = useRef<Element | null>(null);
+  const anchor = useRef<{ id: string; offset: number; top: number } | null>(null);
+  const lost = !!row && version > 0 && (!row.mine || row.assignmentVersion !== version || row.assignedOperator?.id !== actor.id);
+  const reader = useOperatorConversation({ locale, id, version, scope, actorId: actor.id, revision,
+    entry: lost ? "conflict" : row ? row.mine ? "loading" : "unclaimed" : version === 0 ? "missing" : "loading", invalidate, claimed });
+  const { detail, messages, cursor } = reader;
+  const state = lost ? "conflict" : reader.state;
+  function remember() {
+    const node = pane.current;
+    if (!node) return;
+    const top = node.getBoundingClientRect().top;
+    const visible = [...node.children].find((child) => child.getBoundingClientRect().bottom > top);
+    anchor.current = visible ? { id: visible.id, offset: visible.getBoundingClientRect().top - top, top: node.scrollTop } : null;
   }
-  useEffect(() => {
-    const current = lifecycle.current;
-    current.active = true;
-    heading.current?.focus();
-    if (row?.mine || (!row && version > 0)) void run("detail");
-    return () => { current.active = false; current.generation++; };
-    // This component is keyed by the complete queue, selection and session context.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (state !== "ready" || !nextMessageFocus.current) return;
-    document.getElementById(`history-message-${nextMessageFocus.current}`)?.focus();
-    nextMessageFocus.current = null;
-  }, [messages, state]);
+  useEffect(() => { heading.current?.focus(); }, []);
+  useLayoutEffect(() => {
+    const node = pane.current, saved = anchor.current;
+    if (!node) return;
+    if (saved) {
+      const row = document.getElementById(saved.id);
+      node.scrollTop += row ? row.getBoundingClientRect().top - node.getBoundingClientRect().top - saved.offset : saved.top - node.scrollTop;
+    }
+    if (reader.focusId && (document.activeElement === pageFocus.current || document.activeElement === document.body)) {
+      document.getElementById(`history-message-${reader.focusId}`)?.focus({ preventScroll: true });
+    } else if (pageFocus.current && !pageFocus.current.isConnected && document.activeElement === document.body) {
+      node.focus({ preventScroll: true });
+    }
+    remember();
+  }, [messages, reader.focusId]);
+  function more() { remember(); pageFocus.current = document.activeElement; reader.run("page"); }
+  function recover() { remember(); pageFocus.current = document.activeElement; reader.run("refresh"); }
   const selected = detail ?? row;
   const name = selected?.requester ? IdentitySchemas.formatDisplayName(selected.requester, locale) : t.unavailablePerson;
   return <>
@@ -87,18 +63,26 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, refres
       </header>
       {state === "unclaimed" ? <div className="space-y-4 p-5 text-sm">
       <p>{t.claimBody}</p>
-      <Button onClick={() => void run("claim")}>{t.claim}</Button>
+      <Button disabled={reader.busy} aria-busy={reader.busy} onClick={() => reader.run("claim")}>{t.claim}</Button>
+      {["offline", "unavailable"].includes(reader.notice) && <InboxNotice locale={locale} state={reader.notice} retry={() => reader.run("claim")} />}
       </div>
-        : state !== "ready" ? <InboxNotice locale={locale} state={state} retry={() => refresh(state === "conflict")} />
+        : state !== "ready" ? <InboxNotice locale={locale} state={reader.notice === "unavailable" ? "conversationUnavailable" : reader.notice === "offline" ? "offline" : state}
+          retry={() => reader.notice === "offline" || reader.notice === "unavailable" ? recover() : refresh(true)} />
           : <div className="p-5">
             {!messages.length && <p role="status" className="py-8 text-sm text-muted-foreground">{t.noMessages}</p>}
-            <ol aria-label={t.conversation} className="max-h-[30rem] space-y-4 overflow-y-auto pr-1">{messages.map((message) => <li key={message.id} id={`history-message-${message.id}`} tabIndex={-1}
+            <ol ref={pane} aria-label={t.conversation} tabIndex={0} onScroll={remember} className="max-h-[30rem] space-y-4 overflow-y-auto pr-1 [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-ring">{messages.map((message) => <li key={message.id} id={`history-message-${message.id}`} tabIndex={-1}
               className={`max-w-[95%] break-words rounded-lg p-3 text-sm focus-visible:outline-2 focus-visible:outline-ring ${message.author.kind === "operator" ? "ml-auto bg-primary/10" : "bg-muted"}`}>
               <p className="mb-2 text-xs text-muted-foreground">{IdentitySchemas.formatDisplayName(message.author, locale)} · <time dateTime={message.createdAt}>{formatTime(message.createdAt, locale)}</time>
       </p>
               <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.text}</p>
             </li>)}</ol>
-            {cursor && <Button className="mt-5" variant="secondary" onClick={() => void run("transcript")}>{t.moreMessages}</Button>}
+            <div role="status" aria-live="polite" className="mb-3 text-sm text-muted-foreground">{reader.notice === "refreshing" ? t.refreshing
+              : reader.notice === "reconnecting" ? t.reconnecting : reader.notice === "recovered" ? t.recovered : ""}</div>
+            {["offline", "unavailable"].includes(reader.notice) && <div role="alert" className="mb-4 text-sm">
+              <p className="mb-2">{reader.notice === "offline" ? t.offline : t.readError}</p>
+              <Button variant="secondary" onClick={recover}>{t.retry}</Button>
+            </div>}
+            {cursor && <Button className="mt-5" variant="secondary" disabled={reader.busy} onClick={more}>{t.moreMessages}</Button>}
           </div>}
     </section>
     <aside aria-label={t.context} className="min-w-0 border-t bg-muted/20 p-5 lg:col-span-2 xl:col-span-1 xl:border-t-0 xl:border-l">
@@ -108,7 +92,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, refres
       <time dateTime={selected.createdAt}>{formatTime(selected.createdAt, locale)}</time>
       </p>}
       <h4 className="mb-2 text-sm font-medium">{t.source}</h4>
-      <p className="break-all text-sm">{detail ? detail.sourceListingId ?? t.noSource : t.claimContext}</p>
+      {state !== "loading" && <p className="break-all text-sm">{detail ? detail.sourceListingId ?? t.noSource : state === "unclaimed" ? t.claimContext : t.contextUnavailable}</p>}
       {detail?.sourceListingId && <p className="mt-3 text-sm text-muted-foreground">{t.sourceBody}</p>}
     </aside>
   </>;
@@ -118,7 +102,8 @@ export function InboxNotice({ locale, state, retry }: { locale: DeskLocale; stat
   const t = deskCopy[locale];
   const query = useSearchParams().toString();
   const text = state === "expired" || state === "stale" ? t.denied : state === "loading" ? t.loading : state === "conflict" ? t.conflict
-    : state === "denied" ? t.denied : state === "offline" ? t.offline : state === "validation" ? t.validation : state === "missing" ? t.missing : t.error;
+    : state === "denied" ? t.denied : state === "offline" ? t.offline : state === "validation" ? t.validation : state === "missing" ? t.missing
+      : state === "conversationUnavailable" ? t.conversationError : t.error;
   return <div role={state === "loading" ? "status" : "alert"} aria-busy={state === "loading"} className="p-6 text-sm">
     <p className="mb-4">{text}</p>{state !== "loading" && <Button variant="secondary" onClick={retry}>{state === "conflict" ? t.refresh : t.retry}</Button>}
     {["denied", "expired", "stale"].includes(state) && <a className="ml-4 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring" href={`/login?returnTo=${encodeURIComponent(`/vehicle-history/${locale}${query ? `?${query}` : ""}`)}`}>{t.signIn}</a>}
