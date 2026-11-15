@@ -6,6 +6,8 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 
 [ADR-0109](0109-source-first-documentation-and-design-workflow.md) replaces ADR-0020's artifact hierarchy with source-first documentation, temporary specifications, and the current design workflow. [ADR-0060](0060-source-first-agent-context-and-task-scoped-guidance.md) defines short local overviews; ADR-0042 owns vocabulary. [ADR-0108](0108-small-prs-with-full-send-replace-integration-delivery.md) owns delivery. Older ADR text remains unchanged.
 
+[ADR-0113](0113-vehicle-history-delivers-the-format-accepted-before-payment.md) supersedes only ADR-0106's mandatory PDF-plus-shared-link delivery clause: Vehicle History fulfills PDF only, approved provider link only, or both, as accepted before payment.
+
 ## Index
 
 | # | Title | Status | Date |
@@ -124,6 +126,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0110](0110-draft-pull-request-ci-lane.md) | Draft pull requests use a short CI lane until ready | Accepted | 2026-11-05 |
 | [0111](0111-indexed-refresh-token-digests-and-one-time-reauthentication.md) | Indexed refresh-token digests and one-time reauthentication (supersedes ADR-0012 hashing/lookup only) | Accepted | 2026-11-05 |
 | [0112](0112-listing-video-upload-and-playback-contracts.md) | Listing video upload and playback contracts (complements ADR-0099; amends ADR-0079's Listing-video cap/association only and extends ADR-0088) | Accepted | 2026-11-06 |
+| [0113](0113-vehicle-history-delivers-the-format-accepted-before-payment.md) | Vehicle History delivers the format accepted before payment (supersedes ADR-0106's delivery-format clause only) | Accepted | 2026-11-15 |
 
 ## Per-app ADRs
 
