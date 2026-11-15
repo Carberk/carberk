@@ -19,11 +19,13 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   const id = V.HistoryRequestSchema.shape.id.safeParse(url.get("selected"));
   const version = V.ClaimHistoryRequestSchema.shape.expectedAssignmentVersion.safeParse(Number(url.get("v") ?? 0));
   const [revision, setRevision] = useState(0);
-  const key = `${locale}?${raw}:${revision}`;
+  const [readerRevision, setReaderRevision] = useState(0);
+  const key = `${locale}?${raw}`;
   const [queue, setQueue] = useState<{ key: string; source: HistoryInboxResult | undefined; result: HistoryInboxResult } | null>(
     initial ? { key, source: initial, result: initial } : null,
   );
   const [offline, setOffline] = useState(false);
+  const [failure, setFailure] = useState<{ key: string; state: string } | null>(null);
   const t = deskCopy[locale];
   const current = queue?.key === key && queue.source === initial ? queue.result : null;
   function navigate(changes: Record<string, string | null>, replace = false) {
@@ -36,10 +38,14 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   function refresh(resetSelection = false) {
     if (resetSelection) navigate({ selected: null, v: null }, true);
     setRevision((value) => value + 1);
+    setReaderRevision((value) => value + 1);
   }
   useEffect(() => {
     const back = () => { setLocalUrl(window.location.search.slice(1)); setRevision((value) => value + 1); };
-    const revalidate = () => { setOffline(!navigator.onLine); setRevision((value) => value + 1); };
+    const revalidate = () => {
+      setOffline(!navigator.onLine);
+      if (navigator.onLine && document.visibilityState !== "hidden") setRevision((value) => value + 1);
+    };
     window.addEventListener("popstate", back);
     window.addEventListener("focus", revalidate);
     window.addEventListener("online", revalidate);
@@ -61,11 +67,17 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
     void historyInboxAction(locale, { kind: "queue", query: parsed.data,
       ...(initial?.status === "ok" ? { scope: initial.scope } : {}),
     }).then((result) => {
-      if (active) setQueue({ key, source: initial, result });
-    }).catch(() => { if (active) setQueue({ key, source: initial, result: { status: "unavailable" } }); });
+      if (!active) return;
+      setFailure(result.status === "unavailable" ? { key, state: "unavailable" } : null);
+      setQueue((previous) => result.status === "unavailable" && previous?.key === key && previous.source === initial && previous.result.status === "ok"
+        ? previous : { key, source: initial, result });
+    }).catch(() => { if (active) setFailure({ key, state: "unavailable" }); });
     return () => { active = false; };
-  }, [key, locale, raw, offline, initial]);
-  const admitted = !offline && current?.status === "ok" && current.kind === "queue" ? current : null;
+  }, [key, locale, raw, revision, offline, initial]);
+  const admitted = current?.status === "ok" && current.kind === "queue" ? current : null;
+  const selectedRow = admitted?.data.items.find((row) => id.success && row.id === id.data);
+  const assignmentLost = selectedRow && version.success && version.data > 0 &&
+    (!selectedRow.mine || selectedRow.assignmentVersion !== version.data || selectedRow.assignedOperator?.id !== admitted?.actor.id);
   return <>
     <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -91,8 +103,9 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
       </form>
       <Button variant="secondary" onClick={() => refresh()}>{t.refresh}</Button>
     </div>
+    {admitted && !id.success && (offline || failure?.key === key) && <InboxNotice locale={locale} state={offline ? "offline" : "unavailable"} retry={() => refresh()} />}
     {!query.success ? <InboxNotice locale={locale} state="validation" retry={() => navigate({ filter: "unassigned", search: null, cursor: null, selected: null, v: null }, true)} />
-      : !admitted ? <InboxNotice locale={locale} state={offline ? "offline" : current?.status ?? "loading"} retry={() => refresh()} />
+      : !admitted ? <InboxNotice locale={locale} state={offline ? "offline" : current?.status ?? (failure?.key === key ? failure.state : "loading")} retry={() => refresh()} />
         : <div className="grid min-h-[34rem] overflow-hidden rounded-lg border bg-background lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_15rem]">
           <section aria-labelledby="enquiry-queue" className="min-w-0 border-b p-3 lg:border-r lg:border-b-0">
             <h2 id="enquiry-queue" className="mb-3 px-2 text-base font-semibold">{t.requests}</h2>
@@ -113,8 +126,8 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
               {admitted.data.nextCursor && <Button variant="secondary" onClick={() => navigate({ cursor: admitted.data.nextCursor, selected: null, v: null })}>{t.nextPage}</Button>}
             </div>
           </section>
-          {id.success && version.success ? <SelectedRequest key={`${key}:${admitted.scope}`} locale={locale} id={id.data} version={version.data}
-            row={admitted.data.items.find((row) => row.id === id.data)} scope={admitted.scope} actor={admitted.actor}
+          {id.success && version.success ? <SelectedRequest key={`${locale}:${id.data}:${version.data}:${admitted.scope}:${admitted.actor.id}:${!!assignmentLost}`} locale={locale} id={id.data} version={version.data} revision={readerRevision}
+            row={selectedRow} scope={admitted.scope} actor={admitted.actor}
             refresh={refresh} invalidate={(result) => setQueue({ key, source: initial, result })}
             claimed={(assignmentVersion) => navigate({ selected: id.data, v: String(assignmentVersion) }, true)} />
             : <p className="p-6 text-sm text-muted-foreground lg:col-span-1 xl:col-span-2">{t.select}</p>}

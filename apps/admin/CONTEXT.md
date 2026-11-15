@@ -7,7 +7,7 @@ The separate `/vehicle-history/{tk|ru|en}` [inbox](src/app/vehicle-history/[loca
 The [inbox actions](src/app/vehicle-history/[locale]/actions.ts) provide scoped
 queue/context/transcript reads and atomic Claim for the connected inbox. They
 bind outcomes to the API-confirmed actor and stable session without exposing
-tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) reads transcripts only for the current assignment; reply, notes, receipt controls and full Listing viewing belong to their separate slices.
+tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) uses a [serialized reader](src/app/vehicle-history/[locale]/useOperatorConversation.ts) to retain contiguous pages and reading position through refresh and recoverable failures, and remove them on observed authority loss. Reply, notes, receipt controls and full Listing viewing belong to their separate slices.
 
 The dormant [source Listing reader](src/lib/history-source-listing.ts) projects
 only anonymous public display facts; its [catalog resolver](src/lib/history-listing-catalog.ts)
