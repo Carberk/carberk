@@ -12,6 +12,7 @@ import supertest from "supertest";
 
 import { UploadsController } from "./UploadsController";
 import { PresignUpload } from "../application/PresignUpload";
+import { RenewPhotoUpload } from "../application/RenewPhotoUpload";
 import { MEDIA_STORAGE_PORT } from "../domain/ports/MediaStoragePort";
 import { MEDIA_UPLOAD_REPOSITORY } from "../domain/ports/MediaUploadRepository";
 import type { NewMediaUpload } from "../domain/MediaUpload";
@@ -70,6 +71,7 @@ describe("UploadsController e2e", () => {
       controllers: [UploadsController],
       providers: [
         PresignUpload,
+        RenewPhotoUpload,
         {
           provide: MEDIA_STORAGE_PORT,
           useClass: FakeMediaStorage,

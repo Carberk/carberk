@@ -62,6 +62,7 @@ import { ListMyDrafts } from "./application/ListMyDrafts";
 import { DiscardDraft } from "./application/DiscardDraft";
 import { UploadAdoptionGuard } from "./application/UploadAdoptionGuard";
 import { PresignUpload } from "./application/PresignUpload";
+import { RenewPhotoUpload } from "./application/RenewPhotoUpload";
 import { VideoUploadSessions, VIDEO_UPLOAD_NOW } from "./application/VideoUploadSessions";
 import { PublishListing } from "./application/PublishListing";
 import { MarkSold } from "./application/MarkSold";
@@ -275,6 +276,7 @@ import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
     DiscardDraft,
     UploadAdoptionGuard,
     PresignUpload,
+    RenewPhotoUpload,
     VideoUploadSessions,
     PublishListing,
     MarkSold,

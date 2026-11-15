@@ -58,6 +58,7 @@ export class MinioMediaStorageAdapter implements MediaStoragePort, MediaObjectIn
     sizeBytes: number;
     expirySeconds?: number;
     writeProtocol?: "conditional-v1";
+    renew?: true;
   }): Promise<{ url: string; key: string; headers?: Record<string, string>; objectKeys?: string[] }> {
     const bucket = this.inferBucket(data.key);
     if (bucket === "listing-videos" ||
@@ -65,7 +66,9 @@ export class MinioMediaStorageAdapter implements MediaStoragePort, MediaObjectIn
       throw new Error("Listing videos require multipart sessions");
     }
     const objectKeys = data.writeProtocol ? imageUploadObjectKeys(data.key) : undefined;
-    const match = objectKeys ? await new ConditionalImageStorage(this.s3).initialize(objectKeys) : undefined;
+    if (data.renew && !objectKeys) throw new Error("Renewal requires conditional upload authority");
+    const conditional = new ConditionalImageStorage(this.s3);
+    const match = objectKeys ? await (data.renew ? conditional.inspectEmpty(objectKeys) : conditional.initialize(objectKeys)) : undefined;
 
     const command = new PutObjectCommand({
       Bucket: bucket,

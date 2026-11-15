@@ -28,7 +28,7 @@ export class PrismaMediaUploadRepository implements MediaUploadRepository {
     if (keys.length === 0) return [];
     const rows = await this.prisma.mediaUpload.findMany({
       where: { key: { in: keys } },
-      include: { media: { select: { id: true } } },
+      include: { media: { select: { id: true } }, profileOf: { select: { id: true } } },
     });
     return rows.map((row) => ({
       id: row.id,
@@ -40,7 +40,7 @@ export class PrismaMediaUploadRepository implements MediaUploadRepository {
       writeProtocol: row.writeProtocol as "legacy" | "conditional-v1",
       objectKeys: row.objectKeys,
       createdAt: row.createdAt,
-      adopted: row.state === "ADOPTED" || row.media !== null,
+      adopted: row.state === "ADOPTED" || row.media !== null || row.profileOf !== null,
       state: row.state as UploadState,
     }));
   }
