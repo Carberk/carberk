@@ -6019,6 +6019,156 @@
           "maxSizeBytes"
         ]
       },
+      "RenewChatAttachmentRequest": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/webp"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 5242880
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "contentType",
+          "sizeBytes",
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "RenewChatAttachmentResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "present"
+                ]
+              },
+              "key": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "state",
+              "key"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "upload_required"
+                ]
+              },
+              "key": {
+                "type": "string"
+              },
+              "uploadUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresIn": {
+                "type": "number",
+                "enum": [
+                  600
+                ]
+              },
+              "maxSizeBytes": {
+                "type": "number",
+                "enum": [
+                  5242880
+                ]
+              },
+              "headers": {
+                "type": "object",
+                "properties": {
+                  "if-none-match": {
+                    "type": "string",
+                    "enum": [
+                      "*"
+                    ]
+                  },
+                  "content-type": {
+                    "type": "string",
+                    "enum": [
+                      "image/webp"
+                    ]
+                  }
+                },
+                "required": [
+                  "if-none-match",
+                  "content-type"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "state",
+              "key",
+              "uploadUrl",
+              "expiresIn",
+              "maxSizeBytes",
+              "headers"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "RenewChatAttachmentRefusal": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "VALIDATION_FAILED",
+              "UPLOAD_NOT_AVAILABLE"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "timestamp",
+          "requestId"
+        ]
+      },
       "ConversationSummary": {
         "type": "object",
         "properties": {
@@ -9868,6 +10018,228 @@
                     "requestId": {
                       "type": "string",
                       "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/conversations/{id}/attachments/renew": {
+      "post": {
+        "summary": "Recover the original sender's same unsent chat image key",
+        "description": "Presence reports stored bytes only, without upload authority or a usability/sent assertion. An absent object receives a 600-second create-only PUT; existing send/cleaning and clientMessageId reconciliation remain authoritative.",
+        "tags": [
+          "Conversations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenewChatAttachmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Object presence or same-key create-only grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenewChatAttachmentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid metadata or unavailable issuance; no upload authority",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenewChatAttachmentRefusal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current account or Conversation access denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "message",
+                    "timestamp",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "NOT_FOUND",
+                        "USER_NOT_FOUND",
+                        "CONFLICT",
+                        "RATE_LIMITED",
+                        "OTP_EXPIRED",
+                        "OTP_ALREADY_USED",
+                        "INVALID_OTP",
+                        "OTP_LOCKED",
+                        "OTP_NOT_FOUND",
+                        "SIGN_IN_METHOD_TAKEN",
+                        "INVALID_DISPLAY_NAME",
+                        "INTERNAL"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "requestId": {
+                      "type": "string"
                     }
                   },
                   "required": [

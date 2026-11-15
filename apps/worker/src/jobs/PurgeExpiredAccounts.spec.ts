@@ -21,6 +21,7 @@ function makeFakePrisma() {
       avatarUploadId?: string | null;
       deletionScheduledAt: Date | null;
     }>,
+    chatUploads: [] as Array<{ key: string; senderId: string }>,
     /** Upload records, as far as the purge touches them. */
     uploads: [] as Array<{ id: string; state: string }>,
     /** Upload ids with recorded deletion work. */
@@ -97,6 +98,13 @@ function makeFakePrisma() {
       })());
     },
 
+    chatAttachmentUpload: {
+      deleteMany: ({ where }: { where: { senderId: string } }) => labelled("chatAttachmentUpload.deleteMany", (async () => {
+        const kept = state.chatUploads.filter(row => row.senderId !== where.senderId);
+        state.chatUploads.splice(0, state.chatUploads.length, ...kept);
+        return { count: 0 };
+      })()),
+    },
     session: {
       deleteMany: async (args: { where: { userId: string } }) => {
         const before = state.sessions.length;
@@ -573,4 +581,14 @@ describe("PurgeExpiredAccounts", () => {
     const first = fake.users[0];
     expect(first?.phone).toBe("+99361234567");
   });
+});
+
+it("purges only the expired sender's chat issuance, keeping the peer's authority and history lifecycle", async () => {
+  const fake = makeFakePrisma();
+  fake.users.push({ id: "expired", phone: null, displayName: null, avatarUrl: null, deletionScheduledAt: NOW });
+  fake.chatUploads.push({ key: "own", senderId: "expired" }, { key: "peer", senderId: "other" });
+  await new PurgeExpiredAccounts(fake.prisma).execute({ now: NOW });
+  expect(fake.chatUploads).toEqual([{ key: "peer", senderId: "other" }]);
+  expect(fake.users[0]?.id).toBe("expired");
+  expect(fake.transactions[0]).toContain("chatAttachmentUpload.deleteMany");
 });

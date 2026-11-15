@@ -20,6 +20,9 @@ import { ConversationMessageCommitter } from "./application/ConversationMessageC
 import { ConversationSendPolicy } from "./application/ConversationSendPolicy";
 import { SendConversationMessage } from "./application/SendConversationMessage";
 import { PresignChatAttachmentUpload } from "./application/PresignChatAttachmentUpload";
+import { RenewChatAttachmentUpload } from "./application/RenewChatAttachmentUpload";
+import { CHAT_ATTACHMENT_UPLOAD_REPOSITORY } from "./domain/ports/ChatAttachmentUploadRepository";
+import { PrismaChatAttachmentUploadRepository } from "./infrastructure/PrismaChatAttachmentUploadRepository";
 import { UpdateWatermark } from "./application/UpdateWatermark";
 import { MuteConversation } from "./application/MuteConversation";
 import { DeleteMessage } from "./application/DeleteMessage";
@@ -39,6 +42,8 @@ import { CONVERSATION_REPORT_CONTEXT_PORT } from "./domain/ports/ConversationRep
   imports: [EventEmitterModule, ListingsModule, IdentityModule, RealtimeModule],
   controllers: [ConversationsController],
   providers: [
+    { provide: CHAT_ATTACHMENT_UPLOAD_REPOSITORY, useClass: PrismaChatAttachmentUploadRepository },
+    RenewChatAttachmentUpload,
     PrismaConversationRepository,
     {
       provide: CONVERSATION_REPOSITORY,
