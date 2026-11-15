@@ -8,6 +8,8 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 
 [ADR-0113](0113-vehicle-history-delivers-the-format-accepted-before-payment.md) supersedes only ADR-0106's mandatory PDF-plus-shared-link delivery clause: Vehicle History fulfills PDF only, approved provider link only, or both, as accepted before payment.
 
+[ADR-0114](0114-private-history-report-links-open-and-copy-without-access-period-promises.md) supersedes ADR-0113's report-link expiry-messaging recommendation only and records account-free qualified links with exact external Open/Copy; accepted formats remain unchanged.
+
 ## Index
 
 | # | Title | Status | Date |
@@ -127,6 +129,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 | [0111](0111-indexed-refresh-token-digests-and-one-time-reauthentication.md) | Indexed refresh-token digests and one-time reauthentication (supersedes ADR-0012 hashing/lookup only) | Accepted | 2026-11-05 |
 | [0112](0112-listing-video-upload-and-playback-contracts.md) | Listing video upload and playback contracts (complements ADR-0099; amends ADR-0079's Listing-video cap/association only and extends ADR-0088) | Accepted | 2026-11-06 |
 | [0113](0113-vehicle-history-delivers-the-format-accepted-before-payment.md) | Vehicle History delivers the format accepted before payment (supersedes ADR-0106's delivery-format clause only) | Accepted | 2026-11-15 |
+| [0114](0114-private-history-report-links-open-and-copy-without-access-period-promises.md) | Private History report links open and copy without access-period promises (supersedes ADR-0113's link-expiry messaging only) | Accepted | 2026-11-15 |
 
 ## Per-app ADRs
 
