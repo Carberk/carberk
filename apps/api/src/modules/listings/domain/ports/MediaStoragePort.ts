@@ -7,6 +7,8 @@ export interface MediaStoragePort {
     writeProtocol?: "conditional-v1";
     /** Read-only inspection of an issued empty family; never initialize it again. */
     renew?: true;
+    /** Chat renewal only: a signed PUT may create an absent object, never replace bytes. */
+    createOnly?: true;
   }): Promise<{ url: string; key: string; headers?: Record<string, string>; objectKeys?: string[] }>;
 
   resolvePublicUrl(key: string): string;

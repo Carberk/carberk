@@ -379,3 +379,13 @@ describe("MinioMediaStorageAdapter", () => {
     });
   });
 });
+
+// The returned storage authority is the public outcome; original chat grants stay unchanged.
+it("signs only create-if-absent authority for renewed chat uploads", async () => {
+  const adapter = makeAdapter("https://media.auto.tm");
+  const key = "chat-attachments/conversation/11111111-1111-4111-8111-111111111111/original.webp";
+  const grant = await adapter.presignUpload({ key, contentType: "image/webp", sizeBytes: 86, createOnly: true });
+  expect(grant.headers).toEqual({ "if-none-match": "*", "content-type": "image/webp" });
+  expect(awsMocks.signedCommand?.input).toMatchObject({ Bucket: "chat-attachments", Key: key, IfNoneMatch: "*", ContentType: "image/webp", ContentLength: 86 });
+  expect(awsMocks.signedCommand?.input["IfMatch"]).toBeUndefined();
+});

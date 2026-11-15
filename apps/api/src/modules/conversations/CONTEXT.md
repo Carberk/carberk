@@ -30,3 +30,5 @@ The staff report-detail reader uses `MessageModerationReadPort`, implemented ins
 - [Persistence](infrastructure)
 - [Product requirements](../../../../../docs/prd/features/34-conversations.md)
 - [Schema](../../../../../packages/db/prisma/schema.prisma)
+
+New chat photo grants record their issuing User, Conversation and exact WebP metadata in `ChatAttachmentUpload`. `RenewChatAttachmentUpload` checks current access and committed image references (including deleted Messages from either participant) around storage inspection. It returns only presence for matching existing bytes, or a 600-second create-only PUT for an absent key. It never sends/cleans a Message, replaces bytes, or infers historical issuance. Original grants retain their existing overwrite exposure and expiry; send retry still uses the existing client message identity. Sender purge removes the issuance rows while preserving the existing Message/storage lifecycle.

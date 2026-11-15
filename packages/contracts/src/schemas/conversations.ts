@@ -1,3 +1,4 @@
+import { ErrorCode, ErrorResponseSchema } from "../errors";
 import { DateTimeSchema, z } from "../zod";
 import { ListingStatus, MessageKind } from "../enums";
 
@@ -138,6 +139,21 @@ export const PresignChatAttachmentResponseSchema = z.object({
 export type PresignChatAttachmentResponse = z.infer<
   typeof PresignChatAttachmentResponseSchema
 >;
+
+/** A key is an identifier; only recorded sender issuance grants renewal authority. */
+export const RenewChatAttachmentRequestSchema = PresignChatAttachmentRequestSchema.extend({ key: z.string().min(1).max(512) }).strict();
+export type RenewChatAttachmentRequest = z.infer<typeof RenewChatAttachmentRequestSchema>;
+export const RenewChatAttachmentResponseSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("present"), key: z.string() }).strict(),
+  z.object({ state: z.literal("upload_required"), key: z.string(), uploadUrl: z.string().url(),
+    expiresIn: z.literal(600), maxSizeBytes: z.literal(5242880),
+    headers: z.object({ "if-none-match": z.literal("*"), "content-type": z.literal("image/webp") }).strict(),
+  }).strict(),
+]);
+export type RenewChatAttachmentResponse = z.infer<typeof RenewChatAttachmentResponseSchema>;
+export const RenewChatAttachmentRefusalSchema = ErrorResponseSchema.extend({
+  statusCode: z.literal(400), code: z.enum([ErrorCode.ValidationFailed, "UPLOAD_NOT_AVAILABLE"]), requestId: z.string(),
+});
 
 // ── Listing card embedded in conversation responses ──
 

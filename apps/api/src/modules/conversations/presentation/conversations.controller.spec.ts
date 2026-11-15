@@ -54,6 +54,7 @@ function buildController(overrides: {
     overrides.deleteMessage ?? ({} as DeleteMessage),
     overrides.listings ?? ({ getListingSummaries: vi.fn().mockResolvedValue([]) } as unknown as ListingsReadPort),
     overrides.countMyUnreadMessages ?? ({} as CountMyUnreadMessages),
+    {} as import("../application/RenewChatAttachmentUpload").RenewChatAttachmentUpload,
   );
 }
 

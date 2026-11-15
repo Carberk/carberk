@@ -30,6 +30,7 @@ import { SendTextMessage } from "../application/SendTextMessage";
 import { SendMessage } from "../application/SendMessage";
 import { SendPostRefMessage } from "../application/SendPostRefMessage";
 import { PresignChatAttachmentUpload } from "../application/PresignChatAttachmentUpload";
+import { RenewChatAttachmentUpload } from "../application/RenewChatAttachmentUpload";
 import { UpdateWatermark } from "../application/UpdateWatermark";
 import { MuteConversation } from "../application/MuteConversation";
 import { DeleteMessage } from "../application/DeleteMessage";
@@ -69,6 +70,8 @@ export class ConversationsController {
     private readonly listings: ListingsReadPort,
     @Inject(CountMyUnreadMessages)
     private readonly countMyUnreadMessagesUC: CountMyUnreadMessages,
+    @Inject(RenewChatAttachmentUpload)
+    private readonly renewChatAttachmentUploadUC: RenewChatAttachmentUpload,
   ) {}
 
   @Public()
@@ -313,6 +316,12 @@ export class ConversationsController {
       expiresIn: result.expiresIn,
       maxSizeBytes: result.maxSizeBytes,
     };
+  }
+
+  @Post(":id/attachments/renew")
+  async renewChatAttachment(@Param("id") conversationId: string, @Body() body: unknown, @Req() req: FastifyRequest) {
+    const parsed = this.parseOrThrow(ConversationsSchemas.RenewChatAttachmentRequestSchema, body);
+    return this.renewChatAttachmentUploadUC.execute({ ...parsed, conversationId, userId: this.userId(req) });
   }
 
   @Post(":id/watermark")

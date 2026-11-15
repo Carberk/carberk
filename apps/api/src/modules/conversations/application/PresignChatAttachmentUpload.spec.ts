@@ -146,6 +146,7 @@ function makeUseCase(
     repo ?? new FakeConversationRepository(),
     storage ?? new FakeMediaStorage(),
     identityCheck ?? new FakeIdentityCheckPort(),
+    { record: async () => {}, find: async () => null },
   );
 }
 

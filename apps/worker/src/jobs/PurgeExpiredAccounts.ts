@@ -96,6 +96,9 @@ export class PurgeExpiredAccounts {
         },
       }),
 
+      // Issuance cannot survive its sender's purge; stored Messages/bytes keep their existing lifecycle.
+      this.prisma.chatAttachmentUpload.deleteMany({ where: { senderId: userId } }),
+
       // Prune sessions
       this.prisma.session.deleteMany({ where: { userId } }),
 

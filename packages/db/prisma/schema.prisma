@@ -81,6 +81,7 @@ model User {
   favorites                    Favorite[]
   savedSearches                SavedSearch[]
   conversationParticipations   ConversationParticipant[]
+  chatAttachmentUploads        ChatAttachmentUpload[]
   fcmDevices                   FcmDevice[]
   notificationHistory          NotificationHistory[]
   notificationPreferences      NotificationPreference?
@@ -826,11 +827,28 @@ model Conversation {
 
   participants ConversationParticipant[]
   messages     Message[]
+  attachmentUploads ChatAttachmentUpload[]
 
   @@unique([listingId, buyerId])
   @@index([sellerId])
   @@index([lastMessageAt])
   @@map("conversations")
+}
+
+/// Issuance authority for new chat images; committed use remains authoritative in Message.
+model ChatAttachmentUpload {
+  key            String       @id
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  contentType    String
+  sizeBytes      Int
+  createdAt      DateTime     @default(now())
+
+  @@index([senderId])
+  @@index([conversationId])
+  @@map("chat_attachment_uploads")
 }
 
 model ConversationParticipant {

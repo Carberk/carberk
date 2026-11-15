@@ -59,8 +59,12 @@ export class MinioMediaStorageAdapter implements MediaStoragePort, MediaObjectIn
     expirySeconds?: number;
     writeProtocol?: "conditional-v1";
     renew?: true;
+    createOnly?: true;
   }): Promise<{ url: string; key: string; headers?: Record<string, string>; objectKeys?: string[] }> {
     const bucket = this.inferBucket(data.key);
+    if (data.createOnly && (bucket !== "chat-attachments" || data.writeProtocol || data.renew)) {
+      throw new Error("Create-only renewal requires a chat attachment");
+    }
     if (bucket === "listing-videos" ||
       (bucket !== "chat-attachments" && data.contentType.startsWith("video/"))) {
       throw new Error("Listing videos require multipart sessions");
@@ -76,11 +80,12 @@ export class MinioMediaStorageAdapter implements MediaStoragePort, MediaObjectIn
       ContentType: data.contentType,
       ContentLength: data.sizeBytes,
       ...(match ? { IfMatch: match, CacheControl: "no-store" } : {}),
+      ...(data.createOnly ? { IfNoneMatch: "*" } : {}),
     });
 
     // The caller supplies the body later. Do not sign a checksum of an empty body.
     // Keep the installed clients' legacy signer unchanged.
-    if (match) this.conditionalSigner ??= new S3Client({
+    if (match || data.createOnly) this.conditionalSigner ??= new S3Client({
       endpoint: this.publicUrl, region: this.config.get("MINIO_REGION", { infer: true }),
       credentials: {
         accessKeyId: this.config.get("MINIO_ACCESS_KEY", { infer: true }),
@@ -88,16 +93,17 @@ export class MinioMediaStorageAdapter implements MediaStoragePort, MediaObjectIn
       },
       forcePathStyle: true, requestChecksumCalculation: "WHEN_REQUIRED",
     });
-    const signer = match ? this.conditionalSigner : this.signingS3;
+    const signer = match || data.createOnly ? this.conditionalSigner : this.signingS3;
     if (!signer) throw new Error("Conditional signer was not initialized");
     const url = await getSignedUrl(signer, command, {
       expiresIn: data.expirySeconds ?? 600,
       ...(match ? { signableHeaders: new Set(["if-match", "cache-control"]) } : {}),
+      ...(data.createOnly ? { signableHeaders: new Set(["if-none-match", "content-type"]) } : {}),
     });
 
     return { url, key: data.key, ...(match && objectKeys ? {
       headers: { "if-match": match, "content-type": data.contentType, "cache-control": "no-store" }, objectKeys,
-    } : {}) };
+    } : {}), ...(data.createOnly ? { headers: { "if-none-match": "*", "content-type": data.contentType } } : {}) };
   }
 
   resolvePublicUrl(key: string): string {

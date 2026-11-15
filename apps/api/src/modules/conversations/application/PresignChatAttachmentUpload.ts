@@ -15,6 +15,7 @@ import {
   chatAttachmentKey,
 } from "../domain/ChatAttachment";
 import { CONVERSATION_ERROR_CODES } from "../domain/types";
+import { CHAT_ATTACHMENT_UPLOAD_REPOSITORY, type ChatAttachmentUploadRepository } from "../domain/ports/ChatAttachmentUploadRepository";
 
 export interface PresignChatAttachmentUploadInput {
   userId: string;
@@ -45,6 +46,8 @@ export class PresignChatAttachmentUpload {
     private readonly storage: MediaStoragePort,
     @Inject(IDENTITY_CHECK_PORT)
     private readonly identityCheck: IdentityCheckPort,
+    @Inject(CHAT_ATTACHMENT_UPLOAD_REPOSITORY)
+    private readonly uploads: ChatAttachmentUploadRepository,
   ) {}
 
   async execute(
@@ -100,6 +103,8 @@ export class PresignChatAttachmentUpload {
       expirySeconds: CHAT_ATTACHMENT_CONSTRAINTS.presignExpirySeconds,
     });
 
+    await this.uploads.record({ key, senderId: input.userId, conversationId: input.conversationId,
+      contentType: input.contentType, sizeBytes: input.sizeBytes });
     return {
       uploadUrl: url,
       key,
