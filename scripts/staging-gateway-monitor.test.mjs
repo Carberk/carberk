@@ -39,18 +39,23 @@ test('a fresh package assembled by the installer can start with its observer dep
   }
   // Exercise the public installer CLI with filesystem/process/network boundaries
   // redirected to this disposable package. Repository functions stay real.
-  const fixture = `import io,json,os,pathlib,runpy,subprocess,sys,types,urllib.request
+  const fixture = `import builtins,io,json,os,pathlib,runpy,subprocess,sys,types,urllib.request
 from unittest.mock import patch
 root=sys.argv[1]; installer=sys.argv[2]
 OriginalPath=pathlib.Path
 mapping={'/etc/carberk':root+'/config','/opt/carberk-gateway':root+'/release',
  '/etc/snikket/docker-compose.override.yml':root+'/snikket/override.yml','/etc/systemd/system':root+'/systemd'}
-class FixturePath(type(OriginalPath())):
- def __new__(cls,*args,**kwargs):
-  path=os.path.join(*(os.fspath(a) for a in args)) if args else '.'
-  for before,after in mapping.items():
-   if path==before or path.startswith(before+'/'):path=after+path[len(before):];break
-  return super().__new__(cls,path,**kwargs)
+def FixturePath(*args,**kwargs):
+ path=os.path.join(*(os.fspath(a) for a in args)) if args else '.'
+ for before,after in mapping.items():
+  if path==before or path.startswith(before+'/'):path=after+path[len(before):];break
+ return OriginalPath(path,**kwargs)
+scopedPathlib=types.ModuleType('pathlib');scopedPathlib.__dict__.update(vars(pathlib));scopedPathlib.Path=FixturePath
+originalImport=builtins.__import__
+def fixtureImport(name,globals=None,locals=None,fromlist=(),level=0):
+ if name=='pathlib' and globals and globals.get('__file__')==installer:return scopedPathlib
+ return originalImport(name,globals,locals,fromlist,level)
+installerBuiltins={**vars(builtins),'__import__':fixtureImport}
 def process(args,**kwargs):
  if args[:2]==('docker','inspect'):
   return json.dumps([{'Id':'owned-fixture','Mounts':[{'Source':root+'/volume','Destination':'/snikket'}]}]).encode()
@@ -60,8 +65,8 @@ class Response:
  def __enter__(self):return io.BytesIO(b'{"environment":"staging","service":"api"}')
  def __exit__(self,*args):pass
 sys.argv=[installer,'apply','--prepared',root+'/prepared','--runtime',root+'/runtime']
-with patch('pathlib.Path',FixturePath),patch('subprocess.check_output',process),patch('os.geteuid',lambda:0),patch('urllib.request.build_opener',lambda *a:types.SimpleNamespace(open=lambda *a,**k:Response())):
- runpy.run_path(installer,run_name='__main__')
+with patch('subprocess.check_output',process),patch('os.geteuid',lambda:0),patch('urllib.request.build_opener',lambda *a:types.SimpleNamespace(open=lambda *a,**k:Response())):
+ runpy.run_path(installer,init_globals={'__builtins__':installerBuiltins},run_name='__main__')
 `;
   const wrapper = join(dir, 'host-fixture.py');
   await writeFile(wrapper, fixture);
