@@ -85,7 +85,7 @@ it("runs the production request-bound action through current History, public Lis
   expect(await action("en", input)).toMatchObject({ status: "not-found" });
   await prisma.listing.update({ where: { id: listingId }, data: { status: "active" } });
   // An actual History grant plus coincidental seller ownership grants no video access.
-  for (const kind of ["cover", "play"]) expect(await action("en", { ...input, kind })).toMatchObject({ status: "not-found" });
+  for (const kind of ["cover", "play"]) expect(await action("en", { ...input, kind })).toMatchObject({ status: "video-unavailable" });
   for (const lost of ["source", "assignment", "session", "lifecycle"]) {
     let arrive!: () => void, release!: () => void;
     const arrived = new Promise<void>((resolve) => { arrive = resolve; });
