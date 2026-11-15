@@ -51,6 +51,11 @@ it("keeps native sign-in unconfirmed after the server consumes the code, and req
   expect(routerMock.back).not.toHaveBeenCalled();
   expect(verifications).toBe(1);
   expect(resends).toBe(0);
+  await act(async () => { await screen.i18n.changeLanguage("ru"); });
+  expect(screen.getByText("Подтверждение не получено. Код мог быть использован. Запросите новый код, чтобы продолжить.")).toBeTruthy();
+  await act(async () => { await screen.i18n.changeLanguage("tk"); });
+  expect(screen.getByText("Tassyknama alynmady. Kod ulanylan bolmagy mümkin. Dowam etmek üçin täze kod soraň.")).toBeTruthy();
+  await act(async () => { await screen.i18n.changeLanguage("en"); });
   await fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
   expect(screen.getByDisplayValue("").props.editable).toBe(true);
   expect(resends).toBe(1);

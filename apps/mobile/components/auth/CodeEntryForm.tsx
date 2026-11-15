@@ -227,7 +227,7 @@ export function CodeEntryForm({
             accessibilityLiveRegion="polite"
             className="flex-1 text-callout leading-snug text-destructive"
           >
-            {error}
+            {verificationUncertain ? t("codeVerificationUncertain") : error}
           </Text>
         </View>
       ) : null}
