@@ -1,7 +1,7 @@
 import { Controller, Inject, Post, Body, Req, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { SkipThrottle } from "@nestjs/throttler";
 import type { FastifyRequest } from "fastify";
-import { UploadsSchemas, AdminSchemas } from "@auto-tm/contracts";
+import { UploadsSchemas, AdminSchemas, ErrorCode } from "@auto-tm/contracts";
 
 import { IDENTITY_CHECK_PORT, type IdentityCheckPort } from "../../identity/identity.public";
 import { PresignUpload } from "../application/PresignUpload";
@@ -27,7 +27,7 @@ export class UploadsController {
         details: { reason: AdminSchemas.AdminErrorReason.UserSuspended } });
     }
     const parsed = UploadsSchemas.RenewPhotoUploadRequestSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException({ code: "VALIDATION_ERROR", message: "Invalid photo renewal request" });
+    if (!parsed.success) throw new BadRequestException({ code: ErrorCode.ValidationFailed, message: "Invalid photo renewal request" });
     return this.renewPhotoUpload.execute({ ...parsed.data, userId });
   }
 

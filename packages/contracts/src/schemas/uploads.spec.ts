@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
-import { PresignRequestSchema, PresignResponseSchema, RenewPhotoUploadRequestSchema } from "./uploads";
+import { PresignRequestSchema, PresignResponseSchema, RenewPhotoUploadRequestSchema, RenewPhotoUploadRefusalSchema } from "./uploads";
 
 const legacy = {
   uploadUrl: "https://media.example.test/signed", key: "pending/photo/original.webp",
@@ -13,6 +15,19 @@ it("renews only a fixed pending WebP identity and declared metadata, never a cal
   for (const change of [{ key: "https://storage.test/photo" }, { contentType: "image/jpeg" }, { sizeBytes: 0 }, { sizeBytes: 5242881 }, { etag: '"completed"' }, { uploadUrl: "https://other.test" }]) {
     expect(RenewPhotoUploadRequestSchema.safeParse({ ...request, ...change }).success).toBe(false);
   }
+});
+
+it.each(["VALIDATION_FAILED", "UPLOAD_NOT_AVAILABLE"])("preserves the actual %s renewal refusal envelope and details", code => {
+  const response = { statusCode: 400, code, message: "Photo renewal refused", details: { reason: "unchanged" },
+    timestamp: "2026-11-15T00:00:00.000Z", requestId: "11111111-1111-4111-8111-111111111111" };
+  expect(RenewPhotoUploadRefusalSchema.parse(response)).toEqual(response);
+});
+
+it("publishes the renewal refusal codes in the generated HTTP response contract", () => {
+  const document = JSON.parse(readFileSync("openapi.json", "utf8"));
+  const response = document.paths["/api/v1/uploads/renew"].post.responses["400"].content["application/json"].schema;
+  expect(response).toEqual({ $ref: "#/components/schemas/RenewPhotoUploadRefusal" });
+  expect(document.components.schemas.RenewPhotoUploadRefusal.properties.code.enum).toEqual(["VALIDATION_FAILED", "UPLOAD_NOT_AVAILABLE"]);
 });
 
 describe("additive conditional upload contract", () => {

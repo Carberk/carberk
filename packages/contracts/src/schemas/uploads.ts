@@ -1,4 +1,5 @@
 import { z } from "../zod";
+import { ErrorCode, ErrorResponseSchema } from "../errors";
 
 export const PresignKindSchema = z.enum(["image", "video"]);
 export type PresignKind = z.infer<typeof PresignKindSchema>;
@@ -19,6 +20,14 @@ export const RenewPhotoUploadRequestSchema = z.object({
   sizeBytes: z.number().int().positive().max(5 * 1024 * 1024),
 }).strict();
 export type RenewPhotoUploadRequest = z.infer<typeof RenewPhotoUploadRequestSchema>;
+
+/** The renewal route's 400 responses retain the ordinary error envelope and details. */
+export const RenewPhotoUploadRefusalSchema = ErrorResponseSchema.extend({
+  statusCode: z.literal(400),
+  code: z.enum([ErrorCode.ValidationFailed, "UPLOAD_NOT_AVAILABLE"]),
+  // The existing HTTP filter preserves the caller's ID or returns "unknown".
+  requestId: z.string(),
+});
 
 export const PresignResponseSchema = z.object({
   uploadUrl: z.string().url(),
