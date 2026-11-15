@@ -63,7 +63,7 @@ socket tickets, the API-only entry must stay restricted to controlled clients.
 3. Download the archive in `runtime.json` from the official Node release and verify
    its checksum locally and again on the VPS. Extract it into an owned `/tmp`
    runtime directory, keeping the archive as `node.tar.xz`. Copy `runtime.json`,
-   `gateway.mjs`, `serve.mjs` and `operate.py` there. Create the private `gateway.json`.
+   `gateway.mjs`, `serve.mjs`, `monitor-metrics.mjs` and `operate.py` there. Create the private `gateway.json`.
 4. Generate `relay.json` into that directory with R01's `relay-config.py`, allowing
    **only** the configured staging API hostname. Never modify the existing Xray
    service to obtain a convenient path. Keep both JSON files mode 0600.
