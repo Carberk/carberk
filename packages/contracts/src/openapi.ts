@@ -113,6 +113,7 @@ import {
   PresignRequestSchema,
   PresignResponseSchema,
   RenewPhotoUploadRequestSchema,
+  RenewPhotoUploadRefusalSchema,
 } from "./schemas/uploads";
 import {
   ExchangeRateSchema,
@@ -264,6 +265,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   registry.register("PresignRequest", PresignRequestSchema);
   registry.register("PresignResponse", PresignResponseSchema);
   registry.register("RenewPhotoUploadRequest", RenewPhotoUploadRequestSchema);
+  const renewalRefusal = registry.register("RenewPhotoUploadRefusal", RenewPhotoUploadRefusalSchema);
   registry.registerPath({
     method: "post",
     path: "/api/v1/uploads/renew",
@@ -273,7 +275,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     request: { body: { required: true, content: { "application/json": { schema: S(RenewPhotoUploadRequestSchema) } } } },
     responses: {
       201: { description: "Fresh authority for the same pending photo", content: { "application/json": { schema: S(PresignResponseSchema) } } },
-      400: { description: "Invalid request or UPLOAD_NOT_AVAILABLE; no renewed authority", content: { "application/json": { schema: S(ErrorResponseSchema) } } },
+      400: { description: "Invalid request or UPLOAD_NOT_AVAILABLE; no renewed authority", content: { "application/json": { schema: S(renewalRefusal) } } },
       401: { description: "Authentication required", content: { "application/json": { schema: S(ErrorResponseSchema) } } },
       403: { description: "Suspended User or pending account deletion", content: { "application/json": { schema: S(ErrorResponseSchema) } } },
     },

@@ -4630,6 +4630,44 @@
         ],
         "additionalProperties": false
       },
+      "RenewPhotoUploadRefusal": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "VALIDATION_FAILED",
+              "UPLOAD_NOT_AVAILABLE"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "timestamp",
+          "requestId"
+        ]
+      },
       "ExchangeRate": {
         "type": "object",
         "properties": {
@@ -9700,53 +9738,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "statusCode": {
-                      "type": "integer"
-                    },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "VALIDATION_FAILED",
-                        "UNAUTHORIZED",
-                        "FORBIDDEN",
-                        "NOT_FOUND",
-                        "USER_NOT_FOUND",
-                        "CONFLICT",
-                        "RATE_LIMITED",
-                        "OTP_EXPIRED",
-                        "OTP_ALREADY_USED",
-                        "INVALID_OTP",
-                        "OTP_LOCKED",
-                        "OTP_NOT_FOUND",
-                        "SIGN_IN_METHOD_TAKEN",
-                        "INVALID_DISPLAY_NAME",
-                        "INTERNAL"
-                      ]
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "details": {
-                      "nullable": true
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "statusCode",
-                    "code",
-                    "message",
-                    "timestamp",
-                    "requestId"
-                  ]
+                  "$ref": "#/components/schemas/RenewPhotoUploadRefusal"
                 }
               }
             }
