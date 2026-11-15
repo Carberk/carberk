@@ -182,6 +182,30 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
     await prisma.user.update({ where: { id: admin }, data: { role: "admin" } });
     await prisma.session.update({ where: { id: suite.id(`session-${admin}`) }, data: { adminTotpExpiresAt: now } }); await request.get(url).expect(404);
   });
+  it("never converts a History grant, ownership or moderator role into viewer tester authority", async () => {
+    await prisma.staffGrant.createMany({ data: [owner, admin, outsider].map((userId) => ({ userId, purpose: "vehicle_history" as const })) });
+    try {
+      for (const id of [owner, admin, outsider]) {
+        await request.get(path()).set(auth(id)).expect(404);
+        await request.post(path() + "/playback").set(auth(id)).expect(404);
+      }
+      config.set("LISTING_VIDEO_VIEW_TESTER_USER_IDS", `${viewer},${owner},${admin},${outsider}`);
+      for (const status of ["active", "sold"] as const) {
+        await prisma.listing.update({ where: { id: listingId }, data: { status } });
+        expect((await read("viewer", owner)).body).toMatchObject({ status: "ready" });
+        expect((await read("viewer", outsider, true)).body).toHaveProperty("url");
+      }
+      for (const status of ["archived", "banned"] as const) {
+        await prisma.listing.update({ where: { id: listingId }, data: { status } });
+        for (const id of [owner, admin, outsider]) {
+          await request.get(path()).set(auth(id)).expect(404);
+          await request.post(path() + "/playback").set(auth(id)).expect(404);
+        }
+      }
+    } finally {
+      await prisma.staffGrant.deleteMany({ where: { userId: { in: [owner, admin, outsider] }, purpose: "vehicle_history" } });
+    }
+  });
   it("keeps Ready Draft private and refuses injected playlist resources outside the manifest", async () => {
     const draft = await prisma.listingDraft.create({ data: { userId: owner, payload: {} } });
     await prisma.listingVideo.update({ where: { id: videoId }, data: { listingId: null, draftId: draft.id } });
