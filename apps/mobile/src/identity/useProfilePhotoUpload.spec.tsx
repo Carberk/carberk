@@ -4,6 +4,7 @@ import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "../../test/msw";
+import { provisionGatewayKey, selectTesterRoute } from "../api/routes";
 import { PHOTO_ME, setupPhotoHook, signInPhotoUser } from "../../test/profile-photo-api";
 import { choosePhoto, photoDevice, resetPhotoDevice } from "../../test/profile-photo-device";
 
@@ -28,6 +29,10 @@ beforeEach(async () => {
 
   profilePhotoUploadStore.setState({ state: { status: "idle" } });
   await signInPhotoUser();
+  server.use(http.post("*/uploads/renew", async ({ request }) => {
+    const { key } = await request.json() as { key: string };
+    return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key, expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"' } });
+  }));
 });
 
 afterEach(resetProfilePhotoUpload);
@@ -189,4 +194,92 @@ describe("useProfilePhotoUpload", () => {
     await act(async () => { await result.current.pick("camera"); });
     expect(result.current.state.status).toBe("failed");
   });
+});
+
+
+it("sends a selected profile image through TM with its signed headers and no API bearer", async () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  const raw = "https://minio-staging-5795.up.railway.app/listing-photos/pending/profile/original.webp?x=1+2&x=%2F";
+  const headers = { "if-match": '"empty"', "content-type": "image/webp", Authorization: "Bearer api-only" };
+  server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: raw, key: "pending/profile/original.webp", expiresIn: 600, maxSizeBytes: 5242880, headers })),
+    http.put("*/me/photo", () => HttpResponse.json({ ...PHOTO_ME, avatarKey: "pending/profile/original.webp" })));
+  await provisionGatewayKey("synthetic-photo-gateway-access-key");
+  selectTesterRoute("tm");
+  try {
+    choosePhoto();
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
+    let picking!: Promise<void>;
+    await act(() => { picking = result.current.pick("library"); });
+    await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
+    expect(photoDevice.sent[0]).toMatchObject({ url: "https://tm-staging.bagtyyar.dev/photos/listing-photos/pending/profile/original.webp?x=1+2&x=%2F", options: { headers: { "if-match": '"empty"', "content-type": "image/webp", "X-Carberk-Gateway-Key": "synthetic-photo-gateway-access-key" } } });
+    expect(photoDevice.sent[0]?.options?.headers).not.toHaveProperty("Authorization");
+    await act(async () => { photoDevice.finish(); await picking; });
+    expect(result.current.state.status).toBe("idle");
+  } finally { selectTesterRoute("global"); vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
+});
+
+it("renews the same selected image after an expired transfer and route switch", async () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  const key = "pending/00000000-0000-4000-8000-000000000001/original.webp";
+  let issues = 0;
+  const renewed: unknown[] = [];
+  const adopted: unknown[] = [];
+  const grant = { uploadUrl: `https://minio-staging-5795.up.railway.app/listing-photos/${key}?grant=first`, key, expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"empty"', "content-type": "image/webp" } };
+  server.use(http.post("*/uploads/presign", () => { issues++; return HttpResponse.json(grant); }),
+    http.post("*/uploads/renew", async ({ request }) => { renewed.push(await request.json()); return HttpResponse.json({ ...grant, uploadUrl: grant.uploadUrl.replace("first", "renewed") }); }),
+    http.put("*/me/photo", async ({ request }) => { adopted.push(await request.json()); return HttpResponse.json({ ...PHOTO_ME, avatarKey: key }); }));
+  await provisionGatewayKey("synthetic-photo-gateway-access-key");
+  selectTesterRoute("tm");
+  try {
+    choosePhoto();
+    const { result } = await setupPhotoHook(useProfilePhotoUpload);
+    let job!: Promise<void>;
+    await act(() => { job = result.current.pick("library"); });
+    await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
+    await act(async () => { photoDevice.finish(403); await job; });
+    selectTesterRoute("global");
+    await act(() => { job = result.current.retry(); });
+    await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(2));
+    expect(issues).toBe(1);
+    expect(renewed).toEqual([{ key, contentType: "image/webp", sizeBytes: 2048 }]);
+    expect(photoDevice.sent[1]).toMatchObject({ url: grant.uploadUrl.replace("first", "renewed"), options: { headers: grant.headers } });
+    await act(async () => { photoDevice.finish(); await job; });
+    expect(adopted).toEqual([{ key }]);
+    expect(result.current.state.status).toBe("idle");
+  } finally { selectTesterRoute("global"); vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
+});
+
+it.each(["lost PUT response", "lost adoption response"])("reconciles a %s with the same key and never uploads again", async (failure) => {
+  const key = "pending/00000000-0000-4000-8000-000000000001/original.webp";
+  const attempts: unknown[] = [];
+  let adoptionLost = failure === "lost adoption response";
+  server.use(http.post("*/uploads/presign", () => HttpResponse.json({ uploadUrl: "https://storage.example/put-only?signature=synthetic", key, expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"empty"' } })),
+    http.post("*/uploads/renew", () => HttpResponse.json({ code: "UPLOAD_NOT_AVAILABLE", message: "Unavailable" }, { status: 400 })),
+    http.head(`*/listing-photos/${key}`, ({ request }) => {
+      expect(request.url).not.toContain("signature");
+      expect(request.headers.has("authorization")).toBe(false);
+      expect(request.headers.has("if-match")).toBe(false);
+      return new HttpResponse(null, { headers: { "content-type": "image/webp", "content-length": "2048" } });
+    }),
+    http.put("*/me/photo", async ({ request }) => {
+      attempts.push(await request.json());
+      if (adoptionLost) { adoptionLost = false; return HttpResponse.error(); }
+      return HttpResponse.json({ ...PHOTO_ME, avatarKey: key });
+    }));
+  choosePhoto();
+  const { result } = await setupPhotoHook(useProfilePhotoUpload);
+  let job!: Promise<void>;
+  await act(() => { job = result.current.pick("library"); });
+  await vi.waitFor(() => expect(photoDevice.sent).toHaveLength(1));
+  await act(async () => { if (failure === "lost PUT response") photoDevice.fail(new Error("Network reset")); else photoDevice.finish(); await job; });
+  await act(() => result.current.retry());
+  expect(photoDevice.sent).toHaveLength(1);
+  expect(attempts).toEqual(failure === "lost PUT response" ? [{ key }] : [{ key }, { key }]);
+  expect(result.current.state.status).toBe("idle");
 });

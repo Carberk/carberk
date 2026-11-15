@@ -19,7 +19,7 @@ import { queryKeys } from "../../src/api/queryKeys";
 import { useConfig } from "../../src/api/admin/useConfig";
 import { useSendTextMessage } from "../../src/api/conversations/useSendTextMessage";
 import { useSendImageMessage } from "../../src/api/conversations/useSendImageMessage";
-import { usePresignChatAttachment } from "../../src/api/conversations/usePresignChatAttachment";
+import { useChatImageTransfer } from "../../src/conversations/upload/useChatImageTransfer";
 import { useUpdateWatermark } from "../../src/api/conversations/useUpdateWatermark";
 import { useDeleteMessage } from "../../src/api/conversations/useDeleteMessage";
 import { useMuteConversation } from "../../src/api/conversations/useMuteConversation";
@@ -53,7 +53,6 @@ import { useChatPushTokenRegistration } from "../../src/notifications/useChatPus
 import { MessageReportSheet } from "../../src/admin/components/MessageReportSheet";
 import { ReportSheet } from "../../src/admin/components/ReportSheet";
 import {
-  uploadChatImageToPresignedUrl,
   ChatImageUploadError,
 } from "../../src/conversations/upload/chatImageUpload";
 
@@ -139,7 +138,7 @@ export default function ConversationDetailScreen() {
   const messagesQuery = useConversationMessages({ conversationId: readId });
   const sendHttpMessage = useSendTextMessage();
   const sendHttpImageMessage = useSendImageMessage();
-  const presignChatAttachment = usePresignChatAttachment();
+  const imageTransfer = useChatImageTransfer(conversationId);
   const updateWatermark = useUpdateWatermark();
   const deleteHttpMessage = useDeleteMessage();
   const {
@@ -486,9 +485,10 @@ export default function ConversationDetailScreen() {
       localUri: string,
     ) => {
       sendHttpImageMessage.mutate(
-        { conversationId, metadata, clientMessageId },
+        { conversationId, metadata, clientMessageId, assertSession: () => imageTransfer.current(clientMessageId) },
         {
-          onSuccess: (data) => {
+          onSuccess: async (data) => {
+            await imageTransfer.current(clientMessageId);
             // apiClient already parsed MessageSummarySchema, including defaults.
             markConfirmed(clientMessageId, data as ConversationsSchemas.MessageSummary);
             FileSystem.deleteAsync(localUri, { idempotent: true }).catch(
@@ -504,7 +504,7 @@ export default function ConversationDetailScreen() {
         },
       );
     },
-    [conversationId, markConfirmed, markFailed, reloadAfterRefusal, sendHttpImageMessage],
+    [conversationId, imageTransfer, markConfirmed, markFailed, reloadAfterRefusal, sendHttpImageMessage],
   );
 
   const handleSend = useCallback(
@@ -581,24 +581,8 @@ export default function ConversationDetailScreen() {
       setLocalMessages((prev) => [...prev, pendingMessage]);
 
       try {
-        const presignResponse = await presignChatAttachment.mutateAsync({
-          conversationId,
-          request: {
-            contentType: "image/webp",
-            sizeBytes: attachment.fileSize,
-          },
-        });
-
-        await uploadChatImageToPresignedUrl(
-          presignResponse.uploadUrl,
-          attachment.uri,
-        );
-
-        const metadata: ConversationsSchemas.ImageMessageMetadata = {
-          key: presignResponse.key,
-          width: attachment.width,
-          height: attachment.height,
-        };
+        const metadata = await imageTransfer.prepare(clientMessageId, attachment);
+        await imageTransfer.current(clientMessageId);
 
         const result = await sendImageMessage({
           conversationId,
@@ -612,6 +596,7 @@ export default function ConversationDetailScreen() {
             () => {},
           );
         } else if (result.code === "NOT_CONNECTED") {
+          await imageTransfer.current(clientMessageId);
           sendImageViaHttp(clientMessageId, metadata, attachment.uri);
         } else {
           markFailed(clientMessageId);
@@ -630,7 +615,7 @@ export default function ConversationDetailScreen() {
         if (err instanceof ApiError && err.status === 403) {
           reloadAfterRefusal();
         }
-        console.warn("Image message send failed", uploadError);
+        console.warn("Image message send failed", { code: uploadError.code });
       }
     },
     [
@@ -638,7 +623,7 @@ export default function ConversationDetailScreen() {
       cannotSend,
       markConfirmed,
       markFailed,
-      presignChatAttachment,
+      imageTransfer,
       reloadAfterRefusal,
       sendImageViaHttp,
       sendImageMessage,
@@ -668,24 +653,10 @@ export default function ConversationDetailScreen() {
           }
           const fileSize = "size" in fileInfo ? fileInfo.size : (msg.imageFileSize ?? 0);
 
-          const presignResponse = await presignChatAttachment.mutateAsync({
-            conversationId,
-            request: {
-              contentType: "image/webp",
-              sizeBytes: fileSize,
-            },
+          const metadata = await imageTransfer.prepare(msg.clientMessageId, {
+            uri: msg.localImageUri, fileSize, width: msg.imageWidth ?? 0, height: msg.imageHeight ?? 0,
           });
-
-          await uploadChatImageToPresignedUrl(
-            presignResponse.uploadUrl,
-            msg.localImageUri,
-          );
-
-          const metadata: ConversationsSchemas.ImageMessageMetadata = {
-            key: presignResponse.key,
-            width: msg.imageWidth,
-            height: msg.imageHeight,
-          };
+          await imageTransfer.current(msg.clientMessageId);
 
           const result = await sendImageMessage({
             conversationId,
@@ -699,6 +670,7 @@ export default function ConversationDetailScreen() {
               () => {},
             );
           } else if (result.code === "NOT_CONNECTED") {
+            await imageTransfer.current(msg.clientMessageId);
             sendImageViaHttp(msg.clientMessageId, metadata, msg.localImageUri);
           } else {
             markFailed(msg.clientMessageId);
@@ -733,7 +705,7 @@ export default function ConversationDetailScreen() {
       localMessages,
       markConfirmed,
       markFailed,
-      presignChatAttachment,
+      imageTransfer,
       reloadAfterRefusal,
       sendImageMessage,
       sendImageViaHttp,

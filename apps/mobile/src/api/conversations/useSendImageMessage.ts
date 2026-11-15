@@ -12,6 +12,7 @@ export function useSendImageMessage() {
       conversationId: string;
       metadata: ConversationsSchemas.ImageMessageMetadata;
       clientMessageId?: string;
+      assertSession?: () => Promise<unknown>;
     }) =>
       apiClient.post(
         `/conversations/${input.conversationId}/messages/rich`,
@@ -21,6 +22,7 @@ export function useSendImageMessage() {
           clientMessageId: input.clientMessageId,
         },
         ConversationsSchemas.SendMessageResponseSchema,
+        { assertSession: input.assertSession },
       ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
