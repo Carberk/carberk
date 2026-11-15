@@ -1,0 +1,55 @@
+import type { DeskLocale } from "./history-desk-copy";
+
+const en = {
+  gallery: "Listing photos", previous: "Previous photo", next: "Next photo",
+  photo: (n: number, total: number) => `Photo ${n} of ${total}`,
+  thumbnail: (n: number) => `Show photo ${n}`,
+  count: (n: number, total: number) => `${n} of ${total} photos`,
+  noPhotos: "No photos added", photoFailed: "Photo could not load.", retryPhotos: "Reload photos",
+  video: "Listing video", cover: "Video cover", noVideo: "No video added",
+  coverFailed: "Video cover could not load.", retryCover: "Reload video cover",
+  play: "Play video", retryPlayback: "Retry video", closeVideo: "Close video",
+  loading: "Loading…", videoFailed: "Video could not play. Try again.",
+  unsupported: "This browser cannot play this video. Try another browser.",
+  expired: "Video access expired. Retry to check access and continue.",
+  offline: "You are offline. Reconnect, then try again.",
+  suspended: "Media stopped. Reload to continue.", retry: "Reload media",
+  denied: "Listing media is no longer available to you.", unavailable: "Media is unavailable. Try again.",
+};
+
+/** Retained Listing details add their own export without rewriting media copy. */
+export const historyListingMediaCopy: Record<DeskLocale, typeof en> = {
+  en,
+  ru: {
+    gallery: "Фотографии объявления", previous: "Предыдущее фото", next: "Следующее фото",
+    photo: (n, total) => `Фото ${n} из ${total}`,
+    thumbnail: (n) => `Показать фото ${n}`,
+    count: (n, total) => `Фото ${n} из ${total}`,
+    noPhotos: "Фотографии не добавлены", photoFailed: "Не удалось загрузить фото.", retryPhotos: "Загрузить фото снова",
+    video: "Видео объявления", cover: "Обложка видео", noVideo: "Видео не добавлено",
+    coverFailed: "Не удалось загрузить обложку видео.", retryCover: "Загрузить обложку снова",
+    play: "Смотреть видео", retryPlayback: "Повторить видео", closeVideo: "Закрыть видео",
+    loading: "Загрузка…", videoFailed: "Не удалось воспроизвести видео. Попробуйте снова.",
+    unsupported: "Этот браузер не поддерживает видео. Попробуйте другой браузер.",
+    expired: "Доступ к видео истёк. Повторите попытку, чтобы проверить доступ и продолжить.",
+    offline: "Нет подключения. Подключитесь к сети и попробуйте снова.",
+    suspended: "Медиа остановлено. Загрузите снова, чтобы продолжить.", retry: "Загрузить медиа снова",
+    denied: "Медиа объявления больше вам недоступны.", unavailable: "Медиа недоступны. Попробуйте снова.",
+  },
+  tk: {
+    gallery: "Bildirişiň suratlary", previous: "Öňki surat", next: "Indiki surat",
+    photo: (n, total) => `${total} suratdan ${n}-nji`,
+    thumbnail: (n) => `${n}-nji suraty görkez`,
+    count: (n, total) => `${total} suratdan ${n}-nji`,
+    noPhotos: "Surat goşulmady", photoFailed: "Surat ýüklenmedi.", retryPhotos: "Suratlary täzeden ýükle",
+    video: "Bildirişiň wideosy", cover: "Wideonyň örtügi", noVideo: "Wideo goşulmady",
+    coverFailed: "Wideonyň örtügi ýüklenmedi.", retryCover: "Örtügi täzeden ýükle",
+    play: "Wideony görkez", retryPlayback: "Wideony gaýtadan synanyş", closeVideo: "Wideony ýap",
+    loading: "Ýüklenýär…", videoFailed: "Wideo görkezilmedi. Gaýtadan synanyşyň.",
+    unsupported: "Bu brauzer wideony görkezip bilmeýär. Başga brauzeri synap görüň.",
+    expired: "Wideonyň elýeterlilik möhleti gutardy. Dowam etmek üçin gaýtadan synanyşyň.",
+    offline: "Internet ýok. Birikdirip, gaýtadan synanyşyň.",
+    suspended: "Media saklandy. Dowam etmek üçin täzeden ýükläň.", retry: "Mediany täzeden ýükle",
+    denied: "Bildirişiň mediasy indi size elýeterli däl.", unavailable: "Media elýeterli däl. Gaýtadan synanyşyň.",
+  },
+};
