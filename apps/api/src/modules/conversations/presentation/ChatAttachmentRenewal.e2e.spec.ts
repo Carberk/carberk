@@ -229,7 +229,7 @@ describe("sender-bound chat renewal through authenticated HTTP and S3", () => {
     const original = await issue(), signed = new URL(original.uploadUrl);
     const stamp = signed.searchParams.get("X-Amz-Date")!, issued = Date.UTC(+stamp.slice(0, 4), +stamp.slice(4, 6) - 1, +stamp.slice(6, 8), +stamp.slice(9, 11), +stamp.slice(11, 13), +stamp.slice(13, 15));
     expect(signed.searchParams.get("X-Amz-Expires")).toBe("600");
-    await new Promise(resolve => setTimeout(resolve, Math.max(0, issued + 602000 - Date.now())));
+    await new Promise(resolve => setTimeout(resolve, Math.max(0, issued + 602000 - Date.now()) + 25));
     const attempted = Date.now();
     expect(attempted - issued).toBeGreaterThanOrEqual(602000); expect((await put(original)).status).toBe(403);
     const grant = await grantFor(original.key); expect(grant.key).toBe(original.key); expect((await put(grant)).status).toBe(200);
