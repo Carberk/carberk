@@ -39,7 +39,7 @@ it("keeps the Listing photo key uncompleted until retry uploads its renewed capa
   const renewals: unknown[] = [];
   server.use(http.post("*/uploads/presign", () => { issues++; return HttpResponse.json(grant); }),
     http.post("*/uploads/renew", async ({ request }) => { renewals.push(await request.json()); return HttpResponse.json(grant); }));
-  puts.mockResolvedValueOnce({ status: 403, headers: {}, body: "" });
+  puts.mockResolvedValueOnce({ status: 403, headers: {}, body: "", mimeType: "image/webp" });
   const { result } = await setupPhotoHook(() => useUploadQueue("owned-photo", { photos: [] }));
   await vi.waitFor(() => expect(result.current.photos[0]?.state).toBe("failed"));
   expect(result.current.photos[0]?.key).toBeUndefined();
@@ -63,7 +63,7 @@ it.each(["upload_required", "present", "committed refusal"])("retries one chat i
     }));
   const attachment = { uri: "file:///chat.webp", width: 100, height: 100, fileSize: 2048 };
   const { result } = await setupPhotoHook(() => useChatImageTransfer("conversation-one"));
-  puts.mockResolvedValueOnce({ status: 403, headers: {}, body: "" });
+  puts.mockResolvedValueOnce({ status: 403, headers: {}, body: "", mimeType: "image/webp" });
   await act(async () => { await expect(result.current.prepare("same-message", attachment)).rejects.toThrow(); });
   selectTesterRoute("global");
   await act(async () => { expect(await result.current.prepare("same-message", attachment)).toEqual({ key, width: 100, height: 100 }); });
