@@ -156,6 +156,9 @@ import {
   SendPostRefMessageRequestSchema,
   PresignChatAttachmentRequestSchema,
   PresignChatAttachmentResponseSchema,
+  RenewChatAttachmentRequestSchema,
+  RenewChatAttachmentResponseSchema,
+  RenewChatAttachmentRefusalSchema,
   ConversationSummarySchema,
   GetConversationResponseSchema,
   SendRestrictionSchema,
@@ -308,6 +311,25 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     "PresignChatAttachmentResponse",
     PresignChatAttachmentResponseSchema,
   );
+  const chatRenewalRequest = registry.register("RenewChatAttachmentRequest", RenewChatAttachmentRequestSchema);
+  const chatRenewalResponse = registry.register("RenewChatAttachmentResponse", RenewChatAttachmentResponseSchema);
+  const chatRenewalRefusal = registry.register("RenewChatAttachmentRefusal", RenewChatAttachmentRefusalSchema);
+  const chatRenewalAccessError = ErrorResponseSchema.extend({ requestId: z.string() });
+  registry.registerPath({
+    method: "post", path: "/api/v1/conversations/{id}/attachments/renew",
+    summary: "Recover the original sender's same unsent chat image key",
+    description: "Presence reports stored bytes only, without upload authority or a usability/sent assertion. An absent object receives a 600-second create-only PUT; existing send/cleaning and clientMessageId reconciliation remain authoritative.",
+    tags: ["Conversations"], security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string().guid() }),
+      body: { required: true, content: { "application/json": { schema: S(chatRenewalRequest) } } } },
+    responses: {
+      201: { description: "Object presence or same-key create-only grant", content: { "application/json": { schema: S(chatRenewalResponse) } } },
+      400: { description: "Invalid metadata or unavailable issuance; no upload authority", content: { "application/json": { schema: S(chatRenewalRefusal) } } },
+      401: { description: "Authentication required", content: { "application/json": { schema: S(chatRenewalAccessError) } } },
+      403: { description: "Current account or Conversation access denied", content: { "application/json": { schema: S(chatRenewalAccessError) } } },
+      404: { description: "Conversation not found", content: { "application/json": { schema: S(chatRenewalAccessError) } } },
+    },
+  });
   registry.register("ConversationSummary", ConversationSummarySchema);
   registry.register("MessageSummary", MessageSummarySchema);
   registry.register("ConversationListingCard", ConversationListingCardSchema);
