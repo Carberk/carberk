@@ -65,6 +65,8 @@ export async function historyListingAction(locale: unknown, value: unknown): Pro
     }
     const failures: Record<number, HistoryListingFailure["status"]> = { 400: "validation", 401: "expired", 403: "denied", 404: "not-found", 409: "conflict" };
     const status = error instanceof ApiError ? failures[error.status] : undefined;
-    return { status: status ?? "unavailable", scope: selected.scope };
+    // Reauthorization succeeded; only viewer unavailability is local to video.
+    return { status: kind !== "detail" && (!status || status === "not-found")
+      ? "video-unavailable" : status ?? "unavailable", scope: selected.scope };
   }
 }

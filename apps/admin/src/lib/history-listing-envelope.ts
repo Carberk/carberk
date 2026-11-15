@@ -5,7 +5,7 @@ import type { HistoryListingLabels } from "./history-listing-catalog";
 import type { HistorySourceListing } from "./history-source-listing";
 
 export type HistoryListingFailure = {
-  status: "validation" | "expired" | "denied" | "stale" | "conflict" | "unavailable" | "not-found";
+  status: "validation" | "expired" | "denied" | "stale" | "conflict" | "unavailable" | "not-found" | "video-unavailable";
   scope?: string;
 };
 type Binding = { id: string; scope: string; actor: V.HistoryDesk["actor"]; expectedAssignmentVersion: number };

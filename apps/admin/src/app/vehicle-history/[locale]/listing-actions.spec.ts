@@ -153,7 +153,9 @@ it("preserves unavailable outcomes without fallback or data leakage", async () =
   for (const [code, status] of [[400, "validation"], [401, "expired"], [403, "denied"], [404, "not-found"], [409, "conflict"], [503, "unavailable"], [0, "unavailable"]]) {
     responseStatus = (path) => path.includes("/listings/") ? Number(code) : 200;
     for (const kind of ["detail", "cover", "play"]) {
-      expect(await historyListingAction("en", { ...input, kind })).toEqual({ status, scope });
+      const expected = kind !== "detail" && (status === "not-found" || status === "unavailable")
+        ? "video-unavailable" : status;
+      expect(await historyListingAction("en", { ...input, kind })).toEqual({ status: expected, scope });
     }
   }
   expect(seen.filter((entry) => entry.path.includes("/listings/")).every((entry) =>
@@ -174,7 +176,7 @@ it("rejects wrong identities, owner state and mismatched viewer grant resources"
     { video: { ...video.video, cover: { ...video.video.cover, detail: "javascript:alert(1)" } } },
     { url: mediaUrl("master") }]) {
     mediaBody = { ...video, ...patch };
-    expect(await historyListingAction("en", { ...input, kind: "cover" })).toEqual({ status: "unavailable", scope });
+    expect(await historyListingAction("en", { ...input, kind: "cover" })).toEqual({ status: "video-unavailable", scope });
   }
   mediaBody = { status: "none" };
   expect(await historyListingAction("en", { ...input, kind: "cover" })).toMatchObject({ status: "ok", data: { status: "none" } });
@@ -204,4 +206,22 @@ it("reads only the currently assigned source through anonymous public HTTP", asy
   expect(publicReads.every((entry) => !entry.auth && !entry.cookie && entry.method === "GET")).toBe(true);
   expect(seen.filter((entry) => entry.path.includes("/vehicle-history/")).every((entry) => entry.auth === `Bearer ${context.token}`)).toBe(true);
   expect(JSON.stringify(result)).not.toContain(context.token);
+});
+
+it.each((["cover", "play"] as const).flatMap((kind) =>
+  ["before", "finally", "catch"].map((stage) => [kind, stage] as const),
+))("keeps History refusal hard around viewer %s failure at %s", async (kind, stage) => {
+  let mediaReached = false, selectedReads = 0;
+  responseStatus = (path) => {
+    if (path.startsWith(mediaPath)) { mediaReached = true; return 404; }
+    if (path.includes("/vehicle-history/operator/requests/")) {
+      selectedReads += 1;
+      if (stage === "before" || (mediaReached && selectedReads >= (stage === "finally" ? 3 : 5))) return 404;
+    }
+    return 200;
+  };
+  const result = await historyListingAction("en", { ...input, kind });
+  expect(result).toEqual({ status: "unavailable", scope });
+  expect(seen.filter(({ path }) => path.startsWith(mediaPath))).toHaveLength(stage === "before" ? 0 : 1);
+  expect(JSON.stringify(result)).not.toMatch(/"data"|Public car|grant=/);
 });
