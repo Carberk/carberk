@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { BadRequestException } from "@nestjs/common";
 import {
   DeleteObjectCommand, GetBucketVersioningCommand, HeadObjectCommand,
   PutObjectCommand, type S3Client,
@@ -20,6 +21,7 @@ function etag(value: string | undefined): string {
 /** Verifies the provider, then exposes only conditional writes to initialized keys. */
 export class ConditionalImageStorage {
   private capability: Promise<void> | undefined;
+  private emptyETag: string | undefined;
 
   constructor(private readonly s3: S3Client, private readonly bucket = "listing-photos") {}
 
@@ -57,6 +59,27 @@ export class ConditionalImageStorage {
     }), { abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   }
 
+  /** Reuse only untouched issuance placeholders, never the current ETag of uploaded bytes. */
+  async inspectEmpty(keys: string[]): Promise<string> {
+    await this.assertSupported();
+    const heads = await Promise.all(keys.map(async Key => {
+      try {
+        return await this.s3.send(new HeadObjectCommand({ Bucket: this.bucket, Key }), {
+          abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+      } catch (error) {
+        if (isMissingObject(error)) return null;
+        throw error;
+      }
+    }));
+    if (!this.emptyETag || heads.some(head => !head || head.ContentLength !== 0 || head.ETag !== this.emptyETag ||
+      head.CacheControl !== "no-store" || (head.ContentType !== undefined && head.ContentType !== "application/octet-stream") ||
+      Object.keys(head.Metadata ?? {}).length > 0)) {
+      throw new BadRequestException({ code: "UPLOAD_NOT_AVAILABLE", message: "Upload is no longer available" });
+    }
+    return this.emptyETag;
+  }
+
   private async probe(): Promise<void> {
     const key = `pending/${randomUUID()}/.conditional-probe`;
     const input = { Bucket: this.bucket, Key: key };
@@ -65,6 +88,7 @@ export class ConditionalImageStorage {
       const initial = await this.s3.send(new PutObjectCommand({
         ...input, Body: Buffer.alloc(0), IfNoneMatch: "*",
       }), options());
+      this.emptyETag = etag(initial.ETag);
       await this.requireRefusal(new PutObjectCommand({
         ...input, Body: Buffer.from("wrong"), IfMatch: '"not-the-current-etag"',
       }));

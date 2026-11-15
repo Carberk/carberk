@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { PresignRequestSchema, PresignResponseSchema } from "./uploads";
+import { PresignRequestSchema, PresignResponseSchema, RenewPhotoUploadRequestSchema } from "./uploads";
 
 const legacy = {
   uploadUrl: "https://media.example.test/signed", key: "pending/photo/original.webp",
   expiresIn: 600, maxSizeBytes: 5_242_880,
 };
+
+it("renews only a fixed pending WebP identity and declared metadata, never a caller's storage authority", () => {
+  const request = { key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp", contentType: "image/webp", sizeBytes: 1024 };
+  expect(RenewPhotoUploadRequestSchema.parse(request)).toEqual(request);
+  for (const change of [{ key: "https://storage.test/photo" }, { contentType: "image/jpeg" }, { sizeBytes: 0 }, { sizeBytes: 5242881 }, { etag: '"completed"' }, { uploadUrl: "https://other.test" }]) {
+    expect(RenewPhotoUploadRequestSchema.safeParse({ ...request, ...change }).success).toBe(false);
+  }
+});
 
 describe("additive conditional upload contract", () => {
   it("keeps the installed client's request and legacy response valid", () => {

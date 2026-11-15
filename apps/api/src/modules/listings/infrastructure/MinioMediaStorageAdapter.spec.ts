@@ -307,6 +307,30 @@ describe("MinioMediaStorageAdapter", () => {
     expect(awsMocks.clients[1]?.sent).toHaveLength(0);
   });
 
+  it("renews the original empty fence without writing any issued object", async () => {
+    const adapter = makeAdapter("https://media.auto.tm");
+    awsMocks.sendResult = async () => ({ ETag: '"placeholder"', ContentLength: 0, CacheControl: "no-store" });
+    const key = "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp";
+    const result = await adapter.presignUpload({ key, contentType: "image/webp", sizeBytes: 1024,
+      writeProtocol: "conditional-v1", renew: true });
+    expect(result).toMatchObject({ key, headers: { "if-match": '"placeholder"' } });
+    const issuedWrites = awsMocks.clients[0]?.sent.filter(command => {
+      const input = (command as { input: Record<string, unknown> }).input;
+      return String(input["Key"]).startsWith("pending/21b0b4e0-") && input["Body"] !== undefined;
+    });
+    expect(issuedWrites).toEqual([]);
+  });
+
+  it.each([{ ETag: '"completed"', ContentLength: 0, CacheControl: "no-store" },
+    { ETag: '"placeholder"', ContentLength: 1024, CacheControl: "no-store" },
+    { ETag: '"placeholder"', ContentLength: 0, CacheControl: "public" }])("never renews a changed family member", async head => {
+    const adapter = makeAdapter("https://media.auto.tm");
+    awsMocks.sendResult = async () => head;
+    await expect(adapter.presignUpload({ key: "pending/21b0b4e0-4d4a-4d2c-8bd6-705555cb7585/original.webp",
+      contentType: "image/webp", sizeBytes: 1024, writeProtocol: "conditional-v1", renew: true })).rejects.toThrow("Upload is no longer available");
+    expect(awsMocks.signedCommand).toBeUndefined();
+  });
+
   describe("inspect", () => {
     it("reports the stored content type and size from the private endpoint", async () => {
       const adapter = makeAdapter("https://media.auto.tm");

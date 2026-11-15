@@ -12,6 +12,14 @@ export const PresignRequestSchema = z.object({
 });
 export type PresignRequest = z.infer<typeof PresignRequestSchema>;
 
+/** Renewal retains issuance identity and metadata; targets and ETags are never caller authority. */
+export const RenewPhotoUploadRequestSchema = z.object({
+  key: z.string().regex(/^pending\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/original\.webp$/),
+  contentType: z.literal("image/webp"),
+  sizeBytes: z.number().int().positive().max(5 * 1024 * 1024),
+}).strict();
+export type RenewPhotoUploadRequest = z.infer<typeof RenewPhotoUploadRequestSchema>;
+
 export const PresignResponseSchema = z.object({
   uploadUrl: z.string().url(),
   key: z.string(),
