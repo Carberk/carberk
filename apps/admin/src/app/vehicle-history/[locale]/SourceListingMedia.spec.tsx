@@ -307,3 +307,83 @@ it("refuses a grant that expires while HLS is still importing", async () => {
   expect(world.hls.instances).toHaveLength(0);
   expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
 });
+
+it.each(["cover", "play"] as const)("keeps permitted photos when viewer %s returns 404", async (kind) => {
+  const refuse = async (path: string) => path.includes("/video-access/") ? Response.json({}, { status: 404 }) : undefined;
+  if (kind === "cover") world.before = refuse;
+  const view = await mount();
+  if (kind === "play") {
+    await screen.findByAltText("Video cover");
+    world.before = refuse;
+    fireEvent.click(screen.getByRole("button", { name: "Play video" }));
+  }
+  await screen.findByText(kind === "cover" ? "Video cover could not load." : "Video could not play. Try again.");
+  expect(screen.getByAltText("Photo 1 of 3")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: /^Show photo / })).toHaveLength(3);
+  expect(view.props.onInvalidate).not.toHaveBeenCalled();
+  expect(view.container.querySelector("video")).toBeNull();
+  expect(world.seen.filter(({ method }) => method === "POST")).toHaveLength(kind === "play" ? 1 : 0);
+});
+
+it.each((["cover", "play"] as const).flatMap((kind) =>
+  ["before", "finally", "catch"].map((stage) => [kind, stage] as const),
+))("invalidates photos for hard History loss during %s at %s", async (kind, stage) => {
+  const view = await mount();
+  await screen.findByAltText("Video cover");
+  let mediaReached = false, selectedReads = 0;
+  world.before = async (path) => {
+    if (path.includes("/video-access/")) { mediaReached = true; return Response.json({}, { status: 404 }); }
+    if (path.includes("/vehicle-history/operator/requests/")) {
+      selectedReads += 1;
+      if (stage === "before" || (mediaReached && selectedReads >= (stage === "finally" ? 3 : 5))) return Response.json({}, { status: 404 });
+    }
+    return undefined;
+  };
+  if (kind === "cover") fireEvent.error(screen.getByAltText("Video cover"));
+  fireEvent.click(screen.getByRole("button", { name: kind === "cover" ? "Reload video cover" : "Play video" }));
+  await screen.findByText("Media is unavailable. Try again.");
+  expect(view.props.onInvalidate).toHaveBeenCalledWith({ status: "unavailable", scope: selection.scope });
+  expect(view.container.querySelector("img")).toBeNull();
+  expect(view.container.querySelector("video")).toBeNull();
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+});
+
+it.each(["thumbnail", "Home", "ArrowLeft", "End", "ArrowRight"].flatMap((control) =>
+  ["photo", "thumbnail", "cover"].map((target) => [control, target] as const),
+))("retains %s no-op selection load-error recovery for %s", async (control, target) => {
+  const view = await mount();
+  await screen.findByAltText("Video cover");
+  const n = control === "End" || control === "ArrowRight" ? 3 : 1;
+  const thumbnail = screen.getByRole("button", { name: `Show photo ${n}` });
+  if (n === 3) fireEvent.keyDown(thumbnail, { key: "End" });
+  if (control === "thumbnail") fireEvent.click(thumbnail);
+  else fireEvent.keyDown(thumbnail, { key: control });
+  const image = target === "cover" ? screen.getByAltText("Video cover")
+    : target === "photo" ? screen.getByAltText(`Photo ${n} of 3`) : required(thumbnail.querySelector("img"));
+  fireEvent.error(image);
+  expect((target === "thumbnail" ? thumbnail : screen.getByRole("alert")).textContent).toBe(target === "cover" ? "Video cover could not load." : "Photo could not load.");
+  expect(screen.getByRole("button", { name: target === "cover" ? "Reload video cover" : "Reload photos" })).toBeTruthy();
+  expect(view.props.onInvalidate).not.toHaveBeenCalled();
+});
+
+it.each(["pending", "playing"])("current-photo selection cancels %s playback", async (phase) => {
+  const view = await mount();
+  await screen.findByAltText("Video cover");
+  const gate = deferred<undefined>();
+  let reached = false;
+  if (phase === "pending") world.before = async (path) => {
+    if (path.endsWith("/playback")) { reached = true; await gate.promise; }
+    return undefined;
+  };
+  const element = phase === "playing" ? await play(view) : undefined;
+  if (phase === "pending") {
+    fireEvent.click(screen.getByRole("button", { name: "Play video" }));
+    await waitFor(() => expect(reached).toBe(true));
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Show photo 1" }));
+  await act(async () => gate.resolve(undefined));
+  expect(view.container.querySelector("video")).toBeNull();
+  expect(screen.getByAltText("Video cover")).toBeTruthy();
+  expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(phase === "playing" ? 1 : 0);
+  if (element) expect(vi.mocked(HTMLMediaElement.prototype.pause).mock.contexts).toContain(element);
+});

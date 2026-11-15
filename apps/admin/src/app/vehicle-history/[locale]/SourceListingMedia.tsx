@@ -70,9 +70,9 @@ function Media(props: Props & { current: () => boolean }) {
       if (!allowed() || current !== lifetime.attempt) return;
       if (result.status !== "ok") {
         const refused = result.status === "absent" ? { status: "conflict" as const } : result;
-        if (refused.status !== "unavailable" || kind === "detail") setFailure(refused);
+        if (refused.status !== "video-unavailable" || kind === "detail") setFailure(refused);
         else if (kind === "play") setPlayError("videoFailed"); else setCoverFailed(true);
-        if (refused.status !== "unavailable") latest.current.onInvalidate(refused);
+        if (refused.status !== "video-unavailable") latest.current.onInvalidate(refused);
       } else if (result.kind !== kind || result.id !== binding.id || result.scope !== binding.scope ||
         result.actor.id !== binding.actorId || result.expectedAssignmentVersion !== binding.expectedAssignmentVersion ||
         result.sourceListingId !== binding.detail.sourceListingId) {
@@ -131,9 +131,11 @@ function Media(props: Props & { current: () => boolean }) {
   };
   const select = (next: number) => {
     if (!allowed()) return;
+    const selectedIndex = Math.max(0, Math.min(photos.length - 1, next));
+    if (selectedIndex === index && !grant && !pending && !coverLoading) return;
     stop();
     if (coverLoading) { setCoverLoading(false); setCoverFailed(true); }
-    setIndex(Math.max(0, Math.min(photos.length - 1, next)));
+    setIndex(selectedIndex);
   };
   const blocked = suspended ?? (typeof navigator !== "undefined" && !navigator.onLine ? "offline" :
     typeof document !== "undefined" && document.hidden ? "suspended" : undefined);
