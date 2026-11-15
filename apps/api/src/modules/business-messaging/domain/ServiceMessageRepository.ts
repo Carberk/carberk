@@ -30,7 +30,8 @@ export const SERVICE_MESSAGE_REPOSITORY = Symbol("ServiceMessageRepository");
 /** Internal persistence boundary. No identity, assignment or service-object policy. */
 export interface ServiceMessageRepository {
   // Serialize append/retry within the stream; return the original on a reused intent.
-  append(input: SendServiceTextInput & { operationKey?: string }): Promise<ServiceMessage>;
+  // Confirm after the last wait, before the append transaction can commit.
+  append(input: SendServiceTextInput & { operationKey?: string }, confirmCommit?: () => Promise<void>): Promise<ServiceMessage>;
   // Settles older appends/first-stream creation before returning absence.
   findOperation(input: FindServiceTextOperationInput): Promise<ServiceMessage | null>;
   // Ascending committed order, cursor must be an existing message in this stream.

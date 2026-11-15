@@ -204,6 +204,24 @@ it.each(["same", "different"])("recovers eight overlapping senders with %s clien
   });
 });
 
+it("rolls back a refused caller confirmation and preserves the original on a refused retry", async () => {
+  const objectId = randomUUID(); objects.push(objectId);
+  const input = { ...intent, objectId, operationKey: randomUUID(), text: "commit-confirmed notice" };
+  const operation = { ...scope, objectId, operationKey: input.operationKey };
+  expect(await messages.findTextOperation(operation)).toBeNull();
+  const refusal = new Error("caller authority expired");
+  const refuse = async () => { throw refusal; };
+  await expect(messages.sendOnceText(input, refuse)).rejects.toBe(refusal);
+  expect(await messages.findTextOperation(operation)).toBeNull();
+  expect(await messages.readMessages({ ...scope, objectId })).toEqual({ items: [], nextCursor: null });
+  const original = await messages.sendOnceText(input, async () => {});
+  expect(original.order).toBe("1");
+  await expect(messages.sendOnceText({ ...input, senderId: senders[1]!, clientMessageId: randomUUID() }, refuse)).rejects.toBe(refusal);
+  expect(await messages.findTextOperation(operation)).toEqual(original);
+  expect(await messages.readMessages({ ...scope, objectId })).toEqual({ items: [original], nextCursor: null });
+  expect(await messages.readReceipts({ ...scope, objectId })).toEqual({ items: [] });
+});
+
 it("keeps concurrent different operation keys independent within one stream", async () => {
   const objectId = randomUUID(); objects.push(objectId);
   const inputs = senders.map((senderId) => ({ ...intent, objectId, senderId,

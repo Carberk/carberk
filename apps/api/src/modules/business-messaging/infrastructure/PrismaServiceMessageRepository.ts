@@ -26,7 +26,7 @@ function communication(row: StoredMessage, stream: ServiceStream): ServiceMessag
 export class PrismaServiceMessageRepository implements ServiceMessageRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async append(input: SendServiceTextInput & { operationKey?: string }): Promise<ServiceMessage> {
+  async append(input: SendServiceTextInput & { operationKey?: string }, confirmCommit?: () => Promise<void>): Promise<ServiceMessage> {
     const { purpose, objectId, senderId, clientMessageId, text, operationKey } = input;
     return this.prisma.$transaction(async (tx) => {
       const stream = await this.lockStream(tx, { purpose, objectId });
@@ -34,7 +34,10 @@ export class PrismaServiceMessageRepository implements ServiceMessageRepository 
         const operation = await tx.serviceMessage.findUnique({
           where: { conversationId_operationKey: { conversationId: stream.id, operationKey } },
         });
-        if (operation) return communication(operation, { purpose, objectId });
+        if (operation) {
+          await confirmCommit?.();
+          return communication(operation, { purpose, objectId });
+        }
       }
       const original = await tx.serviceMessage.findUnique({
         where: { conversationId_senderId_clientMessageId: {
@@ -45,6 +48,7 @@ export class PrismaServiceMessageRepository implements ServiceMessageRepository 
         if (operationKey && original.operationKey !== operationKey) {
           throw new ServiceMessageError("SERVICE_MESSAGE_INTENT_CONFLICT");
         }
+        await confirmCommit?.();
         return communication(original, { purpose, objectId });
       }
       // The row lock is held until COMMIT, including the insert below. A later
@@ -55,6 +59,7 @@ export class PrismaServiceMessageRepository implements ServiceMessageRepository 
       const saved = await tx.serviceMessage.create({ data: {
         conversationId: stream.id, senderId, clientMessageId, text, operationKey: operationKey ?? null, streamOrder: counter.lastOrder,
       } });
+      await confirmCommit?.();
       return communication(saved, { purpose, objectId });
     });
   }

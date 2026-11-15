@@ -21,6 +21,7 @@ The locked semantic facet saves on the request connection, retaining Identity's 
 [Synchronization](application/SyncHistoryWaiting.ts) settles the request-keyed once outcome before replaying every ascending public page around ordinary sends, without receipt offers.
 The [server lifecycle port](vehicle-history.public.ts) uses current authority and source versions; same-context lock holders use its already-held path.
 [Reminder HTTP](presentation/HistoryRemindersController.ts) exposes safe current-authority
-readback and permanent requester Stop, reconciling without participant fetch/ACK effects.
-Manual send remains #1218, actual controls #1222 and connected completion #1178;
-quote consumers remain separate. No reminder append or outbound action is exposed here.
+readback, permanent requester Stop and one manual operator reminder after 24 hours.
+It reconciles without participant fetch/ACK effects and preserves the original
+once outcome across retries. Actual controls remain #1222 and connected completion
+#1178; quote consumers remain separate. No automatic reminder or outbound action.

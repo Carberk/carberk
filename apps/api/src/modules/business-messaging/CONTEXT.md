@@ -7,3 +7,7 @@ Consume only [the public port](business-messaging.public.ts) through [the module
 [The exported-port Postgres proof](business-messaging.e2e.spec.ts) exercises concurrency and scoped pages. Text equality is exact, preserving whitespace/newlines; only UUID keys are canonicalized. The stream row lock serializes order allocation through commit. Explicit received/read acknowledgements retain participant and assignment-version facts. Transcript reads only record a contiguous fetched range for the current participant/session/version; they never acknowledge receipt. Read cannot exceed received, and acknowledgements cannot exceed that fetched range. No private notes, identity enrichment or retention schedule is introduced.
 
 Trusted server operations also support stream-scoped once text and settled exact lookup. The operation key never enters external inputs or public messages. Lookup creates/locks the stream and waits for older creation/append commit or rollback before reporting absence; ordinary nonparticipant transcript reads stay nonblocking. History still owns eligibility and every current authority fence.
+
+Once append accepts a caller-owned confirmation under that held fence after its
+last wait and before messaging commits. Refusal rolls back without copying the
+caller's authority policy into messaging.

@@ -28,6 +28,23 @@ describe("synthetic History desk contract", () => {
 });
 
 describe("private enquiry consumer contract", () => {
+  it("documents exactly the four authenticated reminder routes with bounded manual intent and safe state", () => {
+    const document = generateOpenApiDocument() as { paths: Record<string, Record<string, unknown>> };
+    const customer = "/api/v1/vehicle-history/requests/{id}/reminder";
+    const operator = "/api/v1/vehicle-history/operator/requests/{id}/reminder";
+    expect(Object.entries(document.paths).filter(([path]) => path.includes("/reminder"))
+      .flatMap(([path, operations]) => Object.keys(operations).map((method) => `${method} ${path}`)).sort())
+      .toEqual([`get ${operator}`, `get ${customer}`, `post ${operator}`, `post ${customer}/stop`].sort());
+    for (const [path, method] of [[customer, "get"], [operator, "get"], [operator, "post"], [customer + "/stop", "post"]] as const) {
+      expect(document.paths[path]?.[method]).toMatchObject({ security: [{ bearerAuth: [] }] });
+    }
+    expect(document.paths[operator]?.["post"]).toMatchObject({ requestBody: { content: { "application/json": { schema: {
+      type: "object", additionalProperties: false, required: ["expectedWaitingVersion", "expectedAssignmentVersion", "clientMessageId"],
+      properties: { expectedWaitingVersion: { minimum: 0, maximum: 2147483647 }, expectedAssignmentVersion: { minimum: 0, maximum: 2147483647 }, clientMessageId: { type: "string", format: "uuid" } },
+    } } } }, responses: { "201": { content: { "application/json": { schema: { additionalProperties: false,
+      properties: { used: { type: "boolean" }, outcome: { type: "object", nullable: true } },
+    } } } } } });
+  });
   it("normalizes equivalent UUID attempts and rejects extra purchase or authority input", () => {
     expect(VehicleHistorySchemas.CreateHistoryRequestSchema.parse({
       attemptKey: "12010000-ABCD-4000-8000-000000000001",

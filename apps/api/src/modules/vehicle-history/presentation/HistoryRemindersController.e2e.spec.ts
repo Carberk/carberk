@@ -20,6 +20,40 @@ describe("Current History reminder state over listening HTTP", () => {
     return { customer, operator, id, customerPath, staffPath, actor, read };
   }
 
+  it("sends one generated notice only at 86,400,000 elapsed History milliseconds and preserves its original on retry", async () => {
+    const { customer, operator, id, customerPath, staffPath, actor, read } = await assigned();
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-14T00:00:00.000Z");
+    await f.app.get<HistoryWaitingLifecycle>(HISTORY_WAITING_LIFECYCLE).change(actor, id,
+      { sourceId: "quote", sourceVersion: 1, expectedVersion: 0, action: "begin", reason: "quote_choice" });
+    const clientMessageId = randomUUID();
+    const send = (locale = "en", version = 1, key = clientMessageId) => f.request.post(staffPath + "/reminder")
+      .auth(operator.token, { type: "bearer" }).set("Accept-Language", locale)
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: version, clientMessageId: key });
+    for (const now of ["2026-11-14T23:59:59.000Z", "2026-11-14T23:59:59.999Z"]) {
+      clock.now = () => new Date(now);
+      await send().expect(409).expect("Cache-Control", "private, no-store");
+      expect((await read()).body).toMatchObject({ version: 1, used: false, outcome: null });
+    }
+    clock.now = () => new Date("2026-11-15T00:00:00.000Z");
+    const result = (await send().expect(201).expect("Cache-Control", "private, no-store")).body;
+    expect(result).toMatchObject({ reason: "quote_choice", since: "2026-11-14T00:00:00.000Z", version: 3, used: true,
+      eligible: false, ineligibleReason: "used", outcome: { clientMessageId, order: "1", kind: "TEXT",
+        text: "We are waiting for your reply about vehicle history. You can reply here or stop reminders.",
+        author: { id: operator.user.id, kind: "operator" } } });
+    expect(Schemas.HistoryReminderSchema.parse(result)).toEqual(result);
+    expect((await send("ru", 0, randomUUID()).expect(201)).body).toEqual(result);
+    expect((await send("tk").expect(201)).body).toEqual(result);
+    expect((await read()).body).toEqual(result);
+    expect((await f.request.get(customerPath + "/receipts").auth(customer.token, { type: "bearer" }).expect(200)).body).toEqual({ items: [] });
+    const messages = (await f.request.get(customerPath + "/messages").auth(customer.token, { type: "bearer" }).expect(200)).body;
+    expect(messages).toEqual({ items: [result.outcome], nextCursor: null });
+    for (const kind of ["received", "read"]) await f.request.post(customerPath + "/receipts").auth(customer.token, { type: "bearer" })
+      .send({ cursor: result.outcome.id, kind }).expect(201);
+    await f.request.get(customerPath + "/receipts").auth(customer.token, { type: "bearer" }).expect(200);
+    expect((await read()).body).toEqual(result);
+  });
+
   it("uses literal elapsed UTC boundaries on History time while current sessions remain valid", async () => {
     const { operator, id, staffPath, actor, read } = await assigned();
     const clock = f.app.get<HistoryClock>(HISTORY_CLOCK), lifecycle = f.app.get<HistoryWaitingLifecycle>(HISTORY_WAITING_LIFECYCLE);
@@ -35,6 +69,71 @@ describe("Current History reminder state over listening HTTP", () => {
     const eligible = { ...early, eligible: true, ineligibleReason: null };
     expect((await read()).body).toEqual(eligible);
     expect((await f.request.get(staffPath + "/reminder?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" }).expect(200)).body).toEqual(eligible);
+  });
+
+  it("arbitrates eight simultaneous same/different attempts and preserves the original after handover and a new wait", async () => {
+    const { customer, operator, id, customerPath, staffPath, actor, read } = await assigned();
+    const reply = (await f.request.post(staffPath + "/messages").auth(operator.token, { type: "bearer" })
+      .send({ clientMessageId: randomUUID(), text: "Please reply", expectedAssignmentVersion: 1 }).expect(201)).body;
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date(new Date(reply.createdAt).getTime() + 86_400_000);
+    const key = randomUUID();
+    await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 1, clientMessageId: reply.clientMessageId }).expect(409);
+    expect((await read()).body).toMatchObject({ version: 1, used: false, outcome: null });
+    f.concurrent(8);
+    const results = await Promise.all(Array.from({ length: 8 }, (_, index) => f.request.post(staffPath + "/reminder")
+      .auth(operator.token, { type: "bearer" }).set("x-history-concurrency", "eight-reminders")
+      .set("Accept-Language", ["en", "ru", "tk"][index % 3]!)
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 1, clientMessageId: index < 4 ? key : randomUUID() })));
+    expect(results.map((result) => result.status)).toEqual([201, 201, 201, 201, 201, 201, 201, 201]);
+    const original = results[0]!.body;
+    for (const result of results) expect(result.body).toEqual(original);
+    expect(original).toMatchObject({ since: reply.createdAt, reason: "customer_answer", version: 3, used: true,
+      ineligibleReason: "used", outcome: { order: "2", author: { id: operator.user.id } } });
+    await f.app.get<HistoryWaitingLifecycle>(HISTORY_WAITING_LIFECYCLE).change(actor, id,
+      { sourceId: "new-wait", sourceVersion: 1, expectedVersion: 3, action: "begin", reason: "quote_choice" });
+    const successor = await f.actor();
+    await f.prisma.vehicleHistoryRequest.update({ where: { id }, data: { assignedOperatorId: successor.user.id, assignmentVersion: 2 } });
+    await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 1, clientMessageId: key }).expect(403);
+    const recovered = (await f.request.post(staffPath + "/reminder").auth(successor.token, { type: "bearer" }).set("Accept-Language", "tk")
+      .send({ expectedAssignmentVersion: 2, expectedWaitingVersion: 0, clientMessageId: randomUUID() }).expect(201)).body;
+    expect(recovered).toMatchObject({ version: 4, used: true, ineligibleReason: "used", outcome: original.outcome });
+    expect((await read()).body).toEqual(recovered);
+    const stream = { purpose: "vehicle_history" as const, objectId: id };
+    const conversation = await f.prisma.serviceConversation.findUniqueOrThrow({ where: { purpose_objectId: stream } });
+    expect(await f.prisma.serviceMessageOffer.count({ where: { conversationId: conversation.id } })).toBe(0);
+    expect((await f.request.get(customerPath + "/messages").auth(customer.token, { type: "bearer" }).expect(200)).body)
+      .toEqual({ items: [reply, original.outcome], nextCursor: null });
+    expect((await f.request.get(customerPath + "/receipts").auth(customer.token, { type: "bearer" }).expect(200)).body).toEqual({ items: [] });
+  });
+
+  it.each([
+    ["tk", "Awtoulagyň taryhy barada jogabyňyza garaşýarys. Şu ýerde jogap berip ýa-da ýatlatmalary bes edip bilersiňiz.", "Ýatlatmanyň maglumatlaryny barlap, gaýtadan synanyşyň.", "Bu ýüz tutma elýeterli däl. Gaýtadan giriň ýa-da taryh ýüz tutmalarynyň sanawyny täzeläň."],
+    ["ru", "Мы ждём вашего ответа об истории автомобиля. Вы можете ответить здесь или отключить напоминания.", "Проверьте параметры напоминания и повторите попытку.", "Обращение недоступно. Войдите снова или обновите входящие истории автомобиля."],
+    ["en", "We are waiting for your reply about vehicle history. You can reply here or stop reminders.", "Check the reminder details and try again.", "This enquiry is unavailable. Sign in again or refresh your History inbox."],
+  ])("generates %s notices and private strict/malformed refusals without accepting caller policy", async (locale, text, invalid, denied) => {
+    const { operator, id, staffPath, actor } = await assigned();
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-14T00:00:00Z");
+    await f.app.get<HistoryWaitingLifecycle>(HISTORY_WAITING_LIFECYCLE).change(actor, id,
+      { sourceId: "wait", sourceVersion: 1, expectedVersion: 0, action: "begin", reason: "customer_answer" });
+    clock.now = () => new Date("2026-11-15T00:00:00Z");
+    const input = { expectedAssignmentVersion: 1, expectedWaitingVersion: 1, clientMessageId: randomUUID() };
+    const foreign = await f.actor();
+    const refusal = await f.request.post(staffPath + "/reminder").auth(foreign.token, { type: "bearer" })
+      .set("Accept-Language", locale!).send(input).expect(403).expect("Cache-Control", "private, no-store");
+    expect(refusal.body).toEqual({ statusCode: 403, code: "HISTORY_OPERATOR_DENIED", message: denied });
+    const post = (path = staffPath + "/reminder") => f.request.post(path).auth(operator.token, { type: "bearer" }).set("Accept-Language", locale!);
+    for (const extra of [{ text: "forged" }, { now: "2030" }, { operationKey: id }, { actorId: id }, { sourceVersion: 2 },
+      { expectedWaitingVersion: "1" }, { expectedAssignmentVersion: 2147483648 }, { clientMessageId: "bad" }]) {
+      const result = await post().send({ ...input, ...extra }).expect(400).expect("Cache-Control", "private, no-store");
+      expect(result.body).toEqual({ statusCode: 400, code: "HISTORY_REMINDER_INVALID", message: invalid });
+    }
+    for (const request of [post().set("Content-Type", "application/json").send('{"clientMessageId":'), post(staffPath + "/reminder?now=forged").send(input)]) {
+      expect((await request.expect(400)).body).toEqual({ statusCode: 400, code: "HISTORY_REMINDER_INVALID", message: invalid });
+    }
+    expect((await post().send(input).expect(201)).body.outcome.text).toBe(text);
   });
 
   it("permanently stops once, rejects stale first attempts and keeps retries idempotent after a new wait", async () => {
@@ -56,7 +155,8 @@ describe("Current History reminder state over listening HTTP", () => {
     expect((await stop(0).expect(201)).body).toEqual(renewed);
     expect((await f.request.get(staffPath + "/reminder?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" }).expect(200)).body).toEqual(renewed);
     expect((await f.request.get(customerPath + "/messages").auth(customer.token, { type: "bearer" }).expect(200)).body.items).toEqual([]);
-    await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" }).send({ expectedWaitingVersion: 2 }).expect(404);
+    await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 2, clientMessageId: randomUUID() }).expect(409);
   });
 
   it("repairs every page after a saved checkpoint, identifying the settled original before replay without offering or acknowledging text", async () => {
@@ -68,13 +168,16 @@ describe("Current History reminder state over listening HTTP", () => {
       clientMessageId: randomUUID(), text: `answer-${i}` });
     const original = await messages.sendOnceText({ ...stream, operationKey: id, senderId: operator.user.id,
       clientMessageId: randomUUID(), text: "  Original\nÝatlatma / Напоминание  " });
-    const state = (await read()).body;
+    const state = (await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" }).set("Accept-Language", "en")
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 0, clientMessageId: randomUUID() }).expect(201)).body;
     expect(Schemas.HistoryReminderSchema.parse(state)).toEqual(state);
     expect(state).toEqual({ reason: null, since: null, version: 58, eligibleAt: null, eligible: false, ineligibleReason: "used",
       declined: false, stopped: false, used: true, outcome: { id: original.id, clientMessageId: original.clientMessageId,
         kind: "TEXT", text: "  Original\nÝatlatma / Напоминание  ", order: "57", createdAt: original.createdAt,
         author: { id: operator.user.id, displayName: "Ayna", nameNumber: 1213, kind: "operator" } } });
     expect((await read()).body).toEqual(state);
+    expect((await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" }).set("Accept-Language", "ru")
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 0, clientMessageId: randomUUID() }).expect(201)).body).toEqual(state);
     expect((await f.request.get(staffPath + "/reminder?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" }).expect(200)).body).toEqual(state);
     expect((await f.request.get(customerPath + "/receipts").auth(customer.token, { type: "bearer" }).expect(200)).body).toEqual({ items: [] });
     const conversation = await f.prisma.serviceConversation.findUniqueOrThrow({ where: { purpose_objectId: stream } });
@@ -101,6 +204,8 @@ describe("Current History reminder state over listening HTTP", () => {
     await lifecycle.change(actor, id, { sourceId: "another-quote", sourceVersion: 3, expectedVersion: 3, action: "begin", reason: "quote_choice" });
     const renewed = (await read()).body;
     expect(renewed).toMatchObject({ reason: "quote_choice", version: 4, declined: true, stopped: true, ineligibleReason: "declined" });
+    await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 4, clientMessageId: randomUUID() }).expect(409);
     expect((await f.request.post(customerPath + "/reminder/stop").auth(customer.token, { type: "bearer" })
       .send({ expectedWaitingVersion: 1 }).expect(201)).body).toEqual(renewed);
   });
@@ -157,6 +262,9 @@ describe("Current History reminder state over listening HTTP", () => {
     if (lost === "staging" || lost === "production") f.config.set("APP_ENV", lost);
     await f.request.get(staffPath + `/reminder?expectedAssignmentVersion=${lost === "version" ? 0 : 1}`).auth(caller.token, { type: "bearer" })
       .expect(lost === "version" ? 409 : 403).expect("Cache-Control", "private, no-store");
+    await f.request.post(staffPath + "/reminder").auth(caller.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: lost === "version" ? 0 : 1, expectedWaitingVersion: 0, clientMessageId: randomUUID() })
+      .expect(lost === "version" ? 409 : 403).expect("Cache-Control", "private, no-store");
     f.config.set("APP_ENV", "test"); f.config.set("VEHICLE_HISTORY_SYNTHETIC_ENABLED", true);
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_USER_IDS", customer.user.id);
     expect((await read()).body).toMatchObject({ version: 0, stopped: false, used: false, outcome: null });
@@ -188,7 +296,7 @@ describe("Current History reminder state over listening HTTP", () => {
     ["ru", "Напоминания временно недоступны. Откройте обращение заново и повторите попытку.", "Запрос недоступен. Войдите снова или вернитесь к своим запросам истории."],
     ["tk", "Ýatlatmalar wagtlaýyn elýeterli däl. Ýüz tutmany täzeden açyp synanyşyň.", "Bu ýüz tutma elýeterli däl. Gaýtadan giriň ýa-da taryh ýüz tutmalaryňyza dolanyň."],
   ])("keeps %s unavailable and foreign-object refusals private without leaking a storage error", async (locale, unavailable, denied) => {
-    const { customer, id, customerPath, read } = await assigned(), other = await f.actor(null);
+    const { customer, operator, id, customerPath, staffPath, read } = await assigned(), other = await f.actor(null);
     const initial = (await read()).body;
     const refusal = await f.request.get(customerPath + "/reminder").auth(other.token, { type: "bearer" }).set("Accept-Language", locale!).expect(403);
     expect(refusal.body).toEqual({ statusCode: 403, code: "HISTORY_REQUEST_DENIED", message: denied });
@@ -198,8 +306,10 @@ describe("Current History reminder state over listening HTTP", () => {
       FOR EACH ROW WHEN (NEW."objectId" = '${id}') EXECUTE FUNCTION reminder_storage_failure()`);
     try {
       for (const operation of [f.request.get(customerPath + "/reminder"),
-        f.request.post(customerPath + "/reminder/stop").send({ expectedWaitingVersion: 0 })]) {
-        const response = await operation.auth(customer.token, { type: "bearer" }).set("Accept-Language", locale!).expect(503);
+        f.request.post(customerPath + "/reminder/stop").send({ expectedWaitingVersion: 0 }),
+        f.request.post(staffPath + "/reminder").send({ expectedWaitingVersion: 0, expectedAssignmentVersion: 1, clientMessageId: randomUUID() })]) {
+        const response = await operation.auth(operation.url.includes("/operator/") ? operator.token : customer.token, { type: "bearer" })
+          .set("Accept-Language", locale!).expect(503);
         expect(response.headers["cache-control"]).toBe("private, no-store");
         expect(response.body).toEqual({ statusCode: 503, code: "HISTORY_REMINDER_UNAVAILABLE", message: unavailable });
       }

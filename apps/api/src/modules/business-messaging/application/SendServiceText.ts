@@ -24,14 +24,22 @@ export class SendServiceText {
     return this.send(input, false);
   }
 
-  executeOnce(input: SendOnceServiceTextInput) {
-    return this.send(input, true);
+  executeOnce(input: SendOnceServiceTextInput, confirmCommit?: () => Promise<void>) {
+    return this.send(input, true, confirmCommit);
   }
 
-  private async send(input: SendServiceTextInput | SendOnceServiceTextInput, once: boolean) {
+  private async send(input: SendServiceTextInput | SendOnceServiceTextInput, once: boolean, confirmCommit?: () => Promise<void>) {
     const parsed = (once ? OnceTextSchema : ServiceMessagesSchemas.SendServiceTextSchema).safeParse(input);
     if (!parsed.success) throw new ServiceMessageError("SERVICE_MESSAGE_INVALID_INPUT");
-    const original = await this.repository.append(parsed.data).catch((error: unknown) => {
+    // Only caller confirmation failures retain their caller-owned refusal.
+    // Unknown persistence failures still leave through the bounded storage error.
+    let refusal: { cause: unknown } | undefined;
+    const confirm = confirmCommit && (async () => {
+      try { await confirmCommit(); }
+      catch (cause) { refusal = { cause }; throw cause; }
+    });
+    const original = await this.repository.append(parsed.data, confirm).catch((error: unknown) => {
+      if (refusal) throw refusal.cause;
       if (error instanceof ServiceMessageError) throw error;
       throw new ServiceMessageError("SERVICE_MESSAGE_UNAVAILABLE");
     });

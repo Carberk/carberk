@@ -40,6 +40,7 @@ import { HISTORY_WAITING_LIFECYCLE } from "./vehicle-history.public";
 import { SyncHistoryWaiting } from "./application/SyncHistoryWaiting";
 import { ReadHistoryReminder } from "./application/ReadHistoryReminder";
 import { StopHistoryReminders } from "./application/StopHistoryReminders";
+import { SendHistoryReminder } from "./application/SendHistoryReminder";
 import { HistoryReminderProjection } from "./application/HistoryReminderProjection";
 import { HistoryRemindersController } from "./presentation/HistoryRemindersController";
 
@@ -48,7 +49,7 @@ import { HistoryRemindersController } from "./presentation/HistoryRemindersContr
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
   controllers: [VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController],
   providers: [AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
-    SyncHistoryWaiting, ChangeHistoryWaiting, ReadHistoryReminder, StopHistoryReminders, HistoryReminderProjection,
+    SyncHistoryWaiting, ChangeHistoryWaiting, ReadHistoryReminder, StopHistoryReminders, SendHistoryReminder, HistoryReminderProjection,
     { provide: HISTORY_WAITING_LIFECYCLE, useExisting: ChangeHistoryWaiting },
     { provide: HISTORY_CLOCK, useFactory: (): HistoryClock => ({ now: () => new Date() }) },
     { provide: HistoryWaiting, inject: [HISTORY_CLOCK], useFactory: (clock: HistoryClock) => new HistoryWaiting(clock) },
