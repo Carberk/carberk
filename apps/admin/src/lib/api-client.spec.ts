@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 const mockState = vi.hoisted(() => ({
@@ -22,9 +24,48 @@ vi.mock("next/navigation", () => ({
   redirect: mockState.redirect,
 }));
 
-import { apiFetch, apiFetchOptional, ApiError } from "./api-client";
+import { apiFetch, apiFetchOptional, apiPublicGet, ApiError } from "./api-client";
 
 const mockCookieStore = mockState.cookieStore;
+const networkFetch = global.fetch;
+
+it("keeps public GETs anonymous over HTTP while preserving authenticated wrappers", async () => {
+  global.fetch = networkFetch;
+  mockCookieStore.get.mockReturnValue({ value: "synthetic-access" });
+  mockCookieStore.set.mockClear();
+  mockState.requestHeaders = new Headers({ "x-real-ip": "203.0.113.7", cookie: "private", authorization: "private" });
+  const seen: Record<"method" | "auth" | "cookie" | "ip" | "locale" | "cache", string | undefined>[] = [];
+  let status = 200;
+  let malformedError = false;
+  const server = createServer((req, res) => {
+    seen.push({ method: req.method, auth: req.headers.authorization, cookie: req.headers.cookie,
+      ip: req.headers["x-real-ip"] as string | undefined, locale: req.headers["accept-language"], cache: req.headers["cache-control"] });
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(malformedError ? "null" : JSON.stringify(status === 200 ? { ok: true } : { code: "REFUSED", message: "Unavailable" }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  vi.stubEnv("API_BASE_URL", `http://127.0.0.1:${(server.address() as { port: number }).port}/api/v1/`);
+  try {
+    expect(await apiPublicGet("/catalog/regions", "tk")).toEqual({ ok: true });
+    expect(seen[0]).toEqual({ method: "GET", auth: undefined, cookie: undefined, ip: "203.0.113.7", locale: "tk", cache: "no-cache" });
+    for (const code of [401, 403, 429, 503]) {
+      status = code;
+      await expect(apiPublicGet("/catalog/regions")).rejects.toMatchObject({ status: code, code: "REFUSED" });
+    }
+    status = 200;
+    expect(await apiFetch("/authenticated")).toEqual({ ok: true });
+    expect(await apiFetchOptional("/authenticated-optional")).toEqual({ ok: true });
+    expect(seen.slice(-2).map((entry) => entry.auth)).toEqual(["Bearer synthetic-access", "Bearer synthetic-access"]);
+    expect(seen.slice(0, -2).every((entry) => !entry.auth && !entry.cookie && entry.method === "GET")).toBe(true);
+    expect(mockCookieStore.set).not.toHaveBeenCalled();
+    expect(seen).toHaveLength(7);
+    status = 503; malformedError = true;
+    await expect(apiPublicGet("/catalog/regions")).rejects.toMatchObject({ status: 503, code: "UNKNOWN" });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    vi.unstubAllEnvs();
+  }
+});
 
 describe("apiFetch", () => {
   beforeEach(() => {

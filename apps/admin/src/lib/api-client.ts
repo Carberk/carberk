@@ -45,6 +45,27 @@ async function doFetch(
   return fetch(url, fetchInit);
 }
 
+/** Public server reads never inherit the operator's cookie or bearer authority. */
+export async function apiPublicGet<T>(
+  path: string,
+  locale?: "tk" | "ru" | "en",
+): Promise<T> {
+  const response = await doFetch(path, {
+    method: "GET",
+    headers: locale ? { "Accept-Language": locale } : {},
+    cache: "no-store",
+    credentials: "omit",
+    redirect: "error",
+  });
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const error = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    throw new ApiError(response.status, typeof error["code"] === "string" ? error["code"] : "UNKNOWN",
+      body, typeof error["message"] === "string" ? error["message"] : `HTTP ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 /**
  * Server-side API fetch wrapper.
  * Forwards Authorization: Bearer header from the access cookie.

@@ -9,6 +9,12 @@ queue/context/transcript reads and atomic Claim for the connected inbox. They
 bind outcomes to the API-confirmed actor and stable session without exposing
 tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) reads transcripts only for the current assignment; reply, notes, receipt controls and full Listing viewing belong to their separate slices.
 
+The dormant [source Listing reader](src/lib/history-source-listing.ts) projects
+only anonymous public display facts; its [catalog resolver](src/lib/history-listing-catalog.ts)
+resolves all present references and lets a caller reauthorize after every read/page.
+These internal readers grant no History, owner or media authority and expose no
+Server Action or mounted viewer. Request-bound viewing belongs to its separate slice.
+
 Browser JavaScript never receives API tokens. Server-side code stores them in HTTP-only cookies and forwards bearer authentication to the API. Preserve production `__Host-` cookie restrictions, origin validation on browser-posted handlers, and local-only `returnTo` validation. The Node `src/proxy.ts` renews expired requests before rendering or Server Actions, forwarding the rotated cookies to the handler and storing both on the response. Layout/API checks still enforce actual authentication and TOTP elevation. Server Components never rotate tokens or write cookies.
 
 Server-side API calls, including proxy renewal, forward the operator address selected by `src/lib/visitor-ip.ts` from the configured trusted ingress header. The private `API_BASE_URL` and `API_CLIENT_IP_HEADER` must match the API's trusted-IP rule. The ingress must overwrite the configured header; missing or malformed values forward no address and share admin's peer budget. A caller-written `X-Forwarded-For` is never a fallback. See [ADR-0078](../../docs/adr/0078-the-api-trusts-one-configured-header-for-the-client-ip.md).
