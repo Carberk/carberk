@@ -71,7 +71,7 @@ def apply(prepared, runtime):
     (release / 'node/bin').mkdir(parents=True, mode=0o755)
     shutil.copyfile(runtime / ('node-v' + descriptor['version'] + '-linux-x64/bin/node'), release / 'node/bin/node')
     (release / 'node/bin/node').chmod(0o755)
-    for name in ['gateway.mjs', 'serve.mjs']:
+    for name in ['gateway.mjs', 'serve.mjs', 'monitor-metrics.mjs']:
         shutil.copyfile(runtime / name, release / name)
     (RELEASE / 'current').symlink_to(release, target_is_directory=True)
     tls_dir.mkdir(mode=0o700)

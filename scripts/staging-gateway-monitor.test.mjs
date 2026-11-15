@@ -5,13 +5,79 @@ import net from 'node:net';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, copyFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { observeGateway } from '../infra/gateway/monitor-metrics.mjs';
 import { probeGateway, createAlarm } from '../infra/gateway/monitor-probe.mjs';
 
 const listen = async server => { server.listen(0, '127.0.0.1'); await once(server, 'listening'); return `http://127.0.0.1:${server.address().port}`; };
+
+test('a fresh package assembled by the installer can start with its observer dependency', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'gateway-package-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const runtime = join(dir, 'runtime');
+  const prepared = join(dir, 'prepared');
+  await mkdir(join(runtime, 'node-v24.13.0-linux-x64/bin'), { recursive: true });
+  await mkdir(join(prepared, 'tls'), { recursive: true });
+  await mkdir(join(dir, 'systemd'), { recursive: true });
+  await mkdir(join(dir, 'snikket'), { recursive: true });
+  await mkdir(join(dir, 'volume'), { recursive: true });
+  // Supply the real source directory. The installer alone decides what ships.
+  for (const name of ['gateway.mjs', 'serve.mjs', 'monitor-metrics.mjs']) {
+    await copyFile(join('infra/gateway', name), join(runtime, name));
+  }
+  await writeFile(join(runtime, 'node.tar.xz'), 'synthetic runtime boundary');
+  await writeFile(join(runtime, 'runtime.json'), JSON.stringify({ version: '24.13.0',
+    sha256: createHash('sha256').update('synthetic runtime boundary').digest('hex') }));
+  await writeFile(join(runtime, 'node-v24.13.0-linux-x64/bin/node'), `#!/bin/sh\nexec '${process.execPath.replaceAll("'", "'\\''")}' "$@"\n`);
+  await writeFile(join(runtime, 'gateway.json'), JSON.stringify({ origin: 'https://api-staging-2861.up.railway.app',
+    transport: 'reverse', proxy: 'http://127.0.0.1:11819', hostname: 'gateway.example.test', accessKey: 'x'.repeat(32) }));
+  for (const name of ['relay.json']) await writeFile(join(runtime, name), '{}');
+  for (const name of ['gateway.conf', 'docker-compose.override.yml', 'carberk-egress.service', 'carberk-gateway.service', 'tls/fullchain.pem', 'tls/privkey.pem']) {
+    await writeFile(join(prepared, name), 'synthetic host boundary');
+  }
+  // Exercise the public installer CLI with filesystem/process/network boundaries
+  // redirected to this disposable package. Repository functions stay real.
+  const fixture = `import io,json,os,pathlib,runpy,subprocess,sys,types,urllib.request
+from unittest.mock import patch
+root=sys.argv[1]; installer=sys.argv[2]
+OriginalPath=pathlib.Path
+mapping={'/etc/carberk':root+'/config','/opt/carberk-gateway':root+'/release',
+ '/etc/snikket/docker-compose.override.yml':root+'/snikket/override.yml','/etc/systemd/system':root+'/systemd'}
+class FixturePath(type(OriginalPath())):
+ def __new__(cls,*args,**kwargs):
+  path=os.path.join(*(os.fspath(a) for a in args)) if args else '.'
+  for before,after in mapping.items():
+   if path==before or path.startswith(before+'/'):path=after+path[len(before):];break
+  return super().__new__(cls,path,**kwargs)
+def process(args,**kwargs):
+ if args[:2]==('docker','inspect'):
+  return json.dumps([{'Id':'owned-fixture','Mounts':[{'Source':root+'/volume','Destination':'/snikket'}]}]).encode()
+ if args[0] in ['docker','systemctl']:return b''
+ raise AssertionError('Unexpected external process')
+class Response:
+ def __enter__(self):return io.BytesIO(b'{"environment":"staging","service":"api"}')
+ def __exit__(self,*args):pass
+sys.argv=[installer,'apply','--prepared',root+'/prepared','--runtime',root+'/runtime']
+with patch('pathlib.Path',FixturePath),patch('subprocess.check_output',process),patch('os.geteuid',lambda:0),patch('urllib.request.build_opener',lambda *a:types.SimpleNamespace(open=lambda *a,**k:Response())):
+ runpy.run_path(installer,run_name='__main__')
+`;
+  const wrapper = join(dir, 'host-fixture.py');
+  await writeFile(wrapper, fixture);
+  const run = (command, args) => new Promise((resolve, reject) => {
+    const child = spawn(command, args);
+    let output = '';
+    child.stdout.on('data', chunk => { output += chunk; });
+    child.stderr.on('data', chunk => { output += chunk; });
+    child.once('error', reject); child.once('close', code => resolve({ code, output }));
+  });
+  const installed = await run('python3', [wrapper, dir, join(process.cwd(), 'infra/gateway/operate.py')]);
+  assert.equal(installed.code, 0, installed.output);
+  const checked = await run(join(dir, 'release/current/node/bin/node'), [join(dir, 'release/current/serve.mjs'), join(dir, 'config/gateway.json'), '--check']);
+  assert.equal(checked.code, 0, checked.output);
+  assert.match(checked.output, /"configuration_valid":true/);
+});
 
 test('route metrics expose failures, time and stalled transfers without retaining private requests', async t => {
   let clock = 100;
