@@ -42,10 +42,13 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
     }
     if (reader.focusId && (document.activeElement === pageFocus.current || document.activeElement === document.body)) {
       document.getElementById(`history-message-${reader.focusId}`)?.focus({ preventScroll: true });
+    } else if (pageFocus.current && !pageFocus.current.isConnected && document.activeElement === document.body) {
+      node.focus({ preventScroll: true });
     }
     remember();
   }, [messages, reader.focusId]);
   function more() { remember(); pageFocus.current = document.activeElement; reader.run("page"); }
+  function recover() { remember(); pageFocus.current = document.activeElement; reader.run("refresh"); }
   const selected = detail ?? row;
   const name = selected?.requester ? IdentitySchemas.formatDisplayName(selected.requester, locale) : t.unavailablePerson;
   return <>
@@ -64,7 +67,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
       {["offline", "unavailable"].includes(reader.notice) && <InboxNotice locale={locale} state={reader.notice} retry={() => reader.run("claim")} />}
       </div>
         : state !== "ready" ? <InboxNotice locale={locale} state={reader.notice === "unavailable" ? "conversationUnavailable" : reader.notice === "offline" ? "offline" : state}
-          retry={() => reader.notice === "offline" || reader.notice === "unavailable" ? reader.run("refresh") : refresh(true)} />
+          retry={() => reader.notice === "offline" || reader.notice === "unavailable" ? recover() : refresh(true)} />
           : <div className="p-5">
             {!messages.length && <p role="status" className="py-8 text-sm text-muted-foreground">{t.noMessages}</p>}
             <ol ref={pane} aria-label={t.conversation} tabIndex={0} onScroll={remember} className="max-h-[30rem] space-y-4 overflow-y-auto pr-1 [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-ring">{messages.map((message) => <li key={message.id} id={`history-message-${message.id}`} tabIndex={-1}
@@ -77,7 +80,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
               : reader.notice === "reconnecting" ? t.reconnecting : reader.notice === "recovered" ? t.recovered : ""}</div>
             {["offline", "unavailable"].includes(reader.notice) && <div role="alert" className="mb-4 text-sm">
               <p className="mb-2">{reader.notice === "offline" ? t.offline : t.readError}</p>
-              <Button variant="secondary" onClick={() => reader.run("refresh")}>{t.retry}</Button>
+              <Button variant="secondary" onClick={recover}>{t.retry}</Button>
             </div>}
             {cursor && <Button className="mt-5" variant="secondary" disabled={reader.busy} onClick={more}>{t.moreMessages}</Button>}
           </div>}

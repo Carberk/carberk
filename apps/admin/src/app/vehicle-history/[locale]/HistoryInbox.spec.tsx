@@ -695,3 +695,23 @@ it("does not let an older queue response re-admit a reader after an observed ref
   expect(document.querySelector("#selected-enquiry")).toBeNull();
   await act(async () => detailRead.resolve(Response.json(detail())));
 });
+
+it("returns keyboard focus to the conversation when recovery removes the focused Retry button", async () => {
+  selectAssigned();
+  const network = networkHandler(); let failed = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages") && failed) return Promise.resolve(Response.json({}, { status: 503 }));
+    if (url.pathname.endsWith("/messages") && url.searchParams.has("cursor")) return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    return network(input, init);
+  });
+  render(view()); await screen.findByText("Can you check this car?");
+  const pane = screen.getByRole("list", { name: "Enquiry conversation" });
+  failed = true; fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  const retry = await screen.findByRole("button", { name: "Try again" }); retry.focus();
+  failed = false; fireEvent.click(retry);
+  await screen.findByText("Connection restored. Messages updated.");
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Try again" })).toBeNull());
+  await waitFor(() => expect(document.activeElement).toBe(pane));
+  expect(screen.getByText("Can you check this car?")).toBeDefined();
+});
