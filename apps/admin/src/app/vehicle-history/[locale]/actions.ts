@@ -4,10 +4,11 @@ import { createHash } from "node:crypto";
 import { VehicleHistorySchemas as V } from "@auto-tm/contracts";
 import { unstable_rethrow } from "next/navigation";
 
-import { apiFetchOptional, ApiError } from "@/lib/api-client";
-import { rejectExpiredSession } from "@/lib/action-session";
-import { getAccessToken } from "@/lib/cookies";
-import type { DeskLocale } from "@/lib/history-desk-copy";
+import { apiFetchOptional, ApiError } from "../../../lib/api-client";
+import { rejectExpiredSession } from "../../../lib/action-session";
+import { getAccessToken } from "../../../lib/cookies";
+import type { DeskLocale } from "../../../lib/history-desk-copy";
+import { parseHistoryMessageInput } from "../../../lib/history-message-input";
 
 type Parsed<S extends { parse: (value: unknown) => unknown }> = ReturnType<S["parse"]>;
 type Scope = { scope: string; actor: V.HistoryDesk["actor"] };
@@ -85,4 +86,65 @@ export async function historyInboxAction(locale: DeskLocale, value: unknown): Pr
     }
     return { status: "unavailable", ...(scope ? { scope } : {}) };
   }
+}
+
+export type HistoryMessageResult = Exclude<HistoryInboxResult, { status: "ok" }> |
+  (Scope & { status: "ok" } & (
+    { kind: "send"; data: V.HistoryMessage } |
+    { kind: "receipts"; data: Parsed<typeof V.HistoryReceiptsSchema> } |
+    { kind: "ack"; data: Parsed<typeof V.HistoryReceiptSchema> }
+  ));
+
+/** Dormant until the reply/reader owners connect it. Detail retains the existing
+ * current-purpose, stable-session and selected-assignment fence on both sides
+ * of the HTTP operation, including uncertain failures. No mutation is replayed. */
+export async function historyMessageAction(locale: DeskLocale, value: unknown): Promise<HistoryMessageResult> {
+  await rejectExpiredSession();
+  const input = parseHistoryMessageInput(value);
+  if (!input || !["tk", "ru", "en"].includes(locale)) return { status: "validation" };
+  const selection = { kind: "detail", id: input.id, scope: input.scope, expectedAssignmentVersion: input.expectedAssignmentVersion };
+  const before = await historyInboxAction(locale, selection);
+  if (before.status !== "ok") return before;
+  let response: unknown, failure: unknown;
+  try {
+    const path = `/vehicle-history/operator/requests/${input.id}/${input.kind === "send" ? "messages" : "receipts"}`;
+    response = await apiFetchOptional<unknown>(path + (input.kind === "receipts" ? `?expectedAssignmentVersion=${input.expectedAssignmentVersion}` : ""), {
+      method: input.kind === "receipts" ? "GET" : "POST", cache: "no-store", headers: { "Accept-Language": locale },
+      ...(input.kind === "receipts" ? {} : { body: { ...input.body, expectedAssignmentVersion: input.expectedAssignmentVersion } }),
+    });
+  } catch (error) { unstable_rethrow(error); failure = error; }
+  const after = await historyInboxAction(locale, selection);
+  if (after.status !== "ok") return after;
+  if (after.scope !== before.scope || after.actor.id !== before.actor.id) return { status: "stale", scope: after.scope };
+  const scope = after.scope;
+  if (failure instanceof ApiError) {
+    if (failure.status === 403) return { status: "denied", scope };
+    if (failure.status === 409) return { status: "conflict", scope };
+    if (failure.status === 400) return { status: "validation", scope };
+  }
+  if (failure) return { status: "unavailable", scope };
+  if (response === null) return { status: "expired", scope };
+  const admitted = { status: "ok", scope, actor: after.actor } as const;
+  if (input.kind === "send") {
+    const result = V.HistoryMessageSchema.safeParse(response);
+    if (!result.success || result.data.clientMessageId !== input.body.clientMessageId || result.data.text !== input.body.text ||
+      result.data.author.id !== after.actor.id || result.data.author.kind !== "operator") return { status: "unavailable", scope };
+    return { ...admitted, kind: input.kind, data: result.data };
+  }
+  if (input.kind === "receipts") {
+    const result = V.HistoryReceiptsSchema.safeParse(response);
+    // Prior staff epochs remain valid facts. The current epoch must belong to
+    // this actor; version zero belongs to one other participant (the requester).
+    if (!result.success || new Set(result.data.items.map((item) => item.assignmentVersion)).size !== result.data.items.length ||
+      result.data.items.some((item) => item.assignmentVersion > input.expectedAssignmentVersion ||
+        (item.assignmentVersion === input.expectedAssignmentVersion && item.participantId !== after.actor.id) ||
+        (item.assignmentVersion === 0 && item.participantId === after.actor.id))) return { status: "unavailable", scope };
+    return { ...admitted, kind: input.kind, data: result.data };
+  }
+  // The fetched cursor's order is correlation only. The API independently
+  // checks its current-session contiguous offer; never fetch here to create one.
+  const result = V.HistoryReceiptSchema.safeParse(response);
+  if (!result.success || result.data.participantId !== after.actor.id || result.data.assignmentVersion !== input.expectedAssignmentVersion ||
+    BigInt(input.body.kind === "read" ? result.data.readOrder : result.data.receivedOrder) < BigInt(input.throughOrder)) return { status: "unavailable", scope };
+  return { ...admitted, kind: input.kind, data: result.data };
 }
