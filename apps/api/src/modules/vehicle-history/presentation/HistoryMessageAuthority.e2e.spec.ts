@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
+import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { historyFixture } from "../../../../test/helpers/historyFixture";
 import { eventually } from "../../../../test/helpers/eventually";
@@ -16,7 +17,8 @@ describe("History message identity commit fence over listening HTTP", () => {
       return row && row.count >= count ? true : null;
     }, { timeoutMs: 2500, intervalMs: 20, description: "HTTP operations waiting on owned identity rows" });
   }
-  it.each(["session", "totp"])("does not append a reminder after its %s expires in the real settled-lookup wait", async (deadline) => {
+  it.each(["session", "totp"].flatMap((deadline) => ["lookup", "append"].map((stage) => [deadline, stage])))
+    ("does not append a reminder after its %s expires in the real %s wait", async (deadline, stage) => {
     const customer = await f.actor(null), operator = await f.actor();
     const id = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })
       .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
@@ -27,19 +29,46 @@ describe("History message identity commit fence over listening HTTP", () => {
       claims: { sub: operator.user.id, sid: operator.session.id } }, id,
       { sourceId: "wait", sourceVersion: 1, expectedVersion: 0, action: "begin", reason: "customer_answer" });
     f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-15T00:00:00Z");
+    const gate = new Client({ connectionString: process.env["DATABASE_URL"] });
+    await gate.connect();
+    if (stage === "append") {
+      await gate.query("SELECT pg_advisory_lock(12181219)");
+      await f.prisma.$executeRawUnsafe(`CREATE FUNCTION reminder_deadline() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN PERFORM pg_advisory_xact_lock(12181219); RETURN NEW; END $$`);
+      await f.prisma.$executeRawUnsafe("CREATE TRIGGER reminder_deadline BEFORE INSERT ON service_messages FOR EACH ROW EXECUTE FUNCTION reminder_deadline()");
+    }
     const expiresAt = new Date(Date.now() + 1500);
     await f.prisma.session.update({ where: { id: operator.session.id }, data: deadline === "totp" ? { adminTotpExpiresAt: expiresAt } : { expiresAt } });
     let pending: Promise<unknown> | undefined;
-    await f.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM service_conversations WHERE "objectId" = ${id} FOR UPDATE`;
+    const attempt = async () => {
       pending = f.request.post(staff + "/reminder").auth(operator.token, { type: "bearer" })
         .send({ expectedAssignmentVersion: 1, expectedWaitingVersion: 1, clientMessageId: randomUUID() })
         .expect(403).expect("Cache-Control", "private, no-store").then((response) => response.body);
       await waiting(1);
+      if (stage === "append") {
+        const [row] = await f.prisma.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event = 'advisory' AND query LIKE '%INSERT%service_messages%') AS waiting`;
+        expect(row?.waiting).toBe(true);
+        expect(Date.now()).toBeLessThan(expiresAt.getTime());
+      }
       await eventually(async () => Date.now() >= expiresAt.getTime() ? true : null,
         { timeoutMs: 2500, intervalMs: 20, description: "real Session/TOTP deadline, with Identity time untouched" });
-    }, { timeout: 10_000 });
-    await pending;
+      if (stage === "append") await gate.query("SELECT pg_advisory_unlock(12181219)");
+    };
+    try {
+      if (stage === "lookup") await f.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM service_conversations WHERE "objectId" = ${id} FOR UPDATE`;
+        await attempt();
+      }, { timeout: 10_000 });
+      else await attempt();
+      await pending;
+    } finally {
+      await gate.end();
+      if (stage === "append") {
+        await f.prisma.$executeRawUnsafe("DROP TRIGGER reminder_deadline ON service_messages");
+        await f.prisma.$executeRawUnsafe("DROP FUNCTION reminder_deadline()");
+      }
+    }
     expect((await f.request.get(path + "/messages").auth(customer.token, { type: "bearer" }).expect(200)).body).toEqual({ items: [], nextCursor: null });
     expect((await f.request.get(path + "/reminder").auth(customer.token, { type: "bearer" }).expect(200)).body)
       .toMatchObject({ version: 1, used: false, outcome: null });

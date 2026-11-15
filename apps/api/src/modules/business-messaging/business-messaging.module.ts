@@ -15,7 +15,7 @@ import { BUSINESS_MESSAGING_PORT, type BusinessMessagingPort } from "./business-
     { provide: SERVICE_MESSAGE_REPOSITORY, useClass: PrismaServiceMessageRepository },
     { provide: BUSINESS_MESSAGING_PORT, inject: [SendServiceText, FindServiceTextOperation, ReadServiceMessages, AcknowledgeServiceMessages, ReadServiceReceipts],
       useFactory: (send: SendServiceText, find: FindServiceTextOperation, read: ReadServiceMessages, ack: AcknowledgeServiceMessages, receipts: ReadServiceReceipts): BusinessMessagingPort => ({
-        sendOnceText: (input) => send.executeOnce(input), findTextOperation: (input) => find.execute(input),
+        sendOnceText: (input, confirmCommit) => send.executeOnce(input, confirmCommit), findTextOperation: (input) => find.execute(input),
         sendText: (input) => send.execute(input), readMessages: (input) => read.execute(input),
         acknowledge: (input) => ack.execute(input), readReceipts: (input) => receipts.execute(input),
       }) },

@@ -33,8 +33,11 @@ export const BUSINESS_MESSAGING_PORT = Symbol("BusinessMessagingPort");
 export interface BusinessMessagingPort {
   /** Once across senders/attempts; conflicting text or ordinary-intent adoption refuses.
    * Recovery preserves the first committed author, attempt, text, order and time.
+   * The optional caller-owned confirmation runs after append waits, inside the
+   * message transaction before commit. Its refusal rolls back and propagates.
+   * The caller must retain its own authority fence; no persistence is exposed.
    */
-  sendOnceText(input: SendOnceServiceTextInput): Promise<ServiceMessage>;
+  sendOnceText(input: SendOnceServiceTextInput, confirmCommit?: () => Promise<void>): Promise<ServiceMessage>;
   /** Locks/creates the stream; waits for older append commit/rollback, never ACKs. */
   findTextOperation(input: FindServiceTextOperationInput): Promise<ServiceMessage | null>;
   sendText(input: SendServiceTextInput): Promise<ServiceMessage>;

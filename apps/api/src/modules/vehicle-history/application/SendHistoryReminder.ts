@@ -32,7 +32,8 @@ export class SendHistoryReminder {
         throw new HistoryRequestError("HISTORY_REMINDER_CONFLICT");
       }
       await this.messages.sendOnceText({ purpose: "vehicle_history", objectId, operationKey: objectId,
-        senderId, clientMessageId: input.clientMessageId, text: historyReminderText(language) });
+        senderId, clientMessageId: input.clientMessageId, text: historyReminderText(language) },
+      async () => { await this.operator.require(actor.claims); });
       return this.projection.one(await this.sync.execute(requesterId, objectId, waiting), requesterId, objectId);
     });
   }
