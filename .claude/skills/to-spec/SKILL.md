@@ -16,7 +16,7 @@ The issue tracker and triage label vocabulary should have been provided to you. 
 
 Check with the user that these seams match their expectations.
 
-3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage.
+3. Use the existing issue when it can own the acceptance criteria; create a parent issue only when the work needs one. Scale the template below to the decision and publish to the configured tracker. Follow [document authority](../../../docs/agents/domain.md#document-authority); this skill does not authorize a repository spec file. Apply the appropriate triage label.
 
 <spec-template>
 
@@ -30,7 +30,7 @@ The solution to the problem, from the user's perspective.
 
 ## User Stories
 
-A LONG, numbered list of user stories. Each user story should be in the format of:
+A concise list of distinct user outcomes where useful. Each story may use:
 
 1. As an <actor>, I want a <feature>, so that <benefit>
 
@@ -38,7 +38,7 @@ A LONG, numbered list of user stories. Each user story should be in the format o
 1. As a mobile bank customer, I want to see balance on my accounts, so that I can make better informed decisions about my spending
 </user-story-example>
 
-This list of user stories should be extremely extensive and cover all aspects of the feature.
+Cover the agreed scope without repeating acceptance criteria or adding boilerplate.
 
 ## Implementation Decisions
 

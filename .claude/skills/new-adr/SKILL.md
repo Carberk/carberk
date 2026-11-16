@@ -7,12 +7,12 @@ disable-model-invocation: true
 
 # Create a new ADR
 
-Create root ADRs under `docs/adr/`. Never edit a merged ADR or invent the decision.
+Create root ADRs under `docs/adr/` only for an explicitly authorized new record under [document authority](../../../docs/agents/domain.md#document-authority). Never edit a merged ADR or invent the decision.
 
 ## Resolve and research
 
 1. Require a non-empty topic from `$ARGUMENTS`.
-2. Follow [AGENTS.md](../../../AGENTS.md). Read `docs/adr/README.md`, `docs/agents/domain.md`, the related decisions/specifications, and affected source/tests. Consult the charter only when the decision touches its locked scope.
+2. Follow [AGENTS.md](../../../AGENTS.md). Read `docs/adr/README.md`, `docs/agents/domain.md`, the related decisions and governing issue, and affected source/tests. Historical charters and sprint plans do not establish current scope.
 3. Run the read-only helper:
 
    `node ${CLAUDE_SKILL_DIR}/scripts/prepare.mjs "$ARGUMENTS"`

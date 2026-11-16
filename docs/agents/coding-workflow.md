@@ -6,9 +6,17 @@ One issue is one small PR from current `main`. [ADR-0108](../adr/0108-small-prs-
 
 - Unclear goal or design: interview the founder with [grilling](../../.claude/skills/grilling/SKILL.md), or [grill-with-docs](../../.claude/skills/grill-with-docs/SKILL.md) when decisions should become ADRs or glossary entries.
 - Open UI or state question: build a throwaway [prototype](../../.claude/skills/prototype/SKILL.md). For user-facing UI, review the affected interaction with the installed `ux-heuristics`, `design-everyday-things`, and `impeccable` skills when available; record findings and limitations in the PR.
-- Write it down with [to-spec](../../.claude/skills/to-spec/SKILL.md), then split it with [to-tickets](../../.claude/skills/to-tickets/SKILL.md). Each ticket must fit one PR of about 500–1,000 changed lines, excluding lockfiles and generated files. Split anything bigger.
+- Small work can use one issue directly. Use [to-spec](../../.claude/skills/to-spec/SKILL.md) for a shared specification and [to-tickets](../../.claude/skills/to-tickets/SKILL.md) for independently verifiable slices. Keep plans and acceptance in GitHub; apply the [sizing guidance](#pr-size-and-splitting) below.
 - For an approved graph in `full-send` or `full-stop` mode, use [ship-tickets](../../.claude/skills/ship-tickets/SKILL.md) to coordinate independent tickets and their blocking edges.
 - New bugs and requests go through [triage](../../.claude/skills/triage/SKILL.md). The [issue tracker](issue-tracker.md) guide has commands and the ticket format.
+
+### PR size and splitting
+
+Founder clarification, 2026-11-16: one PR delivers one coherent, independently testable change. Roughly 1,000 handwritten changed lines prompts a scope review; it is not a hard ceiling, an automatic stop, or a reason to request founder approval. There is no minimum size. Split when independent outcomes can land and be reviewed separately. A larger cohesive change can proceed with a brief explanation in the PR and reviewer agreement when splitting would weaken correctness or reviewability.
+
+Measure the actual proposed repository diff against its base. Report generated and lockfile changes separately. Temporary scripts, tool calls, messages, setup/readback bookkeeping and cumulative work do not consume a PR-line allowance. Retire line-unit forecasts, authoring grants and accounting-only support splits; preserve readable code and required tests. Time, spending, resource ownership and destructive-operation authority remain separate controls.
+
+Judge mechanical comment removal, obsolete-document deletion and generated changes by their scope and verification. Batch them by responsibility and reviewability; do not split a complete deletion just to meet a line count. Keep product changes separate from unrelated cleanup.
 
 ## 2. Build one ticket
 

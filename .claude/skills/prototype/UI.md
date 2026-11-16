@@ -37,7 +37,7 @@ In both sub-shapes the floating bottom bar is identical.
 
 Default to **3 variants**. More than 5 stops being radically different and starts being noise, so cap there.
 
-Write down the plan in one line, in the prototype's location or a top-of-file comment:
+State the plan in one line in the existing issue/thread or visible prototype introduction:
 
 > "Three variants of the settings page, switchable via `?variant=`, on the existing `/settings` route."
 

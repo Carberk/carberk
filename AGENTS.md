@@ -8,8 +8,8 @@ Every change follows the [delivery workflow](docs/agents/coding-workflow.md): on
 
 | When changing | Read before editing |
 |---|---|
-| Domain logic, ownership or documentation | [Domain guidance](docs/agents/domain.md) |
-| New or changed modules, behavior or tests; Standards review | [Coding standards](docs/agents/coding-standards.md) |
+| Domain logic, ownership, documentation creation or retirement | [Domain guidance](docs/agents/domain.md) |
+| New or changed code/configuration, comments or tests; Standards review | [Coding standards](docs/agents/coding-standards.md) |
 | External dependency or service | [Documentation lookups](docs/agents/documentation-lookups.md) |
 | Mobile dependencies, native sessions or runtime | [Mobile/Expo checks](docs/agents/mobile-expo.md) |
 | Mobile styling/components or API/cache | [NativeWind](docs/agents/nativewind-v4.md) or [data fetching](docs/agents/mobile-data-fetching.md) |

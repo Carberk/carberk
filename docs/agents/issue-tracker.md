@@ -6,7 +6,7 @@ Issues and specs for Carberk live as GitHub issues on `Carberk/carberk`. Use the
 
 [to-tickets](../../.claude/skills/to-tickets/SKILL.md) writes tickets and [to-spec](../../.claude/skills/to-spec/SKILL.md) writes parent specs. Each ticket:
 
-- is one vertical slice that a single PR of about 500–1,000 changed lines can finish, excluding lockfiles and generated files;
+- delivers one coherent, independently verifiable outcome in one PR; [PR sizing](coding-workflow.md#pr-size-and-splitting) guides review and splitting without a hard line cap or minimum;
 - says what to build from the user's point of view, its acceptance criteria and what blocks it;
 - avoids file paths and code, which go stale.
 

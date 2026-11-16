@@ -6,6 +6,8 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 
 [ADR-0109](0109-source-first-documentation-and-design-workflow.md) replaces ADR-0020's artifact hierarchy with source-first documentation, temporary specifications, and the current design workflow. [ADR-0060](0060-source-first-agent-context-and-task-scoped-guidance.md) defines short local overviews; ADR-0042 owns vocabulary. [ADR-0108](0108-small-prs-with-full-send-replace-integration-delivery.md) owns delivery. Older ADR text remains unchanged.
 
+The founder's [2026-11-16 clarification](https://github.com/Carberk/carberk/issues/1283) is applied in the current [PR sizing guidance](../agents/coding-workflow.md#pr-size-and-splitting) and [document authority](../agents/domain.md#document-authority): review coherent changes without hard line budgets, reuse authoritative documents, and retire obsolete mirrors after preserving unique requirements. The original ADR bodies remain historical records.
+
 [ADR-0113](0113-vehicle-history-delivers-the-format-accepted-before-payment.md) supersedes only ADR-0106's mandatory PDF-plus-shared-link delivery clause: Vehicle History fulfills PDF only, approved provider link only, or both, as accepted before payment.
 
 [ADR-0114](0114-private-history-report-links-open-and-copy-without-access-period-promises.md) supersedes ADR-0113's report-link expiry-messaging recommendation only and records account-free qualified links with exact external Open/Copy; accepted formats remain unchanged.
