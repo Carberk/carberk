@@ -37,9 +37,17 @@ function fixture(t) {
   write("AGENTS.md", "");
   write("CLAUDE.md", "@AGENTS.md\n[Policy](AGENTS.md)\n");
   write("CONTEXT-MAP.md", "");
-  const git = spawnSync("git", ["init", "-q"], { cwd, encoding: "utf8" });
-  assert.equal(git.status, 0, git.stderr);
-  const env = { ...process.env, TURBO_TELEMETRY_DISABLED: "1", SMOKE_CREDENTIALS_FILE: join(cwd, "absent-credentials.json") };
+  mkdirSync(join(cwd, ".claude/skills"), { recursive: true });
+  mkdirSync(join(cwd, ".agents"));
+  symlinkSync("../.claude/skills", join(cwd, ".agents/skills"));
+  write(".gitignore", "node_modules/\ndist/\n.turbo/\n");
+  for (const args of [["init", "-q"], ["add", "."],
+    ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.com", "commit", "-qm", "fixture"],
+    ["update-ref", "refs/remotes/origin/main", "HEAD"]]) {
+    const git = spawnSync("git", args, { cwd, encoding: "utf8" });
+    assert.equal(git.status, 0, git.stderr);
+  }
+  const env = { ...process.env, GITHUB_ACTIONS: "false", TURBO_TELEMETRY_DISABLED: "1", SMOKE_CREDENTIALS_FILE: join(cwd, "absent-credentials.json") };
   delete env.NODE_TEST_CONTEXT;
   const run = (command) => spawnSync("pnpm", [command], {
     cwd, encoding: "utf8", timeout: 60000,
