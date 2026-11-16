@@ -40,7 +40,7 @@ export function parseMarkdown({ path, source, fileType, adapters = {} }) {
       if (/^<!--[\s\S]*-->$/.test(raw.trim())) {
         const begin = node.position.start.offset + raw.indexOf("<!--");
         result.comments.push(commentSpan(source, begin, begin + raw.trim().length));
-      } else if (/<(?:script|style|template)\b/i.test(raw) || raw.includes("<!--")) {
+      } else {
         const start = node.position.start.offset;
         try {
           embeddedResult({ source, content: raw, offsets: Array.from({ length: raw.length + 1 }, (_, i) => start + i),

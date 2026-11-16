@@ -1,4 +1,5 @@
 import { parse as parseToml } from "smol-toml";
+import { shellExecutableOption } from "./shell.mjs";
 import { commentSpan } from "./markup-spans.mjs";
 
 export function parseConfig({ path, source, fileType, adapters = {} }) {
@@ -9,6 +10,17 @@ export function parseConfig({ path, source, fileType, adapters = {} }) {
   if (fileType === "toml") parseToml(source, { integersAsBigInt: true });
   if (["properties", "ini", "systemd", "ignore", "npmrc"].includes(fileType)) {
     let continued = false;
+    let logical;
+    const assignment = (item) => {
+      const match = item.text.match(/^\s*Exec\w+\s*=\s*([\s\S]*)$/);
+      if (!match) return;
+      const words = match[1].match(/"[^"]*"|'[^']*'|[^\s]+/g) ?? [];
+      const command = (words[0] ?? "").replace(/^[+:!@|-]+/, "").replace(/^(["'])(.*)\1$/, "$2").split("/").at(-1);
+      if (match[1].trimStart().startsWith("|") || command === "env" ||
+        /^(?:(?:ba|da|k|mk)?sh|python[23]?|node|ruby|perl)$/.test(command) && words.slice(1).some((word) => shellExecutableOption(word))) {
+        defer(item.start, item.end, "systemd interpreter command requires declared grammar and source mapping");
+      }
+    };
     for (const match of source.matchAll(/[^\n]+|\n/g)) {
       const line = match[0].replace(/\r$/, "");
       if (line === "\n") continue;
@@ -29,14 +41,15 @@ export function parseConfig({ path, source, fileType, adapters = {} }) {
           else if (/[#;]/.test(char)) { add(match.index + i, match.index + line.length); break; }
         }
       }
-      if (fileType === "systemd" && /^Exec\w*=/.test(trimmed)) {
-        const value = trimmed.slice(trimmed.indexOf("=") + 1);
-        if (/(?:^|\s)(?:\S*\/)?(?:ba|da|k|mk)?sh\s+.*-[^-]*c\b/.test(value)) {
-          defer(start, match.index + line.length, "systemd interpreter command requires declared grammar and source mapping");
-        }
-      }
-      continued = fileType !== "ignore" && /\\$/.test(line) && (line.match(/\\+$/)[0].length % 2 === 1);
+      if (fileType === "systemd") {
+        logical ??= { text: "", start, end: match.index + line.length };
+        logical.text += line.replace(/\\$/, " ");
+        logical.end = match.index + line.length;
+        continued = line.endsWith("\\");
+        if (!continued) { assignment(logical); logical = undefined; }
+      } else continued = fileType === "properties" && /\\$/.test(line) && (line.match(/\\+$/)[0].length % 2 === 1);
     }
+    if (logical) defer(logical.start, logical.end, "unterminated systemd logical assignment");
     return result;
   }
   if (fileType === "env") {

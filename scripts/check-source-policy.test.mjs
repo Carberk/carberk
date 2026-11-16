@@ -508,3 +508,102 @@ test("guide workflow examples inspect executable fields while unrelated run valu
   assert.match(check({ "guide.md": `\`\`\`yaml\n${workflow}\`\`\`\n` }).join("\n"), /explanatory comment/);
   assert.deepEqual(check({ ".github/workflows/new.yml": workflow.replace("echo ok # explanation", "echo ok") }), []);
 });
+
+test("asset-looking ASCII programs never acquire binary provenance", () => {
+  for (const [path, source] of [
+    ["copy.jar", "PK: // explanation\nvoid 0;\n"],
+    ["copy.otf", "OTTO: // explanation\nvoid 0;\n"],
+    ["copy.woff2", "wOF2: // explanation\nvoid 0;\n"],
+    ["copy.mp4", "let ftyp; // explanation\n"],
+  ]) assert.notDeepEqual(check({ [path]: source }), [], path);
+});
+
+test("unfenced Markdown HTML receives the same executable attribute admission as templates", () => {
+  assert.match(check({ "guide.md": '<p style="color:red; /* explanation */">Hello</p>\n' }).join("\n"), /explanatory comment/);
+  assert.match(check({ "guide.md": '<button onclick="run(); /* explanation */">Run</button>\n' }).join("\n"), /unsupported.*javascript-attribute/);
+});
+
+test("package script programs are executable while ordinary JSON values remain data", () => {
+  assert.match(check({ "package.json": '{"scripts":{"build":"echo ok # explanation"}}' }).join("\n"), /explanatory comment|unsupported.*shell/);
+  assert.deepEqual(check({ "package.json": '{"description":"# runtime data","scripts":{"build":"echo ok"}}' }), []);
+});
+
+test("decoded Compose interpreter options and aliases cannot conceal executable content", () => {
+  for (const command of ['["node", "--eval", "1 /* explanation */"]', '*program']) {
+    const source = `program: &program ["sh", "-c", "echo ok # explanation"]\nservices:\n  app:\n    command: ${command}\n`;
+    assert.match(check({ "infra/compose/new.yml": source }).join("\n"), /unsupported.*compose-executable/);
+  }
+});
+
+test("systemd logical assignments classify spaced and continued interpreter commands", () => {
+  for (const value of [
+    'ExecStart = /bin/sh -c "echo ok # explanation"',
+    'ExecStart=/bin/sh \\\n -c "echo ok # explanation"',
+    'ExecStart=/usr/bin/python3 -c "1 # explanation"',
+    'ExecStart=/usr/bin/node --eval "1 /* explanation */"',
+  ]) assert.match(check({ "app.service": `[Service]\n${value}\n` }).join("\n"), /unsupported.*systemd/);
+});
+
+test("INI backslashes never suppress comments as properties continuations do", () => {
+  assert.match(check({ "app.ini": '[app]\npath=C:\\\n; explanation\nname=value\n' }).join("\n"), /explanatory comment/);
+});
+
+test("real image, font, archive and video payloads retain binary semantics", () => {
+  for (const path of [
+    "apps/mobile/assets/images/icon.png", "apps/admin/src/app/favicon.ico", "apps/mobile/assets/fonts/Geist-Regular.ttf",
+    "apps/phone-agent/gradle/wrapper/gradle-wrapper.jar", "packages/db/scripts/reviewer-fixtures/camry-1.jpg",
+    "packages/db/scripts/ui-fixtures/synthetic-video/v1/portrait.mp4",
+  ]) {
+    const bytes = readFileSync(join(repositoryRoot, path));
+    assert.deepEqual(checkSources({ current: new Map([[`copy${path.slice(path.lastIndexOf("."))}`, bytes]]), legacy: sources({}), trusted: sources({}) }), [], path);
+  }
+});
+
+test("known compiler outputs pass exact producer bytes while authored siblings and mutations fail", (t) => {
+  const { directory, write, git, commit } = repository(t);
+  write("packages/contracts/scripts/build.cjs", "export {};\n");
+  write("packages/contracts/tsconfig.build.json", JSON.stringify({ compilerOptions: {
+    target: "ES2022", module: "CommonJS", rootDir: "src", outDir: "dist", declaration: true, declarationMap: true, sourceMap: true,
+  }, include: ["src/**/*.ts"] }));
+  write("packages/contracts/src/index.ts", "export const value = 1;\n");
+  git("add", ".");
+  const tree = git("write-tree");
+  const base = git("-c", "user.name=Source Policy Fixture", "-c", "user.email=fixture@example.invalid", "commit-tree", tree, "-p", commit, "-m", "compiler fixture");
+  git("update-ref", "refs/remotes/origin/main", base);
+  const configPath = join(directory, "packages/contracts/tsconfig.build.json");
+  const compiler = join(repositoryRoot, "node_modules/@typescript/native/bin/tsc");
+  execFileSync(process.execPath, [compiler, "-p", configPath], { cwd: directory });
+  write("packages/contracts/dist/package.json", '{"type":"commonjs"}\n');
+  assert.deepEqual(checkRepository(directory, {}), []);
+  write("packages/contracts/dist/owned.js", "// authored explanation\n");
+  assert.match(checkRepository(directory, {}).join("\n"), /owned\.js.*explanatory comment/);
+  rmSync(join(directory, "packages/contracts/dist/owned.js"));
+  write("packages/contracts/dist/index.js.map", '{"version":3,"sources":[],"mappings":""}');
+  assert.match(checkRepository(directory, {}).join("\n"), /index\.js\.map.*provenance bytes changed/);
+});
+
+test("built-in Prisma output is verified from schema rather than trusting generated headers", (t) => {
+  const { directory, write, git } = repository(t);
+  write(".gitignore", "node_modules\n**/node_modules\npackages/db/generated/\n");
+  symlinkSync(join(repositoryRoot, "node_modules"), join(directory, "node_modules"));
+  write("package.json", '{"private":true}\n');
+  write("packages/db/package.json", '{"name":"source-policy-fixture"}\n');
+  write("packages/db/tsconfig.json", '{"compilerOptions":{"module":"ESNext","moduleResolution":"Bundler"}}\n');
+  write("packages/db/tsconfig.build.json", '{"extends":"./tsconfig.json"}\n');
+  write("packages/db/prisma/schema.prisma", 'generator client {\n  provider = "prisma-client"\n  output = "../generated/prisma/client"\n  moduleFormat = "cjs"\n}\ndatasource db {\n  provider = "postgresql"\n}\nmodel Item {\n  id String @id\n}\n');
+  symlinkSync(join(repositoryRoot, "packages/db/node_modules"), join(directory, "packages/db/node_modules"));
+  write("prisma.config.mjs", 'export default { schema: "packages/db/prisma/schema.prisma" };\n');
+  const manifest = JSON.parse(readFileSync(join(repositoryRoot, "packages/db/node_modules/prisma/package.json"), "utf8"));
+  execFileSync(process.execPath, [join(repositoryRoot, "packages/db/node_modules/prisma", manifest.bin.prisma), "generate", "--config", join(directory, "prisma.config.mjs"), "--generator", "client"], {
+    cwd: directory, env: { ...process.env, PRISMA_GENERATE_SKIP_AUTOINSTALL: "1" }, stdio: ["ignore", "pipe", "pipe"],
+  });
+  git("add", ".");
+  assert.deepEqual(checkRepository(directory, {}), []);
+  const target = "packages/db/generated/prisma/client/client.ts";
+  const generated = readFileSync(join(directory, target), "utf8");
+  write(target, `${generated}\n// forged generated explanation\n`);
+  assert.match(checkRepository(directory, {}).join("\n"), /client\.ts.*provenance bytes changed/);
+  write(target, generated);
+  write("packages/db/generated/prisma/client/owned.ts", "// generated-looking explanation\nexport {};\n");
+  assert.match(checkRepository(directory, {}).join("\n"), /owned\.ts.*explanatory comment/);
+});

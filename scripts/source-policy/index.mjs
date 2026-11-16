@@ -2,11 +2,12 @@ import { basename, extname } from "node:path";
 import { createHash } from "node:crypto";
 import ts from "typescript";
 import { parse as parseHtml } from "parse5";
-import { parseAllDocuments, isMap, isSeq, isScalar } from "yaml";
+import { parseAllDocuments, isMap, isSeq, isScalar, isAlias } from "yaml";
+import { validateAsset } from "./assets.mjs";
 import { javascriptComments } from "./javascript.mjs";
 import { parseConfig } from "./config.mjs";
 import { parseMarkdown } from "./markdown.mjs";
-import { parseShell } from "./shell.mjs";
+import { parseShell, shellExecutableOption } from "./shell.mjs";
 import { parseDocker } from "./docker.mjs";
 import { parseMake } from "./make.mjs";
 import { parsePython } from "./python.mjs";
@@ -25,8 +26,7 @@ const extensions = new Map(Object.entries({
   prisma: "prisma", sql: "sql", toml: "toml", ini: "ini", properties: "properties", env: "env", service: "systemd", socket: "systemd",
   timer: "systemd", target: "systemd", mount: "systemd", pro: "proguard", rb: "ruby", podspec: "ruby", md: "markdown", markdown: "markdown",
 }));
-const binary = new Map(Object.entries({ png: /^\uFFFDPNG\r\n\x1a\n/, jpg: /^\uFFFD\uFFFD/, jpeg: /^\uFFFD\uFFFD/, ico: /^\0\0\x01\0/,
-  jar: /^PK/, ttf: /^\0\x01\0\0/, otf: /^OTTO/, woff2: /^wOF2/, mp4: /^[\s\S]{4}ftyp/ }));
+const binary = new Set(["png", "jpg", "jpeg", "ico", "jar", "ttf", "otf", "woff2", "mp4"]);
 const dataPaths = new Set(["LICENSE", ".nvmrc", "docs/prd/ui/research/reference-screens-2026-09-21-inventory.csv",
   "apps/mobile/assets/fonts/Geist-OFL.txt", "docs/prd/ops/brand/tools/Poppins-OFL.txt",
   ...["en", "ru", "tk"].map((locale) => `docs/prd/ops/play-console-submission/text/${locale}.txt`)]);
@@ -53,10 +53,26 @@ export function sourceType(path) {
   return extensions.get(extension) ?? `unknown:${extension || name}`;
 }
 
-function parseJson({ source, path, fileType }) {
+function parseJson({ source, path, fileType, adapters }) {
   if (fileType === "json" && !/(?:^|\/)tsconfig(?:\.[\w-]+)?\.json$/.test(path)) {
-    JSON.parse(source);
-    return { comments: [], deferred: [] };
+    const value = JSON.parse(source);
+    const result = { comments: [], deferred: [] };
+    if (/^package\.json(?:\.(?:template|tmpl|tpl|example))?$/.test(basename(path)) && value.scripts && typeof value.scripts === "object") {
+      const file = ts.parseJsonText(path, source);
+      const root = file.statements[0]?.expression;
+      const scripts = root?.properties?.find((property) => property.name?.text === "scripts")?.initializer;
+      for (const property of scripts?.properties ?? []) {
+        const program = property.initializer;
+        if (!ts.isStringLiteral(program)) throw new Error(`${path}: package script must be a string`);
+        const start = program.getStart(file), end = program.end;
+        const raw = source.slice(start + 1, end - 1);
+        if (raw !== program.text) result.deferred.push({ path, fileType: "shell", startOffset: start, endOffset: end,
+          reason: "encoded package script requires source mapping" });
+        else embeddedResult({ source, content: raw, offsets: Array.from({ length: raw.length + 1 }, (_, i) => start + 1 + i),
+          fileType: "shell", path, adapters, result });
+      }
+    }
+    return result;
   }
   const parsed = ts.parseConfigFileTextToJson(path, source);
   if (parsed.error) throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, " "));
@@ -103,17 +119,26 @@ function executableYaml(input) {
   const embedded = [];
   const executableLimits = [];
   const walk = (node, path = []) => {
+    if (path[0] === "services" && path.length === 2 && isAlias(node)) executableLimits.push({ path: input.path,
+      fileType: "compose-executable", startOffset: 0, endOffset: input.source.length, reason: "Compose service alias requires declared source mapping" });
     if (isMap(node)) for (const pair of node.items) {
       if (!isScalar(pair.key)) continue;
       const next = [...path, pair.key.value];
       const runField = pair.key.value === "run" && (path.length === 4 && path[0] === "jobs" && path[2] === "steps" && Number.isInteger(path[3]) ||
         path.length === 3 && path[0] === "runs" && path[1] === "steps" && Number.isInteger(path[2]));
       if (path.length === 2 && path[0] === "services" && ["command", "entrypoint"].includes(pair.key.value)) {
-        const value = ["command", "entrypoint"].map((key) => node.get(key, true)).filter((item) => item?.range)
-          .map((item) => input.source.slice(item.range[0], item.range[1])).join(" ");
-        if (/(?:^|[\s,"\[])(?:[^\s,"\[]*\/)?(?:ba|da|k|mk)?sh[\s",\]]+[\s\S]*?-[^-]*c\b|(?:python[23]?|node)[\s",\]]+-(?:c|e|eval)\b/.test(value)) {
-          executableLimits.push({ path: input.path, fileType: "compose-executable", startOffset: pair.value.range[0], endOffset: pair.value.range[1],
-            reason: "Compose interpreter argv requires declared grammar and source mapping" });
+        const fields = ["entrypoint", "command"].map((key) => node.get(key, true)).filter((value) => value != null);
+        const values = fields.map((value) => isScalar(value) && typeof value.value === "string" ?
+          value.value.match(/"[^"]*"|'[^']*'|[^\s]+/g) ?? [] : isSeq(value) && value.items.every((item) => isScalar(item) && typeof item.value === "string") ?
+            value.items.map((item) => item.value) : undefined);
+        const argv = values.flat().map((value) => typeof value === "string" ? value.replace(/^(["'])([\s\S]*)\1$/, "$2") : value);
+        const command = argv[0] && basename(argv[0]);
+        const interpreter = /^(?:(?:ba|da|k|mk)?sh|python[23]?|node|ruby|perl)$/.test(command ?? "");
+        if (values.includes(undefined) || ["env", "tini", "dumb-init"].includes(command) ||
+          interpreter && argv.slice(1).some((value) => shellExecutableOption(value))) {
+          if (!executableLimits.some((item) => item.fileType === "compose-executable")) executableLimits.push({ path: input.path,
+            fileType: "compose-executable", startOffset: 0, endOffset: input.source.length,
+            reason: "Compose interpreter argv or alias requires declared grammar and source mapping" });
         }
         continue;
       }
@@ -192,7 +217,9 @@ export function inspectSource(path, source, notices = []) {
   const fileType = sourceType(path);
   if (fileType === "data" || fileType === "empty" && source === "") return { comments: [], deferred: [], fileType };
   if (fileType.startsWith("asset:")) {
-    if (!binary.get(fileType.slice(6)).test(source) && !(path === "packages/db/scripts/ui-fixtures/synthetic-video/v1/invalid.mp4" && source === "Carberk synthetic SOURCE_INVALID UI input v1: deliberately not MP4.\n")) throw new Error(`${path}: invalid ${fileType} payload`);
+    if (!(path === "packages/db/scripts/ui-fixtures/synthetic-video/v1/invalid.mp4" && source.toString() === "Carberk synthetic SOURCE_INVALID UI input v1: deliberately not MP4.\n")) {
+      validateAsset(path, source, fileType.slice(6));
+    }
     return { comments: [], deferred: [], fileType };
   }
   let result;

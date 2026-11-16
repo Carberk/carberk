@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspectSource, sourceType } from "./source-policy/index.mjs";
 import { commentSpan } from "./source-policy/markup-spans.mjs";
+import { producerProvenance } from "./source-policy/producers.mjs";
 import { checkMigrationRepository } from "./source-policy/migrations.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -92,9 +93,10 @@ export function checkSources({ current, legacy, trusted, exclusions = [], notice
       const migration = /^packages\/db\/prisma\/migrations\/[^/]+\/migration\.sql$/.test(path);
       const immutable = legacy.has(path) && (/^docs\/adr\/\d{4}-.+\.md$/.test(path) ||
         /^patches\/[^/]+\.patch$/.test(path) || /^apps\/phone-agent\/gradlew(?:\.bat)?$/.test(path) ||
-        path === ".claude/skills/THIRD-PARTY-NOTICES.md");
+        path === ".claude/skills/THIRD-PARTY-NOTICES.md" || path === "apps/phone-agent/gradle/wrapper/gradle-wrapper.jar");
       if (migration && trusted.has(path) || immutable) {
-        if (source !== (immutable ? legacy : trusted).get(path)) errors.push(`${path}: immutable history/upstream/migration bytes changed`);
+        const expected = (immutable ? legacy : trusted).get(path);
+        if (Buffer.isBuffer(source) ? !Buffer.isBuffer(expected) || !source.equals(expected) : source !== expected) errors.push(`${path}: immutable history/upstream/migration bytes changed`);
         report.exclusions.push({ path, kind: migration ? "applied-migration" : "history/upstream/legal", sha256: digest(source) });
         continue;
       }
@@ -102,7 +104,7 @@ export function checkSources({ current, legacy, trusted, exclusions = [], notice
       if (pins.length) {
         const hash = digest(source);
         if (!pins.some((entry) => entry.origin && hash === entry.sha256)) errors.push(`${path}: pinned provenance bytes changed`);
-        report.exclusions.push({ path, kind: "generated", sha256: hash });
+        report.exclusions.push({ path, kind: "generated", sha256: hash, origin: pins.find((entry) => entry.sha256 === hash)?.origin });
         continue;
       }
       try {
@@ -154,7 +156,8 @@ function snapshot(directory, ref) {
     const header = blobs.subarray(offset, end).toString().split(" ");
     if (header[1] !== "blob" || !["100644", "100755"].includes(entry.mode) && !(entry.mode === "120000" && entry.path === ".agents/skills")) throw new Error(`unsupported source mode: ${entry.path}`);
     const size = Number(header[2]);
-    result.set(entry.path, blobs.subarray(end + 1, end + 1 + size).toString("utf8"));
+    const bytes = blobs.subarray(end + 1, end + 1 + size);
+    result.set(entry.path, sourceType(entry.path).startsWith("asset:") ? bytes : bytes.toString("utf8"));
     offset = end + 1 + size + 1;
   }
   return result;
@@ -195,7 +198,7 @@ function workingSources(directory) {
     }
     if (path === ".agents/skills" && info.isSymbolicLink() && readlinkSync(join(directory, path)) === "../.claude/skills") { result.set(path, "../.claude/skills"); continue; }
     if (!info.isFile()) throw new Error(`authored source must be a regular file: ${path}`);
-    result.set(path, readFileSync(join(directory, path), "utf8"));
+    result.set(path, readFileSync(join(directory, path), sourceType(path).startsWith("asset:") ? undefined : "utf8"));
   }
   return result;
 }
@@ -222,11 +225,12 @@ export function checkRepository(directory, env = process.env, report = {}) {
   const notices = manifests.get("scripts/source-policy/notices.json");
   const provenance = manifests.get("scripts/source-policy/provenance.json");
   const legacy = snapshot(directory, baseline.commit);
-  const stagedChanges = new Map([...indexed].filter(([path, source]) => current.get(path) !== source));
+  const producers = env.GITHUB_ACTIONS === "true" ? [] : producerProvenance(directory, current, trusted);
+  const stagedChanges = new Map([...indexed].filter(([path, source]) => Buffer.isBuffer(source) ? !Buffer.isBuffer(current.get(path)) || !source.equals(current.get(path)) : current.get(path) !== source));
   return [
     ...checkMigrationRepository(directory, ref),
-    ...checkSources({ current, legacy, trusted, exclusions: provenance, notices, report }),
-    ...checkSources({ current: stagedChanges, legacy, trusted, exclusions: provenance, notices }).map((error) => `staged: ${error}`),
+    ...checkSources({ current, legacy, trusted, exclusions: [...provenance, ...producers], notices, report }),
+    ...checkSources({ current: stagedChanges, legacy, trusted, exclusions: [...provenance, ...producers], notices }).map((error) => `staged: ${error}`),
   ];
 }
 

@@ -76,4 +76,3 @@ export function javascriptComments(path, source, notices = []) {
     };
   });
 }
-
