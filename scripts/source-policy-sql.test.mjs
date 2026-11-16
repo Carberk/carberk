@@ -16,12 +16,16 @@ COMMENT ON TABLE "-- name" IS '/* metadata */'; -- explanation`;
 test("SQL executable bodies and session-dependent quoting expose coverage deferrals", () => {
   for (const source of ["DO $$ BEGIN /* executable */ END $$;",
     "CREATE FUNCTION f() RETURNS int LANGUAGE sql AS 'SELECT 1 /* executable */';",
-    "SET standard_conforming_strings = off;"]) {
+    "SET standard_conforming_strings = off;",
+    'SET "STANDARD_CONFORMING_STRINGS" = off;',
+    "SELECT pg_catalog.set_config('standard_conforming_strings', 'off', false);",
+    "SELECT set_config(name, 'off', false);"]) {
     const result = parseSql({ path: "body", source, fileType: "sql" });
     assert.deepEqual(result.comments, []);
     assert.equal(result.deferred.length, 1);
     assert.match(result.deferred[0].reason, /embedded grammar/);
   }
+  assert.deepEqual(parseSql({ path: "body", source: "SELECT set_config('other', 'on', false);", fileType: "sql" }).deferred, []);
 });
 
 test("PostgreSQL byte offsets become exact UTF-16 comment spans", () => {

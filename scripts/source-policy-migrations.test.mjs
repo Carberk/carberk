@@ -20,7 +20,9 @@ test("trusted migration bytes are immutable and never reinterpreted as new sourc
 
 test("new migration source is parsed and rejected before it can become history", () => {
   assert.deepEqual(checkMigrations({ current: files("COMMENT ON TABLE users IS '-- metadata';"), trusted: files() }), []);
-  for (const source of ["-- new\nSELECT 1;", "/* outer /* inner */ end */ SELECT 1;", "SELECT ("]) {
+  for (const source of ["-- new\nSELECT 1;", "/* outer /* inner */ end */ SELECT 1;", "SELECT (",
+    'SET "STANDARD_CONFORMING_STRINGS" = off;',
+    "SELECT pg_catalog.set_config('standard_conforming_strings', 'off', false);"]) {
     assert.ok(checkMigrations({ current: files(source), trusted: files() }).length);
   }
   assert.match(checkMigrations({ current: new Map([[path, Buffer.from([0xff])]]), trusted: files() }).join("\n"), /check failed/);
