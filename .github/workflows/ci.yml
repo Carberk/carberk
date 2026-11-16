@@ -40,6 +40,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - run: node scripts/check-agent-docs.mjs
 
       # pnpm must be installed before setup-node so `cache: pnpm` can find it.
       # It reads its version from packageManager in package.json.
@@ -72,6 +76,10 @@ jobs:
       DATABASE_URL: postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - run: node scripts/check-agent-docs.mjs
 
       - uses: pnpm/action-setup@v6.1.0
 
@@ -204,6 +212,8 @@ jobs:
       APP_ENV: test
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v6.1.0
 

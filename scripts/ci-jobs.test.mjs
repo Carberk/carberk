@@ -256,3 +256,35 @@ test("every variable the api and db jobs set reaches turbo tasks under strict en
     }
   }
 });
+
+for (const name of ["pr-checks.yml", "ci.yml"]) {
+  test(`${name} checks trusted documentation policy in both lanes before installing dependencies`, () => {
+    const graph = jobs(workflow(name));
+    for (const id of ["docs", "static"]) {
+      const job = graph.get(id);
+      assert.match(job, /uses: actions\/checkout@v7\n {8}with:\n {10}fetch-depth: 0/);
+      assert.ok(job.indexOf("run: node scripts/check-agent-docs.mjs") < job.indexOf("run: pnpm install"));
+      assert.ok(job.includes("run: node scripts/check-agent-docs.mjs"));
+      assert.doesNotMatch(job, /continue-on-error:/);
+    }
+    assert.match(graph.get("frontend"), /fetch-depth: 0/);
+    assert.equal(rootScripts["check:agent-docs"], "node scripts/check-agent-docs.mjs");
+    assert.match(rootScripts["test:agent-docs"], /^pnpm check:agent-docs && /);
+  });
+}
+
+test("documentation policy failure fails the required check in either lane", () => {
+  const script = runBlock(jobs(workflow("pr-checks.yml")).get("pr"));
+  for (const lane of ["docs", "full"]) {
+    const result = spawnSync("bash", ["-c", script], {
+      env: { ...process.env, LANE: lane, LANE_RESULT: "success",
+        DOCS_RESULT: lane === "docs" ? "failure" : "skipped",
+        STATIC_RESULT: lane === "full" ? "failure" : "skipped",
+        API_RESULT: lane === "full" ? "success" : "skipped",
+        DB_RESULT: lane === "full" ? "success" : "skipped",
+        FRONTEND_RESULT: lane === "full" ? "success" : "skipped" },
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+  }
+});
