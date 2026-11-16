@@ -341,11 +341,11 @@ export function useUploadQueue(
         if (!isCurrent()) throw new Error("Photo selection ended");
         return owner?.current();
       };
+      startUpload();
       try {
         owner ??= await capturePhotoSession();
         await assertCurrent();
         transitionToPresigned(photoId);
-        startUpload();
 
         const sizeBytes = fileSize ?? fileInfo.size;
         const previous = grants.current.get(photoId);

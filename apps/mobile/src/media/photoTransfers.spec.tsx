@@ -84,6 +84,24 @@ it("refuses a Listing transfer when the API omits the conditional fence", async 
   expect(puts).not.toHaveBeenCalled();
 });
 
+it("shows a Listing upload in progress after retrying an ownership refusal", async () => {
+  await clearAuthSession();
+  const { result } = await setupPhotoHook(() => useUploadQueue("ownership-retry", { photos: [] }));
+  await vi.waitFor(() => expect(result.current.photos[0]?.state).toBe("failed"));
+  expect(result.current.isUploading).toBe(false);
+  await signInPhotoUser();
+  selectTesterRoute("global");
+  server.use(http.post("*/uploads/presign", () => HttpResponse.json(grant)));
+  let finish!: (value: Awaited<ReturnType<typeof FileSystem.uploadAsync>>) => void;
+  puts.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await act(() => result.current.retryPhoto("one"));
+  await vi.waitFor(() => expect(result.current.photos[0]?.state).toBe("uploading"));
+  try { expect(result.current.isUploading).toBe(true); }
+  finally { await act(async () => { finish({ status: 200, headers: {}, body: "", mimeType: "image/webp" }); }); }
+  await vi.waitFor(() => expect(result.current.photos[0]).toMatchObject({ state: "uploaded", key }));
+  expect(result.current.isUploading).toBe(false);
+});
+
 it.each(["listing", "chat"])("does not issue a %s grant after its initiating session ends", async (kind) => {
   const owner = await capturePhotoSession();
   const issued: unknown[] = [];
