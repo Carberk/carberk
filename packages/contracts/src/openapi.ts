@@ -42,6 +42,7 @@ import {
   ReadOperatorHistoryReceiptsSchema, HistoryReceiptSchema, HistoryReceiptsSchema,
   SendHistoryTextSchema, SendOperatorHistoryTextSchema, ReadHistoryMessagesSchema,
   ReadOperatorHistoryMessagesSchema, HistoryMessageSchema, HistoryMessagesPageSchema, HistoryMessageSendQuerySchema,
+  AddHistoryPrivateNoteSchema, ReadHistoryPrivateNotesSchema, HistoryPrivateNoteSchema, HistoryPrivateNotesPageSchema,
   ReadHistoryReminderSchema, ReadOperatorHistoryReminderSchema, StopHistoryRemindersSchema, SendHistoryReminderSchema, HistoryReminderSchema,
 } from "./schemas/vehicle-history";
 import { HistoryStaffChangeSchema, HistoryStaffLookupSchema, HistoryStaffResponseSchema } from "./schemas/history-staff";
@@ -510,6 +511,19 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
         503: { description: "Temporarily unavailable; retry the same send intent" } },
     });
   }
+  for (const method of ["get", "post"] as const) registry.registerPath({
+    method, path: "/api/v1/vehicle-history/operator/requests/{id}/notes", tags: ["Vehicle History"],
+    security: [{ bearerAuth: [] }], summary: "Current exact assignee/version reads or adds attributed private notes; local synthetic only",
+    request: { params: z.object({ id: z.string().guid() }), ...(method === "get"
+      ? { query: ReadHistoryPrivateNotesSchema }
+      : { query: HistoryMessageSendQuerySchema, body: { content: { "application/json": { schema: AddHistoryPrivateNoteSchema } } } }) },
+    responses: { [method === "get" ? 200 : 201]: { description: "Private, no-store notes; never part of customer messages or previews",
+      content: { "application/json": { schema: method === "get" ? HistoryPrivateNotesPageSchema : HistoryPrivateNoteSchema } } },
+      400: { description: "Invalid note, query or scoped cursor" }, 401: { description: "Sign in again" },
+      403: { description: "Current staff purpose, session, request or assignment refused" },
+      409: { description: "Assignment changed or one note intent contains different text" },
+      503: { description: "Temporarily unavailable; retry the same note intent" } },
+  });
   for (const operator of [false, true]) for (const method of ["get", "post"] as const) registry.registerPath({
     method, path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/receipts`,
     tags: ["Vehicle History"], security: [{ bearerAuth: [] }],

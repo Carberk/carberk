@@ -73,6 +73,20 @@ export const HistoryMessagesPageSchema = z.object({
   items: z.array(HistoryMessageSchema).max(50), nextCursor: MessageKeySchema.nullable(),
 }).strict();
 
+export const AddHistoryPrivateNoteSchema = z.object({
+  clientNoteId: MessageKeySchema, text: ServiceTextSchema, expectedAssignmentVersion: AssignmentVersionSchema,
+}).strict();
+export const ReadHistoryPrivateNotesSchema = ReadOperatorHistoryMessagesSchema;
+export const HistoryPrivateNoteSchema = z.object({
+  id: MessageKeySchema, clientNoteId: MessageKeySchema, text: ServiceTextSchema,
+  createdAt: DateTimeSchema, author: HistoryOperatorSchema.strict(),
+}).strict();
+export type HistoryPrivateNote = z.infer<typeof HistoryPrivateNoteSchema>;
+export const HistoryPrivateNotesPageSchema = z.object({
+  items: z.array(HistoryPrivateNoteSchema).max(50), nextCursor: MessageKeySchema.nullable(),
+}).strict();
+export type HistoryPrivateNotesPage = z.infer<typeof HistoryPrivateNotesPageSchema>;
+
 export const AcknowledgeHistoryMessagesSchema = z.object({ cursor: MessageKeySchema, kind: z.enum(["received", "read"]) }).strict();
 export const AcknowledgeOperatorHistoryMessagesSchema = AcknowledgeHistoryMessagesSchema.extend({ expectedAssignmentVersion: AssignmentVersionSchema }).strict();
 export const ReadHistoryReceiptsSchema = HistoryMessageSendQuerySchema;

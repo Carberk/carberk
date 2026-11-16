@@ -5,6 +5,7 @@ import { Button } from "@auto-tm/ui/components";
 import { IdentitySchemas, type VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
 import type { HistoryInboxResult } from "./actions";
+import { PrivateNotesPanel } from "./PrivateNotesPanel";
 import { ReplyComposer } from "./ReplyComposer";
 import { useOperatorConversation } from "./useOperatorConversation";
 
@@ -166,6 +167,8 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
       <h4 className="mb-2 text-sm font-medium">{t.source}</h4>
       {state !== "loading" && <p className="break-all text-sm">{detail ? detail.sourceListingId ?? t.noSource : state === "unclaimed" ? t.claimContext : t.contextUnavailable}</p>}
       {detail?.sourceListingId && <p className="mt-3 text-sm text-muted-foreground">{t.sourceBody}</p>}
+      {state === "ready" && <PrivateNotesPanel locale={locale} id={id} version={version} scope={scope} actorId={actor.id}
+        revision={revision} invalidate={invalidate} />}
     </aside>
   </>;
 }
