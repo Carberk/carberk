@@ -1,6 +1,7 @@
 # Local Admin access for agents
 
-Use `pnpm admin:access --help` for local Admin preparation and proof. The helper selects explicit local targets, keeps codes out of its output, and leaves authentication to the real browser flow. It neither creates Users nor changes roles, grants, sessions, quotas or data.
+Use `pnpm admin:access --help` for local Admin preparation and proof. The helper selects explicit local targets, keeps codes out of its output, and leaves authentication to the real browser flow.
+It neither creates Users nor changes roles, grants, sessions, quotas or data.
 
 ## 1. Select the target and reuse the session
 
@@ -78,9 +79,28 @@ Use an existing local actor authorized for the selected flow. The documented sha
 
 ## Explicit fixture setup, only when missing
 
-For a missing History staff fixture or grant, coordinate separately with its owner through the approved staff setup procedure. Code retrieval creates no authority; a legitimate History actor needs no marketplace role promotion.
+For a missing History staff fixture or grant, coordinate separately with its owner through the approved staff setup procedure.
+Code retrieval creates no authority; a legitimate History actor needs no marketplace role promotion.
 
 For an agreed local legacy Admin target, create the fixture through ordinary phone sign-in, then run the existing `admin:promote` command against that same explicit local database with a reason. Promotion is a separate, explicit write; it is not part of `check` or code retrieval. Use a fresh sign-in after promotion, respecting `resendInSeconds`, because the older session retains its role. Reaching the QR step establishes pending enrollment; `admin:access totp` can then supply its code. Preserve any active shared fixture owner and coordinate changes rather than replacing Users.
+
+## Owned local History fixtures
+
+The separate `node scripts/history-ui-fixture.mjs --help` entrypoint prepares an explicitly approved, empty local `_ui` database. It does not start services, create/migrate databases or establish resource ownership.
+Use the running API's private effective env file (0600 inside a 0700 directory), development/test with mock SMS and disabled code bypasses, and the helper's fixed synthetic actor admission. Phones come from the existing canonical fixture source; there are no actor-selection flags.
+
+```bash
+node scripts/history-ui-fixture.mjs init --api http://127.0.0.1:3067/api/v1 --admin http://localhost:3068 --api-env <absolute-private-env> --api-log <absolute-private-log> --expected-db <owned_ui> --reason "Approved initial synthetic fixture"
+node scripts/history-ui-fixture.mjs run --api http://127.0.0.1:3067/api/v1 --admin http://localhost:3068 --api-env <absolute-private-env> --api-log <absolute-private-log> --expected-db <owned_ui>
+```
+
+`init` requires an empty target and atomically creates only two default buyers, one History grant and an initial-fixture audit. It seeds no Session, TOTP enrollment or elevation, and is not a staff-management workflow.
+`run` logs in each fixed client once through ordinary OTP and purpose-specific operator TOTP, then creates populated/empty claimed requests and three operator/fifty requester texts. Tokens remain in process memory.
+Wait for its safe summary before entering deliberate stdin stages: `delivered`, then `read` fetch contiguous requester pages before explicit acknowledgement; `unassigned` and `incoming` each permit one ordinary HTTP write.
+`facts` reads actual receipt facts through GET only, without acknowledging messages; `quit` ends the client. Client activity proves no native or Admin visibility.
+The reported browser eligibility time is only a pre-attempt gate. A later browser login uses the real forms separately; never transfer client credentials into a browser or automatically wait/resend/retry.
+Any refusal or uncertain operation stops the invocation. Preserve partial data and inspect it with the owner; there is no resume, refresh, repair, quota reset or deletion mode.
+The utility removes only code directories returned by the existing private-code helper after use. Stop only your owned runtime processes separately and retain fixture/storage data; the utility owns no service lifecycle.
 
 ## Refusals and proof limits
 
