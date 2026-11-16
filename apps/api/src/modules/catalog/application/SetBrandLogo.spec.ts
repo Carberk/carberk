@@ -6,9 +6,10 @@ import type {
   BrandLogoRepository,
   LogoKeyReplacement,
 } from "../domain/ports/BrandLogoRepository";
-import type { BrandLogoStorage } from "../domain/ports/BrandLogoStorage";
 import type { LogoImageProcessor } from "../domain/ports/LogoImageProcessor";
 
+import { FakeBrandLogoStorage as FakeStorage } from "./testing/FakeBrandLogoStorage";
+import { FakeCatalogAuditLog } from "./testing/FakeCatalogAuditLog";
 import { SetBrandLogo } from "./SetBrandLogo";
 
 const PENDING = "pending/brands/toyota/0f8fad5b-d9cb-469f-a165-70867728950e";
@@ -38,48 +39,6 @@ class FakeBrands implements BrandLogoRepository {
   }
 }
 
-class FakeStorage implements BrandLogoStorage {
-  objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
-  failDelete = false;
-  failDeleteVersion = false;
-  deletedVersions: string[] = [];
-
-  async presignUpload(): Promise<{ url: string; headers: Record<string, string> }> {
-    throw new Error("not used");
-  }
-
-  async get(
-    key: string,
-    maxBytes: number,
-  ): Promise<{ bytes: Uint8Array; contentType: string } | "too-large" | null> {
-    const object = this.objects.get(key);
-    if (!object) return null;
-    return object.bytes.byteLength > maxBytes ? "too-large" : object;
-  }
-
-  async put(key: string, bytes: Uint8Array, contentType: string): Promise<void> {
-    this.objects.set(key, { bytes, contentType });
-  }
-
-  async delete(key: string): Promise<void> {
-    if (this.failDelete) throw new Error("storage down");
-    this.objects.delete(key);
-  }
-
-  async deleteLogoVersion(key: string): Promise<void> {
-    this.deletedVersions.push(key);
-    if (this.failDeleteVersion) throw new Error("storage down");
-    const directory = key.slice(0, key.lastIndexOf("/") + 1);
-    for (const existing of [...this.objects.keys()]) {
-      if (existing.startsWith(directory)) this.objects.delete(existing);
-    }
-  }
-
-  publicUrl(key: string): string {
-    return `https://media.example/catalog-assets/${key}`;
-  }
-}
-
 class FakeImages implements LogoImageProcessor {
   probed: { format: string; width: number; height: number } | null = {
     format: "png",
@@ -98,22 +57,13 @@ class FakeImages implements LogoImageProcessor {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{ action: string; targetId: string; details: unknown }> = [];
-  auditLog = {
-    create: async ({ data }: { data: FakePrisma["auditLogs"][number] }) => {
-      this.auditLogs.push(data);
-    },
-  };
-}
-
 const bytes = (n = 100) => new Uint8Array(n).fill(1);
 
 describe("SetBrandLogo", () => {
   let brands: FakeBrands;
   let storage: FakeStorage;
   let images: FakeImages;
-  let prisma: FakePrisma;
+  let audit: FakeCatalogAuditLog;
   let useCase: SetBrandLogo;
 
   const upload = (contentType: string, data: Uint8Array = bytes()) =>
@@ -129,7 +79,7 @@ describe("SetBrandLogo", () => {
     brands = new FakeBrands();
     storage = new FakeStorage();
     images = new FakeImages();
-    prisma = new FakePrisma();
+    audit = new FakeCatalogAuditLog();
     brands.brands.set("b1", {
       id: "b1",
       slug: "toyota",
@@ -144,7 +94,7 @@ describe("SetBrandLogo", () => {
       brands,
       storage,
       images,
-      prisma as unknown as ConstructorParameters<typeof SetBrandLogo>[3],
+      audit,
     );
   });
 
@@ -158,7 +108,7 @@ describe("SetBrandLogo", () => {
     expect(storage.objects.get(key)?.contentType).toBe("image/png");
     expect(storage.objects.has(PENDING)).toBe(false);
     expect(result).toEqual({ id: "b1", logoUrl: `https://media.example/catalog-assets/${key}` });
-    expect(prisma.auditLogs[0]).toMatchObject({ action: "CATALOG_BRAND_LOGO_SET", targetId: "b1" });
+    expect(audit.entries[0]).toMatchObject({ action: "CATALOG_BRAND_LOGO_SET", targetId: "b1" });
   });
 
   it("keeps WebP as WebP", async () => {
@@ -241,7 +191,7 @@ describe("SetBrandLogo", () => {
     await useCase.execute({ brandId: "b1", key: PENDING }, "admin-1");
 
     expect(brands.brands.get("b1")!.logoKey).not.toBe("brands/toyota/v1/logo.png");
-    expect(prisma.auditLogs).toHaveLength(1);
+    expect(audit.entries).toHaveLength(1);
   });
 
   it("retains the uploaded logo and the previous directory when the swap outcome is unknown", async () => {
@@ -269,7 +219,7 @@ describe("SetBrandLogo", () => {
     );
 
     expect(logoObjects()).toEqual([]);
-    expect(prisma.auditLogs).toEqual([]);
+    expect(audit.entries).toEqual([]);
   });
 
   it("throws NotFoundException for an unknown brand", async () => {

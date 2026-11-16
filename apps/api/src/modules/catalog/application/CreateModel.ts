@@ -1,5 +1,4 @@
 import { Inject, Injectable, ConflictException, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
 
 import type { Model } from "../domain/Model";
 import {
@@ -10,6 +9,7 @@ import {
   BRAND_REPOSITORY,
   type BrandRepository,
 } from "../domain/ports/BrandRepository";
+import { CATALOG_AUDIT_LOG, type CatalogAuditLog } from "./ports/CatalogAuditLog";
 import { CatalogSearchIndex } from "./CatalogSearchIndex";
 
 export interface CreateModelInput {
@@ -25,7 +25,7 @@ export class CreateModel {
   constructor(
     @Inject(MODEL_REPOSITORY) private readonly models: ModelRepository,
     @Inject(BRAND_REPOSITORY) private readonly brands: BrandRepository,
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CATALOG_AUDIT_LOG) private readonly audit: CatalogAuditLog,
     @Inject(CatalogSearchIndex)
     private readonly searchIndex: CatalogSearchIndex,
   ) {}
@@ -49,14 +49,12 @@ export class CreateModel {
     const model = await this.models.create(input);
     this.searchIndex.invalidate();
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: actorUserId,
-        action: "CATALOG_MODEL_CREATE",
-        targetType: "Model",
-        targetId: model.id,
-        details: { slug: model.slug, nameRu: model.nameRu, brandId: model.brandId },
-      },
+    await this.audit.record({
+      actorId: actorUserId,
+      action: "CATALOG_MODEL_CREATE",
+      targetType: "Model",
+      targetId: model.id,
+      details: { slug: model.slug, nameRu: model.nameRu, brandId: model.brandId },
     });
 
     return model;

@@ -1,18 +1,12 @@
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
 
 import {
   BRAND_LOGO_REPOSITORY,
   type BrandLogoRepository,
 } from "../domain/ports/BrandLogoRepository";
 import { BRAND_LOGO_STORAGE, type BrandLogoStorage } from "../domain/ports/BrandLogoStorage";
+import { CATALOG_AUDIT_LOG, type CatalogAuditLog } from "./ports/CatalogAuditLog";
 
-/**
- * Clears a brand logo in one short database-only swap, then deletes the
- * version directory the swap actually removed (all imported siblings
- * included). Removing a missing logo is a no-op. A failed or uncertain
- * database swap deletes nothing.
- */
 @Injectable()
 export class RemoveBrandLogo {
   private readonly logger = new Logger(RemoveBrandLogo.name);
@@ -20,7 +14,7 @@ export class RemoveBrandLogo {
   constructor(
     @Inject(BRAND_LOGO_REPOSITORY) private readonly brands: BrandLogoRepository,
     @Inject(BRAND_LOGO_STORAGE) private readonly storage: BrandLogoStorage,
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CATALOG_AUDIT_LOG) private readonly audit: CatalogAuditLog,
   ) {}
 
   async execute(input: { brandId: string }, actorUserId: string): Promise<void> {
@@ -43,14 +37,12 @@ export class RemoveBrandLogo {
       this.logger.warn({ key: previousKey, err }, "Failed to delete brand logo version");
     }
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: actorUserId,
-        action: "CATALOG_BRAND_LOGO_REMOVE",
-        targetType: "Brand",
-        targetId: brand.id,
-        details: { slug: brand.slug, previousLogoKey: previousKey },
-      },
+    await this.audit.record({
+      actorId: actorUserId,
+      action: "CATALOG_BRAND_LOGO_REMOVE",
+      targetType: "Brand",
+      targetId: brand.id,
+      details: { slug: brand.slug, previousLogoKey: previousKey },
     });
   }
 }

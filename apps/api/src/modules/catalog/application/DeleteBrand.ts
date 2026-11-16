@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger, NotFoundException, ConflictException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
 
 import {
   BRAND_REPOSITORY,
   type BrandRepository,
 } from "../domain/ports/BrandRepository";
 import { BRAND_LOGO_STORAGE, type BrandLogoStorage } from "../domain/ports/BrandLogoStorage";
+import { CATALOG_AUDIT_LOG, type CatalogAuditLog } from "./ports/CatalogAuditLog";
 import { CatalogSearchIndex } from "./CatalogSearchIndex";
 
 export interface DeleteBrandInput {
@@ -18,7 +18,7 @@ export class DeleteBrand {
 
   constructor(
     @Inject(BRAND_REPOSITORY) private readonly brands: BrandRepository,
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CATALOG_AUDIT_LOG) private readonly audit: CatalogAuditLog,
     @Inject(CatalogSearchIndex)
     private readonly searchIndex: CatalogSearchIndex,
     @Inject(BRAND_LOGO_STORAGE) private readonly logoStorage: BrandLogoStorage,
@@ -49,8 +49,6 @@ export class DeleteBrand {
     }
     this.searchIndex.invalidate();
 
-    // The key of the row the delete actually removed, not the earlier read:
-    // a logo swapped in between would otherwise be left behind.
     if (deleted.logoKey) {
       try {
         await this.logoStorage.deleteLogoVersion(deleted.logoKey);
@@ -59,14 +57,12 @@ export class DeleteBrand {
       }
     }
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: actorUserId,
-        action: "CATALOG_BRAND_DELETE",
-        targetType: "Brand",
-        targetId: brand.id,
-        details: { slug: brand.slug, nameRu: brand.nameRu },
-      },
+    await this.audit.record({
+      actorId: actorUserId,
+      action: "CATALOG_BRAND_DELETE",
+      targetType: "Brand",
+      targetId: brand.id,
+      details: { slug: brand.slug, nameRu: brand.nameRu },
     });
   }
 }

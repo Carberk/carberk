@@ -3,6 +3,8 @@ import { Module } from "@nestjs/common";
 import { PrismaModule } from "../../common/prisma.module";
 import { IdentityModule } from "../identity/identity.module";
 
+import { CATALOG_AUDIT_LOG } from "./application/ports/CatalogAuditLog";
+import { PrismaCatalogAuditLog } from "./infrastructure/PrismaCatalogAuditLog";
 import { CatalogController } from "./presentation/catalog.controller";
 import { AdminCatalogController } from "./presentation/AdminCatalogController";
 import { ListBrands } from "./application/ListBrands";
@@ -56,6 +58,7 @@ import { TRANSMISSION_REPOSITORY } from "./domain/ports/TransmissionRepository";
   imports: [PrismaModule, IdentityModule],
   controllers: [CatalogController, AdminCatalogController],
   providers: [
+    { provide: CATALOG_AUDIT_LOG, useClass: PrismaCatalogAuditLog },
     PrismaBrandRepository,
     PrismaModelRepository,
     PrismaGenerationRepository,
