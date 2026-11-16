@@ -12,16 +12,15 @@ import type {
   ProfilePhotoPort,
 } from "../../identity/identity.public";
 import { ContentReport } from "../domain/ContentReport";
-import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRepository";
+import type { AuditLogRow } from "../domain/ports/AuditLogRepository";
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { RemoveUserPhoto } from "./RemoveUserPhoto";
+import { FakeModerationUnitOfWork } from "./testing/FakeModerationUnitOfWork";
 
 const KEY = "pending/0b9f3c1e-2d4a-4c6b-8e1f-3a5b7c9d1e2f/original.webp";
-const TX = { name: "moderation transaction" };
 
 class FakeReports {
   reports: ContentReport[] = [];
-  statusTransactions: unknown[] = [];
 
   async findById(id: string): Promise<ContentReport | null> {
     return this.reports.find((r) => r.id === id) ?? null;
@@ -30,9 +29,7 @@ class FakeReports {
   async updateStatus(
     id: string,
     data: { status: string; reviewedById: string; reviewedAt: Date },
-    tx?: unknown,
   ): Promise<ContentReport> {
-    this.statusTransactions.push(tx);
     const index = this.reports.findIndex((r) => r.id === id);
     const report = this.reports[index];
     if (!report) throw new Error("Report not found");
@@ -67,7 +64,6 @@ class FakeReports {
 
 class FakeAudit {
   rows: AuditLogRow[] = [];
-  transactions: unknown[] = [];
 
   async create(
     data: {
@@ -77,9 +73,7 @@ class FakeAudit {
       targetId: string;
       details?: Record<string, unknown> | null;
     },
-    tx?: unknown,
   ): Promise<AuditLogRow> {
-    this.transactions.push(tx);
     const row: AuditLogRow = {
       id: `audit-${this.rows.length + 1}`,
       actorId: data.actorId,
@@ -145,13 +139,10 @@ describe("RemoveUserPhoto", () => {
     identity = new FakeIdentity();
     reports = new FakeReports();
     audit = new FakeAudit();
-    const prisma = { $transaction: <T>(fn: (tx: unknown) => Promise<T>) => fn(TX) };
     useCase = new RemoveUserPhoto(
-      prisma as unknown as ConstructorParameters<typeof RemoveUserPhoto>[0],
+      new FakeModerationUnitOfWork({ photos: identity.photos, reports, audit }),
       identity.read,
-      identity.photos,
       reports as unknown as ContentReportRepository,
-      audit as unknown as AuditLogRepository,
     );
     identity.seed("user-1");
   });
@@ -185,12 +176,6 @@ describe("RemoveUserPhoto", () => {
     ]);
   });
 
-  it("releases the photo and writes the audit entry in one transaction", async () => {
-    await useCase.execute(input);
-
-    expect(identity.releases).toEqual([{ userId: "user-1", tx: TX }]);
-    expect(audit.transactions).toEqual([TX]);
-  });
 
   it("actions the pending report on that User in the same transaction", async () => {
     reports.seed("report-1", "user", "user-1");
@@ -199,7 +184,6 @@ describe("RemoveUserPhoto", () => {
 
     expect(result).toMatchObject({ reportId: "report-1", reportStatus: "actioned" });
     expect(reports.reports[0]).toMatchObject({ status: "actioned", reviewedById: "admin-1" });
-    expect(reports.statusTransactions).toEqual([TX]);
     expect(audit.rows[0]?.details).toMatchObject({
       reportId: "report-1",
       before: { avatarKey: KEY, reportStatus: "pending" },

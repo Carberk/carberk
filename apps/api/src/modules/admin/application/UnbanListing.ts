@@ -4,15 +4,11 @@ import {
   NotFoundException,
   ConflictException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { MODERATION_UNIT_OF_WORK, type ModerationUnitOfWork } from "./ports/ModerationUnitOfWork";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import { LISTINGS_READ_PORT } from "../../listings/domain/ports/ListingsReadPort";
-import type { ListingsAdminPort } from "../../listings/domain/ports/ListingsAdminPort";
-import { LISTINGS_ADMIN_PORT } from "../../listings/domain/ports/ListingsAdminPort";
-import type { AuditLogRepository } from "../domain/ports/AuditLogRepository";
-import { AUDIT_LOG_REPOSITORY } from "../domain/ports/AuditLogRepository";
 
 export interface UnbanListingInput {
   listingId: string;
@@ -29,14 +25,10 @@ export interface UnbanListingResult {
 @Injectable()
 export class UnbanListing {
   constructor(
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(MODERATION_UNIT_OF_WORK)
+    private readonly moderation: ModerationUnitOfWork,
     @Inject(LISTINGS_READ_PORT)
     private readonly listingsRead: ListingsReadPort,
-    @Inject(LISTINGS_ADMIN_PORT)
-    private readonly listingsAdmin: ListingsAdminPort,
-    @Inject(AUDIT_LOG_REPOSITORY)
-    private readonly auditRepo: AuditLogRepository,
   ) {}
 
   async execute(input: UnbanListingInput): Promise<UnbanListingResult> {
@@ -65,13 +57,10 @@ export class UnbanListing {
     }
 
     // 2. Execute mutation + audit in one transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      const unbanResult = await this.listingsAdmin.unbanBannedListing(
-        input.listingId,
-        tx,
-      );
+    const result = await this.moderation.run(async (tx) => {
+      const unbanResult = await tx.listings.unbanBannedListing(input.listingId);
 
-      const auditRow = await this.auditRepo.create(
+      const auditRow = await tx.audit.create(
         {
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.ListingUnban,
@@ -83,7 +72,6 @@ export class UnbanListing {
             after: { status: unbanResult.status },
           },
         },
-        tx,
       );
 
       return {

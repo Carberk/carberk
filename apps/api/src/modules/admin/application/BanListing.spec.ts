@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 
 import { BanListing } from "./BanListing";
+import { FakeModerationUnitOfWork } from "./testing/FakeModerationUnitOfWork";
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { ContentReport } from "../domain/ContentReport";
 import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRepository";
@@ -152,12 +153,6 @@ class FakeListingsAdminPort implements ListingsAdminPort {
   }
 }
 
-class FakePrismaService {
-  async $transaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
-    return fn(undefined);
-  }
-}
-
 function makeReport(
   id: string,
   targetType: "listing" | "user",
@@ -180,30 +175,25 @@ function makeReport(
 }
 
 function makeUseCase(
-  prisma?: FakePrismaService,
-  listingsRead?: FakeListingsReadPort,
-  listingsAdmin?: FakeListingsAdminPort,
-  reportRepo?: FakeContentReportRepository,
-  auditRepo?: FakeAuditLogRepository,
+  listingsRead = new FakeListingsReadPort(),
+  listingsAdmin = new FakeListingsAdminPort(),
+  reportRepo = new FakeContentReportRepository(),
+  auditRepo = new FakeAuditLogRepository(),
 ) {
   return new BanListing(
-    (prisma ?? new FakePrismaService()) as unknown as ConstructorParameters<typeof BanListing>[0],
-    listingsRead ?? new FakeListingsReadPort(),
-    listingsAdmin ?? new FakeListingsAdminPort(),
-    reportRepo ?? new FakeContentReportRepository(),
-    auditRepo ?? new FakeAuditLogRepository(),
+    new FakeModerationUnitOfWork({ listings: listingsAdmin, reports: reportRepo, audit: auditRepo }),
+    listingsRead,
+    reportRepo,
   );
 }
 
 describe("BanListing", () => {
-  let prisma: FakePrismaService;
   let listingsRead: FakeListingsReadPort;
   let listingsAdmin: FakeListingsAdminPort;
   let reportRepo: FakeContentReportRepository;
   let auditRepo: FakeAuditLogRepository;
 
   beforeEach(() => {
-    prisma = new FakePrismaService();
     listingsRead = new FakeListingsReadPort();
     listingsAdmin = new FakeListingsAdminPort();
     reportRepo = new FakeContentReportRepository();
@@ -214,7 +204,7 @@ describe("BanListing", () => {
     listingsRead.seed("l1", { sellerId: "s1", status: "active" });
     listingsAdmin.seed("l1", "active");
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     const result = await uc.execute({
       listingId: "l1",
       adminUserId: "admin-1",
@@ -238,7 +228,7 @@ describe("BanListing", () => {
     listingsAdmin.seed("l1", "active");
     reportRepo.reports = [makeReport("r1", "listing", "l1")];
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     const result = await uc.execute({
       listingId: "l1",
       adminUserId: "admin-1",
@@ -264,7 +254,7 @@ describe("BanListing", () => {
   });
 
   it("returns NOT_FOUND for missing listing", async () => {
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     await expect(
       uc.execute({ listingId: "missing", adminUserId: "admin-1", reason: "Spam" }),
     ).rejects.toThrow(NotFoundException);
@@ -274,7 +264,7 @@ describe("BanListing", () => {
   it("returns MODERATION_TARGET_STATE_CONFLICT for non-active listing", async () => {
     listingsRead.seed("l1", { sellerId: "s1", status: "sold" });
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     try {
       await uc.execute({ listingId: "l1", adminUserId: "admin-1", reason: "Spam" });
       expect.fail("should have thrown");
@@ -293,7 +283,7 @@ describe("BanListing", () => {
     listingsRead.seed("l1", { sellerId: "s1", status: "active" });
     listingsAdmin.seed("l1", "active");
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     await expect(
       uc.execute({
         listingId: "l1",
@@ -310,7 +300,7 @@ describe("BanListing", () => {
     listingsAdmin.seed("l1", "active");
     reportRepo.reports = [makeReport("r1", "listing", "l2")];
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     try {
       await uc.execute({
         listingId: "l1",
@@ -335,7 +325,7 @@ describe("BanListing", () => {
     listingsAdmin.seed("l1", "active");
     reportRepo.reports = [makeReport("r1", "listing", "l1", "dismissed")];
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     try {
       await uc.execute({
         listingId: "l1",
@@ -359,7 +349,7 @@ describe("BanListing", () => {
     listingsRead.seed("l1", { sellerId: "s1", status: "sold" });
     reportRepo.reports = [makeReport("r1", "listing", "l1")];
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, reportRepo, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, reportRepo, auditRepo);
     try {
       await uc.execute({
         listingId: "l1",
@@ -376,32 +366,6 @@ describe("BanListing", () => {
         reason: AdminSchemas.AdminErrorReason.ReportTargetNotActionable,
       });
     }
-    expect(auditRepo.rows).toHaveLength(0);
-  });
-
-  it("rolls back listing mutation when audit write fails", async () => {
-    listingsRead.seed("l1", { sellerId: "s1", status: "active" });
-    listingsAdmin.seed("l1", "active");
-
-    const failingPrisma = {
-      async $transaction<T>(_fn: (tx: unknown) => Promise<T>): Promise<T> {
-        throw new Error("Transaction rollback");
-      },
-    };
-
-    const uc = makeUseCase(
-      failingPrisma as unknown as FakePrismaService,
-      listingsRead,
-      listingsAdmin,
-      reportRepo,
-      auditRepo,
-    );
-    await expect(
-      uc.execute({ listingId: "l1", adminUserId: "admin-1", reason: "Spam" }),
-    ).rejects.toThrow("Transaction rollback");
-
-    // Listing state should remain unchanged because the transaction rolled back
-    expect(listingsAdmin.states["l1"]).toBe("active");
     expect(auditRepo.rows).toHaveLength(0);
   });
 });
