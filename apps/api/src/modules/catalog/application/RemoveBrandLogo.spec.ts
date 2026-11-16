@@ -6,8 +6,9 @@ import type {
   BrandLogoRepository,
   LogoKeyReplacement,
 } from "../domain/ports/BrandLogoRepository";
-import type { BrandLogoStorage } from "../domain/ports/BrandLogoStorage";
 
+import { FakeBrandLogoStorage as FakeStorage } from "./testing/FakeBrandLogoStorage";
+import { FakeCatalogAuditLog } from "./testing/FakeCatalogAuditLog";
 import { RemoveBrandLogo } from "./RemoveBrandLogo";
 
 class FakeBrands implements BrandLogoRepository {
@@ -32,48 +33,16 @@ class FakeBrands implements BrandLogoRepository {
   }
 }
 
-class FakeStorage implements BrandLogoStorage {
-  deleted: string[] = [];
-  deletedVersions: string[] = [];
-  failDeleteVersion = false;
-  async presignUpload(): Promise<{ url: string; headers: Record<string, string> }> {
-    throw new Error("not used");
-  }
-  async get(): Promise<null> {
-    return null;
-  }
-  async put(): Promise<void> {}
-  async delete(key: string): Promise<void> {
-    this.deleted.push(key);
-  }
-  async deleteLogoVersion(key: string): Promise<void> {
-    this.deletedVersions.push(key);
-    if (this.failDeleteVersion) throw new Error("storage down");
-  }
-  publicUrl(key: string): string {
-    return key;
-  }
-}
-
-class FakePrisma {
-  auditLogs: Array<{ action: string; targetId: string }> = [];
-  auditLog = {
-    create: async ({ data }: { data: FakePrisma["auditLogs"][number] }) => {
-      this.auditLogs.push(data);
-    },
-  };
-}
-
 describe("RemoveBrandLogo", () => {
   let brands: FakeBrands;
   let storage: FakeStorage;
-  let prisma: FakePrisma;
+  let audit: FakeCatalogAuditLog;
   let useCase: RemoveBrandLogo;
 
   beforeEach(() => {
     brands = new FakeBrands();
     storage = new FakeStorage();
-    prisma = new FakePrisma();
+    audit = new FakeCatalogAuditLog();
     brands.brands.set("b1", {
       id: "b1",
       slug: "toyota",
@@ -87,7 +56,7 @@ describe("RemoveBrandLogo", () => {
     useCase = new RemoveBrandLogo(
       brands,
       storage,
-      prisma as unknown as ConstructorParameters<typeof RemoveBrandLogo>[2],
+      audit,
     );
   });
 
@@ -97,7 +66,7 @@ describe("RemoveBrandLogo", () => {
     expect(brands.brands.get("b1")!.logoKey).toBeNull();
     expect(storage.deletedVersions).toEqual(["brands/toyota/v1/logo.png"]);
     expect(storage.deleted).toEqual([]);
-    expect(prisma.auditLogs[0]).toMatchObject({
+    expect(audit.entries[0]).toMatchObject({
       action: "CATALOG_BRAND_LOGO_REMOVE",
       targetId: "b1",
     });
@@ -110,7 +79,7 @@ describe("RemoveBrandLogo", () => {
     await useCase.execute({ brandId: "b1" }, "admin-1");
 
     expect(storage.deletedVersions).toEqual([imported]);
-    expect(prisma.auditLogs[0]).toMatchObject({
+    expect(audit.entries[0]).toMatchObject({
       details: { previousLogoKey: imported },
     });
   });
@@ -121,7 +90,7 @@ describe("RemoveBrandLogo", () => {
     await useCase.execute({ brandId: "b1" }, "admin-1");
 
     expect(storage.deletedVersions).toEqual([]);
-    expect(prisma.auditLogs).toEqual([]);
+    expect(audit.entries).toEqual([]);
   });
 
   it("keeps the removal when storage cleanup fails", async () => {
@@ -130,7 +99,7 @@ describe("RemoveBrandLogo", () => {
     await useCase.execute({ brandId: "b1" }, "admin-1");
 
     expect(brands.brands.get("b1")!.logoKey).toBeNull();
-    expect(prisma.auditLogs).toHaveLength(1);
+    expect(audit.entries).toHaveLength(1);
   });
 
   it("deletes nothing when the swap outcome is unknown", async () => {
@@ -155,7 +124,7 @@ describe("RemoveBrandLogo", () => {
 
     expect(storage.deleted).toEqual([]);
     expect(storage.deletedVersions).toEqual([]);
-    expect(prisma.auditLogs).toEqual([]);
+    expect(audit.entries).toEqual([]);
   });
 
   it("throws NotFoundException for an unknown brand", async () => {

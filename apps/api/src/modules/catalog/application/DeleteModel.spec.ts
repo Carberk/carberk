@@ -4,6 +4,7 @@ import { NotFoundException, ConflictException } from "@nestjs/common";
 import type { Model } from "../domain/Model";
 import type { ModelRepository } from "../domain/ports/ModelRepository";
 
+import { FakeCatalogAuditLog } from "./testing/FakeCatalogAuditLog";
 import { DeleteModel } from "./DeleteModel";
 import type { CatalogSearchIndex } from "./CatalogSearchIndex";
 
@@ -53,41 +54,25 @@ class FakeModelRepository implements ModelRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
-
 function makeUseCase(
   modelRepo?: FakeModelRepository,
-  prisma?: FakePrisma,
+  audit?: FakeCatalogAuditLog,
   searchIndex?: FakeSearchIndex,
 ) {
   return new DeleteModel(
     modelRepo ?? new FakeModelRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof DeleteModel>[1],
+    audit ?? new FakeCatalogAuditLog(),
     (searchIndex ?? new FakeSearchIndex()) as unknown as CatalogSearchIndex,
   );
 }
 
 describe("DeleteModel", () => {
   let modelRepo: FakeModelRepository;
-  let prisma: FakePrisma;
+  let audit: FakeCatalogAuditLog;
 
   beforeEach(() => {
     modelRepo = new FakeModelRepository();
-    prisma = new FakePrisma();
+    audit = new FakeCatalogAuditLog();
   });
 
   it("deletes a model when it exists", async () => {
@@ -102,11 +87,11 @@ describe("DeleteModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, prisma);
+    const uc = makeUseCase(modelRepo, audit);
     await uc.execute({ id: "m1" }, "admin-1");
 
-    expect(prisma.auditLogs).toHaveLength(1);
-    expect(prisma.auditLogs[0]).toMatchObject({
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toMatchObject({
       actorId: "admin-1",
       action: "CATALOG_MODEL_DELETE",
       targetType: "Model",
@@ -115,7 +100,7 @@ describe("DeleteModel", () => {
   });
 
   it("throws NotFoundException when model does not exist", async () => {
-    const uc = makeUseCase(modelRepo, prisma);
+    const uc = makeUseCase(modelRepo, audit);
     await expect(uc.execute({ id: "m1" }, "admin-1")).rejects.toThrow(
       NotFoundException,
     );
@@ -134,7 +119,7 @@ describe("DeleteModel", () => {
     });
     modelRepo.shouldThrowFkOnDelete = true;
 
-    const uc = makeUseCase(modelRepo, prisma);
+    const uc = makeUseCase(modelRepo, audit);
     await expect(uc.execute({ id: "m1" }, "admin-1")).rejects.toThrow(
       ConflictException,
     );
@@ -153,7 +138,7 @@ describe("DeleteModel", () => {
     });
 
     const searchIndex = new FakeSearchIndex();
-    const uc = makeUseCase(modelRepo, prisma, searchIndex);
+    const uc = makeUseCase(modelRepo, audit, searchIndex);
     await uc.execute({ id: "m1" }, "admin-1");
 
     expect(searchIndex.invalidated).toBe(true);

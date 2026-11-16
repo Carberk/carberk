@@ -4,6 +4,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import type { Brand } from "../domain/Brand";
 import type { BrandRepository } from "../domain/ports/BrandRepository";
 
+import { FakeCatalogAuditLog } from "./testing/FakeCatalogAuditLog";
 import { UpdateBrand } from "./UpdateBrand";
 import type { CatalogSearchIndex } from "./CatalogSearchIndex";
 
@@ -52,41 +53,25 @@ class FakeBrandRepository implements BrandRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
-
 function makeUseCase(
   brandRepo?: FakeBrandRepository,
-  prisma?: FakePrisma,
+  audit?: FakeCatalogAuditLog,
   searchIndex?: FakeSearchIndex,
 ) {
   return new UpdateBrand(
     brandRepo ?? new FakeBrandRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof UpdateBrand>[1],
+    audit ?? new FakeCatalogAuditLog(),
     (searchIndex ?? new FakeSearchIndex()) as unknown as CatalogSearchIndex,
   );
 }
 
 describe("UpdateBrand", () => {
   let brandRepo: FakeBrandRepository;
-  let prisma: FakePrisma;
+  let audit: FakeCatalogAuditLog;
 
   beforeEach(() => {
     brandRepo = new FakeBrandRepository();
-    prisma = new FakePrisma();
+    audit = new FakeCatalogAuditLog();
   });
 
   it("updates a brand when it exists", async () => {
@@ -100,7 +85,7 @@ describe("UpdateBrand", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     const result = await uc.execute({ id: "b1", nameRu: "Тойота Мотор" }, "admin-1");
 
     expect(result.nameRu).toBe("Тойота Мотор");
@@ -108,7 +93,7 @@ describe("UpdateBrand", () => {
   });
 
   it("throws NotFoundException when brand does not exist", async () => {
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     await expect(uc.execute({ id: "b1", nameRu: "X" }, "admin-1")).rejects.toThrow(
       NotFoundException,
     );
@@ -136,7 +121,7 @@ describe("UpdateBrand", () => {
       },
     );
 
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     await expect(
       uc.execute({ id: "b1", slug: "bmw" }, "admin-1"),
     ).rejects.toThrow(ConflictException);
@@ -153,7 +138,7 @@ describe("UpdateBrand", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     const result = await uc.execute({ id: "b1", slug: "toyota", nameRu: "New" }, "admin-1");
 
     expect(result.slug).toBe("toyota");
@@ -170,11 +155,11 @@ describe("UpdateBrand", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     await uc.execute({ id: "b1", nameRu: "Тойота Мотор" }, "admin-1");
 
-    expect(prisma.auditLogs).toHaveLength(1);
-    expect(prisma.auditLogs[0]).toMatchObject({
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toMatchObject({
       actorId: "admin-1",
       action: "CATALOG_BRAND_UPDATE",
       targetType: "Brand",
@@ -194,7 +179,7 @@ describe("UpdateBrand", () => {
     });
 
     const searchIndex = new FakeSearchIndex();
-    const uc = makeUseCase(brandRepo, prisma, searchIndex);
+    const uc = makeUseCase(brandRepo, audit, searchIndex);
     await uc.execute({ id: "b1", nameRu: "Тойота Мотор" }, "admin-1");
 
     expect(searchIndex.invalidated).toBe(true);

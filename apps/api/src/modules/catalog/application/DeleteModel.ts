@@ -1,10 +1,10 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
 
 import {
   MODEL_REPOSITORY,
   type ModelRepository,
 } from "../domain/ports/ModelRepository";
+import { CATALOG_AUDIT_LOG, type CatalogAuditLog } from "./ports/CatalogAuditLog";
 import { CatalogSearchIndex } from "./CatalogSearchIndex";
 
 export interface DeleteModelInput {
@@ -15,7 +15,7 @@ export interface DeleteModelInput {
 export class DeleteModel {
   constructor(
     @Inject(MODEL_REPOSITORY) private readonly models: ModelRepository,
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CATALOG_AUDIT_LOG) private readonly audit: CatalogAuditLog,
     @Inject(CatalogSearchIndex)
     private readonly searchIndex: CatalogSearchIndex,
   ) {}
@@ -41,14 +41,12 @@ export class DeleteModel {
     }
     this.searchIndex.invalidate();
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: actorUserId,
-        action: "CATALOG_MODEL_DELETE",
-        targetType: "Model",
-        targetId: model.id,
-        details: { slug: model.slug, nameRu: model.nameRu, brandId: model.brandId },
-      },
+    await this.audit.record({
+      actorId: actorUserId,
+      action: "CATALOG_MODEL_DELETE",
+      targetType: "Model",
+      targetId: model.id,
+      details: { slug: model.slug, nameRu: model.nameRu, brandId: model.brandId },
     });
   }
 }

@@ -14,6 +14,7 @@ import sharp from "sharp";
 import { PrismaService } from "@auto-tm/db";
 
 import type { Env } from "../../../env.schema";
+import { PrismaCatalogAuditLog } from "./PrismaCatalogAuditLog";
 import { DeleteBrand } from "../application/DeleteBrand";
 import { RemoveBrandLogo } from "../application/RemoveBrandLogo";
 import { SetBrandLogo } from "../application/SetBrandLogo";
@@ -63,14 +64,15 @@ function buildStack(): Stack {
   const prisma = new PrismaService();
   const repo = new PrismaBrandRepository(prisma);
   const storage = new MinioBrandLogoStorage(config);
+  const audit = new PrismaCatalogAuditLog(prisma);
   return {
     prisma,
     storage,
-    setLogo: new SetBrandLogo(repo, storage, new SharpLogoImageProcessor(), prisma),
-    removeLogo: new RemoveBrandLogo(repo, storage, prisma),
+    setLogo: new SetBrandLogo(repo, storage, new SharpLogoImageProcessor(), audit),
+    removeLogo: new RemoveBrandLogo(repo, storage, audit),
     deleteBrand: new DeleteBrand(
       repo,
-      prisma,
+      audit,
       { invalidate: () => undefined } as never,
       storage,
     ),

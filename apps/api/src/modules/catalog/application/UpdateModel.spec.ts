@@ -6,6 +6,7 @@ import type { Model } from "../domain/Model";
 import type { BrandRepository } from "../domain/ports/BrandRepository";
 import type { ModelRepository } from "../domain/ports/ModelRepository";
 
+import { FakeCatalogAuditLog } from "./testing/FakeCatalogAuditLog";
 import { UpdateModel } from "./UpdateModel";
 import type { CatalogSearchIndex } from "./CatalogSearchIndex";
 
@@ -90,32 +91,16 @@ class FakeModelRepository implements ModelRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
-
 function makeUseCase(
   modelRepo?: FakeModelRepository,
   brandRepo?: FakeBrandRepository,
-  prisma?: FakePrisma,
+  audit?: FakeCatalogAuditLog,
   searchIndex?: FakeSearchIndex,
 ) {
   return new UpdateModel(
     modelRepo ?? new FakeModelRepository(),
     brandRepo ?? new FakeBrandRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof UpdateModel>[2],
+    audit ?? new FakeCatalogAuditLog(),
     (searchIndex ?? new FakeSearchIndex()) as unknown as CatalogSearchIndex,
   );
 }
@@ -123,12 +108,12 @@ function makeUseCase(
 describe("UpdateModel", () => {
   let modelRepo: FakeModelRepository;
   let brandRepo: FakeBrandRepository;
-  let prisma: FakePrisma;
+  let audit: FakeCatalogAuditLog;
 
   beforeEach(() => {
     modelRepo = new FakeModelRepository();
     brandRepo = new FakeBrandRepository();
-    prisma = new FakePrisma();
+    audit = new FakeCatalogAuditLog();
   });
 
   it("updates a model when it exists", async () => {
@@ -152,7 +137,7 @@ describe("UpdateModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     const result = await uc.execute({ id: "m1", nameRu: "Камри Новая" }, "admin-1");
 
     expect(result.nameRu).toBe("Камри Новая");
@@ -160,7 +145,7 @@ describe("UpdateModel", () => {
   });
 
   it("throws NotFoundException when model does not exist", async () => {
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     await expect(uc.execute({ id: "m1", nameRu: "X" }, "admin-1")).rejects.toThrow(
       NotFoundException,
     );
@@ -187,7 +172,7 @@ describe("UpdateModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     await expect(
       uc.execute({ id: "m1", brandId: "b2" }, "admin-1"),
     ).rejects.toThrow(NotFoundException);
@@ -226,7 +211,7 @@ describe("UpdateModel", () => {
       },
     );
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     await expect(
       uc.execute({ id: "m1", slug: "corolla" }, "admin-1"),
     ).rejects.toThrow(ConflictException);
@@ -253,7 +238,7 @@ describe("UpdateModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     const result = await uc.execute({ id: "m1", slug: "camry", nameRu: "New" }, "admin-1");
 
     expect(result.slug).toBe("camry");
@@ -280,11 +265,11 @@ describe("UpdateModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     await uc.execute({ id: "m1", nameRu: "Камри Новая" }, "admin-1");
 
-    expect(prisma.auditLogs).toHaveLength(1);
-    expect(prisma.auditLogs[0]).toMatchObject({
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toMatchObject({
       actorId: "admin-1",
       action: "CATALOG_MODEL_UPDATE",
       targetType: "Model",
@@ -314,7 +299,7 @@ describe("UpdateModel", () => {
     });
 
     const searchIndex = new FakeSearchIndex();
-    const uc = makeUseCase(modelRepo, brandRepo, prisma, searchIndex);
+    const uc = makeUseCase(modelRepo, brandRepo, audit, searchIndex);
     await uc.execute({ id: "m1", nameRu: "Камри Новая" }, "admin-1");
 
     expect(searchIndex.invalidated).toBe(true);

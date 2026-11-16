@@ -1,5 +1,4 @@
 import { Inject, Injectable, ConflictException, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
 
 import type { Model } from "../domain/Model";
 import {
@@ -10,6 +9,7 @@ import {
   BRAND_REPOSITORY,
   type BrandRepository,
 } from "../domain/ports/BrandRepository";
+import { CATALOG_AUDIT_LOG, type CatalogAuditLog } from "./ports/CatalogAuditLog";
 import { CatalogSearchIndex } from "./CatalogSearchIndex";
 
 export interface UpdateModelInput {
@@ -26,7 +26,7 @@ export class UpdateModel {
   constructor(
     @Inject(MODEL_REPOSITORY) private readonly models: ModelRepository,
     @Inject(BRAND_REPOSITORY) private readonly brands: BrandRepository,
-    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(CATALOG_AUDIT_LOG) private readonly audit: CatalogAuditLog,
     @Inject(CatalogSearchIndex)
     private readonly searchIndex: CatalogSearchIndex,
   ) {}
@@ -68,14 +68,12 @@ export class UpdateModel {
     });
     this.searchIndex.invalidate();
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: actorUserId,
-        action: "CATALOG_MODEL_UPDATE",
-        targetType: "Model",
-        targetId: updated.id,
-        details: { slug: updated.slug, nameRu: updated.nameRu, brandId: updated.brandId },
-      },
+    await this.audit.record({
+      actorId: actorUserId,
+      action: "CATALOG_MODEL_UPDATE",
+      targetType: "Model",
+      targetId: updated.id,
+      details: { slug: updated.slug, nameRu: updated.nameRu, brandId: updated.brandId },
     });
 
     return updated;

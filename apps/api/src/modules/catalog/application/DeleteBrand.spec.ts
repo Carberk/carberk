@@ -3,8 +3,9 @@ import { NotFoundException, ConflictException } from "@nestjs/common";
 
 import type { Brand } from "../domain/Brand";
 import type { BrandRepository } from "../domain/ports/BrandRepository";
-import type { BrandLogoStorage } from "../domain/ports/BrandLogoStorage";
 
+import { FakeBrandLogoStorage as FakeLogoStorage } from "./testing/FakeBrandLogoStorage";
+import { FakeCatalogAuditLog } from "./testing/FakeCatalogAuditLog";
 import { DeleteBrand } from "./DeleteBrand";
 import type { CatalogSearchIndex } from "./CatalogSearchIndex";
 
@@ -58,54 +59,15 @@ class FakeBrandRepository implements BrandRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
-
-class FakeLogoStorage implements BrandLogoStorage {
-  deleted: string[] = [];
-  deletedVersions: string[] = [];
-  failDeleteVersion = false;
-  async presignUpload(): Promise<{ url: string; headers: Record<string, string> }> {
-    throw new Error("not used");
-  }
-  async get(): Promise<null> {
-    return null;
-  }
-  async put(): Promise<void> {}
-  async delete(key: string): Promise<void> {
-    this.deleted.push(key);
-  }
-  async deleteLogoVersion(key: string): Promise<void> {
-    this.deletedVersions.push(key);
-    if (this.failDeleteVersion) throw new Error("storage down");
-  }
-  publicUrl(key: string): string {
-    return key;
-  }
-}
-
 function makeUseCase(
   brandRepo?: FakeBrandRepository,
-  prisma?: FakePrisma,
+  audit?: FakeCatalogAuditLog,
   searchIndex?: FakeSearchIndex,
   logoStorage?: FakeLogoStorage,
 ) {
   return new DeleteBrand(
     brandRepo ?? new FakeBrandRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof DeleteBrand>[1],
+    audit ?? new FakeCatalogAuditLog(),
     (searchIndex ?? new FakeSearchIndex()) as unknown as CatalogSearchIndex,
     logoStorage ?? new FakeLogoStorage(),
   );
@@ -113,11 +75,11 @@ function makeUseCase(
 
 describe("DeleteBrand", () => {
   let brandRepo: FakeBrandRepository;
-  let prisma: FakePrisma;
+  let audit: FakeCatalogAuditLog;
 
   beforeEach(() => {
     brandRepo = new FakeBrandRepository();
-    prisma = new FakePrisma();
+    audit = new FakeCatalogAuditLog();
   });
 
   it("deletes a brand when it exists", async () => {
@@ -131,11 +93,11 @@ describe("DeleteBrand", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     await uc.execute({ id: "b1" }, "admin-1");
 
-    expect(prisma.auditLogs).toHaveLength(1);
-    expect(prisma.auditLogs[0]).toMatchObject({
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toMatchObject({
       actorId: "admin-1",
       action: "CATALOG_BRAND_DELETE",
       targetType: "Brand",
@@ -156,7 +118,7 @@ describe("DeleteBrand", () => {
     });
     const logoStorage = new FakeLogoStorage();
 
-    await makeUseCase(brandRepo, prisma, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
+    await makeUseCase(brandRepo, audit, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
 
     expect(logoStorage.deletedVersions).toEqual(["brands/toyota/v1/logo.png"]);
     expect(logoStorage.deleted).toEqual([]);
@@ -177,7 +139,7 @@ describe("DeleteBrand", () => {
     brandRepo.deletedLogoKey = concurrent;
     const logoStorage = new FakeLogoStorage();
 
-    await makeUseCase(brandRepo, prisma, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
+    await makeUseCase(brandRepo, audit, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
 
     expect(logoStorage.deletedVersions).toEqual([concurrent]);
   });
@@ -196,7 +158,7 @@ describe("DeleteBrand", () => {
     brandRepo.deletedLogoKey = null;
     const logoStorage = new FakeLogoStorage();
 
-    await makeUseCase(brandRepo, prisma, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
+    await makeUseCase(brandRepo, audit, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
 
     expect(logoStorage.deletedVersions).toEqual([]);
   });
@@ -215,9 +177,9 @@ describe("DeleteBrand", () => {
     const logoStorage = new FakeLogoStorage();
     logoStorage.failDeleteVersion = true;
 
-    await makeUseCase(brandRepo, prisma, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
+    await makeUseCase(brandRepo, audit, undefined, logoStorage).execute({ id: "b1" }, "admin-1");
 
-    expect(prisma.auditLogs).toHaveLength(1);
+    expect(audit.entries).toHaveLength(1);
   });
 
   it("throws NotFoundException and cleans nothing when the brand vanishes before the delete", async () => {
@@ -235,7 +197,7 @@ describe("DeleteBrand", () => {
     const logoStorage = new FakeLogoStorage();
 
     await expect(
-      makeUseCase(brandRepo, prisma, undefined, logoStorage).execute({ id: "b1" }, "admin-1"),
+      makeUseCase(brandRepo, audit, undefined, logoStorage).execute({ id: "b1" }, "admin-1"),
     ).rejects.toThrow(NotFoundException);
     expect(logoStorage.deletedVersions).toEqual([]);
   });
@@ -255,14 +217,14 @@ describe("DeleteBrand", () => {
     const logoStorage = new FakeLogoStorage();
 
     await expect(
-      makeUseCase(brandRepo, prisma, undefined, logoStorage).execute({ id: "b1" }, "admin-1"),
+      makeUseCase(brandRepo, audit, undefined, logoStorage).execute({ id: "b1" }, "admin-1"),
     ).rejects.toThrow(ConflictException);
     expect(logoStorage.deletedVersions).toEqual([]);
     expect(logoStorage.deleted).toEqual([]);
   });
 
   it("throws NotFoundException when brand does not exist", async () => {
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     await expect(uc.execute({ id: "b1" }, "admin-1")).rejects.toThrow(
       NotFoundException,
     );
@@ -280,7 +242,7 @@ describe("DeleteBrand", () => {
     });
     brandRepo.shouldThrowFkOnDelete = true;
 
-    const uc = makeUseCase(brandRepo, prisma);
+    const uc = makeUseCase(brandRepo, audit);
     await expect(uc.execute({ id: "b1" }, "admin-1")).rejects.toThrow(
       ConflictException,
     );
@@ -298,7 +260,7 @@ describe("DeleteBrand", () => {
     });
 
     const searchIndex = new FakeSearchIndex();
-    const uc = makeUseCase(brandRepo, prisma, searchIndex);
+    const uc = makeUseCase(brandRepo, audit, searchIndex);
     await uc.execute({ id: "b1" }, "admin-1");
 
     expect(searchIndex.invalidated).toBe(true);

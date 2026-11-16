@@ -6,6 +6,7 @@ import type { Model } from "../domain/Model";
 import type { BrandRepository } from "../domain/ports/BrandRepository";
 import type { ModelRepository } from "../domain/ports/ModelRepository";
 
+import { FakeCatalogAuditLog } from "./testing/FakeCatalogAuditLog";
 import { CreateModel } from "./CreateModel";
 import type { CatalogSearchIndex } from "./CatalogSearchIndex";
 
@@ -92,32 +93,16 @@ class FakeModelRepository implements ModelRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
-
 function makeUseCase(
   modelRepo?: FakeModelRepository,
   brandRepo?: FakeBrandRepository,
-  prisma?: FakePrisma,
+  audit?: FakeCatalogAuditLog,
   searchIndex?: FakeSearchIndex,
 ) {
   return new CreateModel(
     modelRepo ?? new FakeModelRepository(),
     brandRepo ?? new FakeBrandRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof CreateModel>[2],
+    audit ?? new FakeCatalogAuditLog(),
     (searchIndex ?? new FakeSearchIndex()) as unknown as CatalogSearchIndex,
   );
 }
@@ -125,12 +110,12 @@ function makeUseCase(
 describe("CreateModel", () => {
   let modelRepo: FakeModelRepository;
   let brandRepo: FakeBrandRepository;
-  let prisma: FakePrisma;
+  let audit: FakeCatalogAuditLog;
 
   beforeEach(() => {
     modelRepo = new FakeModelRepository();
     brandRepo = new FakeBrandRepository();
-    prisma = new FakePrisma();
+    audit = new FakeCatalogAuditLog();
   });
 
   it("creates a model when brand exists and slug is unique", async () => {
@@ -144,7 +129,7 @@ describe("CreateModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     const result = await uc.execute(
       { brandId: "b1", slug: "camry", nameRu: "Камри", nameTk: "Kamri", nameEn: "Camry" },
       "admin-1",
@@ -156,7 +141,7 @@ describe("CreateModel", () => {
   });
 
   it("throws NotFoundException when brand does not exist", async () => {
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     await expect(
       uc.execute(
         { brandId: "b1", slug: "camry", nameRu: "Камри", nameTk: "Kamri", nameEn: "Camry" },
@@ -186,7 +171,7 @@ describe("CreateModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     await expect(
       uc.execute(
         { brandId: "b1", slug: "camry", nameRu: "Камри", nameTk: "Kamri", nameEn: "Camry" },
@@ -206,14 +191,14 @@ describe("CreateModel", () => {
       updatedAt: new Date(),
     });
 
-    const uc = makeUseCase(modelRepo, brandRepo, prisma);
+    const uc = makeUseCase(modelRepo, brandRepo, audit);
     const result = await uc.execute(
       { brandId: "b1", slug: "camry", nameRu: "Камри", nameTk: "Kamri", nameEn: "Camry" },
       "admin-1",
     );
 
-    expect(prisma.auditLogs).toHaveLength(1);
-    expect(prisma.auditLogs[0]).toMatchObject({
+    expect(audit.entries).toHaveLength(1);
+    expect(audit.entries[0]).toMatchObject({
       actorId: "admin-1",
       action: "CATALOG_MODEL_CREATE",
       targetType: "Model",
@@ -233,7 +218,7 @@ describe("CreateModel", () => {
     });
 
     const searchIndex = new FakeSearchIndex();
-    const uc = makeUseCase(modelRepo, brandRepo, prisma, searchIndex);
+    const uc = makeUseCase(modelRepo, brandRepo, audit, searchIndex);
     await uc.execute(
       { brandId: "b1", slug: "camry", nameRu: "Камри", nameTk: "Kamri", nameEn: "Camry" },
       "admin-1",
