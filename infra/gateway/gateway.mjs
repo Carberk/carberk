@@ -15,7 +15,6 @@ function headersFor(headers) {
     && !/^(forwarded$|x-forwarded-|x-real-ip$|x-carberk-|x-railway-|cf-|true-client-ip$|x-client-ip$|refresh$)/i.test(name)));
 }
 
-/** Fixed API/photo origins, reached only through an explicit loopback CONNECT proxy. */
 export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey, ca, log = () => {}, now = Date.now,
   deadlineMs = 30_000, connectMs = 6_000, maxBodyBytes = 16 * 1024 * 1024, maxConcurrent = 16, signing }) {
   const api = new URL(origin);
@@ -80,7 +79,6 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
   const server = http.createServer({ maxHeaderSize: 16 * 1024, highWaterMark: 64 * 1024 }, (req, res) => {
     const photo = Boolean(photos && req.url.startsWith('/photos/'));
     const upstream = photo ? photos : api;
-    // Slice the alias only. URL parsing/rebuilding would alter signed S3 targets.
     const target = photo ? req.url.slice('/photos'.length) : req.url;
     const permitted = photo ? ['GET', 'HEAD', 'PUT'].includes(req.method)
       && /^\/(listing-photos|chat-attachments)\//.test(target) : allowedPath(target);
