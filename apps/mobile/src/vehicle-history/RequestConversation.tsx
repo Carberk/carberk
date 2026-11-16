@@ -66,6 +66,9 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const [pendingLink, setPendingLink] = useState<{ key: string; action: "open" | "copy" } | null>(null);
   const linkAttempt = useRef(0);
   const linkReader = useRef({ mounted: true, ready: false });
+  const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
+  const position = useRef({ offset: 0, height: 0 });
+  const browserPosition = useRef<{ offset: number; height: number; away: boolean } | null>(null);
   const name = useDisplayName();
   const thread = useRequestConversation(viewer, request, metadataCurrent);
   const { pages, receipts } = thread;
@@ -80,6 +83,16 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const linkCurrent = () => linkReader.current.mounted && linkReader.current.ready
     && historySessionCurrent(viewer) && AppState.currentState === "active"
     && focusManager.isFocused() && onlineManager.isOnline();
+  const restoreBrowserPosition = () => {
+    const saved = browserPosition.current;
+    if (!saved?.away || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
+    browserPosition.current = null;
+    list.current?.scrollToOffset({ offset: saved.offset, animated: false });
+  };
+  useEffect(() => {
+    if (!thread.active && browserPosition.current) browserPosition.current.away = true;
+    else restoreBrowserPosition();
+  });
   useEffect(() => {
     if (!ready) {
       linkAttempt.current++;
@@ -100,6 +113,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     setPendingLink({ key, action });
     if (action === "copy") { setCopiedLink(null); setCopyFailure(null); }
     else setOpenFailure(null);
+    const beforeOpen = action === "open" && position.current.height > 0 ? { ...position.current, away: false } : null;
+    browserPosition.current = beforeOpen;
     let succeeded = false;
     try {
       if (action === "copy") succeeded = await Clipboard.setStringAsync(target) === true;
@@ -108,6 +123,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         succeeded = result !== false;
       }
     } catch { succeeded = false; }
+    if (!succeeded && browserPosition.current === beforeOpen) browserPosition.current = null;
     if (attempt !== linkAttempt.current || !linkCurrent()) return;
     setPendingLink(null);
     if (action === "copy") {
@@ -154,10 +170,15 @@ export function RequestConversation({ viewer, request, header, metadataError, me
 
   return <KeyboardAvoidingView behavior="padding" className="flex-1">
     <FlatList
+    ref={list}
     className="flex-1" contentContainerClassName="gap-3 px-5 pb-8 pt-3"
     data={notice ? [] : thread.messages} keyExtractor={(message) => message.id}
     keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
     maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+    scrollEventThrottle={16}
+    onScroll={(event) => { position.current.offset = event.nativeEvent.contentOffset.y; }}
+    onScrollBeginDrag={() => { browserPosition.current = null; }}
+    onLayout={(event) => { position.current.height = event.nativeEvent.layout.height; restoreBrowserPosition(); }}
     onViewableItemsChanged={onVisible} viewabilityConfig={viewabilityConfig}
     refreshControl={<RefreshControl refreshing={metadataRefreshing || pages.isRefetching} onRefresh={retry} />}
     ListHeaderComponent={<View className="gap-4 pb-3">

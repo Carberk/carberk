@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { AccessibilityInfo, AppState, Linking } from "react-native";
-import type * as ReactNative from "react-native";
+import * as ReactNative from "react-native";
 import * as ExpoLinking from "expo-linking";
 import * as Clipboard from "expo-clipboard";
 
@@ -107,6 +107,58 @@ it("opens the exact report target in the external browser", async () => {
   await view.findByText(target);
   await fireEvent.press(view.getByRole("button", { name: "Open report" }));
   expect(Linking.openURL).toHaveBeenCalledWith("https://reports.example.test/report?token=A%2fb%2B&part=1&part=2");
+});
+
+it("restores the report action position after a focused external-browser return resizes the reader", async () => {
+  const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
+  const requests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  const list = getHost(view.container, "RCTScrollView");
+  const input = view.getByLabelText("Your message");
+  await fireEvent.changeText(input, "Keep this focused unsent question");
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 180 } } });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 800 } } });
+  requests.length = 0;
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/report?token=A%2fb%2B&part=1&part=2");
+  await act(() => { AppState.currentState = "background"; focusManager.setFocused(false); });
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 480 } } });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 500 } } });
+  await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
+  expect(requests).toEqual([]);
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 180 } } });
+  expect(requests).toEqual([{ method: "scrollToOffset", offset: 800, animated: false }]);
+  expect(getHost(view.container, "RCTScrollView")).toBe(list);
+  expect(view.getByLabelText("Your message")).toBe(input);
+  expect(view.getByDisplayValue("Keep this focused unsent question")).toBeTruthy();
+  expect(view.getByRole("button", { name: "Open report" })).toBeEnabled();
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 180 } } });
+  expect(requests).toHaveLength(1);
+});
+
+it.each(["Copy link", "failed Open", "user scroll"])("does not restore an old report position after %s", async (action) => {
+  const requests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
+  })));
+  if (action === "failed Open") vi.mocked(Linking.openURL).mockResolvedValueOnce(false);
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a");
+  const list = getHost(view.container, "RCTScrollView");
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 480 } } });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 800 } } });
+  requests.length = 0;
+  await fireEvent.press(view.getByRole("button", { name: action === "Copy link" ? "Copy link" : "Open report" }));
+  if (action === "user scroll") await fireEvent(list, "scrollBeginDrag");
+  await act(() => { AppState.currentState = "background"; focusManager.setFocused(false); });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 500 } } });
+  await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 480 } } });
+  expect(requests).toEqual([]);
 });
 
 it("copies the complete report link and confirms only after clipboard success", async () => {
