@@ -10,7 +10,6 @@ import { uploadChatImageToPresignedUrl, type ChatImageAttachment } from "./chatI
 
 type Transfer = { attachment: ChatImageAttachment; owner?: ProfilePhotoSession; key?: string; putConfirmed?: boolean; job?: Promise<ConversationsSchemas.ImageMessageMetadata> };
 
-/** One issuance/payload per pending Message; retry never replaces the key or replays a Message. */
 export function useChatImageTransfer(conversationId: string) {
   const presign = usePresignChatAttachment();
   const transfers = useRef(new Map<string, Transfer>());
@@ -53,13 +52,11 @@ export function useChatImageTransfer(conversationId: string) {
           grant = renewed;
         } catch (error) {
           if (!(error instanceof ApiError) || error.code !== "UPLOAD_NOT_AVAILABLE") throw error;
-          // A committed/cleaned object can refuse renewal. Only the original
-          // same-clientMessageId send may reconcile it; this is not send success.
           await assertSession();
           return metadata();
         }
       } else {
-        const issued = await presign.mutateAsync({ conversationId, request });
+        const issued = await presign.mutateAsync({ conversationId, request, assertSession });
         retained.key = issued.key;
         grant = issued;
       }

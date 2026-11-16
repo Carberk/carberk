@@ -22,7 +22,7 @@ type PhotoUploadState =
   | { status: "idle" }
   | { status: "uploading"; uri: string; percent: number | null; preparing?: boolean }
   | { status: "removing" }
-  | { status: "failed" | "offline" | "too_large" | "unsupported"; operation?: "remove"; reason?: "listing" | "suspended" };
+  | { status: "failed" | "offline" | "too_large" | "unsupported"; operation?: "remove"; reason?: "listing" | "suspended" | "unusable" };
 interface SelectedPhoto {
   asset: ImagePicker.ImagePickerAsset;
   compressed?: CompressionResult;
@@ -129,8 +129,6 @@ export function useProfilePhotoUpload() {
           transferring = false;
           if (cancelled) return;
           cancelled = true;
-          // SDK 55 removes its progress subscription only after a resolved upload.
-          // cancelAsync also releases it when the native upload promise rejects.
           void task.cancelAsync().catch(() => {});
         };
         photo.stopTransfer = stopTransfer;
@@ -271,8 +269,9 @@ function conflictReason(error: unknown): IdentitySchemas.ProfilePhotoConflictRea
   return parsed.success ? parsed.data.reason : undefined;
 }
 
-function refusalReason(error: unknown): "listing" | "suspended" | undefined {
+function refusalReason(error: unknown): "listing" | "suspended" | "unusable" | undefined {
   if (conflictReason(error) === IdentitySchemas.ProfilePhotoConflictReason.UploadAttachedToListing) return "listing";
+  if (error instanceof ApiError && error.status === 400 && error.code === "UPLOAD_NOT_AVAILABLE") return "unusable";
   if (error instanceof ApiError && error.status === 403 &&
     (error.code === AdminSchemas.AdminErrorReason.UserSuspended || AdminSchemas.UserSuspendedDetailsSchema.safeParse(error.details).success)) return "suspended";
   return undefined;

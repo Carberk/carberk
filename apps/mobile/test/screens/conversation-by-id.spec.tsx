@@ -1158,6 +1158,7 @@ describe("Conversation about a closed Listing", () => {
     expect(state.mutation.mutateAsync).toHaveBeenCalledWith({
       conversationId: CONVERSATION_ID,
       request: { contentType: "image/webp", sizeBytes: 1000 },
+      assertSession: expect.any(Function),
     });
     expect(state.socket.sendImageMessage).not.toHaveBeenCalled();
     expect(await screen.findByText("You can't send messages in this Conversation")).toBeTruthy();
@@ -1199,6 +1200,7 @@ describe("Conversation about a closed Listing", () => {
     expect(state.mutation.mutateAsync).toHaveBeenLastCalledWith({
       conversationId: CONVERSATION_ID,
       request: { contentType: "image/webp", sizeBytes: 1000 },
+      assertSession: expect.any(Function),
     });
     expect(state.socket.sendImageMessage).toHaveBeenCalledTimes(2);
     expect(state.socket.sendImageMessage.mock.calls[1]?.[0]).toEqual(state.socket.sendImageMessage.mock.calls[0]?.[0]);

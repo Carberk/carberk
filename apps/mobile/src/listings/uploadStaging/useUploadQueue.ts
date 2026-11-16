@@ -355,9 +355,9 @@ export function useUploadQueue(
           : await presignMutation.mutateAsync({
           kind: "image",
           contentType: "image/webp",
-          // A photo restored from staging has no recorded size; its file does.
           sizeBytes,
           writeProtocol: "conditional-v1",
+          assertSession: assertCurrent,
         });
 
         await assertCurrent();

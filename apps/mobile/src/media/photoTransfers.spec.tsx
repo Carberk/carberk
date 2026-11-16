@@ -6,9 +6,13 @@ import { act } from "../../test/render";
 import { server } from "../../test/msw";
 import { setupPhotoHook, signInPhotoUser } from "../../test/profile-photo-api";
 import { captureRouteSnapshot, provisionGatewayKey, selectTesterRoute } from "../api/routes";
-import { clearAuthSession } from "../auth/session";
+import { clearAuthSession, storeAuthSession } from "../auth/session";
 import { useChatImageTransfer } from "../conversations/upload/useChatImageTransfer";
+import { photoDevice, resetPhotoDevice } from "../../test/profile-photo-device";
 import { useUploadQueue } from "../listings/uploadStaging/useUploadQueue";
+import { capturePhotoSession } from "../identity/profilePhotoSession";
+import { usePresignUpload } from "../api/uploads/usePresignUpload";
+import { usePresignChatAttachment } from "../api/conversations/usePresignChatAttachment";
 
 vi.mock("expo-secure-store", async () => {
   const { photoApiStorage } = await import("../../test/profile-photo-storage");
@@ -16,10 +20,7 @@ vi.mock("expo-secure-store", async () => {
     setItemAsync: async (key: string, value: string) => { photoApiStorage.set(key, value); },
     deleteItemAsync: async (key: string) => { photoApiStorage.delete(key); } };
 });
-vi.mock("expo-file-system/legacy", () => ({ documentDirectory: "file:///doc/", FileSystemUploadType: { BINARY_CONTENT: 0 },
-  getInfoAsync: async () => ({ exists: true, size: 2048 }), readDirectoryAsync: async () => ["one.webp"], deleteAsync: async () => {},
-  uploadAsync: vi.fn(async () => ({ status: 200, headers: {}, body: "" })),
-}));
+vi.mock("expo-file-system/legacy", async () => (await import("../../test/profile-photo-device")).fileSystemFake);
 vi.mock("expo-image-manipulator", async () => (await import("../../test/profile-photo-device")).imageManipulatorFake);
 vi.mock("@react-native-community/netinfo", () => ({ default: { addEventListener: () => () => {}, fetch: async () => ({ isConnected: true }) } }));
 const origin = "https://minio-staging-5795.up.railway.app";
@@ -30,6 +31,7 @@ beforeEach(async () => {
   vi.stubGlobal("__DEV__", true);
   vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
   vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true"); vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  resetPhotoDevice(); photoDevice.staged = ["one.webp"];
   await signInPhotoUser(); await provisionGatewayKey("synthetic-photo-gateway-access-key"); selectTesterRoute("tm"); puts.mockClear();
 });
 afterEach(() => { selectTesterRoute("global"); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
@@ -80,4 +82,26 @@ it("refuses a Listing transfer when the API omits the conditional fence", async 
   const { result } = await setupPhotoHook(() => useUploadQueue("missing-fence", { photos: [] }));
   await vi.waitFor(() => expect(result.current.photos[0]?.state).toBe("failed"));
   expect(puts).not.toHaveBeenCalled();
+});
+
+it.each(["listing", "chat"])("does not issue a %s grant after its initiating session ends", async (kind) => {
+  const owner = await capturePhotoSession();
+  const issued: unknown[] = [];
+  server.use(http.post("*/uploads/presign", async ({ request }) => { issued.push(await request.json()); return HttpResponse.json(grant); }),
+    http.post("*/attachments/presign", async ({ request }) => { issued.push(await request.json()); return HttpResponse.json(grant); }));
+  const { result } = await setupPhotoHook(() => ({ listing: usePresignUpload(), chat: usePresignChatAttachment() }));
+  await clearAuthSession();
+  await storeAuthSession({ accessToken: "next-user", refreshToken: "next-refresh", user: {
+    id: "00000000-0000-4000-8000-00000000000b", phone: null, email: "next@example.test", displayName: "Next", role: "buyer",
+  } });
+  try {
+    const assertSession = () => owner.current();
+    await act(async () => {
+      const request = { contentType: "image/webp" as const, sizeBytes: 2048 };
+      const job = kind === "listing" ? result.current.listing.mutateAsync({ ...request, kind: "image", writeProtocol: "conditional-v1", assertSession })
+        : result.current.chat.mutateAsync({ conversationId: "conversation-one", request, assertSession });
+      await expect(job).rejects.toThrow();
+    });
+    expect(issued).toEqual([]);
+  } finally { owner.dispose(); }
 });

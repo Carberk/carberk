@@ -1,7 +1,10 @@
 import { http, HttpResponse } from "msw";
+import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo } from "react-native";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { storeAuthSession } from "../../src/auth/session";
+import { photoApiStorage } from "../profile-photo-storage";
 import { server } from "../msw";
 import SellScreen from "../../app/(tabs)/sell";
 import { ApiError } from "../../src/api/client";
@@ -132,7 +135,13 @@ async function openCheck() {
   return screen;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  server.use(http.get("*/me/contact-phones", () => HttpResponse.json({ items: [] })));
+  photoApiStorage.clear();
+  vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key) => photoApiStorage.get(key) ?? null);
+  vi.mocked(SecureStore.setItemAsync).mockImplementation(async (key, value) => { photoApiStorage.set(key, value); });
+  vi.mocked(SecureStore.deleteItemAsync).mockImplementation(async (key) => { photoApiStorage.delete(key); });
+  await storeAuthSession({ accessToken: "seller", refreshToken: "refresh-seller", user: { id, phone: "+99365000000", email: null, displayName: null, role: "buyer" } });
   server.use(http.get("*/me", () => HttpResponse.json({
     id: fixture.id, phone: "+99365000000", email: null, phoneVerified: true,
     displayName: null, nameNumber: 1234, avatarIndex: 0, avatarKey: null, avatarUrl: null,
@@ -143,7 +152,7 @@ beforeEach(() => {
   fixture.staged = { [`draft-${id}`]: [`${photoId}.webp`] };
   fixture.stagingRead = null;
   fixture.patch.mockReset().mockResolvedValue({});
-  fixture.presign.mockReset().mockResolvedValue({ uploadUrl: "http://localhost/put", key: "uploaded-again.webp" });
+  fixture.presign.mockReset().mockResolvedValue({ uploadUrl: "http://localhost/put", key: "uploaded-again.webp", headers: { "if-match": '"empty"', "content-type": "image/webp" } });
   fixture.upload.mockReset().mockResolvedValue({ status: 200 });
   fixture.show.mockReset();
   fixture.mutation.mutateAsync.mockReset().mockResolvedValue({ id });
@@ -416,14 +425,14 @@ describe("Check and publish: what blocks publishing (#588)", () => {
   it("counts the photos still uploading, and lets Publish go when they finish", async () => {
     // A second photo was compressed but not uploaded when the app closed.
     fixture.staged[`draft-${id}`] = [`${photoId}.webp`, `${secondPhoto}.webp`];
-    let finishPresign = (_value: { uploadUrl: string; key: string }) => {};
+    let finishPresign = (_value: { uploadUrl: string; key: string; headers: Record<string, string> }) => {};
     fixture.presign.mockImplementation(() => new Promise((resolve) => { finishPresign = resolve; }));
     const screen = await openCheck();
 
     expect(await screen.findByText("Photos still uploading: 1")).toBeTruthy();
     expect(disabled(screen)).toBe(true);
 
-    await act(async () => { finishPresign({ uploadUrl: "http://localhost/put", key: `${secondPhoto}.webp` }); });
+    await act(async () => { finishPresign({ uploadUrl: "http://localhost/put", key: `${secondPhoto}.webp`, headers: { "if-match": '"empty"', "content-type": "image/webp" } }); });
     await pause(20);
 
     expect(screen.queryByText(/Photos still uploading/)).toBeNull();

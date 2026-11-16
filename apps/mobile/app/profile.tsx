@@ -344,7 +344,7 @@ function SignedInProfile() {
           {photoErrorText}
         </Text>
         <View className="flex-row flex-wrap gap-2">
-          {photo.state.reason === "suspended" ? null : photo.state.status === "failed" || photo.state.status === "offline" ?
+          {photo.state.reason === "suspended" ? null : photo.state.reason !== "listing" && photo.state.reason !== "unusable" && (photo.state.status === "failed" || photo.state.status === "offline") ?
             <Button variant="ghost" className="min-h-11" onPress={() => void photo.retry()}><Text>{t("common:retry")}</Text></Button> :
             <Button variant="ghost" className="min-h-11" onPress={() => { photo.cancel(); setPhotoSheetOpen(true); }}><Text>{t("chooseOther")}</Text></Button>}
           <Button variant="ghost" className="min-h-11" onPress={photo.cancel}><Text>{t("common:cancel")}</Text></Button>

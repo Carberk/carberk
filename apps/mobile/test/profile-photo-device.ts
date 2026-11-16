@@ -1,5 +1,5 @@
 import type { ImagePickerAsset, ImagePickerResult } from "expo-image-picker";
-import type { UploadProgressData, FileSystemUploadOptions } from "expo-file-system/legacy";
+import type { UploadProgressData, FileSystemUploadOptions, FileSystemUploadResult } from "expo-file-system/legacy";
 import { vi } from "vitest";
 
 /** Native boundaries shared by Profile's rendered flow and its upload hook tests. */
@@ -7,6 +7,8 @@ export const photoDevice = {
   result: { canceled: true, assets: null } as ImagePickerResult,
   cameraGranted: false,
   size: 2048,
+  staged: [] as string[],
+  upload: vi.fn(async (_url: string, _uri: string, _options?: FileSystemUploadOptions): Promise<FileSystemUploadResult> => ({ status: 200, headers: {}, body: "", mimeType: "image/webp" })),
   readable: true,
   dimensions: { width: 1024, height: 1024 },
   renderWait: null as Promise<void> | null,
@@ -30,6 +32,8 @@ export function resetPhotoDevice() {
   photoDevice.result = { canceled: true, assets: null };
   photoDevice.cameraGranted = false;
   photoDevice.size = 2048;
+  photoDevice.staged = [];
+  photoDevice.upload.mockReset().mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/webp" });
   photoDevice.readable = true;
   photoDevice.dimensions = { width: 1024, height: 1024 };
   photoDevice.renderWait = null;
@@ -52,6 +56,9 @@ export function choosePhoto(overrides: Partial<ImagePickerAsset> = {}) {
 }
 
 export const fileSystemFake = {
+  documentDirectory: "file:///doc/",
+  readDirectoryAsync: async () => photoDevice.staged,
+  uploadAsync: photoDevice.upload,
   cacheDirectory: "file:///cache/",
   FileSystemUploadType: { BINARY_CONTENT: 0 },
   FileSystemSessionType: { BACKGROUND: 0, FOREGROUND: 1 },

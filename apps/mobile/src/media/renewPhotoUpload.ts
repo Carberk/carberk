@@ -6,7 +6,6 @@ import { ApiError, apiClient } from "../api/client";
 
 import { photoRequest } from "./photoRoute";
 
-/** Retain issuance identity. Presence resolves a lost PUT response, never adoption or write authority. */
 export async function renewPhotoUpload(grant: UploadsSchemas.PresignResponse, sizeBytes: number, assertSession?: () => Promise<unknown>, route = captureRouteSnapshot()): Promise<UploadsSchemas.PresignResponse | null> {
   try {
     const renewed = await apiClient.post("/uploads/renew", { key: grant.key, contentType: "image/webp", sizeBytes }, UploadsSchemas.PresignResponseSchema, { assertSession });

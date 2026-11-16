@@ -51,7 +51,7 @@ const me = {
   createdAt: "2026-01-15T00:00:00.000Z", deletionScheduledAt: null,
 } satisfies AuthSchemas.MeResponse;
 let currentMe: AuthSchemas.MeResponse = me;
-const requests = { presigns: [] as unknown[], sets: [] as unknown[] };
+const requests = { presigns: [] as unknown[], renewals: [] as unknown[], sets: [] as unknown[] };
 
 beforeEach(async () => {
   await resetProfilePhotoUpload();
@@ -61,6 +61,7 @@ beforeEach(async () => {
   currentMe = me;
   requests.presigns = [];
   requests.sets = [];
+  requests.renewals = [];
   onlineManager.setOnline(true);
   profilePhotoUploadStore.setState({ state: { status: "idle" } });
   profileNoticeStore.getState().clear();
@@ -69,6 +70,11 @@ beforeEach(async () => {
     http.post("*/uploads/presign", async ({ request }) => {
       requests.presigns.push(await request.json());
       return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: `pending/new${requests.presigns.length}/original.webp`, expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"', "content-type": "image/webp" } });
+    }),
+    http.post("*/uploads/renew", async ({ request }) => {
+      const body = await request.json() as { key: string };
+      requests.renewals.push(body);
+      return HttpResponse.json({ uploadUrl: "https://storage.example/photo", key: body.key, expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"etag"', "content-type": "image/webp" } });
     }),
     http.put("*/me/photo", async ({ request }) => {
       const body = await request.json() as { key: string };
@@ -154,7 +160,7 @@ describe("Profile photo", () => {
       sent.push(auth);
       if (auth !== "Bearer fresh") return HttpResponse.json({ code: "UNAUTHORIZED" }, { status: 401 });
       if (sent.filter((value) => value === "Bearer fresh").length === 1) return HttpResponse.json({ code: "INTERNAL" }, { status: 500 });
-      currentMe = { ...me, avatarKey: operation === "remove" ? null : "pending/new2/original.webp" };
+      currentMe = { ...me, avatarKey: operation === "remove" ? null : "pending/new1/original.webp" };
       return HttpResponse.json(currentMe);
     };
     server.use(http.post("*/auth/refresh", () => {
@@ -173,9 +179,8 @@ describe("Profile photo", () => {
     expect(refreshes).toBe(1);
     await fireEvent.press(view.getByRole("button", { name: "Retry" }));
     if (operation === "upload") {
-      await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
-      expect(picker.sent[0]?.uri).toBe(picker.sent[1]?.uri);
-      await act(async () => { picker.finish(); });
+      expect(picker.sent).toHaveLength(1);
+      expect(requests.presigns).toHaveLength(1);
     }
     expect(await view.findByText(operation === "remove" ? "Photo removed" : "Photo updated")).toBeTruthy();
     expect(sent).toEqual(["Bearer aman", "Bearer fresh", "Bearer fresh"]);
@@ -294,10 +299,14 @@ describe("Profile photo", () => {
     expect(error.props.accessibilityLiveRegion).toBe("assertive");
     expect(queryAllHosts(view.container, "Image")[0]?.props.source).toEqual({ uri: "https://media.autotm.tm/listing-photos/pending/old/thumbnail.webp?v=webp-natural-1" });
     await fireEvent.press(view.getByRole("button", { name: "Retry" }));
-    await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
+    if (phase === "storage") {
+      await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
+      expect(picker.sent[1]?.uri).toBe(picker.sent[0]?.uri);
+      await act(async () => { picker.finish(500); });
+    } else expect(picker.sent).toHaveLength(1);
     expect(picker.library).toHaveBeenCalledOnce();
-    expect(picker.sent[1]?.uri).toBe(picker.sent[0]?.uri);
-    await act(async () => { picker.finish(500); });
+    expect(requests.presigns).toHaveLength(1);
+    expect(requests.sets.every((body) => (body as { key: string }).key === "pending/new1/original.webp")).toBe(true);
     await view.findByText("Couldn't upload the photo.");
     await fireEvent.press(view.getByRole("button", { name: "Cancel" }));
     expect(view.queryByText("Couldn't upload the photo.")).toBeNull();
@@ -414,8 +423,8 @@ describe("Profile photo", () => {
   it.each([
     [400, "UPLOAD_NOT_AVAILABLE", undefined, "Couldn't upload the photo."],
     [400, "UPLOAD_OBJECT_INVALID", undefined, "Couldn't upload the photo."],
-    [409, "UPLOAD_ALREADY_ATTACHED", "UPLOAD_ATTACHED_TO_LISTING", "This upload belongs to a listing. Retry to upload a new copy."],
-  ])("freshly presigns after %s %s %s, keeping the chosen photo", async (status, code, reason, message) => {
+    [409, "UPLOAD_ALREADY_ATTACHED", "UPLOAD_ATTACHED_TO_LISTING", "This photo is used by a listing."],
+  ])("recovers from %s %s %s without replacing a retry key", async (status, code, reason, message) => {
     choosePhoto();
     server.use(http.put("*/me/photo", async ({ request }) => {
       const body = await request.json() as { key: string };
@@ -432,13 +441,26 @@ describe("Profile photo", () => {
     await act(async () => { picker.finish(); });
     expect(await view.findByText(message)).toBeTruthy();
     expect(view.queryByText("Photo updated")).toBeNull();
-    await fireEvent.press(view.getByRole("button", { name: "Retry" }));
-    await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
-    await act(async () => { picker.finish(); });
-    expect(await view.findByText("Photo updated")).toBeTruthy();
-    expect(requests.presigns).toHaveLength(2);
-    expect(requests.sets).toEqual([{ key: "pending/new1/original.webp" }, { key: "pending/new2/original.webp" }]);
-    expect(picker.library).toHaveBeenCalledOnce();
+    if (code === "UPLOAD_OBJECT_INVALID") {
+      await fireEvent.press(view.getByRole("button", { name: "Retry" }));
+      expect(await view.findByText("Photo updated")).toBeTruthy();
+      expect(picker.sent).toHaveLength(1);
+      expect(requests.presigns).toHaveLength(1);
+      expect(requests.sets).toEqual([{ key: "pending/new1/original.webp" }, { key: "pending/new1/original.webp" }]);
+      expect(picker.library).toHaveBeenCalledOnce();
+    } else {
+      expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
+      expect(requests.presigns).toHaveLength(1);
+      await fireEvent.press(view.getByRole("button", { name: "Choose another photo" }));
+      expect(requests.presigns).toHaveLength(1);
+      await fireEvent.press(view.getByRole("button", { name: "Choose from library" }));
+      await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
+      await act(async () => { picker.finish(); });
+      expect(await view.findByText("Photo updated")).toBeTruthy();
+      expect(requests.presigns).toHaveLength(2);
+      expect(requests.sets).toEqual([{ key: "pending/new1/original.webp" }, { key: "pending/new2/original.webp" }]);
+      expect(picker.library).toHaveBeenCalledTimes(2);
+    }
   });
 
   it.each(["USER_SUSPENDED", "FORBIDDEN"])("keeps the earlier photo for 403 %s and offers no futile retry", async (code) => {
@@ -590,15 +612,17 @@ describe("Profile photo", () => {
       expect(view.getByText("Couldn't upload the photo.")).toBeTruthy();
       expect(attempts).toBe(30);
       expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
+      server.use(http.put("*/me/photo", async ({ request }) => {
+        const body = await request.json() as { key: string };
+        expect(body.key).toBe("pending/new1/original.webp");
+        return HttpResponse.json({ ...me, avatarKey: body.key });
+      }));
       await fireEvent.press(view.getByRole("button", { name: "Retry" }));
-      await vi.waitFor(() => expect(picker.sent).toHaveLength(2));
-      expect(picker.sent[0]?.uri).toBe(picker.sent[1]?.uri);
+      expect(picker.sent).toHaveLength(1);
       expect(picker.library).toHaveBeenCalledOnce();
-      server.use(http.put("*/me/photo", () => HttpResponse.json({ ...me, avatarKey: "pending/new2/original.webp" })));
-      await act(async () => { picker.finish(); });
       await vi.waitFor(() => expect(view.getByText("Photo updated")).toBeTruthy());
     }
-    expect(picker.sent).toHaveLength(ending === "cancel" ? 1 : 2);
+    expect(picker.sent).toHaveLength(1);
   });
 
   it.each(["library", "camera", "permission"])("ignores a late %s rejection after the next User signs in", async (boundary) => {
@@ -804,7 +828,7 @@ describe("Profile photo", () => {
     await act(async () => { picker.finish(state === "failed" ? 500 : 200); });
     if (state === "failed" || state === "attached to listing") {
       expect(await view.findByText(state === "failed" ? copy.photoFail : copy.attached)).toBeTruthy();
-      expect(view.getByRole("button", { name: copy.retry })).toBeTruthy();
+      expect(view.getByRole("button", { name: state === "attached to listing" ? copy.chooseOther : copy.retry })).toBeTruthy();
       await fireEvent.press(view.getByRole("button", { name: copy.cancel }));
     } else {
       if (state === "preparing") {
