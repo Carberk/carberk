@@ -9,6 +9,11 @@ Use this skill when an approved spec has more than one ticket. The parent
 thread coordinates the graph; implementation agents own isolated worktrees.
 There is no separate coordinator agent and no integration branch.
 
+One parent may own related approved graphs. Keep each graph's milestone,
+dependencies, ledger and fixed final-review base distinct; share the parent's
+implementation limit across them. Independently owned graphs keep their own
+parents and coordinate concrete overlaps directly.
+
 Read the parent spec, every child ticket, blocking edges and later founder
 corrections. Also read `AGENTS.md` and
 `docs/agents/{coding-workflow,models,environment}.md`. A missing criterion or
@@ -35,16 +40,20 @@ Keep a compact ledger in the thread with one row per ticket:
 ticket | blockers | owner | branch/worktree | PR | proof | review | merge
 ```
 
-Before dispatch, fetch `origin` and record the current `origin/main` SHA as
-`startingBase`. Preserve that SHA through every merge and pass it explicitly to
-the final review. Do not recompute a merge-base against the new `main`, which
-would hide tickets that already merged.
+For each graph, fetch `origin` before its first dispatch and record the current
+`origin/main` SHA as `startingBase`. Preserve that SHA through every merge and
+pass it explicitly to that graph's final review. A takeover retains the
+graph's recorded base; recomputing it against new `main` would hide merged work.
+
+At a delivery decision or changed blocker, state the next deliverable, owner,
+missing proof, actual blocker and next action alongside the ledger.
 
 ## Graph and dispatch
 
-Use at most three implementation tickets concurrently. A ticket is ready when
-all its blockers are merged into `main`, not merely open as PRs. Check for
-cycles, already-merged work and overlapping owned paths before dispatching.
+Use at most three implementation tickets concurrently across all graphs this
+parent owns, including parent-implemented tickets. A ticket is ready when all
+its blockers are merged into `main`, not merely open as PRs. Check for cycles,
+already-merged work and overlapping owned paths before dispatching.
 
 Each ticket gets one small PR from current `main`. Give its agent:
 
@@ -64,6 +73,25 @@ The agent that creates, takes over or pushes a PR links it immediately as its
 next tool call. Children never watch PRs and never make merge decisions; the
 parent thread watches and integrates. Follow each delegate's returned next
 step, and do not poll or launch replacement work while a delegate is running.
+
+## Parent decisions
+
+1. Choose the next independently verifiable milestone. Prefer ready work that
+   completes a user journey or unblocks downstream tickets; preserve existing
+   owners, patches and valid proof.
+2. Assign whole tickets with the authority above. Owners handle their routine
+   setup, fixes, checks, proof and PR preparation; the parent handles graph
+   decisions, concrete conflicts and integration.
+3. When blocked, identify the missing acceptance or capability and continue
+   independent ready work within the implementation limit. Resolve shared
+   resource conflicts under the [environment guide](../../../docs/agents/environment.md#assignment-and-resource-authority).
+4. Integrate a completed ticket promptly through the merge gate below. When
+   independent parents have ready PRs, agree their final merge order so
+   equivalent rebases and CI do not repeatedly chase each other.
+5. When only delegate or PR completion remains, register the supported
+   completion notification or watcher and end the turn. On a wake, make the
+   next merge-gate or blocker decision. An unchanged status or an event for
+   already-completed work needs no monitoring loop or repeat update.
 
 ## Integrate
 
@@ -85,7 +113,11 @@ squash merge; never bypass branch protection. After a merge, refresh `main`,
 remove that ticket's worktree and dispatch newly unblocked tickets. Keep
 independent tickets moving when another ticket is parked.
 
-Owners run routine local commands directly; parent approval is not a per-command gate. Preserve existing feature environments and let delivery continue without requiring tooling adoption. Coordinate actual heavy compute, native devices, browser sessions and shared staging operations separately. Idle API/Metro sessions and conditional future jobs hold no compute lane. Rechecks state what invalidated earlier proof; keep required proof, isolated review and CI.
+Follow the environment guide for owned setup and separate resource ownership.
+Reuse valid proof under the [delivery workflow](../../../docs/agents/coding-workflow.md#3-prove-it);
+name the source, dependency, fixture, origin or failed-check change that
+invalidated it before repeating expensive checks. Required acceptance,
+independent review and current-head CI remain gates.
 
 ## Finish
 

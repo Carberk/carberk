@@ -64,13 +64,15 @@ Copy each app's `.env.template` to `.env` and keep secrets out of git. The templ
 
 ### Assignment and resource authority
 
-Assignment grants standing authority for routine setup, tests, fixes and data-preserving process recovery inside the owner's worktree/runtime. Owners choose and run the necessary commands without per-command parent grants or frozen command packets. Coordinate only a concrete shared resource or an authority boundary; identify the resource, current owner and operation that would conflict.
+Assignment grants standing authority for routine setup, tests, fixes and data-preserving process recovery inside the owner's worktree/runtime. Owners choose and run the necessary commands without per-command parent grants or frozen command packets. A shared-resource hold identifies the resource, actual conflicting operation, current owner and release condition; coordinate authority boundaries separately. Keep independent source work, focused lightweight checks and hosted CI moving while that conflict is resolved.
 
 Treat compute, devices, browsers and staging as separate resources. Coordinate an actual heavy build/test/export/FFmpeg job with other active heavy jobs, and send its actual start/release when contention exists. An idle API/worker/Metro is not a compute reservation; a conditional future job does not hold a free build lane. Keep FFmpeg transcode concurrency at one on this host. Device selection/handoff follows the owned-device procedure below; browser work owns its tabs/sessions; actual shared staging operations follow the Railway authority below and any task-specific restriction. A local compute grant does not transfer a device, browser session or staging target.
 
 ## iOS Simulator
 
-Test the app on the iOS Simulator. Android is not used for development testing on this Mac; use it only when a ticket is Android-only or the founder asks. Expo Go cannot run this app, so use a development build. The [mobile/Expo checks](mobile-expo.md) cover builds, pitfalls and required gates.
+Use the installed iOS development client with Metro for routine mobile proof. Android builds and emulation impose substantial CPU cost on this Mac, so reserve them for Android-specific acceptance, required release checks or explicit founder direction. JavaScript and styling changes reuse the client; native dependency or configuration changes require a rebuild under the [mobile/Expo checks](mobile-expo.md). Expo Go cannot run this app.
+
+Confirm the required device, fixture and tool capability before scheduling runtime proof. A missing iOS or browser capability remains an explicit acceptance gap while independent work continues; it does not by itself authorize an Android detour or waive the required proof.
 
 **In T3 Code**, drive devices only through the device tools, so the founder can watch in the Device panel:
 

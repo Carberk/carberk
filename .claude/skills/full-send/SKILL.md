@@ -56,11 +56,13 @@ one appears.
 7. **Report** in your final message: the PR link, the merge commit, your proof,
    and each decision you made for the user.
 
-Stay active from step 1 to step 7. If you end your turn while checks or bots are
-pending, the work stops, because nobody will prompt you again. Wait with the
-watcher from `babysit-pr`, so something wakes you when the PR changes. In T3
-Code that is `watch_pull_request`. If you stop before the merge, call
-`unwatch_pull_request` first.
+Own delivery from step 1 to step 7. Continue independent ready work while
+checks or delegates run. When only completion remains, register the supported
+delegate notification or the watcher from `babysit-pr`, then end the turn;
+yielding with that wakeup active keeps delivery moving. In T3 Code the PR
+watcher is `watch_pull_request`. On a wake, inspect the changed evidence and
+make the next delivery decision. Leave unchanged status quiet. If you hand
+work back before merge, call `unwatch_pull_request` first.
 
 ## Proof
 
