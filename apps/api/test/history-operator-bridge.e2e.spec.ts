@@ -97,6 +97,16 @@ describe("production operator actions through the authoritative listening Histor
     expect((await f.request.get(path + "/receipts").auth(customer.token, { type: "bearer" }).expect(200)).body).toEqual({ items: [
       { participantId: operator.user.id, assignmentVersion: 1, receivedOrder: "51", readOrder: "51" },
     ] });
+    await f.request.post(path + "/receipts").auth(customer.token, { type: "bearer" })
+      .send({ cursor: message.id, kind: "received" }).expect(201);
+    expect(await receipts()).toMatchObject({ status: "ok", kind: "receipts", data: { items: expect.arrayContaining([
+      { participantId: customer.user.id, assignmentVersion: 0, receivedOrder: "1", readOrder: "0" },
+    ]) } });
+    await f.request.post(path + "/receipts").auth(customer.token, { type: "bearer" })
+      .send({ cursor: message.id, kind: "read" }).expect(201);
+    expect(await receipts()).toMatchObject({ status: "ok", kind: "receipts", data: { items: expect.arrayContaining([
+      { participantId: customer.user.id, assignmentVersion: 0, receivedOrder: "1", readOrder: "1" },
+    ]) } });
     const session = await f.prisma.session.create({ data: { userId: operator.user.id, refreshTokenHash: randomUUID(),
       expiresAt: new Date(Date.now() + 600_000), adminTotpExpiresAt: new Date(Date.now() + 600_000) } });
     const freshToken = f.app.get(JwtService).sign({ sub: operator.user.id, sid: session.id, role: "buyer" });

@@ -1,14 +1,16 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
-import { historyInboxAction, type HistoryInboxResult } from "./actions";
+import { historyInboxAction, historyMessageAction, type HistoryInboxResult, type HistoryMessageResult } from "./actions";
 
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
 type Detail = Extract<HistoryInboxResult, { kind: "detail" | "claim" }>["data"];
-type Work = "refresh" | "page" | "claim";
+type Read = { message: V.HistoryMessage; eligible: () => boolean };
+type Work = "refresh" | "page" | "claim" | Read;
 type Reader = { detail: Detail | null; messages: V.HistoryMessage[]; cursor: string | null;
+  receipts: ReturnType<typeof V.HistoryReceiptsSchema.parse>["items"]; receiptState: "" | "loading" | "error" | "updated";
   state: string; notice: string; busy: boolean; focusId: string | null };
 
 /** The keyed selection owns one HTTP lane. Scope correlates the stable session;
@@ -19,25 +21,26 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
   invalidate: (result: HistoryInboxResult) => void; claimed: (version: number) => void;
 }) {
   const [reader, setReader] = useState<Reader>({ detail: null, messages: [], cursor: null,
-    state: entry, notice: "", busy: false, focusId: null });
+    receipts: [], receiptState: "", state: entry, notice: "", busy: false, focusId: null });
   const driver = useRef<(work: Work) => void>(() => {});
   const callbacks = useRef({ invalidate, claimed });
   useEffect(() => { callbacks.current = { invalidate, claimed }; });
   useEffect(() => {
     let active = true, busy = false, refused = false, pendingRefresh = false;
-    let current: Reader = { detail: null, messages: [], cursor: null, state: entry, notice: "", busy: false, focusId: null };
+    let received = 0n, read = 0n, pendingRead: Read | null = null;
+    let current: Reader = { detail: null, messages: [], cursor: null, receipts: [], receiptState: "", state: entry, notice: "", busy: false, focusId: null };
     const valid = () => active && !refused;
     function publish(patch: Partial<Reader>) {
       if (!valid()) return;
       current = { ...current, ...patch };
       setReader(current);
     }
-    function accept(result: HistoryInboxResult) {
+    function accept(result: HistoryInboxResult | HistoryMessageResult) {
       if (!valid()) return false;
       const failure = result.status !== "ok" ? result.status
         : result.scope !== scope || result.actor.id !== actorId ? "stale" : null;
       if (failure && failure !== "unavailable") {
-        publish({ detail: null, messages: [], cursor: null, state: failure, notice: "", busy: false });
+        publish({ detail: null, messages: [], receipts: [], receiptState: "", cursor: null, state: failure, notice: "", busy: false });
         refused = true;
         pendingRefresh = false;
         if (["stale", "expired", "denied"].includes(failure)) callbacks.current.invalidate({ status: failure as "stale" | "expired" | "denied" });
@@ -46,15 +49,35 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
       if (failure || !navigator.onLine) throw new Error("Recoverable read failure");
       return true;
     }
+    async function acknowledge(message: V.HistoryMessage, kind: "received" | "read", eligible = () => true) {
+      if (!valid() || !eligible()) return false;
+      const result = await historyMessageAction(locale, { id, scope, expectedAssignmentVersion: version,
+        kind: "ack", throughOrder: message.order, body: { cursor: message.id, kind } });
+      if (!accept(result) || result.status !== "ok") return false;
+      if (result.kind !== "ack") throw new Error("Unexpected acknowledgement result");
+      return eligible();
+    }
     async function run(work: Work) {
       if (!valid()) return;
-      if (busy) { if (work === "refresh") pendingRefresh = true; return; }
+      if (busy) { if (work === "refresh") pendingRefresh = true; else if (typeof work === "object") pendingRead = work; return; }
       if (!navigator.onLine) { publish({ notice: "offline" }); return; }
+      if (typeof work === "object" && (!work.eligible() || !current.detail || current.receiptState === "error" || ["offline", "unavailable", "reconnecting"].includes(current.notice)
+        || !current.messages.some((message) => message.id === work.message.id && message.order === work.message.order)
+        || BigInt(work.message.order) > received || BigInt(work.message.order) <= read)) return;
       busy = true;
       const recovering = ["offline", "unavailable", "reconnecting"].includes(current.notice);
       const recovered = current.notice === "recovered";
-      publish({ busy: true, notice: recovering ? "reconnecting" : recovered ? "recovered" : "refreshing", focusId: null });
+      let receiptWork = typeof work === "object";
+      publish({ busy: true, ...(typeof work === "object" ? {} : { notice: recovering ? "reconnecting" : recovered ? "recovered" : "refreshing", focusId: null }) });
       try {
+        if (typeof work === "object") {
+          publish({ receiptState: "loading" });
+          if (await acknowledge(work.message, "read", work.eligible)) {
+            read = BigInt(work.message.order);
+            publish({ receiptState: "updated" });
+          } else publish({ receiptState: "" });
+          return;
+        }
         const selection = { id, scope, expectedAssignmentVersion: version };
         const result = await historyInboxAction(locale, { ...selection, kind: work === "claim" ? "claim" : "detail" });
         if (!accept(result) || result.status !== "ok") return;
@@ -75,12 +98,23 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
         if (page.data.nextCursor && page.data.nextCursor !== page.data.items.at(-1)?.id) throw new Error("Invalid page frontier");
         publish({ detail: result.data, messages: [...current.messages, ...page.data.items], cursor: page.data.nextCursor,
           state: "ready", notice: recovering || recovered ? "recovered" : "", focusId: work === "page" ? page.data.items[0]?.id ?? null : null });
+        receiptWork = true;
+        publish({ receiptState: "loading" });
+        const receipts = await historyMessageAction(locale, { ...selection, kind: "receipts" });
+        if (!accept(receipts) || receipts.status !== "ok") return;
+        if (receipts.kind !== "receipts") throw new Error("Unexpected receipt result");
+        publish({ receipts: receipts.data.items });
+        const tail = current.messages.at(-1);
+        if (tail && BigInt(tail.order) > received && await acknowledge(tail, "received")) received = BigInt(tail.order);
+        publish({ receiptState: "updated" });
       } catch {
-        publish({ notice: navigator.onLine ? "unavailable" : "offline" });
+        publish(receiptWork ? { receiptState: "error", ...(!navigator.onLine ? { notice: "offline" } : {}) }
+          : { notice: navigator.onLine ? "unavailable" : "offline" });
       } finally {
         busy = false;
         publish({ busy: false });
         if (valid() && pendingRefresh) { pendingRefresh = false; void run("refresh"); }
+        else if (valid() && pendingRead) { const next = pendingRead; pendingRead = null; void run(next); }
       }
     }
     driver.current = (work) => { void run(work); };
@@ -113,5 +147,6 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
     if (previousRevision.current !== revision && entry === "loading") driver.current("refresh");
     previousRevision.current = revision;
   }, [revision, entry]);
-  return { ...reader, run: (work: Work) => driver.current(work) };
+  const acknowledgeRead = useCallback((message: V.HistoryMessage, eligible: () => boolean) => driver.current({ message, eligible }), []);
+  return { ...reader, acknowledgeRead, run: (work: Work) => driver.current(work) };
 }

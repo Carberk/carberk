@@ -39,6 +39,12 @@ beforeEach(() => {
     const url = new URL(input); requests.push({ path: url.pathname + url.search, method: init?.method ?? "GET", body: init?.body });
     if (url.pathname.endsWith("/desk")) return Response.json({ purpose: "vehicle-history", mode: "synthetic", actor, requests: [] });
     if (url.pathname.endsWith("/claim")) { assigned = true; return Response.json(detail()); }
+    if (url.pathname.endsWith("/receipts")) {
+      if (init?.method !== "POST") return Response.json({ items: [] });
+      const body = JSON.parse(String(init.body));
+      const order = body.cursor === id ? "1" : body.cursor === actor.id ? "2" : String(Number(String(body.cursor).slice(-12)));
+      return Response.json({ participantId: actor.id, assignmentVersion: 1, receivedOrder: order, readOrder: body.kind === "read" ? order : "0" });
+    }
     if (url.pathname.endsWith("/messages")) return Response.json({ items: [{ id, clientMessageId: id, order: "1", kind: "TEXT",
       text: "Can you check this car?", author: { ...actor, kind: "requester" }, createdAt: row.createdAt }], nextCursor: null });
     if (url.pathname.endsWith(id)) return Response.json(detail());
@@ -60,8 +66,8 @@ it("shows safe enquiry metadata, then claims atomically before opening the real 
   fireEvent.click(screen.getByRole("button", { name: "Claim enquiry" }));
   await screen.findByText("Can you check this car?");
   expect(screen.getAllByText("Ayna").length).toBeGreaterThan(0);
-  expect(requests.filter((r) => r.method === "POST")).toEqual([{ path: `/api/v1/vehicle-history/operator/requests/${id}/claim`, method: "POST", body: '{"expectedAssignmentVersion":0}' }]);
-  expect(requests.some((r) => r.path.includes("receipts"))).toBe(false);
+  expect(requests.filter((r) => r.method === "POST" && !r.path.includes("receipts"))).toEqual([{ path: `/api/v1/vehicle-history/operator/requests/${id}/claim`, method: "POST", body: '{"expectedAssignmentVersion":0}' }]);
+  expect(requests.filter((r) => r.path.includes("receipts") && r.method === "POST").every((r) => JSON.parse(String(r.body)).kind === "received")).toBe(true);
   expect(screen.queryByRole("textbox", { name: /reply|note/i })).toBeNull();
   await waitFor(() => expect(document.activeElement?.id).toBe("selected-enquiry"));
 });
@@ -265,7 +271,7 @@ function searchForm() {
   if (!form) throw new Error("Missing rendered search form");
   return form;
 }
-it("pages the queue and transcript through real cursor URLs without receipt writes", async () => {
+it("pages the queue and transcript through real cursor URLs with explicit Received only", async () => {
   assigned = true;
   const network = networkHandler();
   let messagePage = 0;
@@ -289,7 +295,7 @@ it("pages the queue and transcript through real cursor URLs without receipt writ
   await screen.findByText("Second page text");
   await waitFor(() => expect(document.activeElement?.textContent).toContain("Second page text"));
   expect(screen.getByText("Can you check this car?")).toBeDefined();
-  expect(requests.filter((r) => r.method === "POST")).toEqual([]);
+  expect(requests.filter((r) => r.method === "POST").every((r) => r.path.includes("receipts") && JSON.parse(String(r.body)).kind === "received")).toBe(true);
 });
 it.each([
   ["tk", "Ýüz tutmany al", "Ýüz tutmalaryň nobaty"],
@@ -580,7 +586,7 @@ it("reconciles missed incoming text on the poll clock without push or a focus ev
     await act(async () => vi.advanceTimersByTimeAsync(30_000));
     await screen.findByText("Reader message 2");
     expect(screen.getByRole("list", { name: "Enquiry conversation" }).children).toHaveLength(2);
-    expect(requests.some((request) => request.method === "POST")).toBe(false);
+    expect(requests.filter((request) => request.method === "POST").every((request) => JSON.parse(String(request.body)).kind === "received")).toBe(true);
   } finally { vi.useRealTimers(); }
 });
 
@@ -714,4 +720,424 @@ it("returns keyboard focus to the conversation when recovery removes the focused
   await waitFor(() => expect(screen.queryByRole("button", { name: "Try again" })).toBeNull());
   await waitFor(() => expect(document.activeElement).toBe(pane));
   expect(screen.getByText("Can you check this car?")).toBeDefined();
+});
+
+it("shows operator Sent, Delivered and Read only from durable requester version-zero receipts", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  let facts = [{ participantId: actor.id, assignmentVersion: 1, receivedOrder: "1", readOrder: "1" }];
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/receipts")) return Promise.resolve(Response.json(init?.method === "POST"
+      ? { participantId: actor.id, assignmentVersion: 1, receivedOrder: "1", readOrder: "0" } : { items: facts }));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({ items: url.searchParams.has("cursor") ? []
+      : [{ ...message(1, "Existing operator reply"), author: { ...actor, kind: "operator" } }], nextCursor: null }));
+    return network(input, init);
+  });
+  render(view()); await screen.findByText("Existing operator reply");
+  await screen.findByText("Sent");
+  expect(screen.queryByText("Read")).toBeNull();
+  facts = [{ participantId: id, assignmentVersion: 0, receivedOrder: "1", readOrder: "0" }];
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await screen.findByText("Delivered");
+  facts = [{ participantId: id, assignmentVersion: 0, receivedOrder: "1", readOrder: "1" }];
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await screen.findByText("Read");
+  expect(screen.queryByRole("textbox", { name: /reply|note/i })).toBeNull();
+});
+
+it("completes Received before a clipped tall row is 50% viewport eligible for 300ms", async () => {
+  selectAssigned();
+  const network = networkHandler(), received = deferred<Response>();
+  const acknowledgements: { cursor: string; kind: string }[] = [];
+  let rowTop = 202;
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  vi.stubGlobal("innerHeight", 300);
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return new DOMRect(0, this.tagName === "OL" ? 100 : rowTop, 400, this.tagName === "OL" ? 400 : 800);
+  });
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({ items: [message(1, "Uzyn tekst\nДлинный текст\n".repeat(50))], nextCursor: null }));
+    if (url.pathname.endsWith("/receipts") && init?.method === "POST") {
+      const body = JSON.parse(String(init.body)); acknowledgements.push({ cursor: body.cursor, kind: body.kind });
+      return body.kind === "received" ? received.promise : Promise.resolve(Response.json({ participantId: actor.id,
+        assignmentVersion: 1, receivedOrder: "1", readOrder: "1" }));
+    }
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    await act(async () => { render(view()); });
+    expect(acknowledgements).toEqual([{ cursor: message(1).id, kind: "received" }]);
+    await act(async () => vi.advanceTimersByTimeAsync(400));
+    expect(acknowledgements).toHaveLength(1);
+    await act(async () => received.resolve(Response.json({ participantId: actor.id, assignmentVersion: 1, receivedOrder: "1", readOrder: "0" })));
+    await act(async () => vi.advanceTimersByTimeAsync(400));
+    expect(acknowledgements).toHaveLength(1);
+    rowTop = 200;
+    fireEvent.scroll(screen.getByRole("list", { name: "Enquiry conversation" }));
+    await act(async () => vi.advanceTimersByTimeAsync(299));
+    expect(acknowledgements).toHaveLength(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(acknowledgements).toEqual([{ cursor: message(1).id, kind: "received" }, { cursor: message(1).id, kind: "read" }]);
+  } finally { vi.useRealTimers(); }
+});
+
+it.each([
+  ["en", "Could not update message status.", "Try again", "Refresh", "Sent"],
+  ["ru", "Не удалось обновить статусы сообщений.", "Попробовать ещё раз", "Обновить", "Отправлено"],
+  ["tk", "Habaryň ýagdaýy täzelenmedi.", "Gaýtadan synanyş", "Täzele", "Iberildi"],
+] as const)("retains text and factual Sent with specific receipt recovery in %s", async (locale, error, retry, refresh, sent) => {
+  selectAssigned();
+  const network = networkHandler(); let failed = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({ items: url.searchParams.has("cursor") ? []
+      : [{ ...message(1, "Existing operator reply"), author: { ...actor, kind: "operator" } }], nextCursor: null }));
+    if (failed && url.pathname.endsWith("/receipts")) return Promise.resolve(Response.json({}, { status: 503 }));
+    return network(input, init);
+  });
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  await screen.findByText(sent);
+  const pane = screen.getByRole("list", { name: /hat alyşmasy|Переписка|Enquiry conversation/ });
+  pane.scrollTop = 40; fireEvent.scroll(pane);
+  failed = true; fireEvent.click(screen.getByRole("button", { name: refresh }));
+  await screen.findByText(error);
+  expect(screen.getByText("Existing operator reply")).toBeDefined();
+  expect(screen.getByText(sent)).toBeDefined();
+  expect(pane.scrollTop).toBe(40);
+  failed = false;
+  const button = screen.getByRole("button", { name: retry }); button.focus(); fireEvent.click(button);
+  await waitFor(() => expect(screen.queryByText(error)).toBeNull());
+  await waitFor(() => expect(document.activeElement).toBe(pane));
+  expect(screen.getByText(sent)).toBeDefined();
+});
+
+function receiptViewport() {
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  vi.stubGlobal("innerHeight", 1000);
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return new DOMRect(0, 100, 400, this.tagName === "OL" ? 400 : 80);
+  });
+}
+
+it.each(["focus", "hidden", "offline", "clipped"])("restarts visible Read dwell after %s interrupts eligibility", async (cause) => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler();
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    return url.pathname.endsWith("/messages") ? Promise.resolve(Response.json({ items: url.searchParams.has("cursor") ? []
+      : [message(1)], nextCursor: null })) : network(input, init);
+  });
+  const writes = () => requests.filter((request) => request.path.includes("/receipts") && request.method === "POST")
+    .map((request) => JSON.parse(String(request.body)).kind);
+  const change = (blocked: boolean) => {
+    if (cause === "focus") vi.mocked(document.hasFocus).mockReturnValue(!blocked);
+    if (cause === "hidden") vi.spyOn(document, "visibilityState", "get").mockReturnValue(blocked ? "hidden" : "visible");
+    if (cause === "offline") vi.spyOn(navigator, "onLine", "get").mockReturnValue(!blocked);
+    if (cause === "clipped") vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+      return new DOMRect(0, blocked && this.tagName !== "OL" ? 900 : 100, 400, this.tagName === "OL" ? 400 : 80);
+    });
+    if (cause === "hidden") document.dispatchEvent(new Event("visibilitychange"));
+    else window.dispatchEvent(new Event(cause === "focus" ? blocked ? "blur" : "focus" : cause === "offline" ? blocked ? "offline" : "online" : "scroll"));
+  };
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    await act(async () => { render(view()); });
+    expect(writes()).toEqual(["received"]);
+    await act(async () => vi.advanceTimersByTimeAsync(200));
+    await act(async () => change(true));
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(writes()).toEqual(["received"]);
+    await act(async () => change(false));
+    await act(async () => vi.advanceTimersByTimeAsync(299));
+    expect(writes()).toEqual(["received"]);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(writes()).toEqual(["received", "read"]);
+  } finally { vi.useRealTimers(); }
+});
+
+it("requires a fresh visible dwell after focus returns while Received is pending", async () => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler(), received = deferred<Response>();
+  const writes: string[] = [];
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({
+      items: url.searchParams.has("cursor") ? [] : [message(1)], nextCursor: null,
+    }));
+    if (url.pathname.endsWith("/receipts") && init?.method === "POST") {
+      const kind = JSON.parse(String(init.body)).kind;
+      writes.push(kind);
+      if (kind === "received") return received.promise;
+    }
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    await act(async () => { render(view()); });
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(writes).toEqual(["received"]);
+    vi.mocked(document.hasFocus).mockReturnValue(false);
+    await act(async () => window.dispatchEvent(new Event("blur")));
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    vi.mocked(document.hasFocus).mockReturnValue(true);
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    await act(async () => received.resolve(Response.json({ participantId: actor.id,
+      assignmentVersion: 1, receivedOrder: "1", readOrder: "0" })));
+    await act(async () => vi.advanceTimersByTimeAsync(299));
+    expect(writes).toEqual(["received"]);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(writes).toEqual(["received", "read"]);
+  } finally { vi.useRealTimers(); }
+});
+
+it.each(["receipts", "received", "read"].flatMap((work) =>
+  (work === "receipts" ? ["http", "lost"] : ["http", "lost", "short"]).map((fault) => [work, fault])))
+  ("retains factual progress after %s %s failure until explicit Retry", async (work, fault) => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler(), attempts: string[] = [];
+  let failed = true;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({ items: url.searchParams.has("cursor") ? []
+      : [{ ...message(1, "Durable operator text"), author: { ...actor, kind: "operator" } }], nextCursor: null }));
+    if (url.pathname.endsWith("/receipts")) {
+      const kind = init?.method === "POST" ? JSON.parse(String(init.body)).kind : "receipts";
+      attempts.push(kind);
+      if (failed && kind === work) {
+        if (fault === "lost") return Promise.reject(new Error("Connection lost after request"));
+        return Promise.resolve(fault === "http" ? Response.json({}, { status: 503 }) : Response.json({
+          participantId: actor.id, assignmentVersion: 1, receivedOrder: work === "read" ? "1" : "0", readOrder: "0",
+        }));
+      }
+    }
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    await act(async () => { render(view()); });
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(screen.getByText("Could not update message status.")).toBeDefined();
+    expect(screen.getByText("Durable operator text")).toBeDefined();
+    expect(screen.getByText("Sent")).toBeDefined();
+    expect(screen.queryByText("Message status updated.")).toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(attempts.filter((kind) => kind === work)).toHaveLength(1);
+    if (work !== "read") expect(attempts).not.toContain("read");
+    failed = false;
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Try again" })));
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(screen.queryByText("Could not update message status.")).toBeNull();
+    expect(attempts.filter((kind) => kind === work)).toHaveLength(2);
+    expect(screen.getByText("Sent")).toBeDefined();
+  } finally { vi.useRealTimers(); }
+});
+
+
+it.each(["receipts", "received", "read"].flatMap((work) => [401, 403, 409].map((status) => [work, status] as const)))
+  ("hides protected text after %s returns HTTP %s", async (work, status) => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler(), writes: string[] = [];
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({ items: [message(1)], nextCursor: null }));
+    if (url.pathname.endsWith("/receipts")) {
+      const kind = init?.method === "POST" ? JSON.parse(String(init.body)).kind : "receipts";
+      if (kind !== "receipts") writes.push(kind);
+      if (kind === work) return Promise.resolve(Response.json({}, { status }));
+    }
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    await act(async () => { render(view()); });
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(screen.getByText(status === 409 ? "Assignment changed. Refresh before continuing." : "Access denied")).toBeDefined();
+    expect(screen.queryByText("Reader message 1")).toBeNull();
+    expect(screen.queryByRole("list", { name: "Enquiry conversation" })).toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(writes).toEqual(work === "receipts" ? [] : work === "received" ? ["received"] : ["received", "read"]);
+  } finally { vi.useRealTimers(); }
+});
+
+it("serializes a pending page, Received and queued refresh before eligible Read", async () => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler(), page = deferred<Response>(), received = deferred<Response>(), refresh = deferred<Response>();
+  const events: string[] = [];
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) {
+      const cursor = url.searchParams.get("cursor"); events.push(cursor === message(1).id ? "page:1" : cursor ? "page:2" : "page:start");
+      return cursor === message(1).id ? page.promise : cursor ? refresh.promise
+        : Promise.resolve(Response.json({ items: [message(1)], nextCursor: message(1).id }));
+    }
+    if (url.pathname.endsWith("/receipts")) {
+      const body = init?.method === "POST" ? JSON.parse(String(init.body)) : null;
+      events.push(body ? body.kind + ":" + String(Number(body.cursor.slice(-12))) : "facts");
+      if (body?.kind === "received" && body.cursor === message(2).id) return received.promise;
+    }
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    await act(async () => { render(view()); });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "More messages" })));
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    await act(async () => { window.dispatchEvent(new Event("focus")); fireEvent.click(screen.getByRole("button", { name: "Refresh" })); });
+    expect(events).toEqual(["page:start", "facts", "received:1", "page:1"]);
+    await act(async () => page.resolve(Response.json({ items: [message(2)], nextCursor: message(2).id })));
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(events).toEqual(["page:start", "facts", "received:1", "page:1", "facts", "received:2"]);
+    await act(async () => received.resolve(Response.json({ participantId: actor.id, assignmentVersion: 1, receivedOrder: "2", readOrder: "0" })));
+    expect(events.at(-1)).toBe("page:2");
+    expect(events.some((event) => event.startsWith("read:"))).toBe(false);
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+      return new DOMRect(0, this.tagName === "OL" || this.id === "history-message-" + message(3).id ? 100 : 900, 400, this.tagName === "OL" ? 400 : 80);
+    });
+    await act(async () => refresh.resolve(Response.json({ items: [message(3)], nextCursor: null })));
+    await act(async () => vi.advanceTimersByTimeAsync(299));
+    expect(events.some((event) => event.startsWith("read:"))).toBe(false);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(events).toEqual(["page:start", "facts", "received:1", "page:1", "facts", "received:2", "page:2", "facts", "received:3", "read:3"]);
+    expect(screen.getByText("Reader message 3")).toBeDefined();
+  } finally { vi.useRealTimers(); }
+});
+
+it("never skips an unseen row or acknowledges an unfetched lookahead", async () => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler(), writes: { cursor: string; kind: string }[] = [];
+  let firstVisible = false;
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+    const target = firstVisible ? message(1).id : message(2).id;
+    return new DOMRect(0, this.tagName === "OL" || this.id === "history-message-" + target ? 100 : 900, 400, this.tagName === "OL" ? 400 : 80);
+  });
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json(url.searchParams.has("cursor")
+      ? { items: [message(3)], nextCursor: null } : { items: [message(1), message(2)], nextCursor: message(2).id }));
+    if (url.pathname.endsWith("/receipts") && init?.method === "POST") writes.push(JSON.parse(String(init.body)));
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    await act(async () => { render(view()); });
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(writes).toMatchObject([{ cursor: message(2).id, kind: "received" }]);
+    expect(screen.queryByText("Reader message 3")).toBeNull();
+    firstVisible = true; fireEvent.scroll(screen.getByRole("list", { name: "Enquiry conversation" }));
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(writes).toHaveLength(1);
+    firstVisible = false;
+    await act(async () => fireEvent.scroll(screen.getByRole("list", { name: "Enquiry conversation" })));
+    await act(async () => vi.advanceTimersByTimeAsync(299));
+    expect(writes).toHaveLength(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(writes).toMatchObject([{ cursor: message(2).id, kind: "received" }, { cursor: message(2).id, kind: "read" }]);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "More messages" })));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText("Reader message 3")).toBeDefined();
+    expect(writes).toMatchObject([{ kind: "received" }, { kind: "read" }, { cursor: message(3).id, kind: "received" }]);
+  } finally { vi.useRealTimers(); }
+});
+
+it.each(["receipts", "received", "read"].flatMap((work) =>
+  ["actor", "session", "assignment", "request", "disposal"].map((change) => [work, change])))
+  ("rejects pending %s after the current %s changes", async (work, change) => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler(), pending = deferred<Response>();
+  const writes: string[] = [];
+  let captured = false, changed = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (changed && change === "actor" && url.pathname.endsWith("/desk")) return Promise.resolve(Response.json({
+      purpose: "vehicle-history", mode: "synthetic", actor: { ...actor, id }, requests: [],
+    }));
+    if (changed && change === "assignment" && url.pathname.endsWith(id)) return Promise.resolve(Response.json({ ...detail(), assignmentVersion: 2 }));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({ items: [message(1)], nextCursor: null }));
+    if (url.pathname.endsWith("/receipts")) {
+      const kind = init?.method === "POST" ? JSON.parse(String(init.body)).kind : "receipts";
+      if (kind !== "receipts") writes.push(kind);
+      if (kind === work && !captured) { captured = true; return pending.promise; }
+    }
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    const mounted = render(view());
+    await act(async () => {});
+    await act(async () => vi.advanceTimersByTimeAsync(work === "read" ? 300 : 0));
+    expect(captured).toBe(true);
+    changed = true;
+    if (change === "actor") platform.token = token(id, id);
+    if (change === "session") platform.token = token(actor.id);
+    if (change === "request") fireEvent.click(screen.getByRole("button", { name: "Unassigned" }));
+    if (change === "disposal") mounted.unmount();
+    await act(async () => pending.resolve(Response.json(work === "receipts" ? { items: [] } : {
+      participantId: actor.id, assignmentVersion: 1, receivedOrder: "1", readOrder: work === "read" ? "1" : "0",
+    })));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.queryByText("Reader message 1")).toBeNull();
+    expect(writes).toEqual(work === "receipts" ? [] : work === "received" ? ["received"] : ["received", "read"]);
+    if (change === "actor" || change === "session") expect(screen.getByText("Access denied")).toBeDefined();
+    if (change === "assignment") expect(screen.getByText("Assignment changed. Refresh before continuing.")).toBeDefined();
+  } finally { vi.useRealTimers(); }
+});
+
+it.each(["received", "read"])("refetches a fresh session before ACK while old %s has fixed initiating cookies", async (work) => {
+  selectAssigned(); receiptViewport();
+  const network = networkHandler(), oldAck = deferred<Response>(), freshPage = deferred<Response>();
+  const oldToken = platform.token, freshToken = token(actor.id);
+  const writes: { session: string; kind: string }[] = [];
+  let fresh = false, captured = false, freshFetch = false, oldFinal = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    const authorization = new Headers(init?.headers).get("Authorization");
+    const current = authorization === `Bearer ${freshToken}`;
+    if (fresh && authorization === `Bearer ${oldToken}` && url.pathname.endsWith("/desk")) oldFinal = true;
+    if (url.pathname.endsWith("/messages")) {
+      if (current) { freshFetch = true; return freshPage.promise; }
+      return Promise.resolve(Response.json({ items: [message(1, "Old session private text")], nextCursor: null }));
+    }
+    if (url.pathname.endsWith("/receipts") && init?.method === "POST") {
+      const kind = JSON.parse(String(init.body)).kind;
+      writes.push({ session: current ? "fresh" : "old", kind });
+      if (!current && kind === work && !captured) { captured = true; return oldAck.promise; }
+    }
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  try {
+    const tree = await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }));
+    const mounted = platform.requestCookies.run(oldToken, () => render(tree));
+    await act(async () => {});
+    await act(async () => platform.requestCookies.run(oldToken, () => vi.advanceTimersByTimeAsync(work === "read" ? 300 : 0)));
+    expect(captured).toBe(true);
+    fresh = true; platform.token = freshToken;
+    const replacement = await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }));
+    await act(async () => platform.requestCookies.run(freshToken, () => mounted.rerender(replacement)));
+    expect(freshFetch).toBe(true);
+    expect(screen.queryByText("Old session private text")).toBeNull();
+    expect(writes.filter((write) => write.session === "fresh")).toEqual([]);
+    await act(async () => oldAck.resolve(Response.json({ participantId: actor.id, assignmentVersion: 1,
+      receivedOrder: "1", readOrder: work === "read" ? "1" : "0" })));
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(oldFinal).toBe(true);
+    expect(writes.filter((write) => write.session === "fresh")).toEqual([]);
+    await act(async () => freshPage.resolve(Response.json({ items: [message(1, "Fresh session private text")], nextCursor: null })));
+    expect(screen.getByText("Fresh session private text")).toBeDefined();
+    expect(writes.filter((write) => write.session === "fresh")).toEqual([{ session: "fresh", kind: "received" }]);
+    await act(async () => vi.advanceTimersByTimeAsync(299));
+    expect(writes.filter((write) => write.session === "fresh")).toHaveLength(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(writes.filter((write) => write.session === "fresh")).toEqual([
+      { session: "fresh", kind: "received" }, { session: "fresh", kind: "read" },
+    ]);
+    expect(writes.filter((write) => write.session === "old")).toEqual(work === "read" ? [
+      { session: "old", kind: "received" }, { session: "old", kind: "read" },
+    ] : [{ session: "old", kind: "received" }]);
+  } finally { vi.useRealTimers(); }
 });
