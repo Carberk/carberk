@@ -1,0 +1,12 @@
+[
+  {
+    "path": "apps/mobile/.expo/types/router.d.ts",
+    "sha256": "06010e15c831c67224583c7bc03b493a5d17a4aab262e701e4d2ba8f02907a49",
+    "origin": "Expo Router typed-route generator, expo-router@55.0.18; tracked SDK artifact"
+  },
+  {
+    "path": "apps/web/next-env.d.ts",
+    "sha256": "1862ac4bbbc5192d4bf562161df66ea547ed3e67173100656ab606ae9797db2b",
+    "origin": "Next.js TypeScript setup generator, next@16.4.1; tracked framework artifact"
+  }
+]

@@ -288,3 +288,22 @@ test("documentation policy failure fails the required check in either lane", () 
     assert.equal(result.status, 1, result.stdout + result.stderr);
   }
 });
+
+for (const name of ["pr-checks.yml", "ci.yml"]) {
+  test(`${name} admits TS/JS source in both required lanes with complete trusted history`, () => {
+    const graph = jobs(workflow(name));
+    for (const id of ["docs", "static"]) {
+      const job = graph.get(id);
+      assert.match(job, /fetch-depth: 0/);
+      for (const command of ["pnpm check:source-policy", "pnpm test:source-policy"]) {
+        assert.ok(job.includes(`run: ${command}`), `${id} omits ${command}`);
+        assert.ok(job.indexOf(`run: ${command}`) > job.indexOf("run: pnpm install --frozen-lockfile"));
+      }
+      assert.doesNotMatch(job, /continue-on-error:/);
+    }
+    assert.equal(rootScripts["check:source-policy"], "node scripts/check-source-policy.mjs");
+    assert.equal(rootScripts["test:source-policy"], "node --test scripts/check-source-policy.test.mjs");
+    assert.match(rootScripts.lint, /^pnpm check:source-policy && turbo run lint$/);
+    assert.match(rootScripts["test:root"], /node --test 'scripts\/\*\.test\.mjs'/);
+  });
+}

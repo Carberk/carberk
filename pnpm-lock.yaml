@@ -315,6 +315,9 @@ importers:
 
   .:
     devDependencies:
+      '@babel/parser':
+        specifier: 7.29.7
+        version: 7.29.7
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
