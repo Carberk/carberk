@@ -19,6 +19,13 @@ function fixture(t, files) {
   return { root, put, check: (allowances = []) => checkRepository(root, { allowances }) };
 }
 
+test("prefix-only Node builtins do not require a package declaration", t => {
+  const f = fixture(t, { "scripts/check.test.mjs": 'import test from "node:test"; import { readFileSync } from "node:fs";' });
+  const result = f.check();
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.edges.map(edge => edge.category), ["builtin", "builtin"]);
+});
+
 test("domain rejects framework imports through effective aliases and type-only barrels", t => {
   const f = fixture(t, {
     "apps/api/src/modules/catalog/domain/Rule.ts": 'import type { Nest } from "@/bridge";',

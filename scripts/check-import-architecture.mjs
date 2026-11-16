@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { builtinModules } from "node:module";
+import { isBuiltin } from "node:module";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -7,7 +7,6 @@ import ts from "typescript";
 const sourcePattern = /\.[cm]?[jt]sx?$/;
 const assetPattern = /\.(?:json|css|scss|svg|png|jpe?g|webp|gif|ttf|otf|woff2?|mp4)$/;
 const ignored = new Set(["node_modules", ".git", ".turbo", ".next", ".expo", "dist", "build", "coverage", "generated", ".gradle", "Pods"]);
-const builtins = new Set(builtinModules.flatMap(name => [name, `node:${name}`]));
 const packageName = name => name.startsWith("@") ? name.split("/").slice(0, 2).join("/") : name.split("/")[0];
 const isTest = path => /(?:^|\/)(?:test|tests|__tests__|testing)\/|\.(?:spec|test)\.[cm]?[jt]sx?$/.test(path);
 const isComposition = path => /\.module\.[cm]?[jt]s$/.test(path);
@@ -222,7 +221,7 @@ export function checkRepository(directory, { allowances } = {}) {
       });
       const local = specifier.startsWith(".") || isAbsolute(specifier) || alias;
       const targetWorkspace = byName.get(name);
-      if (builtins.has(specifier)) { edge.category = "builtin"; edge.target = specifier; continue; }
+      if (isBuiltin(specifier)) { edge.category = "builtin"; edge.target = specifier; continue; }
       if (!local) {
         const manifest = dependencyOwner(file);
         const declared = { ...(edge.test ? workspace.devDependencies : {}), ...manifest.dependencies, ...manifest.peerDependencies, ...manifest.optionalDependencies, ...manifest.devDependencies };
@@ -292,7 +291,7 @@ export function checkRepository(directory, { allowances } = {}) {
     if (from?.[2].startsWith("domain/") && (persistence(name) || framework(name) || to && !to[2].startsWith("domain/"))) report(edge, "domain-purity", target);
     if (from?.[2].startsWith("application/") && (persistence(name) || /^(?:infrastructure|presentation)\//.test(to?.[2] ?? "") && !(publicEntry && to?.[2] === "presentation/contactPhoneCodeException.ts" && to[1] === "identity"))) report(edge, "application-layer", target);
     if ((!transitive || !throughPublic || /^(?:infrastructure|presentation)\//.test(to?.[2] ?? "") && !(publicEntry && target === "apps/api/src/modules/identity/presentation/contactPhoneCodeException.ts")) && from && to && from[1] !== to[1] && !(publicFeature(to[2]) && (to[1] !== "identity" || to[2] === "identity.public.ts")) && !(edge.composition && isComposition(target))) report(edge, "feature-public", target);
-    if (frontend(byName.get(edge.workspace)) && bundledSource(edge.importer) && (persistence(name) || framework(name) && /^(?:@nestjs\/|nestjs-|fastify|express$|socket.io$)/.test(name) || builtins.has(name))) report(edge, "frontend-server", target);
+    if (frontend(byName.get(edge.workspace)) && bundledSource(edge.importer) && (persistence(name) || framework(name) && /^(?:@nestjs\/|nestjs-|fastify|express$|socket.io$)/.test(name) || isBuiltin(name))) report(edge, "frontend-server", target);
   };
   for (const edge of edges) {
     if (!edge.target) continue;
@@ -325,7 +324,7 @@ export function checkRepository(directory, { allowances } = {}) {
         if (persistence(edge.package ?? edge.specifier)) report(entry, "frontend-server", edge.target);
         return;
       }
-      if (builtins.has(edge.target) || persistence(edge.package ?? edge.specifier) || ["server-only", "next/headers", "next/server"].includes(edge.specifier)) report(entry, "frontend-server", edge.target);
+      if (isBuiltin(edge.target) || persistence(edge.package ?? edge.specifier) || ["server-only", "next/headers", "next/server"].includes(edge.specifier)) report(entry, "frontend-server", edge.target);
       if (edge.category === "source") {
         if (serverFiles.has(edge.target) && !frontend(byName.get(entry.workspace))) return;
         for (const next of adjacency.get(edge.target) ?? []) walk(next);
