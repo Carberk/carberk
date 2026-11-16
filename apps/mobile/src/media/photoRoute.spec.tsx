@@ -18,6 +18,7 @@ import type { PhotoDrag } from "../listings/wizard/PhotoThumbnail";
 import { photoRequest } from "./photoRoute";
 
 vi.hoisted(() => { process.env["EXPO_PUBLIC_MEDIA_URL"] = "https://minio-staging-5795.up.railway.app"; });
+vi.mock("expo-image", async () => ({ Image: (await import("./application/testing/NativePhotoImage")).NativePhotoImage }));
 vi.mock("expo-image-manipulator", async () => (await import("../../test/profile-photo-device")).imageManipulatorFake);
 vi.mock("socket.io-client", () => ({ io: () => ({ connected: false, on() {}, disconnect() {} }) }));
 vi.mock("expo-image-picker", () => ({
@@ -49,6 +50,33 @@ beforeEach(async () => {
   await provisionGatewayKey(key);
 });
 afterEach(async () => { await act(() => clearAuthSession()); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+it("keeps a recovered avatar visible when an old native request dispatches through the current callback", async () => {
+  const { UserAvatar } = await import("../../components/identity/UserAvatar");
+  selectTesterRoute("tm");
+  const screen = await renderMobile(<UserAvatar size={40} avatarIndex={1} avatarKey="pending/avatar/original.webp" avatarUrl={photo} />);
+  await vi.waitFor(() => expect(getHost(screen.container, "Image").props.source?.headers).toEqual({ "X-Carberk-Gateway-Key": key }));
+  const pendingNativeError = getHost(screen.container, "Image").props.onError as (event: { error: string }) => void;
+  await act(() => provisionGatewayKey("synthetic-replacement-photo-access-key"));
+  await vi.waitFor(() => expect(getHost(screen.container, "Image").props.source?.headers).toEqual({ "X-Carberk-Gateway-Key": "synthetic-replacement-photo-access-key" }));
+  await act(() => pendingNativeError({ error: "Old request failed after access changed" }));
+  expect(getHost(screen.container, "Image").props.source?.headers).toEqual({ "X-Carberk-Gateway-Key": "synthetic-replacement-photo-access-key" });
+});
+
+it("retains the Assigned Avatar after access removal until private photo access can be prepared", async () => {
+  const { UserAvatar } = await import("../../components/identity/UserAvatar");
+  selectTesterRoute("tm");
+  const route = captureRouteSnapshot();
+  const screen = await renderMobile(<UserAvatar size={40} avatarIndex={1} avatarKey="pending/avatar/original.webp" avatarUrl={photo} />);
+  await vi.waitFor(() => expect(getHost(screen.container, "Image").props.source?.headers).toEqual({ "X-Carberk-Gateway-Key": key }));
+  await fireEvent(getHost(screen.container, "Image"), "error", { error: "HTTP 403" });
+  expect(queryAllHosts(screen.container, "Image")).toHaveLength(0);
+  await act(() => removeGatewayKey());
+  expect(queryAllHosts(screen.container, "Image")).toHaveLength(0);
+  expect(captureRouteSnapshot()).toEqual(route);
+  await act(() => provisionGatewayKey(key));
+  await vi.waitFor(() => expect(getHost(screen.container, "Image").props.source?.headers).toEqual({ "X-Carberk-Gateway-Key": key }));
+});
 
 it("keeps mounted readers on TM without a storage request when private access is removed", async () => {
   selectTesterRoute("tm");
@@ -136,9 +164,13 @@ it.each([false, true])("rebinds a mounted TM photo after provisioning access (in
   if (available) await vi.waitFor(() => expect(source()?.headers).toEqual({ "X-Carberk-Gateway-Key": key }));
   else expect(source()).toBeUndefined();
   await act(() => provisionGatewayKey("synthetic-replacement-photo-access-key"));
-  await vi.waitFor(() => expect(source()).toEqual({
+  await vi.waitFor(() => expect(source()).toEqual(available ? {
     uri: "https://tm-staging.bagtyyar.dev/photos/listing-photos/pending/one/list.webp?v=webp-natural-1",
     cacheKey: "https://minio-staging-5795.up.railway.app/listing-photos/pending/one/list.webp?v=webp-natural-1",
+    headers: { "X-Carberk-Gateway-Key": "synthetic-replacement-photo-access-key" },
+  } : {
+    uri: "https://tm-staging.bagtyyar.dev/photos/listing-photos/pending/one/original.webp",
+    cacheKey: "https://minio-staging-5795.up.railway.app/listing-photos/pending/one/original.webp",
     headers: { "X-Carberk-Gateway-Key": "synthetic-replacement-photo-access-key" },
   }));
   expect(captureRouteSnapshot()).toMatchObject({ entry: "tm", generation });

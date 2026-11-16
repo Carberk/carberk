@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Image as ExpoImage, type ImageProps, type ImageSource } from "expo-image";
 import { cssInterop } from "nativewind";
 
@@ -20,7 +20,7 @@ export async function photoRequest(uri: string, headers: Record<string, string> 
   return { uri: target, headers: { ...safeHeaders, ...await photoRouteHeaders(route, target) } };
 }
 
-function usePhotoSource(source: ImageProps["source"], route: RouteSnapshot, revision: number): ImageProps["source"] {
+function usePhotoSource(source: ImageProps["source"], route: RouteSnapshot, revision: number, onError?: ImageProps["onError"]): ImageProps["source"] {
   const { entry, generation, apiBaseUrl } = route;
   const object = typeof source === "object" && source !== null && !Array.isArray(source) && "uri" in source ? source as ImageSource : undefined;
   const uri = typeof source === "string" ? source : object?.uri;
@@ -32,9 +32,11 @@ function usePhotoSource(source: ImageProps["source"], route: RouteSnapshot, revi
     let current = true;
     void photoRequest(uri, JSON.parse(signature) as Record<string, string>, { entry, generation, apiBaseUrl }).then(request => {
       if (current) setReady({ uri, revision, source: { ...request, cacheKey: object?.cacheKey ?? uri } });
-    }).catch(() => {});
+    }).catch(() => {
+      if (current) onError?.({ error: "Photo access is unavailable" });
+    });
     return () => { current = false; };
-  }, [uri, routed, entry, generation, apiBaseUrl, signature, object?.cacheKey, revision]);
+  }, [uri, routed, entry, generation, apiBaseUrl, signature, object?.cacheKey, revision, onError]);
   if (!uri) return source;
   if (!knownPhoto(uri)) return object?.headers ? { ...object, headers: storageHeaders(object.headers) } : source;
   if (routed) return ready?.uri === uri && ready.revision === revision ? { ...object, ...ready.source } : undefined;
@@ -48,19 +50,20 @@ export function usePhotoFailure(uri: string | null | undefined) {
   const activePhoto = useRef(failureKey);
   activePhoto.current = failureKey;
   const [failedAt, setFailedAt] = useState<string>();
+  const onError = useCallback(() => {
+    if (activePhoto.current === failureKey) setFailedAt(failureKey);
+  }, [failureKey]);
   return {
     failed: failedAt === failureKey,
-    onError: () => {
-      if (activePhoto.current === failureKey) setFailedAt(failureKey);
-    },
+    onError,
   };
 }
 
-export function Photo({ source, placeholder, ...props }: ImageProps & { className?: string }) {
+export function Photo({ source, placeholder, onError, ...props }: ImageProps & { className?: string }) {
   const revision = usePhotoRevision();
   const route = captureRouteSnapshot();
-  const mappedSource = usePhotoSource(source, route, revision);
+  const mappedSource = usePhotoSource(source, route, revision, onError);
   const mappedPlaceholder = usePhotoSource(placeholder, route, revision);
-  return <ExpoImage {...props} source={mappedSource} placeholder={mappedPlaceholder} />;
+  return <ExpoImage key={revision} {...props} source={mappedSource} placeholder={mappedPlaceholder} onError={onError} />;
 }
 cssInterop(Photo, { className: "style" });
