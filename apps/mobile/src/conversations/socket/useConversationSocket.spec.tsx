@@ -328,6 +328,7 @@ describe("useConversationSocket", () => {
         CONV_ID,
         expect.any(String),
       );
+      expect(mockSocket.markConversationRead).toHaveBeenCalledWith(CONV_ID, expect.any(String));
     });
   });
 
@@ -763,6 +764,25 @@ describe("useConversationSocket", () => {
       online: false,
       lastSeenAt: "2026-06-01T12:00:00.000Z",
     });
+  });
+
+  it("clears stale peer presence and typing when the connection drops", () => {
+    let statusHandler: (status: string) => void = () => {};
+    let presenceHandler: (event: unknown) => void = () => {};
+    let typingHandler: (event: unknown) => void = () => {};
+    mockSocket.subscribeStatus.mockImplementation((handler) => { statusHandler = handler; return () => {}; });
+    mockSocket.subscribePresence.mockImplementation((handler) => { presenceHandler = handler; return () => {}; });
+    mockSocket.subscribeTyping.mockImplementation((handler) => { typingHandler = handler; return () => {}; });
+    const { result } = renderHook(() => useConversationSocket(CONV_ID, USER_ID), { wrapper });
+    act(() => {
+      presenceHandler({ conversationId: CONV_ID, userId: "peer-user", online: true });
+      typingHandler({ conversationId: CONV_ID, userId: "peer-user", isTyping: true });
+    });
+    expect(result.current.peerPresence.online).toBe(true);
+    expect(result.current.peerTyping).toBe(true);
+    act(() => statusHandler("disconnected"));
+    expect(result.current.peerPresence).toEqual({ online: false });
+    expect(result.current.peerTyping).toBe(false);
   });
 
   it("ignores typing and presence events for other conversations", async () => {

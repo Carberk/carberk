@@ -128,7 +128,7 @@ export function useConversationSocket(
       });
     };
 
-    let previousStatus = socket.getStatus();
+    let needsRecovery = socket.getStatus() === "disconnected" || socket.getStatus() === "error";
     const unsubscribeStatus = socket.subscribeStatus((next) => {
       setStatus(next);
       if (next === "connected") {
@@ -137,23 +137,29 @@ export function useConversationSocket(
         connectionVersion += 1;
         joining = false;
         joinedRef.current = false;
+        setPeerTyping(false);
+        setPeerPresence({ online: false });
+        if (peerTypingTimerRef.current) {
+          clearTimeout(peerTypingTimerRef.current);
+          peerTypingTimerRef.current = null;
+        }
         // Best-effort cleanup of any in-flight typing state.
         if (typingStartSentRef.current) {
           typingStartSentRef.current = false;
         }
       }
-      if (
-        (previousStatus === "disconnected" || previousStatus === "error") &&
-        next === "connected"
-      ) {
-        // HTTP recovery: reconcile any messages missed while disconnected.
-        // A failed reconnection attempt surfaces as "error" (connect_error),
-        // so recovery can arrive from "error" as well as from "disconnected".
+      if (next === "disconnected" || next === "error") needsRecovery = true;
+      if (next === "connected" && needsRecovery) {
+        needsRecovery = false;
         void queryClient.invalidateQueries({
           queryKey: queryKeys.conversations.messages(conversationId),
         });
+        if (currentUserId) {
+          void Promise.resolve(socket.markConversationRead(conversationId, new Date().toISOString())).then(result => {
+            if (result?.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.unreadCounts() });
+          });
+        }
       }
-      previousStatus = next;
     });
 
     const unsubscribeMessage = socket.subscribeMessage((event) => {
@@ -163,10 +169,11 @@ export function useConversationSocket(
 
       handleMessageNew(queryClient, event);
       if (currentUserId && event.message.senderId !== currentUserId) {
-        void socket.markDelivered(
-          event.message.conversationId,
-          new Date().toISOString(),
-        );
+        const timestamp = new Date().toISOString();
+        void socket.markDelivered(event.message.conversationId, timestamp);
+        void Promise.resolve(socket.markConversationRead(event.message.conversationId, timestamp)).then(result => {
+          if (result?.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.unreadCounts() });
+        });
       }
     });
 

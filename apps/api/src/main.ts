@@ -35,16 +35,31 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
 
   const config = app.get(ConfigService);
+  const httpAdapter = app.getHttpAdapter();
+  const keys = config.get<Record<string, string>>("GATEWAY_ATTRIBUTION_KEYS") ?? {};
+  const nonceStore = Object.keys(keys).length ? new Redis(config.getOrThrow<string>("REDIS_URL"), {
+    commandTimeout: 1_000, connectTimeout: 1_000, maxRetriesPerRequest: 0, enableOfflineQueue: false,
+  }) : undefined;
+  nonceStore?.on("error", () => {});
+  httpAdapter.getInstance().addHook("onClose", async () => { nonceStore?.disconnect(); });
+  const replayStore = nonceStore ? new GatewayReplayStore(nonceStore) : undefined;
+  const gatewayAttribution = {
+    keys,
+    claimNonce: async (key: string) => {
+      if (!replayStore) throw new Error("Nonce store unavailable");
+      return replayStore.claim(key);
+    },
+  };
   const realtimeAdapter = new RealtimeIoAdapter(app, {
     corsOrigin: config.get<string>("SOCKET_IO_CORS_ORIGIN") ?? "*",
     redisAdapterEnabled:
       config.get<boolean>("SOCKET_IO_REDIS_ADAPTER_ENABLED") ?? false,
     redisUrl: config.get<string>("REDIS_URL"),
+    gatewayAttribution,
   });
   await realtimeAdapter.configure();
   app.useWebSocketAdapter(realtimeAdapter);
 
-  const httpAdapter = app.getHttpAdapter();
   httpAdapter.getInstance().addHook("onRequest", (_req, _reply, done) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Fastify request type
     const req = _req as any;
@@ -53,21 +68,7 @@ async function bootstrap() {
     }
     done();
   });
-  const keys = config.get<Record<string, string>>("GATEWAY_ATTRIBUTION_KEYS") ?? {};
-  const nonceStore = Object.keys(keys).length ? new Redis(config.getOrThrow<string>("REDIS_URL"), {
-    commandTimeout: 1_000, connectTimeout: 1_000, maxRetriesPerRequest: 0, enableOfflineQueue: false,
-  }) : undefined;
-  // Deliberately no raw Redis error: connection details can contain credentials.
-  nonceStore?.on("error", () => {});
-  httpAdapter.getInstance().addHook("onClose", async () => { nonceStore?.disconnect(); });
-  const replayStore = nonceStore ? new GatewayReplayStore(nonceStore) : undefined;
-  registerGatewayAttributionHook(httpAdapter.getInstance(), {
-    keys,
-    claimNonce: async (key) => {
-      if (!replayStore) throw new Error("Nonce store unavailable");
-      return replayStore.claim(key);
-    },
-  });
+  registerGatewayAttributionHook(httpAdapter.getInstance(), gatewayAttribution);
   // A Fastify hook, not Nest middleware: see common/accept-language.ts.
   registerAcceptLanguageHook(httpAdapter.getInstance());
 

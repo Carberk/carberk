@@ -4,7 +4,6 @@ const STAGING_API = "https://api-staging-2861.up.railway.app/api/v1";
 const GATEWAY_API = "https://tm-staging.bagtyyar.dev/api/v1";
 const GATEWAY_KEY = "carberk_staging_gateway_key";
 export type RouteEntry = "global" | "tm";
-/** Nonsecret API-only contract. Native media/socket adapters need their own access. */
 export interface RouteSnapshot {
   readonly entry: RouteEntry;
   readonly generation: number;
@@ -24,6 +23,12 @@ export function subscribePhotoRoute(listener: () => void): () => void {
   listeners.add(listener);
   return () => { listeners.delete(listener); };
 }
+const routeListeners = new Set<(route: RouteSnapshot) => void>();
+
+function notifyRouteChanges() {
+  const route = captureRouteSnapshot();
+  routeListeners.forEach(listener => listener(route));
+}
 
 function globalApi() {
   return (process.env["EXPO_PUBLIC_API_URL"] ?? "http://localhost:3006/api/v1").replace(/\/$/, "");
@@ -42,7 +47,17 @@ function assertTester() {
 export function selectTesterRoute(entry: RouteEntry): void {
   assertTester();
   if (entry !== "global" && entry !== "tm") throw new Error("Unknown route");
-  if (selection !== entry) { selection = entry; generation++; invalidatePhotoReaders(); }
+  if (selection !== entry) {
+    selection = entry;
+    generation++;
+    invalidatePhotoReaders();
+    notifyRouteChanges();
+  }
+}
+
+export function subscribeRouteChanges(listener: (route: RouteSnapshot) => void): () => void {
+  routeListeners.add(listener);
+  return () => routeListeners.delete(listener);
 }
 
 /** Capture synchronously before the first storage/network await. */
@@ -65,15 +80,16 @@ export async function provisionGatewayKey(key: string): Promise<void> {
   if (!validKey(key)) throw new Error("Invalid gateway access key");
   await SecureStore.setItemAsync(GATEWAY_KEY, key);
   invalidatePhotoReaders();
+  if (selection === "tm") { generation++; notifyRouteChanges(); }
 }
 
 export async function removeGatewayKey(): Promise<void> {
   assertTester();
   await SecureStore.deleteItemAsync(GATEWAY_KEY);
   invalidatePhotoReaders();
+  if (selection === "tm") { generation++; notifyRouteChanges(); }
 }
 
-/** Private API access only: never put this result in diagnostics or other adapters. */
 export async function apiRouteHeaders(route: RouteSnapshot): Promise<Record<string, string>> {
   if (route.entry === "global") return {};
   assertTester();

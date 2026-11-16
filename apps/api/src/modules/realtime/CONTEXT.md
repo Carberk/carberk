@@ -4,6 +4,8 @@ Realtime provides authenticated Socket.IO infrastructure, user rooms, and online
 
 Socket authentication uses the API access-token boundary. A valid socket identity does not itself establish access to a conversation. Transports consume [the public realtime contract](realtime.public.ts) for namespace/room naming and authenticated actor shape; socket authentication stays internal. Other contexts consume PresencePort for presence.
 
+Engine.IO polling and upgrade requests use the same signed gateway attribution verifier and shared replay store as HTTP requests. Direct requests without a proof follow the existing direct ingress policy; Socket.IO bearer authentication and Conversation access checks remain separate.
+
 Presence is process-local. Enabling the Redis Socket.IO adapter distributes traffic but does not turn the in-memory registry into distributed presence. Consider that limitation before scaling API instances or changing online-based push suppression. Nest/Socket.IO owns namespace lifecycle; preserve proper shutdown behavior.
 
 ## Start here

@@ -460,7 +460,7 @@ export default function ConversationDetailScreen() {
   const sendViaHttp = useCallback(
     (clientMessageId: string, text: string) => {
       sendHttpMessage.mutate(
-        { conversationId, text },
+        { conversationId, text, clientMessageId },
         {
           onSuccess: (data) => {
             // apiClient already parsed MessageSummarySchema, including defaults.

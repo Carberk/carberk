@@ -27,16 +27,11 @@ export function useGlobalConversationSocket(): void {
       handleMessageNew(queryClient, event);
     });
 
-    let previousStatus = socket.getStatus();
+    let needsRecovery = socket.getStatus() === "disconnected" || socket.getStatus() === "error";
     const unsubscribeStatus = socket.subscribeStatus((next) => {
-      // A failed reconnection attempt surfaces as "error" (connect_error), so
-      // recovery can arrive as error → connected as well as disconnected →
-      // connected. The first connect (idle/connecting → connected) is not a
-      // recovery: nothing could have been missed yet.
-      if (
-        (previousStatus === "disconnected" || previousStatus === "error") &&
-        next === "connected"
-      ) {
+      if (next === "disconnected" || next === "error") needsRecovery = true;
+      if (next === "connected" && needsRecovery) {
+        needsRecovery = false;
         void queryClient.invalidateQueries({
           queryKey: queryKeys.conversations.list(),
         });
@@ -44,7 +39,6 @@ export function useGlobalConversationSocket(): void {
           queryKey: queryKeys.conversations.unreadCounts(),
         });
       }
-      previousStatus = next;
     });
 
     // connect() is a no-op when the authenticated shared socket is connected.
