@@ -141,6 +141,42 @@ test("header references and shebangs require complete machine grammar", () => {
   ]) assert.match(check({ "fake.ts": source }).join("\n"), /explanatory comment/);
 });
 
+test("Vitest environment selection requires an exact first-line directive in test source", () => {
+  const path = "apps/admin/src/app/vehicle-history/[locale]/HistoryListingReturn.spec.tsx";
+  const directive = "// @vitest-environment happy-dom";
+  const source = `${directive}\nexport {};\n`;
+  assert.deepEqual(check({ [path]: source }), []);
+  for (const extension of ["js", "jsx", "ts", "tsx", "mjs", "cjs", "mts", "cts"]) {
+    for (const kind of ["test", "spec"]) {
+      assert.deepEqual(check({ [`example.${kind}.${extension}`]: source }), []);
+    }
+  }
+  for (const environment of ["node", "jsdom", "edge-runtime"]) {
+    assert.deepEqual(check({ [path]: `// @vitest-environment ${environment}\nexport {};\n` }), []);
+  }
+  assert.deepEqual(check({ [path]: source.replaceAll("\n", "\r\n") }), []);
+  for (const value of [
+    "// @vitest-environment happy-dom explanation\nexport {};\n",
+    "// @vitest-environment happy-dom // explanation\nexport {};\n",
+    "// @vitest-environment imaginary\nexport {};\n",
+    "// @vitest-environment happy-dom-extra\nexport {};\n",
+    "// @vitest-environment ./custom\nexport {};\n",
+    "// @vitest-environment\nexport {};\n",
+    "/* @vitest-environment happy-dom */\nexport {};\n",
+    `\n${source}`, ` ${source}`, `\uFEFF${source}`,
+    `export {};\n${directive}\n`, `// @ts-check\n${source}`,
+    `${source}${directive}\n`, `${source}// explanation\n`,
+    `${directive}\n/* eslint-disable */\nexport {};\n`,
+  ]) assert.match(check({ [path]: value }).join("\n"), /explanatory comment/, value);
+  for (const copy of ["example.ts", "__tests__/example.tsx", "example.spec.TSX", "example.spec.ts.template", "scripts/source-policy/config.mjs"]) {
+    assert.match(check({ [copy]: source }).join("\n"), /explanatory comment/, copy);
+  }
+  for (const copy of ["guide.md", "example.spec.ts.md"]) {
+    assert.match(check({ [copy]: `\`\`\`tsx title=example.spec.tsx\n${source}\`\`\`\n` }).join("\n"), /explanatory comment/, copy);
+  }
+  assert.match(check({ "view.html.template": `<script>${source}</script>` }).join("\n"), /explanatory comment/);
+});
+
 test("inline rule configuration, blanket disables and fake directives cannot disable admission", () => {
   for (const raw of [
     "/* eslint-disable */", "/* eslint-disable source-policy */",
