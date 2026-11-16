@@ -51,6 +51,8 @@ pnpm --filter @auto-tm/mobile exec expo export -p ios --clear
 
 For UI claims and runtime-only bugs or crashes, run the development build on the iOS Simulator against your own Metro, as in [local testing](local-testing.md#4-run-the-app-on-the-ios-simulator). Expo Go is not an option for this app (see the SDK 55 pitfalls below). Android is checked only for Android-only tickets and release builds; the Android sections below cover those.
 
+Use the [device-tool policy](environment.md#ios-simulator) for launches, interactions, deep links and screenshots, including required Safari/Chrome proof on the target device. Build/install helpers do not replace those controls.
+
 Stop Metro before handing back the task.
 
 ## Guarded native development sessions
@@ -68,7 +70,7 @@ Before current native proof, verify the actual served bundle’s source identity
 
 The Railway CLI must support `variables --project`; set `RAILWAY_CLI` to the intended binary if an older CLI precedes it on PATH. For this host, `/Users/bagtyyar/.railway/bin/railway` is 5.63.4 and supports the flag. The helper rebuilds contracts before starting Metro, disables dotenv overrides, refuses an API, socket or media origin outside `*.up.railway.app`, and refuses a port held on any address, including loopback, without stopping its process. Its failure cleanup signals only the Metro process group it created. Stop that Metro session before handing back native work.
 
-Run `native:ios` from the same worktree after Metro reports its guarded bundle is ready. It verifies the selected bundle against the public-origin receipt in gitignored `.expo/` before any native build. Select a simulator that this session owns; an install and launch replace the app on that selected simulator. Preserve other device and Metro sessions.
+Run `native:ios` from the same worktree after Metro reports its guarded bundle is ready. It verifies the selected bundle against the public-origin receipt in gitignored `.expo/` before any native build. Select a simulator that this session owns; installation replaces the app on that selected simulator. The current helper also terminates/launches through `simctl` and has no build/install-only option, so it is not a compliant T3 launch route. In T3, keep build/install work separate from UI control and launch through the bound `agent-device` command; preserve the same bundle/origin verification. Preserve other device and Metro sessions.
 
 The iOS helper uses `expo prebuild`, UTF-8 CocoaPods, `xcodebuild` Debug for `iphonesimulator`, and `simctl` for the explicitly selected simulator. This bypasses Expo's Simulator.app discovery failure observed on this Xcode 27 host. `IPHONEOS_DEPLOYMENT_TARGET=16.0` is a command-line override for this local simulator build only, covering older pod targets and Router link preview. Shipped Expo platform minimums remain in app configuration. This route installs development clients; release binaries and store operations use their own workflows.
 
@@ -147,7 +149,7 @@ On the 16 GB Mac, finish a native build before starting another heavy build or a
 
 - **`expo prebuild` without `--clean` does not regenerate branding.** Launcher icons, splash, and the app name are baked into `android/` and `ios/` at prebuild time and both directories are gitignored. After changing `assets/images/*` icons, the splash, or the display name, run `npx expo prebuild --clean -p <platform>` or the local build keeps the old branding. Store builds are unaffected (EAS prebuilds fresh); check the AAB contents before suspecting the store.
 
-- **Xcode 27 replaced Simulator.app with Device Hub** (Xcode → Open Developer Tool → Device Hub). `simctl` still works headless: build `Release-iphonesimulator` with `xcodebuild`, then `xcrun simctl install <udid> <App>.app` and `xcrun simctl launch <udid> tm.auto.app`.
+- **Xcode 27 replaced Simulator.app with Device Hub** (Xcode → Open Developer Tool → Device Hub). `simctl` still works headless: build `Release-iphonesimulator` with `xcodebuild`, then `xcrun simctl install <udid> <App>.app`. In T3, launch with the bound `agent-device` command under the device-tool policy above.
 
 - **Local iOS builds need a 16.0 deployment floor.** Xcode 27 rejects pod targets below iOS 15.0, and `expo-router`'s npm tarball ships no prebuilt xcframework, so it compiles from source that uses iOS 16 APIs (`UIAction.subtitle`) despite the podspec declaring 15.1. The ExpoRouter pod, the `Pods-Carberk` aggregate target (it compiles `ExpoModulesProvider.swift`), and the app target must all build at ≥ 16.0, via this `post_install` addition to the generated `ios/Podfile` (re-apply after every `prebuild --clean`; EAS's older Xcode never sees this — do not move it into `app.config.js` without a product decision on dropping iOS 15 devices):
 

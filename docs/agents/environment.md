@@ -68,6 +68,16 @@ Assignment grants standing authority for routine setup, tests, fixes and data-pr
 
 Treat compute, devices, browsers and staging as separate resources. Coordinate an actual heavy build/test/export/FFmpeg job with other active heavy jobs, and send its actual start/release when contention exists. An idle API/worker/Metro is not a compute reservation; a conditional future job does not hold a free build lane. Keep FFmpeg transcode concurrency at one on this host. Device selection/handoff follows the owned-device procedure below; browser work owns its tabs/sessions; actual shared staging operations follow the Railway authority below and any task-specific restriction. A local compute grant does not transfer a device, browser session or staging target.
 
+## Browser proof and service administration
+
+In T3 Code, start Web/Admin product UI work with `preview_status`. Use `preview_open` for an owned usable tab when needed; no active tab alone does not mean the browser is unsupported. Preserve the exact configured origin and tab/session ownership; [Admin access](admin-access.md#1-select-the-target-and-reuse-the-session) covers host-scoped cookies and sign-in. Close only tabs you opened when finished, unless the founder asked to keep them.
+
+An external browser needs a concrete proof reason: required browser/platform behavior, a missing capability such as controlled network/CPU throttling, or a supported-tool failure that meets the current host's fallback rules. Follow the host's thresholds and recovery instructions; do not invent retries or bypass a refusal through another tool. Prefer an existing repeatable test harness for deterministic fault/throttling proof. Record the surface, exception reason and remaining proof in the existing PR or issue.
+
+Explicit founder authorization for a named logged-in browser/session, such as Namecheap, separately permits the scoped service-administration workflow. Identify the intended service, account and tab. Prefer Chrome DevTools MCP only when actually available and authorized. Reuse prior authorization without repetitive confirmation, and preserve unrelated tabs, cookies and sessions. Logged-in access does not expand purchase, destructive, production or unrelated action authority. Never copy sessions or authentication material into another browser for convenience; keep credentials out of reports and screenshots.
+
+Named tools are not evidence of availability: inspect the live host's capabilities and ownership. Preserve live owned authenticated workflows and valid observed proof rather than switching unsafely to apply a default. Reviewers verify browser/device choice and exception reasoning against the required proof. CI can enforce only repository helpers/configuration it inspects, not every agent tool choice. Closed-lid capability remains unverified until actual browser and device screenshot/input tests pass.
+
 ## iOS Simulator
 
 Use the installed iOS development client with Metro for routine mobile proof. Android builds and emulation impose substantial CPU cost on this Mac, so reserve them for Android-specific acceptance, required release checks or explicit founder direction. JavaScript and styling changes reuse the client; native dependency or configuration changes require a rebuild under the [mobile/Expo checks](mobile-expo.md). Expo Go cannot run this app.
@@ -78,9 +88,9 @@ Confirm the required device, fixture and tool capability before scheduling runti
 
 1. `device_list` shows hosts and devices.
 2. `device_open` with the host and device id returns an `agent-device` command bound to that device.
-3. Run that command for every launch, deep link, tap, text entry and screenshot. `device_screenshot` shows the screen.
+3. Run that command for every app launch/relaunch, interaction, deep link and screenshot; open the app before snapshots or input. `device_screenshot` shows the screen.
 
-Do not use `simctl`, `adb` or `idb` for taps, text or screenshots in T3. They stay fine for builds, installs, logs, Metro and port forwards. For `DEVICE_IN_USE`, selection and cleanup, follow the [owned native device procedure](native-fixture-signin.md#prepare-one-owned-device); preserve the existing owner/session.
+Real Safari/Chrome inside the target device remains valid when acceptance requires that browser; operate it through the same device controls. Do not use `simctl`, `adb`, `idb`, SSH or wrappers for device UI control in T3. Builds, installs, logs, Metro, port forwards and operations the device command cannot perform retain their allowed helper roles. Follow current host failure/recovery rules; tool failure does not transfer another session’s ownership. For `DEVICE_IN_USE`, selection and cleanup, follow the [owned native device procedure](native-fixture-signin.md#prepare-one-owned-device); preserve the existing owner/session.
 
 Devices on the founder's Mac:
 
@@ -93,7 +103,7 @@ Devices on the founder's Mac:
 Backends from the Simulator:
 
 - **Local stack:** the Simulator reaches the Mac's `localhost` directly. Start Metro from your worktree and open the installed build against it, as in [local testing](local-testing.md#4-run-the-app-on-the-ios-simulator).
-- **Staging:** run `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <simulator id> --port <port>`. These helpers refuse production. On this Mac's Xcode the `native:ios` route is the one known to work for iOS builds.
+- **Staging:** run `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <simulator id> --port <port>`. These helpers refuse production. Follow the [native build guidance and current T3 launch limitation](mobile-expo.md#guarded-native-development-sessions).
 
 Stop the Metro sessions you started and complete the [owned-device handoff](native-fixture-signin.md#prepare-one-owned-device) before you finish.
 
