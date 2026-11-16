@@ -70,6 +70,8 @@ export function javascriptComments(path, source, notices = []) {
       exception ||= compiler.accepted.has(`${comment.start}:${comment.end}`);
     }
     if (raw === "// @ts-check" && /\.[cm]?jsx?$/i.test(path) && !source.slice(0, comment.start).trim()) exception = true;
+    if (comment.start === 0 && /\.(?:test|spec)\.(?:[cm]?[jt]s|[jt]sx)$/.test(path) &&
+      /^\/\/ @vitest-environment (?:node|jsdom|happy-dom|edge-runtime)$/.test(raw)) exception = true;
     return {
       start: comment.loc.start, end: comment.loc.end, raw, exception,
       identity: digest(JSON.stringify([raw, anchor])),
