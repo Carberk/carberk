@@ -78,6 +78,7 @@ it("shows safe enquiry metadata, then claims atomically before opening the real 
   await waitFor(() => expect(requests.map(r => r.path)).toContain("/api/v1/vehicle-history/operator/requests?filter=unassigned"));
   fireEvent.click(await screen.findByRole("link", { name: /Merdan/ }));
   await screen.findByRole("button", { name: "Claim enquiry" });
+  await waitFor(() => expect(document.activeElement?.id).toBe("selected-enquiry"));
   expect(screen.queryByText("Can you check this car?")).toBeNull();
   expect(requests.some((r) => r.path.includes("/messages"))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Claim enquiry" }));
@@ -87,7 +88,6 @@ it("shows safe enquiry metadata, then claims atomically before opening the real 
   expect(requests.filter((r) => r.path.includes("receipts") && r.method === "POST").every((r) => JSON.parse(String(r.body)).kind === "received")).toBe(true);
   expect(screen.getByRole("textbox", { name: "Reply to customer" })).toBeDefined();
   expect(screen.getByRole("textbox", { name: "Internal note" })).toBeDefined();
-  await waitFor(() => expect(document.activeElement?.id).toBe("selected-enquiry"));
 });
 it("keeps an attributed private note in the staff panel and out of the customer conversation", async () => {
   selectAssigned();
@@ -1491,7 +1491,10 @@ it.each([401, 403, 409])("hides protected reply text after a send refuses HTTP %
   vi.mocked(fetch).mockImplementation((input, init) => String(input).endsWith("/messages") && init?.method === "POST"
     ? Promise.resolve(Response.json({}, { status })) : network(input, init));
   render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Protected refused draft" } });
+  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  await waitFor(() => expect((input as HTMLTextAreaElement).disabled).toBe(false));
+  fireEvent.change(input, { target: { value: "Protected refused draft" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
   await screen.findByText(status === 409 ? "Assignment changed. Refresh before continuing." : "Access denied");
   expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull();
@@ -1781,7 +1784,10 @@ it("offers keyboard reading of a long pending reply while keeping newer writing 
   });
   render(view());
   const text = "Длинный ответ\nUzyn jogap\n".repeat(100);
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: text } });
+  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  await waitFor(() => expect((input as HTMLTextAreaElement).disabled).toBe(false));
+  fireEvent.change(input, { target: { value: text } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
   const readingArea = await screen.findByRole("region", { name: "Reply text" });
   expect(readingArea.textContent).toBe(text);
