@@ -238,7 +238,6 @@ jobs:
       # @auto-tm/contracts.
       - run: pnpm test:root
 
-  # Every workspace's production build, in its normal production mode.
   build:
     needs: lane
     if: needs.lane.outputs.lane != 'docs'
@@ -260,4 +259,4 @@ jobs:
 
       - run: pnpm --filter @auto-tm/db generate
 
-      - run: pnpm build
+      - run: pnpm exec turbo run build --filter=!@auto-tm/admin --concurrency=1
