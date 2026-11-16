@@ -62,6 +62,7 @@ beforeEach(() => {
 afterEach(async () => {
   cleanup();
   await act(async () => { await new Promise<void>((resolve) => setTimeout(resolve, 0)); });
+  server.resetHandlers();
   vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
 });
 it("shows safe enquiry metadata, then claims atomically before opening the real transcript", async () => {
@@ -1540,4 +1541,40 @@ it("retains a newer draft when acknowledgement storage fails and recovers it wit
   mounted.unmount(); render(view());
   await waitFor(() => expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Retain my newer revision"));
   expect(screen.queryByRole("button", { name: "Retry reply" })).toBeNull();
+});
+
+it.each([
+  ["tk", "Müşderä jogap", "Jogaby iber", "Iberilýär", "Jogaby gaýtadan iber", "Iberildi"],
+  ["ru", "Ответ клиенту", "Отправить ответ", "Отправляется", "Повторить отправку", "Отправлено"],
+  ["en", "Reply to customer", "Send reply", "Pending", "Retry reply", "Sent"],
+] as const)("renders %s public reply Pending, failure and same-intent recovery through MSW", async (locale, label, send, pendingLabel, retry, sent) => {
+  selectAssigned();
+  const response = deferred<Response>();
+  const bodies: { clientMessageId: string; text: string }[] = [];
+  let stored: ReturnType<typeof message> | null = null;
+  server.use(
+    http.post(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/messages`, async ({ request }) => {
+      const body = await request.json() as { clientMessageId: string; text: string }; bodies.push(body);
+      if (bodies.length === 1) return response.promise;
+      stored = { ...message(1, body.text), clientMessageId: body.clientMessageId, author: { ...actor, kind: "operator" } };
+      return Response.json(stored);
+    }),
+    http.get(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/messages`, ({ request }) => Response.json({
+      items: stored && !new URL(request.url).searchParams.has("cursor") ? [stored] : [], nextCursor: null,
+    })),
+  );
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  const input = await screen.findByRole("textbox", { name: label });
+  const text = "Ähli maglumatlar\nПодробные сведения\nFull details ".repeat(50);
+  fireEvent.change(input, { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: send }));
+  await screen.findByText(pendingLabel);
+  await act(async () => response.resolve(Response.json({}, { status: 503 })));
+  fireEvent.click(await screen.findByRole("button", { name: retry }));
+  await screen.findByText(sent);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).toEqual(bodies[1]);
+  expect(bodies[0]?.text).toBe(text);
+  await waitFor(() => expect(screen.getAllByText(/Ähli maglumatlar/)).toHaveLength(1));
+  expect((input as HTMLTextAreaElement).value).toBe("");
 });

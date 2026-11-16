@@ -153,8 +153,8 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
               <p className="mb-2">{reader.notice === "offline" ? t.offline : t.readError}</p>
               <Button variant="secondary" onClick={recover}>{t.retry}</Button>
             </div>}
-            <ReplyComposer locale={locale} actorId={actor.id} id={id} version={version} messages={messages} send={reader.send} busy={reader.busy} offline={reader.notice === "offline"} />
             {cursor && <Button className="mt-5" variant="secondary" disabled={reader.busy} onClick={more}>{t.moreMessages}</Button>}
+            <ReplyComposer locale={locale} actorId={actor.id} id={id} version={version} messages={messages} send={reader.send} busy={reader.busy} offline={reader.notice === "offline"} />
           </div>}
     </section>
     <aside aria-label={t.context} className="min-w-0 border-t bg-muted/20 p-5 lg:col-span-2 xl:col-span-1 xl:border-t-0 xl:border-l">
