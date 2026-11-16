@@ -1,8 +1,23 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "agentGuidance": false,
-  "globalDependencies": ["**/.env.*local", "packages/tsconfig/base.json"],
-  "globalEnv": ["NODE_ENV", "APP_ENV", "LOG_LEVEL"],
+  "globalDependencies": ["packages/tsconfig/base.json"],
+  "globalEnv": [
+    "NODE_ENV",
+    "APP_ENV",
+    "LOG_LEVEL",
+    "AUTO_TM_TEST_DATABASES",
+    "VIDEO_STORAGE_E2E",
+    "VIDEO_PROCESSING_DATABASE_E2E",
+    "VIDEO_PROCESSING_STORAGE_E2E",
+    "GITHUB_ACTIONS",
+    "CI",
+    "RICH_VIDEO_TEST_API_REGION",
+    "RICH_VIDEO_TEST_WORKER_REGION",
+    "REPORT_ENTRY_ENABLED",
+    "ADMIN_MODERATION_ACTIONS_ENABLED",
+    "TESTCONTAINERS_RYUK_DISABLED"
+  ],
   "globalPassThroughEnv": [
     "DATABASE_URL",
     "REDIS_URL",
@@ -13,10 +28,7 @@
     "MINIO_PUBLIC_URL",
     "MINIO_ACCESS_KEY",
     "MINIO_SECRET_KEY",
-    "MINIO_REGION",
-    "REPORT_ENTRY_ENABLED",
-    "ADMIN_MODERATION_ACTIONS_ENABLED",
-    "TESTCONTAINERS_RYUK_DISABLED"
+    "MINIO_REGION"
   ],
   "tasks": {
     "build": {
@@ -58,7 +70,17 @@
     },
     "@auto-tm/db#test": {
       "dependsOn": ["^build", "build"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/infra/minio/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/infra/minio/**",
+        "$TURBO_ROOT$/apps/api/src/**/*.ts",
+        "$TURBO_ROOT$/apps/api/package.json",
+        "$TURBO_ROOT$/apps/api/tsconfig*.json",
+        "$TURBO_ROOT$/apps/worker/src/**/*.ts",
+        "$TURBO_ROOT$/apps/worker/package.json",
+        "$TURBO_ROOT$/apps/worker/tsconfig*.json",
+        "$TURBO_ROOT$/packages/tsconfig/*.json"
+      ],
       "outputs": []
     },
     "@auto-tm/db#test:unit": {
@@ -73,6 +95,24 @@
     "@auto-tm/api#test:unit": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/admin/src/lib/**", "$TURBO_ROOT$/apps/admin/package.json"],
+      "outputs": []
+    },
+    "@auto-tm/web#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/db/scripts/demo-inventory/photos.manifest.json",
+        "$TURBO_ROOT$/packages/db/scripts/reviewer-fixtures/photos.manifest.json"
+      ],
+      "outputs": []
+    },
+    "@auto-tm/web#test:unit": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/db/scripts/demo-inventory/photos.manifest.json",
+        "$TURBO_ROOT$/packages/db/scripts/reviewer-fixtures/photos.manifest.json"
+      ],
       "outputs": []
     },
     "clean": {
