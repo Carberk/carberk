@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { LISTING_AUDIT_LOG, type ListingAuditLog } from "./ports/ListingAuditLog";
 
 import type { Listing } from "../domain/Listing";
 import {
@@ -21,8 +21,8 @@ export class ArchiveListing {
   constructor(
     @Inject(LISTING_REPOSITORY)
     private readonly listings: ListingRepository,
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(LISTING_AUDIT_LOG)
+    private readonly audit: ListingAuditLog,
   ) {}
 
   async execute(input: ArchiveListingInput): Promise<ArchiveListingResult> {
@@ -44,14 +44,12 @@ export class ArchiveListing {
     const updated = existing.archive();
     const saved = await this.listings.update(updated);
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: input.userId,
-        action: "listing.archived",
-        targetType: "Listing",
-        targetId: saved.id,
-        details: { previousStatus },
-      },
+    await this.audit.record({
+      actorId: input.userId,
+      action: "listing.archived",
+      targetType: "Listing",
+      targetId: saved.id,
+      details: { previousStatus },
     });
 
     return { listing: saved };

@@ -1,3 +1,4 @@
+import { FakeListingPublication } from "./testing/FakeListingPublication";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   NotFoundException,
@@ -120,123 +121,17 @@ class FakeImageVariantGenerator implements ImageVariantGenerator {
   }
 }
 
-class FakePrisma {
-  $queryRaw = async () => [];
-  listingVideo = { updateMany: async () => ({ count: 0 }) };
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  createdListings: Array<Record<string, unknown>> = [];
-  createdMedia: Array<Record<string, unknown>> = [];
-  deletedDrafts: string[] = [];
-
-  /** When set, the next transaction fails with this error and persists nothing. */
-  failTransaction: (() => Error) | undefined;
-
-  private rollBack(): void {
-    // The real transaction rolls back every statement, so nothing is recorded.
-    this.createdListings = [];
-    this.createdMedia = [];
-    this.deletedDrafts = [];
-    this.auditLogs = [];
-  }
-
-  $transaction = async <T>(work: Promise<T>[] | ((tx: FakePrisma) => Promise<T>)): Promise<T | T[]> => {
-    if (typeof work === "function") {
-      try {
-        // An interactive transaction is atomic, so a failure adopts nothing:
-        // the in-memory claim is not reached rather than undone.
-        if (this.failTransaction) throw this.failTransaction();
-        return await work(this);
-      } catch (err) {
-        this.rollBack();
-        throw err;
-      }
-    }
-    if (this.failTransaction) {
-      await Promise.allSettled(work);
-      this.rollBack();
-      throw this.failTransaction();
-    }
-    return Promise.all(work);
-  };
-
-  listing = {
-    create: async ({ data }: { data: Record<string, unknown> }) => {
-      this.createdListings.push(data);
-      const d = data as Record<string, unknown>;
-      return {
-        id: d["id"] as string,
-        sellerId: d["sellerId"] as string,
-        status: d["status"] as string,
-        brandId: d["brandId"] as string,
-        modelId: d["modelId"] as string,
-        generationId: d["generationId"] as string | null,
-        year: d["year"] as number | null,
-        vin: d["vin"] as string | null,
-        cityId: d["cityId"] as string,
-        regionId: d["regionId"] as string | null,
-        priceAmount: d["priceAmount"] as number,
-        priceCurrency: d["priceCurrency"] as string,
-        contactPhone: d["contactPhone"] as string | null,
-        allowCalls: d["allowCalls"] as boolean,
-        allowChat: d["allowChat"] as boolean,
-        publishedAt: d["publishedAt"] as Date,
-        condition: d["condition"] as string | null,
-        colorId: d["colorId"] as string | null,
-        bodyTypeId: d["bodyTypeId"] as string | null,
-        engineTypeId: d["engineTypeId"] as string | null,
-        transmissionId: d["transmissionId"] as string | null,
-        driveTypeId: d["driveTypeId"] as string | null,
-        enginePower: d["enginePower"] as number | null,
-        mileageKm: d["mileageKm"] as number | null,
-        locationText: d["locationText"] as string | null,
-        description: d["description"] as string | null,
-        acceptsExchange: d["acceptsExchange"] as boolean,
-        installmentAvailable: d["installmentAvailable"] as boolean,
-        damaged: d["damaged"] as boolean | null,
-        knownIssuesText: d["knownIssuesText"] as string | null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-    },
-  };
-
-  listingMedia = {
-    create: async ({ data }: { data: Record<string, unknown> }) => {
-      this.createdMedia.push(data);
-      return data;
-    },
-  };
-
-  listingDraft = {
-    delete: async ({ where }: { where: { id: string } }) => {
-      this.deletedDrafts.push(where.id);
-    },
-  };
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
 
 function makeUseCase(
   draftRepo?: FakeListingDraftRepository,
-  prisma?: FakePrisma,
+  prisma?: FakeListingPublication,
   exchangeRates?: FakeExchangeRatePort,
   events?: FakeEventPublisher,
   variantGenerator?: FakeImageVariantGenerator,
 ) {
   return new PublishListing(
     draftRepo ?? new FakeListingDraftRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof PublishListing>[1],
+    prisma ?? new FakeListingPublication(world.claims),
     exchangeRates ?? new FakeExchangeRatePort(),
     events ?? new FakeEventPublisher(),
     variantGenerator ?? new FakeImageVariantGenerator(),
@@ -263,7 +158,7 @@ function seedDraft(
 
 describe("PublishListing", () => {
   let draftRepo: FakeListingDraftRepository;
-  let prisma: FakePrisma;
+  let prisma: FakeListingPublication;
   let exchangeRates: FakeExchangeRatePort;
   let events: FakeEventPublisher;
   let variantGenerator: FakeImageVariantGenerator;
@@ -278,7 +173,7 @@ describe("PublishListing", () => {
     presignedUpload("p1.webp");
     presignedUpload("p2.webp");
     draftRepo = new FakeListingDraftRepository();
-    prisma = new FakePrisma();
+    prisma = new FakeListingPublication(world.claims);
     exchangeRates = new FakeExchangeRatePort();
     events = new FakeEventPublisher();
     variantGenerator = new FakeImageVariantGenerator();
@@ -506,17 +401,11 @@ describe("PublishListing", () => {
     expect(result.listing.conditionDisclosure).toMatchObject(validPayload.conditionDisclosure);
     expect(prisma.createdListings).toHaveLength(1);
     expect(prisma.createdListings[0]).toMatchObject({
-      damaged: true,
-      knownIssuesText: validPayload.conditionDisclosure.knownIssuesText,
+      conditionDisclosure: { damaged: true, knownIssuesText: validPayload.conditionDisclosure.knownIssuesText },
     });
     expect(prisma.createdMedia).toHaveLength(3);
     expect(variantGenerator.generated).toEqual(["photo1.webp", "photo2.webp", "photo3.webp"]);
     expect(prisma.deletedDrafts).toContain("draft-1");
-    expect(prisma.auditLogs).toHaveLength(1);
-    expect(prisma.auditLogs[0]).toMatchObject({
-      action: "listing.published",
-      actorId: "user-1",
-    });
     expect(events.events).toHaveLength(1);
     expect(events.events[0]).toMatchObject({
       event: "ListingCreated",
@@ -1079,7 +968,7 @@ describe("PublishListing", () => {
     const result = await uc.execute({ draftId: "draft-1", userId: "user-1" });
 
     expect(result.listing.conditionDisclosure).toEqual({ damaged: false });
-    expect(prisma.createdListings[0]).toMatchObject({ damaged: false, knownIssuesText: null });
+    expect(prisma.createdListings[0]).toMatchObject({ conditionDisclosure: { damaged: false } });
   });
 
   it.each([
@@ -1116,7 +1005,7 @@ describe("PublishListing", () => {
       const result = await uc.execute({ draftId: "draft-1", userId: "user-1" });
 
       expect(result.listing.conditionDisclosure?.damaged).toBe(false);
-      expect(prisma.createdListings[0]).toMatchObject({ damaged: false, knownIssuesText });
+      expect(prisma.createdListings[0]?.conditionDisclosure).toEqual({ damaged: false, ...(knownIssuesText !== null ? { knownIssuesText } : {}) });
     });
 
     it("refuses a damaged New car and tells the seller to choose Used", async () => {

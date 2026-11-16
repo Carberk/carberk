@@ -366,11 +366,13 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     const { PrismaListingRepository } = await import(resolve(apiRoot, "src/modules/listings/infrastructure/PrismaListingRepository"));
     const { VideoUploadSessions } = await import(resolve(apiRoot, "src/modules/listings/application/VideoUploadSessions"));
     const { DeleteListing } = await import(resolve(apiRoot, "src/modules/listings/application/DeleteListing"));
+    const { PrismaListingAuditLog } = await import(resolve(apiRoot, "src/modules/listings/infrastructure/PrismaListingAuditLog"));
+    const { PrismaListingMediaCounts } = await import(resolve(apiRoot, "src/modules/listings/infrastructure/PrismaListingMediaCounts"));
     let now = new Date();
     const access = new ConfigListingVideoAccess(config);
     const lifecycle = new VideoUploadSessions(new PrismaVideoUploadRepository(prisma), new BucketVideoStorage(config), access,
       new PrismaListingDraftRepository(prisma), new PrismaListingRepository(prisma), () => now);
-    const deleteListing = new DeleteListing(new PrismaListingRepository(prisma), prisma, { emit: async () => undefined });
+    const deleteListing = new DeleteListing(new PrismaListingRepository(prisma), new PrismaListingAuditLog(prisma), { emit: async () => undefined }, new PrismaListingMediaCounts(prisma));
     const identity = new PrismaIdentityCheckAdapter(prisma);
     const read = new PrismaListingVideoReadRepository(prisma, access, identity);
     const serving = new ServeListingVideo(new PrismaVideoServingRepository(prisma), new BucketVideoStorage(config), identity,

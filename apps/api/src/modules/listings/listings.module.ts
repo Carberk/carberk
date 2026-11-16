@@ -1,3 +1,9 @@
+import { LISTING_PUBLICATION } from "./application/ports/ListingPublication";
+import { PrismaListingPublication } from "./infrastructure/PrismaListingPublication";
+import { LISTING_MEDIA_COUNTS } from "./application/ports/ListingMediaCounts";
+import { PrismaListingMediaCounts } from "./infrastructure/PrismaListingMediaCounts";
+import { LISTING_AUDIT_LOG } from "./application/ports/ListingAuditLog";
+import { PrismaListingAuditLog } from "./infrastructure/PrismaListingAuditLog";
 import { GetTargetVideoStatus } from "./application/GetTargetVideoStatus";
 import { ConfigListingVideoAccess } from "../../common/ConfigListingVideoAccess";
 import { VideoServingController } from "./presentation/VideoServingController";
@@ -116,6 +122,9 @@ import { VIDEO_UPLOAD_ACCESS_PORT } from "./domain/ports/VideoUploadAccessPort";
   imports: [PrismaModule, EventEmitterModule, IdentityModule, BullModule.registerQueue({ name: "video-transcode" })],
   controllers: [VideoServingController, ListingsController, DraftsController, UploadsController, MyListingsController, ExchangeRatesController, FavoritesController, ContactPhonesController, VideoUploadsController, VideoTelemetryController],
   providers: [
+    { provide: LISTING_PUBLICATION, useClass: PrismaListingPublication },
+    { provide: LISTING_MEDIA_COUNTS, useClass: PrismaListingMediaCounts },
+    { provide: LISTING_AUDIT_LOG, useClass: PrismaListingAuditLog },
     GetTargetVideoStatus,
     ServeListingVideo,
     ConfigListingVideoAccess,

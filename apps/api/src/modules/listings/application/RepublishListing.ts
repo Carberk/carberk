@@ -1,3 +1,4 @@
+import { LISTING_MEDIA_COUNTS, type ListingMediaCounts } from "./ports/ListingMediaCounts";
 import {
   BadRequestException,
   Inject,
@@ -5,7 +6,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { LISTING_AUDIT_LOG, type ListingAuditLog } from "./ports/ListingAuditLog";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
 import {
@@ -41,14 +42,16 @@ export class RepublishListing {
   constructor(
     @Inject(LISTING_REPOSITORY)
     private readonly listings: ListingRepository,
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(LISTING_AUDIT_LOG)
+    private readonly audit: ListingAuditLog,
     @Inject(EXCHANGE_RATE_PORT)
     private readonly exchangeRates: ExchangeRatePort,
     @Inject(ContactPhonePolicy)
     private readonly contactPhones: ContactPhonePolicy,
     @Inject(IDENTITY_CLOCK_PORT)
     private readonly clock: ClockPort,
+    @Inject(LISTING_MEDIA_COUNTS)
+    private readonly mediaCounts: ListingMediaCounts,
   ) {}
 
   async execute(input: RepublishListingInput): Promise<RepublishListingResult> {
@@ -69,9 +72,7 @@ export class RepublishListing {
       });
     }
 
-    const photoCount = await this.prisma.listingMedia.count({
-      where: { listingId: existing.id, kind: "image" },
-    });
+    const photoCount = await this.mediaCounts.count(existing.id, "image");
     if (photoCount < ListingsSchemas.MIN_LISTING_PHOTOS) {
       throw new BadRequestException({
         code: LISTING_ERROR_CODES.PHOTO_MINIMUM_REQUIRED,
@@ -106,15 +107,13 @@ export class RepublishListing {
       priceTmt: toPriceTmt(updated.priceAmount, updated.priceCurrency, rateToTmt),
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: input.userId,
-        action: "listing.republished",
-        targetType: "Listing",
-        targetId: saved.id,
-        details: {
-          previousArchivedAt: previousArchivedAt?.toISOString() ?? null,
-        },
+    await this.audit.record({
+      actorId: input.userId,
+      action: "listing.republished",
+      targetType: "Listing",
+      targetId: saved.id,
+      details: {
+        previousArchivedAt: previousArchivedAt?.toISOString() ?? null,
       },
     });
 
