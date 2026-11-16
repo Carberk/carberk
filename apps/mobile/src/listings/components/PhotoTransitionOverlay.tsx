@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native";
-import { Image } from "expo-image";
 import Animated, { useAnimatedStyle, type SharedValue } from "react-native-reanimated";
+
+import { Photo as Image } from "../../media/photoRoute";
 
 import { containRect, coverRect, dragRect, lerpRect, type PhotoGeometry, type PhotoRect } from "./photoTransitionMath";
 

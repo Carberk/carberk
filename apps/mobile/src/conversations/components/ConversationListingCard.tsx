@@ -1,9 +1,10 @@
 import { Pressable, View } from "react-native";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { Enums, type ConversationsSchemas } from "@auto-tm/contracts";
+
+import { Photo as Image } from "../../media/photoRoute";
 
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";

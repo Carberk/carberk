@@ -1,11 +1,11 @@
 import type { VideoUploadsSchemas } from "@auto-tm/contracts";
-import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { Camera, Lock } from "lucide-react-native";
 import { Enums, WizardSchemas } from "@auto-tm/contracts";
 import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { Photo as Image } from "../../media/photoRoute";
 import { VideoReviewLine } from "../video/VideoReviewLine";
 import { useBrands } from "../../api/catalog/useBrands";
 import { findCityInGroups, useCityGroups } from "../../api/catalog/useCityGroups";

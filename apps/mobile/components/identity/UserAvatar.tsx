@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { View } from "react-native";
-import { Image } from "expo-image";
 import { useColorScheme } from "nativewind";
 import Svg, { Circle, Path } from "react-native-svg";
 
+import { Photo as Image, usePhotoFailure } from "../../src/media/photoRoute";
 import { buildVariantUrl } from "../../src/listings/detail/buildVariantUrl";
 import { carAvatarAt, carAvatarTint } from "../../src/identity/carAvatars";
 
@@ -30,10 +29,9 @@ export interface UserAvatarProps {
  */
 export function UserAvatar({ size, avatarIndex, avatarKey, avatarUrl, accessibilityLabel }: UserAvatarProps) {
   const { colorScheme } = useColorScheme();
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-
   const candidateUrl = avatarKey ? avatarUrl || buildVariantUrl(avatarKey, "thumbnail") : null;
-  const photoUrl = candidateUrl && failedUrl !== candidateUrl ? candidateUrl : null;
+  const { failed, onError } = usePhotoFailure(candidateUrl);
+  const photoUrl = failed ? null : candidateUrl;
   const mark = carAvatarAt(avatarIndex);
   const tint = carAvatarTint(mark, colorScheme === "dark" ? "dark" : "light");
   const glyph = Math.round(size * 0.62);
@@ -56,7 +54,7 @@ export function UserAvatar({ size, avatarIndex, avatarKey, avatarUrl, accessibil
           source={{ uri: photoUrl }}
           style={{ width: size, height: size }}
           contentFit="cover"
-          onError={() => setFailedUrl(photoUrl)}
+          onError={onError}
         />
       ) : (
         <Svg

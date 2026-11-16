@@ -52,6 +52,14 @@ business permissions remain owned by the API.
 
 The only photo origin is `https://minio-staging-5795.up.railway.app`.
 
+Native `Photo` readers map that origin to `/photos` on the selected TM entry,
+preserving canonical URI/cache identity and raw path/query. Local and bundled
+images pass through. Mounted readers rebind on explicit entry changes and private
+access saves/removal; removing access leaves TM selected without a Global fallback.
+Provision private photo access through the tester screen, separately from API
+credentials. Never put access in public configuration, query parameters or stored
+photo URLs.
+
 Only GET, HEAD and PUT under `/photos/listing-photos/…` and
 `/photos/chat-attachments/…` are accepted. The gateway removes `/photos` by raw
 slicing, preserves signed Host/TLS identity, body, content and conditional headers,

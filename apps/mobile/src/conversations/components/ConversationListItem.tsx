@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Enums } from "@auto-tm/contracts";
 import { BellOff, Car, Check, CheckCheck, Image as ImageIcon, Trash2, type LucideIcon } from "lucide-react-native";
 
+import { Photo as Image, usePhotoFailure } from "../../media/photoRoute";
 import {
   seedConversationDetail,
   type ConversationSummaryData,
@@ -76,7 +75,6 @@ export function ConversationListItem({
   const { t, i18n } = useTranslation();
   const { t: tConv } = useTranslation("conversations");
   const queryClient = useQueryClient();
-  const [imageFailed, setImageFailed] = useState(false);
   const listing = conversation.listing;
   const peerName = usePeerName(conversation) ?? "";
   const { text: previewText, icon: PreviewIcon } = usePreview(conversation);
@@ -110,6 +108,8 @@ export function ConversationListItem({
   const imageUrl = listing?.coverMediaKey
     ? buildVariantUrl(listing.coverMediaKey, "thumbnail")
     : null;
+
+  const { failed: imageFailed, onError } = usePhotoFailure(imageUrl);
 
   const accessibilityLabel = [
     peerName,
@@ -145,7 +145,7 @@ export function ConversationListItem({
               source={{ uri: imageUrl }}
               className="w-full h-full"
               contentFit="cover"
-              onError={() => setImageFailed(true)}
+              onError={onError}
             />
           ) : (
             <View testID="conversation-row-placeholder" className="w-full h-full items-center justify-center">

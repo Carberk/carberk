@@ -1,9 +1,9 @@
-import { Image } from "expo-image";
 import { CameraOff, Car, Heart, type LucideIcon } from "lucide-react-native";
 import { useState } from "react";
 import { View, type PressableProps, type ViewProps } from "react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 
+import { Photo as Image } from "../../media/photoRoute";
 import { buildOriginalUrl, listingPhotoUrl } from "../detail/buildVariantUrl";
 
 import { GlassSurface } from "@/components/ui/glass-surface";

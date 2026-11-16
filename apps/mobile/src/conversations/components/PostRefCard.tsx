@@ -1,8 +1,9 @@
 import { Pressable, View } from "react-native";
-import { Image } from "expo-image";
 import { useTranslation } from "react-i18next";
 import { Enums } from "@auto-tm/contracts";
 import { AlertCircle } from "lucide-react-native";
+
+import { Photo as Image } from "../../media/photoRoute";
 
 import { Text } from "@/components/ui/text";
 import { Skeleton } from "@/components/ui/skeleton";

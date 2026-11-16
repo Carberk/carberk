@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Check, CheckCheck, Flag, ImageOff, RotateCcw, Trash2 } from "lucide-react-native";
-import { Image } from "expo-image";
 import type { ConversationsSchemas } from "@auto-tm/contracts";
 
+import { Photo as Image, usePhotoFailure } from "../../media/photoRoute";
 import { buildChatImageUrl } from "../upload/buildChatImageUrl";
 import { formatMessageTime } from "../messageTime";
 
@@ -90,7 +89,7 @@ function ImageBubble({
   onLongPress?: () => void;
 }) {
   const { t } = useTranslation();
-  const [failed, setFailed] = useState(false);
+  const { failed, onError } = usePhotoFailure(uri);
 
   const displayHeight =
     width && height && width > 0
@@ -119,7 +118,7 @@ function ImageBubble({
           placeholderContentFit="cover"
           style={{ width: BUBBLE_MAX_WIDTH, height: displayHeight }}
           contentFit="cover"
-          onError={() => setFailed(true)}
+          onError={onError}
         />
       )}
     </Pressable>
