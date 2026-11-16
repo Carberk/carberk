@@ -4,7 +4,9 @@ import { PassThrough } from "node:stream";
 import { act, cloneElement, isValidElement, type ReactNode } from "react";
 import { renderToPipeableStream } from "react-dom/server";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
+import { http } from "msw";
+import { setupServer } from "msw/node";
 
 const platform = await vi.hoisted(async () => {
   const { AsyncLocalStorage } = await import("node:async_hooks");
@@ -30,12 +32,9 @@ let requests: { path: string; method: string; body: unknown }[];
 const token = (sid = id, sub = actor.id) => `e30.${Buffer.from(JSON.stringify({ sub, sid })).toString("base64url")}.synthetic`;
 function view() { return <HistoryWorkbench locale="en" section="desk"><HistoryInbox locale="en" /></HistoryWorkbench>; }
 function detail() { return { ...row, mine: true, assignmentVersion: 1, assignedOperator: actor, sourceListingId: null }; }
-beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubEnv("API_BASE_URL", "http://api.test");
-  platform.token = token(); assigned = false; requests = [];
-  window.history.replaceState(null, "", "/vehicle-history/en");
-  vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request }) => {
+    const input = request.url;
+    const init = { method: request.method, body: request.method === "POST" ? await request.text() : undefined };
     const url = new URL(input); requests.push({ path: url.pathname + url.search, method: init?.method ?? "GET", body: init?.body });
     if (url.pathname.endsWith("/desk")) return Response.json({ purpose: "vehicle-history", mode: "synthetic", actor, requests: [] });
     if (url.pathname.endsWith("/claim")) { assigned = true; return Response.json(detail()); }
@@ -49,11 +48,21 @@ beforeEach(() => {
       text: "Can you check this car?", author: { ...actor, kind: "requester" }, createdAt: row.createdAt }], nextCursor: null });
     if (url.pathname.endsWith(id)) return Response.json(detail());
     return Response.json({ items: [assigned ? { ...row, mine: true, assignmentVersion: 1, assignedOperator: actor } : row], nextCursor: null });
-  }));
+}));
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterAll(() => server.close());
+beforeEach(() => {
+  localStorage.clear();
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubEnv("API_BASE_URL", "http://api.test");
+  platform.token = token(); assigned = false; requests = [];
+  window.history.replaceState(null, "", "/vehicle-history/en");
+  vi.stubGlobal("fetch", vi.fn(fetch));
 });
 afterEach(async () => {
   cleanup();
   await act(async () => { await new Promise<void>((resolve) => setTimeout(resolve, 0)); });
+  server.resetHandlers();
   vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
 });
 it("shows safe enquiry metadata, then claims atomically before opening the real transcript", async () => {
@@ -68,7 +77,8 @@ it("shows safe enquiry metadata, then claims atomically before opening the real 
   expect(screen.getAllByText("Ayna").length).toBeGreaterThan(0);
   expect(requests.filter((r) => r.method === "POST" && !r.path.includes("receipts"))).toEqual([{ path: `/api/v1/vehicle-history/operator/requests/${id}/claim`, method: "POST", body: '{"expectedAssignmentVersion":0}' }]);
   expect(requests.filter((r) => r.path.includes("receipts") && r.method === "POST").every((r) => JSON.parse(String(r.body)).kind === "received")).toBe(true);
-  expect(screen.queryByRole("textbox", { name: /reply|note/i })).toBeNull();
+  expect(screen.getByRole("textbox", { name: "Reply to customer" })).toBeDefined();
+  expect(screen.queryByRole("textbox", { name: /note/i })).toBeNull();
   await waitFor(() => expect(document.activeElement?.id).toBe("selected-enquiry"));
 });
 it("retains queue, search, page and selection in locale links and restores Back/refresh", async () => {
@@ -743,7 +753,7 @@ it("shows operator Sent, Delivered and Read only from durable requester version-
   facts = [{ participantId: id, assignmentVersion: 0, receivedOrder: "1", readOrder: "1" }];
   fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
   await screen.findByText("Read");
-  expect(screen.queryByRole("textbox", { name: /reply|note/i })).toBeNull();
+  expect(screen.queryByRole("textbox", { name: /note/i })).toBeNull();
 });
 
 it("completes Received before a clipped tall row is 50% viewport eligible for 300ms", async () => {
@@ -1140,4 +1150,458 @@ it.each(["received", "read"])("refetches a fresh session before ACK while old %s
       { session: "old", kind: "received" }, { session: "old", kind: "read" },
     ] : [{ session: "old", kind: "received" }]);
   } finally { vi.useRealTimers(); }
+});
+
+it("keeps the public reply draft through request navigation, reload and same-account reauthentication", async () => {
+  selectAssigned();
+  const mounted = render(view());
+  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  fireEvent.change(input, { target: { value: "  Here is the history\nTäze maglumat · Новые сведения  " } });
+  await screen.findByText("Draft saved on this device.");
+  fireEvent.click(screen.getByRole("button", { name: "Unassigned" }));
+  expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull();
+  fireEvent.click(await screen.findByRole("link", { name: /Merdan/ }));
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value)
+    .toBe("  Here is the history\nTäze maglumat · Новые сведения  "));
+  mounted.unmount();
+  platform.token = token(actor.id);
+  render(view());
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value)
+    .toBe("  Here is the history\nTäze maglumat · Новые сведения  "));
+  expect(screen.queryByRole("textbox", { name: /note/i })).toBeNull();
+});
+
+it("sends exact public text once, announces Pending and Sent, and keeps typing done before acknowledgement", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  let sent: { clientMessageId: string; text: string; expectedAssignmentVersion: number } | undefined;
+  let storedBeforeSend = "";
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) {
+      if (init?.method === "POST") {
+        sent = JSON.parse(String(init.body));
+        storedBeforeSend = Object.values(localStorage).join("");
+        return pending.promise;
+      }
+      return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  const mounted = render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "  Exact reply\nSalam  " } });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  await screen.findByText("Pending");
+  await waitFor(() => expect(sent?.text).toBe("  Exact reply\nSalam  "));
+  expect(sent?.expectedAssignmentVersion).toBe(1);
+  expect(storedBeforeSend).toContain(sent?.clientMessageId);
+  fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Newer reply" } });
+  await act(async () => pending.resolve(Response.json({ ...message(1, sent?.text), clientMessageId: sent?.clientMessageId,
+    author: { ...actor, kind: "operator" } })));
+  await screen.findByText("Sent");
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Newer reply");
+  mounted.unmount(); render(view());
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Newer reply"));
+});
+
+it("retries an uncertain send after reload with the original intent and reconciles one visible message", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  const bodies: { clientMessageId: string; text: string }[] = [];
+  let responseLost = true;
+  let durable: ReturnType<typeof message> | null = null;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) {
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body)); bodies.push(body);
+        durable ??= { ...message(1, body.text), clientMessageId: body.clientMessageId, author: { ...actor, kind: "operator" } };
+        return responseLost ? Promise.reject(new Error("Lost response")) : Promise.resolve(Response.json(durable));
+      }
+      return Promise.resolve(Response.json({ items: responseLost || url.searchParams.has("cursor") ? [] : [durable], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  const mounted = render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Retain this uncertain reply" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  await screen.findByText("Send not confirmed. Retry sends the same reply.");
+  mounted.unmount();
+  const fresh = render(view());
+  await screen.findByRole("button", { name: "Retry reply" });
+  responseLost = false;
+  fireEvent.click(screen.getByRole("button", { name: "Retry reply" }));
+  await screen.findByText("Sent");
+  await waitFor(() => expect(screen.getAllByText("Retain this uncertain reply")).toHaveLength(1));
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]).toEqual(bodies[0]);
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("");
+  fresh.unmount(); render(view());
+  await screen.findByRole("textbox", { name: "Reply to customer" });
+  expect(screen.queryByRole("button", { name: "Retry reply" })).toBeNull();
+});
+
+it.each(["read", "write"])("recovers a storage %s failure without claiming saved or sending unrecorded text", async (fault) => {
+  selectAssigned();
+  const storage = vi.spyOn(window.localStorage, fault === "read" ? "getItem" : "setItem");
+  storage.mockImplementation(() => { throw new Error("Storage unavailable"); });
+  render(view());
+  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  if (fault === "write") fireEvent.change(input, { target: { value: "Keep my unsaved work" } });
+  await screen.findByText(fault === "read" ? "Could not open the saved draft. Retry before writing." : "Draft not saved. Keep this page open and retry saving.");
+  expect(screen.queryByText("Draft saved on this device.")).toBeNull();
+  expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(requests.filter((request) => request.method === "POST" && request.path.endsWith("/messages"))).toEqual([]);
+  storage.mockRestore();
+  fireEvent.click(screen.getByRole("button", { name: fault === "read" ? "Retry loading draft" : "Retry saving draft" }));
+  if (fault === "write") {
+    await screen.findByText("Draft saved on this device.");
+    expect((input as HTMLTextAreaElement).value).toBe("Keep my unsaved work");
+  } else await waitFor(() => expect((input as HTMLTextAreaElement).disabled).toBe(false));
+});
+
+it.each(["actor", "session", "assignment", "request", "disposal"] as const)("fences a pending public reply acknowledgement after %s changes", async (change) => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  let changed = false;
+  let intent: { clientMessageId: string; text: string } | undefined;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (changed && change === "actor" && url.pathname.endsWith("/desk")) return Promise.resolve(Response.json({
+      purpose: "vehicle-history", mode: "synthetic", actor: { ...actor, id }, requests: [],
+    }));
+    if (changed && change === "assignment" && url.pathname.endsWith(id)) return Promise.resolve(Response.json({ ...detail(), assignmentVersion: 2 }));
+    if (url.pathname.endsWith("/messages")) {
+      if (init?.method === "POST") { intent = JSON.parse(String(init.body)); return pending.promise; }
+      return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  const mounted = render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Original operator draft" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  await waitFor(() => expect(intent?.text).toBe("Original operator draft"));
+  fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Still private newer work" } });
+  const stored = JSON.stringify(Object.values(localStorage));
+  changed = true;
+  if (change === "actor") platform.token = token(id, id);
+  if (change === "session") platform.token = token(actor.id);
+  if (change === "request") fireEvent.click(screen.getByRole("button", { name: "Unassigned" }));
+  if (change === "disposal") mounted.unmount();
+  await act(async () => pending.resolve(Response.json({ ...message(1, intent?.text), clientMessageId: intent?.clientMessageId,
+    author: { ...actor, kind: "operator" } })));
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull());
+  expect(JSON.stringify(Object.values(localStorage))).toBe(stored);
+  expect(screen.queryByText("Original operator draft")).toBeNull();
+  expect(screen.queryByText("Sent")).toBeNull();
+});
+
+it.each([401, 403, 409])("hides protected reply text after a send refuses HTTP %s and retains its retry intent", async (status) => {
+  selectAssigned();
+  const network = networkHandler();
+  vi.mocked(fetch).mockImplementation((input, init) => String(input).endsWith("/messages") && init?.method === "POST"
+    ? Promise.resolve(Response.json({}, { status })) : network(input, init));
+  render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Protected refused draft" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  await screen.findByText(status === 409 ? "Assignment changed. Refresh before continuing." : "Access denied");
+  expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull();
+  expect(screen.queryByText("Protected refused draft")).toBeNull();
+  expect(Object.values(localStorage).join("")).toContain("Protected refused draft");
+});
+
+it("keeps each request and account draft separate and never restores a previous assignment's draft", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  let currentActor = actor, selectedId = id, selectedVersion = 1;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/desk")) return Promise.resolve(Response.json({ purpose: "vehicle-history", mode: "synthetic", actor: currentActor, requests: [] }));
+    if (url.pathname.endsWith("/requests")) return Promise.resolve(Response.json({ items: [{ ...row, mine: true, id: selectedId, assignedOperator: currentActor, assignmentVersion: selectedVersion }], nextCursor: null }));
+    if (url.pathname.endsWith(selectedId)) return Promise.resolve(Response.json({ ...detail(), id: selectedId, assignedOperator: currentActor, assignmentVersion: selectedVersion }));
+    if (url.pathname.endsWith("/messages")) return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    if (url.pathname.endsWith("/receipts")) return Promise.resolve(Response.json({ items: [] }));
+    return network(input, init);
+  });
+  let mounted = render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Ayna first request" } });
+  mounted.unmount(); selectedId = actor.id;
+  window.history.replaceState(null, "", `?filter=mine&selected=${selectedId}&v=1`);
+  mounted = render(view());
+  let input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  expect((input as HTMLTextAreaElement).value).toBe("");
+  fireEvent.change(input, { target: { value: "Ayna second request" } });
+  mounted.unmount(); selectedId = id; currentActor = { ...actor, id }; platform.token = token(actor.id, id);
+  window.history.replaceState(null, "", `?filter=mine&selected=${id}&v=1`);
+  mounted = render(view());
+  input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  expect((input as HTMLTextAreaElement).value).toBe("");
+  fireEvent.change(input, { target: { value: "Other operator draft" } });
+  mounted.unmount(); currentActor = actor; platform.token = token(); selectedVersion = 2;
+  window.history.replaceState(null, "", `?filter=mine&selected=${id}&v=2`);
+  render(view());
+  input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  expect((input as HTMLTextAreaElement).value).toBe("");
+  expect(Object.values(localStorage).join("")).toContain("Ayna first request");
+  expect(Object.values(localStorage).join("")).toContain("Other operator draft");
+});
+
+it("never sends if recording the intent fails, then recovers the same draft with explicit Retry", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  const bodies: { clientMessageId: string; text: string }[] = [];
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (String(input).endsWith("/messages") && init?.method === "POST") {
+      const body = JSON.parse(String(init.body)); bodies.push(body);
+      return Promise.resolve(Response.json({ ...message(1, body.text), clientMessageId: body.clientMessageId, author: { ...actor, kind: "operator" } }));
+    }
+    if (String(input).includes("/messages")) return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    return network(input, init);
+  });
+  render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Do not lose this reply" } });
+  const storage = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("Disk full"); });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  await screen.findByText("Draft not saved. Keep this page open and retry saving.");
+  expect(bodies).toEqual([]);
+  storage.mockRestore();
+  fireEvent.click(screen.getByRole("button", { name: "Retry saving draft" }));
+  fireEvent.click(screen.getByRole("button", { name: "Retry reply" }));
+  await screen.findByText("Sent");
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]?.text).toBe("Do not lose this reply");
+});
+
+it("reconciles an uncertain reply through the active HTTP poll after reconnect and only shows factual receipts", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  let durable: ReturnType<typeof message> | null = null;
+  let recovered = false, receipt = "sent";
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith("/messages")) {
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        durable = { ...message(1, body.text), clientMessageId: body.clientMessageId, author: { ...actor, kind: "operator" } };
+        return Promise.reject(new Error("Response lost"));
+      }
+      return Promise.resolve(Response.json({ items: recovered && !url.searchParams.has("cursor") ? [durable] : [], nextCursor: null }));
+    }
+    if (url.pathname.endsWith("/receipts") && init?.method !== "POST") return Promise.resolve(Response.json({ items: receipt === "sent" ? [] : [{
+      participantId: id, assignmentVersion: 0, receivedOrder: "1", readOrder: receipt === "read" ? "1" : "0",
+    }] }));
+    return network(input, init);
+  });
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  try {
+    await act(async () => { render(view()); });
+    fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Missed response" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Send reply" })));
+    expect(screen.getByRole("button", { name: "Retry reply" })).toBeDefined();
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    await act(async () => window.dispatchEvent(new Event("offline")));
+    expect((screen.getByRole("button", { name: "Retry reply" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("You’re offline. Check your connection and retry.")).toBeDefined();
+    recovered = true;
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    await act(async () => window.dispatchEvent(new Event("online")));
+    expect(screen.getByText("Connection restored. Messages updated.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Retry reply" })).toBeNull();
+    expect(screen.getAllByText("Missed response")).toHaveLength(1);
+    expect(screen.getByText("Sent")).toBeDefined();
+    expect(screen.queryByText("Delivered")).toBeNull();
+    receipt = "delivered";
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(screen.getByText("Delivered")).toBeDefined();
+    receipt = "read";
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(screen.getByText("Read")).toBeDefined();
+  } finally { vi.useRealTimers(); }
+});
+
+it("refuses malformed or private-note storage and lets the operator explicitly start a new public draft", async () => {
+  selectAssigned();
+  const replyKey = `carberk.history.public-reply.v1:${actor.id}:${id}:1`;
+  localStorage.setItem(replyKey, JSON.stringify({ text: "Private note must not become public", revision: id, intent: null, channel: "private-note" }));
+  render(view());
+  await screen.findByText("The saved draft is unreadable. Start a new draft to replace it.");
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("");
+  expect(screen.queryByText("Private note must not become public")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Start a new draft" }));
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).disabled).toBe(false));
+  fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Only public text" } });
+  await screen.findByText("Draft saved on this device.");
+  expect(localStorage.getItem(replyKey)).toContain("Only public text");
+  expect(localStorage.getItem(replyKey)).not.toContain("Private note");
+});
+
+it("does not hydrate stored protected text until the selected request passes current authority", async () => {
+  selectAssigned();
+  localStorage.setItem(`carberk.history.public-reply.v1:${actor.id}:${id}:1`, JSON.stringify({ text: "Stored protected reply", revision: id, intent: null }));
+  const network = networkHandler(), pending = deferred<Response>();
+  let captured = false;
+  const storage = vi.spyOn(window.localStorage, "getItem");
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (String(input).endsWith(id) && !captured) { captured = true; return pending.promise; }
+    return network(input, init);
+  });
+  render(view());
+  await waitFor(() => expect(captured).toBe(true));
+  expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull();
+  expect(storage.mock.calls).toEqual([]);
+  await act(async () => pending.resolve(Response.json({}, { status: 403 })));
+  await screen.findByText("Access denied");
+  expect(storage.mock.calls).toEqual([]);
+  expect(document.body.textContent).not.toContain("Stored protected reply");
+});
+
+it("keeps fresh-session edits when an old initiating session receives its successful send response", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  const oldToken = platform.token, freshToken = token(actor.id);
+  let intent: { clientMessageId: string; text: string } | undefined;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (String(input).includes("/messages")) {
+      if (init?.method === "POST") { intent = JSON.parse(String(init.body)); return pending.promise; }
+      return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  const tree = await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }));
+  const mounted = platform.requestCookies.run(oldToken, () => render(tree));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Old session intent" } });
+  await act(async () => platform.requestCookies.run(oldToken, () => fireEvent.click(screen.getByRole("button", { name: "Send reply" }))));
+  expect(intent?.text).toBe("Old session intent");
+  platform.token = freshToken;
+  const replacement = await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }));
+  await act(async () => platform.requestCookies.run(freshToken, () => mounted.rerender(replacement)));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Fresh session edit" } });
+  const stored = JSON.stringify(Object.values(localStorage));
+  await act(async () => pending.resolve(Response.json({ ...message(1, intent?.text), clientMessageId: intent?.clientMessageId,
+    author: { ...actor, kind: "operator" } })));
+  expect(JSON.stringify(Object.values(localStorage))).toBe(stored);
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Fresh session edit");
+  expect(screen.getByRole("button", { name: "Retry reply" })).toBeDefined();
+  expect(screen.queryByText("Sent")).toBeNull();
+});
+
+it("keeps every acknowledged reply visible while transcript refresh is unavailable", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  let sent = 0;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (String(input).includes("/messages")) {
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body)); sent++;
+        return Promise.resolve(Response.json({ ...message(sent + 1, body.text), clientMessageId: body.clientMessageId, author: { ...actor, kind: "operator" } }));
+      }
+      return Promise.resolve(sent ? Response.json({}, { status: 503 }) : Response.json({ items: [], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  render(view());
+  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  for (const text of ["First acknowledged reply", "Second acknowledged reply"]) {
+    fireEvent.change(input, { target: { value: text } });
+    fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+    await screen.findByText(text);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(true));
+    await screen.findByText("Could not update messages. Showing previously loaded messages.");
+  }
+  expect(screen.getByText("First acknowledged reply")).toBeDefined();
+  expect(screen.getByText("Second acknowledged reply")).toBeDefined();
+  expect(screen.getAllByText("Sent")).toHaveLength(2);
+});
+
+it("retains a newer draft when acknowledgement storage fails and recovers it without another send", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  let intent: { clientMessageId: string; text: string } | undefined;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (String(input).includes("/messages")) {
+      if (init?.method === "POST") { intent = JSON.parse(String(init.body)); return pending.promise; }
+      return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  const mounted = render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Acknowledged revision" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  await waitFor(() => expect(intent?.text).toBe("Acknowledged revision"));
+  fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Retain my newer revision" } });
+  const writes = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("Storage unavailable"); });
+  await act(async () => pending.resolve(Response.json({ ...message(1, intent?.text), clientMessageId: intent?.clientMessageId, author: { ...actor, kind: "operator" } })));
+  await screen.findByText("Sent");
+  expect(screen.getByText("Draft not saved. Keep this page open and retry saving.")).toBeDefined();
+  expect(screen.queryByText("Draft saved on this device.")).toBeNull();
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Retain my newer revision");
+  writes.mockRestore();
+  fireEvent.click(screen.getByRole("button", { name: "Retry saving draft" }));
+  await screen.findByText("Draft saved on this device.");
+  mounted.unmount(); render(view());
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Retain my newer revision"));
+  expect(screen.queryByRole("button", { name: "Retry reply" })).toBeNull();
+});
+
+it.each([
+  ["tk", "Müşderä jogap", "Jogaby iber", "Iberilýär", "Jogaby gaýtadan iber", "Iberildi"],
+  ["ru", "Ответ клиенту", "Отправить ответ", "Отправляется", "Повторить отправку", "Отправлено"],
+  ["en", "Reply to customer", "Send reply", "Pending", "Retry reply", "Sent"],
+] as const)("renders %s public reply Pending, failure and same-intent recovery through MSW", async (locale, label, send, pendingLabel, retry, sent) => {
+  selectAssigned();
+  const response = deferred<Response>();
+  const bodies: { clientMessageId: string; text: string }[] = [];
+  let stored: ReturnType<typeof message> | null = null;
+  server.use(
+    http.post(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/messages`, async ({ request }) => {
+      const body = await request.json() as { clientMessageId: string; text: string }; bodies.push(body);
+      if (bodies.length === 1) return response.promise;
+      stored = { ...message(1, body.text), clientMessageId: body.clientMessageId, author: { ...actor, kind: "operator" } };
+      return Response.json(stored);
+    }),
+    http.get(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/messages`, ({ request }) => Response.json({
+      items: stored && !new URL(request.url).searchParams.has("cursor") ? [stored] : [], nextCursor: null,
+    })),
+  );
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  const input = await screen.findByRole("textbox", { name: label });
+  const text = "Ähli maglumatlar\nПодробные сведения\nFull details ".repeat(50);
+  fireEvent.change(input, { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: send }));
+  await screen.findByText(pendingLabel);
+  await act(async () => response.resolve(Response.json({}, { status: 503 })));
+  fireEvent.click(await screen.findByRole("button", { name: retry }));
+  await screen.findByText(sent);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]).toEqual(bodies[1]);
+  expect(bodies[0]?.text).toBe(text);
+  await waitFor(() => expect(screen.getAllByText(/Ähli maglumatlar/)).toHaveLength(1));
+  expect((input as HTMLTextAreaElement).value).toBe("");
+});
+
+it("offers keyboard reading of a long pending reply while keeping newer writing available", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  let sent: { clientMessageId: string; text: string } | undefined;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (String(input).includes("/messages")) {
+      if (init?.method === "POST") { sent = JSON.parse(String(init.body)); return pending.promise; }
+      return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  render(view());
+  const text = "Длинный ответ\nUzyn jogap\n".repeat(100);
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  const readingArea = await screen.findByRole("region", { name: "Reply text" });
+  expect(readingArea.textContent).toBe(text);
+  readingArea.focus();
+  expect(document.activeElement).toBe(readingArea);
+  fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Next reply remains editable" } });
+  expect(readingArea.textContent).toBe(text);
+  await waitFor(() => expect(sent?.text).toBe(text));
+  await act(async () => pending.resolve(Response.json({ ...message(1, text), clientMessageId: sent?.clientMessageId, author: { ...actor, kind: "operator" } })));
+  await screen.findByText("Sent");
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Next reply remains editable");
 });

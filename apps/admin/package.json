@@ -36,6 +36,7 @@
     "@types/react-dom": "catalog:",
     "@typescript/native": "catalog:",
     "happy-dom": "catalog:",
+    "msw": "2.14.6",
     "postcss": "catalog:",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",

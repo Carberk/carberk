@@ -5,6 +5,7 @@ import { Button } from "@auto-tm/ui/components";
 import { IdentitySchemas, type VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
 import type { HistoryInboxResult } from "./actions";
+import { ReplyComposer } from "./ReplyComposer";
 import { useOperatorConversation } from "./useOperatorConversation";
 
 
@@ -153,6 +154,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
               <Button variant="secondary" onClick={recover}>{t.retry}</Button>
             </div>}
             {cursor && <Button className="mt-5" variant="secondary" disabled={reader.busy} onClick={more}>{t.moreMessages}</Button>}
+            <ReplyComposer locale={locale} actorId={actor.id} id={id} version={version} messages={messages} send={reader.send} busy={reader.busy} offline={reader.notice === "offline"} />
           </div>}
     </section>
     <aside aria-label={t.context} className="min-w-0 border-t bg-muted/20 p-5 lg:col-span-2 xl:col-span-1 xl:border-t-0 xl:border-l">
