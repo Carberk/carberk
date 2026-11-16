@@ -23,7 +23,9 @@ import { ErrorState } from "@/components/ErrorState";
 
 function reportTargets(text: string) {
   const targets: string[] = [];
-  for (const match of text.matchAll(/https:\/\/[^\s<>"“”‘’«»]+/giu)) {
+  const scanner = /https:\/\/[^\s<>"“”‘’«»]+/giu;
+  let match: RegExpExecArray | null;
+  while ((match = scanner.exec(text)) !== null) {
     const before = text[match.index - 1] ?? "";
     if (before && !/[\s([{"'<“‘«]/u.test(before)) continue;
     let target = match[0];
@@ -31,7 +33,10 @@ function reportTargets(text: string) {
       ['"', '"'], ["<", ">"], ["“", "”"], ["‘", "’"], ["«", "»"]]).get(before);
     const after = text[match.index + match[0].length];
     if (after && !/\s/u.test(after) && after !== closing) continue;
-    if (closing) {
+    if (before === "'") {
+      const end = target.lastIndexOf("'");
+      if (end >= 0) target = target.slice(0, end);
+    } else if (closing) {
       let depth = 0;
       for (let index = 0; index < target.length; index++) {
         if (target[index] === closing && depth === 0) { target = target.slice(0, index); break; }
@@ -39,6 +44,7 @@ function reportTargets(text: string) {
         else if (target[index] === closing) depth--;
       }
     } else if (target !== text && !/[?#]/u.test(target)) target = target.replace(/[.,;!]+$/u, "");
+    scanner.lastIndex = match.index + target.length;
     try {
       const parsed = new URL(target);
       if (parsed.protocol === "https:" && !parsed.username && !parsed.password

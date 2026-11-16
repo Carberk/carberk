@@ -520,6 +520,36 @@ it.each([
   expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith(target, {});
 });
 
+it("preserves legal apostrophes inside a quoted opaque query", async () => {
+  const text = "Read 'https://reports.example.test/report?token=O'Reilly&part=1&part=2'.";
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(text);
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/report?token=O'Reilly&part=1&part=2");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/report?token=O'Reilly&part=1&part=2", {});
+});
+
+it("offers each adjacent delimited target without whitespace", async () => {
+  const text = "(https://reports.example.test/a),(https://reports.example.test/b)";
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(text);
+  await fireEvent.press(view.getByRole("button", { name: "Open report 1" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/a");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link 1" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/a", {});
+  await fireEvent.press(view.getByRole("button", { name: "Open report 2" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/b");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link 2" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/b", {});
+});
+
 it("appends ascending pages, retains earlier messages on failure, and retries the exact forward cursor", async () => {
   const cursors: (string | null)[] = [];
   let fail = true;
