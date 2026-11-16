@@ -321,6 +321,12 @@ importers:
       '@typescript/native':
         specifier: 'catalog:'
         version: typescript@7.0.2
+      dockerfile-ast:
+        specifier: 0.7.1
+        version: 0.7.1
+      mvdan-sh:
+        specifier: 0.10.1
+        version: 0.10.1
       parse5:
         specifier: 7.3.0
         version: 7.3.0
@@ -1186,6 +1192,23 @@ importers:
         version: '@typescript/typescript6@6.0.2'
 
 packages:
+
+  vscode-languageserver-types@3.18.5:
+    resolution:
+      integrity: sha512-kPd6+JQNz3HMJvjKlqUxERSlZHAntl/aGpsk7ImwIh0ewDKDcjgAEyVSYciPiOJD3ftbK9IrfiqUeTZLSbCizw==
+
+  vscode-languageserver-textdocument@1.0.16:
+    resolution:
+      integrity: sha512-qeNEuOi9a3qkqRf7Gfez2WL2VwlBTLCNekHBGO9kxPVUp9XuY15yfTJ9jwvOwKI0I2MhUUfZq95NSp+LK1CLQg==
+
+  mvdan-sh@0.10.1:
+    resolution:
+      integrity: sha512-kMbrH0EObaKmK3nVRKUIIya1dpASHIEusM13S4V1ViHFuxuNxCo+arxoa6j/dbV22YBGjl7UKJm9QQKJ2Crzhg==
+    deprecated: See https://github.com/mvdan/sh/issues/1145
+
+  dockerfile-ast@0.7.1:
+    resolution:
+      integrity: sha512-oX/A4I0EhSkGqrFv0YuvPkBUSYp1XiY8O8zAKc8Djglx8ocz+JfOr8gP0ryRMC2myqvDLagmnZaU9ot1vG2ijw==
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -11343,6 +11366,17 @@ packages:
     hasBin: true
 
 snapshots:
+
+  vscode-languageserver-types@3.18.5: {}
+
+  vscode-languageserver-textdocument@1.0.16: {}
+
+  mvdan-sh@0.10.1: {}
+
+  dockerfile-ast@0.7.1:
+    dependencies:
+      vscode-languageserver-textdocument: 1.0.16
+      vscode-languageserver-types: 3.18.5
 
   '@alloc/quick-lru@5.2.0': {}
 
