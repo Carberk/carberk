@@ -6,7 +6,6 @@ import { configDefaults, defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     globals: true,
-    passWithNoTests: true,
     testTimeout: 120_000,
     hookTimeout: 60_000,
     // Vitest 4 stopped excluding dist by default; `nest build` emits compiled specs there.

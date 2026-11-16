@@ -8,8 +8,8 @@
     "start": "next start -p 3001",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "test:unit": "vitest run --passWithNoTests",
+    "test": "vitest run",
+    "test:unit": "vitest run",
     "verify:runtime": "pnpm build && node ../../scripts/admin-session-runtime-smoke.mjs && node scripts/verify-standalone-assets.mjs"
   },
   "dependencies": {

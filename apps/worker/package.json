@@ -8,7 +8,7 @@
     "dev": "nest start --watch",
     "start": "node dist/main",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "video:fixture": "tsx scripts/video-fixture.ts"

@@ -12,7 +12,6 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    passWithNoTests: true,
     testTimeout: 30_000,
     hookTimeout: 15_000,
   },
