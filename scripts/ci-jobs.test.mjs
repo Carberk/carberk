@@ -304,6 +304,6 @@ for (const name of ["pr-checks.yml", "ci.yml"]) {
     assert.equal(rootScripts["check:source-policy"], "node scripts/check-source-policy.mjs");
     assert.equal(rootScripts["test:source-policy"], "node --test scripts/check-source-policy.test.mjs");
     assert.match(rootScripts.lint, /^pnpm check:source-policy && turbo run lint$/);
-    assert.match(rootScripts["test:root"], /&& pnpm check:source-policy && /);
+    assert.match(rootScripts["test:root"], /node --test 'scripts\/\*\.test\.mjs'/);
   });
 }

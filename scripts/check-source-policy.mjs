@@ -23,11 +23,23 @@ function compilerComments(path, source) {
   const accepted = new Set();
   const tags = new Set(["type", "param", "returns", "return", "typedef", "template", "satisfies", "this"]);
   const visit = (node) => {
-    for (const doc of node.kind === ts.SyntaxKind.EndOfFileToken ? [] : node.jsDoc ?? []) {
+    for (const doc of node.jsDoc ?? []) {
       const parsed = ts.parseIsolatedJSDocComment(source.slice(doc.pos, doc.end));
       if (parsed.diagnostics.length || doc.comment || !doc.tags?.length) continue;
       if (!doc.tags.every((tag) => tags.has(tag.tagName.text) && !tag.comment &&
         (tag.typeExpression || tag.tagName.text === "template" && tag.typeParameters?.length))) continue;
+      const target = ts.isVariableStatement(node) && node.declarationList.declarations.length === 1 ?
+        node.declarationList.declarations[0].initializer : node;
+      const signature = target && ts.isFunctionLike(target) ? target : undefined;
+      if (!doc.tags.every((tag) => {
+        const name = tag.tagName.text;
+        if (name === "typedef") return Boolean(tag.fullName);
+        if (name === "template") return Boolean(signature || doc.tags.some((entry) => entry.tagName.text === "typedef"));
+        if (name === "param") return signature?.parameters.some((parameter) =>
+          parameter.name.getText(file) === tag.name?.getText(file).split(".")[0]);
+        if (["returns", "return", "this"].includes(name)) return Boolean(signature);
+        return node.kind !== ts.SyntaxKind.EndOfFileToken;
+      })) continue;
       accepted.add(`${doc.pos}:${doc.end}`);
     }
     ts.forEachChild(node, visit);

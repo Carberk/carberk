@@ -91,6 +91,7 @@ test("only compiler-consumed type annotations without prose qualify", () => {
     '/** @type {number} */\nconst value = 1;\n',
     '/** @param {number} value\n * @returns {number}\n */\nfunction identity(value) { return value; }\n',
     '/** @typedef {{ id: string }} Entity */\nconst value = 1;\n',
+    '/** @typedef {number} Count */',
     '/** @template T\n * @param {T} value\n * @returns {T}\n */\nfunction identity(value) { return value; }\n',
     '/** @satisfies {Record<string, number>} */\nconst value = { x: 1 };\n',
   ];
@@ -102,6 +103,9 @@ test("only compiler-consumed type annotations without prose qualify", () => {
     '/** @type {number} */\n',
     '/** @type {number */\nconst value = 1;\n',
     '/** @example something */\nconst value = 1;\n',
+    '/** @param {number} missing */\nfunction f(value) {}\n',
+    '/** @param {number} value */\nconst value = 1;\n',
+    '/** @returns {number} */\nconst value = 1;\n',
     '/** @type {number} */\nconst value: number = 1;\n',
   ]) assert.match(check({ [source.includes(": number") ? "typed.ts" : "typed.js"]: source }).join("\n"), /explanatory comment/, source);
 });
@@ -196,6 +200,7 @@ test("repository admission sees tracked, untracked and ignored authored config o
     if (path.includes("dist")) git("add", "-f", path);
     assert.match(checkRepository(directory, {}).join("\n"), new RegExp(`${path.replaceAll(".", "\\.")}.*explanatory comment`));
     write(path, "export {};\n");
+    if (path.includes("dist")) git("add", "-f", path);
   }
   assert.deepEqual(checkRepository(directory, {}), []);
 });
