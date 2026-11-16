@@ -276,3 +276,34 @@ test("Next directives use the parsed prologue and preserve server-action imports
   f.put("apps/web/src/action.ts", 'import "node:fs"; export async function action() {}');
   assert.ok(f.check().errors.some(e => e.rule === "frontend-server" && e.importer.endsWith("client.tsx")));
 });
+
+test("ordinary shared barrels retain cross-feature privacy through multiple hops", t => {
+  const f = fixture(t, {
+    "apps/api/src/modules/listings/application/UseCatalog.ts": 'import type { Private } from "../../../bridge";',
+    "apps/api/src/bridge.ts": 'export type { Private } from "./nested";',
+    "apps/api/src/nested.ts": 'export type { Private } from "./modules/catalog/application/Private";',
+    "apps/api/src/modules/catalog/application/Private.ts": "export interface Private {}",
+  });
+  assert.ok(f.check().errors.some(e => e.rule === "feature-public" && e.importer.endsWith("UseCatalog.ts")));
+  f.put("apps/api/src/nested.ts", 'export type { Private } from "./modules/catalog/catalog.public";');
+  f.put("apps/api/src/modules/catalog/catalog.public.ts", 'export type { Private } from "./application/Private";');
+  assert.deepEqual(f.check().errors, []);
+});
+
+for (const declaration of [
+  'export type Prisma = import("@auto-tm/db").Prisma;',
+  'type Prisma = import("@auto-tm/db").Prisma; export type { Prisma };',
+  'export interface Value { prisma: import("@auto-tm/db").Prisma }',
+]) {
+  test(`exported type dependencies reject persistence laundering: ${declaration}`, t => {
+    const f = fixture(t, {
+      "apps/api/src/modules/catalog/application/Create.ts": 'import type { Prisma } from "../../../bridge";',
+      "apps/api/src/bridge.ts": declaration,
+      "apps/api/package.json": { name: "@auto-tm/api", dependencies: { "@auto-tm/db": "workspace:*" } },
+      "packages/db/package.json": { name: "@auto-tm/db", exports: { ".": "./dist/index.js" } },
+      "packages/db/tsconfig.json": { compilerOptions: { module: "CommonJS", moduleResolution: "Bundler", rootDir: "src", outDir: "dist" } },
+      "packages/db/src/index.ts": "export interface Prisma {}",
+    });
+    assert.ok(f.check().errors.some(e => e.rule === "application-layer" && e.importer.endsWith("Create.ts")));
+  });
+}

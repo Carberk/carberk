@@ -54,6 +54,23 @@ function declarations(file, text) {
   for (const statement of ast.statements) if (ts.isExportDeclaration(statement) && !statement.moduleSpecifier && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
     for (const element of statement.exportClause.elements) localExports.add((element.propertyName ?? element.name).text);
   }
+  const typeDeclarations = new Map(ast.statements.filter(node => ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)).map(node => [node.name.text, node]));
+  for (const [name, node] of typeDeclarations) if (node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) localExports.add(name);
+  const pendingTypes = [...localExports];
+  for (const name of pendingTypes) {
+    const declaration = typeDeclarations.get(name);
+    if (!declaration) continue;
+    const expose = node => {
+      if (ts.isIdentifier(node) && !localExports.has(node.text)) { localExports.add(node.text); pendingTypes.push(node.text); }
+      ts.forEachChild(node, expose);
+    };
+    expose(declaration);
+  }
+  const exposedType = node => {
+    let declaration = node;
+    while (declaration.parent && declaration.parent !== ast) declaration = declaration.parent;
+    return typeDeclarations.has(declaration.name?.text) && localExports.has(declaration.name.text);
+  };
   const add = (node, argument, kind, typeOnly = false) => edges.push({
     specifier: argument && (ts.isStringLiteralLike(argument) ? argument.text : undefined),
     expression: argument?.getText(ast), kind, typeOnly,
@@ -73,6 +90,7 @@ function declarations(file, text) {
       add(node, node.moduleReference.expression, "require", node.isTypeOnly);
     } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
       add(node, node.argument.literal, "import-type", true);
+      edges.at(-1).reexport = exposedType(node);
     } else if (ts.isCallExpression(node)) {
       const name = node.expression.getText(ast);
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword) add(node, node.arguments[0], "dynamic");
@@ -266,29 +284,33 @@ export function checkRepository(directory, { allowances } = {}) {
     list.push(edge);
     adjacency.set(edge.importer, list);
   }
-  const checkBoundary = (edge, target, name, transitive = false, publicEntry = false) => {
+  const checkBoundary = (edge, target, name, transitive = false, publicEntry = false, throughPublic = false) => {
     if (edge.test) return;
     const from = feature(edge.importer);
     const to = feature(target);
     if (from?.[2].match(/^[^/]+\.public\.ts$/) && (persistence(name) || /^(?:infrastructure|presentation)\//.test(to?.[2] ?? "")) && !(edge.importer === "apps/api/src/modules/identity/identity.public.ts" && target === "apps/api/src/modules/identity/presentation/contactPhoneCodeException.ts")) report(edge, "public-export", target);
     if (from?.[2].startsWith("domain/") && (persistence(name) || framework(name) || to && !to[2].startsWith("domain/"))) report(edge, "domain-purity", target);
     if (from?.[2].startsWith("application/") && (persistence(name) || /^(?:infrastructure|presentation)\//.test(to?.[2] ?? "") && !(publicEntry && to?.[2] === "presentation/contactPhoneCodeException.ts" && to[1] === "identity"))) report(edge, "application-layer", target);
-    if ((!transitive || /^(?:infrastructure|presentation)\//.test(to?.[2] ?? "") && !(publicEntry && target === "apps/api/src/modules/identity/presentation/contactPhoneCodeException.ts")) && from && to && from[1] !== to[1] && !(publicFeature(to[2]) && (to[1] !== "identity" || to[2] === "identity.public.ts")) && !(edge.composition && isComposition(target))) report(edge, "feature-public", target);
+    if ((!transitive || !throughPublic || /^(?:infrastructure|presentation)\//.test(to?.[2] ?? "") && !(publicEntry && target === "apps/api/src/modules/identity/presentation/contactPhoneCodeException.ts")) && from && to && from[1] !== to[1] && !(publicFeature(to[2]) && (to[1] !== "identity" || to[2] === "identity.public.ts")) && !(edge.composition && isComposition(target))) report(edge, "feature-public", target);
     if (frontend(byName.get(edge.workspace)) && bundledSource(edge.importer) && (persistence(name) || framework(name) && /^(?:@nestjs\/|nestjs-|fastify|express$|socket.io$)/.test(name) || builtins.has(name))) report(edge, "frontend-server", target);
   };
   for (const edge of edges) {
     if (!edge.target) continue;
     checkBoundary(edge, edge.target, edge.package ?? edge.specifier);
     const visited = new Set();
-    const follow = target => {
-      if (visited.has(target)) return;
-      visited.add(target);
+    const follow = (target, throughPublic = false, identityFacade = false) => {
+      const exposed = feature(target);
+      throughPublic ||= Boolean(exposed && publicFeature(exposed[2]) && (exposed[1] !== "identity" || exposed[2] === "identity.public.ts"));
+      identityFacade ||= target === "apps/api/src/modules/identity/identity.public.ts";
+      const identity = JSON.stringify([target, throughPublic, identityFacade]);
+      if (visited.has(identity)) return;
+      visited.add(identity);
       for (const next of adjacency.get(target) ?? []) {
         if (!next.target) continue;
         const from = feature(edge.importer);
         if (next.kind === "export" || next.reexport || from?.[2].startsWith("domain/")) {
-          checkBoundary(edge, next.target, next.package ?? next.specifier, true, edge.target === "apps/api/src/modules/identity/identity.public.ts");
-          follow(next.target);
+          checkBoundary(edge, next.target, next.package ?? next.specifier, true, identityFacade, throughPublic);
+          follow(next.target, throughPublic, identityFacade);
         }
       }
     };
