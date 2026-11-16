@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { ImageOff, MoreHorizontal } from "lucide-react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
-import { Photo as Image } from "../../media/photoRoute";
+import { Photo as Image, usePhotoFailure } from "../../media/photoRoute";
 import { carTitle } from "../carTitle";
 import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
 import { draftProgress } from "../wizard/draftProgress";
@@ -40,7 +40,6 @@ export function DraftCard({
   onResume,
   onMore,
 }: DraftCardProps) {
-  const [imageFailed, setImageFailed] = useState(false);
   const { t, i18n } = useTranslation();
 
   const payload = draft.payload;
@@ -57,6 +56,7 @@ export function DraftCard({
       ? buildOriginalUrl(coverKey)
       : buildVariantUrl(coverKey, "list")
     : null;
+  const { failed: imageFailed, onError } = usePhotoFailure(imageUrl);
 
   const title = carTitle(brandName, modelName, payload.year);
 
@@ -87,7 +87,7 @@ export function DraftCard({
                 className="h-[100px] w-[140px]"
                 contentFit="cover"
                 cachePolicy="memory-disk"
-                onError={() => setImageFailed(true)}
+                onError={onError}
               />
             ) : (
               <View className="h-full w-full items-center justify-center">

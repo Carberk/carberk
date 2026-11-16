@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, withTiming, type SharedValue } from "react-native-reanimated";
@@ -6,7 +5,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { ImageIcon, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
-import { Photo as Image } from "../../media/photoRoute";
+import { Photo as Image, usePhotoFailure } from "../../media/photoRoute";
 import type { StagedPhoto } from "../uploadStaging/types";
 import { getPhotoUri } from "../uploadStaging/photoUri";
 
@@ -56,8 +55,8 @@ export function PhotoThumbnail({
 }: PhotoThumbnailProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
-  const [imageFailed, setImageFailed] = useState(false);
   const uri = getPhotoUri(photo);
+  const { failed: imageFailed, onError } = usePhotoFailure(uri);
   const tileSize = getPhotoTileSize(width);
 
   // Held for a moment, the photo follows the finger anywhere in the grid, and
@@ -134,7 +133,7 @@ export function PhotoThumbnail({
             source={{ uri }}
             style={StyleSheet.absoluteFillObject}
             contentFit="cover"
-            onError={() => setImageFailed(true)}
+            onError={onError}
           />
         ) : (
           <View className="h-full w-full items-center justify-center">

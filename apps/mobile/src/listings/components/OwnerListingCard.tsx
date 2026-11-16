@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Pressable, View } from "react-native";
 import { MoreHorizontal } from "lucide-react-native";
 import { Enums } from "@auto-tm/contracts";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
-import { Photo as Image } from "../../media/photoRoute";
+import { Photo as Image, usePhotoFailure } from "../../media/photoRoute";
 import { useExistingListingVideoTask } from "../video/ListingVideoTasks";
 import { useListingVideoAccess } from "../video/useListingVideoAccess";
 import { useTargetVideo } from "../video/useTargetVideo";
@@ -70,10 +70,10 @@ export function OwnerListingCard({
   const { video, pendingVideo } = (isVideoUploadTester ? status.data : undefined) ?? listing;
   const videoStatus = localVideoStatus(task, video, pendingVideo);
   const { t, i18n } = useTranslation();
-  const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = listing.coverMediaKey
     ? buildVariantUrl(listing.coverMediaKey, "list")
     : null;
+  const { failed: imageFailed, onError } = usePhotoFailure(imageUrl);
 
   const title = carTitle(brandName ?? listing.brandId, modelName ?? listing.modelId, listing.year);
 
@@ -95,7 +95,7 @@ export function OwnerListingCard({
             className="h-[100px] w-[140px]"
             contentFit="cover"
             cachePolicy="memory-disk"
-            onError={() => setImageFailed(true)}
+            onError={onError}
           />
         ) : (
           <View className="h-full w-full items-center justify-center">

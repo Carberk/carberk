@@ -4,7 +4,7 @@ import { http, HttpResponse } from "msw";
 
 import { act, fireEvent, getAllHosts, getHost, queryAllHosts, renderMobile, routeParams } from "../../test/render";
 import { server } from "../../test/msw";
-import { fixture } from "../../test/fixtures/listing";
+import { fixture, summaryFixture } from "../../test/fixtures/listing";
 import ProfileScreen from "../../app/profile";
 import TesterRouteScreen from "../../app/tester-route";
 import ConversationDetailScreen from "../../app/conversations/[id]";
@@ -13,6 +13,7 @@ import { captureRouteSnapshot, provisionGatewayKey, removeGatewayKey, selectTest
 import { clearAuthSession, loadAuthSession, storeAuthSession } from "../auth/session";
 import { ConversationList } from "../conversations/components/ConversationList";
 import { ListingPhoto } from "../listings/feed/ListingPhoto";
+import type { PhotoDrag } from "../listings/wizard/PhotoThumbnail";
 
 import { photoRequest } from "./photoRoute";
 
@@ -24,6 +25,10 @@ vi.mock("expo-image-picker", () => ({
   launchImageLibraryAsync: async () => ({ canceled: true, assets: null }),
   launchCameraAsync: async () => ({ canceled: true, assets: null }),
 }));
+vi.mock("@rn-primitives/progress", async () => {
+  const { View } = await import("react-native");
+  return { Root: View, Indicator: View };
+});
 
 const key = "synthetic-photo-gateway-access-key";
 const photo = "https://minio-staging-5795.up.railway.app/listing-photos/pending/a%2fb/original.webp?x=1+2&x=%2F";
@@ -242,4 +247,26 @@ it.each(["profile", "conversation list", "conversation detail"])("routes API-bac
   await act(() => selectTesterRoute("global"));
   expect(getAllHosts(screen.container, "Image").some(node => node.props.source?.uri === canonical && !node.props.source.headers)).toBe(true);
   expect(await loadAuthSession()).toEqual(session);
+});
+
+it.each(["draft", "owner", "sell", "thumbnail"])("recovers the mounted %s photo after access changes and ignores old image errors", async (kind) => {
+  const { DraftCard } = await import("../listings/components/DraftCard");
+  const { OwnerListingCard } = await import("../listings/components/OwnerListingCard");
+  const { SellEntry } = await import("../listings/sell/SellEntry");
+  const { PhotoThumbnail } = await import("../listings/wizard/PhotoThumbnail");
+  const draft = { id: "draft", userId: "reader", payload: { photos: [{ photoId: "p", key: "pending/one/original.webp", sortOrder: 0 }] }, createdAt: "2026-11-15T00:00:00Z", updatedAt: "2026-11-15T00:00:00Z" };
+  selectTesterRoute("tm");
+  const screen = await renderMobile(kind === "draft" ? <DraftCard draft={draft} onResume={() => {}} onMore={() => {}} />
+    : kind === "owner" ? <OwnerListingCard listing={summaryFixture({ coverMediaKey: "pending/one/original.webp" })} onOpen={() => {}} onMore={() => {}} />
+    : kind === "sell" ? <SellEntry drafts={[draft]} isPending={false} error={null} onRetry={() => {}} isCreating={false} onContinue={() => {}} onCreate={() => {}} onNavigate={() => {}} limitSheetOpen={false} onLimitSheetOpenChange={() => {}} />
+    : <PhotoThumbnail photo={{ photoId: "p", key: "pending/one/original.webp", state: "attached", retryCount: 0, sortOrder: 0 }} index={0} total={1} onRemove={() => {}} onOpenActions={() => {}} dragEnabled={false} onDragStart={() => {}} onDrop={() => {}} drag={{ from: { value: -1 }, to: { value: -1 }, x: { value: 0 }, y: { value: 0 } } as unknown as PhotoDrag} />);
+  await vi.waitFor(() => expect(getHost(screen.container, "Image").props.source?.headers).toEqual({ "X-Carberk-Gateway-Key": key }));
+  const canonical = getHost(screen.container, "Image").props.source.cacheKey;
+  const oldError = getHost(screen.container, "Image").props.onError as () => void;
+  await act(() => oldError());
+  expect(queryAllHosts(screen.container, "Image")).toHaveLength(0);
+  await act(() => provisionGatewayKey("synthetic-replacement-photo-access-key"));
+  await vi.waitFor(() => expect(getHost(screen.container, "Image").props.source).toMatchObject({ cacheKey: canonical, headers: { "X-Carberk-Gateway-Key": "synthetic-replacement-photo-access-key" } }));
+  await act(() => oldError());
+  expect(getHost(screen.container, "Image").props.source.cacheKey).toBe(canonical);
 });

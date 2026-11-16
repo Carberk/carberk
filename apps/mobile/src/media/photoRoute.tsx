@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Image as ExpoImage, type ImageProps, type ImageSource } from "expo-image";
 import { cssInterop } from "nativewind";
 
@@ -41,7 +41,20 @@ function usePhotoSource(source: ImageProps["source"], route: RouteSnapshot, revi
   return { ...object, uri, ...(object?.headers ? { headers: storageHeaders(object.headers) } : {}) };
 }
 
-export function usePhotoRevision() { return useSyncExternalStore(subscribePhotoRoute, photoRouteRevision); }
+function usePhotoRevision() { return useSyncExternalStore(subscribePhotoRoute, photoRouteRevision); }
+
+export function usePhotoFailure(uri: string | null | undefined) {
+  const failureKey = `${usePhotoRevision()}:${uri}`;
+  const activePhoto = useRef(failureKey);
+  activePhoto.current = failureKey;
+  const [failedAt, setFailedAt] = useState<string>();
+  return {
+    failed: failedAt === failureKey,
+    onError: () => {
+      if (activePhoto.current === failureKey) setFailedAt(failureKey);
+    },
+  };
+}
 
 export function Photo({ source, placeholder, ...props }: ImageProps & { className?: string }) {
   const revision = usePhotoRevision();

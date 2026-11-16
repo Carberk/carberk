@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { View } from "react-native";
 import { Car, FileText, List, Plus } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
-import { Photo as Image } from "../../media/photoRoute";
+import { Photo as Image, usePhotoFailure } from "../../media/photoRoute";
 import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
 import { draftProgress } from "../wizard/draftProgress";
 import { MenuDivider, MenuGap, MenuRow } from "../../../components/account/MenuRow";
@@ -57,10 +56,10 @@ function draftTitle(
 }
 
 function DraftCover({ draft }: { draft: ListingDraft }) {
-  const [failed, setFailed] = useState(false);
   const key = draft.payload.photos?.find((photo) => photo.key)?.key;
   // Draft photos still live under pending/; sized variants exist only after publish.
   const uri = key ? (key.startsWith("pending/") ? buildOriginalUrl(key) : buildVariantUrl(key, "list")) : null;
+  const { failed, onError } = usePhotoFailure(uri);
 
   return (
     <View className="h-12 w-16 items-center justify-center overflow-hidden rounded-lg bg-muted">
@@ -70,7 +69,7 @@ function DraftCover({ draft }: { draft: ListingDraft }) {
           className="h-12 w-16"
           contentFit="cover"
           cachePolicy="memory-disk"
-          onError={() => setFailed(true)}
+          onError={onError}
         />
       ) : (
         <Icon as={Car} className="size-6 text-muted-foreground" />
