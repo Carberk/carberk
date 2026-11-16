@@ -17,7 +17,9 @@ These internal readers grant no History, owner or media authority. The dormant
 source from the existing authorized selected-request action, rechecks that
 selection after each read/page or failure, and uses only authenticated viewer
 cover/explicit Play controls. It has no mounted viewer; connected viewing and
-return remain separate slices.
+return remain separate slices. The dormant [scoped viewer](src/app/vehicle-history/[locale]/SourceListing.tsx)
+composes public facts with the request-bound media component; retained #1217 owns
+its inbox mount, preserved return context and connected browser proof.
 
 The same action module has a strict, currently unmounted message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. Receipt and reply controls remain separate slices.
 
