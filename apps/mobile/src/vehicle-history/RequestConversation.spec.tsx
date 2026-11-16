@@ -444,9 +444,10 @@ it("confirms Copy beside only the message whose action was selected", async () =
   expect(view.getAllByText("Link copied")).toHaveLength(1);
 });
 
-it("shows pending clipboard work without claiming success or replacing the composer", async () => {
+it.each(["Open report", "Copy link"])("overlays pending %s feedback without changing the action, reader or composer layout", async (action) => {
   const copied = deferred<boolean>();
-  nativeClipboard.setStringAsync.mockReturnValueOnce(copied.promise);
+  if (action === "Copy link") nativeClipboard.setStringAsync.mockReturnValueOnce(copied.promise);
+  else vi.mocked(Linking.openURL).mockReturnValueOnce(copied.promise);
   server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
     items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
   })));
@@ -454,12 +455,21 @@ it("shows pending clipboard work without claiming success or replacing the compo
   await view.findByText("https://reports.example.test/a");
   const composer = view.getByLabelText("Your message");
   const list = getHost(view.container, "RCTScrollView");
+  const label = view.getByText(action);
   await fireEvent.changeText(composer, "Unsent question");
-  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Copy link" })); });
-  expect(view.getByRole("button", { name: "Copy link", busy: true })).toBeTruthy();
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: action })); });
+  const button = view.getByRole("button", { name: action, busy: true });
+  expect(button.props.accessibilityLabel).toBe(action);
+  const indicator = getHost(view.container, "ActivityIndicator");
+  expect(indicator.parent?.parent).toBe(button);
+  expect(indicator.parent?.props.className).toContain("absolute");
+  expect(indicator.parent?.props.pointerEvents).toBe("none");
+  expect(view.getByText(action)).toBe(label);
+  expect(label.props.className).toContain("opacity-0");
   expect(view.queryByText("Link copied")).toBeNull();
   await act(() => copied.resolve(true));
-  expect(view.getByRole("button", { name: "Copy link", busy: false })).toBeTruthy();
+  expect(view.getByRole("button", { name: action, busy: false })).toBeTruthy();
+  expect(label.props.className).not.toContain("opacity-0");
   expect(view.getByLabelText("Your message")).toBe(composer);
   expect(view.getByDisplayValue("Unsent question")).toBeTruthy();
   expect(getHost(view.container, "RCTScrollView")).toBe(list);

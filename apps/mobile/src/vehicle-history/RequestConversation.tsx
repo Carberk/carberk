@@ -207,19 +207,31 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         <Text selectable className="text-body leading-6 text-foreground">{item.text}</Text>
         {targets.map((reportTarget, index) => {
           const linkKey = `${item.id}:${index}`;
+          const opening = pendingLink?.key === linkKey && pendingLink.action === "open";
+          const copying = pendingLink?.key === linkKey && pendingLink.action === "copy";
+          const suffix = targets.length > 1 ? ` ${index + 1}` : "";
+          const openLabel = t(openFailure === linkKey ? "vehicleHistory.retryOpenReport" : "vehicleHistory.openReport") + suffix;
+          const copyLabel = t(copyFailure === linkKey ? "vehicleHistory.retryCopyLink" : "vehicleHistory.copyLink") + suffix;
           return <View key={linkKey} className="gap-2">
           <View className="flex-row flex-wrap gap-1">
-            <Button variant="link" className="max-w-full" disabled={!ready}
-              accessibilityState={{ busy: pendingLink?.key === linkKey && pendingLink.action === "open" }}
+            <Button variant="link" className="relative max-w-full" disabled={!ready}
+              accessibilityLabel={openLabel}
+              accessibilityState={{ busy: opening }}
               onPress={() => actOnReport(linkKey, reportTarget, "open")}>
-              <Text>{t(openFailure === linkKey ? "vehicleHistory.retryOpenReport" : "vehicleHistory.openReport")}{targets.length > 1 ? ` ${index + 1}` : ""}</Text>
+              <Text className={opening ? "opacity-0" : undefined}>{openLabel}</Text>
+              {opening && <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+                <ActivityIndicator accessible={false} />
+              </View>}
             </Button>
-            <Button variant="link" className="max-w-full" disabled={!ready}
-              accessibilityState={{ busy: pendingLink?.key === linkKey && pendingLink.action === "copy" }}
+            <Button variant="link" className="relative max-w-full" disabled={!ready}
+              accessibilityLabel={copyLabel}
+              accessibilityState={{ busy: copying }}
               onPress={() => actOnReport(linkKey, reportTarget, "copy")}>
-              <Text>{t(copyFailure === linkKey ? "vehicleHistory.retryCopyLink" : "vehicleHistory.copyLink")}{targets.length > 1 ? ` ${index + 1}` : ""}</Text>
+              <Text className={copying ? "opacity-0" : undefined}>{copyLabel}</Text>
+              {copying && <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+                <ActivityIndicator accessible={false} />
+              </View>}
             </Button>
-            {pendingLink?.key === linkKey && <ActivityIndicator accessible={false} />}
           </View>
         {openFailure === linkKey && <Text accessibilityRole="alert">{t("vehicleHistory.openReportFailed")}</Text>}
         {copyFailure === linkKey && <Text accessibilityRole="alert">{t("vehicleHistory.copyLinkFailed")}</Text>}
