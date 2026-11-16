@@ -48,7 +48,8 @@ Run [sol-loop](../../.claude/skills/sol-loop/SKILL.md) before filing or updating
 Every reviewer, whatever its model, reviews without touching another session's checkout:
 
 - Read the change with `git fetch origin pull/<n>/head:review-<n>`, `git diff` and `git show`. Never `git checkout` or `git switch` in a worktree you did not create; another session may have uncommitted work there.
-- To run tests or the app, make a temporary worktree: `git worktree add /tmp/review-<n> review-<n>`, then `pnpm install --frozen-lockfile` in it. Remove it with `git worktree remove /tmp/review-<n>` when done.
+- In T3, the parent provisions tests or runtime review with `delegate_task` and `isolation: "worktree"`. Commit the scoped change locally before dispatch so the host-prepared checkout includes it. The child uses its host-assigned checkout and branch, installs dependencies there as needed, and leaves checkout cleanup to the host; it does not manufacture a shell checkout. Shared isolation is suitable for read-only diff review without branch switches or file changes. [sol-loop](../../.claude/skills/sol-loop/SKILL.md#2-start-sol) owns dispatch and briefing.
+- Outside T3, to run tests or the app, make an owned temporary worktree: `git worktree add /tmp/review-<n> review-<n>`, then `pnpm install --frozen-lockfile` in it. Choose an unused path and owned review ref; remove only the worktree you created with `git worktree remove /tmp/review-<n>` when done.
 - For runtime behavior, use the fixture data from [local testing](local-testing.md) and follow the [owned-device procedure](native-fixture-signin.md#prepare-one-owned-device) for coordinated selection and handoff. Use your own ports and stop the processes you started.
 
 Every review reply starts with `MERGE CONFIDENCE: N/10` for correctness and the issue's criteria.
