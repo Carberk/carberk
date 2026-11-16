@@ -1,3 +1,4 @@
+import { FakeListingAuditLog } from "./testing/FakeListingAuditLog";
 import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, ForbiddenException } from "@nestjs/common";
 
@@ -43,26 +44,11 @@ class FakeListingRepository implements ListingRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
 
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
-
-function makeUseCase(repo?: FakeListingRepository, prisma?: FakePrisma) {
+function makeUseCase(repo?: FakeListingRepository, prisma?: FakeListingAuditLog) {
   return new ArchiveListing(
     repo ?? new FakeListingRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof ArchiveListing>[1],
+    prisma ?? new FakeListingAuditLog(),
   );
 }
 
@@ -90,11 +76,11 @@ function seedListing(
 
 describe("ArchiveListing", () => {
   let repo: FakeListingRepository;
-  let prisma: FakePrisma;
+  let prisma: FakeListingAuditLog;
 
   beforeEach(() => {
     repo = new FakeListingRepository();
-    prisma = new FakePrisma();
+    prisma = new FakeListingAuditLog();
   });
 
   it("archives an active listing", async () => {

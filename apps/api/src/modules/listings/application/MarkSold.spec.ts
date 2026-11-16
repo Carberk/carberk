@@ -1,3 +1,4 @@
+import { FakeListingAuditLog } from "./testing/FakeListingAuditLog";
 import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, ForbiddenException } from "@nestjs/common";
 
@@ -44,21 +45,6 @@ class FakeListingRepository implements ListingRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
 
 class FakeEventPublisher implements ListingEventPublisher {
   events: Array<{ event: string; listingId: string; sellerId?: string }> = [];
@@ -70,12 +56,12 @@ class FakeEventPublisher implements ListingEventPublisher {
 
 function makeUseCase(
   repo?: FakeListingRepository,
-  prisma?: FakePrisma,
+  prisma?: FakeListingAuditLog,
   events?: FakeEventPublisher,
 ) {
   return new MarkSold(
     repo ?? new FakeListingRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof MarkSold>[1],
+    prisma ?? new FakeListingAuditLog(),
     events ?? new FakeEventPublisher(),
   );
 }
@@ -102,12 +88,12 @@ function seedActiveListing(repo: FakeListingRepository, overrides?: Partial<Para
 
 describe("MarkSold", () => {
   let repo: FakeListingRepository;
-  let prisma: FakePrisma;
+  let prisma: FakeListingAuditLog;
   let events: FakeEventPublisher;
 
   beforeEach(() => {
     repo = new FakeListingRepository();
-    prisma = new FakePrisma();
+    prisma = new FakeListingAuditLog();
     events = new FakeEventPublisher();
   });
 

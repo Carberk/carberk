@@ -8,7 +8,7 @@ import {
   BadRequestException,
   ConflictException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { LISTING_PUBLICATION, type ListingPublication } from "./ports/ListingPublication";
 import { AuthSchemas, ListingsSchemas, WizardSchemas } from "@auto-tm/contracts";
 import type { z } from "zod";
 
@@ -17,7 +17,7 @@ import {
   type ClockPort,
 } from "../../identity/identity.public";
 import { ContactPhonePolicy } from "../domain/ContactPhonePolicy";
-import { Listing } from "../domain/Listing";
+import type { Listing } from "../domain/Listing";
 import { toPriceTmt } from "../domain/Price";
 import { resolveDamagedAnswer } from "../domain/damagedAnswer";
 import { DomainError, LISTING_ERROR_CODES } from "../domain/types";
@@ -140,8 +140,8 @@ export class PublishListing {
   constructor(
     @Inject(LISTING_DRAFT_REPOSITORY)
     private readonly drafts: ListingDraftRepository,
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(LISTING_PUBLICATION)
+    private readonly publication: ListingPublication,
     @Inject(EXCHANGE_RATE_PORT)
     private readonly exchangeRates: ExchangeRatePort,
     @Inject(LISTING_EVENT_PUBLISHER)
@@ -319,124 +319,52 @@ export class PublishListing {
         return [photo.key as string, prepared?.status === "fulfilled" ? prepared.value.thumbHash : undefined];
       }));
 
-      // The Listing, its media, the draft removal, the audit entry and the
-      // adoption of every upload commit together or not at all.
-      const listingRow = await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT id FROM users WHERE id = ${input.userId} FOR UPDATE`;
-        await tx.$queryRaw`SELECT id FROM listing_drafts WHERE id = ${draft.id} FOR UPDATE`;
-        await this.claims.finalize(tx, { token: reservation.token, ...claim });
-        const created = await tx.listing.create({
-          data: {
-            id: listingId,
-            sellerId: input.userId,
-            status: "active",
-            brandId: payload.brandId,
-            modelId: payload.modelId,
-            generationId: payload.generationId ?? null,
-            year: payload.year ?? null,
-            vin: payload.vin ?? null,
-            cityId: payload.cityId,
-            regionId: payload.regionId ?? null,
-            priceAmount: payload.priceAmount,
-            priceCurrency: payload.priceCurrency,
-            priceTmt,
-            contactPhone: payload.contactPhone,
-            allowCalls: payload.allowCalls,
-            allowChat: payload.allowChat,
-            publishedAt: now,
-            condition: payload.condition,
-            colorId: payload.colorId ?? null,
-            bodyTypeId: payload.bodyTypeId ?? null,
-            engineTypeId: payload.engineTypeId ?? null,
-            transmissionId: payload.transmissionId ?? null,
-            driveTypeId: payload.driveTypeId ?? null,
-            enginePower: payload.enginePower ?? null,
-            mileageKm: payload.mileageKm ?? null,
-            locationText: payload.locationText ?? null,
-            description: payload.description,
-            acceptsExchange: payload.acceptsExchange ?? false,
-            installmentAvailable: payload.installmentAvailable ?? false,
+      const listing = await this.publication.publish({
+        draftId: draft.id,
+        listing: {
+          id: listingId,
+          sellerId: input.userId,
+          status: "active",
+          publishedAt: now,
+          brandId: payload.brandId,
+          modelId: payload.modelId,
+          year: payload.year,
+          cityId: payload.cityId,
+          regionId: payload.regionId,
+          priceAmount: payload.priceAmount,
+          priceCurrency: payload.priceCurrency,
+          contactPhone: payload.contactPhone,
+          allowCalls: payload.allowCalls,
+          allowChat: payload.allowChat,
+          condition: payload.condition,
+          description: payload.description,
+          ...(payload.generationId != null ? { generationId: payload.generationId } : {}),
+          ...(payload.vin != null ? { vin: payload.vin } : {}),
+          ...(payload.colorId != null ? { colorId: payload.colorId } : {}),
+          ...(payload.bodyTypeId != null ? { bodyTypeId: payload.bodyTypeId } : {}),
+          ...(payload.engineTypeId != null ? { engineTypeId: payload.engineTypeId } : {}),
+          ...(payload.transmissionId != null ? { transmissionId: payload.transmissionId } : {}),
+          ...(payload.driveTypeId != null ? { driveTypeId: payload.driveTypeId } : {}),
+          ...(payload.enginePower != null ? { enginePower: payload.enginePower } : {}),
+          ...(payload.mileageKm != null ? { mileageKm: payload.mileageKm } : {}),
+          ...(payload.locationText != null ? { locationText: payload.locationText } : {}),
+          acceptsExchange: payload.acceptsExchange ?? false,
+          installmentAvailable: payload.installmentAvailable ?? false,
+          ...(damaged !== null ? { conditionDisclosure: {
             damaged,
-            knownIssuesText: payload.conditionDisclosure?.knownIssuesText ?? null,
-          },
-        });
-        for (const photo of attachedPhotos) {
-          await tx.listingMedia.create({
-            data: {
-              id: photo.photoId,
-              listingId,
-              kind: "image",
-              key: photo.key as string,
-              sortOrder: photo.sortOrder,
-              uploadId: uploadIdByKey.get(photo.key as string) as string,
-              thumbHash: thumbHashByKey.get(photo.key as string) ?? null,
-            },
-          });
-        }
-        // Transfer server-recorded ownership, independently of optional video state.
-        await tx.listingVideo.updateMany({
-          where: { draftId: draft.id, ownerId: input.userId },
-          data: { draftId: null, listingId },
-        });
-        await tx.listingDraft.delete({ where: { id: draft.id } });
-        await tx.auditLog.create({
-          data: {
-            actorId: input.userId,
-            action: "listing.published",
-            targetType: "Listing",
-            targetId: listingId,
-            details: {
-              brandId: payload.brandId,
-              modelId: payload.modelId,
-              cityId: payload.cityId,
-              priceAmount: payload.priceAmount,
-              priceCurrency: payload.priceCurrency,
-            },
-          },
-        });
-        return created;
-      });
-
-      const listing = Listing.create({
-        id: listingRow.id,
-        publicNumber: listingRow.publicNumber,
-        sellerId: listingRow.sellerId,
-        status: listingRow.status as "active" | "sold" | "archived",
-        brandId: listingRow.brandId,
-        modelId: listingRow.modelId,
-        cityId: listingRow.cityId,
-        priceAmount: listingRow.priceAmount,
-        priceCurrency: listingRow.priceCurrency as "TMT" | "USD" | "AED",
-        allowCalls: listingRow.allowCalls,
-        allowChat: listingRow.allowChat,
-        publishedAt: listingRow.publishedAt ?? now,
-        createdAt: listingRow.createdAt,
-        updatedAt: listingRow.updatedAt,
-        ...(listingRow.generationId ? { generationId: listingRow.generationId } : {}),
-        ...(listingRow.year ? { year: listingRow.year } : {}),
-        ...(listingRow.vin ? { vin: listingRow.vin } : {}),
-        ...(listingRow.regionId ? { regionId: listingRow.regionId } : {}),
-        ...(listingRow.contactPhone ? { contactPhone: listingRow.contactPhone } : {}),
-        ...(listingRow.condition ? { condition: listingRow.condition as "new" | "used" } : {}),
-        ...(listingRow.colorId ? { colorId: listingRow.colorId } : {}),
-        ...(listingRow.bodyTypeId ? { bodyTypeId: listingRow.bodyTypeId } : {}),
-        ...(listingRow.engineTypeId ? { engineTypeId: listingRow.engineTypeId } : {}),
-        ...(listingRow.transmissionId ? { transmissionId: listingRow.transmissionId } : {}),
-        ...(listingRow.driveTypeId ? { driveTypeId: listingRow.driveTypeId } : {}),
-        ...(listingRow.enginePower ? { enginePower: listingRow.enginePower } : {}),
-        ...(listingRow.mileageKm ? { mileageKm: listingRow.mileageKm } : {}),
-        ...(listingRow.locationText ? { locationText: listingRow.locationText } : {}),
-        ...(listingRow.description ? { description: listingRow.description } : {}),
-        acceptsExchange: listingRow.acceptsExchange,
-        installmentAvailable: listingRow.installmentAvailable,
-        ...(listingRow.damaged !== null
-          ? {
-              conditionDisclosure: {
-                damaged: listingRow.damaged,
-                ...(listingRow.knownIssuesText ? { knownIssuesText: listingRow.knownIssuesText } : {}),
-              },
-            }
-          : {}),
+            ...(payload.conditionDisclosure?.knownIssuesText !== undefined
+              ? { knownIssuesText: payload.conditionDisclosure.knownIssuesText } : {}),
+          } } : {}),
+        },
+        priceTmt,
+        claimToken: reservation.token,
+        photos: attachedPhotos.map((photo) => ({
+          id: photo.photoId,
+          key: photo.key as string,
+          sortOrder: photo.sortOrder,
+          uploadId: uploadIdByKey.get(photo.key as string) as string,
+          thumbHash: thumbHashByKey.get(photo.key as string),
+        })),
       });
 
       await this.events.emit({

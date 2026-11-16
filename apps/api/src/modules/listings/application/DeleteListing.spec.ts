@@ -1,3 +1,5 @@
+import { FakeListingMediaCounts } from "./testing/FakeListingMediaCounts";
+import { FakeListingAuditLog } from "./testing/FakeListingAuditLog";
 import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, ForbiddenException } from "@nestjs/common";
 
@@ -44,27 +46,6 @@ class FakeListingRepository implements ListingRepository {
   }
 }
 
-class FakePrisma {
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  _mediaCount = 0;
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-
-  listingMedia = {
-    count: async (_args: unknown) => this._mediaCount,
-  };
-}
 
 class FakeEventPublisher implements ListingEventPublisher {
   events: Array<{ event: string; listingId: string; sellerId?: string }> = [];
@@ -74,15 +55,18 @@ class FakeEventPublisher implements ListingEventPublisher {
   }
 }
 
+let mediaCounts = new FakeListingMediaCounts();
+
 function makeUseCase(
   repo?: FakeListingRepository,
-  prisma?: FakePrisma,
+  prisma?: FakeListingAuditLog,
   events?: FakeEventPublisher,
 ) {
   return new DeleteListing(
     repo ?? new FakeListingRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof DeleteListing>[1],
+    prisma ?? new FakeListingAuditLog(),
     events ?? new FakeEventPublisher(),
+    mediaCounts,
   );
 }
 
@@ -107,18 +91,19 @@ function seedActiveListing(repo: FakeListingRepository) {
 
 describe("DeleteListing", () => {
   let repo: FakeListingRepository;
-  let prisma: FakePrisma;
+  let prisma: FakeListingAuditLog;
   let events: FakeEventPublisher;
 
   beforeEach(() => {
+    mediaCounts = new FakeListingMediaCounts();
     repo = new FakeListingRepository();
-    prisma = new FakePrisma();
+    prisma = new FakeListingAuditLog();
     events = new FakeEventPublisher();
   });
 
   it("soft-deletes a listing and preserves media rows", async () => {
     seedActiveListing(repo);
-    prisma._mediaCount = 3;
+    mediaCounts.mediaCount = 3;
 
     const uc = makeUseCase(repo, prisma, events);
     await uc.execute({ listingId: "listing-1", userId: "user-1" });

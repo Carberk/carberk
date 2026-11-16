@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { LISTING_AUDIT_LOG, type ListingAuditLog } from "./ports/ListingAuditLog";
 
 import type { Listing } from "../domain/Listing";
 import {
@@ -25,8 +25,8 @@ export class MarkSold {
   constructor(
     @Inject(LISTING_REPOSITORY)
     private readonly listings: ListingRepository,
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(LISTING_AUDIT_LOG)
+    private readonly audit: ListingAuditLog,
     @Inject(LISTING_EVENT_PUBLISHER)
     private readonly events: ListingEventPublisher,
   ) {}
@@ -49,21 +49,19 @@ export class MarkSold {
     const updated = existing.markSold(new Date());
     const saved = await this.listings.update(updated);
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: input.userId,
-        action: "listing.marked_sold",
-        targetType: "Listing",
-        targetId: saved.id,
-        details: {
-          priceAmount: saved.priceAmount,
-          priceCurrency: saved.priceCurrency,
-          daysActive: saved.soldAt
-            ? Math.floor(
-                (saved.soldAt.getTime() - saved.publishedAt.getTime()) / 86_400_000,
-              )
-            : 0,
-        },
+    await this.audit.record({
+      actorId: input.userId,
+      action: "listing.marked_sold",
+      targetType: "Listing",
+      targetId: saved.id,
+      details: {
+        priceAmount: saved.priceAmount,
+        priceCurrency: saved.priceCurrency,
+        daysActive: saved.soldAt
+          ? Math.floor(
+              (saved.soldAt.getTime() - saved.publishedAt.getTime()) / 86_400_000,
+            )
+          : 0,
       },
     });
 

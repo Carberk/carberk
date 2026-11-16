@@ -1,5 +1,6 @@
+import { LISTING_MEDIA_COUNTS, type ListingMediaCounts } from "./ports/ListingMediaCounts";
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { LISTING_AUDIT_LOG, type ListingAuditLog } from "./ports/ListingAuditLog";
 
 import {
   LISTING_REPOSITORY,
@@ -20,10 +21,12 @@ export class DeleteListing {
   constructor(
     @Inject(LISTING_REPOSITORY)
     private readonly listings: ListingRepository,
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(LISTING_AUDIT_LOG)
+    private readonly audit: ListingAuditLog,
     @Inject(LISTING_EVENT_PUBLISHER)
     private readonly events: ListingEventPublisher,
+    @Inject(LISTING_MEDIA_COUNTS)
+    private readonly mediaCounts: ListingMediaCounts,
   ) {}
 
   async execute(input: DeleteListingInput): Promise<void> {
@@ -41,22 +44,18 @@ export class DeleteListing {
       });
     }
 
-    const mediaCount = await this.prisma.listingMedia.count({
-      where: { listingId: existing.id },
-    });
+    const mediaCount = await this.mediaCounts.count(existing.id);
 
     await this.listings.softDelete(existing.id, new Date());
 
-    await this.prisma.auditLog.create({
-      data: {
-        actorId: input.userId,
-        action: "listing.deleted",
-        targetType: "Listing",
-        targetId: existing.id,
-        details: {
-          status: existing.status,
-          mediaCount,
-        },
+    await this.audit.record({
+      actorId: input.userId,
+      action: "listing.deleted",
+      targetType: "Listing",
+      targetId: existing.id,
+      details: {
+        status: existing.status,
+        mediaCount,
       },
     });
 

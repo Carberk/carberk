@@ -1,3 +1,5 @@
+import { FakeListingMediaCounts } from "./testing/FakeListingMediaCounts";
+import { FakeListingAuditLog } from "./testing/FakeListingAuditLog";
 import { describe, it, expect, beforeEach } from "vitest";
 import { BadRequestException, NotFoundException, ForbiddenException } from "@nestjs/common";
 
@@ -53,23 +55,6 @@ class FakeListingRepository implements ListingRepository {
   }
 }
 
-class FakePrisma {
-  photoCount = 3;
-  listingMedia = { count: async () => this.photoCount };
-  auditLogs: Array<{
-    actorId: string;
-    action: string;
-    targetType: string;
-    targetId: string;
-    details: unknown;
-  }> = [];
-
-  auditLog = {
-    create: async ({ data }: { data: unknown }) => {
-      this.auditLogs.push(data as FakePrisma["auditLogs"][number]);
-    },
-  };
-}
 
 class FakeExchangeRatePort implements ExchangeRatePort {
   rates: Record<string, number> = {};
@@ -83,17 +68,20 @@ class FakeExchangeRatePort implements ExchangeRatePort {
   }
 }
 
+let mediaCounts = new FakeListingMediaCounts();
+
 function makeUseCase(
   repo?: FakeListingRepository,
-  prisma?: FakePrisma,
+  prisma?: FakeListingAuditLog,
   exchangeRates?: FakeExchangeRatePort,
 ) {
   return new RepublishListing(
     repo ?? new FakeListingRepository(),
-    (prisma ?? new FakePrisma()) as unknown as ConstructorParameters<typeof RepublishListing>[1],
+    prisma ?? new FakeListingAuditLog(),
     exchangeRates ?? new FakeExchangeRatePort(),
     contactPhones.policy,
     clock,
+    mediaCounts,
   );
 }
 
@@ -125,11 +113,12 @@ function seedListing(
 
 describe("RepublishListing", () => {
   let repo: FakeListingRepository;
-  let prisma: FakePrisma;
+  let prisma: FakeListingAuditLog;
 
   beforeEach(() => {
+    mediaCounts = new FakeListingMediaCounts();
     repo = new FakeListingRepository();
-    prisma = new FakePrisma();
+    prisma = new FakeListingAuditLog();
     contactPhones = new InMemoryContactPhones();
     clock = { now: () => new Date() };
   });
@@ -143,7 +132,7 @@ describe("RepublishListing", () => {
 
   it("refuses two photos without changing the stored Listing", async () => {
     seedListing(repo, "archived");
-    prisma.photoCount = 2;
+    mediaCounts.photoCount = 2;
     const error = await makeUseCase(repo, prisma).execute({ listingId: "listing-1", userId: "user-1" }).catch((err: unknown) => err);
     expect(error).toBeInstanceOf(BadRequestException);
     expect((error as BadRequestException).getResponse()).toMatchObject({ code: "PHOTO_MINIMUM_REQUIRED", details: { minimum: 3 } });

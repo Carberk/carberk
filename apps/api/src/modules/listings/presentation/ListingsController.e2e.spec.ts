@@ -386,6 +386,89 @@ describe("ListingsController e2e", () => {
     });
   });
 
+  describe("Listing persistence boundaries", () => {
+    async function withRejectedAudit(action: string, work: () => Promise<void>) {
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE audit_logs ADD CONSTRAINT a06_reject_audit CHECK (NOT ("actorId" = '${suite.id("user-1")}' AND action = '${action}'))`,
+      );
+      try {
+        await work();
+      } finally {
+        await prisma.$executeRawUnsafe("ALTER TABLE audit_logs DROP CONSTRAINT a06_reject_audit");
+      }
+    }
+
+    it("rolls back publication, adoption and video transfer after a late audit failure, then retries the same photos", async () => {
+      await seedCatalog();
+      const token = await createUser("user-1");
+      const draft = await seedDraft("user-1", validPayload);
+      const video = await prisma.listingVideo.create({ data: { ownerId: suite.id("user-1"), draftId: draft.id } });
+      const uploadsBefore = await prisma.mediaUpload.findMany({ where: { userId: suite.id("user-1") } });
+      expect(uploadsBefore).toHaveLength(3);
+
+      await withRejectedAudit("listing.published", async () => {
+        await request.post(`/api/v1/listings/drafts/${draft.id}/publish`)
+          .set("Authorization", `Bearer ${token}`).send({}).expect(500);
+        expect(await prisma.listing.count({ where: { sellerId: suite.id("user-1") } })).toBe(0);
+        expect(await prisma.listingMedia.count({ where: { uploadId: { in: uploadsBefore.map((upload) => upload.id) } } })).toBe(0);
+        expect(await prisma.listingDraft.findUnique({ where: { id: draft.id } })).not.toBeNull();
+        expect(await prisma.listingVideo.findUnique({ where: { id: video.id } })).toMatchObject({ draftId: draft.id, listingId: null });
+        expect(await prisma.auditLog.count({ where: { actorId: suite.id("user-1"), action: "listing.published" } })).toBe(0);
+        const uploadsAfter = await prisma.mediaUpload.findMany({ where: { userId: suite.id("user-1") } });
+        expect(uploadsAfter.map((upload) => ({ state: upload.state, token: upload.claimToken })))
+          .toEqual([{ state: "AVAILABLE", token: null }, { state: "AVAILABLE", token: null }, { state: "AVAILABLE", token: null }]);
+        expect(await prisma.mediaUploadCleanup.count({ where: { uploadId: { in: uploadsBefore.map((upload) => upload.id) } } })).toBe(0);
+      });
+
+      const published = await request.post(`/api/v1/listings/drafts/${draft.id}/publish`)
+        .set("Authorization", `Bearer ${token}`).send({}).expect(201);
+      expect(await prisma.listingVideo.findUnique({ where: { id: video.id } })).toMatchObject({ draftId: null, listingId: published.body.id });
+      expect(await prisma.listingMedia.count({ where: { listingId: published.body.id } })).toBe(3);
+      expect(await prisma.listingDraft.findUnique({ where: { id: draft.id } })).toBeNull();
+      expect((await prisma.mediaUpload.findMany({ where: { userId: suite.id("user-1") } })).map((upload) => upload.state))
+        .toEqual(["ADOPTED", "ADOPTED", "ADOPTED"]);
+      expect(await prisma.auditLog.findFirst({ where: { action: "listing.published", targetId: published.body.id } })).toMatchObject({
+        actorId: suite.id("user-1"), targetType: "Listing", targetId: published.body.id,
+        details: { brandId: suite.catalog.brandId, modelId: suite.catalog.modelId, cityId: suite.catalog.cityId, priceAmount: 100000, priceCurrency: "TMT" },
+      });
+    });
+
+    it.each([
+      ["listing.archived", "archive", "archived"],
+      ["listing.marked_sold", "sold", "sold"],
+      ["listing.republished", "republish", "active"],
+      ["listing.price_changed", "edit", "active"],
+      ["listing.deleted", "delete", "active"],
+    ] as const)("keeps the committed lifecycle write when %s audit fails", async (action, operation, status) => {
+      await seedCatalog();
+      const token = await createUser("user-1");
+      const draft = await seedDraft("user-1", validPayload);
+      const published = await request.post(`/api/v1/listings/drafts/${draft.id}/publish`)
+        .set("Authorization", `Bearer ${token}`).send({}).expect(201);
+      const listingId = published.body.id as string;
+      if (operation === "republish") {
+        await request.post(`/api/v1/listings/${listingId}/archive`)
+          .set("Authorization", `Bearer ${token}`).send({}).expect(201);
+      }
+      await withRejectedAudit(action, async () => {
+        const endpoint = `/api/v1/listings/${listingId}`;
+        const mutation = operation === "delete" ? request.delete(endpoint)
+          : operation === "edit" ? request.patch(endpoint)
+          : request.post(`${endpoint}/${operation}`);
+        await mutation.set("Authorization", `Bearer ${token}`)
+          .send(operation === "edit" ? { priceAmount: 120000 } : {}).expect(500);
+        const stored = await prisma.listing.findUniqueOrThrow({ where: { id: listingId } });
+        expect(stored.status).toBe(status);
+        expect(stored.publishedAt?.toISOString()).toBe(published.body.publishedAt);
+        expect(stored.priceAmount).toBe(operation === "edit" ? 120000 : 100000);
+        expect(stored.priceTmt).toBe(operation === "edit" ? 120000 : 100000);
+        if (operation === "delete") expect(stored.deletedAt).toBeInstanceOf(Date);
+        if (operation === "sold") expect(stored.soldAt).toBeInstanceOf(Date);
+        expect(await prisma.auditLog.count({ where: { targetId: listingId, action } })).toBe(0);
+      });
+    });
+  });
+
   describe("POST /api/v1/listings/drafts/:id/publish", () => {
     it("returns 401 without bearer token", async () => {
       await request
