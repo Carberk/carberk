@@ -2,7 +2,7 @@
 
 > **Status**: Strategy doc, drafted 2026-05-18. Mutable; not an ADR.
 > **First matters in**: Post-MLP marketplace bets. Ads should not distract from the MLP beta loop.
-> **Why it exists**: Per [`00-vision.md`](../00-vision.md) anti-goals, AutoTM bans paid placement on listings. Third-party advertising is the alternative ad-revenue stream that respects that constraint. The detail page + feed + blog generate ~10-100M impressions/year by Year 3 — sellable inventory if monetized thoughtfully.
+> **Why it exists**: Per [product boundaries](../../../README.md#product-boundaries), AutoTM bans paid placement on listings. Third-party advertising is the alternative ad-revenue stream that respects that constraint. The detail page + feed + blog generate ~10-100M impressions/year by Year 3 — sellable inventory if monetized thoughtfully.
 
 ---
 
@@ -407,7 +407,7 @@ If at Year 2 we're below $50k MRR from ads → consider whether ad strategy need
 
 ## Cross-references
 
-- [`../00-vision.md`](../00-vision.md) — Anti-goals: no paid placement
+- [Product boundaries](../../../README.md#product-boundaries) — Anti-goals: no paid placement
 - [`../03-roadmap.md`](../03-roadmap.md) — ads are a post-MLP bet, not part of the MLP beta
 - [`../features/`](../features/) — future feature PRD for `34-advertising.md` (TBD)
 - [`inspection-program.md`](inspection-program.md) — inspection report viewer pages = prime ad inventory

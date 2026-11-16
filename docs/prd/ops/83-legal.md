@@ -135,7 +135,7 @@ The Google Play answers, store copy, reviewer access template and Console steps 
 - [ADR-0056 — Listing contact phones are verified](../../adr/0056-listing-contact-phones-are-verified.md) — verified Listing contact phone replaces the phone Sign-in Method publish gate
 - [ADR-0022 — City-first listing location](../../adr/0022-city-first-listing-location.md) — city-level listing/search location policy
 - [ADR-0023 — First-party product analytics](../../adr/0023-first-party-product-analytics.md) — no third-party analytics SDKs in the MLP beta
-- [GRILL-OUTCOME §19](../../../GRILL-OUTCOME.md) — outstanding action item #7
+- [Launch plan](84-launch-plan.md#compliance-public-app-store-launch) — legal and store-readiness gates
 
 ## Commercial anonymous insights and optional demographics
 

@@ -4,7 +4,7 @@ This directory contains architecture decisions for AutoTM. ADRs are **immutable 
 
 ## Effective documentation policy
 
-[ADR-0109](0109-source-first-documentation-and-design-workflow.md) replaces ADR-0020's artifact hierarchy with source-first documentation, temporary specifications, and the current design workflow. [ADR-0060](0060-source-first-agent-context-and-task-scoped-guidance.md) defines short local overviews; ADR-0042 owns vocabulary. [ADR-0108](0108-small-prs-with-full-send-replace-integration-delivery.md) owns delivery. Older ADR text remains unchanged.
+[ADR-0109](0109-source-first-documentation-and-design-workflow.md) replaces ADR-0020's artifact hierarchy with source-first documentation, temporary specifications, and the current design workflow. [ADR-0060](0060-source-first-agent-context-and-task-scoped-guidance.md) defines short local overviews; ADR-0042 owns vocabulary. [ADR-0108](0108-small-prs-with-full-send-replace-integration-delivery.md) owns delivery. Older ADR text remains unchanged. References there to retired charter, PRD, glossary or design files are historical: read their targets in Git history. The canonical [glossary](../domain/GLOSSARY.md), root [README](../../README.md), [roadmap](../prd/03-roadmap.md) and current issues replace the old document hierarchy.
 
 The founder's [2026-11-16 clarification](https://github.com/Carberk/carberk/issues/1283) is applied in the current [PR sizing guidance](../agents/coding-workflow.md#pr-size-and-splitting) and [document authority](../agents/domain.md#document-authority): review coherent changes without hard line budgets, reuse authoritative documents, and retire obsolete mirrors after preserving unique requirements. The original ADR bodies remain historical records.
 

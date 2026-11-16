@@ -1,6 +1,6 @@
 # Kolesa browse observations, 2026-09-21
 
-> Noncanonical observational research. This note records what first-party Kolesa sources showed on 2026-09-21. It does not change [ADR-0034](../../../adr/0034-kolesa-ux-findability-reference.md), the [Kolesa findability reference](../kolesa-findability-reference.md), or any AutoTM design spec. Live listing counts and promotion blocks change frequently.
+> Noncanonical observational research. This note records what first-party Kolesa sources showed on 2026-09-21. It does not change [ADR-0034](../../../adr/0034-kolesa-ux-findability-reference.md), the [historical Kolesa findability reference](https://github.com/Carberk/carberk/blob/c84375ff9bae14c1eb0fff673cfb522e1210b4e0/docs/prd/ui/kolesa-findability-reference.md), or any AutoTM design spec. Live listing counts and promotion blocks change frequently.
 
 ## What was actually checked
 
@@ -24,7 +24,7 @@ The live [mobile cars page](https://m.kolesa.kz/cars/) exposes a category button
 
 Kolesa's Google Play description says buyers select a category, search by city/make/price and other parameters, save a search, favorite listings, and message or call sellers. Its mobile promotion page advertises listings alongside new cars, reviews, news, and stories. These support the app's *capabilities*, not the pixel layout or precise current navigation order. [Google Play listing](https://play.google.com/store/apps/details?id=kz.kolesa), [Kolesa mobile page](https://kolesa.kz/promo/mobile/)
 
-The existing AutoTM [findability reference](../kolesa-findability-reference.md) says Kolesa's native home has stories, category tiles, and a recommended feed, and that cars browse has a dedicated Filter entry. That account came from a May 2026 third-party screen-gallery capture plus local founder screenshots. I have not independently reverified those native screens on the September 2026 app. The current first-party evidence therefore supports the **filter funnel and brand/model drill-in**, but not a claim that Kolesa currently uses a personalized home feed or the exact same home/results navigation described in the older reference.
+The existing AutoTM [findability reference](https://github.com/Carberk/carberk/blob/c84375ff9bae14c1eb0fff673cfb522e1210b4e0/docs/prd/ui/kolesa-findability-reference.md) says Kolesa's native home has stories, category tiles, and a recommended feed, and that cars browse has a dedicated Filter entry. That account came from a May 2026 third-party screen-gallery capture plus local founder screenshots. I have not independently reverified those native screens on the September 2026 app. The current first-party evidence therefore supports the **filter funnel and brand/model drill-in**, but not a claim that Kolesa currently uses a personalized home feed or the exact same home/results navigation described in the older reference.
 
 ## Implication for the comparison
 

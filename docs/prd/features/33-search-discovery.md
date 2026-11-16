@@ -11,7 +11,7 @@ Maral (the first-time buyer persona) needs to slice through thousands of Listing
 ## Reference and bounds
 
 - **Auto.ru is the structural reference for this journey** (ADR-0051). It shapes Home, the pickers, Search, Results, Sort and Search parameters. It is not a visual template or a feature list.
-- **AutoTM keeps its own design tokens and its five tabs** (Search, Favorites, Sell, Messages, Cabinet), plus anonymous browsing and the [00-vision anti-goals](../00-vision.md#anti-goals-things-we-explicitly-will-not-build) (no paid placement).
+- **AutoTM keeps its own design tokens and its five tabs** (Search, Favorites, Sell, Messages, Cabinet), plus anonymous browsing and the [product boundaries](../../../README.md#product-boundaries) (no paid placement).
 - **Kolesa is no longer the reference for Home, search, filters or Results.** [ADR-0034](../../adr/0034-kolesa-ux-findability-reference.md) is superseded for these surfaces.
 - **Approved specs:** the [release screen map resolution](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/344#issuecomment-5759595278) and the [listing content resolution](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/351#issuecomment-5761811759). Their clickable prototypes live on the read-only branches `prototype/release-screen-map` and `prototype/listing-content`.
 - **Reference captures** (`AR-…`, `KZ-…` IDs below) are indexed in [the reference screens index](../ui/research/reference-screens-2026-09-21.md).

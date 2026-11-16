@@ -19,7 +19,6 @@ docs
 railway
 infra
 .github
-GRILL-OUTCOME.md
 CONTEXT-MAP.md
 
 # Remote PR seed in the API image needs only the bucket bootstrap contract.
