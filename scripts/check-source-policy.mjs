@@ -37,8 +37,12 @@ function compilerComments(path, source) {
         if (name === "template") return Boolean(signature || doc.tags.some((entry) => entry.tagName.text === "typedef"));
         if (name === "param") return signature?.parameters.some((parameter) =>
           parameter.name.getText(file) === tag.name?.getText(file).split(".")[0]);
-        if (["returns", "return", "this"].includes(name)) return Boolean(signature);
-        return node.kind !== ts.SyntaxKind.EndOfFileToken;
+        if (name === "this") return Boolean(signature && !ts.isArrowFunction(signature));
+        if (["returns", "return"].includes(name)) return Boolean(signature);
+        if (["type", "satisfies"].includes(name)) return ts.isParenthesizedExpression(node) ||
+          ts.isVariableStatement(node) && node.declarationList.declarations.length === 1 &&
+          (name === "type" || Boolean(node.declarationList.declarations[0].initializer));
+        return false;
       })) continue;
       accepted.add(`${doc.pos}:${doc.end}`);
     }

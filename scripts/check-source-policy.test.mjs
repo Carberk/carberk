@@ -89,6 +89,7 @@ test("CRLF, multiline comments and column changes retain exact token boundaries"
 test("only compiler-consumed type annotations without prose qualify", () => {
   const accepted = [
     '/** @type {number} */\nconst value = 1;\n',
+    'const value = /** @type {number} */ (1);\n',
     '/** @param {number} value\n * @returns {number}\n */\nfunction identity(value) { return value; }\n',
     '/** @typedef {{ id: string }} Entity */\nconst value = 1;\n',
     '/** @typedef {number} Count */',
@@ -106,6 +107,9 @@ test("only compiler-consumed type annotations without prose qualify", () => {
     '/** @param {number} missing */\nfunction f(value) {}\n',
     '/** @param {number} value */\nconst value = 1;\n',
     '/** @returns {number} */\nconst value = 1;\n',
+    '/** @satisfies {number} */\nexport function value() { return "hello"; }\n',
+    '/** @type {number} */\nconsole.log(1);\n',
+    '/** @this {{ id: string }} */\nconst value = () => this.id;\n',
     '/** @type {number} */\nconst value: number = 1;\n',
   ]) assert.match(check({ [source.includes(": number") ? "typed.ts" : "typed.js"]: source }).join("\n"), /explanatory comment/, source);
 });
@@ -243,4 +247,19 @@ test("staged source cannot hide comments behind a cleaned working file", (t) => 
   git("add", "staged.js");
   write("staged.js", "export {};\n");
   assert.match(checkRepository(directory, {}).join("\n"), /staged\.js.*explanatory comment/);
+});
+
+test("accepted satisfies annotations have a compiler-visible constraint", () => {
+  for (const source of [
+    '/** @satisfies {number} */\nexport const value = "hello";\n',
+    'export const value = /** @satisfies {number} */ ("hello");\n',
+  ]) {
+    assert.deepEqual(check({ "typed.js": source }), []);
+    const file = ts.createSourceFile("/typed.js", source, ts.ScriptTarget.Latest, true);
+    const options = { allowJs: true, checkJs: true, noLib: true, noResolve: true };
+    const host = ts.createCompilerHost(options);
+    host.getSourceFile = (path) => path === "/typed.js" ? file : undefined;
+    const program = ts.createProgram(["/typed.js"], options, host);
+    assert.ok(program.getSemanticDiagnostics(file).some((diagnostic) => diagnostic.code === 1360));
+  }
 });
