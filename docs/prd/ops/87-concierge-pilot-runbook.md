@@ -334,8 +334,8 @@ When S9b triggers, the coordinator follows this runbook and records outputs. The
 
 - [ADR-0037](../../adr/0037-trust-inspection-competitive-wedge.md) — trust as the wedge; the S9 sprint plan with the S9a DoD and S9b outline was removed from `main` on 2026-11-04 and remains in git history
 - [`business/inspection-program.md`](../business/inspection-program.md) — Phase 0 pilot + full program strategy
-- [`business/README.md`](../business/README.md) — competitive context
-- [`../00-vision.md`](../00-vision.md) — anti-goals, especially no test-drive scheduling and no escrow
+- [ADR-0037](../../adr/0037-trust-inspection-competitive-wedge.md) — competitive context
+- [Product boundaries](../../../README.md#product-boundaries) — anti-goals, especially no test-drive scheduling and no escrow
 - [ADR-0037](../../adr/0037-trust-inspection-competitive-wedge.md) — trust wedge rationale
 - [ADR-0057](../../adr/0057-defer-the-in-app-inspection-demand-signal.md) — no in-app inspection demand signal; the pilot measures demand
 - [ADR-0020](../../adr/0020-document-hierarchy-and-mutability.md) — doc mutability rules

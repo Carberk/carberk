@@ -4,7 +4,7 @@ A mobile-first vehicle marketplace for Turkmenistan, with Russian, Turkmen, and 
 
 ## Find the right area
 
-Start with [AGENTS.md](AGENTS.md) for task instructions. Use [CONTEXT-MAP.md](CONTEXT-MAP.md) to find ownership and source entry points, the [glossary](docs/domain/GLOSSARY.md) for terms, and the [ADR index](docs/adr/README.md) for durable decisions and supersession. Current delivery scope lives in the linked GitHub issue; the roadmap is scheduling context only.
+Start with [AGENTS.md](AGENTS.md) for task instructions. Use [CONTEXT-MAP.md](CONTEXT-MAP.md) to find ownership and source entry points, the [glossary](docs/domain/GLOSSARY.md) for terms, and the [ADR index](docs/adr/README.md) for durable decisions and supersession. Current delivery scope lives in the linked GitHub issue; the [roadmap](docs/prd/03-roadmap.md) is scheduling context only.
 
 | Workspace | Responsibility |
 |---|---|
@@ -19,6 +19,12 @@ Start with [AGENTS.md](AGENTS.md) for task instructions. Use [CONTEXT-MAP.md](CO
 | `packages/ui` | Shared tokens and browser components |
 | `packages/tsconfig`, `packages/eslint-config` | Workspace compiler/lint configuration |
 | `infra`, `railway` | Local infrastructure, container images, deployment configuration |
+
+## Product boundaries
+
+Browse anonymously and require sign-in for gated actions. Keep seller content in the language it was written; the UI supports RU/TK/EN. Use truthful trust claims, with no fake AI, fake verification or paid placement. Inspection report availability is not a condition grade, guarantee or ranking boost ([ADR-0104](docs/adr/0104-center-diagnostics-with-private-and-public-reports.md)).
+
+The marketplace excludes auctions, escrow/payment processing, test-drive scheduling, insurance integration, cross-border listings, AI photo enhancement or other generative product features, crypto/NFT ownership, forums and public Listing comments. Separate service payment arrangements do not introduce marketplace escrow. Cars remain the initial vertical; trucks, parts/compatibility and services require separate shaping under [ADR-0035](docs/adr/0035-multi-vertical-platform-direction.md).
 
 ## Local development
 

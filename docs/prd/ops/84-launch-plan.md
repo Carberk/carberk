@@ -208,15 +208,28 @@ MLP flags are server-side environment/deployment config; API enforcement is auth
 
 - Capture user feedback systematically (in-app feedback form or documented support channel)
 - Plan Phase 2 with what we've learned
-- Re-evaluate the 12-month success metrics from [00-vision.md](../00-vision.md)
+- Re-evaluate the planning targets below against actual pilot learning.
+
+## Planning targets
+
+The original vision set these post-launch ambitions. They are targets to revisit, not measured results, activation gates or permission to collect data; measurement remains subject to [83](83-legal.md) and [85](85-launch-analytics-plan.md).
+
+| Measure | Original target |
+|---|---|
+| Monthly active users | 10,000 by month 6 |
+| Active Listings | 1,000 by month 3 |
+| Messages | 300 per day |
+| Buyers completing search → contact → meeting in-app | 30% |
+| Week-2 retention among Listing sellers | 80% |
+| Scam-report rate per Listing | Below 2% |
 
 ## References
 
 - [ADR-0039 — Phased cloud-first hosting](../../adr/0039-phased-cloud-first-hosting.md)
 - Sprint 11 — Railway deployment
-- [Phase plan](../02-phases.md)
+- [Roadmap](../03-roadmap.md)
 - [Deployment runbook](80-deployment-runbook.md)
 - [Monitoring + alarms](81-monitoring-alarms.md)
 - [Incident template](82-incident-template.md)
 - [Launch analytics + scaling plan](85-launch-analytics-plan.md)
-- [Vision metrics](../00-vision.md)
+- [Product boundaries](../../../README.md#product-boundaries)
