@@ -12,7 +12,7 @@ import type { Namespace, Socket } from "socket.io";
 
 import { SocketAuthMiddleware } from "./SocketAuthMiddleware";
 import { SocketConnectionRegistry } from "./SocketConnectionRegistry";
-import { REALTIME_NAMESPACE, userRoom } from "./realtime.config";
+import { REALTIME_NAMESPACE, userRoom } from "../realtime.public";
 
 @Injectable()
 @WebSocketGateway({

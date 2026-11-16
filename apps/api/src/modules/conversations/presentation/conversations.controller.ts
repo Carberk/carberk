@@ -37,7 +37,7 @@ import { DeleteMessage } from "../application/DeleteMessage";
 import type { Conversation } from "../domain/Conversation";
 import type { Message } from "../domain/Message";
 import type { PostRefMessageMetadata } from "../domain/types";
-import { availabilityMapForListingSummaries } from "../infrastructure/PostRefSnapshotMapper";
+import { availabilityMapForListingSummaries } from "../application/PostRefSnapshotMapper";
 
 type AuthenticatedRequest = FastifyRequest & { user?: { sub?: string } };
 

@@ -11,7 +11,7 @@ import type {
 import { LISTINGS_READ_PORT } from "../../listings/domain/ports/ListingsReadPort";
 import { Message } from "../domain/Message";
 import { CONVERSATION_ERROR_CODES } from "../domain/types";
-import { buildPostRefSnapshot } from "../infrastructure/PostRefSnapshotMapper";
+import { buildPostRefSnapshot } from "./PostRefSnapshotMapper";
 
 import { SendConversationMessage } from "./SendConversationMessage";
 
