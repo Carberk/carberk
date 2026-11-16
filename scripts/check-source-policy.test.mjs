@@ -187,6 +187,10 @@ function repository(t) {
     writeFileSync(join(directory, path), source);
   };
   write("scripts/source-policy/baseline.json", baselinePolicy);
+  for (const name of ["notices.json", "provenance.json"]) {
+    const path = `scripts/source-policy/${name}`;
+    write(path, readFileSync(join(repositoryRoot, path), "utf8"));
+  }
   write("config.cjs", "module.exports = {};\n");
   git("add", ".");
   const tree = git("write-tree");
@@ -216,6 +220,21 @@ test("repository admission rejects source symlinks and baseline tampering", (t) 
   write("scripts/source-policy/baseline.json", baselinePolicy);
   symlinkSync("config.cjs", join(directory, "alias.js"));
   assert.throws(() => checkRepository(directory, {}), /regular file/);
+});
+
+test("policy manifests cannot self-authorize new comment exceptions", (t) => {
+  const { directory, write, git } = repository(t);
+  for (const name of ["notices.json", "provenance.json"]) {
+    const path = `scripts/source-policy/${name}`;
+    const original = readFileSync(join(directory, path), "utf8");
+    write(path, '[{"path":"config.cjs","origin":"self-authored","sha256":"x","tokenSha256":"x"}]\n');
+    assert.throws(() => checkRepository(directory, {}), /immutable source-policy manifest changed/);
+    git("add", path);
+    write(path, original);
+    assert.throws(() => checkRepository(directory, {}), /immutable source-policy manifest changed/);
+    git("add", path);
+  }
+  assert.deepEqual(checkRepository(directory, {}), []);
 });
 
 test("CI derives comparison only from valid main PR or push event metadata", (t) => {

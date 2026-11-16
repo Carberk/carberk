@@ -13,10 +13,12 @@ const baselineText = readFileSync(join(root, baselinePath), "utf8");
 const baseline = JSON.parse(baselineText);
 if (baseline.version !== 1 || baseline.commit !== "48a1bba7ff6dda6bb865e1b496cf002d6019502c" ||
   baseline.tree !== "944befccc257885a3e8fa27a2fc226f907062b84") throw new Error("immutable legacy baseline changed");
-const provenance = JSON.parse(readFileSync(join(root, "scripts/source-policy/provenance.json"), "utf8"));
-const notices = JSON.parse(readFileSync(join(root, "scripts/source-policy/notices.json"), "utf8"));
 const sourceExtension = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
+const policyManifests = new Map([
+  ["scripts/source-policy/notices.json", "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"],
+  ["scripts/source-policy/provenance.json", "1397bee9b82b55663a123a1c4b21b0edd8d83547a5f098402073179f28a56a2a"],
+]);
 
 function compilerComments(path, source) {
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
@@ -172,7 +174,7 @@ function snapshot(directory, ref) {
     const fields = metadata.split(" ");
     if (ref === ":" && fields[2] !== "0") throw new Error(`unmerged source index: ${path}`);
     return { path, mode: fields[0], oid: fields[ref === ":" ? 1 : 2] };
-  }).filter((entry) => sourceExtension.test(entry.path) || entry.path === baselinePath);
+  }).filter((entry) => sourceExtension.test(entry.path) || entry.path === baselinePath || policyManifests.has(entry.path));
   const result = new Map();
   const blobs = execFileSync("git", ["cat-file", "--batch"], {
     cwd: directory, input: entries.map((entry) => entry.oid).join("\n") + "\n", maxBuffer: 128 * 1024 * 1024,
@@ -241,6 +243,14 @@ export function checkRepository(directory, env = process.env) {
   const current = workingSources(directory);
   const indexed = snapshot(directory, ":");
   if (indexed.get(baselinePath) !== baselineText) throw new Error("immutable legacy baseline must be staged unchanged");
+  const manifests = new Map();
+  for (const [path, hash] of policyManifests) {
+    const text = readFileSync(join(directory, path), "utf8");
+    if (digest(text) !== hash || indexed.get(path) !== text) throw new Error(`immutable source-policy manifest changed: ${path}`);
+    manifests.set(path, JSON.parse(text));
+  }
+  const notices = manifests.get("scripts/source-policy/notices.json");
+  const provenance = manifests.get("scripts/source-policy/provenance.json");
   const legacy = snapshot(directory, baseline.commit);
   const stagedChanges = new Map([...indexed].filter(([path, source]) => current.get(path) !== source));
   return [
