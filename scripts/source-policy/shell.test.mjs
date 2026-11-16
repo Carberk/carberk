@@ -80,10 +80,13 @@ test("interpreter heredocs stay data unless the effective stdin is proven execut
   assert.deepEqual(result.comments.map(({ raw }) => raw), ["# script"]);
   assert.deepEqual(result.deferred, []);
   assert.ok(parseShell({ path: "tool", source: "bash -e <<'CODE'\n# script\nCODE\n", fileType: "shell" }).deferred.length);
+  for (const source of ["bash <<'CODE' 0<&0\n# script\nCODE\n", "bash 3<<'CODE' 0<&3\n# script\nCODE\n"]) {
+    assert.ok(parseShell({ path: "tool", source, fileType: "shell" }).deferred.length, source);
+  }
 });
 
 test("long eval options cannot silently hide executable snippets", () => {
-  for (const source of ["node --eval '// code'", "node --eval='// code'", "node --print '// code'", "node -p '// code'", "perl -E '# code'", "env node --eval '// code'"]) {
+  for (const source of ["node --eval '// code'", "node --eval='// code'", "node --print '// code'", "node -p '// code'", "perl -E '# code'", "env node --eval '// code'", "node \"--eval=\"'// code'", "node \"--eval=$CODE\""]) {
     assert.ok(parseShell({ path: "tool", source, fileType: "shell" }).deferred.length, source);
   }
 });

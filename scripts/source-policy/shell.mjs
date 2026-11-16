@@ -47,6 +47,21 @@ export function parseShell({ path, source, fileType, executable = false, dialect
     }
     return undefined;
   };
+  const staticPrefix = (word) => {
+    let value = "";
+    for (const part of word.Parts) {
+      const type = syntax.NodeType(part);
+      if ((type === "Lit" || type === "SglQuoted" && !part.Dollar) && !/[\\]/.test(part.Value)) {
+        value += part.Value;
+      } else if (type === "DblQuoted") {
+        for (const nested of part.Parts) {
+          if (syntax.NodeType(nested) !== "Lit" || /[\\]/.test(nested.Value)) return value;
+          value += nested.Value;
+        }
+      } else return value;
+    }
+    return value;
+  };
   const embedded = (content, start, grammar, nestedDialect) => {
     const offsets = Array.from({ length: content.length + 1 }, (_, index) => start + index);
     embeddedResult({ source, content, offsets, path, fileType: grammar, result,
@@ -64,7 +79,7 @@ export function parseShell({ path, source, fileType, executable = false, dialect
       const name = command && basename(command.value);
       const selected = name && shellInterpreter(name);
       const grammar = selected ? "shell" : /^python[23]?$/.test(name ?? "") ? "python" : undefined;
-      if (["eval", "source", "."].includes(name) || ["node", "ruby", "perl", "env"].includes(name) && node.Args.slice(1).some((word) => shellExecutableOption(literal(word)?.value ?? (word.Parts[0] && syntax.NodeType(word.Parts[0]) === "Lit" ? word.Parts[0].Value : "")))) {
+      if (["eval", "source", "."].includes(name) || ["node", "ruby", "perl", "env"].includes(name) && node.Args.slice(1).some((word) => shellExecutableOption(staticPrefix(word)))) {
         defer(node, "executable indirection requires declared grammar and source mapping");
       }
       if (grammar) {
@@ -91,7 +106,11 @@ export function parseShell({ path, source, fileType, executable = false, dialect
       const dataStdin = args.some((value) => value && (selected ? /^-(?:[^-]*c|-command(?:=.*)?)$/.test(value) : ["-c", "-m"].includes(value))) ||
         args[0] && !args[0].startsWith("-");
       for (const redirect of node.Redirs ?? []) {
-        if (!redirect.Hdoc || !grammar || !stdin || offset(redirect.Pos()) !== offset(stdin.Pos()) || dataStdin) continue;
+        if (!redirect.Hdoc || !grammar || dataStdin) continue;
+        if (!stdin || offset(redirect.Pos()) !== offset(stdin.Pos())) {
+          defer(redirect, "interpreter stdin redirection requires declared source mapping");
+          continue;
+        }
         if (!executableStdin) { defer(redirect, "ambiguous interpreter stdin mode requires declared source mapping"); continue; }
         const start = offset(redirect.Hdoc.Pos());
         const body = redirect.Hdoc.Parts.length === 1 && syntax.NodeType(redirect.Hdoc.Parts[0]) === "Lit" ? redirect.Hdoc.Parts[0].Value : undefined;
