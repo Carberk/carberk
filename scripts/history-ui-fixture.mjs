@@ -17,7 +17,7 @@ const MODELS = ["user", "otpRequest", "session", "staffGrant", "totpEnrollment",
 const HELP = "Local History fixture: init|run --api <loopback/api/v1> --admin <loopback-origin> " +
   "--api-env <absolute-private-file> --api-log <absolute-private-log> --expected-db <owned_ui> " +
   "[init only: --reason <initial-fixture-reason>]. run stdin: delivered, read, unassigned, incoming, facts, quit. " +
-  "Explicit ownership approval is separate. No retry, reset or browser authentication.";
+  "Assigned local runtime ownership is required. No retry, reset or browser authentication.";
 
 function optionsFor(argv) {
   const options = { mode: argv[0] };

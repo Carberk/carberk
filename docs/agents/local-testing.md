@@ -4,9 +4,11 @@ How an agent runs Carberk on the local stack, signs in to the app and to Admin, 
 
 Test the app on the **iOS Simulator**. The Android emulator is not used for development testing on this Mac; use it only when a ticket is Android-only or the founder asks.
 
+For a fresh ticket runtime, start with `pnpm local-env up <ticket-name> --profile native --with metro` (or `--profile history --with admin` for History). [Local runtime profiles and standing authority](environment.md#local-development) own setup, stop/resume and partial recovery. Use the reported API/Metro/media origins and private `api.env`/`worker.env` paths in the checks below; do not copy them into committed files or manually synchronize app env. History and native use separate names. Existing active environments continue with their current owned bindings and data.
+
 ## 1. Check and reuse the local baseline
 
-Implementers, reviewers and delegate briefs use this preparation route before native proof. Coordinate the target API/worktree and process/device ownership first. Preserve an active release verification session. From your checkout, select the running local API and its actual env file explicitly:
+Implementers, reviewers and delegate briefs use this preparation route before native proof. Select the owned target API/worktree and coordinate any actual shared process/device conflict. Preserve an active release verification session. From your checkout, select the running local API and its actual env file explicitly:
 
 ```bash
 pnpm native:ready --api-origin http://127.0.0.1:3006 --env-file /absolute/path/to/api/.env \
@@ -21,7 +23,7 @@ A successful check establishes environment availability, **not device sign-in or
 
 ### Start only missing, owned services
 
-When the check identifies an absent service, coordinate its startup separately. Stop only processes you started. For initial data/schema setup see section 1a.
+When the check identifies an absent owned service, start or repair it under the assignment's standing authority. Coordinate startup only for a shared target with an actual conflicting owner. Stop only processes you started. For legacy initial data/schema setup see section 1a; named runtimes use their selected profile.
 
 ### Explicit additive rich photo scenarios
 
@@ -151,7 +153,7 @@ For contention and cleanup use the [owned-device procedure](native-fixture-signi
 
 ## 5. Finish
 
-Stop the API, Admin and Metro processes you started, close only your owned device sessions in the [required order](native-fixture-signin.md#prepare-one-owned-device), and close your preview tabs. Leave the Docker stack running.
+For a named runtime, `pnpm local-env stop <ticket-name>` stops owned application sessions and containers while retaining data. For legacy environments, stop the API, Admin and Metro processes you started and leave the shared Docker stack running. Close only your owned device sessions in the [required order](native-fixture-signin.md#prepare-one-owned-device), and close your preview tabs.
 
 `next dev` rewrites `apps/admin/AGENTS.md` and Metro rewrites `apps/mobile/.expo/types/router.d.ts`. Restore them with `git checkout -- <file>` before committing, unless your change is about them.
 

@@ -58,7 +58,9 @@
     "check:source-policy": "node scripts/check-source-policy.mjs",
     "test:source-policy": "node --test scripts/check-source-policy.test.mjs 'scripts/source-policy*.test.mjs' 'scripts/source-policy/*.test.mjs'",
     "check:import-architecture": "node scripts/check-import-architecture.mjs",
-    "test:import-architecture": "node --test scripts/check-import-architecture.test.mjs"
+    "test:import-architecture": "node --test scripts/check-import-architecture.test.mjs",
+    "local-env": "node scripts/local-env.mjs",
+    "test:local-env": "node --test scripts/local-env*.test.mjs"
   },
   "devDependencies": {
     "@auto-tm/contracts": "workspace:*",

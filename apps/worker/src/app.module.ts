@@ -39,6 +39,7 @@ import {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      ignoreEnvFile: process.env["CARBERK_LOCAL_ENV"] === "true",
       validate: parseEnv,
     }),
     LoggerModule.forRoot({
