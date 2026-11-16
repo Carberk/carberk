@@ -8,7 +8,9 @@ import type { DeskLocale } from "@/lib/history-desk-copy";
 
 type Detail = Extract<HistoryInboxResult, { kind: "detail" | "claim" }>["data"];
 type Read = { message: V.HistoryMessage; eligible: () => boolean };
-type Work = "refresh" | "page" | "claim" | Read;
+export type ReplyIntent = { clientMessageId: string; text: string };
+type Send = { body: ReplyIntent; complete: (result: HistoryMessageResult) => void };
+type Work = "refresh" | "page" | "claim" | Read | Send;
 type Reader = { detail: Detail | null; messages: V.HistoryMessage[]; cursor: string | null;
   receipts: ReturnType<typeof V.HistoryReceiptsSchema.parse>["items"]; receiptState: "" | "loading" | "error" | "updated";
   state: string; notice: string; busy: boolean; focusId: string | null };
@@ -22,7 +24,7 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
 }) {
   const [reader, setReader] = useState<Reader>({ detail: null, messages: [], cursor: null,
     receipts: [], receiptState: "", state: entry, notice: "", busy: false, focusId: null });
-  const driver = useRef<(work: Work) => void>(() => {});
+  const driver = useRef<(work: Work) => boolean>(() => false);
   const callbacks = useRef({ invalidate, claimed });
   useEffect(() => { callbacks.current = { invalidate, claimed }; });
   useEffect(() => {
@@ -59,17 +61,24 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
     }
     async function run(work: Work) {
       if (!valid()) return;
-      if (busy) { if (work === "refresh") pendingRefresh = true; else if (typeof work === "object") pendingRead = work; return; }
+      if (busy) { if (work === "refresh") pendingRefresh = true; else if (typeof work === "object" && "message" in work) pendingRead = work; return; }
       if (!navigator.onLine) { publish({ notice: "offline" }); return; }
-      if (typeof work === "object" && (!work.eligible() || !current.detail || current.receiptState === "error" || ["offline", "unavailable", "reconnecting"].includes(current.notice)
+      if (typeof work === "object" && "message" in work && (!work.eligible() || !current.detail || current.receiptState === "error" || ["offline", "unavailable", "reconnecting"].includes(current.notice)
         || !current.messages.some((message) => message.id === work.message.id && message.order === work.message.order)
         || BigInt(work.message.order) > received || BigInt(work.message.order) <= read)) return;
       busy = true;
       const recovering = ["offline", "unavailable", "reconnecting"].includes(current.notice);
       const recovered = current.notice === "recovered";
-      let receiptWork = typeof work === "object";
+      let receiptWork = typeof work === "object" && "message" in work;
       publish({ busy: true, ...(typeof work === "object" ? {} : { notice: recovering ? "reconnecting" : recovered ? "recovered" : "refreshing", focusId: null }) });
       try {
+        if (typeof work === "object" && "body" in work) {
+          const result = await historyMessageAction(locale, { id, scope, expectedAssignmentVersion: version, kind: "send", body: work.body });
+          if (!accept(result)) return;
+          work.complete(result);
+          if (result.status === "ok") pendingRefresh = true;
+          return;
+        }
         if (typeof work === "object") {
           publish({ receiptState: "loading" });
           if (await acknowledge(work.message, "read", work.eligible)) {
@@ -108,6 +117,11 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
         if (tail && BigInt(tail.order) > received && await acknowledge(tail, "received")) received = BigInt(tail.order);
         publish({ receiptState: "updated" });
       } catch {
+        if (typeof work === "object" && "body" in work) {
+          if (valid()) work.complete({ status: "unavailable" });
+          if (!navigator.onLine) publish({ notice: "offline" });
+          return;
+        }
         publish(receiptWork ? { receiptState: "error", ...(!navigator.onLine ? { notice: "offline" } : {}) }
           : { notice: navigator.onLine ? "unavailable" : "offline" });
       } finally {
@@ -117,7 +131,11 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
         else if (valid() && pendingRead) { const next = pendingRead; pendingRead = null; void run(next); }
       }
     }
-    driver.current = (work) => { void run(work); };
+    driver.current = (work) => {
+      if (!valid() || typeof work === "object" && "body" in work && (busy || !navigator.onLine || current.state !== "ready")) return false;
+      void run(work);
+      return true;
+    };
     if (!navigator.onLine) publish({ notice: "offline" });
     if (entry === "loading") void run("refresh");
     const reconcile = () => {
@@ -132,7 +150,7 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
     const poll = window.setInterval(reconcile, 30_000);
     return () => {
       active = false;
-      driver.current = () => {};
+      driver.current = () => false;
       window.clearInterval(poll);
       window.removeEventListener("focus", reconcile);
       window.removeEventListener("online", reconcile);
@@ -148,5 +166,6 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
     previousRevision.current = revision;
   }, [revision, entry]);
   const acknowledgeRead = useCallback((message: V.HistoryMessage, eligible: () => boolean) => driver.current({ message, eligible }), []);
-  return { ...reader, acknowledgeRead, run: (work: Work) => driver.current(work) };
+  const send = useCallback((body: ReplyIntent, complete: Send["complete"]) => driver.current({ body, complete }), []);
+  return { ...reader, acknowledgeRead, send, run: (work: Work) => driver.current(work) };
 }
