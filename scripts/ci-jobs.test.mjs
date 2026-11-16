@@ -67,8 +67,10 @@ test("api and worker share the api job, apart from the db suite", () => {
   assert.equal(rootScripts["test:backend"], undefined, "test:backend would run api and db on one runner again");
 });
 
-test("the CI test scripts run every root node --test file", () => {
-  assert.match(rootScripts["test:root"], /node --test 'scripts\/\*\.test\.mjs'/);
+test("full local tests share root discovery with CI without repeating focused suites", () => {
+  assert.equal(rootScripts.test, "pnpm test:root && turbo run test");
+  assert.match(rootScripts["test:root"], /node --test 'scripts\/\*\.test\.mjs' 'infra\/minio\/\*\.test\.mjs'/);
+  assert.equal(rootScripts["test:unit"], "pnpm test:agent-github && pnpm test:native-session && pnpm test:native-fixture-signin && pnpm test:admin-access && turbo run test:unit");
 });
 
 for (const name of ["pr-checks.yml", "ci.yml"]) {
