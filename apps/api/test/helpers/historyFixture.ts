@@ -65,6 +65,7 @@ export async function historyFixture(configure?: (config: ConfigService) => void
         await prisma.serviceReceipt.deleteMany({ where: scope });
         await prisma.serviceMessage.deleteMany({ where: scope });
         await prisma.serviceConversation.deleteMany({ where: { id: scope.conversationId } });
+        await prisma.historyPrivateNote.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.vehicleHistoryRequest.deleteMany({ where: { requesterId: { in: users } } });
         await prisma.user.deleteMany({ where: { id: { in: users } } });
         await prisma.dealership.deleteMany({ where: { slug: { in: users } } });

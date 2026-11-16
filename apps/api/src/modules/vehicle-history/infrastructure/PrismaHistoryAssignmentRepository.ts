@@ -90,7 +90,7 @@ export class HistoryMessageLocks {
       await client.query("BEGIN");
       await client.query("SET LOCAL lock_timeout = '5s'");
       const { rows } = await client.query<HistoryMessageRequest>(`SELECT id, "requesterId", "assignedOperatorId", "assignmentVersion"
-        FROM vehicle_history_requests WHERE id = $1 FOR UPDATE`, [id]);
+        FROM vehicle_history_requests WHERE id = $1 FOR NO KEY UPDATE`, [id]);
       return await this.identityFence.withSession(authority, async () => {
         const result = await operation(rows[0] ?? null, waiting);
         await client.query("COMMIT");

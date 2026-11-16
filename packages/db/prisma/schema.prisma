@@ -73,6 +73,7 @@ model User {
   serviceReceipts              ServiceReceipt[]
   historyRequests              VehicleHistoryRequest[] @relation("HistoryRequester")
   assignedHistoryRequests      VehicleHistoryRequest[] @relation("HistoryAssignee")
+  historyPrivateNotesAuthored   HistoryPrivateNote[] @relation("HistoryNoteAuthor")
   dealershipMemberships        DealershipMember[]
   ownedVehicles                OwnedVehicle[]
   blockedUsers                 BlockedUser[]             @relation("Blocker")
@@ -176,6 +177,7 @@ model VehicleHistoryRequest {
   assignedOperatorId String?
   assignedOperator   User? @relation("HistoryAssignee", fields: [assignedOperatorId], references: [id], onDelete: Restrict)
   assignmentVersion  Int @default(0)
+  privateNotes       HistoryPrivateNote[]
 
   waitingReason          String?
   waitingSince           DateTime? @db.Timestamptz(3)
@@ -198,6 +200,23 @@ model VehicleHistoryRequest {
   @@unique([requesterId, attemptKey])
   @@index([requesterId, createdAt, id])
   @@map("vehicle_history_requests")
+}
+
+model HistoryPrivateNote {
+  id                String @id @default(uuid())
+  requestId         String
+  request           VehicleHistoryRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  authorId          String
+  author            User @relation("HistoryNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  assignmentVersion Int
+  clientNoteId      String @db.Uuid
+  text              String
+  sequence          BigInt @unique @default(autoincrement())
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([requestId, authorId, clientNoteId])
+  @@index([requestId, sequence])
+  @@map("vehicle_history_private_notes")
 }
 
 enum DealershipMemberRole {

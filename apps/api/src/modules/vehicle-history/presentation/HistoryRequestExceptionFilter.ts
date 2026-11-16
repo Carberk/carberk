@@ -4,6 +4,10 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_NOTE_INVALID: "Check the private note and page details. Text must contain 1–4,000 characters.",
+    HISTORY_NOTE_CURSOR: "This private-note page is unavailable. Reopen the enquiry.",
+    HISTORY_NOTE_CONFLICT: "This note attempt already saved different text. Reopen the enquiry before trying again.",
+    HISTORY_NOTE_UNAVAILABLE: "Private notes are temporarily unavailable. Retry the same note attempt.",
     HISTORY_REMINDER_INVALID: "Check the reminder details and try again.",
     HISTORY_REMINDER_CONFLICT: "Reminder state changed. Refresh the enquiry before trying again.",
     HISTORY_REMINDER_UNAVAILABLE: "Reminders are temporarily unavailable. Reopen the enquiry and retry.",
@@ -18,6 +22,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_NOTE_INVALID: "Проверьте заметку и параметры страницы. Текст должен содержать от 1 до 4 000 символов.",
+    HISTORY_NOTE_CURSOR: "Эта страница личных заметок недоступна. Откройте обращение заново.",
+    HISTORY_NOTE_CONFLICT: "Эта попытка уже сохранила другой текст заметки. Откройте обращение перед повтором.",
+    HISTORY_NOTE_UNAVAILABLE: "Личные заметки временно недоступны. Повторите ту же попытку сохранения.",
     HISTORY_REMINDER_INVALID: "Проверьте параметры напоминания и повторите попытку.",
     HISTORY_REMINDER_CONFLICT: "Состояние напоминания изменилось. Обновите обращение и повторите попытку.",
     HISTORY_REMINDER_UNAVAILABLE: "Напоминания временно недоступны. Откройте обращение заново и повторите попытку.",
@@ -32,6 +40,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_NOTE_INVALID: "Şahsy belligi we sahypanyň maglumatlaryny barlaň. Tekst 1–4 000 nyşandan ybarat bolmaly.",
+    HISTORY_NOTE_CURSOR: "Şahsy bellikleriň bu sahypasy elýeterli däl. Ýüz tutmany täzeden açyň.",
+    HISTORY_NOTE_CONFLICT: "Bu bellik synanyşygy başga teksti eýýäm saklady. Gaýtadan synanyşmazdan öň ýüz tutmany açyň.",
+    HISTORY_NOTE_UNAVAILABLE: "Şahsy bellikler wagtlaýyn elýeterli däl. Şol synanyşyk bilen gaýtadan synanyşyň.",
     HISTORY_REMINDER_INVALID: "Ýatlatmanyň maglumatlaryny barlap, gaýtadan synanyşyň.",
     HISTORY_REMINDER_CONFLICT: "Ýatlatmanyň ýagdaýy üýtgedi. Täzeden synanyşmazdan öň ýüz tutmany täzeläň.",
     HISTORY_REMINDER_UNAVAILABLE: "Ýatlatmalar wagtlaýyn elýeterli däl. Ýüz tutmany täzeden açyp synanyşyň.",
@@ -60,6 +72,18 @@ export class HistoryRequestExceptionFilter implements ExceptionFilter {
 export class HistoryMessagesExceptionFilter extends HistoryRequestExceptionFilter {}
 
 @Catch()
+export class HistoryNotesExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    const code = error instanceof HistoryRequestError ? error.code : null;
+    super.catch(code === "HISTORY_MESSAGE_INVALID" ? new HistoryRequestError("HISTORY_NOTE_INVALID")
+      : code === "HISTORY_MESSAGE_CURSOR" ? new HistoryRequestError("HISTORY_NOTE_CURSOR")
+        : code === "HISTORY_MESSAGE_CONFLICT" ? new HistoryRequestError("HISTORY_NOTE_CONFLICT")
+          : code === "HISTORY_MESSAGE_UNAVAILABLE" || (!code && !(error instanceof HttpException))
+            ? new HistoryRequestError("HISTORY_NOTE_UNAVAILABLE") : error, host);
+  }
+}
+
+@Catch()
 export class HistoryRemindersExceptionFilter extends HistoryRequestExceptionFilter {
   override catch(error: unknown, host: ArgumentsHost) {
     const code = error instanceof HistoryRequestError ? error.code : null;
@@ -74,8 +98,9 @@ export function historyRequestFailure(error: unknown, language: string | undefin
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" ? 503
-    : code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" ? 409
-      : code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID" ? 400 : 403;
+  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
+    : code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
+      : code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
+        || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
 }
