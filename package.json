@@ -61,16 +61,22 @@
     "test:import-architecture": "node --test scripts/check-import-architecture.test.mjs"
   },
   "devDependencies": {
+    "@auto-tm/contracts": "workspace:*",
+    "@aws-sdk/client-s3": "3.1048.0",
+    "@aws-sdk/s3-request-presigner": "3.1048.0",
     "@babel/parser": "7.29.7",
     "@typescript/native": "catalog:",
     "dockerfile-ast": "0.7.1",
     "mvdan-sh": "0.10.1",
     "parse5": "7.3.0",
     "postcss": "8.5.6",
+    "query-string": "7.1.3",
     "saxes": "6.0.0",
+    "socket.io-client": "4.8.3",
     "tsx": "catalog:",
     "turbo": "^2.11.7",
     "typescript": "catalog:",
+    "ws": "8.21.0",
     "yaml": "2.8.1"
   },
   "workspaces": [

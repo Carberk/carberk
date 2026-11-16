@@ -37,6 +37,7 @@
     "@nestjs/cli": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native": "catalog:",
+    "tsx": "4.23.15",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

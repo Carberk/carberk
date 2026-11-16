@@ -315,6 +315,24 @@ importers:
 
   .:
     devDependencies:
+      '@auto-tm/contracts':
+        specifier: workspace:*
+        version: link:packages/contracts
+      '@aws-sdk/client-s3':
+        specifier: 3.1048.0
+        version: 3.1048.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: 3.1048.0
+        version: 3.1048.0
+      query-string:
+        specifier: 7.1.3
+        version: 7.1.3(patch_hash=c45bcf01a3c61375fbcc866a485046d0782f1ad9f22922668bc749bb5d93b3b5)
+      socket.io-client:
+        specifier: 4.8.3
+        version: 4.8.3(supports-color@8.1.1)
+      ws:
+        specifier: 8.21.0
+        version: 8.21.0
       '@babel/parser':
         specifier: 7.29.7
         version: 7.29.7
@@ -524,6 +542,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      jsonwebtoken:
+        specifier: 9.0.3
+        version: 9.0.3
       '@auto-tm/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -587,6 +608,18 @@ importers:
 
   apps/mobile:
     dependencies:
+      semver:
+        specifier: 7.7.3
+        version: 7.7.3
+      '@react-navigation/bottom-tabs':
+        specifier: 7.16.0
+        version: 7.16.0(33e4c90b192a9d41f79fba12a6512257)
+      '@react-navigation/native':
+        specifier: 7.2.4
+        version: 7.2.4(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.85.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.14)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
       '@auto-tm/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -762,6 +795,18 @@ importers:
         specifier: ^5.0.13
         version: 5.0.13(@types/react@19.2.14)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
     devDependencies:
+      '@babel/core':
+        specifier: 7.29.7
+        version: 7.29.7(supports-color@8.1.1)
+      '@react-native/virtualized-lists':
+        specifier: 0.83.10
+        version: 0.83.10(@types/react@19.2.14)(react-native@0.83.10(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.85.3(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.14)(react@19.2.0)(supports-color@8.1.1))(react@19.2.0)
+      '@react-navigation/core':
+        specifier: 7.17.4
+        version: 7.17.4(react@19.2.0)
+      '@react-navigation/routers':
+        specifier: 7.5.5
+        version: 7.5.5
       '@auto-tm/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -987,6 +1032,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
       '@auto-tm/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
@@ -1070,6 +1118,9 @@ importers:
         specifier: 0.1.1
         version: 0.1.1
     devDependencies:
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
       '@auto-tm/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
