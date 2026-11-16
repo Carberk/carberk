@@ -51,7 +51,7 @@ export function parseShell({ path, source, fileType, executable = false, dialect
     let value = "";
     for (const part of word.Parts) {
       const type = syntax.NodeType(part);
-      if ((type === "Lit" || type === "SglQuoted" && !part.Dollar) && !/[\\]/.test(part.Value)) {
+      if (type === "Lit" && !/[\\]/.test(part.Value) || type === "SglQuoted" && !part.Dollar) {
         value += part.Value;
       } else if (type === "DblQuoted") {
         for (const nested of part.Parts) {

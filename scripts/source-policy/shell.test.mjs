@@ -86,7 +86,7 @@ test("interpreter heredocs stay data unless the effective stdin is proven execut
 });
 
 test("long eval options cannot silently hide executable snippets", () => {
-  for (const source of ["node --eval '// code'", "node --eval='// code'", "node --print '// code'", "node -p '// code'", "perl -E '# code'", "env node --eval '// code'", "node \"--eval=\"'// code'", "node \"--eval=$CODE\""]) {
+  for (const source of ["node --eval '// code'", "node --eval='// code'", "node --print '// code'", "node -p '// code'", "perl -E '# code'", "env node --eval '// code'", "node \"--eval=\"'// code'", "node \"--eval=$CODE\"", "node '--eval=console.log(\"\\n\")'"]) {
     assert.ok(parseShell({ path: "tool", source, fileType: "shell" }).deferred.length, source);
   }
 });
