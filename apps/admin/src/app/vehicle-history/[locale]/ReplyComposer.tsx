@@ -95,11 +95,11 @@ export function ReplyComposer({ locale, actorId, id, version, messages, send, bu
   const visibleConfirmed = confirmed.filter((item) => !messages.some((message) => message.id === item.id));
   return <div className="mt-5 border-t pt-5">
     {visibleConfirmed.map((message) => <div key={message.id} className="mb-4 ml-auto max-w-[95%] rounded-lg bg-primary/10 p-3 text-sm">
-      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.text}</p>
+      <p role="region" aria-label={t.replyText} tabIndex={0} className="max-h-60 overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-ring">{message.text}</p>
       <p role="status" aria-live="polite" className="mt-2 text-xs">{t.sent}</p>
     </div>)}
     {draft.intent && <div className="mb-4 ml-auto max-w-[95%] rounded-lg bg-primary/10 p-3 text-sm">
-      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{draft.intent.text}</p>
+      <p role="region" aria-label={t.replyText} tabIndex={0} className="max-h-60 overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] focus-visible:outline-2 focus-visible:outline-ring">{draft.intent.text}</p>
       <p role="status" aria-live="polite" className="mt-2 text-xs">{phase === "pending" ? t.pending : t.sendUncertain}</p>
       {draft.intent && phase !== "pending" && <Button className="mt-3" variant="secondary" disabled={busy || offline || !saved} onClick={submit}>{t.retryReply}</Button>}
     </div>}

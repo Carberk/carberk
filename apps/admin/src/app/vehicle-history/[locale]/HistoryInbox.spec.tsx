@@ -1578,3 +1578,30 @@ it.each([
   await waitFor(() => expect(screen.getAllByText(/Ähli maglumatlar/)).toHaveLength(1));
   expect((input as HTMLTextAreaElement).value).toBe("");
 });
+
+it("offers keyboard reading of a long pending reply while keeping newer writing available", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  let sent: { clientMessageId: string; text: string } | undefined;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (String(input).includes("/messages")) {
+      if (init?.method === "POST") { sent = JSON.parse(String(init.body)); return pending.promise; }
+      return Promise.resolve(Response.json({ items: [], nextCursor: null }));
+    }
+    return network(input, init);
+  });
+  render(view());
+  const text = "Длинный ответ\nUzyn jogap\n".repeat(100);
+  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  const readingArea = await screen.findByRole("region", { name: "Reply text" });
+  expect(readingArea.textContent).toBe(text);
+  readingArea.focus();
+  expect(document.activeElement).toBe(readingArea);
+  fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Next reply remains editable" } });
+  expect(readingArea.textContent).toBe(text);
+  await waitFor(() => expect(sent?.text).toBe(text));
+  await act(async () => pending.resolve(Response.json({ ...message(1, text), clientMessageId: sent?.clientMessageId, author: { ...actor, kind: "operator" } })));
+  await screen.findByText("Sent");
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Next reply remains editable");
+});
