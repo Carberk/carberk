@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, RefreshControl, View, type ViewToken } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, Keyboard, KeyboardAvoidingView, RefreshControl, View, type ViewToken } from "react-native";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import * as Linking from "expo-linking";
@@ -68,7 +68,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const linkReader = useRef({ mounted: true, ready: false });
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
   const position = useRef({ offset: 0, height: 0 });
-  const browserPosition = useRef<{ offset: number; height: number; away: boolean } | null>(null);
+  const browserPosition = useRef<{ offset: number; height: number; away: boolean; keyboardReady: boolean } | null>(null);
   const name = useDisplayName();
   const thread = useRequestConversation(viewer, request, metadataCurrent);
   const { pages, receipts } = thread;
@@ -85,13 +85,23 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     && focusManager.isFocused() && onlineManager.isOnline();
   const restoreBrowserPosition = () => {
     const saved = browserPosition.current;
-    if (!saved?.away || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
-    browserPosition.current = null;
-    list.current?.scrollToOffset({ offset: saved.offset, animated: false });
+    if (!saved?.away || !saved.keyboardReady || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
+    requestAnimationFrame(() => {
+      if (browserPosition.current !== saved || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
+      browserPosition.current = null;
+      list.current?.scrollToOffset({ offset: saved.offset, animated: false });
+    });
   };
   useEffect(() => {
     if (!thread.active && browserPosition.current) browserPosition.current.away = true;
     else restoreBrowserPosition();
+    const keyboard = Keyboard.addListener("keyboardDidShow", () => {
+      if (browserPosition.current?.away) {
+        browserPosition.current.keyboardReady = true;
+        restoreBrowserPosition();
+      }
+    });
+    return () => keyboard.remove();
   });
   useEffect(() => {
     if (!ready) {
@@ -113,7 +123,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     setPendingLink({ key, action });
     if (action === "copy") { setCopiedLink(null); setCopyFailure(null); }
     else setOpenFailure(null);
-    const beforeOpen = action === "open" && position.current.height > 0 ? { ...position.current, away: false } : null;
+    const beforeOpen = action === "open" && position.current.height > 0
+      ? { ...position.current, away: false, keyboardReady: !Keyboard.isVisible() } : null;
     browserPosition.current = beforeOpen;
     let succeeded = false;
     try {

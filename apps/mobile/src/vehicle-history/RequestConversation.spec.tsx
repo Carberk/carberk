@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { focusManager, onlineManager } from "@tanstack/react-query";
-import { AccessibilityInfo, AppState, Linking } from "react-native";
+import { AccessibilityInfo, AppState, Keyboard, Linking } from "react-native";
 import * as ReactNative from "react-native";
 import * as ExpoLinking from "expo-linking";
 import * as Clipboard from "expo-clipboard";
@@ -20,10 +20,12 @@ const nativeClipboard = vi.hoisted(() => ({
 
 vi.unmock("expo-linking");
 vi.unmock("expo-clipboard");
-vi.mock("react-native", async (importOriginal) => ({
-  ...await importOriginal<typeof ReactNative>(),
-  Linking: { openURL: vi.fn(async () => true) },
-}));
+vi.mock("react-native", async (importOriginal) => {
+  const native = await importOriginal<typeof ReactNative>();
+  return { ...native, Linking: { openURL: vi.fn(async () => true) },
+    Keyboard: { ...native.Keyboard, isVisible: () => false },
+  };
+});
 vi.mock("expo-modules-core", async () => {
   const native = await import("react-native");
   return {
@@ -73,6 +75,7 @@ beforeEach(async () => {
   vi.mocked(AsyncStorage.getItem).mockResolvedValue(null);
   vi.mocked(AsyncStorage.setItem).mockResolvedValue();
   vi.mocked(AsyncStorage.removeItem).mockResolvedValue();
+  AppState.currentState = "active";
   stored = null;
   acknowledgements = [];
   vi.mocked(Linking.openURL).mockReset().mockResolvedValue(true);
@@ -109,9 +112,18 @@ it("opens the exact report target in the external browser", async () => {
   expect(Linking.openURL).toHaveBeenCalledWith("https://reports.example.test/report?token=A%2fb%2B&part=1&part=2");
 });
 
-it("restores the report action position after a focused external-browser return resizes the reader", async () => {
+it.each(["same reader", "replacement session", "unmounted reader"] as const)("restores the focused report action position only for the same reader (%s)", async (change) => {
   const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
   const requests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
+  let shown: ((event: ReactNative.KeyboardEvent) => void) | undefined;
+  vi.spyOn(Keyboard, "isVisible").mockReturnValue(true);
+  const subscribeKeyboard = Keyboard.addListener;
+  vi.spyOn(Keyboard, "addListener").mockImplementation((event, listener) => {
+    if (event === "keyboardDidShow") shown = listener;
+    return subscribeKeyboard(event, listener);
+  });
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { frames.push(callback); return frames.length; });
   server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
     items: [{ ...message(), text: target }], nextCursor: null,
   })));
@@ -131,6 +143,21 @@ it("restores the report action position after a focused external-browser return 
   await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
   expect(requests).toEqual([]);
   await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 180 } } });
+  expect(requests).toEqual([]);
+  await act(() => shown?.({ duration: 250, easing: "keyboard",
+    endCoordinates: { screenX: 0, screenY: 540, width: 390, height: 304 },
+  }));
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 650 } } });
+  if (change === "replacement session") {
+    await act(() => storeAuthSession(session("session-two")));
+    await view.findByText(target);
+  }
+  if (change === "unmounted reader") await view.unmount();
+  await act(() => frames.splice(0).forEach((frame) => frame(16)));
+  if (change !== "same reader") {
+    expect(requests).toEqual([]);
+    return;
+  }
   expect(requests).toEqual([{ method: "scrollToOffset", offset: 800, animated: false }]);
   expect(getHost(view.container, "RCTScrollView")).toBe(list);
   expect(view.getByLabelText("Your message")).toBe(input);
