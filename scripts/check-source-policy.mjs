@@ -1,11 +1,12 @@
-import { parse } from "@babel/parser";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { inspectSource, sourceType } from "./source-policy/index.mjs";
+import { commentSpan } from "./source-policy/markup-spans.mjs";
+import { producerProvenance } from "./source-policy/producers.mjs";
 import { checkMigrationRepository } from "./source-policy/migrations.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -14,85 +15,12 @@ const baselineText = readFileSync(join(root, baselinePath), "utf8");
 const baseline = JSON.parse(baselineText);
 if (baseline.version !== 1 || baseline.commit !== "48a1bba7ff6dda6bb865e1b496cf002d6019502c" ||
   baseline.tree !== "944befccc257885a3e8fa27a2fc226f907062b84") throw new Error("immutable legacy baseline changed");
-const sourceExtension = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
+
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const policyManifests = new Map([
   ["scripts/source-policy/notices.json", "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"],
   ["scripts/source-policy/provenance.json", "60d764e6be2419746107549246442ecb6dc2d6c95fead216d02aefe45b4a170c"],
 ]);
-
-function compilerComments(path, source) {
-  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
-  const accepted = new Set();
-  const tags = new Set(["type", "param", "returns", "return", "typedef", "template", "satisfies", "this"]);
-  const visit = (node) => {
-    for (const doc of node.jsDoc ?? []) {
-      const parsed = ts.parseIsolatedJSDocComment(source.slice(doc.pos, doc.end));
-      if (parsed.diagnostics.length || doc.comment || !doc.tags?.length) continue;
-      if (!doc.tags.every((tag) => tags.has(tag.tagName.text) && !tag.comment &&
-        (tag.typeExpression || tag.tagName.text === "template" && tag.typeParameters?.length))) continue;
-      const target = ts.isVariableStatement(node) && node.declarationList.declarations.length === 1 ?
-        node.declarationList.declarations[0].initializer : node;
-      const signature = target && ts.isFunctionLike(target) ? target : undefined;
-      if (!doc.tags.every((tag) => {
-        const name = tag.tagName.text;
-        if (name === "typedef") return Boolean(tag.fullName);
-        if (name === "template") return Boolean(signature || doc.tags.some((entry) => entry.tagName.text === "typedef"));
-        if (name === "param") return signature?.parameters.some((parameter) =>
-          parameter.name.getText(file) === tag.name?.getText(file).split(".")[0]);
-        if (name === "this") return Boolean(signature && !ts.isArrowFunction(signature));
-        if (["returns", "return"].includes(name)) return Boolean(signature);
-        if (["type", "satisfies"].includes(name)) return ts.isParenthesizedExpression(node) ||
-          ts.isVariableStatement(node) && node.declarationList.declarations.length === 1 &&
-          (name === "type" || Boolean(node.declarationList.declarations[0].initializer));
-        return false;
-      })) continue;
-      accepted.add(`${doc.pos}:${doc.end}`);
-    }
-    ts.forEachChild(node, visit);
-  };
-  if (/\.[cm]?jsx?$/i.test(path)) visit(file);
-  return { file, accepted };
-}
-
-function comments(path, source, notices) {
-  const typescript = /\.[cm]?tsx?$/i.test(path);
-  const ast = parse(source, {
-    sourceType: "unambiguous", tokens: true, attachComment: false,
-    plugins: [...(typescript ? [["typescript", { dts: /\.d\.[cm]?ts$/i.test(path) }]] : []),
-      ...(/\.[jt]sx$/i.test(path) ? ["jsx"] : []), "decorators-legacy"],
-  });
-  const tokens = ast.tokens.filter((token) => typeof token.type !== "string" && token.type.label !== "eof");
-  let compiler;
-  const list = [...ast.comments];
-  if (ast.program.interpreter) list.unshift(ast.program.interpreter);
-  return list.map((comment) => {
-    const raw = source.slice(comment.start, comment.end);
-    const next = tokens.findIndex((token) => token.start >= comment.end);
-    const index = next < 0 ? tokens.length : next;
-    const ownLine = !source.slice(source.lastIndexOf("\n", comment.start - 1) + 1, comment.start).trim();
-    const anchor = tokens.slice(ownLine ? index : Math.max(0, index - 5), index + 5)
-      .map((token) => source.slice(token.start, token.end));
-    let exception = comment.type === "InterpreterDirective" && comment.start === 0 &&
-      /^#!(?:\/usr\/bin\/env (?:node|tsx)|\/usr\/bin\/node)$/.test(raw);
-    if (notices.some((notice) => notice.path === path && notice.tokenSha256 === digest(raw) && notice.origin)) exception = true;
-    if (/^\/\/\/ <reference (?:types|path)="[^"<>\r\n]+" \/>$/.test(raw) &&
-      source.slice(0, comment.start).replace(/^\/\/\/ <reference (?:types|path)="[^"<>\r\n]+" \/>\r?\n/gm, "").trim() === "") {
-      compiler ??= compilerComments(path, source);
-      const references = [...compiler.file.typeReferenceDirectives, ...compiler.file.referencedFiles];
-      exception ||= typescript && references.some((reference) => reference.pos >= comment.start && reference.end <= comment.end);
-    }
-    if (raw.startsWith("/**")) {
-      compiler ??= compilerComments(path, source);
-      exception ||= compiler.accepted.has(`${comment.start}:${comment.end}`);
-    }
-    if (raw === "// @ts-check" && /\.[cm]?jsx?$/i.test(path) && !source.slice(0, comment.start).trim()) exception = true;
-    return {
-      start: comment.loc.start, end: comment.loc.end, raw, exception,
-      identity: digest(JSON.stringify([raw, anchor])),
-    };
-  });
-}
 
 function unchangedLines(before, after, directory) {
   if (before === after) return (line) => line;
@@ -121,6 +49,7 @@ function unchangedLines(before, after, directory) {
 }
 
 function retained(beforeSource, afterSource, beforeComments, afterComments, directory) {
+  if (!beforeComments.length || !afterComments.length) return [];
   const line = unchangedLines(beforeSource, afterSource, directory);
   const available = new Map(beforeComments.map((comment) => [
     `${comment.start.line}:${comment.start.column}:${comment.end.line}:${comment.end.column}:${comment.identity}`, comment,
@@ -133,31 +62,71 @@ function retained(beforeSource, afterSource, beforeComments, afterComments, dire
   });
 }
 
-export function checkSources({ current, legacy, trusted, exclusions = [], notices = [] }) {
+export function checkSources({ current, legacy, trusted, exclusions = [], notices = [], report = {} }) {
   const errors = [];
+  report.coverage ??= {};
+  report.files ??= [];
+  report.legacyComments ??= [];
+  report.deferred ??= [];
+  report.exclusions ??= [];
   const directory = mkdtempSync(join(tmpdir(), "carberk-source-policy-"));
+  const parsedSources = new Map();
+  const findings = (path, source) => {
+    if (!parsedSources.has(path)) parsedSources.set(path, new Map());
+    const cache = parsedSources.get(path);
+    if (cache.has(source)) return cache.get(source);
+    const parsed = inspectSource(path, source, notices);
+    const result = { ...parsed, comments: parsed.comments.filter((comment) => !comment.exception),
+      deferred: parsed.deferred.map((item) => ({ ...commentSpan(source, item.startOffset, item.endOffset),
+        identity: digest(JSON.stringify([item.fileType, item.reason, source.slice(item.startOffset, item.endOffset)])),
+        reason: item.reason, fileType: item.fileType })) };
+    cache.set(source, result);
+    return result;
+  };
   try {
     for (const [path, source] of current) {
-      if (!sourceExtension.test(path)) continue;
+      report.files.push({ path, fileType: sourceType(path) });
+      if (path === ".agents/skills" && source === "../.claude/skills") {
+        report.exclusions.push({ path, kind: "skill-discovery symlink", sha256: digest(source) });
+        continue;
+      }
+      const migration = /^packages\/db\/prisma\/migrations\/[^/]+\/migration\.sql$/.test(path);
+      const immutable = legacy.has(path) && (/^docs\/adr\/\d{4}-.+\.md$/.test(path) ||
+        /^patches\/[^/]+\.patch$/.test(path) || /^apps\/phone-agent\/gradlew(?:\.bat)?$/.test(path) ||
+        path === ".claude/skills/THIRD-PARTY-NOTICES.md" || path === "apps/phone-agent/gradle/wrapper/gradle-wrapper.jar");
+      if (migration && trusted.has(path) || immutable) {
+        const expected = (immutable ? legacy : trusted).get(path);
+        if (Buffer.isBuffer(source) ? !Buffer.isBuffer(expected) || !source.equals(expected) : source !== expected) errors.push(`${path}: immutable history/upstream/migration bytes changed`);
+        report.exclusions.push({ path, kind: migration ? "applied-migration" : "history/upstream/legal", sha256: digest(source) });
+        continue;
+      }
       const pins = exclusions.filter((entry) => entry.path === path);
       if (pins.length) {
         const hash = digest(source);
         if (!pins.some((entry) => entry.origin && hash === entry.sha256)) errors.push(`${path}: pinned provenance bytes changed`);
+        report.exclusions.push({ path, kind: "generated", sha256: hash, origin: pins.find((entry) => entry.sha256 === hash)?.origin });
         continue;
       }
       try {
-        const findings = comments(path, source, notices).filter((comment) => !comment.exception);
+        const parsed = findings(path, source);
+        report.coverage[parsed.fileType ?? "empty"] = (report.coverage[parsed.fileType ?? "empty"] ?? 0) + 1;
         const originalSource = legacy.get(path) ?? "";
         const mainSource = trusted.get(path) ?? "";
-        const original = comments(path, originalSource, notices).filter((comment) => !comment.exception);
-        const main = comments(path, mainSource, notices).filter((comment) => !comment.exception);
-        const mainLegacy = retained(originalSource, mainSource, original, main, directory);
-        const allowed = new Set(retained(mainSource, source, mainLegacy, findings, directory));
-        for (const finding of findings) {
-          if (!allowed.has(finding)) errors.push(`${path}:${finding.start.line}:${finding.start.column + 1}: new or moved explanatory comment`);
+        const original = legacy.has(path) ? findings(path, originalSource) : { comments: [], deferred: [] };
+        const main = trusted.has(path) ? findings(path, mainSource) : { comments: [], deferred: [] };
+        for (const kind of ["comments", "deferred"]) {
+          const mainLegacy = retained(originalSource, mainSource, original[kind], main[kind], directory);
+          const allowed = new Set(retained(mainSource, source, mainLegacy, parsed[kind], directory));
+          for (const finding of parsed[kind]) {
+            if (!allowed.has(finding)) {
+              errors.push(`${path}:${finding.start.line}:${finding.start.column + 1}: ${kind === "comments" ?
+                "new or moved explanatory comment" : `unsupported ${finding.fileType}: ${finding.reason}`}`);
+            } else if (kind === "comments") report.legacyComments.push({ path, fileType: parsed.fileType, start: finding.start, end: finding.end, raw: finding.raw });
+            else report.deferred.push({ path, start: finding.start, end: finding.end, language: finding.fileType, reason: finding.reason });
+          }
         }
       } catch (error) {
-        errors.push(`${path}: TS/JS parse or comparison failed: ${error.message}`);
+        errors.push(`${path}: parse or comparison failed: ${error.message}`);
       }
     }
   } finally {
@@ -176,7 +145,7 @@ function snapshot(directory, ref) {
     const fields = metadata.split(" ");
     if (ref === ":" && fields[2] !== "0") throw new Error(`unmerged source index: ${path}`);
     return { path, mode: fields[0], oid: fields[ref === ":" ? 1 : 2] };
-  }).filter((entry) => sourceExtension.test(entry.path) || entry.path === baselinePath || policyManifests.has(entry.path));
+  });
   const result = new Map();
   const blobs = execFileSync("git", ["cat-file", "--batch"], {
     cwd: directory, input: entries.map((entry) => entry.oid).join("\n") + "\n", maxBuffer: 128 * 1024 * 1024,
@@ -185,9 +154,10 @@ function snapshot(directory, ref) {
   for (const entry of entries) {
     const end = blobs.indexOf(10, offset);
     const header = blobs.subarray(offset, end).toString().split(" ");
-    if (header[1] !== "blob" || !["100644", "100755"].includes(entry.mode)) throw new Error(`unsupported source mode: ${entry.path}`);
+    if (header[1] !== "blob" || !["100644", "100755"].includes(entry.mode) && !(entry.mode === "120000" && entry.path === ".agents/skills")) throw new Error(`unsupported source mode: ${entry.path}`);
     const size = Number(header[2]);
-    result.set(entry.path, blobs.subarray(end + 1, end + 1 + size).toString("utf8"));
+    const bytes = blobs.subarray(end + 1, end + 1 + size);
+    result.set(entry.path, sourceType(entry.path).startsWith("asset:") ? bytes : bytes.toString("utf8"));
     offset = end + 1 + size + 1;
   }
   return result;
@@ -206,19 +176,18 @@ function trustedRef(directory, env) {
 
 function workingSources(directory) {
   const paths = new Set(git(directory, "ls-files", "-z").split("\0").filter(Boolean));
-  const cache = /(?:^|\/)(?:node_modules|\.git|\.turbo|\.pnpm-store|\.gradle)$|^(?:apps|packages)\/[^/]+\/(?:dist|build|coverage|\.next|\.expo)$|^packages\/db\/generated$/;
+  const cache = /(?:^|\/)(?:node_modules|\.git|\.turbo|\.pnpm-store|\.gradle)$/;
   const walk = (parent = "") => {
     for (const entry of readdirSync(join(directory, parent), { withFileTypes: true })) {
       const path = parent ? `${parent}/${entry.name}` : entry.name;
       if (cache.test(path)) continue;
       if (entry.isDirectory()) walk(path);
-      else if (sourceExtension.test(path)) paths.add(path);
+      else paths.add(path);
     }
   };
   walk();
   const result = new Map();
   for (const path of paths) {
-    if (!sourceExtension.test(path)) continue;
     let info;
     try { info = lstatSync(join(directory, path)); }
     catch (error) { if (error.code === "ENOENT") continue; throw error; }
@@ -227,14 +196,16 @@ function workingSources(directory) {
       ancestor = join(ancestor, part);
       if (lstatSync(ancestor).isSymbolicLink()) throw new Error(`source parent must not be a symlink: ${path}`);
     }
+    if (path === ".agents/skills" && info.isSymbolicLink() && readlinkSync(join(directory, path)) === "../.claude/skills") { result.set(path, "../.claude/skills"); continue; }
     if (!info.isFile()) throw new Error(`authored source must be a regular file: ${path}`);
-    result.set(path, readFileSync(join(directory, path), "utf8"));
+    result.set(path, readFileSync(join(directory, path), sourceType(path).startsWith("asset:") ? undefined : "utf8"));
   }
   return result;
 }
 
-export function checkRepository(directory, env = process.env) {
+export function checkRepository(directory, env = process.env, report = {}) {
   const ref = trustedRef(directory, env);
+  report.admission = env.GITHUB_ACTIONS === "true" ? "committed HEAD and index" : "working tree, index, untracked and ignored files outside installed dependency and tool caches";
   const trusted = snapshot(directory, ref);
   const policy = readFileSync(join(directory, baselinePath), "utf8");
   if (policy !== baselineText || trusted.has(baselinePath) && policy !== trusted.get(baselinePath)) {
@@ -242,7 +213,7 @@ export function checkRepository(directory, env = process.env) {
   }
   if (git(directory, "rev-parse", `${baseline.commit}^{tree}`).trim() !== baseline.tree) throw new Error("legacy snapshot tree mismatch");
   git(directory, "merge-base", "--is-ancestor", baseline.commit, ref);
-  const current = workingSources(directory);
+  const current = env.GITHUB_ACTIONS === "true" ? snapshot(directory, "HEAD") : workingSources(directory);
   const indexed = snapshot(directory, ":");
   if (indexed.get(baselinePath) !== baselineText) throw new Error("immutable legacy baseline must be staged unchanged");
   const manifests = new Map();
@@ -254,22 +225,32 @@ export function checkRepository(directory, env = process.env) {
   const notices = manifests.get("scripts/source-policy/notices.json");
   const provenance = manifests.get("scripts/source-policy/provenance.json");
   const legacy = snapshot(directory, baseline.commit);
-  const stagedChanges = new Map([...indexed].filter(([path, source]) => current.get(path) !== source));
+  const producers = env.GITHUB_ACTIONS === "true" ? [] : producerProvenance(directory, current, trusted);
+  const stagedChanges = new Map([...indexed].filter(([path, source]) => Buffer.isBuffer(source) ? !Buffer.isBuffer(current.get(path)) || !source.equals(current.get(path)) : current.get(path) !== source));
   return [
     ...checkMigrationRepository(directory, ref),
-    ...checkSources({ current, legacy, trusted, exclusions: provenance, notices }),
-    ...checkSources({ current: stagedChanges, legacy, trusted, exclusions: provenance, notices }).map((error) => `staged: ${error}`),
+    ...checkSources({ current, legacy, trusted, exclusions: [...provenance, ...producers], notices, report }),
+    ...checkSources({ current: stagedChanges, legacy, trusted, exclusions: [...provenance, ...producers], notices }).map((error) => `staged: ${error}`),
   ];
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  console.log("Source policy coverage: authored TS/JS (.js/.jsx/.ts/.tsx/.mjs/.cjs/.mts/.cts) and migration integrity/new SQL; other adapters await whole-source activation.");
+  const report = {};
   try {
-    const errors = checkRepository(root);
+    const errors = checkRepository(root, process.env, report);
+    if (process.argv.includes("--json")) console.log(JSON.stringify({ ...report, errors }));
+    else {
+      console.log(`Source policy admission: ${report.admission}; ${report.files.length} paths inventoried`);
+      console.log(`Source policy coverage: ${JSON.stringify(report.coverage)}`);
+      console.log(`Legacy explanatory comments retained: ${report.legacyComments?.length ?? 0}; immutable exclusions: ${report.exclusions?.length ?? 0}`);
+      console.log(`Legacy unsupported spans retained: ${report.deferred?.length ?? 0}`);
+      console.log(`Legacy unsupported languages: ${JSON.stringify(Object.fromEntries([...new Set(report.deferred.map((item) => item.language))].map((language) => [language, report.deferred.filter((item) => item.language === language).length])))}`);
+      console.log("Full path/token inventory: pnpm check:source-policy --json");
+    }
     if (errors.length) {
       console.error(errors.join("\n"));
       process.exitCode = 1;
-    } else console.log("Source policy: TS/JS parser tokens, legacy retention, pinned provenance and migration integrity/new SQL pass");
+    } else if (!process.argv.includes("--json")) console.log("Source policy: new source/comment admission and decreasing legacy retention pass; retained unsupported spans remain disclosed");
   } catch (error) {
     console.error(`Source policy failed: ${error.message}`);
     process.exitCode = 1;

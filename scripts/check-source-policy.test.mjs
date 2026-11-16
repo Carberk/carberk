@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -196,6 +196,7 @@ function repository(t) {
   const tree = git("write-tree");
   const commit = git("-c", "user.name=Source Policy Fixture", "-c", "user.email=fixture@example.invalid", "commit-tree", tree, "-p", baselineCommit, "-m", "fixture");
   git("update-ref", "refs/remotes/origin/main", commit);
+  git("update-ref", "HEAD", commit);
   return { directory, write, git, commit };
 }
 
@@ -323,5 +324,330 @@ test("accepted satisfies annotations have a compiler-visible constraint", () => 
     host.getSourceFile = (path) => path === "/typed.js" ? file : undefined;
     const program = ts.createProgram(["/typed.js"], options, host);
     assert.ok(program.getSemanticDiagnostics(file).some((diagnostic) => diagnostic.code === 1360));
+  }
+});
+
+
+test("whole-source admission rejects configuration and nested guide comments", () => {
+  for (const [path, source] of [
+    ["settings.toml", 'name = "# payload" # explanation\n'],
+    ["settings.ini", '[app]\n; explanation\nname=value\n'],
+    ["gradle.properties", '# explanation\nname=value\n'],
+    [".env.template", 'NAME="value#payload" # explanation\n'],
+    ["app.service", '[Service]\n# explanation\nExecStart=/bin/true\n'],
+    ["rules.pro", '-keep class example.Main # explanation\n'],
+    ["Caddyfile", ':8080 {\n # explanation\n respond "hello#payload"\n}\n'],
+    ["view.html.template", '<template><!-- explanation --></template>'],
+    ["guide.md", '```typescript\n// copied explanation\nexport const value = 1;\n```\n'],
+    ["guide.md", '> ```html\n> <!-- explanation -->\n> <p>Hello</p>\n> ```\n'],
+  ]) assert.match(check({ [path]: source }).join("\n"), /explanatory comment/, path);
+});
+
+test("unknown authored formats and executable fences fail visibly", () => {
+  for (const [path, source, language] of [
+    ["source.weird", 'const value = 1;', 'weird'],
+    ["empty.unknown", '', 'unknown'],
+    ["guide.md", '```unknown-runtime\nrun();\n```\n', 'unknown-runtime'],
+    ["payload.template", '# explanation\n', 'template'],
+  ]) {
+    const errors = check({ [path]: source }).join("\n");
+    assert.ok(errors.includes(path), errors);
+    assert.ok(errors.includes(language), errors);
+  }
+});
+
+test("format renames and copied guide snippets cannot launder legacy comments", () => {
+  const source = '```js\n// explanation\nexport const value = 1;\n```\n';
+  const legacy = { "guide.md": source };
+  assert.deepEqual(check(legacy, legacy), []);
+  for (const current of [
+    { "copy.md": source },
+    { "guide.md": source + source },
+    { "guide.md": source.replace("js\n", "typescript\n") },
+    { "generated/copy.md": source },
+  ]) assert.match(check(current, legacy).join("\n"), /explanatory comment/);
+});
+
+test("configuration hashes and semicolons retain their format-specific runtime meaning", () => {
+  for (const [path, source] of [
+    ["settings.toml", 'name = "# payload"\ntext = """first\n# payload\nlast"""\nlarge = 9223372036854775807\n'],
+    ["settings.toml", 'text = """quote""""\n'],
+    ["settings.ini", '[app]\nname=value#payload;payload\n'],
+    ["gradle.properties", 'name=value#payload\ncontinued=value\\\n # payload\nescaped=\\#payload\n'],
+    [".env.template", 'export NAME="value#payload"\nTEXT=\'first\n# payload\nlast\'\n'],
+    ["app.service", '[Service]\nDescription=runtime # payload ; payload\nExecStart=/bin/echo "# payload"\n'],
+    ["rules.pro", '-keep class example.Main\n-include "rules#payload.pro"\n'],
+    ["Caddyfile", ':8080 {\n respond `first\n# payload\nlast`\n header X-Value {http.request.host}\n respond hello#payload\n}\n'],
+    ["view.html.template", '<template><p title="<!-- payload -->">Hello</p></template>'],
+    ["Caddyfile", '\n:8080 {\n respond <<BODY\n# runtime payload\nBODY\n}\n'],
+    ["settings.json", '{"payload":"// runtime data"}\n'],
+    ["guide.md", 'Prose about # headings and // delimiters.\n\n```text\n// literal payload\n```\n\n```html\n<script type="application/json">{"payload":"// value"}</script>\n```\n'],
+  ]) assert.deepEqual(check({ [path]: source }), [], path);
+});
+
+test("configuration machine keywords never grant comment exceptions", () => {
+  for (const [path, source] of [
+    ["settings.toml", '# source-policy-disable\nname="value"\n'],
+    ["app.service", '# systemd directive: explanation\n[Service]\nExecStart=/bin/true\n'],
+    [".env", '#!/usr/bin/env node explanation\nNAME=value\n'],
+    ["rules.pro", '# keep compiler directive explanation\n-keep class example.Main\n'],
+    ["Caddyfile", '# syntax=caddy explanation\n:8080 { respond hello }\n'],
+    ["guide.md", '```js\n// @ts-check explanation\nexport {};\n```\n'],
+    ["scripts/source-policy/config.ini", '# disable-checker\n[policy]\nenabled=false\n'],
+  ]) assert.match(check({ [path]: source }).join("\n"), /explanatory comment/, path);
+});
+
+test("declared nested languages retain directives, exact host locations and legal provenance", () => {
+  assert.deepEqual(check({ "guide.md": '```js\n// @ts-check\nexport const value = 1;\n```\n' }), []);
+  const source = '> ```html\r\n> <script>\r\n> // explanation\r\n> const value = 1;\r\n> </script>\r\n> ```\r\n';
+  assert.match(check({ "guide.md": source }).join("\n"), /guide\.md:3:3: new or moved explanatory comment/);
+  const token = '<!-- Copyright (c) fixture owner. -->';
+  const notice = { path: "guide.md", tokenSha256: createHash("sha256").update(token).digest("hex"), origin: "fixture license" };
+  const run = (path, value) => checkSources({ current: sources({ [path]: value }), legacy: sources({}), trusted: sources({}), notices: [notice] });
+  assert.deepEqual(run("guide.md", `\`\`\`html\n${token}\n<p>Hello</p>\n\`\`\`\n`), []);
+  assert.match(run("copy.md", `\`\`\`html\n${token}\n\`\`\`\n`).join("\n"), /explanatory comment/);
+});
+
+test("legacy unsupported spans are visible, cannot grow and cannot be copied or resurrected", () => {
+  const legacy = { "guide.md": '```unknown-runtime\nexecute();\n```\n' };
+  const report = {};
+  assert.deepEqual(checkSources({ current: sources(legacy), legacy: sources(legacy), trusted: sources(legacy), report }), []);
+  assert.equal(report.deferred[0].path, "guide.md");
+  assert.equal(report.deferred[0].language, "unknown-runtime");
+  for (const current of [
+    { "guide.md": legacy["guide.md"].replace("execute();", "execute(); // explanation") },
+    { "copy.md": legacy["guide.md"] },
+    { "guide.md": legacy["guide.md"] + legacy["guide.md"] },
+  ]) assert.match(check(current, legacy).join("\n"), /unsupported.*unknown-runtime/);
+  assert.match(check(legacy, legacy, {}).join("\n"), /unsupported.*unknown-runtime/);
+});
+
+test("immutable history and upstream exceptions require original paths and exact bytes", () => {
+  const source = '```js\n// historical explanation\nexport {};\n```\n';
+  const path = "docs/adr/0001-decision.md";
+  const legacy = { [path]: source };
+  const report = {};
+  assert.deepEqual(checkSources({ current: sources(legacy), legacy: sources(legacy), trusted: sources(legacy), report }), []);
+  assert.equal(report.exclusions[0].path, path);
+  assert.match(check({ [path]: source + "Changed\n" }, legacy).join("\n"), /immutable history/);
+  for (const copied of ["docs/adr/9999-copy.md", "generated/copy.md", "docs/history/copy.md"]) {
+    assert.match(check({ [copied]: source }, legacy).join("\n"), /explanatory comment/);
+  }
+});
+
+test("new executable YAML scalars are inspected while ordinary payload values stay data", () => {
+  for (const scalar of [
+    'echo ok # explanation',
+    '"echo ok # explanation"',
+    "'echo ok # explanation'",
+    '|\n          echo ok # explanation',
+  ]) {
+    const source = `jobs:\n  test:\n    steps:\n      - run: ${scalar}\n`;
+    assert.match(check({ ".github/workflows/new.yml": source }).join("\n"), /explanatory comment/, scalar);
+  }
+  assert.deepEqual(check({ ".github/workflows/new.yml": 'jobs:\n  test:\n    steps:\n      - run: echo "# payload"\n        env:\n          MESSAGE: "# runtime data"\n' }), []);
+});
+
+test("repository-wide admission includes staged, ignored and committed non-JS additions", (t) => {
+  const { directory, write, git, commit } = repository(t);
+  write(".gitignore", "ignored/\n");
+  for (const path of ["ignored/settings.toml", "generated/settings.ini", "scripts/source-policy/settings.properties", "ignored/view.html.template"]) {
+    const source = path.endsWith(".template") ? '<!-- explanation -->' : '# explanation\nname="value"\n';
+    write(path, source);
+    assert.match(checkRepository(directory, {}).join("\n"), /explanatory comment/);
+    write(path, path.endsWith(".template") ? '<p>Hello</p>' : 'name="value"\n');
+  }
+  write("guide.md", '```js\n// staged explanation\nexport {};\n```\n');
+  git("add", "guide.md");
+  write("guide.md", '```js\nexport {};\n```\n');
+  assert.match(checkRepository(directory, {}).join("\n"), /staged: guide\.md.*explanatory comment/);
+  git("add", "guide.md");
+  write("committed.toml", '# explanation\nname="value"\n');
+  git("add", "committed.toml");
+  const tree = git("write-tree");
+  const head = git("-c", "user.name=Source Policy Fixture", "-c", "user.email=fixture@example.invalid", "commit-tree", tree, "-p", commit, "-m", "authored addition");
+  git("update-ref", "HEAD", head);
+  write("event.json", JSON.stringify({ pull_request: { base: { ref: "main", sha: commit } } }));
+  assert.match(checkRepository(directory, { GITHUB_ACTIONS: "true", GITHUB_EVENT_NAME: "pull_request", GITHUB_EVENT_PATH: join(directory, "event.json") }).join("\n"), /committed\.toml.*explanatory comment/);
+});
+
+
+test("ignored authored files cannot borrow a generated output directory exemption", (t) => {
+  const { directory, write } = repository(t);
+  for (const path of ["packages/db/generated/owned.ts", "apps/example/dist/owned.ts", "apps/example/build/owned.kt"]) {
+    write(path, "// explanation\n");
+    assert.match(checkRepository(directory, {}).join("\n"), /explanatory comment|unsupported/);
+    rmSync(join(directory, path));
+  }
+});
+
+
+test("executable markup attributes cannot conceal code behind host parsing", () => {
+  assert.match(check({ "view.html.template": '<p style="color:red; /* explanation */">Hello</p>' }).join("\n"), /explanatory comment/);
+  for (const source of [
+    '<button onclick="run(); /* explanation */">Run</button>',
+    '<a href="javascript:run(); /* explanation */">Run</a>',
+    '<iframe srcdoc="&lt;!-- explanation --&gt;"></iframe>',
+  ]) assert.match(check({ "guide.md": `\`\`\`html\n${source}\n\`\`\`\n` }).join("\n"), /unsupported.*(?:javascript|html)-/);
+  assert.deepEqual(check({ "view.html.template": '<p style="color:red" title="// runtime payload">Hello</p>' }), []);
+});
+
+
+test("Compose argv payloads stay data and executable indirection fails visibly", () => {
+  assert.deepEqual(check({ "infra/compose/new.yml": 'services:\n  app:\n    command: "server # runtime payload"\n' }), []);
+  for (const source of [
+    'services:\n  app:\n    command: ["sh", "-c", "echo ok # explanation"]\n',
+    'services:\n  app:\n    entrypoint: ["/bin/bash", "-c"]\n    command: "echo ok # explanation"\n',
+  ]) assert.match(check({ "infra/compose/new.yml": source }).join("\n"), /unsupported.*compose-executable/);
+  assert.match(check({ ".github/workflows/new.yml": 'script: &script echo ok # comment\njobs:\n  test:\n    steps:\n      - run: *script\n' }).join("\n"), /unsupported.*workflow-run/);
+});
+
+
+test("guide workflow examples inspect executable fields while unrelated run values stay data", () => {
+  const workflow = 'jobs:\n  test:\n    env:\n      run: "# runtime data"\n    steps:\n      - run: echo ok # explanation\n';
+  assert.match(check({ "guide.md": `\`\`\`yaml\n${workflow}\`\`\`\n` }).join("\n"), /explanatory comment/);
+  assert.deepEqual(check({ ".github/workflows/new.yml": workflow.replace("echo ok # explanation", "echo ok") }), []);
+});
+
+test("asset-looking ASCII programs never acquire binary provenance", () => {
+  for (const [path, source] of [
+    ["copy.jar", "PK: // explanation\nvoid 0;\n"],
+    ["copy.otf", "OTTO: // explanation\nvoid 0;\n"],
+    ["copy.woff2", "wOF2: // explanation\nvoid 0;\n"],
+    ["copy.mp4", "let ftyp; // explanation\n"],
+  ]) assert.notDeepEqual(check({ [path]: source }), [], path);
+});
+
+test("unfenced Markdown HTML receives the same executable attribute admission as templates", () => {
+  assert.match(check({ "guide.md": '<p style="color:red; /* explanation */">Hello</p>\n' }).join("\n"), /explanatory comment/);
+  assert.match(check({ "guide.md": '<button onclick="run(); /* explanation */">Run</button>\n' }).join("\n"), /unsupported.*javascript-attribute/);
+});
+
+test("package script programs are executable while ordinary JSON values remain data", () => {
+  assert.match(check({ "package.json": '{"scripts":{"build":"echo ok # explanation"}}' }).join("\n"), /explanatory comment|unsupported.*shell/);
+  assert.deepEqual(check({ "package.json": '{"description":"# runtime data","scripts":{"build":"echo ok"}}' }), []);
+});
+
+test("decoded Compose interpreter options and aliases cannot conceal executable content", () => {
+  for (const command of ['["node", "--eval", "1 /* explanation */"]', '*program']) {
+    const source = `program: &program ["sh", "-c", "echo ok # explanation"]\nservices:\n  app:\n    command: ${command}\n`;
+    assert.match(check({ "infra/compose/new.yml": source }).join("\n"), /unsupported.*compose-executable/);
+  }
+});
+
+test("systemd logical assignments classify spaced and continued interpreter commands", () => {
+  for (const value of [
+    'ExecStart = /bin/sh -c "echo ok # explanation"',
+    'ExecStart=/bin/sh \\\n -c "echo ok # explanation"',
+    'ExecStart=/usr/bin/python3 -c "1 # explanation"',
+    'ExecStart=/usr/bin/node --eval "1 /* explanation */"',
+  ]) assert.match(check({ "app.service": `[Service]\n${value}\n` }).join("\n"), /unsupported.*systemd/);
+});
+
+test("INI backslashes never suppress comments as properties continuations do", () => {
+  assert.match(check({ "app.ini": '[app]\npath=C:\\\n; explanation\nname=value\n' }).join("\n"), /explanatory comment/);
+});
+
+test("real image, font, archive and video payloads retain binary semantics", () => {
+  for (const path of [
+    "apps/mobile/assets/images/icon.png", "apps/admin/src/app/favicon.ico", "apps/mobile/assets/fonts/Geist-Regular.ttf",
+    "apps/phone-agent/gradle/wrapper/gradle-wrapper.jar", "packages/db/scripts/reviewer-fixtures/camry-1.jpg",
+    "packages/db/scripts/ui-fixtures/synthetic-video/v1/portrait.mp4",
+  ]) {
+    const bytes = readFileSync(join(repositoryRoot, path));
+    assert.deepEqual(checkSources({ current: new Map([[`copy${path.slice(path.lastIndexOf("."))}`, bytes]]), legacy: sources({}), trusted: sources({}) }), [], path);
+  }
+});
+
+test("known compiler outputs pass exact producer bytes while authored siblings and mutations fail", (t) => {
+  const { directory, write, git, commit } = repository(t);
+  write("packages/contracts/scripts/build.cjs", "export {};\n");
+  write("packages/contracts/tsconfig.build.json", JSON.stringify({ compilerOptions: {
+    target: "ES2022", module: "CommonJS", rootDir: "src", outDir: "dist", declaration: true, declarationMap: true, sourceMap: true,
+  }, include: ["src/**/*.ts"] }));
+  write("packages/contracts/src/index.ts", "export const value = 1;\n");
+  git("add", ".");
+  const tree = git("write-tree");
+  const base = git("-c", "user.name=Source Policy Fixture", "-c", "user.email=fixture@example.invalid", "commit-tree", tree, "-p", commit, "-m", "compiler fixture");
+  git("update-ref", "refs/remotes/origin/main", base);
+  const configPath = join(directory, "packages/contracts/tsconfig.build.json");
+  const compiler = join(repositoryRoot, "node_modules/@typescript/native/bin/tsc");
+  execFileSync(process.execPath, [compiler, "-p", configPath], { cwd: directory });
+  write("packages/contracts/dist/package.json", '{"type":"commonjs"}\n');
+  assert.deepEqual(checkRepository(directory, {}), []);
+  write("packages/contracts/dist/owned.js", "// authored explanation\n");
+  assert.match(checkRepository(directory, {}).join("\n"), /owned\.js.*explanatory comment/);
+  rmSync(join(directory, "packages/contracts/dist/owned.js"));
+  write("packages/contracts/dist/index.js.map", '{"version":3,"sources":[],"mappings":""}');
+  assert.match(checkRepository(directory, {}).join("\n"), /index\.js\.map.*provenance bytes changed/);
+  const originalConfig = JSON.parse(readFileSync(configPath, "utf8"));
+  for (const option of ["declarationDir", "outFile", "tsBuildInfoFile", "generateTrace"]) {
+    write("packages/contracts/tsconfig.build.json", JSON.stringify({ ...originalConfig,
+      compilerOptions: { ...originalConfig.compilerOptions, [option]: "./policy-overwrite" } }));
+    assert.throws(() => checkRepository(directory, {}), /unsupported producer output configuration/);
+    assert.equal(existsSync(join(directory, "packages/contracts/policy-overwrite")), false);
+    assert.equal(existsSync(join(directory, "policy-overwrite")), false);
+  }
+
+});
+
+test("built-in Prisma output is verified from schema rather than trusting generated headers", (t) => {
+  const { directory, write, git } = repository(t);
+  write(".gitignore", "node_modules\n**/node_modules\npackages/db/generated/\n");
+  symlinkSync(join(repositoryRoot, "node_modules"), join(directory, "node_modules"));
+  write("package.json", '{"private":true}\n');
+  write("packages/db/package.json", '{"name":"source-policy-fixture"}\n');
+  write("packages/db/tsconfig.json", '{"compilerOptions":{"module":"ESNext","moduleResolution":"Bundler"}}\n');
+  write("packages/db/tsconfig.build.json", '{"extends":"./tsconfig.json"}\n');
+  write("packages/db/prisma/schema.prisma", 'generator client {\n  provider = "prisma-client"\n  output = "../generated/prisma/client"\n  moduleFormat = "cjs"\n}\ndatasource db {\n  provider = "postgresql"\n}\nmodel Item {\n  id String @id\n}\n');
+  symlinkSync(join(repositoryRoot, "packages/db/node_modules"), join(directory, "packages/db/node_modules"));
+  write("prisma.config.mjs", 'export default { schema: "packages/db/prisma/schema.prisma" };\n');
+  const manifest = JSON.parse(readFileSync(join(repositoryRoot, "packages/db/node_modules/prisma/package.json"), "utf8"));
+  execFileSync(process.execPath, [join(repositoryRoot, "packages/db/node_modules/prisma", manifest.bin.prisma), "generate", "--config", join(directory, "prisma.config.mjs"), "--generator", "client"], {
+    cwd: directory, env: { ...process.env, PRISMA_GENERATE_SKIP_AUTOINSTALL: "1" }, stdio: ["ignore", "pipe", "pipe"],
+  });
+  git("add", ".");
+  assert.deepEqual(checkRepository(directory, {}), []);
+  const target = "packages/db/generated/prisma/client/client.ts";
+  const generated = readFileSync(join(directory, target), "utf8");
+  write(target, `${generated}\n// forged generated explanation\n`);
+  assert.match(checkRepository(directory, {}).join("\n"), /client\.ts.*provenance bytes changed/);
+  write(target, generated);
+  write("packages/db/generated/prisma/client/owned.ts", "// generated-looking explanation\nexport {};\n");
+  assert.match(checkRepository(directory, {}).join("\n"), /owned\.ts.*explanatory comment/);
+});
+
+test("duplicate package script sections cannot hide the effective executable value", () => {
+  for (const source of [
+    '{"scripts":{"safe":"echo ok"},"scripts":{"build":"echo ok # explanation"}}',
+    '{"scripts":["echo ok # explanation"]}',
+    '{"scripts":{"build":"echo ok # explanation"},"scripts":{"safe":"echo ok"}}',
+    '{"scripts":{"safe":"echo ok"},"scr\\u0069pts":{"build":"echo ok # explanation"}}',
+  ]) assert.match(check({ "package.json": source }).join("\n"), /unsupported.*json|duplicate scripts/);
+});
+
+test("Compose merge and collection aliases cannot hide inherited executable configuration", () => {
+  for (const source of [
+    'x-base: &base\n  command: ["sh", "-c", "echo ok # explanation"]\nservices:\n  app:\n    <<: *base\n',
+    'x-services: &services\n  app:\n    command: ["node", "--eval", "1 /* explanation */"]\nservices: *services\n',
+    'x-root: &root\n  services:\n    app:\n      command: ["sh", "-c", "echo ok # explanation"]\n<<: *root\n',
+  ]) assert.match(check({ "infra/compose/new.yml": source }).join("\n"), /unsupported.*(?:compose|yaml)-executable/);
+});
+
+test("systemd interpreter option quoting and escapes never disable executable admission", () => {
+  for (const value of [
+    '/bin/sh "-c" "echo ok # explanation"',
+    '/usr/bin/node "--eval" "1 /* explanation */"',
+    '/usr/bin/python3 \'-c\' "1 # explanation"',
+    '/bin/sh "-\\x63" "echo ok # explanation"',
+    '/bin/sh $OPTIONS "echo ok # explanation"',
+  ]) assert.match(check({ "app.service": `[Service]\nExecStart=${value}\n` }).join("\n"), /unsupported.*systemd/);
+});
+
+
+test("NVM version files inspect their documented comments rather than bypassing configuration admission", () => {
+  assert.deepEqual(check({ ".nvmrc": "22.23.3\n" }), []);
+  for (const source of ["22.23.3 # explanation\n", "# explanation\n22.23.3\n"]) {
+    assert.match(check({ ".nvmrc": source }).join("\n"), /explanatory comment/);
   }
 });
