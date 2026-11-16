@@ -48,6 +48,7 @@ export function PrivateNotesPanel({ locale, id, version, scope, actorId, revisio
   const current = useRef(draft);
   const active = useRef(false);
   const request = useRef(0);
+  const priorRevision = useRef(revision);
   const busy = useRef(false);
   const callbacks = useRef({ invalidate });
   useEffect(() => { callbacks.current = { invalidate }; });
@@ -113,6 +114,10 @@ export function PrivateNotesPanel({ locale, id, version, scope, actorId, revisio
   }, [loadDraft]);
   useEffect(() => {
     const pending = request;
+    if (priorRevision.current !== revision) {
+      priorRevision.current = revision;
+      if (current.current.intent) setPhase((value) => value === "pending" ? "uncertain" : value);
+    }
     void read();
     return () => { pending.current++; busy.current = false; };
   }, [read, revision]);

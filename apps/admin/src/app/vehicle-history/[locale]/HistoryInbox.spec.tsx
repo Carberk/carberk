@@ -143,6 +143,30 @@ it("retries an unconfirmed private note with its original identity while retaini
   expect(screen.getByRole("region", { name: "Private staff notes" }).textContent).toContain("First staff note");
   expect(screen.getByRole("list", { name: "Enquiry conversation" }).textContent).not.toContain("First staff note");
 });
+it("keeps the same private-note Retry available when Refresh interrupts a pending save", async () => {
+  selectAssigned();
+  const network = networkHandler(), pending = deferred<Response>();
+  const attempts: { clientNoteId: string; text: string }[] = [];
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (new URL(String(input)).pathname.endsWith("/notes") && init?.method === "POST") {
+      attempts.push(JSON.parse(String(init.body)));
+      return attempts.length === 1 ? pending.promise : network(input, init);
+    }
+    return network(input, init);
+  });
+  render(view());
+  fireEvent.change(await screen.findByRole("textbox", { name: "Internal note" }), { target: { value: "Keep one note intent" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  await waitFor(() => expect(attempts).toHaveLength(1));
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await act(async () => pending.resolve(Response.json({}, { status: 503 })));
+  fireEvent.click(await screen.findByRole("button", { name: "Retry this note" }));
+  await waitFor(() => expect(attempts).toHaveLength(2));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Retry this note" })).toBeNull());
+  expect(attempts[1]?.clientNoteId).toBe(attempts[0]?.clientNoteId);
+  expect(screen.getByRole("list", { name: "Private staff notes" }).textContent).toContain("Keep one note intent");
+  expect(screen.getByRole("list", { name: "Enquiry conversation" }).textContent).not.toContain("Keep one note intent");
+});
 it("blocks a private note when its durable intent cannot be stored, then allows explicit recovery", async () => {
   selectAssigned();
   render(view());
