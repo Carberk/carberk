@@ -22,6 +22,7 @@ Judge mechanical comment removal, obsolete-document deletion and generated chang
 
 1. Branch from current `origin/main` in your own worktree. Name it `t3/<issue>-<slug>` or `agent/issue-<issue>-<slug>`.
 2. Read the issue, [CONTEXT-MAP.md](../../CONTEXT-MAP.md), the owning code and its tests, and the guides [AGENTS.md](../../AGENTS.md) routes for the area.
+   Assignment includes [standing authority for owned setup, tests and fixes](environment.md#assignment-and-resource-authority). Use a named local runtime for fresh environments; preserve active environments and coordinate only actual shared-resource conflicts.
 3. Work test-first with [tdd](../../.claude/skills/tdd/SKILL.md). Use [diagnosing-bugs](../../.claude/skills/diagnosing-bugs/SKILL.md) for hard failures.
    For product UI, apply the [UI copy rules](coding-standards.md#ui-copy) before handoff.
 4. Hide unfinished user-visible features behind a feature flag or tester-only switch, so each PR can merge without exposing half a feature.
@@ -38,6 +39,8 @@ Proof is what you observed in this session:
 Signed-in UI preparation follows the required [native fixture sign-in procedure](native-fixture-signin.md).
 
 Put proof in the PR description. Screenshots go in the PR, never in the repository. Do not commit evidence, receipts or review files.
+
+Reuse still-valid proof. A recheck names the change that invalidated it, such as changed runtime source, dependencies, schema, fixture state, served origins or a failed check. A conditional future check reserves no compute lane. Required acceptance, review and CI remain gates; unchanged evidence is not a reason to repeat a heavy job.
 
 Draft pull requests run only the lane selector. Their required `pr` check is skipped, so a draft-only run cannot establish a green head for the docs shortcut. Mark a draft ready for review to run the selected docs or full lane; later pushes run it again. Adding the `run-full-ci` label forces the full matrix, including on a draft.
 

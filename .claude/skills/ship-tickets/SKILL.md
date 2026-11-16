@@ -52,6 +52,7 @@ Each ticket gets one small PR from current `main`. Give its agent:
 - its blockers and the decisions already made for them;
 - the recorded base and the paths it owns;
 - the mode, required proof and applicable project guidance;
+- standing authority for routine owned setup, tests and fixes under the [environment guide](../../../docs/agents/environment.md#assignment-and-resource-authority), with a named local runtime for fresh setup and actual shared-resource conflicts identified separately;
 - the instruction to run the configured checks, `sol-loop` and `file-pr`.
 
 Use the environment's delegation procedure with an isolated worktree. The
@@ -83,6 +84,8 @@ up to date and GitHub reports it mergeable. Use the repository's protected
 squash merge; never bypass branch protection. After a merge, refresh `main`,
 remove that ticket's worktree and dispatch newly unblocked tickets. Keep
 independent tickets moving when another ticket is parked.
+
+Owners run routine local commands directly; parent approval is not a per-command gate. Preserve existing feature environments and let delivery continue without requiring tooling adoption. Coordinate actual heavy compute, native devices, browser sessions and shared staging operations separately. Idle API/Metro sessions and conditional future jobs hold no compute lane. Rechecks state what invalidated earlier proof; keep required proof, isolated review and CI.
 
 ## Finish
 

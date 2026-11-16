@@ -74,7 +74,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = process.env["PORT"] ?? 3006;
-  await app.listen(port, "0.0.0.0");
+  await app.listen(port, process.env["CARBERK_LOCAL_ENV"] === "true" ? "127.0.0.1" : "0.0.0.0");
   app.get(Logger).log(`API listening on port ${port}`, "NestApplication");
 }
 

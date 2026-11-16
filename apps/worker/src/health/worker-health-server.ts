@@ -132,7 +132,7 @@ export class WorkerHealthServer implements OnModuleInit, OnModuleDestroy {
         return;
       }
       server.once("error", reject);
-      server.listen(this.config.get("PORT", { infer: true }), "0.0.0.0", () => {
+      server.listen(this.config.get("PORT", { infer: true }), process.env["CARBERK_LOCAL_ENV"] === "true" ? "127.0.0.1" : "0.0.0.0", () => {
         server.off("error", reject);
         resolve();
       });

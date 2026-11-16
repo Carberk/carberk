@@ -4,7 +4,7 @@ What exists for Carberk, how to use it, and what an agent may change without ask
 
 | Place | Use it for | Agents may | Ask the founder first |
 |---|---|---|---|
-| Local Docker stack | Daily development and manual testing | Start, stop, migrate, seed, reset its data | Deleting its volumes (`down -v`) |
+| Owned local runtime | Daily development and manual testing | Create/resume, start/stop, migrate, initialize fresh fixtures and fix/test owned code | Deleting its volumes (`down -v`); shared data changes need actual owner coordination |
 | GitHub Actions CI | Proving every PR | Run and rerun checks | Changing workflows or branch protection |
 | Railway staging | Real phones, testers, a last check before release | Everything: deploy, redeploy, change variables and settings, add or change Buckets, run migrations and seeds, reset data | Nothing; see the staging rules below |
 | Railway production | Real users later | Read status | Everything else |
@@ -16,7 +16,21 @@ Node `>=22.13`, pnpm `12.11.2` (from [package.json](../../package.json)). Instal
 
 ## Local development
 
-The founder's Mac runs one shared development stack, Docker Compose project `compose`, from [docker-compose.dev.yml](../../infra/compose/docker-compose.dev.yml):
+For fresh ticket environments, use the opt-in runtime helper:
+
+```bash
+pnpm local-env up 1356-history --profile history --with admin
+pnpm local-env status 1356-history
+pnpm local-env stop 1356-history
+```
+
+Choose a ticket number and unique suffix. `up` binds the name to this worktree, discovers Docker-assigned loopback ports, builds API/worker sequentially, migrates and bootstraps project-scoped storage. It writes private env, logs and ownership state under `/tmp/carberk-local-<uid>/<name>`, outside git. API and worker have distinct loopback listeners; optional `--with admin,web,metro` uses the same generated origins. Reruns retain named containers, volumes, fixture data and live sessions. After source changes, stop/up rebuilds owned services; it does not replace fixtures. `--infra-only` starts just the empty infrastructure profile.
+
+Profiles are exclusive for the life of the runtime. `empty` only prepares schema/buckets. `history` initializes the existing empty-table History actors/grant. `native` installs the existing canonical catalog/UI fixture, then plans/applies rich photos, private drafts and real-worker video sources in that order, and runs canonical `native:ready`. Sparse fixture installation never establishes native readiness. Use separate names for History and native; profile switching refuses before writes. Existing photo/logo source caches and the rich renderer cache are reused by their existing commands.
+
+`stop` authenticates owned process sessions and checks ownership labels on containers, networks and volumes. It stops only those sessions and verified containers and preserves data. There is no destroy command. Inspect private logs on startup failure; ordinary infrastructure/startup recovery is stop/up. Interrupted fixture writes refuse replay: inspect the exact fixture receipt and follow its recovery, or use a new named runtime. An interrupted CLI can leave `operation.lock`: inspect its private owner record, verify that process ended, then remove only that lock directory. Never remove a live operation's lock. `/tmp` state is required to prove ownership; if it is lost, choose a new name and coordinate recovery of the old resources rather than adopting them.
+
+Existing feature environments stay in place. Do not migrate, reset or move an active proof environment merely to adopt this helper, and do not make delivery wait for its adoption. The legacy shared development stack, Docker Compose project `compose`, remains available from [docker-compose.dev.yml](../../infra/compose/docker-compose.dev.yml):
 
 | Service | Port |
 |---|---|
@@ -44,9 +58,15 @@ Copy each app's `.env.template` to `.env` and keep secrets out of git. The templ
 | Web (`apps/web`) | `3002` | `pnpm --filter @auto-tm/web dev` |
 | Mobile Metro (`apps/mobile`) | `8081` | `pnpm --filter @auto-tm/mobile dev` |
 
-`pnpm dev` starts all of them. A real Listing video upload stays in Processing until the worker runs, so start it when you test uploads; `video:fixture` does not need it. The stack is shared by every agent on this Mac. Use your own database for destructive test runs, and never run `docker compose down -v` without asking. Schema changes are committed migrations; `db push` and `migrate dev` stay on localhost.
+`pnpm dev` starts all of them against manually selected legacy env files. A real Listing video upload stays in Processing until the worker runs, so start it when you test uploads; `video:fixture` does not need it. The legacy stack is shared by agents on this Mac. Preserve its active owners and data; use a named runtime for fresh work. Volume deletion still needs explicit authority. Schema changes are committed migrations; `db push` and `migrate dev` stay on localhost.
 
 [Local testing](local-testing.md) has the fast path: env files, the API log, sign-in codes, the local admin and its authenticator code, and the iOS Simulator steps.
+
+### Assignment and resource authority
+
+Assignment grants standing authority for routine setup, tests, fixes and data-preserving process recovery inside the owner's worktree/runtime. Owners choose and run the necessary commands without per-command parent grants or frozen command packets. Coordinate only a concrete shared resource or an authority boundary; identify the resource, current owner and operation that would conflict.
+
+Treat compute, devices, browsers and staging as separate resources. Coordinate an actual heavy build/test/export/FFmpeg job with other active heavy jobs, and send its actual start/release when contention exists. An idle API/worker/Metro is not a compute reservation; a conditional future job does not hold a free build lane. Keep FFmpeg transcode concurrency at one on this host. Device selection/handoff follows the owned-device procedure below; browser work owns its tabs/sessions; actual shared staging operations follow the Railway authority below and any task-specific restriction. A local compute grant does not transfer a device, browser session or staging target.
 
 ## iOS Simulator
 
