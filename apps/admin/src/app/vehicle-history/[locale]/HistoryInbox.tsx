@@ -94,7 +94,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
         {(["unassigned", "mine"] as const).map((filter) => <Button key={filter} variant={query.success && query.data.filter === filter ? "primary" : "secondary"}
           aria-pressed={query.success && query.data.filter === filter} onClick={() => navigate({ filter, cursor: null, selected: null, v: null })}>{t[filter]}</Button>)}
       </div>
-      <form className="w-full min-w-0 sm:max-w-md sm:flex-1" onSubmit={(event) => {
+      <form className="w-full min-w-0 sm:min-w-72 sm:max-w-md sm:flex-1" onSubmit={(event) => {
         event.preventDefault(); const search = String(new FormData(event.currentTarget).get("search") ?? "").trim();
         navigate({ search: search || null, cursor: null, selected: null, v: null });
       }}>

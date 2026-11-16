@@ -20,11 +20,72 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
   const pane = useRef<HTMLOListElement>(null);
   const pageFocus = useRef<Element | null>(null);
   const anchor = useRef<{ id: string; offset: number; top: number } | null>(null);
+  const seen = useRef(new Set<string>());
   const lost = !!row && version > 0 && (!row.mine || row.assignmentVersion !== version || row.assignedOperator?.id !== actor.id);
   const reader = useOperatorConversation({ locale, id, version, scope, actorId: actor.id, revision,
     entry: lost ? "conflict" : row ? row.mine ? "loading" : "unclaimed" : version === 0 ? "missing" : "loading", invalidate, claimed });
   const { detail, messages, cursor } = reader;
   const state = lost ? "conflict" : reader.state;
+  const receiptFailed = reader.receiptState === "error";
+  const { acknowledgeRead, notice } = reader;
+  useEffect(() => {
+    if (state !== "ready") return;
+    let cancelled = false, timer: number | undefined;
+    const started = new Map<string, number>();
+    function eligible() {
+      const node = pane.current;
+      if (cancelled || !node || !navigator.onLine || !document.hasFocus() || document.visibilityState !== "visible"
+        || receiptFailed || ["offline", "unavailable", "reconnecting"].includes(notice)) return [];
+      const box = node.getBoundingClientRect(), viewport = window.visualViewport;
+      const top = Math.max(box.top, viewport?.offsetTop ?? 0);
+      const bottom = Math.min(box.bottom, (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight));
+      const left = Math.max(box.left, viewport?.offsetLeft ?? 0);
+      const right = Math.min(box.right, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth));
+      if (bottom <= top || right <= left) return [];
+      return messages.filter((message) => {
+        const row = document.getElementById(`history-message-${message.id}`)?.getBoundingClientRect();
+        if (!row || row.height <= 0 || row.left < left || row.right > right) return false;
+        const visible = Math.min(row.bottom, bottom) - Math.max(row.top, top);
+        return visible > 0 && (row.top >= top && row.bottom <= bottom || visible >= (bottom - top) / 2);
+      }).map((message) => message.id);
+    }
+    function scan() {
+      window.clearTimeout(timer);
+      const visible = new Set(eligible()), now = performance.now();
+      for (const id of started.keys()) if (!visible.has(id)) started.delete(id);
+      const waits: number[] = [];
+      for (const id of visible) {
+        if (!started.has(id)) started.set(id, now);
+        const elapsed = now - (started.get(id) ?? now);
+        if (elapsed >= 300) seen.current.add(id);
+        else waits.push(300 - elapsed);
+      }
+      let through: V.HistoryMessage | undefined;
+      for (const message of messages) { if (!seen.current.has(message.id)) break; through = message; }
+      if (through && visible.has(through.id) && now - (started.get(through.id) ?? now) >= 300) {
+        const target = through;
+        acknowledgeRead(target, () => !cancelled && eligible().includes(target.id)
+          && performance.now() - (started.get(target.id) ?? performance.now()) >= 300);
+      }
+      if (waits.length) timer = window.setTimeout(scan, Math.min(...waits));
+    }
+    const node = pane.current;
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scan);
+    if (node) { observer?.observe(node); for (const child of node.children) observer?.observe(child); }
+    const events = ["scroll", "resize", "focus", "blur", "online", "offline"];
+    for (const event of events) window.addEventListener(event, scan, true);
+    document.addEventListener("visibilitychange", scan);
+    window.visualViewport?.addEventListener("resize", scan);
+    window.visualViewport?.addEventListener("scroll", scan);
+    scan();
+    return () => {
+      cancelled = true; window.clearTimeout(timer); observer?.disconnect();
+      for (const event of events) window.removeEventListener(event, scan, true);
+      document.removeEventListener("visibilitychange", scan);
+      window.visualViewport?.removeEventListener("resize", scan);
+      window.visualViewport?.removeEventListener("scroll", scan);
+    };
+  }, [messages, state, notice, receiptFailed, acknowledgeRead]);
   function remember() {
     const node = pane.current;
     if (!node) return;
@@ -50,6 +111,9 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
   function more() { remember(); pageFocus.current = document.activeElement; reader.run("page"); }
   function recover() { remember(); pageFocus.current = document.activeElement; reader.run("refresh"); }
   const selected = detail ?? row;
+  const other = reader.receipts.find((receipt) => receipt.assignmentVersion === 0 && receipt.participantId !== actor.id);
+  const messageStatus = (message: V.HistoryMessage) => other && BigInt(other.readOrder) >= BigInt(message.order) ? t.read
+    : other && BigInt(other.receivedOrder) >= BigInt(message.order) ? t.delivered : t.sent;
   const name = selected?.requester ? IdentitySchemas.formatDisplayName(selected.requester, locale) : t.unavailablePerson;
   return <>
     <section aria-labelledby="selected-enquiry" className="min-w-0">
@@ -75,9 +139,15 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
               <p className="mb-2 text-xs text-muted-foreground">{IdentitySchemas.formatDisplayName(message.author, locale)} · <time dateTime={message.createdAt}>{formatTime(message.createdAt, locale)}</time>
       </p>
               <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.text}</p>
+              {message.author.kind === "operator" && <p role="status" aria-live="polite" className="mt-2 text-xs text-foreground/80">{messageStatus(message)}</p>}
             </li>)}</ol>
             <div role="status" aria-live="polite" className="mb-3 text-sm text-muted-foreground">{reader.notice === "refreshing" ? t.refreshing
-              : reader.notice === "reconnecting" ? t.reconnecting : reader.notice === "recovered" ? t.recovered : ""}</div>
+              : reader.notice === "reconnecting" ? t.reconnecting : reader.notice === "recovered" ? t.recovered
+                : reader.receiptState === "loading" ? t.receiptUpdating : reader.receiptState === "updated" ? t.receiptUpdated : ""}</div>
+            {receiptFailed && !["offline", "unavailable"].includes(reader.notice) && <div role="alert" className="mb-4 text-sm">
+              <p className="mb-2">{t.receiptError}</p>
+              <Button variant="secondary" onClick={recover}>{t.retry}</Button>
+            </div>}
             {["offline", "unavailable"].includes(reader.notice) && <div role="alert" className="mb-4 text-sm">
               <p className="mb-2">{reader.notice === "offline" ? t.offline : t.readError}</p>
               <Button variant="secondary" onClick={recover}>{t.retry}</Button>
