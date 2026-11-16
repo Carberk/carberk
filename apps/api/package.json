@@ -8,7 +8,7 @@
     "dev": "nest start --watch",
     "start": "node dist/src/main.js",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:unit": "AUTO_TM_TEST_DATABASES=off vitest run --exclude '**/*.e2e.spec.ts' --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
