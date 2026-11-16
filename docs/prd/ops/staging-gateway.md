@@ -1,9 +1,9 @@
-# Closed staging API gateway (R02)
+# Closed staging gateway
 
 [R02](https://github.com/Carberk/carberk/issues/1155) adds a controlled-client API
 entry on the VPS. [R01](staging-egress.md) owns fixed-relay selection and its
-independence proof. This release forwards only the staging API: media-origin
-mapping, native route selection and sockets remain separate tickets. R03 adds
+independence proof. R05 adds the fixed photo alias below; video and sockets
+remain separate tickets. R03 adds
 optional signed client attribution as described below. A gateway key does not grant API business permissions.
 
 ## Runtime contract
@@ -15,14 +15,14 @@ optional signed client attribution as described below. A gateway key does not gr
 settings fail `--check`; unavailable transport fails requests without fallback.
 The [reverse procedure](staging-egress.md#persistent-reverse-connector-1224) owns the
 supervised Railway connector and isolated VPS listener/adapter. The CLI permits
-only the staging API origin and these fixed loopback proxies. The configured
+only the staging API/photo origins and these fixed loopback proxies. The configured
 hostname must match the request Host. A client supplies `X-Carberk-Gateway-Key` in
 addition to its normal API bearer token. Never put the gateway key in a URL, git,
 logs or a public build. Generate it into a mode-0600 file in a private directory.
 
 nginx terminates validated client TLS on the dedicated SNI hostname and streams
 to loopback port 11880. The gateway uses an explicit HTTP CONNECT tunnel through
-the selected loopback transport and validates the fixed API origin's TLS
+the selected loopback transport and validates each fixed origin's TLS
 hostname/certificate.
 The [runtime pin](../../../infra/gateway/runtime.json) identifies the official
 Linux x64 Node archive and SHA-256. There are no npm runtime dependencies.
@@ -45,9 +45,23 @@ requests retain admission slots until cleanup and never initiate a later tunnel.
 nginx also disables request/response buffering, gzip transformation and upstream retry. Logs contain
 only method category, status, outcome and duration; never targets, headers or bodies.
 
-Without R03 signing enabled, Railway sees the relay's ingress address. Do not increase trusted hop
-counts or accept unsigned forwarded metadata to compensate. Until later media and
-socket tickets, the API-only entry must stay restricted to controlled clients.
+The entry stays restricted to controlled testers; API bearer authentication and
+business permissions remain owned by the API.
+
+## Photos (R05)
+
+The only photo origin is `https://minio-staging-5795.up.railway.app`.
+
+Only GET, HEAD and PUT under `/photos/listing-photos/…` and
+`/photos/chat-attachments/…` are accepted. The gateway removes `/photos` by raw
+slicing, preserves signed Host/TLS identity, body, content and conditional headers,
+and strips API credentials and private entry access before storage. Storage
+redirects fail closed. Video has no alias/configuration in this release.
+
+Before installed activation, prepare exact candidate/restore files, hashes,
+modes and service identity as in the upgrade procedure below. Preserve the R11
+observer and persistent reverse connector/signer. R05 requires no nginx, Xray or
+transport changes; never run the initial installer or its rollback on this host.
 
 ## Prepare before approval
 
