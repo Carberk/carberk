@@ -3,10 +3,8 @@ import type { UserRepository } from "../domain/ports/UserRepository";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
 import type { AccountDeletionUnitOfWork } from "../domain/ports/AccountDeletionUnitOfWork";
 import type { ClockPort } from "../domain/ports/ClockPort";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
-import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 import { ACCOUNT_DELETION_UNIT_OF_WORK } from "../domain/ports/AccountDeletionUnitOfWork";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 const GRACE_PERIOD_DAYS = 30;
 
@@ -17,13 +15,13 @@ export interface DeleteMeInput {
 @Injectable()
 export class DeleteMe {
   constructor(
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: UserRepository,
-    @Inject(PrismaSessionRepository)
+    @Inject(IDENTITY_TOKENS.SessionRepository)
     private readonly sessionRepo: SessionRepository,
     @Inject(ACCOUNT_DELETION_UNIT_OF_WORK)
     private readonly unitOfWork: AccountDeletionUnitOfWork,
-    @Inject(SystemClockAdapter)
+    @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
   ) {}
 

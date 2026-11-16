@@ -1,8 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { UserRepository } from "../domain/ports/UserRepository";
 import { isPhoneVerified } from "../domain/SignInMethods";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
-import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
+import type { VideoUploadAccessPort } from "../domain/ports/VideoUploadAccessPort";
 import { IDENTITY_TOKENS } from "../identity.tokens";
 import type { IdentityCheckPort } from "../domain/ports/IdentityCheckPort";
 
@@ -31,10 +30,10 @@ export interface GetMeResult {
 @Injectable()
 export class GetMe {
   constructor(
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: UserRepository,
-    @Inject(ConfigListingVideoAccess)
-    private readonly videoAccess: ConfigListingVideoAccess,
+    @Inject(IDENTITY_TOKENS.VideoUploadAccessPort)
+    private readonly videoAccess: VideoUploadAccessPort,
     @Inject(IDENTITY_TOKENS.IdentityCheckPort)
     private readonly identity: IdentityCheckPort,
   ) {}

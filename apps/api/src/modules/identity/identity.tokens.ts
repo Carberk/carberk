@@ -14,4 +14,8 @@ export const IDENTITY_TOKENS = {
   TotpEnrollmentRepository: "IDENTITY_TOTP_ENROLLMENT_REPOSITORY",
   TotpThrottlePort: "IDENTITY_TOTP_THROTTLE_PORT",
   SecurityLoggerPort: "IDENTITY_SECURITY_LOGGER_PORT",
+  CredentialCryptoPort: "IDENTITY_CREDENTIAL_CRYPTO_PORT",
+  AccessTokenSignerPort: "IDENTITY_ACCESS_TOKEN_SIGNER_PORT",
+  VideoUploadAccessPort: "IDENTITY_VIDEO_UPLOAD_ACCESS_PORT",
+  IdentityEventBusPort: "EventBus",
 } as const;

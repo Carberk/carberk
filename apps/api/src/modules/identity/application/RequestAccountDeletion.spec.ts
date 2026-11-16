@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { describe, expect, it } from "vitest";
 
 import type { OtpRequest, SignInCodePurpose } from "../domain/OtpRequest";
@@ -117,6 +118,7 @@ function setup(users: User[] = [], testMode = true) {
     clock,
     testMode,
     emailSender,
+    new NodeCredentialCrypto(),
   );
   return { useCase, otpRepo, sms, emails };
 }

@@ -1,12 +1,9 @@
-import { randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
+import type { CredentialCryptoPort } from "../domain/ports/CredentialCryptoPort";
+import type { AccessTokenSignerPort } from "../domain/ports/AccessTokenSignerPort";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
 import type { RefreshTokenHasherPort } from "../domain/ports/RefreshTokenHasherPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
-import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
-import { RefreshTokenDigestAdapter } from "../infrastructure/RefreshTokenDigestAdapter";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 
 import { UserSuspendedError } from "../domain/UserSuspendedError";
 import type { IdentityCheckPort } from "../domain/ports/IdentityCheckPort";
@@ -26,16 +23,18 @@ export interface RefreshSessionResult {
 @Injectable()
 export class RefreshSession {
   constructor(
-    @Inject(PrismaSessionRepository)
+    @Inject(IDENTITY_TOKENS.SessionRepository)
     private readonly sessionRepo: SessionRepository,
-    @Inject(RefreshTokenDigestAdapter)
+    @Inject(IDENTITY_TOKENS.RefreshTokenHasherPort)
     private readonly hasher: RefreshTokenHasherPort,
-    @Inject(SystemClockAdapter)
+    @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
-    @Inject(JwtService)
-    private readonly jwtService: JwtService,
+    @Inject(IDENTITY_TOKENS.AccessTokenSignerPort)
+    private readonly jwtService: AccessTokenSignerPort,
     @Inject(IDENTITY_TOKENS.IdentityCheckPort)
     private readonly identityCheck: IdentityCheckPort,
+    @Inject(IDENTITY_TOKENS.CredentialCryptoPort)
+    private readonly crypto: CredentialCryptoPort,
   ) {}
 
   async execute(input: RefreshSessionInput): Promise<RefreshSessionResult> {
@@ -53,7 +52,7 @@ export class RefreshSession {
       throw new UserSuspendedError();
     }
 
-    const newRefreshToken = randomBytes(32).toString("hex");
+    const newRefreshToken = this.crypto.generateRefreshToken();
     const newHash = await this.hasher.hash(newRefreshToken);
     const newExpiresAt = new Date(
       now.getTime() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000,

@@ -2,9 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { TotpEnrollmentRepository } from "../domain/ports/TotpEnrollmentRepository";
 import type { TotpSecretCipherPort } from "../domain/ports/TotpSecretCipherPort";
 import type { TotpVerifierPort } from "../domain/ports/TotpVerifierPort";
-import { PrismaTotpEnrollmentRepository } from "../infrastructure/PrismaTotpEnrollmentRepository";
-import { AesGcmTotpSecretCipher } from "../infrastructure/AesGcmTotpSecretCipher";
-import { OtplibTotpVerifier } from "../infrastructure/OtplibTotpVerifier";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 export interface EnrollAdminTotpInput {
   userId: string;
@@ -18,11 +16,11 @@ export interface EnrollAdminTotpResult {
 @Injectable()
 export class EnrollAdminTotp {
   constructor(
-    @Inject(PrismaTotpEnrollmentRepository)
+    @Inject(IDENTITY_TOKENS.TotpEnrollmentRepository)
     private readonly totpRepo: TotpEnrollmentRepository,
-    @Inject(AesGcmTotpSecretCipher)
+    @Inject(IDENTITY_TOKENS.TotpSecretCipherPort)
     private readonly cipher: TotpSecretCipherPort,
-    @Inject(OtplibTotpVerifier)
+    @Inject(IDENTITY_TOKENS.TotpVerifierPort)
     private readonly verifier: TotpVerifierPort,
   ) {}
 

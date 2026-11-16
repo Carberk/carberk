@@ -1,5 +1,3 @@
-import { randomInt } from "node:crypto";
-
 const CODE_RE = /^\d{6}$/;
 
 export class OtpCode {
@@ -10,11 +8,6 @@ export class OtpCode {
       throw new Error("OTP code must be exactly six digits");
     }
     return new OtpCode(raw);
-  }
-
-  static generate(): OtpCode {
-    const code = String(randomInt(0, 999999)).padStart(6, "0");
-    return new OtpCode(code);
   }
 
   equals(other: OtpCode): boolean {

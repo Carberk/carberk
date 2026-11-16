@@ -13,17 +13,6 @@ describe("OtpCode", () => {
     expect(code.value).toBe("000001");
   });
 
-  it("generates a 6-digit code", () => {
-    const code = OtpCode.generate();
-    expect(code.value).toMatch(/^\d{6}$/);
-  });
-
-  it("generates different codes on successive calls", () => {
-    const codes = new Set(Array.from({ length: 10 }, () => OtpCode.generate().value));
-    // Extremely unlikely all 10 are identical
-    expect(codes.size).toBeGreaterThan(1);
-  });
-
   it("rejects non-digit characters", () => {
     expect(() => OtpCode.create("12345a")).toThrow("OTP code must be exactly six digits");
   });

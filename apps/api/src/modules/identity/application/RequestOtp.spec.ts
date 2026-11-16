@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { describe, expect, it } from "vitest";
 import type {
   OtpRequest,
@@ -134,6 +135,7 @@ function harness(options: {
     email,
     options.reviewerConfig ?? noReviewers,
     comparator,
+    new NodeCredentialCrypto(),
   );
   return { clock, repo, sms, email, useCase };
 }
@@ -175,8 +177,8 @@ function allFlows() {
     findByEmail: async () => null,
     replaceSignInMethod: async () => { throw new Error("unused"); },
   };
-  const deletion = new RequestAccountDeletion(repo, users, sms, clock, false, email);
-  const methodChange = new RequestSignInMethodChange(repo, users, sms, clock, false, email);
+  const deletion = new RequestAccountDeletion(repo, users, sms, clock, false, email, new NodeCredentialCrypto());
+  const methodChange = new RequestSignInMethodChange(repo, users, sms, clock, false, email, new NodeCredentialCrypto());
   return { clock, repo, signIn, deletion, methodChange };
 }
 

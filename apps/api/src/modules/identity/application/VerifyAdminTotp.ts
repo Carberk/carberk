@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { randomBytes, createHash } from "node:crypto";
+import type { CredentialCryptoPort } from "../domain/ports/CredentialCryptoPort";
 import type { TotpEnrollmentRepository } from "../domain/ports/TotpEnrollmentRepository";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
 import type { TotpSecretCipherPort } from "../domain/ports/TotpSecretCipherPort";
@@ -7,26 +7,11 @@ import type { TotpVerifierPort } from "../domain/ports/TotpVerifierPort";
 import type { TotpThrottlePort } from "../domain/ports/TotpThrottlePort";
 import type { SecurityLoggerPort } from "../domain/ports/SecurityLoggerPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
-import { PrismaTotpEnrollmentRepository } from "../infrastructure/PrismaTotpEnrollmentRepository";
-import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
-import { AesGcmTotpSecretCipher } from "../infrastructure/AesGcmTotpSecretCipher";
-import { OtplibTotpVerifier } from "../infrastructure/OtplibTotpVerifier";
-import { InMemoryTotpThrottleAdapter } from "../infrastructure/InMemoryTotpThrottleAdapter";
-import { PinoSecurityLoggerAdapter } from "../infrastructure/PinoSecurityLoggerAdapter";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 const ELEVATION_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_FAILURES = 5;
 const BACKUP_CODE_COUNT = 10;
-const BACKUP_CODE_LENGTH = 16;
-
-function hashSha256(input: string): string {
-  return createHash("sha256").update(input).digest("hex");
-}
-
-function generateBackupCode(): string {
-  return randomBytes(BACKUP_CODE_LENGTH / 2).toString("hex");
-}
 
 export interface VerifyAdminTotpInput {
   userId: string;
@@ -42,20 +27,22 @@ export interface VerifyAdminTotpResult {
 @Injectable()
 export class VerifyAdminTotp {
   constructor(
-    @Inject(PrismaTotpEnrollmentRepository)
+    @Inject(IDENTITY_TOKENS.TotpEnrollmentRepository)
     private readonly totpRepo: TotpEnrollmentRepository,
-    @Inject(PrismaSessionRepository)
+    @Inject(IDENTITY_TOKENS.SessionRepository)
     private readonly sessionRepo: SessionRepository,
-    @Inject(AesGcmTotpSecretCipher)
+    @Inject(IDENTITY_TOKENS.TotpSecretCipherPort)
     private readonly cipher: TotpSecretCipherPort,
-    @Inject(OtplibTotpVerifier)
+    @Inject(IDENTITY_TOKENS.TotpVerifierPort)
     private readonly verifier: TotpVerifierPort,
-    @Inject(InMemoryTotpThrottleAdapter)
+    @Inject(IDENTITY_TOKENS.TotpThrottlePort)
     private readonly throttle: TotpThrottlePort,
-    @Inject(PinoSecurityLoggerAdapter)
+    @Inject(IDENTITY_TOKENS.SecurityLoggerPort)
     private readonly securityLogger: SecurityLoggerPort,
-    @Inject(SystemClockAdapter)
+    @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
+    @Inject(IDENTITY_TOKENS.CredentialCryptoPort)
+    private readonly crypto: CredentialCryptoPort,
   ) {}
 
   async execute(input: VerifyAdminTotpInput): Promise<VerifyAdminTotpResult> {
@@ -77,7 +64,7 @@ export class VerifyAdminTotp {
 
     const validTotp = this.verifier.verify(secret, input.code);
     const backupCodeHash = !validTotp && !isFirstVerify
-      ? hashSha256(input.code)
+      ? this.crypto.hashCode(input.code)
       : null;
 
     if (!validTotp && backupCodeHash == null) {
@@ -93,8 +80,8 @@ export class VerifyAdminTotp {
     };
 
     if (isFirstVerify) {
-      const backupCodes = Array.from({ length: BACKUP_CODE_COUNT }, generateBackupCode);
-      const codeHashes = backupCodes.map(hashSha256);
+      const backupCodes = Array.from({ length: BACKUP_CODE_COUNT }, () => this.crypto.generateBackupCode());
+      const codeHashes = backupCodes.map((code) => this.crypto.hashCode(code));
       await this.totpRepo.completeFirstVerification({
         userId: input.userId,
         enrollmentId: enrollment.id,

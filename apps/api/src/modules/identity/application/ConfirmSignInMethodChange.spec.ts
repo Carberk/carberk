@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import { createHash } from "node:crypto";
 
@@ -165,7 +166,7 @@ function harnessFor(
   const otpRepo = new FakeOtpRepo(current.id, destination, purpose);
   const users = new FakeUsers(current, ...otherUsers);
   const clock: ClockPort = { now: () => NOW };
-  const verifyCode = new VerifySignInCode(otpRepo, clock);
+  const verifyCode = new VerifySignInCode(otpRepo, clock, new NodeCredentialCrypto());
   const useCase = new ConfirmSignInMethodChange(
     otpRepo,
     users,

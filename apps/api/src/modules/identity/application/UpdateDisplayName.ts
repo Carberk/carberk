@@ -5,7 +5,6 @@ import { UserSuspendedError } from "../domain/UserSuspendedError";
 import type { IdentityCheckPort } from "../domain/ports/IdentityCheckPort";
 import type { UserRepository } from "../domain/ports/UserRepository";
 import { IDENTITY_TOKENS } from "../identity.tokens";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
 
 export interface UpdateDisplayNameInput {
   userId: string;
@@ -21,7 +20,7 @@ export interface UpdateDisplayNameInput {
 @Injectable()
 export class UpdateDisplayName {
   constructor(
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: UserRepository,
     @Inject(IDENTITY_TOKENS.IdentityCheckPort)
     private readonly identityCheck: IdentityCheckPort,

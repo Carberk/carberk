@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { randomUUID, createHash } from "node:crypto";
 import type { TotpEnrollment } from "../domain/TotpEnrollment";
@@ -248,6 +249,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
     const result = await uc.execute({
       userId: "user-1",
@@ -285,6 +287,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
     await expect(
       uc.execute({ userId: "user-1", sessionId: session.id, code: "wrong" }),
@@ -302,6 +305,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
 
     await expect(
@@ -326,6 +330,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
     const result = await uc.execute({
       userId: "user-1",
@@ -348,6 +353,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
     const result = await uc.execute({
       userId: "user-1",
@@ -374,6 +380,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
     await uc.execute({ userId: "user-1", sessionId: session.id, code: backupCode });
 
@@ -392,6 +399,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
 
     // 5 failures
@@ -414,6 +422,7 @@ describe("VerifyAdminTotp", () => {
 
     const uc = new VerifyAdminTotp(
       totpRepo, sessionRepo, cipher, verifier, throttle, securityLogger, clock,
+      new NodeCredentialCrypto(),
     );
 
     // 4 failures

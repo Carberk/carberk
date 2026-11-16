@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { describe, expect, it } from "vitest";
 
 import type { User } from "../domain/User";
@@ -119,6 +120,7 @@ function harness(current: User | null) {
     clock,
     true,
     emailSender,
+    new NodeCredentialCrypto(),
   );
   return { otpRepo, sms, email, useCase };
 }
