@@ -92,4 +92,4 @@ The pages in [`components/`](components/) describe intended behavior and review 
 - shadcn docs: <https://ui.shadcn.com/>
 - Mobile implementation rules: [`../../agents/nativewind-v4.md`](../../agents/nativewind-v4.md)
 - [71-design-tokens.md](71-design-tokens.md)
-- [79-web-vs-mobile.md](79-web-vs-mobile.md)
+- [Shared UI and native boundary](../../../packages/ui/CONTEXT.md)

@@ -68,7 +68,7 @@ Tab 5 opens the Cabinet, which is a plain menu rather than a Settings screen. Th
 - Cabinet also has these states: profile loading, profile failed with Retry, and My listings with a number or without one.
 - The Profile row opens Profile. Sign-in Methods, Log out and Delete account are on Profile, not on Cabinet ([30 — Identity](features/30-identity.md#profile-screens)).
 - Language and Theme open bottom-sheet pickers on Cabinet.
-- Notifications opens the release notification screen ([36 — Notifications](features/36-notifications.md#preferences-screen)).
+- Notifications opens the release notification screen ([36 — Notifications](../../apps/mobile/app/notifications.tsx)).
 - Help shows an email address and a phone number, signed in or out. There is no support chat in the release.
 - Terms of Service and Privacy Policy open the web legal pages. Posting rules opens its own web page ([#527](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/527)). About shows the app name and version.
 - There is no gear and no "List a car" row: the Sell tab is the only selling entry.

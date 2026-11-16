@@ -58,11 +58,11 @@ Cabinet is a menu, and Profile is one screen below it ([20 — Information archi
 - **View other user:** avatar, name, tenure, public listings
 - **Block user** from a Conversation is recorded in the `BlockedUser` table.
 
-Post-MLP profile additions: public Garage entries, blog posts, richer trust stats, and per-category notification preferences ([36 — Notifications](36-notifications.md#preferences-screen)).
+Post-MLP profile additions: public Garage entries, blog posts, richer trust stats, and per-category notification preferences ([36 — Notifications](https://github.com/Carberk/carberk/issues/1309#issuecomment-6910424355)).
 
 ### Dealership (post-MLP bet)
 
-Approved campaign target, 2026-10-14, formalized by [ADR-0103](../../adr/0103-free-dealer-business-ownership-and-enquiries.md). [38 — Dealer workspace and showroom](38-showroom.md) owns the approved bounded policy; [flow 67](../flows/67-dealer-workspace-and-sharing.md) owns the journeys.
+Approved campaign target, 2026-10-14, formalized by [ADR-0103](../../adr/0103-free-dealer-business-ownership-and-enquiries.md). [38 — Dealer workspace and showroom](https://github.com/Carberk/carberk/issues/950#issuecomment-6910383394) owns the approved bounded policy; [flow 67](https://github.com/Carberk/carberk/issues/950#issuecomment-6910383394) owns the journeys.
 
 - A person keeps their personal sign-in and enters a business workspace from Cabinet. There is one Carberk app; no shared business login or separate dealer app.
 - Application/invitation requires manual approval before business access. It is not self-activation. Owner-controlled recipient-bound invitation and audited founder recovery apply under feature 38; actual checked evidence is a live admission input.
@@ -71,7 +71,7 @@ Approved campaign target, 2026-10-14, formalized by [ADR-0103](../../adr/0103-fr
 - Dealer access is free. A checked business identity does not certify vehicle condition or buy a ranking advantage. Exact public verification wording remains to approve.
 - Current membership schema allows one Dealership per User. Keep one membership; preserve business-owned stock/history on creator removal, protect sole owner with audited recovery, and scope business contact proof to owner authority under ADR-0103. Corresponding additive migrations are implementation work.
 
-Inspection staff permissions are a separate capability defined in [50](50-reports-tier.md). Dealership ownership never grants access to private buyer reports or the internal inspection portal. Existing admin TOTP guards are not a substitute for scoped technician/reviewer authorization.
+Inspection staff permissions are a separate capability defined in [50](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741). Dealership ownership never grants access to private buyer reports or the internal inspection portal. Existing admin TOTP guards are not a substitute for scoped technician/reviewer authorization.
 
 Sole-business-owner protection never prevents User account deletion under ADR-0032. An ownerless business enters protected suspended recovery, retaining business assets while personal data follows its own deletion rules. Only audited founder recovery appoints a replacement.
 
@@ -131,7 +131,7 @@ MLP beta decision: keep the 30-day grace period. The S2 hard-delete endpoint is 
 - Mobile S2 auth routes are `(auth)/phone` and `(auth)/otp`. Historical `login` / `login/otp` route names are superseded for the mobile implementation.
 - Legal agreement in S2 is implicit copy under the phone CTA: "By continuing, you agree to the Terms and Privacy Policy." Add a checkbox only if legal review requires explicit recorded acceptance. Legal pages remain canonical on web.
 - OTP login does not ask for native notification permission. Notification prompts are tied to later user actions that need notifications.
-- OTP SMS bodies must be formatted for iOS and Android autofill. The API/SMS gateway owns formatting; the phone-agent sends the body unchanged.
+- OTP SMS bodies must include the visible code, an Android app hash derived after the final package name and signing certificate exist, and an iOS domain-bound code line for autofill. Identity owns the API/SMS formatter; the phone-agent sends the supplied body unchanged. This formatting requirement does not establish that the delivery path or autofill is implemented.
 - `apps/api` remains bearer-token only for the MLP. Admin web cookies are owned by `apps/admin`; its server actions / route handlers forward bearer tokens to the API.
 - Admin token cookies are HTTP-only, `Secure`, `SameSite=Lax`, `Path=/`, max-age aligned to token/session lifetimes, and use production names `__Host-auto_tm_admin_access` and `__Host-auto_tm_admin_refresh` with no `Domain` when admin runs on its own host. Local dev may drop the prefix only when `__Host-` constraints cannot be satisfied. Browser client code never receives admin tokens and does not call `apps/api` directly.
 - Admin server actions / route handlers refresh once on API 401, rotate cookies on success, retry the original API call once, and clear cookies + redirect to login if refresh fails. Refresh preserves but never extends `adminTotpExpiresAt`.

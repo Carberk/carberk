@@ -1,7 +1,7 @@
 # Hi-Fi — Mobile Cabinet Tab
 
 > Maps to: `apps/mobile/app/(tabs)/services.tsx` (Tab 5; the route keeps its `services` name)
-> Derived from wireframe: `docs/prd/ui/wireframes/mobile-tabs-services.md`
+> Derived from wireframe: [Cabinet decisions](https://github.com/Carberk/carberk/issues/353#issuecomment-5946561929)
 > Governed by: [20 — Information architecture, Tab 5 — Cabinet menu](../../20-information-architecture.md#tab-5--cabinet-menu), the founder's [screen map amendment](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/344#issuecomment-5947347989) and the [#353 decisions](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/353#issuecomment-5946561929). This page describes what the app does on `main`. Notifications comes before My listings, as in the information architecture since #665.
 > History: this page first specified a "Services" list with Profile, Settings, Bortzhurnal and Help & Support rows (#124, design archive `app-shell.html`). The 2026-10-02 amendment removed the Settings screen; that design is retired and not kept here.
 
@@ -156,6 +156,6 @@ Reduced Motion uses a 150 ms fade without spatial movement. A rapid reopen rever
 - Signed in, the large row opens Profile; signed out, it opens sign-in with Cabinet as the return route. Profile shows the same avatar at 72 pt with the Display Name under it, also on one line.
 - The My listings total counts Listings and drafts together; it is hidden before the first count arrives, after a failed request and when it is zero, and kept through a refresh, and it refreshes when Cabinet regains focus.
 - Legal rows open the localized web page for the current language; they do not deep-link into the app.
-- Help is the release's only support entry. The code screen links to it only at the daily Sign-in Code limit ([mobile OTP login flow](mobile-otp-login-flow.md)).
+- Help is the release's only support entry. The code screen links to it only at the daily Sign-in Code limit ([mobile OTP login flow](https://github.com/Carberk/carberk/issues/353#issuecomment-5947334041)).
 - Log out and a finished account deletion land on Cabinet, signed out.
 - The screens Cabinet opens share its grouped look: Profile puts the Sign-in methods under a quiet tracked label (`MenuSectionLabel`, `text-footnote font-medium tracking-wide text-muted-foreground`) on one card and Log out with Delete account on another, Delete account in the `destructive` token; Notifications, Help and Delete account set their rows on cards with notes under them aligned to the row text (`MenuFooter`, `px-8`).

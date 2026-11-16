@@ -7,5 +7,5 @@ Keep schema/migration history and account-purge consumers intact. Do not infer a
 ## Start here
 
 - [Capability scope](../../../../../docs/prd/03-roadmap.md)
-- [Target requirements](../../../../../docs/prd/features/35-subscriptions.md)
+- [Deferred Saved Search scope](https://github.com/Carberk/carberk/issues/1309#issuecomment-6910424355)
 - [Schema](../../../../../packages/db/prisma/schema.prisma)

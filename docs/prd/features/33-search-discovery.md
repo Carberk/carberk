@@ -162,7 +162,7 @@ Each needs its own decision and evidence from the release:
 - More filters: mileage, engine type, gearbox, drive, body type, seller type, "only with photo", and "posted within".
 - An "Exclude damaged" filter, which [ADR-0052](../../adr/0052-seller-condition-disclosure-is-damaged-plus-known-issues.md) left undecided.
 - Free-text search over Listing titles and descriptions.
-- Saved searches ([Feature 35](35-subscriptions.md)).
+- Saved searches ([Feature 35](https://github.com/Carberk/carberk/issues/1309#issuecomment-6910424355)).
 - Other vehicle categories ([ADR-0035](../../adr/0035-multi-vertical-platform-direction.md)).
 
 ## Screens / states
@@ -216,6 +216,6 @@ Each needs its own decision and evidence from the release:
 
 ## Approved dealer and report extensions, 2026-10-14
 
-[ADR-0103](../../adr/0103-free-dealer-business-ownership-and-enquiries.md) and [ADR-0104](../../adr/0104-center-diagnostics-with-private-and-public-reports.md) govern the bounded campaign target. [38](38-showroom.md) owns mixed private/dealer results, compact truthful dealer identity and an explicit seller-type filter. Use existing card components and filter draft/apply behavior. Dealer status, business availability confirmation and platform ownership do not boost ranking.
+[ADR-0103](../../adr/0103-free-dealer-business-ownership-and-enquiries.md) and [ADR-0104](../../adr/0104-center-diagnostics-with-private-and-public-reports.md) govern the bounded campaign target. [38](https://github.com/Carberk/carberk/issues/950#issuecomment-6910383394) owns mixed private/dealer results, compact truthful dealer identity and an explicit seller-type filter. Use existing card components and filter draft/apply behavior. Dealer status, business availability confirmation and platform ownership do not boost ranking.
 
-[50](50-reports-tier.md) requires the neutral localized public-report availability badge on Results cards and Listing detail, opening complete dated findings. A new inspection filter is outside this campaign. A private buyer inspection is absent from public cards, filters, counts and metadata. No tier/score or ranking advantage is activated. Existing visible sort behavior remains truthful; any future quality-ranking experiment needs a separate decision under the vision and [ADR-0021](../../adr/0021-feed-ranking-port.md).
+[50](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741) requires the neutral localized public-report availability badge on Results cards and Listing detail, opening complete dated findings. A new inspection filter is outside this campaign. A private buyer inspection is absent from public cards, filters, counts and metadata. No tier/score or ranking advantage is activated. Existing visible sort behavior remains truthful; any future quality-ranking experiment needs a separate decision under the vision and [ADR-0021](../../adr/0021-feed-ranking-port.md).
