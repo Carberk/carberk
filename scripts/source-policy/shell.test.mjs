@@ -67,3 +67,23 @@ test("all executable adapters inspect dangerous payloads without running them or
   assert.ok(parseMake({ path: "Makefile", source: `VALUE := $(shell touch '${marker}')\nall:\n\ttouch '${marker}'\n`, fileType: "make" }).deferred.length);
   assert.equal(existsSync(marker), false);
 });
+
+test("interpreter heredocs stay data unless the effective stdin is proven executable", () => {
+  for (const source of [
+    "bash -c 'cat' <<'DATA'\n# payload\nDATA\n",
+    "bash script.sh <<'DATA'\n# payload\nDATA\n",
+    "bash 3<<'DATA'\n# payload\nDATA\n",
+    "bash <<'DATA' < input\n# payload\nDATA\n",
+    "python3 -c 'print(input())' <<'DATA'\n# payload\nDATA\n",
+  ]) assert.deepEqual(parseShell({ path: "tool", source, fileType: "shell", adapters: { python: parsePython } }).comments, [], source);
+  const result = parseShell({ path: "tool", source: "bash -s 0<<'CODE'\n# script\nCODE\n", fileType: "shell" });
+  assert.deepEqual(result.comments.map(({ raw }) => raw), ["# script"]);
+  assert.deepEqual(result.deferred, []);
+  assert.ok(parseShell({ path: "tool", source: "bash -e <<'CODE'\n# script\nCODE\n", fileType: "shell" }).deferred.length);
+});
+
+test("long eval options cannot silently hide executable snippets", () => {
+  for (const source of ["node --eval '// code'", "node --eval='// code'", "node --print '// code'", "node -p '// code'", "perl -E '# code'", "env node --eval '// code'"]) {
+    assert.ok(parseShell({ path: "tool", source, fileType: "shell" }).deferred.length, source);
+  }
+});

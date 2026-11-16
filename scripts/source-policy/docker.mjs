@@ -1,6 +1,6 @@
 import { DockerfileParser, Keyword } from "dockerfile-ast";
 import { commentSpan, embeddedResult } from "./markup-spans.mjs";
-import { parseShell, shellInterpreter } from "./shell.mjs";
+import { parseShell, shellInterpreter, shellExecutableOption } from "./shell.mjs";
 
 export function parseDocker({ path, source, fileType, adapters = {} }) {
   if (fileType !== "docker") throw new Error(`${path}: expected configured Docker file type`);
@@ -103,8 +103,16 @@ export function parseDocker({ path, source, fileType, adapters = {} }) {
       content = content.slice(match[0].length); offsets = offsets.slice(match[0].length);
     } else if (!["RUN", "CMD", "ENTRYPOINT"].includes(keyword)) {
       if (["COPY", "ADD"].includes(keyword)) {
-        for (const heredoc of instruction.getHeredocs()) if (!heredoc.getDelimiterRange()) throw new Error(`${path}: unterminated Docker heredoc`);
+        const heredocs = instruction.getHeredocs();
+        for (const heredoc of heredocs) if (!heredoc.getDelimiterRange()) throw new Error(`${path}: unterminated Docker heredoc`);
+        if (content.trimStart().startsWith("[")) {
+          let argv;
+          try { argv = JSON.parse(content); } catch { throw new Error(`${path}: malformed Docker ${keyword} JSON`); }
+          if (!Array.isArray(argv) || argv.length < 2 || argv.some((item) => typeof item !== "string" || !item)) throw new Error(`${path}: malformed Docker ${keyword} array`);
+          if (!instruction.getFlags().length) continue;
+        } else if (heredocs.length === 1 && /^<<-?(?:'[^']+'|"[^"]+"|\w+) +[^\s]+\s*$/.test(content.split(/\r?\n/)[0]) && !instruction.getFlags().length) continue;
       }
+      defer(start, end, `Docker ${keyword} syntax requires validation`);
       continue;
     }
     if (content.startsWith("--") || keyword === "RUN" && instruction.getFlags().length) {
@@ -117,7 +125,7 @@ export function parseDocker({ path, source, fileType, adapters = {} }) {
       if (!Array.isArray(argv) || !argv.length || argv.some((item) => typeof item !== "string")) throw new Error(`${path}: malformed Docker executable array`);
       const selected = shellInterpreter(argv[0]);
       const interpreter = selected || /(?:python[23]?|node|ruby|perl)$/.test(argv[0]);
-      const commandIndex = interpreter ? argv.findIndex((item, index) => index > 0 && /^-[^-]*[ce]$/.test(item)) : -1;
+      const commandIndex = interpreter ? argv.findIndex((item, index) => index > 0 && shellExecutableOption(item)) : -1;
       if (commandIndex >= 0) {
         const tokens = [...content.matchAll(/"(?:[^"\\]|\\.)*"/g)];
         const token = tokens[commandIndex + 1];

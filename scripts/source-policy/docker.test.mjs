@@ -52,3 +52,18 @@ test("Docker executable heredoc shebangs declare Python while COPY heredocs stay
   assert.deepEqual(result.comments.map(({ raw, exception }) => [raw, exception]), [["#!/usr/bin/env python3", true], ["# python", false]]);
   assert.deepEqual(result.deferred, []);
 });
+
+test("unchecked Docker instruction syntax is rejected or deferred instead of passing", () => {
+  for (const source of ['FROM alpine\nCOPY ["a",]\n', 'FROM alpine\nCOPY ["a"]\n']) {
+    assert.throws(() => parseDocker({ path: "Dockerfile", source, fileType: "docker" }), /Docker/);
+  }
+  for (const source of ["FROM alpine\nCOPY x\n", "FROM alpine\nENV x\n", "FROM alpine\nEXPOSE nope\n"]) {
+    assert.ok(parseDocker({ path: "Dockerfile", source, fileType: "docker" }).deferred.length, source);
+  }
+});
+
+test("Docker long eval options cannot silently hide executable snippets", () => {
+  for (const source of ['FROM alpine\nRUN ["node", "--eval", "// code"]\n', 'FROM alpine\nRUN ["node", "--eval=// code"]\n', 'FROM alpine\nRUN node --eval \'// code\'\n']) {
+    assert.ok(parseDocker({ path: "Dockerfile", source, fileType: "docker" }).deferred.length, source);
+  }
+});

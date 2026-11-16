@@ -10,6 +10,10 @@ export function shellInterpreter(command) {
   return interpreters.get(basename(command));
 }
 
+export function shellExecutableOption(value) {
+  return /^-(?:[^-]*[ceEp]|-(?:eval|print|command)(?:=.*)?)$/.test(value);
+}
+
 export function parseShell({ path, source, fileType, executable = false, dialect = "posix", adapters = {} }) {
   if (fileType !== "shell") throw new Error(`${path}: expected configured shell file type`);
   const result = { comments: [], deferred: [] };
@@ -60,7 +64,7 @@ export function parseShell({ path, source, fileType, executable = false, dialect
       const name = command && basename(command.value);
       const selected = name && shellInterpreter(name);
       const grammar = selected ? "shell" : /^python[23]?$/.test(name ?? "") ? "python" : undefined;
-      if (["eval", "source", "."].includes(name) || ["node", "ruby", "perl", "env"].includes(name) && node.Args.slice(1).some((word) => /^-(?:[^-]*[ce]|-command)$/.test(literal(word)?.value ?? ""))) {
+      if (["eval", "source", "."].includes(name) || ["node", "ruby", "perl", "env"].includes(name) && node.Args.slice(1).some((word) => shellExecutableOption(literal(word)?.value ?? (word.Parts[0] && syntax.NodeType(word.Parts[0]) === "Lit" ? word.Parts[0].Value : "")))) {
         defer(node, "executable indirection requires declared grammar and source mapping");
       }
       if (grammar) {
@@ -80,8 +84,15 @@ export function parseShell({ path, source, fileType, executable = false, dialect
       const name = command && basename(command.value);
       const selected = name && shellInterpreter(name);
       const grammar = selected ? "shell" : /^python[23]?$/.test(name ?? "") ? "python" : undefined;
+      const stdin = (node.Redirs ?? []).filter((redirect) => redirect.N?.Value === "0" ||
+        !redirect.N && source[offset(redirect.Pos())] === "<").at(-1);
+      const args = node.Cmd.Args.slice(1).map((word) => literal(word)?.value);
+      const executableStdin = args.length === 0 || args.length === 1 && args[0] === (selected ? "-s" : "-");
+      const dataStdin = args.some((value) => value && (selected ? /^-(?:[^-]*c|-command(?:=.*)?)$/.test(value) : ["-c", "-m"].includes(value))) ||
+        args[0] && !args[0].startsWith("-");
       for (const redirect of node.Redirs ?? []) {
-        if (!redirect.Hdoc || !grammar) continue;
+        if (!redirect.Hdoc || !grammar || !stdin || offset(redirect.Pos()) !== offset(stdin.Pos()) || dataStdin) continue;
+        if (!executableStdin) { defer(redirect, "ambiguous interpreter stdin mode requires declared source mapping"); continue; }
         const start = offset(redirect.Hdoc.Pos());
         const body = redirect.Hdoc.Parts.length === 1 && syntax.NodeType(redirect.Hdoc.Parts[0]) === "Lit" ? redirect.Hdoc.Parts[0].Value : undefined;
         const content = body;
