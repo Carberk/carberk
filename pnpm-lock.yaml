@@ -315,6 +315,12 @@ importers:
 
   .:
     devDependencies:
+      '@prisma/prisma-schema-wasm':
+        specifier: 7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a
+        version: 7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a
+      libpg-query:
+        specifier: 18.2.2
+        version: 18.2.2
       web-tree-sitter:
         specifier: 0.26.13
         version: 0.26.13
@@ -1255,6 +1261,15 @@ importers:
         version: '@typescript/typescript6@6.0.2'
 
 packages:
+
+  '@pgsql/types@18.0.0':
+    resolution: {integrity: sha512-jtAY4JU7jdVYZ/Vv3zlZqVP+FRWZokyCLKPPCnAApiaJAElpyyiMC3HRiquBu29kSrVs+rkqZD50SUIb/zyEGw==}
+
+  '@prisma/prisma-schema-wasm@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a':
+    resolution: {integrity: sha512-yyKNwOSaxExepEI+pWwESbDNRSIhzE53PXD6YaEvY7cNl39qOIMjWJCIXMDwZQpt5ixDkL/sesWYg3XxCmBkZQ==}
+
+  libpg-query@18.2.2:
+    resolution: {integrity: sha512-BOKY0X05vnxkFe+FD8JH71sSO560UKoSRv9Fsy67zapmryhqcew+4Hq0Phu8a6mcENklK7LiHJi0d0j8DbIb4A==}
 
   '@lumis-sh/wasm-groovy@0.26.5':
     resolution: {integrity: sha512-K/csblGzOcRv4If1AtrnxMJxgJiL6/R2J9u1Xgfe2assJ9QrUsB+KLK811yllesGeLnMtJGKC8XpmJGl4RrZrg==}
@@ -11456,6 +11471,14 @@ packages:
     hasBin: true
 
 snapshots:
+
+  '@pgsql/types@18.0.0': {}
+
+  '@prisma/prisma-schema-wasm@7.8.0-6.3c6e192761c0362d496ed980de936e2f3cebcd3a': {}
+
+  libpg-query@18.2.2:
+    dependencies:
+      '@pgsql/types': 18.0.0
 
   '@lumis-sh/wasm-groovy@0.26.5': {}
 

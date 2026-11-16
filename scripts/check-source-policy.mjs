@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { checkMigrationRepository } from "./source-policy/migrations.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = "scripts/source-policy/baseline.json";
@@ -255,21 +256,22 @@ export function checkRepository(directory, env = process.env) {
   const legacy = snapshot(directory, baseline.commit);
   const stagedChanges = new Map([...indexed].filter(([path, source]) => current.get(path) !== source));
   return [
+    ...checkMigrationRepository(directory, ref),
     ...checkSources({ current, legacy, trusted, exclusions: provenance, notices }),
     ...checkSources({ current: stagedChanges, legacy, trusted, exclusions: provenance, notices }).map((error) => `staged: ${error}`),
   ];
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  console.log("Source policy coverage: authored TS/JS only (.js/.jsx/.ts/.tsx/.mjs/.cjs/.mts/.cts), including tests, scripts and lint-ignored configuration. Other language adapters are not covered.");
+  console.log("Source policy coverage: authored TS/JS (.js/.jsx/.ts/.tsx/.mjs/.cjs/.mts/.cts) and migration integrity/new SQL; other adapters await whole-source activation.");
   try {
     const errors = checkRepository(root);
     if (errors.length) {
       console.error(errors.join("\n"));
       process.exitCode = 1;
-    } else console.log("TS/JS source policy: parser tokens, immutable legacy snapshot, trusted-current-main retention and pinned provenance pass");
+    } else console.log("Source policy: TS/JS parser tokens, legacy retention, pinned provenance and migration integrity/new SQL pass");
   } catch (error) {
-    console.error(`TS/JS source policy failed: ${error.message}`);
+    console.error(`Source policy failed: ${error.message}`);
     process.exitCode = 1;
   }
 }
