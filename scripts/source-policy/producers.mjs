@@ -39,7 +39,7 @@ export function producerProvenance(directory, current, trusted) {
       symlinkSync(join(directory, "packages/db/node_modules"), join(temporary, "packages/db/node_modules"));
       const config = join(temporary, "prisma.config.mjs");
       writeFileSync(config, `export default { schema: ${JSON.stringify(schema)} };\n`);
-      const require = createRequire(join(directory, "packages/db/package.json"));
+      const require = createRequire(import.meta.url);
       const manifest = require.resolve("prisma/package.json");
       const cli = JSON.parse(readFileSync(manifest, "utf8")).bin.prisma;
       execFileSync(process.execPath, [join(dirname(manifest), cli), "generate", "--config", config, "--generator", "client"], {
@@ -68,7 +68,8 @@ export function producerProvenance(directory, current, trusted) {
     const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
     if (loaded.error) throw new Error(`${workspace}: producer configuration unavailable`);
     const config = ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(configPath));
-    if (config.errors.length || resolve(config.options.outDir ?? "") !== join(directory, workspace, "dist")) {
+    if (config.errors.length || config.options.declarationDir || config.options.outFile || config.options.tsBuildInfoFile ||
+      resolve(config.options.outDir ?? "") !== join(directory, workspace, "dist")) {
       throw new Error(`${workspace}: unsupported producer output configuration`);
     }
     const temporary = mkdtempSync(join(tmpdir(), "carberk-typescript-producer-"));

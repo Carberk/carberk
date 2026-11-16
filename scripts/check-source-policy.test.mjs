@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -580,6 +580,14 @@ test("known compiler outputs pass exact producer bytes while authored siblings a
   rmSync(join(directory, "packages/contracts/dist/owned.js"));
   write("packages/contracts/dist/index.js.map", '{"version":3,"sources":[],"mappings":""}');
   assert.match(checkRepository(directory, {}).join("\n"), /index\.js\.map.*provenance bytes changed/);
+  const originalConfig = JSON.parse(readFileSync(configPath, "utf8"));
+  for (const option of ["declarationDir", "outFile", "tsBuildInfoFile"]) {
+    write("packages/contracts/tsconfig.build.json", JSON.stringify({ ...originalConfig,
+      compilerOptions: { ...originalConfig.compilerOptions, [option]: "./policy-overwrite" } }));
+    assert.throws(() => checkRepository(directory, {}), /unsupported producer output configuration/);
+    assert.equal(existsSync(join(directory, "packages/contracts/policy-overwrite")), false);
+  }
+
 });
 
 test("built-in Prisma output is verified from schema rather than trusting generated headers", (t) => {
@@ -606,4 +614,39 @@ test("built-in Prisma output is verified from schema rather than trusting genera
   write(target, generated);
   write("packages/db/generated/prisma/client/owned.ts", "// generated-looking explanation\nexport {};\n");
   assert.match(checkRepository(directory, {}).join("\n"), /owned\.ts.*explanatory comment/);
+});
+
+test("duplicate package script sections cannot hide the effective executable value", () => {
+  for (const source of [
+    '{"scripts":{"safe":"echo ok"},"scripts":{"build":"echo ok # explanation"}}',
+    '{"scripts":["echo ok # explanation"]}',
+    '{"scripts":{"build":"echo ok # explanation"},"scripts":{"safe":"echo ok"}}',
+    '{"scripts":{"safe":"echo ok"},"scr\\u0069pts":{"build":"echo ok # explanation"}}',
+  ]) assert.match(check({ "package.json": source }).join("\n"), /unsupported.*json|duplicate scripts/);
+});
+
+test("Compose merge and collection aliases cannot hide inherited executable configuration", () => {
+  for (const source of [
+    'x-base: &base\n  command: ["sh", "-c", "echo ok # explanation"]\nservices:\n  app:\n    <<: *base\n',
+    'x-services: &services\n  app:\n    command: ["node", "--eval", "1 /* explanation */"]\nservices: *services\n',
+    'x-root: &root\n  services:\n    app:\n      command: ["sh", "-c", "echo ok # explanation"]\n<<: *root\n',
+  ]) assert.match(check({ "infra/compose/new.yml": source }).join("\n"), /unsupported.*(?:compose|yaml)-executable/);
+});
+
+test("systemd interpreter option quoting and escapes never disable executable admission", () => {
+  for (const value of [
+    '/bin/sh "-c" "echo ok # explanation"',
+    '/usr/bin/node "--eval" "1 /* explanation */"',
+    '/usr/bin/python3 \'-c\' "1 # explanation"',
+    '/bin/sh "-\\x63" "echo ok # explanation"',
+    '/bin/sh $OPTIONS "echo ok # explanation"',
+  ]) assert.match(check({ "app.service": `[Service]\nExecStart=${value}\n` }).join("\n"), /unsupported.*systemd/);
+});
+
+
+test("NVM version files inspect their documented comments rather than bypassing configuration admission", () => {
+  assert.deepEqual(check({ ".nvmrc": "22.23.3\n" }), []);
+  for (const source of ["22.23.3 # explanation\n", "# explanation\n22.23.3\n"]) {
+    assert.match(check({ ".nvmrc": source }).join("\n"), /explanatory comment/);
+  }
 });

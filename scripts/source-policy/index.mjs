@@ -27,7 +27,7 @@ const extensions = new Map(Object.entries({
   timer: "systemd", target: "systemd", mount: "systemd", pro: "proguard", rb: "ruby", podspec: "ruby", md: "markdown", markdown: "markdown",
 }));
 const binary = new Set(["png", "jpg", "jpeg", "ico", "jar", "ttf", "otf", "woff2", "mp4"]);
-const dataPaths = new Set(["LICENSE", ".nvmrc", "docs/prd/ui/research/reference-screens-2026-09-21-inventory.csv",
+const dataPaths = new Set(["LICENSE", "docs/prd/ui/research/reference-screens-2026-09-21-inventory.csv",
   "apps/mobile/assets/fonts/Geist-OFL.txt", "docs/prd/ops/brand/tools/Poppins-OFL.txt",
   ...["en", "ru", "tk"].map((locale) => `docs/prd/ops/play-console-submission/text/${locale}.txt`)]);
 
@@ -40,6 +40,7 @@ export function sourceType(path) {
   if ([".gitignore", ".dockerignore", ".git/info/exclude", "CODEOWNERS"].includes(name)) return "ignore";
   if (name === ".editorconfig") return "ini";
   if (name === ".npmrc") return "npmrc";
+  if (name === ".nvmrc") return "nvmrc";
   if (path === "infra/egress/ingress.conf.template") return "nginx";
   if (/\.(?:template|tmpl|tpl|example)$/i.test(name)) {
     const nested = sourceType(path.replace(/\.[^.]+$/, ""));
@@ -55,12 +56,17 @@ export function sourceType(path) {
 
 function parseJson({ source, path, fileType, adapters }) {
   if (fileType === "json" && !/(?:^|\/)tsconfig(?:\.[\w-]+)?\.json$/.test(path)) {
-    const value = JSON.parse(source);
+    JSON.parse(source);
     const result = { comments: [], deferred: [] };
-    if (/^package\.json(?:\.(?:template|tmpl|tpl|example))?$/.test(basename(path)) && value.scripts && typeof value.scripts === "object") {
+    if (/^package\.json(?:\.(?:template|tmpl|tpl|example))?$/.test(basename(path))) {
       const file = ts.parseJsonText(path, source);
       const root = file.statements[0]?.expression;
-      const scripts = root?.properties?.find((property) => property.name?.text === "scripts")?.initializer;
+      if (!ts.isObjectLiteralExpression(root)) throw new Error(`${path}: package manifest must be an object`);
+      const declarations = root.properties.filter((property) => property.name?.text === "scripts");
+      if (!declarations.length) return result;
+      if (declarations.length !== 1) throw new Error(`${path}: duplicate scripts properties require one effective manifest`);
+      const scripts = declarations[0].initializer;
+      if (!ts.isObjectLiteralExpression(scripts)) throw new Error(`${path}: package scripts must be an object`);
       for (const property of scripts?.properties ?? []) {
         const program = property.initializer;
         if (!ts.isStringLiteral(program)) throw new Error(`${path}: package script must be a string`);
@@ -119,11 +125,17 @@ function executableYaml(input) {
   const embedded = [];
   const executableLimits = [];
   const walk = (node, path = []) => {
-    if (path[0] === "services" && path.length === 2 && isAlias(node)) executableLimits.push({ path: input.path,
-      fileType: "compose-executable", startOffset: 0, endOffset: input.source.length, reason: "Compose service alias requires declared source mapping" });
+    const executionContainer = path.length === 0 || path[0] === "services" && path.length <= 2 ||
+      path[0] === "jobs" && (path.length <= 2 || path[2] === "steps" && path.length <= 4) ||
+      path[0] === "runs" && (path.length === 1 || path[1] === "steps" && path.length <= 3);
+    const aliasLimit = () => executableLimits.push({ path: input.path,
+      fileType: path[0] === "services" ? "compose-executable" : "yaml-executable", startOffset: 0, endOffset: input.source.length,
+      reason: "executable configuration alias or merge requires declared source mapping" });
+    if (executionContainer && isAlias(node)) aliasLimit();
     if (isMap(node)) for (const pair of node.items) {
       if (!isScalar(pair.key)) continue;
       const next = [...path, pair.key.value];
+      if (executionContainer && pair.key.value === "<<") { aliasLimit(); continue; }
       const runField = pair.key.value === "run" && (path.length === 4 && path[0] === "jobs" && path[2] === "steps" && Number.isInteger(path[3]) ||
         path.length === 3 && path[0] === "runs" && path[1] === "steps" && Number.isInteger(path[2]));
       if (path.length === 2 && path[0] === "services" && ["command", "entrypoint"].includes(pair.key.value)) {
@@ -209,7 +221,7 @@ for (const [names, adapter] of [
   [["kotlin", "kt", "swift"], (input) => parseNative({ ...input, fileType: input.fileType === "kt" ? "kotlin" : input.fileType })],
   [["kotlin-gradle", "groovy-gradle"], (input) => parseNative({ ...input, fileType: "gradle", dialect: input.fileType.split("-")[0] })],
   [["prisma"], parsePrisma], [["sql", "postgresql"], (input) => parseSql({ ...input, fileType: "sql" })],
-  [["toml", "ini", "properties", "env", "systemd", "proguard", "caddy", "nginx", "ignore", "npmrc"], parseConfig],
+  [["toml", "ini", "properties", "env", "systemd", "proguard", "caddy", "nginx", "ignore", "npmrc", "nvmrc"], parseConfig],
   [["json", "jsonc"], parseJson], [["markdown", "md"], parseMarkdown],
 ]) for (const name of names) adapters[name] = adapter;
 

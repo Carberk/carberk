@@ -7,6 +7,10 @@ export function parseConfig({ path, source, fileType, adapters = {} }) {
   const add = (start, end) => result.comments.push(commentSpan(source, start, end));
   const defer = (start, end, reason) => result.deferred.push({ path, fileType, startOffset: start, endOffset: end, reason });
   if (/\r(?!\n)/.test(source)) throw new Error(`${path}: ${fileType} requires LF or CRLF source mapping`);
+  if (fileType === "nvmrc") {
+    for (const match of source.matchAll(/#[^\r\n]*/g)) add(match.index, match.index + match[0].length);
+    return result;
+  }
   if (fileType === "toml") parseToml(source, { integersAsBigInt: true });
   if (["properties", "ini", "systemd", "ignore", "npmrc"].includes(fileType)) {
     let continued = false;
@@ -14,10 +18,13 @@ export function parseConfig({ path, source, fileType, adapters = {} }) {
     const assignment = (item) => {
       const match = item.text.match(/^\s*Exec\w+\s*=\s*([\s\S]*)$/);
       if (!match) return;
-      const words = match[1].match(/"[^"]*"|'[^']*'|[^\s]+/g) ?? [];
-      const command = (words[0] ?? "").replace(/^[+:!@|-]+/, "").replace(/^(["'])(.*)\1$/, "$2").split("/").at(-1);
-      if (match[1].trimStart().startsWith("|") || command === "env" ||
-        /^(?:(?:ba|da|k|mk)?sh|python[23]?|node|ruby|perl)$/.test(command) && words.slice(1).some((word) => shellExecutableOption(word))) {
+      const raw = match[1].match(/"[^"]*"|'[^']*'|[^\s]+/g) ?? [];
+      const words = raw.map((word) => word.replace(/^(["'])(.*)\1$/, "$2"));
+      const executable = (words[0] ?? "").replace(/^[+:!@|-]+/, "");
+      const command = executable.split("/").at(-1);
+      if (match[1].includes("\\") || raw.includes(";") || executable.includes("%") ||
+        match[1].trimStart().startsWith("|") || command === "env" ||
+        /^(?:(?:ba|da|k|mk)?sh|python[23]?|node|ruby|perl)$/.test(command) && words.slice(1).some((word) => word.includes("$") || shellExecutableOption(word))) {
         defer(item.start, item.end, "systemd interpreter command requires declared grammar and source mapping");
       }
     };
