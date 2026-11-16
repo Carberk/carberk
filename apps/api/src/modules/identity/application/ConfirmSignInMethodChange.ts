@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Enums } from "@auto-tm/contracts";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 import type { User } from "../domain/User";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
@@ -11,9 +12,6 @@ import {
 import type { ClockPort } from "../domain/ports/ClockPort";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import type { SignInMethodRepository } from "../domain/ports/SignInMethodRepository";
-import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 import { VerifySignInCode } from "./VerifySignInCode";
 
 export type ConfirmSignInMethodChangeInput = (
@@ -27,11 +25,11 @@ export type ConfirmSignInMethodChangeInput = (
 @Injectable()
 export class ConfirmSignInMethodChange {
   constructor(
-    @Inject(PrismaOtpRequestRepository)
+    @Inject(IDENTITY_TOKENS.OtpRequestRepository)
     private readonly otpRequestRepo: OtpRequestRepository,
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: SignInMethodRepository,
-    @Inject(SystemClockAdapter)
+    @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
     @Inject(VerifySignInCode)
     private readonly verifySignInCode: VerifySignInCode,

@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 
 import { InvalidSignInCodeError } from "../domain/InvalidSignInCodeError";
+import type { CredentialCryptoPort } from "../domain/ports/CredentialCryptoPort";
 import type { OtpRequest, SignInCodePurpose } from "../domain/OtpRequest";
 import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import type { SignInCodeDestination } from "../domain/SignInCodeDestination";
@@ -16,6 +16,8 @@ export class VerifySignInCode {
     private readonly otpRequestRepo: OtpRequestRepository,
     @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
+    @Inject(IDENTITY_TOKENS.CredentialCryptoPort)
+    private readonly crypto: CredentialCryptoPort,
   ) {}
 
   /**
@@ -47,7 +49,7 @@ export class VerifySignInCode {
       throw new Error("Too many attempts");
     }
 
-    const codeHash = createHash("sha256").update(code).digest("hex");
+    const codeHash = this.crypto.hashCode(code);
     if (request.codeHash === codeHash) return request;
 
     const failed = await this.otpRequestRepo.incrementAttempts(request.id);

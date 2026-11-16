@@ -1,8 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { UserRepository } from "../domain/ports/UserRepository";
 import type { AccountRestoreUnitOfWork } from "../domain/ports/AccountRestoreUnitOfWork";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
 import { ACCOUNT_RESTORE_UNIT_OF_WORK } from "../domain/ports/AccountRestoreUnitOfWork";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 export interface RecoverAccountInput {
   userId: string;
@@ -11,7 +11,7 @@ export interface RecoverAccountInput {
 @Injectable()
 export class RecoverAccount {
   constructor(
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: UserRepository,
     @Inject(ACCOUNT_RESTORE_UNIT_OF_WORK)
     private readonly unitOfWork: AccountRestoreUnitOfWork,

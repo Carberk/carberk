@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { Inject, Injectable } from "@nestjs/common";
 import { Enums } from "@auto-tm/contracts";
 
@@ -11,6 +9,7 @@ import { OtpCode } from "../domain/OtpCode";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
 import { SignInCodeRateLimitedError } from "../domain/SignInCodeRateLimitedError";
 import { SIGN_IN_CODE_CHANNELS } from "../domain/types";
+import type { CredentialCryptoPort } from "../domain/ports/CredentialCryptoPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
 import type { EmailCodeSenderPort } from "../domain/ports/EmailCodeSenderPort";
 import { EMAIL_CODE_SENDER_PORT } from "../domain/ports/EmailCodeSenderPort";
@@ -18,10 +17,6 @@ import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository"
 import type { OtpSenderPort } from "../domain/ports/OtpSenderPort";
 import type { SignInMethodRepository } from "../domain/ports/SignInMethodRepository";
 import { IDENTITY_TOKENS } from "../identity.tokens";
-import { HttpOtpSenderAdapter } from "../infrastructure/HttpOtpSenderAdapter";
-import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 
 export type RequestAccountDeletionInput = (
   | { phone: string }
@@ -52,18 +47,20 @@ export class RequestAccountDeletion {
   );
 
   constructor(
-    @Inject(PrismaOtpRequestRepository)
+    @Inject(IDENTITY_TOKENS.OtpRequestRepository)
     private readonly otpRequestRepo: OtpRequestRepository,
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: SignInMethodRepository,
-    @Inject(HttpOtpSenderAdapter)
+    @Inject(IDENTITY_TOKENS.OtpSenderPort)
     private readonly otpSender: OtpSenderPort,
-    @Inject(SystemClockAdapter)
+    @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
     @Inject(IDENTITY_TOKENS.OtpTestMode)
     private readonly testMode: boolean,
     @Inject(EMAIL_CODE_SENDER_PORT)
     private readonly emailCodeSender: EmailCodeSenderPort,
+    @Inject(IDENTITY_TOKENS.CredentialCryptoPort)
+    private readonly crypto: CredentialCryptoPort,
   ) {}
 
   async execute(
@@ -105,12 +102,12 @@ export class RequestAccountDeletion {
       ? await this.userRepo.findByPhone(destination.value)
       : await this.userRepo.findByEmail(destination.value);
 
-    const code = OtpCode.generate();
+    const code = OtpCode.create(this.crypto.generateSignInCode());
     const record = await this.otpRequestRepo.create({
       purpose: Enums.SignInCodePurpose.AccountDeletion,
       channel: destination.channel,
       destination: destination.value,
-      codeHash: createHash("sha256").update(code.value).digest("hex"),
+      codeHash: this.crypto.hashCode(code.value),
       expiresAt: destination.expiresAt(now),
       userId: holder?.id ?? null,
       ip: input.ip,

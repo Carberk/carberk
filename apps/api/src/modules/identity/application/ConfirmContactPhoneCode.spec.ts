@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { createHash } from "node:crypto";
 
 import { beforeEach, describe, expect, it } from "vitest";
@@ -34,7 +35,7 @@ describe("ConfirmContactPhoneCode", () => {
     now = new Date("2026-10-03T12:00:00.000Z");
     otp = new InMemoryOtpRequests(() => now);
     const clock = { now: () => now };
-    useCase = new ConfirmContactPhoneCode(otp, new VerifySignInCode(otp, clock));
+    useCase = new ConfirmContactPhoneCode(otp, new VerifySignInCode(otp, clock, new NodeCredentialCrypto()));
   });
 
   it("consumes the seller's newest contact-phone code for the number", async () => {

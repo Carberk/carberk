@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { createHash } from "node:crypto";
 
 import { beforeEach, describe, expect, it } from "vitest";
@@ -21,7 +22,7 @@ describe("IssueContactPhoneCode", () => {
   let sender: OtpSenderPort;
 
   function useCase(testMode = true): IssueContactPhoneCode {
-    return new IssueContactPhoneCode(otp, sender, { now: () => NOW }, testMode);
+    return new IssueContactPhoneCode(otp, sender, { now: () => NOW }, testMode, new NodeCredentialCrypto());
   }
 
   beforeEach(() => {

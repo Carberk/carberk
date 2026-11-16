@@ -1,12 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Enums } from "@auto-tm/contracts";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
 import { SIGN_IN_CODE_CHANNELS } from "../domain/types";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import type { SignInMethodRepository } from "../domain/ports/SignInMethodRepository";
-import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
 import { DeleteMe } from "./DeleteMe";
 import { VerifySignInCode } from "./VerifySignInCode";
 
@@ -25,9 +24,9 @@ export type ConfirmAccountDeletionInput = (
 @Injectable()
 export class ConfirmAccountDeletion {
   constructor(
-    @Inject(PrismaOtpRequestRepository)
+    @Inject(IDENTITY_TOKENS.OtpRequestRepository)
     private readonly otpRequestRepo: OtpRequestRepository,
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: SignInMethodRepository,
     @Inject(VerifySignInCode)
     private readonly verifySignInCode: VerifySignInCode,

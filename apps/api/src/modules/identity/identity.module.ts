@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { BullModule } from "@nestjs/bullmq";
 import { EventEmitterModule } from "@nestjs/event-emitter";
+import { JwtService } from "@nestjs/jwt";
 import { AuthSchemas } from "@auto-tm/contracts";
 
 import { PrismaModule } from "../../common/prisma.module";
@@ -78,6 +79,7 @@ import { REVIEWER_OTP_BYPASS_CONFIG } from "./domain/ports/ReviewerOtpBypassConf
 import { RedisReservedPhoneAttemptLedger } from "./infrastructure/RedisReservedPhoneAttemptLedger";
 import { RESERVED_PHONE_ATTEMPT_LEDGER } from "./domain/ports/ReservedPhoneAttemptLedger";
 import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
+import { NodeCredentialCrypto } from "./infrastructure/NodeCredentialCrypto";
 
 @Module({
   imports: [
@@ -178,6 +180,30 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
       useExisting: PrismaOtpRequestRepository,
     },
     {
+      provide: IDENTITY_TOKENS.UserRepository,
+      useExisting: PrismaUserRepository,
+    },
+    {
+      provide: IDENTITY_TOKENS.OtpSenderPort,
+      useExisting: HttpOtpSenderAdapter,
+    },
+    {
+      provide: IDENTITY_TOKENS.RefreshTokenHasherPort,
+      useExisting: RefreshTokenDigestAdapter,
+    },
+    {
+      provide: IDENTITY_TOKENS.CredentialCryptoPort,
+      useClass: NodeCredentialCrypto,
+    },
+    {
+      provide: IDENTITY_TOKENS.AccessTokenSignerPort,
+      useExisting: JwtService,
+    },
+    {
+      provide: IDENTITY_TOKENS.VideoUploadAccessPort,
+      useExisting: ConfigListingVideoAccess,
+    },
+    {
       provide: IDENTITY_TOKENS.ClockPort,
       useExisting: SystemClockAdapter,
     },
@@ -187,11 +213,11 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
     {
       provide: IDENTITY_TOKENS.TotpSecretCipherPort,
-      useClass: AesGcmTotpSecretCipher,
+      useExisting: AesGcmTotpSecretCipher,
     },
     {
       provide: IDENTITY_TOKENS.TotpVerifierPort,
-      useClass: OtplibTotpVerifier,
+      useExisting: OtplibTotpVerifier,
     },
     {
       provide: IDENTITY_TOKENS.TotpEnrollmentRepository,
@@ -199,11 +225,11 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     },
     {
       provide: IDENTITY_TOKENS.TotpThrottlePort,
-      useClass: InMemoryTotpThrottleAdapter,
+      useExisting: InMemoryTotpThrottleAdapter,
     },
     {
       provide: IDENTITY_TOKENS.SecurityLoggerPort,
-      useClass: PinoSecurityLoggerAdapter,
+      useExisting: PinoSecurityLoggerAdapter,
     },
     {
       provide: "TOTP_SECRET_ENCRYPTION_KEY",
@@ -214,8 +240,8 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
       useFactory: () => 30,
     },
     {
-      provide: "EventBus",
-      useClass: EventEmitterIdentityEventBus,
+      provide: IDENTITY_TOKENS.IdentityEventBusPort,
+      useExisting: EventEmitterIdentityEventBus,
     },
     RequestOtp,
     VerifyOtp,
@@ -263,10 +289,8 @@ import { EMAIL_CODE_SENDER_PORT } from "./domain/ports/EmailCodeSenderPort";
     IDENTITY_TOKENS.SessionRepository,
     IDENTITY_TOKENS.ClockPort,
     IDENTITY_ADMIN_PORT,
-    // For ProfilePhotoModule, identity's own composition above Listings. Other
-    // contexts cannot name these classes: lint keeps them to identity.public.
     GetMe,
-    PrismaUserRepository,
+    IDENTITY_TOKENS.UserRepository,
   ],
 })
 export class IdentityModule {}

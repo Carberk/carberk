@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
-import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 export interface LogoutInput {
   refreshToken: string;
@@ -9,7 +9,7 @@ export interface LogoutInput {
 @Injectable()
 export class Logout {
   constructor(
-    @Inject(PrismaSessionRepository)
+    @Inject(IDENTITY_TOKENS.SessionRepository)
     private readonly sessionRepo: SessionRepository,
   ) {}
 

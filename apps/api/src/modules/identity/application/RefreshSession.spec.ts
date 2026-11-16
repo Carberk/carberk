@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { JwtService } from "@nestjs/jwt";
@@ -160,6 +161,7 @@ function makeUseCase(opts: MakeUseCaseOpts = {}) {
     opts.clock ?? new FakeClock(),
     jwtService,
     opts.identityCheck ?? new InMemoryIdentityCheck(),
+    new NodeCredentialCrypto(),
   );
 }
 

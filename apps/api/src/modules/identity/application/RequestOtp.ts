@@ -1,6 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Enums } from "@auto-tm/contracts";
-import { createHash, randomUUID } from "node:crypto";
 
 import { OtpCode } from "../domain/OtpCode";
 import {
@@ -11,6 +10,7 @@ import { findReviewerAccount } from "../domain/ReviewerSignIn";
 import { signInCodeDestination } from "../domain/SignInCodeDestination";
 import { SignInCodeRateLimitedError } from "../domain/SignInCodeRateLimitedError";
 import { SIGN_IN_CODE_CHANNELS } from "../domain/types";
+import type { CredentialCryptoPort } from "../domain/ports/CredentialCryptoPort";
 import type { OtpRequestRepository } from "../domain/ports/OtpRequestRepository";
 import type { OtpSenderPort } from "../domain/ports/OtpSenderPort";
 import type { ClockPort } from "../domain/ports/ClockPort";
@@ -21,9 +21,6 @@ import { REVIEWER_OTP_BYPASS_CONFIG } from "../domain/ports/ReviewerOtpBypassCon
 import type { ConstantTimeComparatorPort } from "../domain/ports/ConstantTimeComparatorPort";
 import { CONSTANT_TIME_COMPARATOR_PORT } from "../domain/ports/ConstantTimeComparatorPort";
 import { IDENTITY_TOKENS } from "../identity.tokens";
-import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
-import { HttpOtpSenderAdapter } from "../infrastructure/HttpOtpSenderAdapter";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 
 export type RequestOtpInput = ({ phone: string } | { email: string }) & {
   ip: string;
@@ -45,9 +42,9 @@ export class RequestOtp {
   );
 
   constructor(
-    @Inject(PrismaOtpRequestRepository) private readonly otpRequestRepo: OtpRequestRepository,
-    @Inject(HttpOtpSenderAdapter) private readonly otpSender: OtpSenderPort,
-    @Inject(SystemClockAdapter) private readonly clock: ClockPort,
+    @Inject(IDENTITY_TOKENS.OtpRequestRepository) private readonly otpRequestRepo: OtpRequestRepository,
+    @Inject(IDENTITY_TOKENS.OtpSenderPort) private readonly otpSender: OtpSenderPort,
+    @Inject(IDENTITY_TOKENS.ClockPort) private readonly clock: ClockPort,
     @Inject(IDENTITY_TOKENS.OtpTestMode) private readonly testMode: boolean,
     @Inject(EMAIL_CODE_SENDER_PORT)
     private readonly emailCodeSender: EmailCodeSenderPort,
@@ -55,6 +52,8 @@ export class RequestOtp {
     private readonly reviewerBypassConfig: ReviewerOtpBypassConfig,
     @Inject(CONSTANT_TIME_COMPARATOR_PORT)
     private readonly constantTimeComparator: ConstantTimeComparatorPort,
+    @Inject(IDENTITY_TOKENS.CredentialCryptoPort)
+    private readonly crypto: CredentialCryptoPort,
   ) {}
 
   async execute(input: RequestOtpInput): Promise<RequestOtpResult> {
@@ -70,7 +69,7 @@ export class RequestOtp {
       destination.channel === SIGN_IN_CODE_CHANNELS.PHONE &&
       reservedAccount !== null
     ) {
-      return { requestId: randomUUID(), resendInSeconds: 0 };
+      return { requestId: this.crypto.generateRequestId(), resendInSeconds: 0 };
     }
 
     const now = this.clock.now();
@@ -107,8 +106,8 @@ export class RequestOtp {
 
     const code = destination.channel === SIGN_IN_CODE_CHANNELS.EMAIL && reservedAccount !== null
       ? OtpCode.create(reservedAccount.code)
-      : OtpCode.generate();
-    const codeHash = createHash("sha256").update(code.value).digest("hex");
+      : OtpCode.create(this.crypto.generateSignInCode());
+    const codeHash = this.crypto.hashCode(code.value);
 
     const record = await this.otpRequestRepo.create({
       purpose: Enums.SignInCodePurpose.SignIn,

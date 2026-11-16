@@ -9,7 +9,7 @@ import { RemoveProfilePhoto } from "./application/RemoveProfilePhoto";
 import { SetProfilePhoto } from "./application/SetProfilePhoto";
 import { PROFILE_PHOTO_PORT } from "./domain/ports/ProfilePhotoPort";
 import { IdentityModule } from "./identity.module";
-import { PrismaUserRepository } from "./infrastructure/PrismaUserRepository";
+import { IDENTITY_TOKENS } from "./identity.tokens";
 import { MePhotoController } from "./presentation/MePhotoController";
 import { ProfilePhotoModule } from "./profile-photo.module";
 
@@ -47,7 +47,7 @@ describe("ProfilePhotoModule", () => {
 
   it("reads /me and the User through providers IdentityModule exports", () => {
     expect(metadata(MODULE_METADATA.EXPORTS, IdentityModule)).toEqual(
-      expect.arrayContaining([GetMe, PrismaUserRepository]),
+      expect.arrayContaining([GetMe, IDENTITY_TOKENS.UserRepository]),
     );
   });
 });

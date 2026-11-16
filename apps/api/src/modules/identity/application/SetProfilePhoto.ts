@@ -5,7 +5,6 @@ import type { IdentityCheckPort } from "../domain/ports/IdentityCheckPort";
 import { PROFILE_PHOTO_PORT, type ProfilePhotoPort } from "../domain/ports/ProfilePhotoPort";
 import type { UserRepository } from "../domain/ports/UserRepository";
 import { IDENTITY_TOKENS } from "../identity.tokens";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
 
 export interface SetProfilePhotoInput {
   userId: string;
@@ -23,7 +22,7 @@ export interface SetProfilePhotoInput {
 @Injectable()
 export class SetProfilePhoto {
   constructor(
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: UserRepository,
     @Inject(IDENTITY_TOKENS.IdentityCheckPort)
     private readonly identityCheck: IdentityCheckPort,

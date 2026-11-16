@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import { createHash } from "node:crypto";
 
@@ -203,7 +204,7 @@ function setup(users: User[] = []) {
   const useCase = new ConfirmAccountDeletion(
     otpRepo,
     userRepo,
-    new VerifySignInCode(otpRepo, clock),
+    new VerifySignInCode(otpRepo, clock, new NodeCredentialCrypto()),
     deleteMe,
   );
   return { useCase, otpRepo, userRepo, sessions, listings };

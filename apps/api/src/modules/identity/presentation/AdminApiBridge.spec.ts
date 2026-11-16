@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { resolve } from "node:path";
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,6 +49,7 @@ describe("real admin-to-API sign-in routing", () => {
             requests, { send: async () => undefined }, { now }, false,
             { enqueue: async () => undefined }, { enabled: false, accounts: [] },
             { compare: (candidate, expected) => candidate === expected },
+            new NodeCredentialCrypto(),
           ),
         },
         ...[VerifyOtp, RefreshSession, Logout, LogoutAll].map((provide) => ({

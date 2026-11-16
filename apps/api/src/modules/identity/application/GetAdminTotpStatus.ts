@@ -2,9 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { TotpEnrollmentRepository } from "../domain/ports/TotpEnrollmentRepository";
 import type { SessionRepository } from "../domain/ports/SessionRepository";
 import type { ClockPort } from "../domain/ports/ClockPort";
-import { PrismaTotpEnrollmentRepository } from "../infrastructure/PrismaTotpEnrollmentRepository";
-import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
+import { IDENTITY_TOKENS } from "../identity.tokens";
 
 export interface GetAdminTotpStatusInput {
   userId: string;
@@ -20,11 +18,11 @@ export interface GetAdminTotpStatusResult {
 @Injectable()
 export class GetAdminTotpStatus {
   constructor(
-    @Inject(PrismaTotpEnrollmentRepository)
+    @Inject(IDENTITY_TOKENS.TotpEnrollmentRepository)
     private readonly totpRepo: TotpEnrollmentRepository,
-    @Inject(PrismaSessionRepository)
+    @Inject(IDENTITY_TOKENS.SessionRepository)
     private readonly sessionRepo: SessionRepository,
-    @Inject(SystemClockAdapter)
+    @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
   ) {}
 

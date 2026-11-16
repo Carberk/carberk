@@ -1,6 +1,6 @@
-import { randomBytes } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
+import type { CredentialCryptoPort } from "../domain/ports/CredentialCryptoPort";
+import type { AccessTokenSignerPort } from "../domain/ports/AccessTokenSignerPort";
 import { Enums } from "@auto-tm/contracts";
 import type { User } from "../domain/User";
 import { UserSuspendedError } from "../domain/UserSuspendedError";
@@ -19,12 +19,8 @@ import { REVIEWER_OTP_BYPASS_CONFIG } from "../domain/ports/ReviewerOtpBypassCon
 import type { RandomSourcePort } from "../domain/ports/RandomSourcePort";
 import { RANDOM_SOURCE_PORT } from "../domain/ports/RandomSourcePort";
 import { drawGeneratedIdentity } from "../domain/GeneratedIdentity";
-import { PrismaOtpRequestRepository } from "../infrastructure/PrismaOtpRequestRepository";
-import { PrismaUserRepository } from "../infrastructure/PrismaUserRepository";
-import { PrismaSessionRepository } from "../infrastructure/PrismaSessionRepository";
-import { RefreshTokenDigestAdapter } from "../infrastructure/RefreshTokenDigestAdapter";
-import { SystemClockAdapter } from "../infrastructure/SystemClockAdapter";
 import type { IdentityCheckPort } from "../domain/ports/IdentityCheckPort";
+import type { IdentityEventBusPort } from "../domain/ports/IdentityEventBusPort";
 import { IDENTITY_TOKENS } from "../identity.tokens";
 import { VerifySignInCode } from "./VerifySignInCode";
 import { RESERVED_PHONE_ATTEMPT_LEDGER, type ReservedPhoneAttemptLedger } from "../domain/ports/ReservedPhoneAttemptLedger";
@@ -54,20 +50,20 @@ export interface VerifyOtpResult {
 @Injectable()
 export class VerifyOtp {
   constructor(
-    @Inject(PrismaOtpRequestRepository)
+    @Inject(IDENTITY_TOKENS.OtpRequestRepository)
     private readonly otpRequestRepo: OtpRequestRepository,
-    @Inject(PrismaUserRepository)
+    @Inject(IDENTITY_TOKENS.UserRepository)
     private readonly userRepo: UserRepository,
-    @Inject(PrismaSessionRepository)
+    @Inject(IDENTITY_TOKENS.SessionRepository)
     private readonly sessionRepo: SessionRepository,
-    @Inject(RefreshTokenDigestAdapter)
+    @Inject(IDENTITY_TOKENS.RefreshTokenHasherPort)
     private readonly hasher: RefreshTokenHasherPort,
-    @Inject(SystemClockAdapter)
+    @Inject(IDENTITY_TOKENS.ClockPort)
     private readonly clock: ClockPort,
-    @Inject(JwtService)
-    private readonly jwtService: JwtService,
-    @Inject("EventBus")
-    private readonly eventBus: { emit: (event: string, payload: unknown) => void },
+    @Inject(IDENTITY_TOKENS.AccessTokenSignerPort)
+    private readonly jwtService: AccessTokenSignerPort,
+    @Inject(IDENTITY_TOKENS.IdentityEventBusPort)
+    private readonly eventBus: IdentityEventBusPort,
     @Inject(REVIEWER_OTP_BYPASS_CONFIG)
     private readonly reviewerBypassConfig: ReviewerOtpBypassConfig,
     @Inject(CONSTANT_TIME_COMPARATOR_PORT)
@@ -80,6 +76,8 @@ export class VerifyOtp {
     private readonly identityCheck: IdentityCheckPort,
     @Inject(RESERVED_PHONE_ATTEMPT_LEDGER)
     private readonly reservedPhoneAttempts: ReservedPhoneAttemptLedger,
+    @Inject(IDENTITY_TOKENS.CredentialCryptoPort)
+    private readonly crypto: CredentialCryptoPort,
   ) {}
 
   async execute(input: VerifyOtpInput): Promise<VerifyOtpResult> {
@@ -272,8 +270,7 @@ export class VerifyOtp {
       await this.sessionRepo.deleteOldestByUserId(user.id);
     }
 
-    // Generate refresh token
-    const refreshToken = randomBytes(32).toString("hex");
+    const refreshToken = this.crypto.generateRefreshToken();
     const refreshTokenHash = await this.hasher.hash(refreshToken);
 
     const expiresAt = new Date(

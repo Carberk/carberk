@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "../infrastructure/NodeCredentialCrypto";
 import { MAX_SIGN_IN_CODE_ATTEMPTS } from "../domain/OtpRequest";
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
@@ -385,10 +386,11 @@ function makeUseCase(opts: MakeUseCaseOpts = {}) {
     opts.eventBus ?? { emit: vi.fn() },
     opts.reviewerBypassConfig ?? { enabled: false, accounts: [] },
     opts.constantTimeComparator ?? new FakeConstantTimeComparator(),
-    new VerifySignInCode(otpRepo, clock),
+    new VerifySignInCode(otpRepo, clock, new NodeCredentialCrypto()),
     opts.random ?? new FixedRandomSource([0.5]),
     opts.identityCheck ?? new InMemoryIdentityCheck(),
     opts.reservedPhoneAttempts ?? new InMemoryReservedPhoneAttemptLedger(clock),
+    new NodeCredentialCrypto(),
   );
 }
 

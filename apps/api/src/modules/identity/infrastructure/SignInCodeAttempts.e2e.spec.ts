@@ -1,3 +1,4 @@
+import { NodeCredentialCrypto } from "./NodeCredentialCrypto";
 import { createHash } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import { PrismaService } from "@auto-tm/db";
@@ -49,7 +50,7 @@ it("limits parallel wrong Sign-in Codes to five failures with truthful remaining
     codeHash: createHash("sha256").update("999999").digest("hex"),
     expiresAt: new Date(NOW.getTime() + 300_000), userId: null, ip: "192.0.2.1",
   });
-  const verify = new VerifySignInCode(repo, { now: () => NOW });
+  const verify = new VerifySignInCode(repo, { now: () => NOW }, new NodeCredentialCrypto());
   const results = await Promise.allSettled(Array.from({ length: 10 }, (_, index) =>
     verify.execute({ purpose: "sign-in", destination: signInCodeDestination({ phone: PHONE }),
       code: String(index).padStart(6, "0") })));
@@ -70,7 +71,7 @@ it("refuses a previously verified correct code if five wrong attempts lock it be
     codeHash: createHash("sha256").update("999999").digest("hex"),
     expiresAt: new Date(NOW.getTime() + 300_000), userId: null, ip: "192.0.2.1",
   });
-  const verify = new VerifySignInCode(repo, { now: () => NOW });
+  const verify = new VerifySignInCode(repo, { now: () => NOW }, new NodeCredentialCrypto());
   const candidate = await verify.execute({ purpose: "sign-in",
     destination: signInCodeDestination({ phone: PHONE }), code: "999999" });
   // The caller has not consumed its candidate yet; other requests exhaust it.
