@@ -11,7 +11,7 @@ export function HistoryWorkbench({ locale: initialLocale, section, children }: {
   const t = deskCopy[locale];
   const params = useSearchParams();
   const query = section === "staff" ? params.toString() : new URLSearchParams(
-    [...params].filter(([name]) => ["filter", "search", "cursor", "selected", "v"].includes(name)),
+    [...params].filter(([name, value]) => ["filter", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"),
   ).toString();
   return <div lang={locale} className="min-h-screen bg-muted/40">
     <a href="#history-content" className="sr-only focus:not-sr-only focus:block focus:p-4">{t.skip}</a>

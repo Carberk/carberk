@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@auto-tm/ui/components";
 import { IdentitySchemas, type VehicleHistorySchemas as V } from "@auto-tm/contracts";
@@ -8,14 +8,16 @@ import type { HistoryInboxResult } from "./actions";
 import { PrivateNotesPanel } from "./PrivateNotesPanel";
 import { ReplyComposer } from "./ReplyComposer";
 import { useOperatorConversation } from "./useOperatorConversation";
+import { SourceListing } from "./SourceListing";
 
 
 import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
 
 type Row = Extract<HistoryInboxResult, { kind: "queue" }>["data"]["items"][number];
-export function SelectedRequest({ locale, id, version, row, scope, actor, revision, refresh, invalidate, claimed }: {
+export function SelectedRequest({ locale, id, version, row, scope, actor, revision, refresh, invalidate, claimed, listingOpen, listing, returnQuery }: {
   locale: DeskLocale; id: string; version: number; row: Row | undefined; scope: string; actor: V.HistoryDesk["actor"];
   revision: number; refresh: (resetSelection?: boolean) => void; invalidate: (result: HistoryInboxResult) => void; claimed: (version: number) => void;
+  listingOpen: boolean; listing: (open: boolean) => void; returnQuery: string;
 }) {
   const t = deskCopy[locale];
   const heading = useRef<HTMLHeadingElement>(null);
@@ -23,6 +25,21 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
   const pageFocus = useRef<Element | null>(null);
   const anchor = useRef<{ id: string; offset: number; top: number } | null>(null);
   const seen = useRef(new Set<string>());
+  const sourceControl = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  const returnKey = `history-return:${scope}:${actor.id}:${id}:${version}`;
+  const [saved] = useState(() => {
+    try {
+      const value: unknown = JSON.parse(sessionStorage.getItem(returnKey) ?? "null");
+      if (!value || typeof value !== "object" || !("id" in value) || typeof value.id !== "string" ||
+        !(value.id === "selected-enquiry" || /^history-message-[0-9a-f-]{36}$/.test(value.id)) || !("offset" in value) || typeof value.offset !== "number" ||
+        !("top" in value) || typeof value.top !== "number" || !("queueTop" in value) || typeof value.queueTop !== "number" ||
+        !("windowTop" in value) || typeof value.windowTop !== "number" ||
+        ![value.offset, value.top, value.queueTop, value.windowTop].every(Number.isFinite)) return null;
+      return { id: value.id, offset: value.offset, top: value.top, queueTop: value.queueTop, windowTop: value.windowTop };
+    } catch { return null; }
+  });
+  const restoring = useRef(!!saved);
   const lost = !!row && version > 0 && (!row.mine || row.assignmentVersion !== version || row.assignedOperator?.id !== actor.id);
   const reader = useOperatorConversation({ locale, id, version, scope, actorId: actor.id, revision,
     entry: lost ? "conflict" : row ? row.mine ? "loading" : "unclaimed" : version === 0 ? "missing" : "loading", invalidate, claimed });
@@ -36,7 +53,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
     const started = new Map<string, number>();
     function eligible() {
       const node = pane.current;
-      if (cancelled || !node || !navigator.onLine || !document.hasFocus() || document.visibilityState !== "visible"
+      if (cancelled || listingOpen || !node || !navigator.onLine || !document.hasFocus() || document.visibilityState !== "visible"
         || receiptFailed || ["offline", "unavailable", "reconnecting"].includes(notice)) return [];
       const box = node.getBoundingClientRect(), viewport = window.visualViewport;
       const top = Math.max(box.top, viewport?.offsetTop ?? 0);
@@ -87,21 +104,46 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
       window.visualViewport?.removeEventListener("resize", scan);
       window.visualViewport?.removeEventListener("scroll", scan);
     };
-  }, [messages, state, notice, receiptFailed, acknowledgeRead]);
-  function remember() {
+  }, [messages, state, notice, receiptFailed, acknowledgeRead, listingOpen]);
+  useLayoutEffect(() => {
+    if (wasOpen.current && !listingOpen) (sourceControl.current ?? heading.current)?.focus({ preventScroll: true });
+    wasOpen.current = listingOpen;
+  }, [listingOpen]);
+  const remember = useCallback(() => {
     const node = pane.current;
-    if (!node) return;
+    if (!node || restoring.current) return;
     const top = node.getBoundingClientRect().top;
     const visible = [...node.children].find((child) => child.getBoundingClientRect().bottom > top);
-    anchor.current = visible ? { id: visible.id, offset: visible.getBoundingClientRect().top - top, top: node.scrollTop } : null;
-  }
+    anchor.current = visible ? { id: visible.id, offset: visible.getBoundingClientRect().top - top, top: node.scrollTop }
+      : { id: "selected-enquiry", offset: 0, top: node.scrollTop };
+    if (anchor.current) {
+      try { sessionStorage.setItem(returnKey, JSON.stringify({ ...anchor.current,
+        queueTop: document.getElementById("history-queue")?.scrollTop ?? 0, windowTop: window.scrollY })); } catch { return; }
+    }
+  }, [returnKey]);
   useEffect(() => { heading.current?.focus(); }, []);
   useLayoutEffect(() => {
-    const node = pane.current, saved = anchor.current;
+    const node = pane.current;
     if (!node) return;
-    if (saved) {
-      const row = document.getElementById(saved.id);
-      node.scrollTop += row ? row.getBoundingClientRect().top - node.getBoundingClientRect().top - saved.offset : saved.top - node.scrollTop;
+    if (restoring.current && saved) {
+      const target = document.getElementById(saved.id);
+      if (!target && cursor && !reader.busy && !reader.notice) { reader.run("page"); return; }
+      if (!target && cursor) return;
+      anchor.current = saved;
+      restoring.current = false;
+      const queue = document.getElementById("history-queue");
+      if (queue) queue.scrollTop = saved.queueTop;
+      window.scrollTo({ top: saved.windowTop, behavior: "instant" });
+      node.scrollTop = saved.top;
+    }
+  });
+  useLayoutEffect(() => {
+    const node = pane.current;
+    if (!node || restoring.current) return;
+    const position = anchor.current;
+    if (position) {
+      const row = document.getElementById(position.id);
+      node.scrollTop += row && node.contains(row) ? row.getBoundingClientRect().top - node.getBoundingClientRect().top - position.offset : position.top - node.scrollTop;
     }
     if (reader.focusId && (document.activeElement === pageFocus.current || document.activeElement === document.body)) {
       document.getElementById(`history-message-${reader.focusId}`)?.focus({ preventScroll: true });
@@ -109,7 +151,12 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
       node.focus({ preventScroll: true });
     }
     remember();
-  }, [messages, reader.focusId]);
+  }, [messages, reader.focusId, remember]);
+  useEffect(() => {
+    window.addEventListener("pagehide", remember);
+    window.addEventListener("beforeunload", remember);
+    return () => { window.removeEventListener("pagehide", remember); window.removeEventListener("beforeunload", remember); };
+  }, [remember]);
   function more() { remember(); pageFocus.current = document.activeElement; reader.run("page"); }
   function recover() { remember(); pageFocus.current = document.activeElement; reader.run("refresh"); }
   const selected = detail ?? row;
@@ -167,9 +214,16 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
       <h4 className="mb-2 text-sm font-medium">{t.source}</h4>
       {state !== "loading" && <p className="break-all text-sm">{detail ? detail.sourceListingId ?? t.noSource : state === "unclaimed" ? t.claimContext : t.contextUnavailable}</p>}
       {detail?.sourceListingId && <p className="mt-3 text-sm text-muted-foreground">{t.sourceBody}</p>}
+      {state === "ready" && detail?.sourceListingId && <Button ref={sourceControl} type="button" size="lg" variant="secondary" className="mt-4 max-w-full whitespace-normal" onClick={() => { remember(); listing(true); }}>{t.viewListing}</Button>}
       {state === "ready" && <PrivateNotesPanel locale={locale} id={id} version={version} scope={scope} actorId={actor.id}
         revision={revision} invalidate={invalidate} />}
     </aside>
+    {state === "ready" && <SourceListing key={detail?.sourceListingId ?? "absent"} open={listingOpen} locale={locale} id={id} scope={scope} actorId={actor.id}
+      expectedAssignmentVersion={version} returnQuery={returnQuery} onClose={() => listing(false)}
+      onInvalidate={(failure) => {
+        if (failure.status === "stale" || failure.status === "expired") invalidate({ status: failure.status });
+        else { recover(); }
+      }} />}
   </>;
 }
 

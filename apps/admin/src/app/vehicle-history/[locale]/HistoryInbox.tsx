@@ -12,6 +12,7 @@ import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
 export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?: HistoryInboxResult }) {
   const params = useSearchParams();
   const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const openedHere = useRef(false);
   const raw = localUrl ?? params.toString();
   const url = new URLSearchParams(raw);
   const query = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned",
@@ -21,7 +22,8 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   const [revision, setRevision] = useState(0);
   const [readerRevision, setReaderRevision] = useState(0);
   const queueGeneration = useRef(0);
-  const key = `${locale}?${raw}`;
+  const queueUrl = new URLSearchParams([...url].filter(([name]) => ["filter", "search", "cursor", "selected", "v"].includes(name))).toString();
+  const key = `${locale}?${queueUrl}`;
   const [queue, setQueue] = useState<{ key: string; source: HistoryInboxResult | undefined; result: HistoryInboxResult } | null>(
     initial ? { key, source: initial, result: initial } : null,
   );
@@ -32,9 +34,15 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   function navigate(changes: Record<string, string | null>, replace = false) {
     const next = new URLSearchParams(raw);
     for (const [name, value] of Object.entries(changes)) { if (value === null) next.delete(name); else next.set(name, value); }
-    const safe = new URLSearchParams([...next].filter(([name]) => ["filter", "search", "cursor", "selected", "v"].includes(name)));
-    window.history[replace ? "replaceState" : "pushState"](null, "", `/vehicle-history/${locale}?${safe}`);
+    if ("selected" in changes || "filter" in changes || "search" in changes || "cursor" in changes) next.delete("source");
+    const safe = new URLSearchParams([...next].filter(([name, value]) => ["filter", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"));
+    window.history[replace ? "replaceState" : "pushState"](null, "", `/vehicle-history/${locale}?${safe}${window.location.hash}`);
     setLocalUrl(safe.toString());
+  }
+  function listing(open: boolean) {
+    if (open) { openedHere.current = true; navigate({ source: "listing" }); }
+    else if (openedHere.current) { openedHere.current = false; window.history.back(); }
+    else navigate({ source: null }, true);
   }
   function refresh(resetSelection = false) {
     if (resetSelection) navigate({ selected: null, v: null }, true);
@@ -42,7 +50,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
     setReaderRevision((value) => value + 1);
   }
   useEffect(() => {
-    const back = () => { setLocalUrl(window.location.search.slice(1)); setRevision((value) => value + 1); };
+    const back = () => { openedHere.current = false; setLocalUrl(window.location.search.slice(1)); setRevision((value) => value + 1); };
     const revalidate = () => {
       setOffline(!navigator.onLine);
       if (navigator.onLine && document.visibilityState !== "hidden") setRevision((value) => value + 1);
@@ -65,7 +73,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
     const generation = ++queueGeneration.current;
     const valid = () => active && generation === queueGeneration.current;
     const parsed = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned",
-      ...Object.fromEntries([...new URLSearchParams(raw)].filter(([name]) => ["filter", "search", "cursor"].includes(name))) });
+      ...Object.fromEntries([...new URLSearchParams(queueUrl)].filter(([name]) => ["filter", "search", "cursor"].includes(name))) });
     if (!parsed.success || offline) return;
     void historyInboxAction(locale, { kind: "queue", query: parsed.data,
       ...(initial?.status === "ok" ? { scope: initial.scope } : {}),
@@ -76,7 +84,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
         ? previous : { key, source: initial, result });
     }).catch(() => { if (valid()) setFailure({ key, state: "unavailable" }); });
     return () => { active = false; };
-  }, [key, locale, raw, revision, offline, initial]);
+  }, [key, locale, queueUrl, revision, offline, initial]);
   const admitted = current?.status === "ok" && current.kind === "queue" ? current : null;
   const selectedRow = admitted?.data.items.find((row) => id.success && row.id === id.data);
   const assignmentLost = selectedRow && version.success && version.data > 0 &&
@@ -100,7 +108,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
       }}>
       <label htmlFor="history-search" className="mb-1 block text-sm font-medium">{t.search}</label>
         <div className="flex gap-2">
-      <Input id="history-search" name="search" type="search" className="min-w-0 flex-1" maxLength={64} defaultValue={query.success ? query.data.search : ""} key={raw} />
+      <Input id="history-search" name="search" type="search" className="min-w-0 flex-1" maxLength={64} defaultValue={query.success ? query.data.search : ""} key={query.success ? query.data.search : ""} />
       <Button type="submit" variant="secondary">{t.find}</Button>
       </div>
       </form>
@@ -113,7 +121,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
           <section aria-labelledby="enquiry-queue" className="min-w-0 border-b p-3 lg:border-r lg:border-b-0">
             <h2 id="enquiry-queue" className="mb-3 px-2 text-base font-semibold">{t.requests}</h2>
             {!admitted.data.items.length && <p role="status" className="px-2 py-8 text-sm text-muted-foreground">{query.data.search ? t.noResults : query.data.cursor ? t.emptyPage : t.empty}</p>}
-            <ul className="max-h-[30rem] space-y-1 overflow-y-auto">{admitted.data.items.map((row) => <li key={row.id}>
+            <ul id="history-queue" className="max-h-[30rem] space-y-1 overflow-y-auto">{admitted.data.items.map((row) => <li key={row.id}>
               <a href={`/vehicle-history/${locale}?${new URLSearchParams({ ...Object.fromEntries(Object.entries(query.data).filter((entry): entry is [string, string] => typeof entry[1] === "string")), selected: row.id, v: String(row.assignmentVersion) })}`}
                 aria-current={id.success && id.data === row.id ? "true" : undefined} onClick={(event) => {
                   if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -131,6 +139,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
           </section>
           {id.success && version.success ? <SelectedRequest key={`${locale}:${id.data}:${version.data}:${admitted.scope}:${admitted.actor.id}:${!!assignmentLost}`} locale={locale} id={id.data} version={version.data} revision={readerRevision}
             row={selectedRow} scope={admitted.scope} actor={admitted.actor}
+            listingOpen={url.get("source") === "listing"} listing={listing} returnQuery={raw}
             refresh={refresh} invalidate={(result) => { queueGeneration.current++; setQueue({ key, source: initial, result }); }}
             claimed={(assignmentVersion) => navigate({ selected: id.data, v: String(assignmentVersion) }, true)} />
             : <p className="p-6 text-sm text-muted-foreground lg:col-span-1 xl:col-span-2">{t.select}</p>}

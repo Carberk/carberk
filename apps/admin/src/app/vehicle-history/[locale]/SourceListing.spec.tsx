@@ -237,7 +237,7 @@ it.each(["hidden", "offline", "pagehide", "popstate"])("clears protected facts o
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Public car")).toBeTruthy();
   expect(world.seen.every(({ method }) => method === "GET")).toBe(true);
-  if (reason === "popstate") expect(onClose).toHaveBeenCalledTimes(1);
+  if (reason === "popstate") expect(onClose).not.toHaveBeenCalled();
 });
 
 it.each(["close", "dispose", "locale", "request", "scope", "actor", "version"])("discards a delayed detail across %s", async (change) => {

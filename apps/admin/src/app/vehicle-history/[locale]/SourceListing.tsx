@@ -14,6 +14,7 @@ type Props = {
   open: boolean; locale: DeskLocale; id: string; scope: string; actorId: string;
   expectedAssignmentVersion: number; onClose: () => void;
   onInvalidate: (failure: HistoryListingFailure) => void;
+  returnQuery?: string;
 };
 type Detail = Extract<HistoryListingResult, { kind: "detail" }>;
 
@@ -95,7 +96,7 @@ function ListingDialog(props: Props & { current: () => boolean }) {
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("offline", offline);
     window.addEventListener("pagehide", leave);
-    window.addEventListener("popstate", close);
+    window.addEventListener("popstate", leave);
     void read();
     return () => {
       current.active = false;
@@ -103,7 +104,7 @@ function ListingDialog(props: Props & { current: () => boolean }) {
       document.removeEventListener("visibilitychange", hidden);
       window.removeEventListener("offline", offline);
       window.removeEventListener("pagehide", leave);
-      window.removeEventListener("popstate", close);
+      window.removeEventListener("popstate", leave);
       element?.close();
       queueMicrotask(() => {
         if (invoker instanceof HTMLElement && invoker.isConnected && document.activeElement === document.body) invoker.focus();
@@ -125,10 +126,16 @@ function ListingDialog(props: Props & { current: () => boolean }) {
         event.preventDefault(); first?.focus();
       }
     }}
-    className="max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-5xl overflow-y-auto rounded-lg border bg-background p-5 text-foreground">
-    <header className="mb-5 flex items-start justify-between gap-4">
+    className="m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-5xl overflow-y-auto rounded-lg border bg-background p-5 text-foreground">
+    <header className="sticky -top-5 z-10 -mx-5 -mt-5 mb-5 flex flex-wrap items-start justify-between gap-4 border-b bg-background p-5">
       <h2 ref={heading} tabIndex={-1} id={titleId} className="break-words text-xl font-semibold focus-visible:outline-2 focus-visible:outline-ring">{copy.title}{detail ? ` ${detail.data.listing.publicNumber}` : ""}</h2>
       <Button type="button" size="lg" variant="secondary" onClick={close}>{copy.close}</Button>
+      {props.returnQuery !== undefined && <nav aria-label={props.locale === "tk" ? "Dil" : props.locale === "ru" ? "Язык" : "Language"} className="flex w-full gap-1">
+        {(["tk", "ru", "en"] as const).map((language) => <a key={language} lang={language} aria-current={language === props.locale ? "page" : undefined}
+          href={`/vehicle-history/${language}?${new URLSearchParams([...new URLSearchParams(props.returnQuery)].filter(([name, value]) =>
+            ["filter", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"))}`}
+          className="rounded-md px-3 py-3 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:bg-muted">{language.toUpperCase()}</a>)}
+      </nav>}
     </header>
     {detail && state === "ready" ? <>
       <ListingFacts detail={detail} locale={props.locale} />
