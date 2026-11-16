@@ -315,6 +315,18 @@ importers:
 
   .:
     devDependencies:
+      web-tree-sitter:
+        specifier: 0.26.13
+        version: 0.26.13
+      '@lumis-sh/wasm-swift':
+        specifier: 0.26.5
+        version: 0.26.5
+      '@lumis-sh/wasm-kotlin':
+        specifier: 0.26.5
+        version: 0.26.5
+      '@lumis-sh/wasm-groovy':
+        specifier: 0.26.5
+        version: 0.26.5
       '@auto-tm/contracts':
         specifier: workspace:*
         version: link:packages/contracts
@@ -1243,6 +1255,33 @@ importers:
         version: '@typescript/typescript6@6.0.2'
 
 packages:
+
+  '@lumis-sh/wasm-groovy@0.26.5':
+    resolution: {integrity: sha512-K/csblGzOcRv4If1AtrnxMJxgJiL6/R2J9u1Xgfe2assJ9QrUsB+KLK811yllesGeLnMtJGKC8XpmJGl4RrZrg==}
+    peerDependencies:
+      '@lumis-sh/lumis': '>=0.9.0'
+    peerDependenciesMeta:
+      '@lumis-sh/lumis':
+        optional: true
+
+  '@lumis-sh/wasm-kotlin@0.26.5':
+    resolution: {integrity: sha512-jm5TjXCt58uv2VoEBoIgNkvSPJYhooco47LX5xp7INcYDieROBsT3pRK2O3xftPhnfMHwuuglNSdtzlPcM/5rA==}
+    peerDependencies:
+      '@lumis-sh/lumis': '>=0.9.0'
+    peerDependenciesMeta:
+      '@lumis-sh/lumis':
+        optional: true
+
+  '@lumis-sh/wasm-swift@0.26.5':
+    resolution: {integrity: sha512-3QC2YNu+0yPAPpgncKEvicAqnCXBFR1rcv45H2N2RI8VCJSOdQYQypYtSZRwtRkoKEHeU7Vy/YSIdE5yLV31YA==}
+    peerDependencies:
+      '@lumis-sh/lumis': '>=0.9.0'
+    peerDependenciesMeta:
+      '@lumis-sh/lumis':
+        optional: true
+
+  web-tree-sitter@0.26.13:
+    resolution: {integrity: sha512-5bUZ7vbQ1kcondet96wzP974+JfCZDeQ7bTpacICm2nnvHpa5cO0ByRsoMcAhUP+743vpkb4m0BFlVSm+Ye9VA==}
 
   vscode-languageserver-types@3.18.5:
     resolution:
@@ -11417,6 +11456,14 @@ packages:
     hasBin: true
 
 snapshots:
+
+  '@lumis-sh/wasm-groovy@0.26.5': {}
+
+  '@lumis-sh/wasm-kotlin@0.26.5': {}
+
+  '@lumis-sh/wasm-swift@0.26.5': {}
+
+  web-tree-sitter@0.26.13: {}
 
   vscode-languageserver-types@3.18.5: {}
 
