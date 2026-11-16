@@ -47,7 +47,7 @@ function TesterControls() {
   };
   const remove = async () => {
     setBusy(true); setStatus(null);
-    try { await removeGatewayKey(); setConfigured(false); setEntry("global"); }
+    try { await removeGatewayKey(); setConfigured(false); }
     catch { setStatus("saveFailed"); }
     finally { setBusy(false); }
   };

@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { Enums } from "@auto-tm/contracts";
 import { BellOff, Car, Check, CheckCheck, Image as ImageIcon, Trash2, type LucideIcon } from "lucide-react-native";
 
+import { Photo as Image, usePhotoRevision } from "../../media/photoRoute";
 import {
   seedConversationDetail,
   type ConversationSummaryData,
@@ -76,7 +76,8 @@ export function ConversationListItem({
   const { t, i18n } = useTranslation();
   const { t: tConv } = useTranslation("conversations");
   const queryClient = useQueryClient();
-  const [imageFailed, setImageFailed] = useState(false);
+  const revision = usePhotoRevision();
+  const [failedAt, setFailedAt] = useState<string>();
   const listing = conversation.listing;
   const peerName = usePeerName(conversation) ?? "";
   const { text: previewText, icon: PreviewIcon } = usePreview(conversation);
@@ -110,6 +111,11 @@ export function ConversationListItem({
   const imageUrl = listing?.coverMediaKey
     ? buildVariantUrl(listing.coverMediaKey, "thumbnail")
     : null;
+
+  const failureKey = `${revision}:${imageUrl}`;
+  const activePhoto = useRef(failureKey);
+  activePhoto.current = failureKey;
+  const imageFailed = failedAt === failureKey;
 
   const accessibilityLabel = [
     peerName,
@@ -145,7 +151,9 @@ export function ConversationListItem({
               source={{ uri: imageUrl }}
               className="w-full h-full"
               contentFit="cover"
-              onError={() => setImageFailed(true)}
+              onError={() => {
+                if (activePhoto.current === failureKey) setFailedAt(failureKey);
+              }}
             />
           ) : (
             <View testID="conversation-row-placeholder" className="w-full h-full items-center justify-center">

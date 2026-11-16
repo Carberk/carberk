@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { View } from "react-native";
-import { Image } from "expo-image";
 import { Car, FileText, List, Plus } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
+import { Photo as Image } from "../../media/photoRoute";
 import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
 import { draftProgress } from "../wizard/draftProgress";
 import { MenuDivider, MenuGap, MenuRow } from "../../../components/account/MenuRow";

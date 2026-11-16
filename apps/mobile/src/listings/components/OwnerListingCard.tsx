@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
-import { Image } from "expo-image";
 import { MoreHorizontal } from "lucide-react-native";
 import { Enums } from "@auto-tm/contracts";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { Photo as Image } from "../../media/photoRoute";
 import { useExistingListingVideoTask } from "../video/ListingVideoTasks";
 import { useListingVideoAccess } from "../video/useListingVideoAccess";
 import { useTargetVideo } from "../video/useTargetVideo";

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
-import { Image } from "expo-image";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, withTiming, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { ImageIcon, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 
+import { Photo as Image } from "../../media/photoRoute";
 import type { StagedPhoto } from "../uploadStaging/types";
 import { getPhotoUri } from "../uploadStaging/photoUri";
 

@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
-import { Image } from "expo-image";
 import { ImageOff, MoreHorizontal } from "lucide-react-native";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import { useTranslation } from "react-i18next";
 
+import { Photo as Image } from "../../media/photoRoute";
 import { carTitle } from "../carTitle";
 import { buildOriginalUrl, buildVariantUrl } from "../detail/buildVariantUrl";
 import { draftProgress } from "../wizard/draftProgress";

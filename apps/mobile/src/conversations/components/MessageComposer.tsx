@@ -11,8 +11,8 @@ import { Send, Paperclip, X, AlertCircle } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Linking from "expo-linking";
-import { Image } from "expo-image";
 
+import { Photo as Image } from "../../media/photoRoute";
 import { THEME } from "../../../lib/theme";
 import {
   compressChatImage,

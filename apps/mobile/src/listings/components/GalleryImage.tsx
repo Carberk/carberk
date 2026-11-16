@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { Image } from "expo-image";
 import type { ListingsSchemas } from "@auto-tm/contracts";
 import type { ComponentProps } from "react";
 
+import { Photo as Image } from "../../media/photoRoute";
 import { buildOriginalUrl, listingPhotoUrl } from "../detail/buildVariantUrl";
 
 import { Text } from "@/components/ui/text";

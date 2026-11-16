@@ -1,7 +1,8 @@
 import { Modal, Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react-native";
-import { Image } from "expo-image";
+
+import { Photo as Image } from "../../media/photoRoute";
 
 import { Icon } from "@/components/ui/icon";
 
