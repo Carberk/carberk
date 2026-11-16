@@ -88,9 +88,9 @@ Operators need to review harmful marketplace content with sufficient target cont
 
 ### Dealer and diagnostic operations
 
-Dealer application/manual identity approval and business membership/inventory/enquiries follow [38](38-showroom.md). Evidence-specific business identity is separate from inspection and no generic paid PRO badge is introduced. Marketplace admin privileges do not become dealership membership or permission to read business enquiries/private reports.
+Dealer application/manual identity approval and business membership/inventory/enquiries follow [38](https://github.com/Carberk/carberk/issues/950#issuecomment-6910383394). Evidence-specific business identity is separate from inspection and no generic paid PRO badge is introduced. Marketplace admin privileges do not become dealership membership or permission to read business enquiries/private reports.
 
-Center reception, technician, reviewer and checklist-manager workspaces follow [50](50-reports-tier.md), [PDF export](51-pdf-export.md) and the owning diagnostic flow. Staff need scoped elevation/capability boundaries, not automatic promotion to marketplace admin. Buyer-private reports stay private to commissioning buyer and explicitly authorized staff; seller/dealer public reports require separate publication consent and qualified review. Final report/PDF share immutable snapshots and complete findings. Company service failure gets correction/reinspection at company cost or founder refund decision, never selective removal of unfavorable findings. Exact final public/private review and audience contracts govern release.
+Center reception, technician, reviewer and checklist-manager workspaces follow [50](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741), [PDF export](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741) and the owning diagnostic flow. Staff need scoped elevation/capability boundaries, not automatic promotion to marketplace admin. Buyer-private reports stay private to commissioning buyer and explicitly authorized staff; seller/dealer public reports require separate publication consent and qualified review. Final report/PDF share immutable snapshots and complete findings. Company service failure gets correction/reinspection at company cost or founder refund decision, never selective removal of unfavorable findings. Exact final public/private review and audience contracts govern release.
 
 ### Catalog and operational controls
 
@@ -149,8 +149,8 @@ The following remain excluded: phone-first admin, generic role hierarchy beyond 
 |---|---|
 | Assistance/appeals, operational notices, closure/reopening/content purge | [54 - Support](54-support.md) |
 | History offer, quote/payment/capacity/fulfilment/refund, licensed archive | [53 - Vehicle History](53-vehicle-history.md) |
-| Diagnostic consent, role separation, evidence, report corrections/reader/PDF | [50](50-reports-tier.md), [51](51-pdf-export.md) and owning diagnostic flow |
-| Dealer identity/business membership and enquiry ownership | [38](38-showroom.md) and owning dealer flow |
+| Diagnostic consent, role separation, evidence, report corrections/reader/PDF | [50](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741), [51](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741) and owning diagnostic flow |
+| Dealer identity/business membership and enquiry ownership | [38](https://github.com/Carberk/carberk/issues/950#issuecomment-6910383394) and owning dealer flow |
 | Analytics aggregate/investigation/rights, diagnostics/incident health | Owning analytics and operations specifications |
 | Scoped staff capability/session grants and recovery | [30 - Identity](30-identity.md) plus this bounded admin contract |
 | Public marketplace Message report context | [34 - Conversations](34-conversations.md), then audited Admin read port |

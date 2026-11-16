@@ -349,7 +349,7 @@ Phone/email switching stays in place with separate held values and one native
 input; it adds no navigation history. The common header/logo/button/legal chrome
 stays fixed and localized method copy cross-fades inside measured stable space.
 The existing phone normalization, helper/error strings and OTP API contract are
-retained. See the current [login-flow implementation](mobile-otp-login-flow.md#in-place-sign-in-entry-717)
+retained. See the current [login-flow implementation](../../../../apps/mobile/components/auth/SignInEntryScreen.tsx)
 for Code return, single exit, motion/haptics, account-purpose boundaries and the
 required native matrix. The historical screen example above is not an instruction
 to restore a separate method screen or obsolete font/color/link values.

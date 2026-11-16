@@ -47,5 +47,5 @@ Response items are `{ kind: "brand" | "model", brandId, modelId?, label, brandLa
 - [Public reads and integration tests](presentation/catalog.controller.ts)
 - [Catalog ports](domain/ports)
 - [Seed implementation](../../../../../packages/db/src/seed.ts)
-- [Target capability](../../../../../docs/prd/features/31-catalog.md)
+- [Catalog planning scope](https://github.com/Carberk/carberk/issues/1309#issuecomment-6910424355)
 - [Schema](../../../../../packages/db/prisma/schema.prisma)

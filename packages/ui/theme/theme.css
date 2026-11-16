@@ -1,11 +1,3 @@
-/* Carberk shared theme CSS — Tailwind v4 ONLY.
- * Consumed by apps/web/src/app/[locale]/globals.css and apps/admin/src/app/globals.css.
- * The @theme blocks are Tailwind v4 syntax — NEVER import this file into
- * apps/mobile (Tailwind v3). Mobile defines its own CSS vars in
- * apps/mobile/global.css. Token VALUES on both sides derive from
- * packages/ui/tokens/colors.ts.
- * Boundary rules: docs/prd/ui/79-web-vs-mobile.md.
- */
 @import "tailwindcss";
 @source "../components";
 

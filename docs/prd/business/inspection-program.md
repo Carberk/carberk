@@ -6,7 +6,7 @@
 
 The founder is preparing one diagnostic center in Aşgabat. Start with one understandable service plan covering mechanic-approved physical checks and computer diagnostics. Personal sellers, dealerships and buyers may request it. Use the same standards regardless of who owns the vehicle or pays.
 
-The product capability and access rules live in [feature 50](../features/50-reports-tier.md), output in [feature 51](../features/51-pdf-export.md), and journeys in [flow 66](../flows/66-diagnostic-inspection.md). This document owns real service scope, staffing, economics and readiness. It does not independently define report permissions or checklist fields.
+The product capability and access rules live in [feature 50](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741), output in [feature 51](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741), and journeys in [flow 66](https://github.com/Carberk/carberk/issues/951#issuecomment-6910384741). This document owns real service scope, staffing, economics and readiness. It does not independently define report permissions or checklist fields.
 
 Do not promise an inspector visit, multiple cities/branches, a lift, dynamometer, teardown, specific scan capabilities, fault detection coverage or turnaround before the center validates them. No number of checks, overall grade, repair guarantee, insurance cover or buyer compensation is established here.
 
