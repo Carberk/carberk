@@ -1,5 +1,1 @@
-[
-  {"importer":"apps/api/src/modules/conversations/application/SendPostRefMessage.ts","target":"apps/api/src/modules/conversations/infrastructure/PostRefSnapshotMapper.ts","rule":"application-layer","reason":"Inject the PostRefSnapshotMapper port instead of its concrete adapter","owner":"conversations","issue":"https://github.com/Carberk/carberk/issues/1350","count":1},
-  {"importer":"apps/api/src/modules/conversations/presentation/gateways/ConversationGateway.ts","target":"apps/api/src/modules/realtime/infrastructure/realtime.config.ts","rule":"feature-public","reason":"Expose the realtime gateway contract through a deliberate public interface","owner":"conversations","issue":"https://github.com/Carberk/carberk/issues/1350","count":1},
-  {"importer":"apps/api/src/modules/conversations/presentation/gateways/ConversationGateway.ts","target":"apps/api/src/modules/realtime/infrastructure/SocketAuthMiddleware.ts","rule":"feature-public","reason":"Expose the realtime gateway contract through a deliberate public interface","owner":"conversations","issue":"https://github.com/Carberk/carberk/issues/1350","count":1}
-]
+[]

@@ -22,7 +22,7 @@ import { IdentityModule } from "../../identity/identity.module";
 import { IMAGE_VARIANT_GENERATOR } from "../../listings/domain/ports/ImageVariantGenerator";
 import { LISTING_EVENT_PUBLISHER } from "../../listings/domain/ports/ListingEventPublisher";
 import { RealtimeIoAdapter } from "../../realtime/infrastructure/RealtimeIoAdapter";
-import { REALTIME_NAMESPACE } from "../../realtime/infrastructure/realtime.config";
+import { REALTIME_NAMESPACE } from "../../realtime/realtime.public";
 import type { MessageSentEvent } from "../domain/ports/MessageEventPublisher";
 import { GlobalErrorFilter } from "../../../common/error.filter";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
@@ -238,12 +238,15 @@ describe("Conversation message broadcast e2e", () => {
     return Buffer.from(await res.arrayBuffer());
   }
 
-  /** Connects a socket, joins the conversation room, and records every message:new. */
-  async function joinedSocket(token: string, conversationId: string) {
+  async function connectedSocket(token: string, useHeader = false) {
     const socket = io(`${baseUrl}${REALTIME_NAMESPACE}`, {
-      auth: { token },
+      ...(useHeader
+        ? { extraHeaders: { Authorization: `Bearer ${token}` } }
+        : { auth: { token } }),
       transports: ["websocket"],
       forceNew: true,
+      reconnection: false,
+      timeout: 5_000,
     });
     sockets.push(socket);
     const received: MessageNew[] = [];
@@ -253,11 +256,17 @@ describe("Conversation message broadcast e2e", () => {
       socket.once("connect", () => resolve());
       socket.once("connect_error", reject);
     });
+    return { socket, received };
+  }
+
+  async function joinedSocket(token: string, conversationId: string) {
+    const connection = await connectedSocket(token);
+    const { socket } = connection;
     const ack = (await socket.emitWithAck("conversation:join", {
       conversationId,
-    })) as { ok: boolean };
-    expect(ack.ok).toBe(true);
-    return { socket, received };
+    })) as { ok: boolean; conversationId: string; room: string };
+    expect(ack).toEqual({ ok: true, conversationId, room: `conversation:${conversationId}` });
+    return connection;
   }
 
   async function waitFor(received: MessageNew[], count: number) {
@@ -267,6 +276,72 @@ describe("Conversation message broadcast e2e", () => {
     }
     await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
   }
+
+  it.each([
+    { token: undefined, code: "MISSING_AUTH_TOKEN" },
+    { token: "not-a-jwt", code: "INVALID_TOKEN" },
+  ])("refuses a chat connection with $code", async ({ token, code }) => {
+    const socket = io(`${baseUrl}${REALTIME_NAMESPACE}`, {
+      auth: token ? { token } : {},
+      transports: ["websocket"],
+      forceNew: true,
+      reconnection: false,
+      timeout: 5_000,
+    });
+    sockets.push(socket);
+
+    const error = await new Promise<Error & { data?: unknown }>((resolve, reject) => {
+      socket.once("connect_error", resolve);
+      socket.once("connect", () => reject(new Error("Unauthenticated chat connection accepted")));
+    });
+
+    expect(error.data).toEqual({ code });
+    expect(socket.connected).toBe(false);
+  });
+
+  it("keeps an authenticated outsider out of conversation joins, sends and delivery", async () => {
+    const { buyerToken, sellerToken, conversationId } = await seedConversation();
+    const outsider = await connectedSocket(await createUser("buyer-2"));
+    const peer = await joinedSocket(sellerToken, conversationId);
+    const sender = await connectedSocket(app.get(JwtService).sign({
+      sub: suite.id("buyer-1"),
+      sid: "buyer-session",
+      phone: null,
+      role: "buyer",
+    }), true);
+
+    expect(await outsider.socket.timeout(5_000).emitWithAck("conversation:join", {
+      conversationId,
+    })).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    expect(await outsider.socket.timeout(5_000).emitWithAck("message:send", {
+      conversationId,
+      kind: "text",
+      text: "Unauthorized",
+      senderId: suite.id("buyer-1"),
+      clientMessageId: "outsider-message",
+    })).toMatchObject({ ok: false, code: "FORBIDDEN" });
+
+    const sent = await sender.socket.timeout(5_000).emitWithAck("message:send", {
+      conversationId,
+      kind: "text",
+      text: "Authorized",
+      senderId: suite.id("seller-1"),
+      clientMessageId: "authorized-message",
+    }) as { ok: boolean; message: { id: string; senderId: string } };
+    expect(sent).toMatchObject({ ok: true, message: { senderId: suite.id("buyer-1") } });
+
+    const history = await request
+      .get(`/api/v1/conversations/${conversationId}/messages`)
+      .set("Authorization", `Bearer ${buyerToken}`)
+      .expect(200);
+    expect(history.body.items).toHaveLength(1);
+    expect(history.body.items[0]).toMatchObject({ id: sent.message.id, text: "Authorized" });
+    await waitFor(peer.received, 1);
+    expect(peer.received).toHaveLength(1);
+    expect(peer.received[0]?.message).toMatchObject({ id: sent.message.id, senderId: suite.id("buyer-1") });
+    expect(outsider.received).toEqual([]);
+    expect(messageSentEvents).toHaveLength(1);
+  });
 
   it("disconnects a malformed binary packet without interrupting other chat connections", async () => {
     const { buyerToken, sellerToken, conversationId } = await seedConversation();
@@ -366,10 +441,20 @@ describe("Conversation message broadcast e2e", () => {
     expect(await prisma.message.count({ where: { conversationId } })).toBe(0);
   });
 
-  it("delivers a post-reference card sent over HTTP to the peer", async () => {
+  it("delivers the complete post-reference snapshot and retains it when the Listing changes", async () => {
     const { buyerToken, sellerToken, conversationId, listingId } =
       await seedConversation();
     const peer = await joinedSocket(sellerToken, conversationId);
+    await prisma.listingMedia.updateMany({
+      where: { listingId, sortOrder: 0 },
+      data: { key: "a07-cover.webp", thumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH" },
+    });
+
+    await request
+      .post(`/api/v1/conversations/${conversationId}/messages/post-ref`)
+      .set("Authorization", `Bearer ${buyerToken}`)
+      .send({ metadata: { listingId, coverThumbHash: "untrusted" }, clientMessageId: "client-ref-1" })
+      .expect(400);
 
     const res = await request
       .post(`/api/v1/conversations/${conversationId}/messages/post-ref`)
@@ -379,13 +464,47 @@ describe("Conversation message broadcast e2e", () => {
 
     await waitFor(peer.received, 1);
 
+    const metadata = {
+      listingId,
+      brandId: suite.catalog.brandId,
+      modelId: suite.catalog.modelId,
+      year: 2020,
+      displayPriceTmt: 100000,
+      priceCurrency: "TMT",
+      coverMediaKey: "a07-cover.webp",
+      coverThumbHash: "1fsDBYCIiIiHiIdweIeHh4d4cIgH",
+      status: "active",
+      available: true,
+    };
+    expect(res.body.metadata).toEqual(metadata);
     expect(peer.received).toHaveLength(1);
     expect(peer.received[0]?.message).toMatchObject({
       id: res.body.id,
       kind: "post_ref",
       clientMessageId: "client-ref-1",
-      metadata: expect.objectContaining({ listingId, available: true }),
+      metadata,
     });
+    expect(messageSentEvents).toHaveLength(1);
+
+    await prisma.listing.update({
+      where: { id: listingId },
+      data: { status: "sold", year: 2024, priceAmount: 900000 },
+    });
+    const retry = await request
+      .post(`/api/v1/conversations/${conversationId}/messages/post-ref`)
+      .set("Authorization", `Bearer ${buyerToken}`)
+      .send({ metadata: { listingId }, clientMessageId: "client-ref-1" })
+      .expect(201);
+    expect(retry.body).toMatchObject({ id: res.body.id, metadata: { ...metadata, available: false } });
+
+    const history = await request
+      .get(`/api/v1/conversations/${conversationId}/messages`)
+      .set("Authorization", `Bearer ${sellerToken}`)
+      .expect(200);
+    expect(history.body.items).toHaveLength(1);
+    expect(history.body.items[0].metadata).toEqual({ ...metadata, available: false });
+    await waitFor(peer.received, 1);
+    expect(peer.received).toHaveLength(1);
     expect(messageSentEvents).toHaveLength(1);
   });
 

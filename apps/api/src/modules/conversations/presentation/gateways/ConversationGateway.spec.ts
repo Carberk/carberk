@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from "vitest";
 import type { Server, Socket } from "socket.io";
 
 import {
+  type AuthenticatedSocketUser,
   conversationRoom,
   userRoom,
-} from "../../../realtime/infrastructure/realtime.config";
-import type { AuthenticatedSocketUser } from "../../../realtime/infrastructure/SocketAuthMiddleware";
+} from "../../../realtime/realtime.public";
 import type { PresencePort } from "../../../realtime/domain/ports/PresencePort";
 import { Conversation } from "../../domain/Conversation";
 import { Message } from "../../domain/Message";

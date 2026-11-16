@@ -2,21 +2,9 @@ import { Inject, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import type { Socket } from "socket.io";
 
+import type { AuthenticatedSocketUser } from "../realtime.public";
+
 import { REALTIME_ERROR_CODES } from "../domain/types";
-
-export interface AuthenticatedSocketUser {
-  sub: string;
-  sid: string;
-  phone: string | null;
-  role: string;
-}
-
-declare module "socket.io" {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface SocketData {
-    user?: AuthenticatedSocketUser;
-  }
-}
 
 interface SocketAuthError extends Error {
   data: Record<string, unknown>;

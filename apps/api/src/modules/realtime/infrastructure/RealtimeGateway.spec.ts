@@ -4,7 +4,7 @@ import type { Namespace, Socket } from "socket.io";
 import { RealtimeGateway } from "./RealtimeGateway";
 import { SocketAuthMiddleware } from "./SocketAuthMiddleware";
 import { SocketConnectionRegistry } from "./SocketConnectionRegistry";
-import { userRoom } from "./realtime.config";
+import { userRoom } from "../realtime.public";
 
 function buildSocket(overrides: {
   id?: string;

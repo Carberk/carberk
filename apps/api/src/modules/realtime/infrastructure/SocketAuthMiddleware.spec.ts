@@ -69,12 +69,12 @@ describe("SocketAuthMiddleware", () => {
     middleware.use(socket, next);
 
     expect(next).toHaveBeenCalledWith();
-    expect(socket.data.user).toEqual(expect.objectContaining({ sub: "user-1", role: "user" }));
+    expect(socket.data.user).toMatchObject({ sub: "user-1", sid: "session-1", phone: "+99361234567", role: "user" });
   });
 
   it("accepts a valid token from the Authorization header", () => {
     const { middleware, jwtService } = buildMiddleware();
-    const payload = { sub: "user-2", sid: "session-2", phone: "+99361234568", role: "user" };
+    const payload = { sub: "user-2", sid: "session-2", phone: null, role: "user" };
     const token = jwtService.sign(payload);
     const socket = buildSocket({ header: `Bearer ${token}` });
 
@@ -82,7 +82,7 @@ describe("SocketAuthMiddleware", () => {
     middleware.use(socket, next);
 
     expect(next).toHaveBeenCalledWith();
-    expect(socket.data.user?.sub).toBe("user-2");
+    expect(socket.data.user).toMatchObject({ sub: "user-2", sid: "session-2", phone: null, role: "user" });
   });
 
   it("prefers handshake auth over the Authorization header", () => {

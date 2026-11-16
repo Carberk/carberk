@@ -13,12 +13,12 @@ import { z } from "zod";
 import type { Server, Socket } from "socket.io";
 
 import {
+  type AuthenticatedSocketUser,
   conversationRoom,
   CONVERSATION_ROOM_PREFIX,
   REALTIME_NAMESPACE,
   userRoom,
-} from "../../../realtime/infrastructure/realtime.config";
-import type { AuthenticatedSocketUser } from "../../../realtime/infrastructure/SocketAuthMiddleware";
+} from "../../../realtime/realtime.public";
 import { PRESENCE_PORT, type PresencePort } from "../../../realtime/domain/ports/PresencePort";
 import { CONVERSATION_SOCKET_ERROR_CODES } from "../../domain/types";
 import {
