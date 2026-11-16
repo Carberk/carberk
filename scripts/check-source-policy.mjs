@@ -17,7 +17,7 @@ const sourceExtension = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const policyManifests = new Map([
   ["scripts/source-policy/notices.json", "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"],
-  ["scripts/source-policy/provenance.json", "1397bee9b82b55663a123a1c4b21b0edd8d83547a5f098402073179f28a56a2a"],
+  ["scripts/source-policy/provenance.json", "c72ed34450c5059cdb693962770515a38c3685ba6dbf8b8cfa99a30d0422df02"],
 ]);
 
 function compilerComments(path, source) {
