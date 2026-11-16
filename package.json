@@ -12,14 +12,14 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
+    "lint": "pnpm check:source-policy && turbo run lint",
     "test": "pnpm test:root && turbo run test",
     "test:unit": "pnpm test:agent-github && pnpm test:native-session && pnpm test:native-fixture-signin && pnpm test:admin-access && turbo run test:unit",
     "test:api": "turbo run test --filter=@auto-tm/api --filter=@auto-tm/worker",
     "test:api:unit": "DATABASE_URL=postgresql://auto_tm_ci:auto_tm_ci_pass@127.0.0.1:1/auto_tm_ci pnpm --filter @auto-tm/api... build && pnpm --filter @auto-tm/api test:unit",
     "test:db": "turbo run test --filter=@auto-tm/db",
     "test:frontend": "turbo run test --filter=@auto-tm/mobile --filter=@auto-tm/web --filter=@auto-tm/admin --filter=@auto-tm/contracts --filter=@auto-tm/sms-gateway",
-    "test:root": "pnpm exec turbo run build --filter=@auto-tm/contracts && pnpm check:agent-docs && node --test 'scripts/*.test.mjs' 'infra/minio/*.test.mjs'",
+    "test:root": "pnpm exec turbo run build --filter=@auto-tm/contracts && pnpm check:source-policy && pnpm check:agent-docs && node --test 'scripts/*.test.mjs' 'infra/minio/*.test.mjs'",
     "typecheck": "turbo run typecheck",
     "check:glossary": "node scripts/check-domain-glossary.mjs",
     "test:glossary": "node --test scripts/check-domain-glossary.test.mjs",
@@ -54,9 +54,12 @@
     "test:native-fixture-signin": "node --test scripts/native-fixture-signin.test.mjs",
     "native:ready": "pnpm --filter @auto-tm/db fixture:check",
     "admin:access": "node scripts/admin-access.mjs",
-    "test:admin-access": "node --test scripts/admin-access.test.mjs scripts/admin-access-process.test.mjs"
+    "test:admin-access": "node --test scripts/admin-access.test.mjs scripts/admin-access-process.test.mjs",
+    "check:source-policy": "node scripts/check-source-policy.mjs",
+    "test:source-policy": "node --test scripts/check-source-policy.test.mjs"
   },
   "devDependencies": {
+    "@babel/parser": "7.29.7",
     "@typescript/native": "catalog:",
     "tsx": "catalog:",
     "turbo": "^2.11.7",
