@@ -233,6 +233,9 @@ it("keeps prose selectable and maps multiple punctuated links to their exact tar
   })));
   const view = await renderMobile(<RequestScreen />);
   expect((await view.findByText(text)).props.selectable).toBe(true);
+  for (const name of ["Open report 1", "Copy link 1", "Open report 2", "Copy link 2"]) {
+    expect(view.getByRole("button", { name }).props.accessibilityHint).toBeUndefined();
+  }
   await fireEvent.press(view.getByRole("button", { name: "Open report 1" }));
   expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/a?token=A%2fb%2B&part=1&part=2");
   await fireEvent.press(view.getByRole("button", { name: "Copy link 2" }));
@@ -394,7 +397,8 @@ it.each([
   })));
   const view = await renderMobile(<RequestScreen />, { locale: language });
   await view.findByText("https://reports.example.test/a#synthetic");
-  expect(view.getByRole("button", { name: open }).props.accessibilityHint).toBe("https://reports.example.test/a#synthetic");
+  expect(view.getByRole("button", { name: open }).props.accessibilityHint).toBeUndefined();
+  expect(view.getByRole("button", { name: copy }).props.accessibilityHint).toBeUndefined();
   await fireEvent.press(view.getByRole("button", { name: copy }));
   expect(await view.findByText(confirmation)).toBeTruthy();
   expect(announce).toHaveBeenCalledWith(confirmation);

@@ -177,12 +177,12 @@ export function RequestConversation({ viewer, request, header, metadataError, me
           const linkKey = `${item.id}:${index}`;
           return <View key={linkKey} className="gap-2">
           <View className="flex-row flex-wrap gap-1">
-            <Button variant="link" className="max-w-full" disabled={!ready} accessibilityHint={reportTarget}
+            <Button variant="link" className="max-w-full" disabled={!ready}
               accessibilityState={{ busy: pendingLink?.key === linkKey && pendingLink.action === "open" }}
               onPress={() => actOnReport(linkKey, reportTarget, "open")}>
               <Text>{t(openFailure === linkKey ? "vehicleHistory.retryOpenReport" : "vehicleHistory.openReport")}{targets.length > 1 ? ` ${index + 1}` : ""}</Text>
             </Button>
-            <Button variant="link" className="max-w-full" disabled={!ready} accessibilityHint={reportTarget}
+            <Button variant="link" className="max-w-full" disabled={!ready}
               accessibilityState={{ busy: pendingLink?.key === linkKey && pendingLink.action === "copy" }}
               onPress={() => actOnReport(linkKey, reportTarget, "copy")}>
               <Text>{t(copyFailure === linkKey ? "vehicleHistory.retryCopyLink" : "vehicleHistory.copyLink")}{targets.length > 1 ? ` ${index + 1}` : ""}</Text>
