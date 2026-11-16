@@ -148,3 +148,58 @@ export async function historyMessageAction(locale: DeskLocale, value: unknown): 
     BigInt(input.body.kind === "read" ? result.data.readOrder : result.data.receivedOrder) < BigInt(input.throughOrder)) return { status: "unavailable", scope };
   return { ...admitted, kind: input.kind, data: result.data };
 }
+
+export type HistoryPrivateNoteResult = Exclude<HistoryInboxResult, { status: "ok" }> |
+  (Scope & { status: "ok" } & (
+    { kind: "page"; data: V.HistoryPrivateNotesPage } |
+    { kind: "add"; data: V.HistoryPrivateNote }
+  ));
+
+export async function historyPrivateNoteAction(locale: DeskLocale, value: unknown): Promise<HistoryPrivateNoteResult> {
+  await rejectExpiredSession();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { status: "validation" };
+  const command = value as Record<string, unknown>;
+  const selection = V.HistoryInboxActionSchema.safeParse({ kind: "detail", id: command["id"], scope: command["scope"],
+    expectedAssignmentVersion: command["expectedAssignmentVersion"] });
+  if (!selection.success || selection.data.kind !== "detail" || !["tk", "ru", "en"].includes(locale)) return { status: "validation" };
+  const kind = command["kind"];
+  if (kind !== "page" && kind !== "add") return { status: "validation" };
+  if (Object.keys(command).some((key) => !["kind", "id", "scope", "expectedAssignmentVersion", ...(kind === "page" ? ["cursor"] : ["body"])].includes(key))) return { status: "validation" };
+  const cursor = kind === "page" && command["cursor"] !== undefined ? V.HistoryPrivateNoteSchema.shape.id.safeParse(command["cursor"]) : null;
+  if (cursor && !cursor.success || kind === "page" && "body" in command || kind === "add" && "cursor" in command) return { status: "validation" };
+  const body = kind === "add" ? V.AddHistoryPrivateNoteSchema.safeParse(command["body"]) : null;
+  if (kind === "add" && (!body?.success || body.data.expectedAssignmentVersion !== selection.data.expectedAssignmentVersion)) return { status: "validation" };
+  const before = await historyInboxAction(locale, selection.data);
+  if (before.status !== "ok") return before;
+  let response: unknown, failure: unknown;
+  try {
+    const path = `/vehicle-history/operator/requests/${selection.data.id}/notes`;
+    const query = new URLSearchParams({ expectedAssignmentVersion: String(selection.data.expectedAssignmentVersion) });
+    if (cursor?.success) query.set("cursor", cursor.data);
+    response = await apiFetchOptional<unknown>(kind === "page" ? `${path}?${query}` : path, {
+      method: kind === "page" ? "GET" : "POST", cache: "no-store", headers: { "Accept-Language": locale },
+      ...(body?.success ? { body: body.data } : {}),
+    });
+  } catch (error) { unstable_rethrow(error); failure = error; }
+  const after = await historyInboxAction(locale, selection.data);
+  if (after.status !== "ok") return after;
+  if (after.scope !== before.scope || after.actor.id !== before.actor.id) return { status: "stale", scope: after.scope };
+  const scope = after.scope;
+  if (failure instanceof ApiError) {
+    if (failure.status === 403) return { status: "denied", scope };
+    if (failure.status === 409) return { status: "conflict", scope };
+    if (failure.status === 400) return { status: "validation", scope };
+  }
+  if (failure) return { status: "unavailable", scope };
+  if (response === null) return { status: "expired", scope };
+  if (kind === "page") {
+    const data = V.HistoryPrivateNotesPageSchema.safeParse(response);
+    if (!data.success || new Set(data.data.items.map((note) => note.id)).size !== data.data.items.length ||
+      data.data.nextCursor && data.data.nextCursor !== data.data.items.at(-1)?.id) return { status: "unavailable", scope };
+    return { status: "ok", scope, actor: after.actor, kind, data: data.data };
+  }
+  const data = V.HistoryPrivateNoteSchema.safeParse(response);
+  if (!data.success || !body?.success || data.data.clientNoteId !== body.data.clientNoteId ||
+    data.data.text !== body.data.text || data.data.author.id !== after.actor.id) return { status: "unavailable", scope };
+  return { status: "ok", scope, actor: after.actor, kind, data: data.data };
+}

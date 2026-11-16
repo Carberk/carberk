@@ -46,6 +46,14 @@ const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request
     }
     if (url.pathname.endsWith("/messages")) return Response.json({ items: [{ id, clientMessageId: id, order: "1", kind: "TEXT",
       text: "Can you check this car?", author: { ...actor, kind: "requester" }, createdAt: row.createdAt }], nextCursor: null });
+    if (url.pathname.endsWith("/notes")) {
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        return Response.json({ id: body.clientNoteId, clientNoteId: body.clientNoteId, text: body.text,
+          createdAt: row.createdAt, author: actor }, { status: 201 });
+      }
+      return Response.json({ items: [], nextCursor: null });
+    }
     if (url.pathname.endsWith(id)) return Response.json(detail());
     return Response.json({ items: [assigned ? { ...row, mine: true, assignmentVersion: 1, assignedOperator: actor } : row], nextCursor: null });
 }));
@@ -78,8 +86,154 @@ it("shows safe enquiry metadata, then claims atomically before opening the real 
   expect(requests.filter((r) => r.method === "POST" && !r.path.includes("receipts"))).toEqual([{ path: `/api/v1/vehicle-history/operator/requests/${id}/claim`, method: "POST", body: '{"expectedAssignmentVersion":0}' }]);
   expect(requests.filter((r) => r.path.includes("receipts") && r.method === "POST").every((r) => JSON.parse(String(r.body)).kind === "received")).toBe(true);
   expect(screen.getByRole("textbox", { name: "Reply to customer" })).toBeDefined();
-  expect(screen.queryByRole("textbox", { name: /note/i })).toBeNull();
+  expect(screen.getByRole("textbox", { name: "Internal note" })).toBeDefined();
   await waitFor(() => expect(document.activeElement?.id).toBe("selected-enquiry"));
+});
+it("keeps an attributed private note in the staff panel and out of the customer conversation", async () => {
+  selectAssigned();
+  render(view());
+  await screen.findByText("Can you check this car?");
+  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  expect(note).not.toBe(screen.getByRole("textbox", { name: "Reply to customer" }));
+  fireEvent.change(note, { target: { value: "Check the record before replying" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  await waitFor(() => expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/notes"))).toBe(true));
+  expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/messages"))).toBe(false);
+  expect(screen.getByRole("list", { name: "Enquiry conversation" }).textContent).not.toContain("Check the record before replying");
+  expect(screen.getByRole("region", { name: "Private staff notes" }).textContent).toContain("Check the record before replying");
+});
+it("restores an unsent private note separately from the public reply after remount", async () => {
+  selectAssigned();
+  const mounted = render(view());
+  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  fireEvent.change(note, { target: { value: "Staff-only draft" } });
+  await screen.findByText("Draft saved on this device.");
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("");
+  mounted.unmount();
+  render(view());
+  await waitFor(() => expect((screen.getByRole("textbox", { name: "Internal note" }) as HTMLTextAreaElement).value).toBe("Staff-only draft"));
+  expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("");
+  expect(localStorage.getItem(`carberk.history.private-note.v1:${actor.id}:${id}:1`)).toContain("Staff-only draft");
+});
+it("retries an unconfirmed private note with its original identity while retaining a newer draft", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  let attempts = 0;
+  vi.mocked(fetch).mockImplementation(async (input, init) => {
+    if (new URL(String(input)).pathname.endsWith("/notes") && init?.method === "POST") {
+      attempts++;
+      const response = await network(input, init);
+      if (attempts === 1) throw new Error("Response lost");
+      return response;
+    }
+    return network(input, init);
+  });
+  render(view());
+  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  fireEvent.change(note, { target: { value: "First staff note" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  await screen.findByRole("button", { name: "Retry this note" });
+  fireEvent.change(note, { target: { value: "Newer staff draft" } });
+  fireEvent.click(screen.getByRole("button", { name: "Retry this note" }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Retry this note" })).toBeNull());
+  expect((note as HTMLTextAreaElement).value).toBe("Newer staff draft");
+  const posts = requests.filter((request) => request.method === "POST" && request.path.endsWith("/notes"));
+  expect(posts).toHaveLength(2);
+  expect(JSON.parse(String(posts[0]?.body)).clientNoteId).toBe(JSON.parse(String(posts[1]?.body)).clientNoteId);
+  expect(screen.getByRole("region", { name: "Private staff notes" }).textContent).toContain("First staff note");
+  expect(screen.getByRole("list", { name: "Enquiry conversation" }).textContent).not.toContain("First staff note");
+});
+it("blocks a private note when its durable intent cannot be stored, then allows explicit recovery", async () => {
+  selectAssigned();
+  render(view());
+  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  fireEvent.change(note, { target: { value: "Durable note" } });
+  const storage = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("Disk full"); });
+  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  await screen.findByText("Note draft not saved. Retry saving it.");
+  expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/notes"))).toBe(false);
+  storage.mockRestore();
+  fireEvent.click(screen.getByRole("button", { name: "Retry saving note draft" }));
+  fireEvent.click(screen.getByRole("button", { name: "Retry this note" }));
+  await waitFor(() => expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/notes"))).toBe(true));
+});
+it("shows a separate private-note read failure and recovers through its own Retry", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  let failed = true;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (new URL(String(input)).pathname.endsWith("/notes") && failed) return Promise.resolve(Response.json({}, { status: 503 }));
+    return network(input, init);
+  });
+  render(view());
+  await screen.findByText("Could not load private notes.");
+  expect((screen.getByRole("button", { name: "Add private note" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("Can you check this car?")).toBeDefined();
+  failed = false;
+  fireEvent.click(screen.getByRole("button", { name: "Retry loading notes" }));
+  await screen.findByText("No private notes yet.");
+  expect((screen.getByRole("textbox", { name: "Internal note" }) as HTMLTextAreaElement).disabled).toBe(false);
+});
+it("discards a delayed private-note page after the selected request is disposed", async () => {
+  selectAssigned();
+  const network = networkHandler(), delayed = deferred<Response>();
+  vi.mocked(fetch).mockImplementation((input, init) => new URL(String(input)).pathname.endsWith("/notes")
+    ? delayed.promise : network(input, init));
+  render(view());
+  await screen.findByText("Can you check this car?");
+  fireEvent.click(screen.getByRole("button", { name: "Unassigned" }));
+  await waitFor(() => expect(screen.queryByRole("textbox", { name: "Internal note" })).toBeNull());
+  await act(async () => delayed.resolve(Response.json({ items: [{ id, clientNoteId: id, text: "Old private body",
+    createdAt: row.createdAt, author: actor }], nextCursor: null })));
+  expect(screen.queryByText("Old private body")).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull();
+});
+it("removes loaded private text when the note read loses current authority", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  let refused = false;
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    if (new URL(String(input)).pathname.endsWith("/notes")) return Promise.resolve(refused
+      ? Response.json({}, { status: 403 }) : Response.json({ items: [{ id, clientNoteId: id, text: "Staff-only fact",
+        createdAt: row.createdAt, author: actor }], nextCursor: null }));
+    return network(input, init);
+  });
+  render(view());
+  await screen.findByText("Staff-only fact");
+  refused = true;
+  fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+  await waitFor(() => expect(screen.queryByText("Staff-only fact")).toBeNull());
+  expect(screen.queryByRole("textbox", { name: "Internal note" })).toBeNull();
+});
+it("pages attributed private notes without adding them to the customer transcript", async () => {
+  selectAssigned();
+  const network = networkHandler();
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = new URL(String(input));
+    if (!url.pathname.endsWith("/notes")) return network(input, init);
+    const second = url.searchParams.has("cursor");
+    return Promise.resolve(Response.json({ items: [{ id: second ? id : actor.id, clientNoteId: id,
+      text: second ? "Second private note" : "First private note", createdAt: row.createdAt,
+      author: second ? { ...actor, displayName: "Selbi" } : actor }], nextCursor: second ? null : actor.id }));
+  });
+  render(view());
+  await screen.findByText("First private note");
+  fireEvent.click(screen.getByRole("button", { name: "More notes" }));
+  await screen.findByText("Second private note");
+  expect(screen.getByRole("region", { name: "Private staff notes" }).textContent).toContain("Selbi");
+  expect(screen.getByRole("list", { name: "Enquiry conversation" }).textContent).not.toContain("private note");
+});
+it.each([
+  ["tk", "Içerki bellik", "Şahsy bellik goş", "Müşderä iberilmeýär."],
+  ["ru", "Внутренняя заметка", "Добавить личную заметку", "Не отправляются клиенту."],
+  ["en", "Internal note", "Add private note", "Never sent to the customer."],
+] as const)("keeps the private action and privacy consequence clear in %s", async (locale, label, action, consequence) => {
+  assigned = true; platform.path = `/vehicle-history/${locale}`;
+  window.history.replaceState(null, "", `${platform.path}?filter=mine&selected=${id}&v=1`);
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  expect(await screen.findByRole("textbox", { name: label })).toBeDefined();
+  expect(screen.getByRole("button", { name: action })).toBeDefined();
+  expect(screen.getByText(consequence)).toBeDefined();
 });
 it("retains queue, search, page and selection in locale links and restores Back/refresh", async () => {
   const snapshot = `/vehicle-history/en?filter=mine&search=Merdan&cursor=${id}&selected=${id}&v=1`;
@@ -753,7 +907,7 @@ it("shows operator Sent, Delivered and Read only from durable requester version-
   facts = [{ participantId: id, assignmentVersion: 0, receivedOrder: "1", readOrder: "1" }];
   fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
   await screen.findByText("Read");
-  expect(screen.queryByRole("textbox", { name: /note/i })).toBeNull();
+  expect(screen.getByRole("textbox", { name: "Internal note" })).toBeDefined();
 });
 
 it("completes Received before a clipped tall row is 50% viewport eligible for 300ms", async () => {
@@ -1168,7 +1322,7 @@ it("keeps the public reply draft through request navigation, reload and same-acc
   render(view());
   await waitFor(() => expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value)
     .toBe("  Here is the history\nTäze maglumat · Новые сведения  "));
-  expect(screen.queryByRole("textbox", { name: /note/i })).toBeNull();
+  expect((screen.getByRole("textbox", { name: "Internal note" }) as HTMLTextAreaElement).value).toBe("");
 });
 
 it("sends exact public text once, announces Pending and Sent, and keeps typing done before acknowledgement", async () => {
