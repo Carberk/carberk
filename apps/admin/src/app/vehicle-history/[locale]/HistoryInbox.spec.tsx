@@ -145,9 +145,14 @@ it("retries an unconfirmed private note with its original identity while retaini
 });
 it("keeps the same private-note Retry available when Refresh interrupts a pending save", async () => {
   selectAssigned();
-  const network = networkHandler(), pending = deferred<Response>();
+  const network = networkHandler(), pending = deferred<Response>(), initialNotes = deferred<Response>();
+  let firstRead = true;
   const attempts: { clientNoteId: string; text: string }[] = [];
   vi.mocked(fetch).mockImplementation((input, init) => {
+    if (new URL(String(input)).pathname.endsWith("/notes") && init?.method !== "POST" && firstRead) {
+      firstRead = false;
+      return initialNotes.promise;
+    }
     if (new URL(String(input)).pathname.endsWith("/notes") && init?.method === "POST") {
       attempts.push(JSON.parse(String(init.body)));
       return attempts.length === 1 ? pending.promise : network(input, init);
@@ -156,11 +161,17 @@ it("keeps the same private-note Retry available when Refresh interrupts a pendin
   });
   render(view());
   fireEvent.change(await screen.findByRole("textbox", { name: "Internal note" }), { target: { value: "Keep one note intent" } });
-  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  const add = screen.getByRole("button", { name: "Add private note" }) as HTMLButtonElement;
+  expect(add.disabled).toBe(true);
+  await act(async () => initialNotes.resolve(Response.json({ items: [], nextCursor: null })));
+  await waitFor(() => expect(add.disabled).toBe(false));
+  fireEvent.click(add);
   await waitFor(() => expect(attempts).toHaveLength(1));
   fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
   await act(async () => pending.resolve(Response.json({}, { status: 503 })));
-  fireEvent.click(await screen.findByRole("button", { name: "Retry this note" }));
+  const retry = await screen.findByRole("button", { name: "Retry this note" }) as HTMLButtonElement;
+  await waitFor(() => expect(retry.disabled).toBe(false));
+  fireEvent.click(retry);
   await waitFor(() => expect(attempts).toHaveLength(2));
   await waitFor(() => expect(screen.queryByRole("button", { name: "Retry this note" })).toBeNull());
   expect(attempts[1]?.clientNoteId).toBe(attempts[0]?.clientNoteId);

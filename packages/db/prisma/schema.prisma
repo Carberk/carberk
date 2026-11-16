@@ -214,7 +214,7 @@ model HistoryPrivateNote {
   sequence          BigInt @unique @default(autoincrement())
   createdAt         DateTime @default(now()) @db.Timestamptz(3)
 
-  @@unique([requestId, authorId, clientNoteId])
+  @@unique([requestId, authorId, clientNoteId], map: "vehicle_history_private_notes_requestId_authorId_clientNoteId_k")
   @@index([requestId, sequence])
   @@map("vehicle_history_private_notes")
 }
