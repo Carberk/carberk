@@ -64,6 +64,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const [copyFailure, setCopyFailure] = useState<string | null>(null);
   const [openFailure, setOpenFailure] = useState<string | null>(null);
   const [pendingLink, setPendingLink] = useState<{ key: string; action: "open" | "copy" } | null>(null);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const linkAttempt = useRef(0);
   const linkReader = useRef({ mounted: true, ready: false });
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
@@ -171,6 +172,11 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     return t("conversations:messageSent");
   };
   const retry = () => { void thread.refresh(); };
+  const pullRefresh = async () => {
+    setPullRefreshing(true);
+    try { await thread.refresh(); }
+    finally { if (linkReader.current.mounted) setPullRefreshing(false); }
+  };
   let notice: ReactNode = null;
   if (denied) notice = <Text accessibilityRole="alert">{t("vehicleHistory.denied")}</Text>;
   else if (pages.isPending) notice = <ActivityIndicator accessibilityLabel={t("loading")} />;
@@ -191,7 +197,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     onScrollBeginDrag={() => { browserPosition.current = null; }}
     onLayout={(event) => { position.current.height = event.nativeEvent.layout.height; restoreBrowserPosition(); }}
     onViewableItemsChanged={onVisible} viewabilityConfig={viewabilityConfig}
-    refreshControl={<RefreshControl refreshing={metadataRefreshing || pages.isRefetching} onRefresh={retry} />}
+    refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
       {header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}

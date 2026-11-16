@@ -167,6 +167,101 @@ it.each(["same reader", "replacement session", "unmounted reader"] as const)("re
   expect(requests).toHaveLength(1);
 });
 
+it("keeps the focused report action at its captured screen position through return and later reconciliation", async () => {
+  const requests = (ReactNative as unknown as { scrollRequests: { method: string; offset: number }[] }).scrollRequests;
+  const polls: (() => void)[] = [];
+  const interval = globalThis.setInterval;
+  vi.spyOn(globalThis, "setInterval").mockImplementation((callback, delay, ...args) => {
+    if (delay === 15_000) polls.push(callback as () => void);
+    return interval(callback, delay, ...args);
+  });
+  let shown: ((event: ReactNative.KeyboardEvent) => void) | undefined;
+  vi.spyOn(Keyboard, "isVisible").mockReturnValue(true);
+  const subscribeKeyboard = Keyboard.addListener;
+  vi.spyOn(Keyboard, "addListener").mockImplementation((event, listener) => {
+    if (event === "keyboardDidShow") shown = listener;
+    return subscribeKeyboard(event, listener);
+  });
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { frames.push(callback); return frames.length; });
+  let detailGate: ReturnType<typeof deferred<Response>> | null = null;
+  let detailRequests = 0;
+  server.use(
+    http.get("*/vehicle-history/requests/:id", () => { detailRequests++; return detailGate?.promise ?? HttpResponse.json(enquiry); }),
+    http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+      items: [{ ...message(), text: "(https://reports.example.test/a),(https://reports.example.test/b)" }], nextCursor: null,
+    })),
+  );
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByRole("button", { name: "Open report 2" });
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  const list = getHost(view.container, "RCTScrollView");
+  const input = view.getByLabelText("Your message");
+  await fireEvent.changeText(input, "Keep this focused question");
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 176.667 } } });
+  let nativeOffset = 871.667;
+  let nativeRefreshing = false;
+  const settleNativeViewport = async () => {
+    const refreshing = list.props.refreshControl.props.refreshing;
+    if (refreshing && !nativeRefreshing) nativeOffset -= 60;
+    nativeRefreshing = refreshing;
+    for (const request of requests.splice(0)) if (request.method === "scrollToOffset") nativeOffset = request.offset;
+    await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: nativeOffset },
+      contentSize: { width: 402, height: 1048.333 },
+      layoutMeasurement: { width: 402, height: 176.667 },
+    } });
+    return 1090.167 - nativeOffset;
+  };
+  expect(await settleNativeViewport()).toBeCloseTo(218.5, 3);
+  await fireEvent.press(view.getByRole("button", { name: "Open report 2" }));
+  await act(() => { AppState.currentState = "background"; focusManager.setFocused(false); });
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 0 } } });
+  await act(() => shown?.({ duration: 250, easing: "keyboard",
+    endCoordinates: { screenX: 0, screenY: 539, width: 402, height: 335 },
+  }));
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 176.667 } } });
+  detailGate = deferred<Response>();
+  const returningRequest = detailRequests + 1;
+  await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
+  await vi.waitFor(() => expect(detailRequests).toBe(returningRequest));
+  await settleNativeViewport();
+  await act(() => detailGate?.resolve(HttpResponse.json(enquiry)));
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await act(() => frames.splice(0).forEach((frame) => frame(16)));
+  expect(await settleNativeViewport()).toBeCloseTo(218.5, 3);
+  detailGate = deferred<Response>();
+  const laterRequest = detailRequests + 1;
+  await act(() => polls.at(-1)?.());
+  await vi.waitFor(() => expect(detailRequests).toBe(laterRequest));
+  const settledActionCenter = await settleNativeViewport();
+  await act(() => detailGate?.resolve(HttpResponse.json(enquiry)));
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  expect(settledActionCenter).toBeCloseTo(218.5, 3);
+  expect(getHost(view.container, "RCTScrollView")).toBe(list);
+  expect(view.getByLabelText("Your message")).toBe(input);
+  expect(view.getByDisplayValue("Keep this focused question")).toBeTruthy();
+});
+
+it.each([200, 503])("shows pull feedback only for an explicit refresh and settles after HTTP %s", async (status) => {
+  const response = deferred<Response>();
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Questions are welcome.");
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  const list = getHost(view.container, "RCTScrollView");
+  const input = view.getByLabelText("Your message");
+  await fireEvent.changeText(input, "Keep this question through refresh");
+  expect(list.props.refreshControl.props.refreshing).toBe(false);
+  server.use(http.get("*/vehicle-history/requests/:id", () => response.promise));
+  await act(() => list.props.refreshControl.props.onRefresh());
+  await vi.waitFor(() => expect(list.props.refreshControl.props.refreshing).toBe(true));
+  await act(() => response.resolve(status === 200 ? HttpResponse.json(enquiry)
+    : HttpResponse.json({ code: "UNAVAILABLE" }, { status })));
+  await vi.waitFor(() => expect(list.props.refreshControl.props.refreshing).toBe(false));
+  expect(getHost(view.container, "RCTScrollView")).toBe(list);
+  expect(view.getByLabelText("Your message")).toBe(input);
+  expect(view.getByDisplayValue("Keep this question through refresh")).toBeTruthy();
+});
+
 it.each(["Copy link", "failed Open", "user scroll"])("does not restore an old report position after %s", async (action) => {
   const requests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
   server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
