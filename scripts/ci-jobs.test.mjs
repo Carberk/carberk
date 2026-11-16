@@ -151,21 +151,29 @@ test("the required check rejects failed, cancelled and unexpectedly skipped jobs
   }
 });
 
-test("the full PR static job builds the worker and its production prerequisites", () => {
-  const job = jobs(workflow("pr-checks.yml")).get("static");
-  const command = /run: (pnpm exec turbo run build --filter=@auto-tm\/worker --concurrency=1)\n/.exec(job)?.[1];
-  assert.ok(command, "static must run the worker production build through Turbo");
-  assert.doesNotMatch(job, /continue-on-error:/);
-  const graph = spawnSync("pnpm", [...command.split(" ").slice(1), "--dry=json"], {
-    cwd: root, encoding: "utf8", timeout: 30000,
-  });
-  assert.equal(graph.status, 0, graph.stderr);
-  const tasks = JSON.parse(graph.stdout).tasks;
-  const worker = tasks.find(task => task.taskId === "@auto-tm/worker#build");
-  assert.equal(worker.command, "nest build");
-  for (const id of ["@auto-tm/contracts#build", "@auto-tm/db#build"]) {
-    assert.ok(worker.dependencies.includes(id), `worker build must depend on ${id}`);
-    assert.equal(tasks.find(task => task.taskId === id)?.command, "node scripts/build.cjs");
+test("full gates build API, worker and public Web once without rebuilding Admin", () => {
+  for (const name of ["pr-checks.yml", "ci.yml"]) {
+    const graph = jobs(workflow(name));
+    const buildJob = graph.get(name === "pr-checks.yml" ? "static" : "build");
+    const command = /run: (pnpm exec turbo run build[^\n]*)/.exec(buildJob)?.[1];
+    assert.ok(command, `${name} must select production builds through Turbo`);
+    assert.doesNotMatch(buildJob, /continue-on-error:|NODE_ENV: test|APP_ENV: test/);
+    assert.match(buildJob, /DATABASE_URL: postgresql:\/\/auto_tm_ci:auto_tm_ci_pass@127\.0\.0\.1:1\/auto_tm_ci/);
+    const result = spawnSync("pnpm", [...command.split(" ").slice(1), "--dry=json"], {
+      cwd: root, encoding: "utf8", timeout: 30000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const tasks = JSON.parse(result.stdout).tasks;
+    for (const app of ["api", "worker", "web"]) {
+      const task = tasks.find(task => task.taskId === `@auto-tm/${app}#build`);
+      assert.ok(task, `${name} does not build ${app}`);
+      assert.equal(task.command, app === "web" ? "next build" : "nest build");
+      assert.ok(task.dependencies.includes("@auto-tm/contracts#build"));
+      if (app !== "web") assert.ok(task.dependencies.includes("@auto-tm/db#build"));
+    }
+    assert.equal(tasks.some(task => task.taskId === "@auto-tm/admin#build"), false);
+    assert.equal([...graph.values()].filter(job => job.includes("run: pnpm --filter @auto-tm/admin verify:runtime")).length, 1);
+    assert.equal([...graph.values()].filter(job => /run: pnpm (?:build|exec turbo run build)/.test(job)).length, 1);
   }
 });
 
@@ -208,6 +216,84 @@ test("production rootDir errors missed by typecheck fail the required PR gate", 
     });
     assert.equal(aggregate.status, expectedGate, aggregate.stdout + aggregate.stderr);
     t.diagnostic(`${config} production config: Nest exit ${build.status}${config === "broken" ? " (TS6059)" : " (CommonJS emitted)"}; required pr aggregate exit ${aggregate.status}`);
+  }
+});
+
+function productionGateResult(build) {
+  assert.ok(Number.isInteger(build.status), build.error?.message ?? "build did not exit");
+  return spawnSync("bash", ["-c", runBlock(jobs(workflow("pr-checks.yml")).get("pr"))], {
+    env: { ...process.env, LANE: "full", LANE_RESULT: "success", DOCS_RESULT: "skipped",
+      STATIC_RESULT: build.status === 0 ? "success" : "failure",
+      API_RESULT: "success", DB_RESULT: "success", FRONTEND_RESULT: "success" },
+    encoding: "utf8",
+  });
+}
+
+test("API production emit failures missed by ordinary typecheck fail the required gate", t => {
+  const fixture = mkdtempSync(join(tmpdir(), "ci-api-build-"));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  const cwd = join(fixture, "api");
+  mkdirSync(join(cwd, "src"), { recursive: true });
+  symlinkSync(join(root, "apps/api/node_modules"), join(cwd, "node_modules"), "dir");
+  writeFileSync(join(cwd, "tsconfig.json"), JSON.stringify({
+    extends: join(root, "apps/api/tsconfig.json"),
+    compilerOptions: { types: [], outDir: "./dist" },
+  }));
+  for (const config of ["nest-cli.json", "tsconfig.build.json"]) {
+    writeFileSync(join(cwd, config), JSON.stringify(readJson(`apps/api/${config}`)));
+  }
+  const run = (binary, args) => spawnSync(process.execPath, [join(cwd, "node_modules", binary), ...args], {
+    cwd, encoding: "utf8", timeout: 30000,
+  });
+  for (const broken of [true, false]) {
+    mkdirSync(join(cwd, "dist/src"), { recursive: true });
+    writeFileSync(join(cwd, "dist/src/main.d.ts"), "export interface Fixture { value: number; }\n");
+    writeFileSync(join(cwd, "src/main.ts"), broken
+      ? 'import type { Fixture } from "../dist/src/main"; export const value: Fixture = { value: 1 };\n'
+      : 'export const value = 1;\n');
+    const typecheck = run("@typescript/native/bin/tsc", ["--noEmit"]);
+    assert.equal(typecheck.status, 0, typecheck.stdout + typecheck.stderr);
+    const build = run("@nestjs/cli/bin/nest.js", ["build"]);
+    assert.equal(build.status, broken ? 1 : 0, build.stdout + build.stderr);
+    if (broken) assert.match(build.stdout + build.stderr, /TS5055/);
+    else assert.match(readFileSync(join(cwd, "dist/src/main.js"), "utf8"), /exports.value/);
+    const aggregate = productionGateResult(build);
+    assert.equal(aggregate.status, broken ? 1 : 0, aggregate.stdout + aggregate.stderr);
+    t.diagnostic(`API ${broken ? "broken" : "fixed"}: typecheck ${typecheck.status}, Nest ${build.status}, pr ${aggregate.status}`);
+  }
+});
+
+test("public Web prerender failures missed by typecheck fail the required gate", t => {
+  const cwd = mkdtempSync(join(root, ".ci-web-build-"));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  symlinkSync(join(root, "apps/web/node_modules"), join(cwd, "node_modules"), "dir");
+  mkdirSync(join(cwd, "src/app"), { recursive: true });
+  writeFileSync(join(cwd, "package.json"), JSON.stringify({ name: "ci-web-build-fixture", private: true }));
+  writeFileSync(join(cwd, "tsconfig.json"), JSON.stringify(readJson("apps/web/tsconfig.json")));
+  writeFileSync(join(cwd, "next.config.mjs"), `export default ${JSON.stringify({
+    output: "standalone", outputFileTracingRoot: root, turbopack: { root },
+  })};\n`);
+  writeFileSync(join(cwd, "next-env.d.ts"), 'import "next"; import "next/image-types/global";\n');
+  writeFileSync(join(cwd, "src/app/layout.tsx"),
+    'export default function Layout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n');
+  const run = (binary, args) => spawnSync(process.execPath, [join(cwd, "node_modules", binary), ...args], {
+    cwd, encoding: "utf8", timeout: 120000,
+    env: { ...process.env, NODE_ENV: "production", NEXT_TELEMETRY_DISABLED: "1" },
+  });
+  for (const broken of [true, false]) {
+    rmSync(join(cwd, ".next"), { recursive: true, force: true });
+    writeFileSync(join(cwd, "src/app/page.tsx"), broken
+      ? 'export default function Page() { throw new Error("Q03_PRERENDER_FAILURE"); return <main>Ready</main>; }\n'
+      : 'export default function Page() { return <main>Ready</main>; }\n');
+    const typecheck = run("@typescript/native/bin/tsc", ["--noEmit"]);
+    assert.equal(typecheck.status, 0, typecheck.stdout + typecheck.stderr);
+    const build = run("next/dist/bin/next", ["build"]);
+    assert.equal(build.status, broken ? 1 : 0, build.stdout + build.stderr);
+    if (broken) assert.match(build.stdout + build.stderr, /Q03_PRERENDER_FAILURE/);
+    else assert.match(readFileSync(join(cwd, ".next/server/app/index.html"), "utf8"), /Ready/);
+    const aggregate = productionGateResult(build);
+    assert.equal(aggregate.status, broken ? 1 : 0, aggregate.stdout + aggregate.stderr);
+    t.diagnostic(`Web ${broken ? "broken" : "fixed"}: typecheck ${typecheck.status}, Next ${build.status}, pr ${aggregate.status}`);
   }
 });
 
