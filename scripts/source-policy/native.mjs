@@ -65,7 +65,8 @@ export function parseNative({ path, source, fileType, dialect }) {
         result.deferred.push({ path, fileType, startOffset: node.startIndex, endOffset: node.endIndex,
           reason: "native script interpreter requires executable provenance" });
       } else if (!literalTypes.has(node.type)) {
-        if (!node.childCount && /^(?:\/\*|\*\/|\/\/)/.test(source.slice(node.startIndex, node.startIndex + 2))) {
+        const delimiterCandidate = node.type === "custom_operator" ? node.text : source.slice(node.startIndex, node.startIndex + 2);
+        if (!node.childCount && /\/\*|\*\/|\/\//.test(delimiterCandidate)) {
           throw new Error(`${path}: ${grammar} parse failed (unrecognized comment delimiter at ${node.startIndex})`);
         }
         pending.push(...children(node, grammar).reverse());

@@ -91,6 +91,12 @@ test("undeclared Gradle dialects and unrelated grammars visibly fail", () => {
   }
 });
 
+test("Swift operator tokens cannot hide comment delimiters from the inventory", () => {
+  for (const source of ["let x = 1 +/* unclosed", "let x = 1 +// explanation\n2"]) {
+    assert.throws(() => parseNative({ path: "operator.swift", fileType: "swift", source }), /operator\.swift:.*parse failed/);
+  }
+});
+
 test("Groovy rejects nested block comments instead of inventing Kotlin semantics", () => {
   assert.throws(() => parseNative({ path: "build.gradle", source: "/* outer /* inner */ done */", fileType: "gradle", dialect: "groovy" }), /parse failed/);
 });
