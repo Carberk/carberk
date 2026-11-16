@@ -581,11 +581,12 @@ test("known compiler outputs pass exact producer bytes while authored siblings a
   write("packages/contracts/dist/index.js.map", '{"version":3,"sources":[],"mappings":""}');
   assert.match(checkRepository(directory, {}).join("\n"), /index\.js\.map.*provenance bytes changed/);
   const originalConfig = JSON.parse(readFileSync(configPath, "utf8"));
-  for (const option of ["declarationDir", "outFile", "tsBuildInfoFile"]) {
+  for (const option of ["declarationDir", "outFile", "tsBuildInfoFile", "generateTrace"]) {
     write("packages/contracts/tsconfig.build.json", JSON.stringify({ ...originalConfig,
       compilerOptions: { ...originalConfig.compilerOptions, [option]: "./policy-overwrite" } }));
     assert.throws(() => checkRepository(directory, {}), /unsupported producer output configuration/);
     assert.equal(existsSync(join(directory, "packages/contracts/policy-overwrite")), false);
+    assert.equal(existsSync(join(directory, "policy-overwrite")), false);
   }
 
 });

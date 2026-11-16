@@ -68,7 +68,7 @@ export function producerProvenance(directory, current, trusted) {
     const loaded = ts.readConfigFile(configPath, ts.sys.readFile);
     if (loaded.error) throw new Error(`${workspace}: producer configuration unavailable`);
     const config = ts.parseJsonConfigFileContent(loaded.config, ts.sys, dirname(configPath));
-    if (config.errors.length || config.options.declarationDir || config.options.outFile || config.options.tsBuildInfoFile ||
+    if (config.errors.length || config.options.declarationDir || config.options.outFile || config.options.tsBuildInfoFile || config.options.generateTrace ||
       resolve(config.options.outDir ?? "") !== join(directory, workspace, "dist")) {
       throw new Error(`${workspace}: unsupported producer output configuration`);
     }
