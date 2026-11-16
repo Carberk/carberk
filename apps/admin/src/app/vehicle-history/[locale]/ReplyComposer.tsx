@@ -59,25 +59,24 @@ export function ReplyComposer({ locale, actorId, id, version, messages, send, bu
     try { ports.current.storage().removeItem(key); load(); }
     catch { setSaved(false); setStorageError("corrupt"); }
   }
-  function save(next: Draft) {
+  const save = useCallback((next: Draft) => {
     if (!active.current) return false;
     current.current = next; setDraft(next);
     try { ports.current.storage().setItem(key, JSON.stringify(next)); setSaved(true); setStorageError(""); return true; }
     catch { setSaved(false); setStorageError("save"); return false; }
-  }
-  function acknowledge(message: V.HistoryMessage) {
+  }, [key]);
+  const acknowledge = useCallback((message: V.HistoryMessage) => {
     if (!active.current) return;
     const latest = current.current, intent = latest.intent;
     if (!intent || message.clientMessageId !== intent.clientMessageId || message.text !== intent.text || message.author.id !== actorId) return;
     save({ text: latest.revision === intent.revision ? "" : latest.text, revision: latest.revision, intent: null });
     setPhase(""); setConfirmed((previous) => [...previous.filter((item) => item.id !== message.id), message]);
-  }
+  }, [actorId, save]);
   useEffect(() => {
     const intent = current.current.intent;
     const found = intent && messages.find((message) => message.clientMessageId === intent.clientMessageId && message.author.kind === "operator");
     if (found) acknowledge(found);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messages, acknowledge]);
   function submit() {
     if (!active.current || busy || offline || phase === "pending" || !saved) return;
     const latest = current.current;
