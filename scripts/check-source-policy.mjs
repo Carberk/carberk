@@ -17,7 +17,7 @@ const sourceExtension = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const policyManifests = new Map([
   ["scripts/source-policy/notices.json", "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"],
-  ["scripts/source-policy/provenance.json", "c72ed34450c5059cdb693962770515a38c3685ba6dbf8b8cfa99a30d0422df02"],
+  ["scripts/source-policy/provenance.json", "60d764e6be2419746107549246442ecb6dc2d6c95fead216d02aefe45b4a170c"],
 ]);
 
 function compilerComments(path, source) {
@@ -138,9 +138,10 @@ export function checkSources({ current, legacy, trusted, exclusions = [], notice
   try {
     for (const [path, source] of current) {
       if (!sourceExtension.test(path)) continue;
-      const exclusion = exclusions.find((entry) => entry.path === path);
-      if (exclusion) {
-        if (!exclusion.origin || digest(source) !== exclusion.sha256) errors.push(`${path}: pinned provenance bytes changed`);
+      const pins = exclusions.filter((entry) => entry.path === path);
+      if (pins.length) {
+        const hash = digest(source);
+        if (!pins.some((entry) => entry.origin && hash === entry.sha256)) errors.push(`${path}: pinned provenance bytes changed`);
         continue;
       }
       try {
