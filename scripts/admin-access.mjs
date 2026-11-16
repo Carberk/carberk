@@ -36,21 +36,21 @@ function argumentsFor(argv) {
   return options;
 }
 
-function adminOrigin(value) {
+export function adminOrigin(value) {
   let url;
   try { url = new URL(value); } catch { throw new FixtureError("Use an explicit http loopback Admin origin with no path"); }
   if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || url.origin !== value || url.username || url.password) throw new FixtureError("Use an explicit http loopback Admin origin with no path");
   return url;
 }
 
-function localConfig(env, api) {
+export function localConfig(env, api) {
   if (!["development", "test"].includes(env.APP_ENV) || !["development", "test"].includes(env.NODE_ENV) || env.SMS_DRIVER !== "mock" || env.OTP_TEST_MODE !== "false" || env.OTP_TEST_CODE_RESPONSE !== "false" || (env.PORT ?? "3006") !== (api.port || "80")) throw new FixtureError("Selected API env must match the port and use development/test, mock SMS and disabled CI code bypasses");
   let db;
   try { db = new URL(env.DATABASE_URL); } catch { throw new FixtureError("Selected API env needs an explicit local PostgreSQL target"); }
   if (db.href !== env.DATABASE_URL || !["postgres:", "postgresql:"].includes(db.protocol) || !["localhost", "127.0.0.1", "[::1]"].includes(db.hostname) || db.search || db.hash) throw new FixtureError("Refusing a nonlocal or overridden database target");
 }
 
-async function health(url, service, ports, environment) {
+export async function health(url, service, ports, environment) {
   let result;
   try {
     const response = await ports.fetch(new URL("/healthz", url), { redirect: "error", signal: AbortSignal.timeout(5000) });
