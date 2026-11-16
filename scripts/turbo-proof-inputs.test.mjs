@@ -14,6 +14,11 @@ const photoManifests = [
 ];
 const proofFlags = {
   AUTO_TM_TEST_DATABASES: "off",
+  VIDEO_STORAGE_E2E: "1",
+  VIDEO_PROCESSING_DATABASE_E2E: "1",
+  VIDEO_PROCESSING_STORAGE_E2E: "1",
+  GITHUB_ACTIONS: "true",
+  CI: "true",
   RICH_VIDEO_TEST_API_REGION: "eu-west-1",
   RICH_VIDEO_TEST_WORKER_REGION: "eu-west-2",
   REPORT_ENTRY_ENABLED: "true",
