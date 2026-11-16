@@ -6,21 +6,17 @@ import {
   ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { MODERATION_UNIT_OF_WORK, type ModerationUnitOfWork } from "./ports/ModerationUnitOfWork";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import {
-  IDENTITY_ADMIN_PORT,
   IDENTITY_READ_PORT,
-  type IdentityAdminPort,
   type IdentityReadPort,
 } from "../../identity/identity.public";
 import { MESSAGE_MODERATION_READ_PORT, type MessageModerationReadPort } from "../../conversations/domain/ports/MessageModerationReadPort";
 import { reportedMessageSenderId } from "../domain/reportedMessageSenderId";
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { CONTENT_REPORT_REPOSITORY } from "../domain/ports/ContentReportRepository";
-import type { AuditLogRepository } from "../domain/ports/AuditLogRepository";
-import { AUDIT_LOG_REPOSITORY } from "../domain/ports/AuditLogRepository";
 
 export interface SuspendUserInput {
   userId: string;
@@ -44,16 +40,12 @@ export interface SuspendUserResult {
 @Injectable()
 export class SuspendUser {
   constructor(
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(MODERATION_UNIT_OF_WORK)
+    private readonly moderation: ModerationUnitOfWork,
     @Inject(IDENTITY_READ_PORT)
     private readonly identityRead: IdentityReadPort,
-    @Inject(IDENTITY_ADMIN_PORT)
-    private readonly identityAdmin: IdentityAdminPort,
     @Inject(CONTENT_REPORT_REPOSITORY)
     private readonly reportRepo: ContentReportRepository,
-    @Inject(AUDIT_LOG_REPOSITORY)
-    private readonly auditRepo: AuditLogRepository,
     @Inject(MESSAGE_MODERATION_READ_PORT)
     private readonly messageRead: MessageModerationReadPort,
   ) {}
@@ -155,30 +147,26 @@ export class SuspendUser {
     }
 
     // 4. Execute mutation + audit in one transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      const suspendResult = await this.identityAdmin.suspendUser(
+    const result = await this.moderation.run(async (tx) => {
+      const suspendResult = await tx.identity.suspendUser(
         input.userId,
         input.adminUserId,
         input.reason,
-        tx,
       );
 
-      // Action the report if provided
       let reportStatus: "actioned" | undefined;
       if (report) {
-        await this.reportRepo.updateStatus(
+        await tx.reports.updateStatus(
           report.id,
           {
             status: "actioned",
             reviewedById: input.adminUserId,
             reviewedAt: new Date(),
           },
-          tx,
         );
         reportStatus = "actioned";
       }
 
-      // Write audit log
       const auditDetails: Record<string, unknown> = {
         reason: input.reason,
         before: {
@@ -199,7 +187,7 @@ export class SuspendUser {
         (auditDetails["after"] as Record<string, unknown>)["reportStatus"] = "actioned";
       }
 
-      const auditRow = await this.auditRepo.create(
+      const auditRow = await tx.audit.create(
         {
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.UserSuspend,
@@ -207,7 +195,6 @@ export class SuspendUser {
           targetId: input.userId,
           details: auditDetails,
         },
-        tx,
       );
 
       return {

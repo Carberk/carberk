@@ -29,6 +29,7 @@ import {
   seedSuiteCatalog,
 } from "../../../../test/helpers/e2eSuite";
 import { bullTestRoot } from "../../../../test/helpers/bullTestRoot";
+import { MODERATION_UNIT_OF_WORK, type ModerationUnitOfWork } from "../application/ports/ModerationUnitOfWork";
 
 const suite = defineE2eSuite("admin-moderation-controller");
 type SuiteUser =
@@ -158,6 +159,87 @@ describe("AdminModerationController e2e smoke", () => {
     });
     return listing;
   }
+
+  async function withAuditFailure(work: () => Promise<void>) {
+    await prisma.$executeRaw`ALTER TABLE audit_logs ADD CONSTRAINT a04_reject_audit CHECK (false) NOT VALID`;
+    try {
+      await work();
+    } finally {
+      await prisma.$executeRaw`ALTER TABLE audit_logs DROP CONSTRAINT a04_reject_audit`;
+    }
+  }
+
+  it.each(["ban", "unban", "suspend", "unsuspend", "dismiss"] as const)(
+    "keeps moderation, report and Sessions intact when the %s audit fails, then permits retry",
+    async (action) => {
+      await createUser("reporter-one");
+      await createUser("seller-one");
+      await createUser("admin-one", "admin");
+      const adminToken = await createAdminSession(adminOneId);
+      const listing = await createActiveListing(sellerOneId);
+      const userTarget = action === "suspend" || action === "unsuspend";
+      const report = await request
+        .post(userTarget ? `/api/v1/users/${sellerOneId}/report` : `/api/v1/listings/${listing.id}/report`)
+        .set("Authorization", `Bearer ${mintUserJwt(reporterOneId)}`)
+        .send({ reason: "spam" }).expect(201);
+      const reportId = report.body.reportId as string;
+      const targetPath = userTarget ? `users/${sellerOneId}` : `listings/${listing.id}`;
+      if (action === "unban" || action === "unsuspend") {
+        await request.post(`/api/v1/admin/${targetPath}/${action === "unban" ? "ban" : "suspend"}`)
+          .set("Authorization", `Bearer ${adminToken}`).send({ reason: "Initial moderation" }).expect(200);
+      }
+      await prisma.session.create({ data: {
+        id: suite.id("rollback-session"), userId: sellerOneId,
+        refreshTokenHash: "a04-rollback-session", expiresAt: new Date(Date.now() + 60_000),
+      } });
+      const readState = async () => ({
+        listing: await prisma.listing.findUniqueOrThrow({ where: { id: listing.id } }),
+        user: await prisma.user.findUniqueOrThrow({ where: { id: sellerOneId } }),
+        report: await prisma.contentReport.findUniqueOrThrow({ where: { id: reportId } }),
+        sessions: await prisma.session.findMany({ where: { userId: sellerOneId }, orderBy: { id: "asc" } }),
+        audits: await prisma.auditLog.findMany({ where: { actorId: adminOneId }, orderBy: { id: "asc" } }),
+      });
+      const before = await readState();
+      const path = action === "dismiss" ? `reports/${reportId}/dismiss` : `${targetPath}/${action}`;
+      const body = {
+        reason: "Reviewed moderation",
+        ...(action === "ban" || action === "suspend" ? { reportId } : {}),
+      };
+
+      await withAuditFailure(async () => {
+        await request.post(`/api/v1/admin/${path}`).set("Authorization", `Bearer ${adminToken}`)
+          .send(body).expect(500);
+      });
+
+      expect(await readState()).toEqual(before);
+      const retried = await request.post(`/api/v1/admin/${path}`).set("Authorization", `Bearer ${adminToken}`)
+        .send(body).expect(200);
+      const after = await readState();
+      expect(after.audits).toHaveLength(before.audits.length + 1);
+      expect(after.audits.some((audit) => audit.id === retried.body.auditLogId)).toBe(true);
+      expect(after.report.status).toBe(action === "dismiss" ? "dismissed" : action === "ban" || action === "suspend" ? "actioned" : "pending");
+      if (action === "ban" || action === "unban") expect(after.listing.status).toBe(action === "ban" ? "banned" : "active");
+      if (action === "suspend") {
+        expect(after.user.suspendedAt).toBeInstanceOf(Date);
+        expect(after.sessions).toEqual([]);
+      }
+      if (action === "unsuspend") expect(after.user.suspendedAt).toBeNull();
+    },
+  );
+
+  it("rolls back an audit already written when the following moderation operation fails", async () => {
+    await createUser("admin-one", "admin");
+    const moderation = app.get<ModerationUnitOfWork>(MODERATION_UNIT_OF_WORK);
+
+    await expect(moderation.run(async (tx) => {
+      await tx.audit.create({
+        actorId: adminOneId, action: "LISTING_BAN", targetType: "listing", targetId: suite.id("missing-listing"),
+      });
+      await tx.listings.banActiveListing(suite.id("missing-listing"));
+    })).rejects.toMatchObject({ code: "P2025" });
+
+    expect(await prisma.auditLog.findMany({ where: { actorId: adminOneId } })).toEqual([]);
+  });
 
   describe("deterministic smoke: report → TOTP admin action → audit → enforcement", () => {
     it("reads only a reported Message for elevated staff, suspends its sender, and enforces messaging and sign-in", async () => {
@@ -464,6 +546,32 @@ describe("AdminModerationController e2e smoke", () => {
       expect((await prisma.user.findUniqueOrThrow({ where: { id: ownerId } })).avatarKey).toBe(photoKey);
       expect((await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } })).state).toBe("ADOPTED");
       expect(await prisma.auditLog.count({ where: { targetId: ownerId } })).toBe(0);
+    });
+
+    it("keeps the photo, adopted upload and pending report without cleanup or audit when audit storage refuses", async () => {
+      const upload = await createOwnerWithPhoto();
+      await createUser("photo-reporter");
+      await createUser("photo-admin", "admin");
+      const adminToken = await createAdminSession(suite.id("photo-admin"));
+      const report = await request.post(`/api/v1/users/${ownerId}/report`)
+        .set("Authorization", `Bearer ${mintUserJwt(suite.id("photo-reporter"))}`)
+        .send({ reason: "other", details: "Offensive photo" }).expect(201);
+      const reportId = report.body.reportId as string;
+
+      await withAuditFailure(async () => {
+        await removePhoto(adminToken, { reason: "Offensive photo", reportId }).expect(500);
+      });
+
+      expect(await prisma.user.findUniqueOrThrow({ where: { id: ownerId } })).toMatchObject({
+        avatarKey: photoKey, avatarUploadId: upload.id, avatarIndex: 7, suspendedAt: null,
+      });
+      expect((await prisma.mediaUpload.findUniqueOrThrow({ where: { id: upload.id } })).state).toBe("ADOPTED");
+      expect(await prisma.mediaUploadCleanup.findUnique({ where: { uploadId: upload.id } })).toBeNull();
+      expect(await prisma.contentReport.findUniqueOrThrow({ where: { id: reportId } })).toMatchObject({
+        status: "pending", reviewedById: null, reviewedAt: null,
+      });
+      expect(await prisma.auditLog.count({ where: { targetId: ownerId } })).toBe(0);
+      await removePhoto(adminToken, { reason: "Offensive photo", reportId }).expect(200);
     });
   });
 });

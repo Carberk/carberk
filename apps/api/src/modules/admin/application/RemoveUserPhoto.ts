@@ -6,19 +6,15 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { MODERATION_UNIT_OF_WORK, type ModerationUnitOfWork } from "./ports/ModerationUnitOfWork";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import {
   IDENTITY_READ_PORT,
-  PROFILE_PHOTO_PORT,
   type IdentityReadPort,
-  type ProfilePhotoPort,
 } from "../../identity/identity.public";
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { CONTENT_REPORT_REPOSITORY } from "../domain/ports/ContentReportRepository";
-import type { AuditLogRepository } from "../domain/ports/AuditLogRepository";
-import { AUDIT_LOG_REPOSITORY } from "../domain/ports/AuditLogRepository";
 
 export interface RemoveUserPhotoInput {
   userId: string;
@@ -45,16 +41,12 @@ export interface RemoveUserPhotoResult {
 @Injectable()
 export class RemoveUserPhoto {
   constructor(
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(MODERATION_UNIT_OF_WORK)
+    private readonly moderation: ModerationUnitOfWork,
     @Inject(IDENTITY_READ_PORT)
     private readonly identityRead: IdentityReadPort,
-    @Inject(PROFILE_PHOTO_PORT)
-    private readonly photos: ProfilePhotoPort,
     @Inject(CONTENT_REPORT_REPOSITORY)
     private readonly reportRepo: ContentReportRepository,
-    @Inject(AUDIT_LOG_REPOSITORY)
-    private readonly auditRepo: AuditLogRepository,
   ) {}
 
   async execute(input: RemoveUserPhotoInput): Promise<RemoveUserPhotoResult> {
@@ -116,24 +108,20 @@ export class RemoveUserPhoto {
       });
     if (user.avatarKey === null) throw noPhoto();
 
-    return this.prisma.$transaction(async (tx) => {
-      // The release takes the User's row lock, so it sees the photo as it is
-      // now. If the owner removed it since the read above, nothing was done
-      // and the throw rolls this transaction back with no audit entry.
-      const { removedKey } = await this.photos.release(input.userId, tx);
+    return this.moderation.run(async (tx) => {
+      const { removedKey } = await tx.photos.release(input.userId);
       if (removedKey === null) throw noPhoto();
 
       let reportStatus: "actioned" | undefined;
       if (report) {
-        await this.reportRepo.updateStatus(
+        await tx.reports.updateStatus(
           report.id,
           { status: "actioned", reviewedById: input.adminUserId, reviewedAt: new Date() },
-          tx,
         );
         reportStatus = "actioned";
       }
 
-      const auditRow = await this.auditRepo.create(
+      const auditRow = await tx.audit.create(
         {
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.UserPhotoRemove,
@@ -147,7 +135,6 @@ export class RemoveUserPhoto {
             after: { avatarKey: null, ...(report ? { reportStatus: "actioned" } : {}) },
           },
         },
-        tx,
       );
 
       return {

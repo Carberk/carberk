@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, ConflictException, ForbiddenException } from "@nestjs/common";
 
 import { UnsuspendUser } from "./UnsuspendUser";
+import { FakeModerationUnitOfWork } from "./testing/FakeModerationUnitOfWork";
 import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRepository";
 import type { IdentityUserSummary, IdentityAdminPort, IdentityReadPort } from "../../identity/identity.public";
 import { AdminSchemas } from "@auto-tm/contracts";
@@ -124,34 +125,23 @@ class FakeIdentityAdminPort implements IdentityAdminPort {
   }
 }
 
-class FakePrismaService {
-  async $transaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
-    return fn(undefined);
-  }
-}
-
 function makeUseCase(
-  prisma?: FakePrismaService,
-  identityRead?: FakeIdentityReadPort,
-  identityAdmin?: FakeIdentityAdminPort,
-  auditRepo?: FakeAuditLogRepository,
+  identityRead = new FakeIdentityReadPort(),
+  identityAdmin = new FakeIdentityAdminPort(),
+  auditRepo = new FakeAuditLogRepository(),
 ) {
   return new UnsuspendUser(
-    (prisma ?? new FakePrismaService()) as unknown as ConstructorParameters<typeof UnsuspendUser>[0],
-    identityRead ?? new FakeIdentityReadPort(),
-    identityAdmin ?? new FakeIdentityAdminPort(),
-    auditRepo ?? new FakeAuditLogRepository(),
+    new FakeModerationUnitOfWork({ identity: identityAdmin, audit: auditRepo }),
+    identityRead,
   );
 }
 
 describe("UnsuspendUser", () => {
-  let prisma: FakePrismaService;
   let identityRead: FakeIdentityReadPort;
   let identityAdmin: FakeIdentityAdminPort;
   let auditRepo: FakeAuditLogRepository;
 
   beforeEach(() => {
-    prisma = new FakePrismaService();
     identityRead = new FakeIdentityReadPort();
     identityAdmin = new FakeIdentityAdminPort();
     auditRepo = new FakeAuditLogRepository();
@@ -161,7 +151,7 @@ describe("UnsuspendUser", () => {
     identityRead.seed("u1", { role: "buyer", suspendedAt: new Date("2026-01-01T00:00:00Z"), suspendedById: "admin-1", suspensionReason: "Spam" });
     identityAdmin.seed("u1", { suspendedAt: new Date("2026-01-01T00:00:00Z"), suspendedById: "admin-1", suspensionReason: "Spam" });
 
-    const uc = makeUseCase(prisma, identityRead, identityAdmin, auditRepo);
+    const uc = makeUseCase(identityRead, identityAdmin, auditRepo);
     const result = await uc.execute({
       userId: "u1",
       adminUserId: "admin-1",
@@ -181,7 +171,7 @@ describe("UnsuspendUser", () => {
   });
 
   it("returns NOT_FOUND for missing user", async () => {
-    const uc = makeUseCase(prisma, identityRead, identityAdmin, auditRepo);
+    const uc = makeUseCase(identityRead, identityAdmin, auditRepo);
     await expect(
       uc.execute({ userId: "missing", adminUserId: "admin-1", reason: "Mistake" }),
     ).rejects.toThrow(NotFoundException);
@@ -191,7 +181,7 @@ describe("UnsuspendUser", () => {
   it("returns ADMIN_TARGET_NOT_MODERATABLE for admin target", async () => {
     identityRead.seed("u1", { role: "admin", suspendedAt: new Date("2026-01-01T00:00:00Z") });
 
-    const uc = makeUseCase(prisma, identityRead, identityAdmin, auditRepo);
+    const uc = makeUseCase(identityRead, identityAdmin, auditRepo);
     try {
       await uc.execute({ userId: "u1", adminUserId: "admin-1", reason: "Mistake" });
       expect.fail("should have thrown");
@@ -209,7 +199,7 @@ describe("UnsuspendUser", () => {
   it("returns ADMIN_TARGET_NOT_MODERATABLE for self-admin target", async () => {
     identityRead.seed("admin-1", { role: "admin", suspendedAt: new Date("2026-01-01T00:00:00Z") });
 
-    const uc = makeUseCase(prisma, identityRead, identityAdmin, auditRepo);
+    const uc = makeUseCase(identityRead, identityAdmin, auditRepo);
     try {
       await uc.execute({ userId: "admin-1", adminUserId: "admin-1", reason: "Mistake" });
       expect.fail("should have thrown");
@@ -227,7 +217,7 @@ describe("UnsuspendUser", () => {
   it("returns SELF_MODERATION_NOT_ALLOWED for self target", async () => {
     identityRead.seed("buyer-1", { role: "buyer", suspendedAt: new Date("2026-01-01T00:00:00Z") });
 
-    const uc = makeUseCase(prisma, identityRead, identityAdmin, auditRepo);
+    const uc = makeUseCase(identityRead, identityAdmin, auditRepo);
     try {
       await uc.execute({ userId: "buyer-1", adminUserId: "buyer-1", reason: "Mistake" });
       expect.fail("should have thrown");
@@ -245,7 +235,7 @@ describe("UnsuspendUser", () => {
   it("returns MODERATION_TARGET_STATE_CONFLICT for non-suspended user", async () => {
     identityRead.seed("u1", { role: "buyer" });
 
-    const uc = makeUseCase(prisma, identityRead, identityAdmin, auditRepo);
+    const uc = makeUseCase(identityRead, identityAdmin, auditRepo);
     try {
       await uc.execute({ userId: "u1", adminUserId: "admin-1", reason: "Mistake" });
       expect.fail("should have thrown");
@@ -257,30 +247,6 @@ describe("UnsuspendUser", () => {
         reason: AdminSchemas.AdminErrorReason.ModerationTargetStateConflict,
       });
     }
-    expect(auditRepo.rows).toHaveLength(0);
-  });
-
-  it("rolls back when audit write fails", async () => {
-    identityRead.seed("u1", { role: "buyer", suspendedAt: new Date("2026-01-01T00:00:00Z"), suspendedById: "admin-1", suspensionReason: "Spam" });
-    identityAdmin.seed("u1", { suspendedAt: new Date("2026-01-01T00:00:00Z"), suspendedById: "admin-1", suspensionReason: "Spam" });
-
-    const failingPrisma = {
-      async $transaction<T>(_fn: (tx: unknown) => Promise<T>): Promise<T> {
-        throw new Error("Transaction rollback");
-      },
-    };
-
-    const uc = makeUseCase(
-      failingPrisma as unknown as FakePrismaService,
-      identityRead,
-      identityAdmin,
-      auditRepo,
-    );
-    await expect(
-      uc.execute({ userId: "u1", adminUserId: "admin-1", reason: "Mistake" }),
-    ).rejects.toThrow("Transaction rollback");
-
-    expect(identityAdmin.states["u1"]?.suspendedAt).not.toBeNull();
     expect(auditRepo.rows).toHaveLength(0);
   });
 });

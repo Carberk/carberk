@@ -5,17 +5,13 @@ import {
   ConflictException,
   ForbiddenException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { MODERATION_UNIT_OF_WORK, type ModerationUnitOfWork } from "./ports/ModerationUnitOfWork";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import {
-  IDENTITY_ADMIN_PORT,
   IDENTITY_READ_PORT,
-  type IdentityAdminPort,
   type IdentityReadPort,
 } from "../../identity/identity.public";
-import type { AuditLogRepository } from "../domain/ports/AuditLogRepository";
-import { AUDIT_LOG_REPOSITORY } from "../domain/ports/AuditLogRepository";
 
 export interface UnsuspendUserInput {
   userId: string;
@@ -36,14 +32,10 @@ export interface UnsuspendUserResult {
 @Injectable()
 export class UnsuspendUser {
   constructor(
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(MODERATION_UNIT_OF_WORK)
+    private readonly moderation: ModerationUnitOfWork,
     @Inject(IDENTITY_READ_PORT)
     private readonly identityRead: IdentityReadPort,
-    @Inject(IDENTITY_ADMIN_PORT)
-    private readonly identityAdmin: IdentityAdminPort,
-    @Inject(AUDIT_LOG_REPOSITORY)
-    private readonly auditRepo: AuditLogRepository,
   ) {}
 
   async execute(input: UnsuspendUserInput): Promise<UnsuspendUserResult> {
@@ -93,13 +85,10 @@ export class UnsuspendUser {
     }
 
     // 4. Execute mutation + audit in one transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      const unsuspendResult = await this.identityAdmin.unsuspendUser(
-        input.userId,
-        tx,
-      );
+    const result = await this.moderation.run(async (tx) => {
+      const unsuspendResult = await tx.identity.unsuspendUser(input.userId);
 
-      const auditRow = await this.auditRepo.create(
+      const auditRow = await tx.audit.create(
         {
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.UserUnsuspend,
@@ -119,7 +108,6 @@ export class UnsuspendUser {
             },
           },
         },
-        tx,
       );
 
       return {

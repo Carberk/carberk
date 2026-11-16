@@ -4,13 +4,11 @@ import {
   NotFoundException,
   ConflictException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { MODERATION_UNIT_OF_WORK, type ModerationUnitOfWork } from "./ports/ModerationUnitOfWork";
 import { AdminSchemas } from "@auto-tm/contracts";
 
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { CONTENT_REPORT_REPOSITORY } from "../domain/ports/ContentReportRepository";
-import type { AuditLogRepository } from "../domain/ports/AuditLogRepository";
-import { AUDIT_LOG_REPOSITORY } from "../domain/ports/AuditLogRepository";
 
 export interface DismissReportInput {
   reportId: string;
@@ -28,12 +26,10 @@ export interface DismissReportResult {
 @Injectable()
 export class DismissReport {
   constructor(
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(MODERATION_UNIT_OF_WORK)
+    private readonly moderation: ModerationUnitOfWork,
     @Inject(CONTENT_REPORT_REPOSITORY)
     private readonly reportRepo: ContentReportRepository,
-    @Inject(AUDIT_LOG_REPOSITORY)
-    private readonly auditRepo: AuditLogRepository,
   ) {}
 
   async execute(input: DismissReportInput): Promise<DismissReportResult> {
@@ -59,18 +55,17 @@ export class DismissReport {
 
     const reviewedAt = new Date();
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      await this.reportRepo.updateStatus(
+    const result = await this.moderation.run(async (tx) => {
+      await tx.reports.updateStatus(
         report.id,
         {
           status: "dismissed",
           reviewedById: input.adminUserId,
           reviewedAt,
         },
-        tx,
       );
 
-      const auditRow = await this.auditRepo.create(
+      const auditRow = await tx.audit.create(
         {
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.ContentReportResolve,
@@ -84,7 +79,6 @@ export class DismissReport {
             after: { status: "dismissed" },
           },
         },
-        tx,
       );
 
       return {

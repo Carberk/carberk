@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, ConflictException } from "@nestjs/common";
 
 import { DismissReport } from "./DismissReport";
+import { FakeModerationUnitOfWork } from "./testing/FakeModerationUnitOfWork";
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { ContentReport } from "../domain/ContentReport";
 import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRepository";
@@ -83,12 +84,6 @@ class FakeAuditLogRepository implements AuditLogRepository {
   }
 }
 
-class FakePrismaService {
-  async $transaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
-    return fn(undefined);
-  }
-}
-
 function makeReport(
   id: string,
   targetType: "listing" | "user" | "message",
@@ -111,31 +106,27 @@ function makeReport(
 }
 
 function makeUseCase(
-  prisma?: FakePrismaService,
-  reportRepo?: FakeContentReportRepository,
-  auditRepo?: FakeAuditLogRepository,
+  reportRepo = new FakeContentReportRepository(),
+  auditRepo = new FakeAuditLogRepository(),
 ) {
   return new DismissReport(
-    (prisma ?? new FakePrismaService()) as unknown as ConstructorParameters<typeof DismissReport>[0],
-    reportRepo ?? new FakeContentReportRepository(),
-    auditRepo ?? new FakeAuditLogRepository(),
+    new FakeModerationUnitOfWork({ reports: reportRepo, audit: auditRepo }),
+    reportRepo,
   );
 }
 
 describe("DismissReport", () => {
-  let prisma: FakePrismaService;
   let reportRepo: FakeContentReportRepository;
   let auditRepo: FakeAuditLogRepository;
 
   beforeEach(() => {
-    prisma = new FakePrismaService();
     reportRepo = new FakeContentReportRepository();
     auditRepo = new FakeAuditLogRepository();
   });
 
   it("dismisses a Message report and audits its target", async () => {
     reportRepo.reports = [makeReport("r1", "message", "m1")];
-    const result = await makeUseCase(prisma, reportRepo, auditRepo).execute({ reportId: "r1", adminUserId: "admin-1", reason: "No violation" });
+    const result = await makeUseCase(reportRepo, auditRepo).execute({ reportId: "r1", adminUserId: "admin-1", reason: "No violation" });
     expect(result.status).toBe("dismissed");
     expect(reportRepo.reports[0]?.status).toBe("dismissed");
     expect(auditRepo.rows[0]).toMatchObject({ action: "CONTENT_REPORT_RESOLVE", targetId: "r1", details: { reportedTargetType: "message", reportedTargetId: "m1" } });
@@ -144,7 +135,7 @@ describe("DismissReport", () => {
   it("dismisses a pending report and writes audit", async () => {
     reportRepo.reports = [makeReport("r1", "listing", "l1")];
 
-    const uc = makeUseCase(prisma, reportRepo, auditRepo);
+    const uc = makeUseCase(reportRepo, auditRepo);
     const result = await uc.execute({
       reportId: "r1",
       adminUserId: "admin-1",
@@ -173,7 +164,7 @@ describe("DismissReport", () => {
   });
 
   it("returns NOT_FOUND for missing report", async () => {
-    const uc = makeUseCase(prisma, reportRepo, auditRepo);
+    const uc = makeUseCase(reportRepo, auditRepo);
     await expect(
       uc.execute({ reportId: "missing", adminUserId: "admin-1", reason: "Spam" }),
     ).rejects.toThrow(NotFoundException);
@@ -183,7 +174,7 @@ describe("DismissReport", () => {
   it("returns REPORT_ALREADY_RESOLVED for non-pending report", async () => {
     reportRepo.reports = [makeReport("r1", "listing", "l1", "dismissed")];
 
-    const uc = makeUseCase(prisma, reportRepo, auditRepo);
+    const uc = makeUseCase(reportRepo, auditRepo);
     try {
       await uc.execute({ reportId: "r1", adminUserId: "admin-1", reason: "Spam" });
       expect.fail("should have thrown");
@@ -195,29 +186,6 @@ describe("DismissReport", () => {
         reason: AdminSchemas.AdminErrorReason.ReportAlreadyResolved,
       });
     }
-    expect(auditRepo.rows).toHaveLength(0);
-  });
-
-  it("rolls back when audit write fails", async () => {
-    reportRepo.reports = [makeReport("r1", "listing", "l1")];
-
-    const failingPrisma = {
-      async $transaction<T>(_fn: (tx: unknown) => Promise<T>): Promise<T> {
-        throw new Error("Transaction rollback");
-      },
-    };
-
-    const uc = makeUseCase(
-      failingPrisma as unknown as FakePrismaService,
-      reportRepo,
-      auditRepo,
-    );
-    await expect(
-      uc.execute({ reportId: "r1", adminUserId: "admin-1", reason: "Spam" }),
-    ).rejects.toThrow("Transaction rollback");
-
-    // Report should remain unchanged because the transaction rolled back
-    expect(reportRepo.reports[0]!.status).toBe("pending");
     expect(auditRepo.rows).toHaveLength(0);
   });
 });

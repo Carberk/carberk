@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { NotFoundException, ConflictException } from "@nestjs/common";
 
 import { UnbanListing } from "./UnbanListing";
+import { FakeModerationUnitOfWork } from "./testing/FakeModerationUnitOfWork";
 import type { AuditLogRepository, AuditLogRow } from "../domain/ports/AuditLogRepository";
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import type { ListingsAdminPort } from "../../listings/domain/ports/ListingsAdminPort";
@@ -94,34 +95,23 @@ class FakeListingsAdminPort implements ListingsAdminPort {
   }
 }
 
-class FakePrismaService {
-  async $transaction<T>(fn: (tx: unknown) => Promise<T>): Promise<T> {
-    return fn(undefined);
-  }
-}
-
 function makeUseCase(
-  prisma?: FakePrismaService,
-  listingsRead?: FakeListingsReadPort,
-  listingsAdmin?: FakeListingsAdminPort,
-  auditRepo?: FakeAuditLogRepository,
+  listingsRead = new FakeListingsReadPort(),
+  listingsAdmin = new FakeListingsAdminPort(),
+  auditRepo = new FakeAuditLogRepository(),
 ) {
   return new UnbanListing(
-    (prisma ?? new FakePrismaService()) as unknown as ConstructorParameters<typeof UnbanListing>[0],
-    listingsRead ?? new FakeListingsReadPort(),
-    listingsAdmin ?? new FakeListingsAdminPort(),
-    auditRepo ?? new FakeAuditLogRepository(),
+    new FakeModerationUnitOfWork({ listings: listingsAdmin, audit: auditRepo }),
+    listingsRead,
   );
 }
 
 describe("UnbanListing", () => {
-  let prisma: FakePrismaService;
   let listingsRead: FakeListingsReadPort;
   let listingsAdmin: FakeListingsAdminPort;
   let auditRepo: FakeAuditLogRepository;
 
   beforeEach(() => {
-    prisma = new FakePrismaService();
     listingsRead = new FakeListingsReadPort();
     listingsAdmin = new FakeListingsAdminPort();
     auditRepo = new FakeAuditLogRepository();
@@ -131,7 +121,7 @@ describe("UnbanListing", () => {
     listingsRead.seed("l1", { sellerId: "s1", status: "banned" });
     listingsAdmin.seed("l1", "banned");
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, auditRepo);
     const result = await uc.execute({
       listingId: "l1",
       adminUserId: "admin-1",
@@ -151,7 +141,7 @@ describe("UnbanListing", () => {
   });
 
   it("returns NOT_FOUND for missing listing", async () => {
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, auditRepo);
     await expect(
       uc.execute({ listingId: "missing", adminUserId: "admin-1", reason: "Mistake" }),
     ).rejects.toThrow(NotFoundException);
@@ -161,7 +151,7 @@ describe("UnbanListing", () => {
   it("returns MODERATION_TARGET_STATE_CONFLICT for non-banned listing", async () => {
     listingsRead.seed("l1", { sellerId: "s1", status: "active" });
 
-    const uc = makeUseCase(prisma, listingsRead, listingsAdmin, auditRepo);
+    const uc = makeUseCase(listingsRead, listingsAdmin, auditRepo);
     try {
       await uc.execute({ listingId: "l1", adminUserId: "admin-1", reason: "Mistake" });
       expect.fail("should have thrown");
@@ -173,30 +163,6 @@ describe("UnbanListing", () => {
         reason: AdminSchemas.AdminErrorReason.ModerationTargetStateConflict,
       });
     }
-    expect(auditRepo.rows).toHaveLength(0);
-  });
-
-  it("rolls back when audit write fails", async () => {
-    listingsRead.seed("l1", { sellerId: "s1", status: "banned" });
-    listingsAdmin.seed("l1", "banned");
-
-    const failingPrisma = {
-      async $transaction<T>(_fn: (tx: unknown) => Promise<T>): Promise<T> {
-        throw new Error("Transaction rollback");
-      },
-    };
-
-    const uc = makeUseCase(
-      failingPrisma as unknown as FakePrismaService,
-      listingsRead,
-      listingsAdmin,
-      auditRepo,
-    );
-    await expect(
-      uc.execute({ listingId: "l1", adminUserId: "admin-1", reason: "Mistake" }),
-    ).rejects.toThrow("Transaction rollback");
-
-    expect(listingsAdmin.states["l1"]).toBe("banned");
     expect(auditRepo.rows).toHaveLength(0);
   });
 });

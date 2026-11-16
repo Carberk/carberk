@@ -24,6 +24,8 @@ import { RemoveUserPhoto } from "./application/RemoveUserPhoto";
 import { RecordReviewerAuthBypassAudit } from "./application/RecordReviewerAuthBypassAudit";
 import { PrismaContentReportRepository } from "./infrastructure/PrismaContentReportRepository";
 import { PrismaAuditLogRepository } from "./infrastructure/PrismaAuditLogRepository";
+import { PrismaModerationUnitOfWork } from "./infrastructure/PrismaModerationUnitOfWork";
+import { MODERATION_UNIT_OF_WORK } from "./application/ports/ModerationUnitOfWork";
 import { CONTENT_REPORT_REPOSITORY } from "./domain/ports/ContentReportRepository";
 import { AUDIT_LOG_REPOSITORY } from "./domain/ports/AuditLogRepository";
 
@@ -31,6 +33,10 @@ import { AUDIT_LOG_REPOSITORY } from "./domain/ports/AuditLogRepository";
   imports: [EventEmitterModule, ListingsModule, IdentityModule, ConversationsModule],
   controllers: [AdminController, ReportsController, AuditController, AdminModerationController, ConfigController],
   providers: [
+    {
+      provide: MODERATION_UNIT_OF_WORK,
+      useClass: PrismaModerationUnitOfWork,
+    },
     PrismaContentReportRepository,
     {
       provide: CONTENT_REPORT_REPOSITORY,

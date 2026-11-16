@@ -5,16 +5,12 @@ import {
   BadRequestException,
   ConflictException,
 } from "@nestjs/common";
-import { PrismaService } from "@auto-tm/db";
+import { MODERATION_UNIT_OF_WORK, type ModerationUnitOfWork } from "./ports/ModerationUnitOfWork";
 import { AdminSchemas } from "@auto-tm/contracts";
 import type { ListingsReadPort } from "../../listings/domain/ports/ListingsReadPort";
 import { LISTINGS_READ_PORT } from "../../listings/domain/ports/ListingsReadPort";
-import type { ListingsAdminPort } from "../../listings/domain/ports/ListingsAdminPort";
-import { LISTINGS_ADMIN_PORT } from "../../listings/domain/ports/ListingsAdminPort";
 import type { ContentReportRepository } from "../domain/ports/ContentReportRepository";
 import { CONTENT_REPORT_REPOSITORY } from "../domain/ports/ContentReportRepository";
-import type { AuditLogRepository } from "../domain/ports/AuditLogRepository";
-import { AUDIT_LOG_REPOSITORY } from "../domain/ports/AuditLogRepository";
 
 export interface BanListingInput {
   listingId: string;
@@ -34,16 +30,12 @@ export interface BanListingResult {
 @Injectable()
 export class BanListing {
   constructor(
-    @Inject(PrismaService)
-    private readonly prisma: PrismaService,
+    @Inject(MODERATION_UNIT_OF_WORK)
+    private readonly moderation: ModerationUnitOfWork,
     @Inject(LISTINGS_READ_PORT)
     private readonly listingsRead: ListingsReadPort,
-    @Inject(LISTINGS_ADMIN_PORT)
-    private readonly listingsAdmin: ListingsAdminPort,
     @Inject(CONTENT_REPORT_REPOSITORY)
     private readonly reportRepo: ContentReportRepository,
-    @Inject(AUDIT_LOG_REPOSITORY)
-    private readonly auditRepo: AuditLogRepository,
   ) {}
 
   async execute(input: BanListingInput): Promise<BanListingResult> {
@@ -119,29 +111,22 @@ export class BanListing {
     }
 
     // 3. Execute mutation + audit in one transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Ban the listing
-      const banResult = await this.listingsAdmin.banActiveListing(
-        input.listingId,
-        tx,
-      );
+    const result = await this.moderation.run(async (tx) => {
+      const banResult = await tx.listings.banActiveListing(input.listingId);
 
-      // Action the report if provided
       let reportStatus: "actioned" | undefined;
       if (report) {
-        await this.reportRepo.updateStatus(
+        await tx.reports.updateStatus(
           report.id,
           {
             status: "actioned",
             reviewedById: input.adminUserId,
             reviewedAt: new Date(),
           },
-          tx,
         );
         reportStatus = "actioned";
       }
 
-      // Write audit log
       const auditDetails: Record<string, unknown> = {
         reason: input.reason,
         before: { status: "active" },
@@ -153,7 +138,7 @@ export class BanListing {
         auditDetails["after"] = { status: banResult.status, reportStatus: "actioned" };
       }
 
-      const auditRow = await this.auditRepo.create(
+      const auditRow = await tx.audit.create(
         {
           actorId: input.adminUserId,
           action: AdminSchemas.AdminAuditAction.ListingBan,
@@ -161,7 +146,6 @@ export class BanListing {
           targetId: input.listingId,
           details: auditDetails,
         },
-        tx,
       );
 
       return {
