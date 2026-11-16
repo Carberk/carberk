@@ -28,8 +28,6 @@ export function usePublishDraft() {
     networkMode: "always",
     retry: false,
     mutationFn: async (draftId: string) => {
-      // Publication has no draft-to-Listing lookup or replay contract. Retain
-      // the draft identity across step/route changes and require inspection.
       if (uncertain.current.has(draftId)) throw uncertain.current.get(draftId);
       try {
         return await apiClient.post(

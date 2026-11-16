@@ -410,7 +410,7 @@ export default function SellScreen() {
       try {
         await queryClient.fetchInfiniteQuery({ ...myListingsQueryOptions(), staleTime: 0, retry: false, networkMode: "always" });
         router.push("/listings/manage");
-      } catch { /* No authoritative read: keep the result uncertain and the draft here. */ }
+      } catch {}
       finally { inspectingRef.current = false; setIsInspecting(false); }
       return;
     }

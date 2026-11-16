@@ -41,7 +41,6 @@ export interface CheckAndPublishProps {
    * says nothing about the draft, so Check does not claim there are none.
    */
   photosReady?: boolean;
-  /** An unconfirmed publication must be inspected before the draft can change. */
   readOnly?: boolean;
 }
 

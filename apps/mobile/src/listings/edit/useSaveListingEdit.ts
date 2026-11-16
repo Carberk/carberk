@@ -309,9 +309,6 @@ export function useSaveListingEdit(
           opStates[opId] = "succeeded";
           dispatch({ type: "OP_SUCCESS", opId });
         } catch (err) {
-          // Attach returns the existing row for the same upload key; reorder
-          // sets the same order for fixed media IDs. Their explicit Retry keeps
-          // those identities. Fields/removal require inspection after loss.
           if (isUncertainWrite(err) && !opId.startsWith("attach:") && opId !== "reorder") {
             uncertainListing.current = listingId;
           }

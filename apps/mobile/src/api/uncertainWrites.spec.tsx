@@ -26,7 +26,6 @@ vi.mock("expo-secure-store", async () => {
 const id = "00000000-0000-4000-8000-000000000373";
 const clients = new Set<QueryClient>();
 async function setup<T>(hook: () => T) {
-  // A caller's retry defaults must never turn an uncertain write into replay.
   const client = new QueryClient({ defaultOptions: { mutations: { retry: 2, retryDelay: 0 } } });
   clients.add(client);
   function wrapper({ children }: PropsWithChildren) {
