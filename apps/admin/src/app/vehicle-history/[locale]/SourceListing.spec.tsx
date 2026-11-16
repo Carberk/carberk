@@ -326,6 +326,42 @@ it.each(["close", "hidden", "offline", "popstate", "locale"])("the composed view
   expect(world.seen.filter(({ method }) => method === "POST")).toHaveLength(1);
 });
 
+it.each(["hidden", "offline"])("restores same-generation playback position after composed %s recovery and explicit Play", async (reason) => {
+  world.hls.supported = true;
+  const view = render(<SourceListing open locale="en" {...selection} actorId={actor.id} onClose={vi.fn()} onInvalidate={vi.fn()} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Play video" }));
+  await waitFor(() => expect(world.hls.instances).toHaveLength(1));
+  const first = required(view.container.querySelector("video"));
+  fireEvent.loadedMetadata(first);
+  act(() => required(world.hls.instances[0]).emit("hlsManifestParsed"));
+  await waitFor(() => expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1));
+  first.currentTime = 37;
+  let restore = () => {};
+  if (reason === "hidden") {
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    restore = () => hidden.mockReturnValue(false);
+    fireEvent(document, new Event("visibilitychange"));
+  } else {
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    restore = () => online.mockReturnValue(true);
+    fireEvent(window, new Event("offline"));
+  }
+  expect(required(world.hls.instances[0]).destroyed).toBe(true);
+  expect(first.getAttribute("src")).toBeNull();
+  expect(screen.queryByText("Public car")).toBeNull();
+  restore();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await screen.findByText("Public car");
+  expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+  fireEvent.click(await screen.findByRole("button", { name: "Play video" }));
+  await waitFor(() => expect(world.hls.instances).toHaveLength(2));
+  const resumed = required(view.container.querySelector("video"));
+  fireEvent.loadedMetadata(resumed);
+  act(() => required(world.hls.instances[1]).emit("hlsManifestParsed"));
+  await waitFor(() => expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(2));
+  expect(resumed.currentTime).toBe(37);
+});
+
 it.each([
   ["ru", "Объявление 1270", "Toyota Prius · 2020", "Цена", "20\u00a0000 USD", "Местоположение", "Ахал · Ашхабад", "Опубликовано", "15.11.2026, 05:00 UTC+5", "Пробег", "0 км", "Расшифровка VIN", "Не указано"],
   ["tk", "Bildiriş 1270", "Toyota Prius · 2020", "Baha", "20,000 USD", "Ýerleşýän ýeri", "Ahal · Aşgabat", "Çap edildi", "15/11/2026, 05:00 UTC+5", "Ýörişi", "0 km", "VIN maglumatlary", "Görkezilmedik"],

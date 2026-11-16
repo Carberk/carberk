@@ -13,13 +13,14 @@ import { historyListingMediaCopy } from "../../../lib/history-listing-copy";
 import { historyListingAction } from "./listing-actions";
 
 type Detail = Extract<HistoryListingResult, { kind: "detail" }>;
-type Position = { identity: string; seconds: number };
+export type SourceListingPosition = { identity: string; seconds: number };
 type Lifetime = { mounted: boolean; attempt: number; dispose: () => void };
 type PlaybackError = "videoFailed" | "unsupported" | "expired";
 type Props = {
   open: boolean; locale: DeskLocale; id: string; scope: string; actorId: string;
   expectedAssignmentVersion: number; detail: Detail;
   onInvalidate: (failure: HistoryListingFailure) => void;
+  resumePosition?: { current: SourceListingPosition };
 };
 
 export function SourceListingMedia(props: Props) {
@@ -46,7 +47,8 @@ function Media(props: Props & { current: () => boolean }) {
   const [pending, setPending] = useState(false);
   const [playError, setPlayError] = useState<PlaybackError>();
   const [suspended, setSuspended] = useState<"offline" | "suspended">();
-  const position = useRef<Position>({ identity: "", seconds: 0 });
+  const localPosition = useRef<SourceListingPosition>({ identity: "", seconds: 0 });
+  const position = props.resumePosition ?? localPosition;
   const latest = useRef(props);
   latest.current = props;
   const [lifetime] = useState<Lifetime>(() => ({ mounted: false, attempt: 0, dispose: () => {} }));
@@ -100,7 +102,7 @@ function Media(props: Props & { current: () => boolean }) {
         if (kind === "detail") setLoading(false); else if (kind === "cover") setCoverLoading(false); else setPending(false);
       }
     }
-  }, [allowed, lifetime, stop]);
+  }, [allowed, lifetime, position, stop]);
   useLayoutEffect(() => {
     lifetime.mounted = true;
     void read("cover", true);
@@ -189,7 +191,7 @@ function Media(props: Props & { current: () => boolean }) {
 function Playback({ data, copy, allowed, lifetime, playbackAttempt, position, onFailure }: {
   data: L.VideoAccessResponse; copy: (typeof historyListingMediaCopy)[DeskLocale]; allowed: () => boolean;
   lifetime: Lifetime; playbackAttempt: number; onFailure: (error: PlaybackError, playbackAttempt: number) => void;
-  position: Position;
+  position: SourceListingPosition;
 }) {
   const media = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);

@@ -8,7 +8,7 @@ import type { DeskLocale } from "../../../lib/history-desk-copy";
 import { historyListingDetailsCopy, historyListingFactCopy } from "../../../lib/history-listing-copy";
 
 import { historyListingAction } from "./listing-actions";
-import { SourceListingMedia } from "./SourceListingMedia";
+import { SourceListingMedia, type SourceListingPosition } from "./SourceListingMedia";
 
 type Props = {
   open: boolean; locale: DeskLocale; id: string; scope: string; actorId: string;
@@ -28,6 +28,7 @@ function ListingDialog(props: Props & { current: () => boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
+  const resumePosition = useRef<SourceListingPosition>({ identity: "", seconds: 0 });
   const [detail, setDetail] = useState<Detail>();
   const [state, setState] = useState<"ready" | keyof (typeof historyListingDetailsCopy)["en"]>("loading");
   const lifetime = useRef({ active: false, attempt: 0 });
@@ -133,7 +134,7 @@ function ListingDialog(props: Props & { current: () => boolean }) {
       <ListingFacts detail={detail} locale={props.locale} />
       <SourceListingMedia open={props.open} locale={props.locale} id={props.id} scope={props.scope}
         actorId={props.actorId} expectedAssignmentVersion={props.expectedAssignmentVersion}
-        detail={detail} onInvalidate={invalidate} />
+        detail={detail} onInvalidate={invalidate} resumePosition={resumePosition} />
     </> : <div role={state === "loading" ? "status" : "alert"} aria-busy={state === "loading"} className="space-y-4 py-6">
       <p>{state === "ready" ? copy.unavailable : copy[state]}</p>
       {state !== "loading" && <Button type="button" size="lg" onClick={() => void read()}>{copy.retry}</Button>}
