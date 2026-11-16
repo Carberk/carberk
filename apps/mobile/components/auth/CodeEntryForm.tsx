@@ -77,7 +77,7 @@ export function CodeEntryForm({
     __DEV__ ? initialTestCode : undefined,
   );
   const [secondsRemaining, setSecondsRemaining] = useState(initialResendSeconds);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ action: "verify" | "resend"; cause: unknown } | null>(null);
   const [terminalError, setTerminalError] = useState(false);
   const [verificationUncertain, setVerificationUncertain] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -135,7 +135,7 @@ export function CodeEntryForm({
       lastSubmittedCode.current = null;
 
       const copy = getVerifyCodeErrorCopy(verifyError, t, method);
-      setError(copy.message);
+      setError({ action: "verify", cause: verifyError });
       setTerminalError(copy.terminal);
       setVerificationUncertain(copy.uncertain === true);
       if (!copy.terminal && !copy.uncertain) {
@@ -176,7 +176,7 @@ export function CodeEntryForm({
       refocusWhenEnabled.current = true;
     } catch (resendError) {
       const copy = getResendCodeErrorCopy(resendError, t);
-      setError(copy.message);
+      setError({ action: "resend", cause: resendError });
       setDailyLimit(copy.dailyLimit);
     } finally {
       setIsResending(false);
@@ -187,6 +187,10 @@ export function CodeEntryForm({
     method === "email" &&
     !dailyLimit &&
     (hasResent || secondsRemaining === 0);
+
+  const errorMessage = error === null ? null : error.action === "verify"
+    ? getVerifyCodeErrorCopy(error.cause, t, method).message
+    : getResendCodeErrorCopy(error.cause, t).message;
 
   return (
     <View className="gap-6">
@@ -227,7 +231,7 @@ export function CodeEntryForm({
             accessibilityLiveRegion="polite"
             className="flex-1 text-callout leading-snug text-destructive"
           >
-            {verificationUncertain ? t("codeVerificationUncertain") : error}
+            {errorMessage}
           </Text>
         </View>
       ) : null}

@@ -1,4 +1,5 @@
 import { http, HttpResponse } from "msw";
+import * as RN from "react-native";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import SellScreen from "../../app/(tabs)/sell";
@@ -49,6 +50,7 @@ const payload = { ...listing, photos: listing.media.map((media) => ({
   photoId: media.id, key: media.key, sortOrder: media.sortOrder,
 })) };
 const page = (items: unknown[]) => HttpResponse.json({ items, nextCursor: null, hasMore: false });
+const pressHardwareBack = (RN as unknown as { pressHardwareBack: () => boolean }).pressHardwareBack;
 
 beforeEach(async () => {
   vi.stubGlobal("__DEV__", false);
@@ -125,4 +127,30 @@ it("keeps changed fields in the editor after a lost save and opens the same auth
   expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${id}`);
   expect(screen.queryClient.getQueryData(queryKeys.listings.detail(id))).toMatchObject({ id, priceAmount: 12000 });
   expect(edits).toBe(1);
+});
+
+it("closes an uncertain publication on system Back without writing the potentially consumed draft", async () => {
+  let publicationSent = false;
+  const postPublicationDraftWrites: unknown[] = [];
+  server.use(
+    http.post("*/listings/drafts/:id/publish", () => {
+      publicationSent = true;
+      return HttpResponse.error();
+    }),
+    http.patch("*/listings/drafts/:id", async ({ request }) => {
+      if (publicationSent) postPublicationDraftWrites.push(await request.json());
+      return HttpResponse.json({ id, userId: id, payload, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z" });
+    }),
+  );
+  const screen = await renderMobile(<ToastProvider><SellScreen /></ToastProvider>);
+  await fireEvent.press(await screen.findByRole("button", { name: "Continue" }));
+  await fireEvent.press(await screen.findByRole("button", { name: "Publish", disabled: false }));
+  await screen.findByText("Publication was not confirmed. The listing may be in My listings. Check before publishing again.");
+
+  await act(() => { expect(pressHardwareBack()).toBe(true); });
+
+  expect(screen.getByText("Sell")).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.queryByText("Saved to Drafts")).toBeNull();
+  expect(postPublicationDraftWrites).toEqual([]);
 });

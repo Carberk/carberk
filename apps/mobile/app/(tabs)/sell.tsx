@@ -240,9 +240,9 @@ export default function SellScreen() {
   // Autosave when payload changes. Not before the queue holds this draft's photos:
   // a save built from the queue until then would write the draft without them.
   useEffect(() => {
-    if (!queueReady || machineState.status !== "step") return;
+    if (publishUncertain || !queueReady || machineState.status !== "step") return;
     save(fullPayload);
-  }, [fullPayload, machineState.draftId, machineState.status, queueReady, save]);
+  }, [fullPayload, machineState.draftId, machineState.status, queueReady, publishUncertain, save]);
 
   const handleCreateNewDraft = useCallback(() => {
     if (!isAuthenticated) {
@@ -344,6 +344,7 @@ export default function SellScreen() {
   }, [params.confirmedContactPhone]);
 
   const handleBack = useCallback(() => {
+    if (publishUncertain) return;
     dispatch({ type: "BACK" });
     // Force save on navigation, with the step it moves to: the payload in hand
     // still names the step being left.
@@ -354,10 +355,10 @@ export default function SellScreen() {
       validatedSteps: moved.validatedSteps,
     };
     void forceSave(fullPayload);
-  }, [machineState, photosToSave, forceSave]);
+  }, [machineState, photosToSave, forceSave, publishUncertain]);
 
   const handleContinue = useCallback(() => {
-    if (discardDraft.isPending || publishDraft.isPending) return;
+    if (publishUncertain || discardDraft.isPending || publishDraft.isPending) return;
     // The Contact step's Continue stays tappable so its selection error can
     // appear (same pattern as the specs step): a number whose 7-day window
     // ended, or no number at all, must be confirmed or changed first. A
@@ -400,7 +401,7 @@ export default function SellScreen() {
       validatedSteps: moved.validatedSteps,
     };
     void forceSave(fullPayload);
-  }, [ctx.canContinue, ctx.editDetourActive, machineState, photosToSave, forceSave, discardDraft.isPending, publishDraft.isPending, accountPhone, contactPhonesData, publishPhoneError]);
+  }, [ctx.canContinue, ctx.editDetourActive, machineState, photosToSave, forceSave, discardDraft.isPending, publishDraft.isPending, accountPhone, contactPhonesData, publishPhoneError, publishUncertain]);
 
   const handlePublish = useCallback(async () => {
     if (publishUncertain) {
@@ -572,12 +573,12 @@ export default function SellScreen() {
         setUnsavedDialogOpen(false);
         return true;
       }
-      if (ctx.canGoBack) handleBack();
+      if (ctx.canGoBack && !publishUncertain) handleBack();
       else void handleClose();
       return true;
     });
     return () => subscription.remove();
-  }, [backIsWizards, ctx.canGoBack, isClosing, unsavedDialogOpen, handleBack, handleClose]);
+  }, [backIsWizards, ctx.canGoBack, isClosing, unsavedDialogOpen, handleBack, handleClose, publishUncertain]);
 
   const handlePayloadChange = useCallback(
     (updates: Partial<WizardSchemas.WizardDraftPayload>) => {

@@ -61,3 +61,40 @@ it("keeps native sign-in unconfirmed after the server consumes the code, and req
   expect(resends).toBe(1);
   expect(verifications).toBe(1);
 });
+
+it.each([
+  {
+    outcome: "lost response",
+    response: () => HttpResponse.error(),
+    message: "Could not confirm whether a code was sent. Wait before requesting another.",
+    russian: "Не удалось подтвердить отправку кода. Подождите перед новым запросом.",
+    dailyLimit: false,
+  },
+  {
+    outcome: "daily limit",
+    response: () => HttpResponse.json({ code: "RATE_LIMITED", details: {
+      reason: "destination_limit", retryInSeconds: 0,
+    } }, { status: 429 }),
+    message: "Too many codes requested for this destination in 24 hours. Try again later.",
+    russian: "За 24 часа запрошено слишком много кодов. Попробуйте позже.",
+    dailyLimit: true,
+  },
+])("shows the latest resend $outcome while keeping the uncertain old code locked", async ({ response, message, russian, dailyLimit }) => {
+  server.use(
+    http.post("*/auth/otp/verify", () => HttpResponse.error()),
+    http.post("*/auth/otp/request", response),
+  );
+  const screen = await renderMobile(<ToastProvider><OtpScreen /></ToastProvider>);
+  await act(async () => { void fireEvent.changeText(screen.getByDisplayValue(""), "123456"); });
+  await screen.findByText("No confirmation received. This code may have been used. Request a new code to continue.");
+
+  await fireEvent.press(screen.getByRole("button", { name: "Resend code" }));
+
+  await screen.findByText(message);
+  expect(screen.queryByText("No confirmation received. This code may have been used. Request a new code to continue.")).toBeNull();
+  expect(screen.getByDisplayValue("").props.editable).toBe(false);
+  expect(await loadAuthSession()).toBeNull();
+  expect(Boolean(screen.queryByRole("button", { name: "Resend code" }))).toBe(!dailyLimit);
+  await act(async () => { await screen.i18n.changeLanguage("ru"); });
+  expect(screen.getByText(russian)).toBeTruthy();
+});
