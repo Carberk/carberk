@@ -2,6 +2,7 @@ import { Controller, Get, Head, Post, Param, Req, Res, Inject } from "@nestjs/co
 import { SkipThrottle } from "@nestjs/throttler";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { Public } from "../../../common/public.decorator";
+import { verifiedGatewayIp, type ClientIpRequest } from "../../../common/client-ip";
 import { ServeListingVideo } from "../application/ServeListingVideo";
 
 type Request = FastifyRequest & { user?: { sub?: string; sid?: string } };
@@ -13,13 +14,13 @@ export class VideoServingController {
   @Get("video-access/:audience/:type/:id")
   async cover(@Param("audience") audience: string, @Param("type") type: string, @Param("id") id: string, @Req() req: Request, @Res({ passthrough: true }) reply: FastifyReply) {
     reply.header("Cache-Control", "private, no-store");
-    return this.serving.control(req.user ?? {}, audience, type, id, false);
+    return this.serving.control(req.user ?? {}, audience, type, id, false, (req as ClientIpRequest)[verifiedGatewayIp] ? "tm" : "global");
   }
 
   @Post("video-access/:audience/:type/:id/playback")
   async playback(@Param("audience") audience: string, @Param("type") type: string, @Param("id") id: string, @Req() req: Request, @Res({ passthrough: true }) reply: FastifyReply) {
     reply.header("Cache-Control", "private, no-store");
-    return this.serving.control(req.user ?? {}, audience, type, id, true);
+    return this.serving.control(req.user ?? {}, audience, type, id, true, (req as ClientIpRequest)[verifiedGatewayIp] ? "tm" : "global");
   }
 
   @Public()
@@ -35,7 +36,8 @@ export class VideoServingController {
   async file(@Param() params: { audience: string; videoId: string; generationId: string; resource: string }, @Req() req: Request, @Res() reply: FastifyReply) {
     reply.headers({ "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer", "Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, ETag, Content-Length" });
     const query = req.query as { grant?: unknown };
-    const result = await this.serving.file({ ...params, token: typeof query.grant === "string" ? query.grant : "", ...(req.headers.range ? { range: req.headers.range } : {}), head: req.method === "HEAD" });
+    const ifRange = req.headers["if-range"];
+    const result = await this.serving.file({ ...params, token: typeof query.grant === "string" ? query.grant : "", ...(req.headers.range ? { range: req.headers.range } : {}), ...(typeof ifRange === "string" ? { ifRange } : {}), head: req.method === "HEAD" });
     return reply.status(result.status).headers(result.headers).send(result.body);
   }
 }

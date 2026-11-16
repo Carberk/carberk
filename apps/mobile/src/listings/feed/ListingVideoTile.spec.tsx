@@ -109,11 +109,11 @@ describe("Video cover on Results and Favorites cards", () => {
     expect(await view.findByRole("button", { name: label })).toBeTruthy();
   });
 
-  it("keeps the cover image in memory only, never on disk", async () => {
+  it("disables the cover image cache", async () => {
     const { view } = await resultsCard();
     await view.findByRole("button", { name: "Video, 42 seconds" });
     const image = await view.findByTestId("video-cover-image");
-    expect(image.props.cachePolicy).toBe("memory");
+    expect(image.props.cachePolicy).toBe("none");
   });
 
   it("reads the cover as owner-preview on the owner's own pending Listing", async () => {

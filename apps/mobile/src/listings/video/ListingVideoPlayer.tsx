@@ -48,6 +48,7 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
   playbackRef.current = playback;
 
   const masterUrl = playback.phase === "ready" ? playback.url : undefined;
+  const mediaHeaders = playback.phase === "ready" ? playback.headers : undefined;
   const durationS = playback.phase === "ready" ? playback.durationMs / 1000 : 0;
   const qualities = playback.phase === "ready" ? playback.qualities : [];
 
@@ -95,10 +96,19 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
     if (!masterUrl) return;
     let live = true;
     const settle = (map: ReadonlyMap<number, string>) => { if (live) setVariants({ master: masterUrl, map }); };
-    fetch(masterUrl)
+    fetch(masterUrl, { headers: mediaHeaders, redirect: "error", cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error(`master playlist ${res.status}`);
-        settle(parseMasterPlaylist(await res.text(), qualities));
+        const parsed = parseMasterPlaylist(await res.text(), qualities);
+        const master = new URL(masterUrl);
+        const prefix = master.pathname.slice(0, master.pathname.lastIndexOf("/") + 1);
+        for (const uri of parsed.values()) {
+          const variant = new URL(uri);
+          if (variant.origin !== master.origin || variant.username || variant.password || !variant.pathname.startsWith(prefix)) {
+            throw new Error("Unknown video destination");
+          }
+        }
+        settle(parsed);
       })
       // Without variants only Auto can play.
       .catch(() => settle(new Map()));
@@ -122,8 +132,8 @@ export function ListingVideoPlayer({ audience, type, id, onClose, now = Date.now
     if (choiceUnavailable) setChoice("auto");
   }, [choiceUnavailable]);
   const source = useMemo(
-    () => (sourceUri ? { uri: sourceUri, contentType: "hls" as const } : null),
-    [sourceUri],
+    () => (sourceUri ? { uri: sourceUri, contentType: "hls" as const, useCaching: false, headers: mediaHeaders } : null),
+    [sourceUri, mediaHeaders],
   );
   // expo-video builds a new native player whenever the source changes, so
   // per-player settings are applied here on every one of them.

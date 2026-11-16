@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Inject, Injectable, NotFoundException, HttpException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { z } from "zod";
@@ -9,7 +9,7 @@ import { VIDEO_SERVING_REPOSITORY, type VideoServingRepository, type VideoAudien
 import { VIDEO_MEDIA_STORAGE, type VideoMediaStorage } from "../domain/ports/VideoMediaStorage";
 
 const audiences = z.enum(["viewer", "owner-preview", "moderator"]);
-const grantSchema = z.object({ sub: z.string(), sid: z.string(), aud: audiences, video: z.string(), generation: z.string(), scope: z.enum(["cover", "playback"]), exp: z.number() });
+const grantSchema = z.object({ sub: z.string(), sid: z.string(), aud: audiences, video: z.string(), generation: z.string(), scope: z.enum(["cover", "playback"]), entry: z.enum(["global", "tm"]), exp: z.number() });
 const manifestSchema = z.record(z.string(), z.object({ key: z.string().min(1), sizeBytes: z.number().int().positive() }));
 type Grant = z.infer<typeof grantSchema>;
 type Actor = { sub?: string; sid?: string };
@@ -59,7 +59,12 @@ export class ServeListingVideo {
     return { generation, manifest: parsed.data };
   }
 
-  private origin(): string {
+  private origin(entry: Grant["entry"]): string {
+    if (entry === "tm") {
+      const gateway = this.config.get("LISTING_VIDEO_GATEWAY_ORIGIN", { infer: true });
+      if (!gateway) throw unavailable();
+      return gateway;
+    }
     const configured = this.config.get("LISTING_VIDEO_API_ORIGIN", { infer: true });
     const env = this.config.get("APP_ENV", { infer: true });
     if (!configured && env !== "development" && env !== "test") throw unavailable();
@@ -88,10 +93,10 @@ export class ServeListingVideo {
     } catch { throw unavailable(); }
   }
   private url(grant: Grant, token: string, member: string): string {
-    return `${this.origin()}/api/v1/listings/video-files/${grant.aud}/${grant.video}/${grant.generation}/${resource(member)}?grant=${token}`;
+    return `${this.origin(grant.entry)}/api/v1/listings/video-files/${grant.aud}/${grant.video}/${grant.generation}/${resource(member)}?grant=${token}`;
   }
 
-  async control(actor: Actor, audienceInput: string, type: string, id: string, play: boolean) {
+  async control(actor: Actor, audienceInput: string, type: string, id: string, play: boolean, entry: Grant["entry"] = "global") {
     const audience = audiences.safeParse(audienceInput);
     if (!audience.success || (type !== "listing" && type !== "draft")) throw unavailable();
     const video = await this.videos.find({ type, id });
@@ -101,13 +106,13 @@ export class ServeListingVideo {
     const pendingStatus = audience.data === "viewer" ? undefined : video.pendingStatus?.toLowerCase();
     if (!video.active) { if (play) throw unavailable(); return { status: pendingStatus ?? "none" }; }
     const { generation, manifest } = this.ready(video);
-    const grant: Grant = { sub: authorized.sub, sid: authorized.sid, aud: audience.data, video: video.id, generation: generation.id, scope: play ? "playback" : "cover", exp: this.clock.now().getTime() + this.grantTtlMs() };
+    const grant: Grant = { sub: authorized.sub, sid: authorized.sid, aud: audience.data, video: video.id, generation: generation.id, scope: play ? "playback" : "cover", entry, exp: this.clock.now().getTime() + this.grantTtlMs() };
     const token = this.sign(grant);
     const cover = Object.fromEntries(["thumbnail", "list", "detail", "fullscreen"].map((variant) => [variant, this.url(grant, token, `cover:${variant}`)]));
     return { status: "ready", ...(pendingStatus ? { pendingStatus } : {}), video: { id: video.id, generationId: generation.id, durationMs: generation.durationMs, cover }, expiresAt: new Date(grant.exp).toISOString(), ...(play ? { url: this.url(grant, token, "master") } : {}), qualities: [240, 360, 720].filter((tier) => manifest[`playlist:${tier}`]) };
   }
 
-  async file(input: { audience: string; videoId: string; generationId: string; resource: string; token: string; range?: string; head: boolean }) {
+  async file(input: { audience: string; videoId: string; generationId: string; resource: string; token: string; range?: string; ifRange?: string; head: boolean }) {
     const grant = this.verify(input.token);
     if (grant.aud !== input.audience || grant.video !== input.videoId || grant.generation !== input.generationId) throw unavailable();
     const video = await this.videos.find({ videoId: grant.video });
@@ -134,21 +139,22 @@ export class ServeListingVideo {
           return rewrite(line.trim());
         }).join("\n");
         const body = Buffer.from(text);
-        return { body: input.head ? undefined : body, status: 200, headers: { "Content-Type": "application/vnd.apple.mpegurl", "Content-Length": String(body.length) } };
+        return { body: input.head ? undefined : body, status: 200, headers: { "Content-Type": "application/vnd.apple.mpegurl", "Content-Length": String(body.length), ETag: `"${createHash("sha256").update(body).digest("hex")}"` } };
       }
       const meta = await this.storage.mediaHead(entry.key);
+      const range = input.ifRange && (input.ifRange !== meta.etag || input.ifRange.startsWith("W/")) ? undefined : input.range;
       let start = 0;
       let end = meta.sizeBytes - 1;
-      if (input.range) {
-        const match = /^bytes=(\d*)-(\d*)$/.exec(input.range);
+      if (range) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
         if (!match || (!match[1] && !match[2])) throw new HttpException({ code: "VIDEO_RANGE_INVALID" }, 416);
         start = match[1] ? Number(match[1]) : Math.max(0, meta.sizeBytes - Number(match[2]));
         end = match[1] && match[2] ? Math.min(Number(match[2]), end) : end;
         if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= meta.sizeBytes) throw new HttpException({ code: "VIDEO_RANGE_INVALID" }, 416);
       }
       const headers: Record<string, string> = { "Content-Type": member.startsWith("cover:") ? "image/webp" : "video/mp2t", "Accept-Ranges": "bytes", "Content-Length": String(end - start + 1), ETag: meta.etag };
-      if (input.range) headers["Content-Range"] = `bytes ${start}-${end}/${meta.sizeBytes}`;
-      return { status: input.range ? 206 : 200, headers, body: input.head ? undefined : Buffer.from(await this.storage.mediaRead(entry.key, input.range ? `bytes=${start}-${end}` : undefined)) };
+      if (range) headers["Content-Range"] = `bytes ${start}-${end}/${meta.sizeBytes}`;
+      return { status: range ? 206 : 200, headers, body: input.head ? undefined : Buffer.from(await this.storage.mediaRead(entry.key, range ? `bytes=${start}-${end}` : undefined)) };
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() === 416) {
         const meta = await this.storage.mediaHead(entry.key);

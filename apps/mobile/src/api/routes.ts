@@ -109,3 +109,13 @@ export async function photoRouteHeaders(route: RouteSnapshot, destination: strin
   if (!validKey(key)) throw new Error("Gateway access is not configured");
   return { "X-Carberk-Gateway-Key": key };
 }
+
+export async function videoRouteHeaders(uri: string): Promise<Record<string, string>> {
+  const url = new URL(uri);
+  if (url.username || url.password || url.hash) throw new Error("Unknown video destination");
+  if (url.origin === new URL(globalApi()).origin) return {};
+  if (url.origin !== new URL(GATEWAY_API).origin || !url.pathname.startsWith("/api/v1/listings/video-files/")) {
+    throw new Error("Unknown video destination");
+  }
+  return apiRouteHeaders({ entry: "tm", generation, apiBaseUrl: GATEWAY_API });
+}

@@ -16,6 +16,7 @@ import { EnvSchema } from "../../../env.schema";
 import { ConfigListingVideoAccess } from "../../../common/ConfigListingVideoAccess";
 import { JwtAuthGuard } from "../../../common/jwt-auth.guard";
 import { GlobalErrorFilter } from "../../../common/error.filter";
+import { registerGatewayAttributionHook } from "../../../common/gateway-attribution";
 import { IdentityModule } from "../../identity/identity.module";
 import { IDENTITY_CLOCK_PORT } from "../../identity/identity.public";
 import { ServeListingVideo } from "../application/ServeListingVideo";
@@ -25,23 +26,25 @@ import { PrismaVideoServingRepository } from "../infrastructure/PrismaVideoServi
 import { BucketVideoStorage } from "../infrastructure/BucketVideoStorage";
 import { PrismaListingsReadRepository } from "../infrastructure/PrismaListingsReadRepository";
 import { defineE2eSuite, seedSuiteCatalog } from "../../../../test/helpers/e2eSuite";
+import { loopbackGateway } from "../../../../test/helpers/loopbackGateway";
 import { VideoServingController } from "./VideoServingController";
 
 const enabled = process.env["VIDEO_STORAGE_E2E"] === "1" || process.env["GITHUB_ACTIONS"] === "true";
-describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Bucket", () => {
+describe.skipIf(!enabled).each(["global", "tm"] as const)("every Listing video HTTP request through %s on real Postgres/Bucket", (entry) => {
   const suite = defineE2eSuite(`serve-video-${randomUUID().slice(0, 8)}`);
   const owner = suite.id("owner"), viewer = suite.id("viewer"), admin = suite.id("admin"), outsider = suite.id("outsider");
   const listingId = suite.id("listing"), videoId = suite.id("video"), generationId = suite.id("generation"), sourceId = suite.id("source");
   const prefix = `test-serving/${suite.slug}/`;
   const keys: string[] = [];
   let now = new Date();
-  let app: NestFastifyApplication, prisma: PrismaService, request: ReturnType<typeof supertest>, storage: BucketVideoStorage, config: ConfigService;
+  let app: NestFastifyApplication, prisma: PrismaService, request: ReturnType<typeof supertest.agent>, storage: BucketVideoStorage, config: ConfigService;
+  let gateway: Awaited<ReturnType<typeof loopbackGateway>> | undefined;
   let s3: S3Client;
   let manifest: Record<string, { key: string; sizeBytes: number }>;
   const path = (audience = "viewer", type = "listing", id = listingId) => `/api/v1/listings/video-access/${audience}/${type}/${id}`;
   const auth = (id = viewer) => ({ Authorization: `Bearer ${app.get(JwtService).sign({ sub: id, sid: suite.id(`session-${id}`) })}` });
   const masterBody = () => `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=100000,CODECS="avc1.64001e",RESOLUTION=202x360\n${prefix}hls/360p/index.m3u8\n`;
-  const local = (url: string) => { const parsed = new URL(url); expect(parsed.origin).toBe("https://media.example.test"); return parsed.pathname + parsed.search; };
+  const local = (url: string) => { const parsed = new URL(url); expect(parsed.origin).toBe(entry === "tm" ? "https://gateway.example.test" : "https://media.example.test"); return parsed.pathname + parsed.search; };
   async function read(audience = "viewer", id = viewer, play = false, type = "listing", targetId = listingId) {
     return request[play ? "post" : "get"](path(audience, type, targetId) + (play ? "/playback" : "")).set(auth(id)).expect(play ? 201 : 200);
   }
@@ -55,17 +58,25 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
     return urls;
   }
   beforeAll(async () => {
-    const env = EnvSchema.parse({ ...process.env, LISTING_VIDEO_API_ORIGIN: "https://media.example.test", LISTING_VIDEO_VIEW_TESTER_USER_IDS: viewer, LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: owner });
+    const env = EnvSchema.parse({ ...process.env, LISTING_VIDEO_API_ORIGIN: "https://media.example.test", LISTING_VIDEO_GATEWAY_ORIGIN: "https://gateway.example.test", LISTING_VIDEO_VIEW_TESTER_USER_IDS: viewer, LISTING_VIDEO_UPLOAD_TESTER_USER_IDS: owner });
     const module = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => env] }), EventEmitterModule.forRoot(), BullModule.forRoot({ connection: { url: env.REDIS_URL } }), JwtModule.register({ global: true, secret: env.JWT_ACCESS_SECRET }), IdentityModule],
       controllers: [VideoServingController],
       providers: [PrismaService, ServeListingVideo, ConfigListingVideoAccess, { provide: VIDEO_SERVING_REPOSITORY, useClass: PrismaVideoServingRepository }, { provide: VIDEO_MEDIA_STORAGE, useClass: BucketVideoStorage }],
     }).overrideProvider(IDENTITY_CLOCK_PORT).useValue({ now: () => now }).compile();
     app = module.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+    const nonces = new Set<string>();
+    registerGatewayAttributionHook(app.getHttpAdapter().getInstance(), {
+      keys: { r07: "ab".repeat(32) },
+      claimNonce: async key => { if (nonces.has(key)) return false; nonces.add(key); return true; },
+    });
     app.useGlobalGuards(new JwtAuthGuard(app.get(Reflector), app.get(JwtService)));
     app.useGlobalFilters(new GlobalErrorFilter());
     await app.listen(0, "127.0.0.1");
-    request = supertest(app.getHttpServer()); prisma = app.get(PrismaService); storage = app.get(VIDEO_MEDIA_STORAGE); config = app.get(ConfigService);
+    if (entry === "tm") gateway = await loopbackGateway(Number(new URL(await app.getUrl()).port));
+    request = supertest.agent(gateway?.server ?? app.getHttpServer());
+    if (gateway) request.set(gateway.headers);
+    prisma = app.get(PrismaService); storage = app.get(VIDEO_MEDIA_STORAGE); config = app.get(ConfigService);
     s3 = new S3Client({ endpoint: env.MINIO_ENDPOINT, region: env.MINIO_REGION, credentials: { accessKeyId: env.MINIO_ACCESS_KEY, secretAccessKey: env.MINIO_SECRET_KEY }, forcePathStyle: true });
     const multipart = await storage.createMultipart({ key: `${prefix}bootstrap`, contentType: "video/mp4" });
     await storage.abortMultipart({ key: `${prefix}bootstrap`, uploadId: multipart.uploadId });
@@ -103,6 +114,7 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
   afterAll(async () => {
     for (const key of keys) await storage.deleteObject(key);
     s3?.destroy();
+    await gateway?.close();
     await app?.close();
   });
   it("issues cover-only reads, starts HLS only on Play and rewrites every child explicitly", async () => {
@@ -143,6 +155,58 @@ describe.skipIf(!enabled)("every Listing video HTTP request on real Postgres/Buc
     await request.get(url).set("If-None-Match", (ranged.headers["etag"] ?? "")).expect(200);
     await prisma.listing.update({ where: { id: listingId }, data: { status: "banned" } });
     await request.head(url).set("If-None-Match", (ranged.headers["etag"] ?? "")).expect(404).expect("Cache-Control", "private, no-store");
+  });
+  it("sends a full representation when If-Range does not match its strong validator", async () => {
+    const play = await read("viewer", viewer, true);
+    const [variant] = await children(play.body.url);
+    const [segment] = await children(variant!);
+    const url = local(segment!);
+    const complete = await request.get(url).expect(200);
+    const etag = String(complete.headers["etag"]);
+    const matched = await request.get(url).set("Range", "bytes=2-5").set("If-Range", etag).expect(206);
+    expect(matched.body.toString()).toBe("2345");
+    for (const validator of ['"stale"', `W/${etag}`, "Wed, 21 Oct 2015 07:28:00 GMT"]) {
+      const response = await request.get(url).set("Range", "bytes=2-5").set("If-Range", validator).expect(200);
+      expect(response.body.toString()).toBe("0123456789");
+      expect(response.headers["content-length"]).toBe("10");
+      expect(response.headers["content-range"]).toBeUndefined();
+      expect(response.headers["etag"]).toBe(etag);
+    }
+  });
+
+  it("keeps playlist HEAD length and validators equal to the rewritten representation", async () => {
+    const play = await read("viewer", viewer, true);
+    const url = local(play.body.url);
+    const get = await request.get(url).expect(200);
+    const head = await request.head(url).expect(200);
+    expect(get.headers["etag"]).toMatch(/^"[a-f0-9]{64}"$/);
+    expect(head.headers["etag"]).toBe(get.headers["etag"]);
+    expect(head.headers["content-length"]).toBe(String(Buffer.byteLength(get.text)));
+    expect(head.headers["content-type"]).toBe("application/vnd.apple.mpegurl");
+    expect(head.text).toBeUndefined();
+  });
+
+  it("binds the entry in the grant and never falls back from missing gateway configuration", async () => {
+    const play = await read("viewer", viewer, true);
+    const url = new URL(play.body.url);
+    const token = url.searchParams.get("grant")!;
+    const [payload, signature] = token.split(".");
+    const changed = { ...JSON.parse(Buffer.from(payload!, "base64url").toString()), entry: entry === "tm" ? "global" : "tm" };
+    url.searchParams.set("grant", `${Buffer.from(JSON.stringify(changed)).toString("base64url")}.${signature}`);
+    await request.get(local(url.toString())).expect(404).expect("Cache-Control", "private, no-store");
+    if (entry === "tm") {
+      config.set("LISTING_VIDEO_GATEWAY_ORIGIN", undefined);
+      delete process.env["LISTING_VIDEO_GATEWAY_ORIGIN"];
+      try {
+        await request.post(path() + "/playback").set(auth()).expect(404).expect("Cache-Control", "private, no-store");
+        await request.get(local(play.body.url)).expect(404).expect("Cache-Control", "private, no-store");
+      } finally {
+        config.set("LISTING_VIDEO_GATEWAY_ORIGIN", "https://gateway.example.test");
+      }
+    } else {
+      const response = await request.post(path() + "/playback").set(auth()).set({ Host: "unapproved.example", "X-Forwarded-Host": "gateway.example.test", "X-Forwarded-Proto": "https" }).expect(201);
+      expect(new URL(response.body.url).origin).toBe("https://media.example.test");
+    }
   });
   it.each(["banned", "archived", "deleted", "replaced", "removed", "retired"])("revokes cover, playlist and segment after %s", async (state) => {
     const cover = await read(); const play = await read("viewer", viewer, true); const [variant] = await children(play.body.url); const [segment] = await children(variant!);

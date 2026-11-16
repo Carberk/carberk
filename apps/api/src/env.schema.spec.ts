@@ -14,6 +14,14 @@ const baseEnv = {
   TOTP_SECRET_ENCRYPTION_KEY: "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=",
 };
 
+it("accepts a fixed HTTPS video gateway origin and refuses URL targets", () => {
+  expect(EnvSchema.parse({ ...baseEnv, LISTING_VIDEO_GATEWAY_ORIGIN: "https://tm-staging.bagtyyar.dev" }))
+    .toHaveProperty("LISTING_VIDEO_GATEWAY_ORIGIN", "https://tm-staging.bagtyyar.dev");
+  for (const origin of ["https://tm-staging.bagtyyar.dev/api", "https://user:secret@tm-staging.bagtyyar.dev", "https://tm-staging.bagtyyar.dev?target=other", "http://untrusted.example"]) {
+    expect(EnvSchema.safeParse({ ...baseEnv, LISTING_VIDEO_GATEWAY_ORIGIN: origin }).success).toBe(false);
+  }
+});
+
 describe("routing preference configuration", () => {
   it("defaults enabled preference and accepts only explicit booleans", () => {
     expect(EnvSchema.parse(baseEnv).ROUTING_DISABLE_TM_PREFERENCE).toBe(false);

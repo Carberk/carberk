@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ListingsSchemas } from "@auto-tm/contracts";
 
 import { apiClient, ApiError } from "../../api/client";
+import { videoRouteHeaders } from "../../api/routes";
 
 export type PlaybackAudience = "viewer" | "owner-preview" | "moderator";
 export type PlaybackTargetType = "listing" | "draft";
@@ -17,6 +18,7 @@ export type ListingPlayback =
   | {
       phase: "ready";
       url: string;
+      headers: Record<string, string>;
       qualities: number[];
       durationMs: number;
       expiresAt?: string;
@@ -50,9 +52,12 @@ export function useListingPlayback(target: PlaybackTarget) {
         setPlayback({ phase: "unavailable" });
         return;
       }
+      const headers = await videoRouteHeaders(res.url);
+      if (requestId.current !== id) return;
       setPlayback({
         phase: "ready",
         url: res.url,
+        headers,
         qualities: res.qualities ?? [],
         durationMs: res.video.durationMs,
         ...(res.expiresAt ? { expiresAt: res.expiresAt } : {}),

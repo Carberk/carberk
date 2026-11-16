@@ -1,11 +1,13 @@
 import { http, HttpResponse } from "msw";
 import { AppState } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { waitFor } from "@testing-library/react-native";
 
 import { sentVideoTelemetry, server } from "../../../test/msw";
 import { act, fireEvent, renderMobile } from "../../../test/render";
 import { createdPlayers, fakeVideoOptions, type FakeVideoPlayer } from "../../../test/native-video";
+import { provisionGatewayKey, selectTesterRoute } from "../../api/routes";
 
 import { ListingVideoPlayer } from "./ListingVideoPlayer";
 
@@ -170,6 +172,45 @@ beforeEach(() => {
 });
 
 describe("ListingVideoPlayer", () => {
+  it("keeps the native HLS source and quality requests on the granted gateway entry", async () => {
+    vi.stubGlobal("__DEV__", true);
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+    vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+    vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+    const key = "synthetic-video-gateway-key-0123456789";
+    const storage = new Map<string, string>();
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async name => storage.get(name) ?? null);
+    vi.mocked(SecureStore.setItemAsync).mockImplementation(async (name, value) => { storage.set(name, value); });
+    await provisionGatewayKey(key);
+    selectTesterRoute("tm");
+    const gatewayMaster = "https://tm-staging.bagtyyar.dev/api/v1/listings/video-files/viewer/v1/g1/master.m3u8?grant=tm";
+    const gatewayVariant = "https://tm-staging.bagtyyar.dev/api/v1/listings/video-files/viewer/v1/g1/360.m3u8?grant=tm";
+    let requestHeaders: Headers | undefined;
+    server.use(
+      http.post("https://tm-staging.bagtyyar.dev/api/v1/listings/video-access/viewer/listing/:id/playback", () => {
+        selectTesterRoute("global");
+        return HttpResponse.json(readyBody({ url: gatewayMaster, qualities: [360] }));
+      }),
+      http.get(gatewayMaster, ({ request }) => {
+        requestHeaders = request.headers;
+        return new HttpResponse(`#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=900000\n${gatewayVariant}\n`);
+      }),
+    );
+    try {
+      const { screen } = await renderPlayer();
+      const player = await startPlaying(screen);
+      expect(player.source).toEqual({ uri: gatewayMaster, contentType: "hls", useCaching: false, headers: { "X-Carberk-Gateway-Key": key } });
+      await waitFor(() => expect(requestHeaders?.get("x-carberk-gateway-key")).toBe(key));
+      expect(requestHeaders?.get("authorization")).toBeNull();
+      await pickQuality(screen, "360p");
+      expect(playerOf(screen).source).toEqual({ uri: gatewayVariant, contentType: "hls", useCaching: false, headers: { "X-Carberk-Gateway-Key": key } });
+    } finally {
+      selectTesterRoute("global");
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("shows Loading video until the first frame is ready, then starts playing with sound", async () => {
     const { screen } = await renderPlayer();
     expect(await screen.findByText("Loading video")).toBeTruthy();

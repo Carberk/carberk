@@ -66,6 +66,7 @@ describe("Listing detail video tile", () => {
     expect(screen.getByRole("button", { name: "1 of 4" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "3 of 4" })).toBeTruthy();
     const strip = screen.getByTestId("detail-photo-strip");
+    await screen.findByTestId("video-cover-image");
     expect(getAllHosts(strip, "Image").map((image) => image.props.source.uri)[1]).toBe(cover.detail);
     expectNothingPlayed();
     await fireEvent.press(play);

@@ -9,6 +9,11 @@ const booleanFlag = z
   .default("false")
   .transform((v) => v === "true");
 
+const videoOriginSchema = z.string().url().refine((value) => {
+  const url = new URL(value);
+  return url.origin === value && (url.protocol === "https:" || ["localhost", "127.0.0.1"].includes(url.hostname));
+}, "Use an HTTPS origin (HTTP is local-only)");
+
 const BaseSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /**
@@ -69,7 +74,8 @@ const BaseSchema = z.object({
   SOCKET_IO_CORS_ORIGIN: z.string().min(1).default("*"),
   SOCKET_IO_REDIS_ADAPTER_ENABLED: booleanFlag,
 
-  LISTING_VIDEO_API_ORIGIN: z.string().url().refine((value) => { const url = new URL(value); return url.origin === value && (url.protocol === "https:" || ["localhost", "127.0.0.1"].includes(url.hostname)); }, "Use an HTTPS origin (HTTP is local-only)").optional(),
+  LISTING_VIDEO_API_ORIGIN: videoOriginSchema.optional(),
+  LISTING_VIDEO_GATEWAY_ORIGIN: videoOriginSchema.optional(),
   /** Local testing only: a shorter Listing video grant, so expiry checks take seconds. Deployed environments always use five minutes. */
   LISTING_VIDEO_GRANT_TTL_SECONDS: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().int().min(10).max(300).optional()),
   MINIO_ENDPOINT: z.string().default("http://localhost:9000"),
