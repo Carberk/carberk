@@ -68,3 +68,9 @@ test("explicit YAML indentation, CRLF and chomping preserve the declared program
   assert.equal(result.comments[0].raw, "/* actual */");
   assert.deepEqual(result.comments[0].start, { line: 3, column: 4 });
 });
+
+test("digits in YAML block header comments are data rather than indentation indicators", () => {
+  const result = parseYaml({ path: "docs/style", fileType: "yaml", source: 'style: | # ticket 2\n    a{} /* actual */\n',
+    embedded: [{ path: ["style"], fileType: "css" }] });
+  assert.deepEqual(result.comments.map((item) => item.raw), ["# ticket 2", "/* actual */"]);
+});

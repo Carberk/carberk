@@ -32,3 +32,9 @@ test("CSS BOM and unquoted data URL contents retain their exact parser boundarie
   assert.equal(comment.raw, "/* actual */");
   assert.equal(source.slice(comment.startOffset, comment.endOffset), "/* actual */");
 });
+
+test("CSS comments in selectors values functions and at-rule parameters are inventoried", () => {
+  const source = '@media screen/* media */{a/* selector */{color:r/* value */ed; width:calc(1px/* function */ + 2px)}}';
+  const result = parseCss({ path: "docs/theme", fileType: "css", source });
+  assert.deepEqual(result.comments.map((item) => item.raw), ["/* media */", "/* selector */", "/* value */", "/* function */"]);
+});

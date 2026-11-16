@@ -43,7 +43,7 @@ export function parseMarkup({ path, source, fileType, adapters = {} }) {
     parser.on("error", (error) => { throw new Error(`${path}: XML parse failed: ${error.message}`); });
     parser.on("comment", () => {
       const end = parser.position + 1;
-      const start = source.lastIndexOf("<!--", end);
+      const start = source.lastIndexOf("<!--", end - 3);
       result.comments.push(commentSpan(source, start, end));
     });
     parser.on("doctype", (value) => {

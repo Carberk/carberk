@@ -45,3 +45,9 @@ test("Python syntax and tokenizer failures reject incomplete and malformed input
     assert.throws(() => parsePython({ path: "docs/broken", fileType: "python", source }), /Python parse failed/);
   }
 });
+
+test("Python string line separators do not change tokenizer line offsets", () => {
+  const result = parsePython({ path: "docs/tool", fileType: "python", source: 'value = "a\u2028b\u0085c" # explanation\n' });
+  assert.equal(result.comments[0].raw, "# explanation");
+  assert.deepEqual(result.comments[0].start, { line: 1, column: 16 });
+});

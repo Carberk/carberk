@@ -32,7 +32,7 @@ export function parseYaml({ path, source, fileType, embedded = [], adapters = {}
     const bodyStart = source.indexOf("\n", start) + 1;
     const raw = source.slice(bodyStart, end);
     const nonempty = raw.split("\n").filter((line) => line.trim());
-    const indicator = source.slice(start, bodyStart).match(/[1-9]/)?.[0];
+    const indicator = scalar.srcToken.props.find((token) => token.type === "block-scalar-header")?.source.match(/[1-9]/)?.[0];
     const indent = indicator ? scalar.srcToken.indent + Number(indicator) :
       Math.min(...nonempty.map((line) => line.match(/^ */)[0].length));
     let content = "";

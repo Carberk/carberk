@@ -46,3 +46,8 @@ test("nested JavaScript syntax errors remain failures and XML escaped programs s
   const result = parseMarkup({ path: "page", fileType: "xml", source: '<root><script type="text/javascript">const x = &quot;data&quot;;</script></root>', adapters });
   assert.equal(result.deferred[0].reason, "XML encoded or mixed embedded content");
 });
+
+test("adjacent XML host comments each retain their complete delimiters", () => {
+  const result = parseMarkup({ path: "docs/sample", fileType: "xml", source: "<root><!-- first --><!-- second --></root>" });
+  assert.deepEqual(result.comments.map((item) => item.raw), ["<!-- first -->", "<!-- second -->"]);
+});

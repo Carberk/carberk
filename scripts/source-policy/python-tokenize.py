@@ -8,7 +8,8 @@ import tokenize
 request = json.load(sys.stdin)
 source = request["source"]
 tree = ast.parse(source, filename=request["path"], type_comments=True)
-lines = source.splitlines(keepends=True)
+lines = source.split("\n")
+lines = [line + "\n" for line in lines[:-1]] + lines[-1:]
 
 def offset(position):
     row, column = position
