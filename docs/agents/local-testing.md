@@ -137,9 +137,9 @@ The local-only helper does not grant staging/production authority; those targets
 
 ## 4. Run the app on the iOS Simulator
 
-Use the iPhone 17 Simulator (iOS 26.2, id `38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`). In T3 Code, every launch, tap, text entry and screenshot goes through the device tools:
+Use the iPhone 17 Simulator (iOS 26.2, id `38747B85-BB39-48A2-BF0D-4DD6A5ED1D13`). In T3 Code, every launch/relaunch, interaction, deep link and screenshot follows the [device-tool policy](environment.md#ios-simulator):
 
-1. `device_list`, then `device_open` with the host `local` and that id. It returns an `agent-device` command bound to the device. If the device is held, preserve its owner and follow the contention rule in the native fixture procedure.
+1. `device_list`, then `device_open` with the returned host id and that device id. It returns an `agent-device` command bound to the device. If the device is held, preserve its owner and follow the contention rule in the native fixture procedure.
 2. Start Metro from your own worktree as a background command, on `8081` or any free port: `pnpm --filter @auto-tm/mobile dev --port 8081`. A Metro started by another worktree serves that worktree's code. If your API is not on `3006`, set the same port in `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WS_URL` in `apps/mobile/.env` first.
 3. Open the development build against your Metro: `<agent-device> open tm.auto.app --relaunch --metro-port 8081`.
 4. `<agent-device> snapshot -i` lists the screen's elements with `@eN` refs. Use `press @eN` and `fill @eN "text"`, and use `device_screenshot` to look. Refs change after every screen change, so take a new snapshot before each press. If the first snapshot warns that the app was not in front, take it again.
@@ -149,7 +149,7 @@ The Simulator reaches the Mac's `localhost`, so the app uses the local API, sock
 
 For contention and cleanup use the [owned-device procedure](native-fixture-signin.md#prepare-one-owned-device), including the bound command's `close` and confirmed receipt **before** Device-panel cleanup. Preserve signed-in app data.
 
-**When to rebuild the development build:** the Carberk Debug build is already installed on the iPhone 17 and loads JavaScript from whichever Metro it opens, so JavaScript and styling changes need no rebuild. Rebuild after a native change, such as a new native package, an Expo upgrade, or a change to app config or plugins. Use the route known to work on this Mac's Xcode: `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <id> --port <port>`, as in the [mobile/Expo checks](mobile-expo.md#guarded-native-development-sessions). The build is the same for every backend. Afterwards, reopen it against your local Metro with step 3.
+**When to rebuild the development build:** the Carberk Debug build is already installed on the iPhone 17 and loads JavaScript from whichever Metro it opens, so JavaScript and styling changes need no rebuild. Rebuild after a native change, such as a new native package, an Expo upgrade, or a change to app config or plugins. Use the route known to work on this Mac's Xcode: `native:metro -- --env staging --port <port>`, then `native:ios -- --udid <id> --port <port>`, as in the [mobile/Expo checks, including the current T3 launch limitation](mobile-expo.md#guarded-native-development-sessions). The build is the same for every backend. Afterwards, reopen it against your local Metro with step 3.
 
 ## 5. Finish
 
