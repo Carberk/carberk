@@ -31,7 +31,8 @@ function createFixture(glossary) {
   writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: {
     "check:glossary": "node scripts/check-domain-glossary.mjs",
     "test:glossary": "node --test scripts/check-domain-glossary.test.mjs",
-    test: "pnpm test:agent-docs && pnpm test:glossary && turbo run test && pnpm test:reviewer-flow-smoke",
+    test: "pnpm test:root && turbo run test",
+    "test:root": "pnpm exec turbo run build --filter=@auto-tm/contracts && pnpm check:agent-docs && node --test 'scripts/*.test.mjs' 'infra/minio/*.test.mjs'",
   } }));
   writeFileSync(join(root, "docs", "adr", "0042-domain-glossary-authority-and-mutability.md"), [
     "[`docs/domain/GLOSSARY.md`](../domain/GLOSSARY.md)",
@@ -98,28 +99,42 @@ test("accepts complete repository integration", () => withFixture(valid, (root) 
 test("accepts an equivalent root gate with reordered required checks", () => withFixture(valid, (root) => {
   const packagePath = join(root, "package.json");
   const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
-  packageJson.scripts.test = "pnpm test:glossary && pnpm test:agent-docs && turbo run test && pnpm test:reviewer-flow-smoke";
+  packageJson.scripts.test = "turbo run test && pnpm test:root";
   writeFileSync(packagePath, JSON.stringify(packageJson));
   assert.equal(run(root).status, 0);
 }));
-for (const operator of [" || true", "; true", " | cat", " & true"]) {
-  test(`rejects a root gate with ${operator.trim()}`, () => withFixture(valid, (root) => {
+for (const command of ["test", "test:root"]) {
+  for (const operator of [" || true", "; true", " | cat", " & true"]) {
+    test(`rejects ${command} with ${operator.trim()}`, () => withFixture(valid, (root) => {
+      const packagePath = join(root, "package.json");
+      const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+      packageJson.scripts[command] += operator;
+      writeFileSync(packagePath, JSON.stringify(packageJson));
+      assert.match(failure(root), /package.json root test gate must run agent-docs, glossary, and workspace tests/);
+    }));
+  }
+}
+for (const [command, step] of [
+  ["test", "pnpm test:root"],
+  ["test", "turbo run test"],
+  ["test:root", "pnpm check:agent-docs"],
+  ["test:root", "node --test 'scripts/*.test.mjs' 'infra/minio/*.test.mjs'"],
+]) {
+  test(`rejects ${command} missing ${step}`, () => withFixture(valid, (root) => {
     const packagePath = join(root, "package.json");
     const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
-    packageJson.scripts.test += operator;
+    packageJson.scripts[command] = packageJson.scripts[command].split(" && ").filter((part) => part !== step).join(" && ");
     writeFileSync(packagePath, JSON.stringify(packageJson));
     assert.match(failure(root), /package.json root test gate must run agent-docs, glossary, and workspace tests/);
   }));
 }
-for (const step of ["pnpm test:agent-docs", "pnpm test:glossary", "turbo run test"]) {
-  test(`rejects a root gate missing ${step}`, () => withFixture(valid, (root) => {
-    const packagePath = join(root, "package.json");
-    const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
-    packageJson.scripts.test = packageJson.scripts.test.split(" && ").filter((part) => part !== step).join(" && ");
-    writeFileSync(packagePath, JSON.stringify(packageJson));
-    assert.match(failure(root), /package.json root test gate must run agent-docs, glossary, and workspace tests/);
-  }));
-}
+test("rejects root discovery that omits the MinIO suites", () => withFixture(valid, (root) => {
+  const packagePath = join(root, "package.json");
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+  packageJson.scripts["test:root"] = packageJson.scripts["test:root"].replace(" 'infra/minio/*.test.mjs'", "");
+  writeFileSync(packagePath, JSON.stringify(packageJson));
+  assert.match(failure(root), /package.json root test gate must run agent-docs, glossary, and workspace tests/);
+}));
 test("rejects missing repository references", () => withFixture(valid, (root) => {
   writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: {} }));
   writeFileSync(join(root, "docs", "adr", "README.md"), "");
