@@ -6,6 +6,12 @@ These rules are mandatory for new or changed behavior and its code/tests ([ADR-0
 
 Implementers satisfy these rules before handoff; Standards reviewers block violations in the changed behavior. Trace relevant existing callers/tests to validate the changed contract. Unrelated legacy debt receives a separate audit/repair task, not an opportunistic rewrite. Existing mock style does not excuse weak evidence for new or changed behavior. Refactor only what the changed outcome needs.
 
+## Code comments
+
+Maintained source, tests and configuration use names, types, module boundaries and behavior tests to express intent. Explanatory comments, including rationale, TODOs, region headings and disabled-code notes, are prohibited. Preserve only required legal notices, valid shebangs and genuinely necessary compiler/tool directives. Match the directive's grammar and effect; a keyword or suppression with arbitrary prose is not an exception. Type-bearing annotations must keep their compiler meaning.
+
+Keep applied migration bytes and pinned upstream/generated artifacts intact; review their integrity and provenance separately. New maintained code follows this rule immediately. Remove legacy explanatory comments in owned, behavior-preserving cleanup slices, not unrelated feature changes. Do not move explanations into docstrings, inert strings or new documentation to evade the rule. Runtime strings and data remain part of the behavior. [Document authority](domain.md#document-authority) owns where durable information belongs.
+
 ## Vocabulary
 
 - **Module:** anything with an interface and an implementation: a function, a class, a hook, a screen, a package.

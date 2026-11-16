@@ -1,11 +1,11 @@
-<!-- One issue, one small PR (about 500–1,000 changed lines). Lead with the problem in plain words, not a file list. -->
+Describe the problem and the resulting behavior. Keep one coherent change; explain a larger cohesive scope when useful for review.
 
-<!-- Problem: what was wrong or missing, for whom. -->
+Problem: <what was wrong or missing, and for whom>
 
-<!-- Change: what this PR does about it, in a few sentences. -->
+Change: <how this resolves it>
 
-Proof: <!-- what you ran or saw: checks, focused test, simulator screenshots -->
+Proof: <checks and observed behavior, with any missing evidence>
 
-Reviewed with sol-loop: <!-- N rounds with <model>. Sol verdict: approved -->
+Reviewed with sol-loop: <rounds, model, verdict>
 
-Closes #<!-- issue -->
+Closes #<issue>

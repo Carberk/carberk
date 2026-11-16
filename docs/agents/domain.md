@@ -27,7 +27,11 @@ Commit schema changes as migrations; `db push` is localhost-only. Store timestam
 | What is scheduled? | Roadmap and open GitHub issues |
 | What did this change finish? | The PR description and its linked issue |
 
-For a new durable decision, write a superseding ADR; merged ADRs are immutable. Use an issue or disposable prototype for temporary planning. Semantic vocabulary changes and ownership changes follow ADR-0042; routine definitions go into the glossary. User-facing copy belongs to the issue, code, and i18n resources that ship it.
+Update the existing authoritative source when its owned fact changes. New Markdown requires explicit task-specific founder authorization, a concrete unique purpose and a destination that existing source, tests, issues or guides cannot serve. A skill's generic request for research notes, a spec, a glossary or an ADR does not authorize another file. Keep task plans, progress, findings and review records in the existing issue, PR or thread; create no Markdown diaries, proof packets or replacement archives in or beside the repository. Necessary raw logs and machine-readable tool receipts are not prose diaries in another extension.
+
+A genuinely new durable decision can use the explicitly approved ADR process; merged ADRs remain immutable. Semantic vocabulary and ownership changes follow ADR-0042; routine definitions go into the canonical glossary. User-facing copy belongs to the issue, code, and i18n resources that ship it.
+
+Retire the obsolete charter, duplicate glossary, PRD implementation mirrors, wireframes/handoffs and sprint narratives identified by ADR-0109 after preserving any unique still-binding requirement in an existing authoritative source. Repair active inbound links in the same change. Keep immutable decisions, necessary legal and operational references, and current ownership/navigation guidance. Coordinate release of documents used by active delivery before retiring them; age or a filename alone is not evidence that their requirements are obsolete. Git history is the archive.
 
 For user-facing UI work, apply the installed `ux-heuristics`, `design-everyday-things`, and `impeccable` skills to the affected interaction. If a skill is unavailable, disclose that and review clarity, accessibility, state feedback, and error prevention/recovery without claiming the skill ran.
 

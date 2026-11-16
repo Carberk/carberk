@@ -110,39 +110,26 @@ and append "..." to indicate truncation.
 ## Agent Brief
 
 **Category:** enhancement
-**Summary:** Add `.out-of-scope/` directory support for tracking rejected feature requests
+**Summary:** Surface prior rejected proposals during triage
 
 **Current behavior:**
-When a feature request is rejected, the issue is closed with a `wontfix` label
-and a comment. There is no persistent record of the decision or reasoning.
-Future similar requests require the maintainer to recall or search for the
-prior discussion.
+Triage checks existing implementation but does not surface relevant decisions
+from closed issues, so the same rejected proposal can be reconsidered without
+its earlier context.
 
 **Desired behavior:**
-Rejected feature requests should be documented in `.out-of-scope/<concept>.md`
-files that capture the decision, reasoning, and links to all issues that
-requested the feature. When triaging new issues, these files should be
-checked for matches.
-
-**Key interfaces:**
-- Markdown file format in `.out-of-scope/`: each file should have a
-  `# Concept Name` heading, a `**Decision:**` line, a `**Reason:**` line,
-  and a `**Prior requests:**` list with issue links
-- The triage workflow should read all `.out-of-scope/*.md` files early
-  and match incoming issues against them by concept similarity
+Search closed issues by domain concept, read matching decision comments and
+show their links and reasons in the current issue's triage summary.
 
 **Acceptance criteria:**
-- [ ] Closing a feature as wontfix creates/updates a file in `.out-of-scope/`
-- [ ] The file includes the decision, reasoning, and link to the closed issue
-- [ ] If a matching `.out-of-scope/` file already exists, the new issue is
-      appended to its "Prior requests" list rather than creating a duplicate
-- [ ] During triage, existing `.out-of-scope/` files are checked and surfaced
-      when a new issue matches a prior rejection
+- [ ] A matching rejected proposal appears with its original issue and reason
+- [ ] An already-implemented closure is not presented as a rejection
+- [ ] Unrelated issues with overlapping words are excluded
+- [ ] A changed founder decision is recorded in the current issue
 
 **Out of scope:**
-- Automated matching (human confirms the match)
-- Reopening previously rejected features
-- Bug reports (only enhancement rejections go to `.out-of-scope/`)
+- Creating local Markdown records or a second decision archive
+- Automatically reopening old issues
 ```
 
 ### Good agent brief (PR)
