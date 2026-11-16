@@ -410,7 +410,7 @@ export default function SellScreen() {
       try {
         await queryClient.fetchInfiniteQuery({ ...myListingsQueryOptions(), staleTime: 0, retry: false, networkMode: "always" });
         router.push("/listings/manage");
-      } catch {}
+      } catch { return; }
       finally { inspectingRef.current = false; setIsInspecting(false); }
       return;
     }
@@ -673,7 +673,6 @@ export default function SellScreen() {
         }
         uploadStatus={uploadStatus}
         onUploadStatusPress={() => {
-          // From Check the chip opens Photos as a change, so Done comes back.
           if (!publishUncertain) dispatch({ type: ctx.isLastStep ? "CHANGE_FROM_REVIEW" : "GO_TO_STEP", step: "photos" });
         }}
       >

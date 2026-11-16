@@ -334,7 +334,7 @@ function EditListingSession({ listingId }: { listingId: string }) {
       try {
         await queryClient.fetchQuery({ ...listingDetailQueryOptions(listingId), staleTime: 0, retry: false, networkMode: "always" });
         router.push(`/(public)/listings/${listingId}`);
-      } catch {}
+      } catch { return; }
       finally { inspectingRef.current = false; setIsInspecting(false); }
       return;
     }

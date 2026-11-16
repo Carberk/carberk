@@ -23,8 +23,6 @@ export function usePublishDraft() {
   const uncertain = useRef(new Map<string, unknown>());
 
   return useMutation({
-    // Offline, fail now instead of pausing: a paused publish never settles, and
-    // Check and publish would read "Publishing..." until the network came back.
     networkMode: "always",
     retry: false,
     mutationFn: async (draftId: string) => {

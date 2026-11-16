@@ -7,8 +7,6 @@ type Translate = (key: string) => string;
 
 export interface VerifyCodeErrorCopy {
   message: string;
-  // A terminal error cannot be fixed by entering or resending a code; the
-  // User has to change the phone or email.
   terminal: boolean;
   uncertain?: boolean;
 }
