@@ -78,6 +78,10 @@ jobs:
 
       - run: pnpm test:source-policy
 
+      - run: pnpm check:import-architecture
+
+      - run: pnpm test:import-architecture
+
       - run: pnpm check:glossary
 
       - run: pnpm test:ci-lane
@@ -113,6 +117,10 @@ jobs:
       - run: pnpm check:source-policy
 
       - run: pnpm test:source-policy
+
+      - run: pnpm check:import-architecture
+
+      - run: pnpm test:import-architecture
 
       - run: pnpm check:glossary
 

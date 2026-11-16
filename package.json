@@ -12,7 +12,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "pnpm check:source-policy && turbo run lint",
+    "lint": "pnpm check:source-policy && pnpm check:import-architecture && turbo run lint",
     "test": "pnpm test:root && turbo run test",
     "test:unit": "pnpm test:agent-github && pnpm test:native-session && pnpm test:native-fixture-signin && pnpm test:admin-access && turbo run test:unit",
     "test:api": "turbo run test --filter=@auto-tm/api --filter=@auto-tm/worker",
@@ -56,7 +56,9 @@
     "admin:access": "node scripts/admin-access.mjs",
     "test:admin-access": "node --test scripts/admin-access.test.mjs scripts/admin-access-process.test.mjs",
     "check:source-policy": "node scripts/check-source-policy.mjs",
-    "test:source-policy": "node --test scripts/check-source-policy.test.mjs"
+    "test:source-policy": "node --test scripts/check-source-policy.test.mjs",
+    "check:import-architecture": "node scripts/check-import-architecture.mjs",
+    "test:import-architecture": "node --test scripts/check-import-architecture.test.mjs"
   },
   "devDependencies": {
     "@babel/parser": "7.29.7",

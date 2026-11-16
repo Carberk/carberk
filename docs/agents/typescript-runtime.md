@@ -107,3 +107,5 @@ node --input-type=module -e "import('@auto-tm/contracts').then(() => console.log
 ```
 
 If these fail, fix the package boundary first. Do not start by editing the consuming Nest module.
+
+`pnpm lint` runs the uncached import architecture gate before Turbo. Both CI lanes also run it and its fixtures directly, so source, resolver configs, workspace manifests, exports and allowance changes are always read again. Static runtime cycles include imports, re-exports and literal require; explicit type-only and dynamic/lazy edges remain subject to boundary rules but do not create static cycle edges. Nonliteral loaders are reported, and unsupported production app loaders fail. Generated Prisma and Next declaration prerequisites are classified by their exact producer paths; generated internals and external package internals are outside the source graph. Next client graphs and Expo runtime graphs cannot reach server imports; Next server actions retain their framework boundary.

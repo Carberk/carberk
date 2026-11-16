@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -389,7 +390,51 @@ for (const name of ["pr-checks.yml", "ci.yml"]) {
     }
     assert.equal(rootScripts["check:source-policy"], "node scripts/check-source-policy.mjs");
     assert.equal(rootScripts["test:source-policy"], "node --test scripts/check-source-policy.test.mjs");
-    assert.match(rootScripts.lint, /^pnpm check:source-policy && turbo run lint$/);
+    assert.match(rootScripts.lint, /^pnpm check:source-policy && pnpm check:import-architecture && turbo run lint$/);
     assert.match(rootScripts["test:root"], /node --test 'scripts\/\*\.test\.mjs'/);
   });
 }
+
+for (const name of ["pr-checks.yml", "ci.yml"]) {
+  test(`${name} runs uncached import architecture checks and fixtures in both lanes`, () => {
+    const graph = jobs(workflow(name));
+    for (const id of ["docs", "static"]) {
+      const job = graph.get(id);
+      assert.match(job, /run: pnpm check:import-architecture/);
+      assert.match(job, /run: pnpm test:import-architecture/);
+      assert.doesNotMatch(job, /continue-on-error:/);
+    }
+    assert.equal(rootScripts["check:import-architecture"], "node scripts/check-import-architecture.mjs");
+    assert.equal(rootScripts["test:import-architecture"], "node --test scripts/check-import-architecture.test.mjs");
+    assert.match(rootScripts.lint, /^pnpm check:source-policy && pnpm check:import-architecture && turbo run lint$/);
+  });
+}
+
+test("a rejected resolved import fails the required aggregate in either CI lane", t => {
+  const cwd = mkdtempSync(join(tmpdir(), "carberk-import-gate-"));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const put = (path, value) => {
+    mkdirSync(dirname(join(cwd, path)), { recursive: true });
+    writeFileSync(join(cwd, path), typeof value === "string" ? value : JSON.stringify(value));
+  };
+  put("package.json", { private: true });
+  put("apps/api/package.json", { name: "@auto-tm/api", dependencies: { "@nestjs/common": "*" } });
+  put("scripts/import-architecture/legacy.json", []);
+  for (const broken of [true, false]) {
+    put("apps/api/src/modules/catalog/domain/Rule.ts", broken ? 'import type { Injectable } from "@nestjs/common";' : "export const value = 1;");
+    const guard = spawnSync(process.execPath, [join(root, "scripts/check-import-architecture.mjs"), cwd], { encoding: "utf8" });
+    assert.equal(guard.status, broken ? 1 : 0, guard.stdout + guard.stderr);
+    if (broken) assert.match(guard.stderr, /domain-purity/);
+    for (const lane of ["docs", "full"]) {
+      const result = spawnSync("bash", ["-c", runBlock(jobs(workflow("pr-checks.yml")).get("pr"))], {
+        env: { ...process.env, LANE: lane, LANE_RESULT: "success",
+          DOCS_RESULT: lane === "docs" ? guard.status ? "failure" : "success" : "skipped",
+          STATIC_RESULT: lane === "full" ? guard.status ? "failure" : "success" : "skipped",
+          API_RESULT: lane === "full" ? "success" : "skipped",
+          DB_RESULT: lane === "full" ? "success" : "skipped",
+          FRONTEND_RESULT: lane === "full" ? "success" : "skipped" }, encoding: "utf8",
+      });
+      assert.equal(result.status, broken ? 1 : 0, result.stdout + result.stderr);
+    }
+  }
+});
