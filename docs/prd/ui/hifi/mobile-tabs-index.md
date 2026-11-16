@@ -65,5 +65,5 @@ Reuse the existing `brandModel`, `listingsCount`, `newListings`, `seeAll` and
 viewer-aware Favorites, pending-action replay and retained navigation destinations.
 No keyboard interaction belongs to the Home header.
 
-The [bounded audit](../research/ui-polish-719/audit.md) records the separate
-remaining screen concerns and the provenance/limits of before evidence.
+The [#719 preservation comment](https://github.com/Carberk/carberk/issues/719#issuecomment-6909443228) records the separate
+accessibility concerns, subsequent source fixes and unresolved native proof.

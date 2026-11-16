@@ -40,8 +40,7 @@
       "screens/06-location.html",
       "screens/07-description.html",
       "screens/08-review.html",
-      "screens/09-discard.html",
-      "ux-audit-findings.md"
+      "screens/09-discard.html"
     ],
     "html": [
       "app-shell.html",
@@ -84,8 +83,7 @@
       "mpd2c3vr-Screenshot-2026-05-20-at-04.05.50.png",
       "mpd2qsqo-Screenshot-2026-05-20-at-04.17.16.png",
       "mpd3dvus-image.png",
-      "mpd3qajt-Screenshot-2026-05-20-at-04.44.51.png",
-      "ux-audit-findings.md"
+      "mpd3qajt-Screenshot-2026-05-20-at-04.44.51.png"
     ]
   },
   "screens": [
