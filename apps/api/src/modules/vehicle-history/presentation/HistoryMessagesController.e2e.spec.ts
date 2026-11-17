@@ -170,11 +170,13 @@ describe("Current History text over listening HTTP", () => {
     await send(customer, id, "existing").expect(201);
     let pending: PromiseLike<unknown> | undefined, handover: Promise<unknown> | undefined;
     await f.prisma.$transaction(async (tx) => {
+      const pid = (await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`)[0]!.pid;
       await tx.$queryRaw`SELECT id FROM service_conversations WHERE "objectId" = ${id} FOR UPDATE`;
       pending = send(operator, id, "authorized before handover", randomUUID(), true).expect(201).then((result) => result);
       await eventually(async () => {
         const [row] = await f.prisma.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_stat_activity
-          WHERE wait_event_type = 'Lock' AND query LIKE '%service_conversations%' AND pid <> pg_backend_pid()) AS waiting`;
+          WHERE wait_event_type = 'Lock' AND query LIKE '%service_conversations%'
+          AND ${pid} = ANY(pg_blocking_pids(pid))) AS waiting`;
         return row?.waiting ? true : null;
       }, { timeoutMs: 2500, intervalMs: 20, description: "messaging commit blocked inside the History fence" });
       // NOWAIT proves the separate messaging transaction still retains History's row fence.
