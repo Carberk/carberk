@@ -17,10 +17,15 @@ export function useConversationMessages(opts: UseConversationMessagesOptions) {
   currentConversationId.current = conversationId;
   const [newestPageState, setNewestPageState] = useState<{ conversationId: string; pending: boolean } | null>(null);
   const newestPageReady = useRef<string | null>(null);
+  const fetchGeneration = useRef(0);
 
   useEffect(() => queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== "updated" || currentConversationId.current !== conversationId ||
       event.query !== queryClient.getQueryCache().find({ queryKey: queryKeys.conversations.messages(conversationId), exact: true })) return;
+    if (event.action.type === "fetch") {
+      fetchGeneration.current++;
+      newestPageReady.current = null;
+    }
     if (event.action.type === "error") newestPageReady.current = null;
     if (event.action.type === "success" && !event.action.manual && newestPageReady.current === conversationId) {
       newestPageReady.current = null;
@@ -31,6 +36,7 @@ export function useConversationMessages(opts: UseConversationMessagesOptions) {
   const query = useInfiniteQuery({
     queryKey: queryKeys.conversations.messages(conversationId),
     queryFn: async ({ pageParam }) => {
+      const generation = fetchGeneration.current;
       const newestPage = pageParam === null;
       if (newestPage && currentConversationId.current === conversationId) {
         newestPageReady.current = null;
@@ -45,7 +51,7 @@ export function useConversationMessages(opts: UseConversationMessagesOptions) {
         `/conversations/${conversationId}/messages?${params.toString()}`,
         ConversationsSchemas.ListMessagesResponseSchema,
       );
-      if (newestPage && currentConversationId.current === conversationId) newestPageReady.current = conversationId;
+      if (newestPage && currentConversationId.current === conversationId && fetchGeneration.current === generation) newestPageReady.current = conversationId;
       return page;
     },
     initialPageParam: null as string | null,

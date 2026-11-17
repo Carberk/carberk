@@ -128,13 +128,20 @@ it("retains newest-history recovery through live cache patches and older-page fe
     text: "Live after failed recovery", createdAt: "2026-11-16T12:00:00.000Z" };
   const older = { ...live, id: "550e8400-e29b-41d4-a716-446655440004", text: "Older page" };
   const missed = { ...live, id: "550e8400-e29b-41d4-a716-446655440005", text: "Missed newest" };
-  let response: "initial" | "failure" | "partial" | "recovered" = "initial";
+  let response: "initial" | "failure" | "partial" | "cancel" | "recovered" = "initial";
   let olderFails = false;
+  let releaseOlder!: () => void;
+  const olderStarted = vi.fn();
   server.use(http.get(`${globalEntry}/conversations/${conversationId}/messages`, ({ request }) => {
     const cursor = new URL(request.url).searchParams.get("cursor");
+    if (cursor === "older" && response === "cancel") {
+      olderStarted();
+      return new Promise<ReturnType<typeof HttpResponse.json>>((resolve) => { releaseOlder = () => resolve(HttpResponse.json({ items: [older], nextCursor: "older2" })); });
+    }
     if (cursor === "older" && olderFails) return HttpResponse.json({}, { status: 503 });
     if (cursor === "older") return HttpResponse.json({ items: [older], nextCursor: "older2" });
-    if (cursor === "older2") return HttpResponse.json({ items: [], nextCursor: null });
+    if (cursor === "older2") return HttpResponse.json({ items: [], nextCursor: "older3" });
+    if (cursor === "older3") return HttpResponse.json({ items: [], nextCursor: null });
     if (response === "failure") return HttpResponse.json({}, { status: 503 });
     return HttpResponse.json({ items: response === "initial" ? [] : [missed, live], nextCursor: "older" });
   }));
@@ -176,11 +183,81 @@ it("retains newest-history recovery through live cache patches and older-page fe
   expect(hook.result.current.data?.pages[0]?.items).toEqual([live]);
   expect(hook.result.current.newestPagePending).toBe(true);
 
+  response = "cancel";
+  let recovery!: Promise<void>;
+  await act(() => { recovery = client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
+  await waitFor(() => expect(olderStarted).toHaveBeenCalledTimes(1));
+  await act(async () => { await hook.result.current.fetchNextPage(); });
+  await waitFor(() => expect(hook.result.current.failureCount).toBe(0));
+  expect(hook.result.current.data?.pages[0]?.items).toEqual([live]);
+  expect(hook.result.current.newestPagePending).toBe(true);
+  releaseOlder();
+  await recovery;
+
   response = "recovered";
   await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
   await waitFor(() => expect(hook.result.current.failureCount).toBe(0));
   await waitFor(() => expect(hook.result.current.data?.pages[0]?.items).toEqual([missed, live]));
   await waitFor(() => expect(hook.result.current.newestPagePending).toBe(false));
+  await hook.unmount();
+  client.clear();
+});
+
+it("does not promote a canceled late newest page through later pagination", async () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", globalEntry);
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  vi.mocked(SecureStore.getItemAsync).mockImplementation(async key => storage.get(key) ?? null);
+  vi.mocked(SecureStore.setItemAsync).mockImplementation(async (key, value) => { storage.set(key, value); });
+  vi.mocked(SecureStore.deleteItemAsync).mockImplementation(async key => { storage.delete(key); });
+  selectTesterRoute("global");
+  const claims = Buffer.from(JSON.stringify({ sub: senderId, sid: "session-a", iat: 1000, exp: 4600 })).toString("base64url");
+  await storeAuthSession({
+    user: { id: senderId, phone: "+99361000001", email: null, displayName: null, role: "buyer" },
+    accessToken: `e30.${claims}.sig`, refreshToken: "refresh-a",
+  });
+  const missed = { id: messageId, conversationId, senderId, kind: "text" as const,
+    text: "Missed during cancellation", createdAt: "2026-11-16T12:00:00.000Z" };
+  let blockHead = false;
+  let releaseHead!: () => void;
+  let releaseOlder2!: () => void;
+  const headStarted = vi.fn();
+  const older2Started = vi.fn();
+  server.use(http.get(`${globalEntry}/conversations/${conversationId}/messages`, ({ request }) => {
+    const cursor = new URL(request.url).searchParams.get("cursor");
+    if (cursor === "older") return HttpResponse.json({ items: [], nextCursor: "older2" });
+    if (cursor === "older2") {
+      older2Started();
+      return new Promise<ReturnType<typeof HttpResponse.json>>((resolve) => { releaseOlder2 = () => resolve(HttpResponse.json({ items: [], nextCursor: null })); });
+    }
+    if (blockHead) {
+      headStarted();
+      return new Promise<ReturnType<typeof HttpResponse.json>>((resolve) => { releaseHead = () => resolve(HttpResponse.json({ items: [missed], nextCursor: "older" })); });
+    }
+    return HttpResponse.json({ items: [], nextCursor: "older" });
+  }));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const hook = await renderHook(() => {
+    const messages = useConversationMessages({ conversationId });
+    return { data: messages.data, newestPagePending: messages.newestPagePending, fetchNextPage: messages.fetchNextPage };
+  }, { wrapper });
+  await waitFor(() => expect(hook.result.current.data?.pages[0]?.items).toEqual([]));
+  await waitFor(() => expect(hook.result.current.newestPagePending).toBe(false));
+
+  blockHead = true;
+  let recovery!: Promise<void>;
+  await act(() => { recovery = client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
+  await waitFor(() => expect(headStarted).toHaveBeenCalledTimes(1));
+  await act(async () => { await hook.result.current.fetchNextPage(); });
+  let pagination!: ReturnType<typeof hook.result.current.fetchNextPage>;
+  await act(() => { pagination = hook.result.current.fetchNextPage(); });
+  await waitFor(() => expect(older2Started).toHaveBeenCalledTimes(1));
+  await act(async () => { releaseHead(); await recovery; });
+  await act(async () => { releaseOlder2(); await pagination; });
+  expect(hook.result.current.data?.pages[0]?.items).toEqual([]);
+  expect(hook.result.current.newestPagePending).toBe(true);
   await hook.unmount();
   client.clear();
 });
