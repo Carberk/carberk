@@ -19,7 +19,14 @@ Every comment or issue posted to the issue tracker during triage **must** start 
 ## Reference docs
 
 - [AGENT-BRIEF.md](AGENT-BRIEF.md): how to write durable agent briefs
-- [OUT-OF-SCOPE.md](OUT-OF-SCOPE.md): how existing tracker decisions record rejected requests
+
+## Rejected requests
+
+Existing GitHub issues and decision comments are the record of rejected requests. Follow [GitHub operations](../../../docs/agents/github-operations.md) for complete reads and authorized writes. Do not create a local `.out-of-scope/` knowledge base or a replacement archive.
+
+During triage, search prior closed issues by the domain concept, read the decision and linked context, and surface a relevant rejection. A matching phrase alone does not establish the same request. Distinguish a rejected proposal from already-implemented behavior.
+
+When the founder rejects an enhancement, record the concrete reason and related issue links in that issue before closing it. If the decision changes later, record the new decision in the current issue and link the historical one. Do not rewrite history or reopen unrelated issues automatically.
 
 ## Roles
 
@@ -82,7 +89,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
    - For `wontfix`, close the issue, with the comment depending on *why*:
      - **Already implemented**: the change already exists in the codebase. Point to where it lives and keep the disposition in the issue.
      - **Rejected (bug)**: give a polite explanation, then close.
-     - **Rejected (enhancement)**: record the decision and reasoning in the existing issue, link related prior decisions, then close ([OUT-OF-SCOPE.md](OUT-OF-SCOPE.md)).
+     - **Rejected (enhancement)**: record the decision and reasoning in the existing issue, link related prior decisions, then close (see [Rejected requests](#rejected-requests)).
    - `needs-triage`: apply the role. Optional comment if there's partial progress.
 
 ## Quick state override

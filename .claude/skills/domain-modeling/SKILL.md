@@ -31,7 +31,7 @@ When the user states how something works, check whether the code agrees. If you 
 
 ### Update GLOSSARY.md inline
 
-When a term is resolved, update the canonical glossary using its existing format and vocabulary rules. Keep the agreed definition in the current issue/thread until the scoped change is ready.
+When a term is resolved, update the canonical glossary using its existing format and [vocabulary rules](../../../docs/adr/0042-domain-glossary-authority-and-mutability.md#decision). Include project-specific domain concepts rather than general programming concepts. Keep the agreed definition in the current issue/thread until the scoped change is ready.
 
 `GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
 
