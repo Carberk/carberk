@@ -46,6 +46,7 @@ const state = vi.hoisted(() => ({
     isFetching: false,
     isPaused: false,
     failureCount: 0,
+    newestPagePending: false,
     dataUpdatedAt: 1,
     error: null as unknown,
     refetch: vi.fn(),
@@ -212,6 +213,7 @@ beforeEach(async () => {
   state.messages.isFetching = false;
   state.messages.isPaused = false;
   state.messages.failureCount = 0;
+  state.messages.newestPagePending = false;
   state.messages.dataUpdatedAt = 1;
   state.messages.error = null;
   state.messages.data = { pages: [{ items: [] }] };
@@ -294,6 +296,7 @@ describe("Conversation opened with only its ID", () => {
     state.messages.isFetching = false;
     state.messages.isError = true;
     state.messages.isSuccess = false;
+    state.messages.newestPagePending = true;
     state.messages.error = new Error("offline");
     await screen.rerender(<ConversationDetailScreen />);
     expect(state.socket.markRead).toHaveBeenCalledTimes(1);
@@ -310,6 +313,11 @@ describe("Conversation opened with only its ID", () => {
 
     state.messages.failureCount = 0;
     state.messages.dataUpdatedAt = 3;
+    await screen.rerender(<ConversationDetailScreen />);
+    expect(state.socket.markRead).toHaveBeenCalledTimes(1);
+
+    state.messages.newestPagePending = false;
+    state.messages.dataUpdatedAt = 4;
     state.messages.data = { pages: [{ items: [serverMessage("recovered", SELLER_ID)] }] };
     await screen.rerender(<ConversationDetailScreen />);
     expect(await screen.findByText("recovered")).toBeTruthy();

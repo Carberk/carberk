@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { useInfiniteQuery, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import { ConversationsSchemas } from "@auto-tm/contracts";
 
@@ -11,25 +12,33 @@ interface UseConversationMessagesOptions {
 
 export function useConversationMessages(opts: UseConversationMessagesOptions) {
   const { conversationId, limit = 20 } = opts;
+  const currentConversationId = useRef(conversationId);
+  currentConversationId.current = conversationId;
+  const [newestPageState, setNewestPageState] = useState<{ conversationId: string; pending: boolean } | null>(null);
 
-  return useInfiniteQuery({
+  const query = useInfiniteQuery({
     queryKey: queryKeys.conversations.messages(conversationId),
     queryFn: async ({ pageParam }) => {
+      const newestPage = pageParam === null;
+      if (newestPage && currentConversationId.current === conversationId) setNewestPageState({ conversationId, pending: true });
       const params = new URLSearchParams();
       params.set("limit", String(limit));
       if (pageParam) {
         params.set("cursor", pageParam);
       }
-      return apiClient.get(
+      const page = await apiClient.get(
         `/conversations/${conversationId}/messages?${params.toString()}`,
         ConversationsSchemas.ListMessagesResponseSchema,
       );
+      if (newestPage && currentConversationId.current === conversationId) setNewestPageState({ conversationId, pending: false });
+      return page;
     },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 30_000,
     enabled: !!conversationId,
   });
+  return { ...query, newestPagePending: newestPageState?.conversationId === conversationId && newestPageState.pending === true };
 }
 
 /** Persist the durable acknowledgement before the local outbox is reconciled. */

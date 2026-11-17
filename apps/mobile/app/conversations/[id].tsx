@@ -428,6 +428,7 @@ export default function ConversationDetailScreen() {
   useEffect(() => {
     if (!isFocused || !foreground || AppState.currentState !== "active") { lastMarkedDataAtRef.current = 0; return; }
     if (messagesQuery.isSuccess && !messagesQuery.isFetching && !messagesQuery.isPaused &&
+      !messagesQuery.newestPagePending &&
       messagesQuery.failureCount === 0 && viewer?.userId && conversationId &&
       messagesQuery.dataUpdatedAt > lastMarkedDataAtRef.current) void markRead(messagesQuery.dataUpdatedAt);
   }, [
@@ -436,6 +437,7 @@ export default function ConversationDetailScreen() {
     messagesQuery.isSuccess,
     messagesQuery.isFetching,
     messagesQuery.isPaused,
+    messagesQuery.newestPagePending,
     messagesQuery.failureCount,
     messagesQuery.dataUpdatedAt,
     viewer?.userId,
