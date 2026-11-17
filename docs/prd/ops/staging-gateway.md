@@ -2,8 +2,8 @@
 
 [R02](https://github.com/Carberk/carberk/issues/1155) adds a controlled-client API
 entry on the VPS. [R01](staging-egress.md) owns fixed-relay selection and its
-independence proof. R05 adds the fixed photo alias below; video and sockets
-remain separate tickets. R03 adds
+independence proof. R05 adds the fixed photo alias below; R08 adds Socket.IO
+forwarding. Video remains a separate ticket. R03 adds
 optional signed client attribution as described below. A gateway key does not grant API business permissions.
 
 ## Runtime contract
@@ -27,8 +27,10 @@ hostname/certificate.
 The [runtime pin](../../../infra/gateway/runtime.json) identifies the official
 Linux x64 Node archive and SHA-256. There are no npm runtime dependencies.
 
-Allowed targets are `/healthz`, `/readyz`, and `/api/v1/…`; CONNECT, WebSocket
-upgrade, absolute-form destinations and unconfigured paths are refused. The raw
+Allowed targets are `/healthz`, `/readyz`, `/api/v1/…`, and the exact
+`/socket.io/` handshake path. Only GET and POST use Socket.IO polling; a GET
+may upgrade to WebSocket. CONNECT, upgrades elsewhere, absolute-form destinations
+and unconfigured paths are refused. The raw
 request target, method, body and ordinary API status are preserved. Hop-by-hop
 headers, caller-supplied forwarding metadata and the gateway key never reach the
 API. API bearer tokens go only to that fixed origin. External/invalid redirects
@@ -36,7 +38,7 @@ produce 502; approved same-origin redirects become relative gateway paths. The
 gateway follows no redirects and retries no request. An interrupted response
 stays interrupted, rather than ending a truncated body as a successful transfer.
 
-Requests have a 30-second total deadline, six-second CONNECT/TLS budget, 16 MiB
+HTTP requests and WebSocket handshakes have a 30-second deadline and six-second CONNECT/TLS budget. An upgraded socket stays open under Socket.IO heartbeats. The gateway has a 16 MiB
 upload limit and 16 concurrent-request limit. Streaming uses backpressure and
 bounded stream buffers, with no durable body spool/cache. The upstream agent
 counts CONNECT/TLS attempts within its eight-connection limit and keeps at most
@@ -47,6 +49,19 @@ only method category, status, outcome and duration; never targets, headers or bo
 
 The entry stays restricted to controlled testers; API bearer authentication and
 business permissions remain owned by the API.
+
+## Socket.IO (R08)
+
+The native socket connects to `/ws/chat` as its Socket.IO namespace and sends
+Engine.IO traffic to `/socket.io/`. The gateway key stays in transport headers;
+the API access token stays in the Socket.IO auth payload. The gateway strips the
+key and caller attribution headers, signs each polling request or upgrade with
+the observed client address, and forwards only to the fixed API origin. nginx
+passes Upgrade and Connection for WebSocket and keeps its read timeout above the
+Socket.IO heartbeat interval. The API verifies signed polling and upgrade
+requests through the same replay store as ordinary HTTP. Polling remains
+available when an upgrade fails.
+Push delivery stays on the native FCM/APNS device and provider path.
 
 ## Photos (R05)
 

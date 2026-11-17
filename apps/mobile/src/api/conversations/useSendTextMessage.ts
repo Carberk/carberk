@@ -8,11 +8,11 @@ export function useSendTextMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: { conversationId: string; text: string }) =>
+    mutationFn: (input: { conversationId: string; text: string; clientMessageId?: string }) =>
       apiClient.post(
-        `/conversations/${input.conversationId}/messages`,
-        { text: input.text },
-        ConversationsSchemas.SendTextMessageResponseSchema,
+        `/conversations/${input.conversationId}/messages/rich`,
+        { kind: "text", text: input.text, clientMessageId: input.clientMessageId },
+        ConversationsSchemas.SendMessageResponseSchema,
       ),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

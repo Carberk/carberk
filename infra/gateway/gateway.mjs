@@ -7,7 +7,8 @@ import { isIP } from 'node:net';
 
 const methods = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 const hopHeaders = ['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'expect'];
-const allowedPath = value => value.startsWith('/api/v1/') || ['/healthz', '/readyz'].includes(value.split('?')[0]);
+const socketPath = value => value.split('?')[0] === '/socket.io/';
+const allowedPath = value => value.startsWith('/api/v1/') || ['/healthz', '/readyz'].includes(value.split('?')[0]) || socketPath(value);
 
 function headersFor(headers) {
   const denied = new Set([...hopHeaders, ...(headers.connection ?? '').toLowerCase().split(',').map(s => s.trim())]);
@@ -76,12 +77,14 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
     return secure;
   };
   let active = 0;
+  const validHost = value => value === hostname || value === `${hostname}:${server.address()?.port}`;
   const server = http.createServer({ maxHeaderSize: 16 * 1024, highWaterMark: 64 * 1024 }, (req, res) => {
     const photo = Boolean(photos && req.url.startsWith('/photos/'));
     const upstream = photo ? photos : api;
     const target = photo ? req.url.slice('/photos'.length) : req.url;
     const permitted = photo ? ['GET', 'HEAD', 'PUT'].includes(req.method)
-      && /^\/(listing-photos|chat-attachments)\//.test(target) : allowedPath(target);
+      && /^\/(listing-photos|chat-attachments)\//.test(target) : allowedPath(target)
+        && (!socketPath(target) || ['GET', 'POST'].includes(req.method));
     const started = now();
     let counted = false;
     let outbound;
@@ -112,7 +115,7 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
       res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', connection: 'close' });
       res.end(JSON.stringify({ error: reason }));
     }
-    if (req.headers.host !== hostname || !methods.has(req.method) || !req.url.startsWith('/') || req.url.startsWith('//')
+    if (!validHost(req.headers.host) || !methods.has(req.method) || !req.url.startsWith('/') || req.url.startsWith('//')
         || req.url.includes('\\') || !permitted) { fail(400, 'invalid_target'); return; }
     const supplied = Buffer.from(req.headers['x-carberk-gateway-key'] ?? '');
     if (supplied.length !== expectedKey.length || !timingSafeEqual(supplied, expectedKey)) { fail(403, 'gateway_access_denied'); return; }
@@ -173,7 +176,73 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
   server.maxRequestsPerSocket = 100;
   server.maxConnections = 64;
   server.on('connect', (_req, socket) => socket.end('HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'));
-  server.on('upgrade', (_req, socket) => socket.end('HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'));
+  server.on('upgrade', (req, client, head) => {
+    const started = now();
+    let outcome = 'response';
+    let status = 0;
+    let released = false;
+    let outbound;
+    let upstreamSocket;
+    let timer;
+    const finish = () => {
+      clearTimeout(timer);
+      if (!released) { active--; released = true; }
+      upstreamSocket?.destroy();
+      outbound?.destroy();
+      log({ method: 'GET', status, outcome, durationMs: Math.max(0, now() - started) });
+    };
+    const reject = (code, reason) => {
+      outcome = reason; status = code;
+      client.end(`HTTP/1.1 ${code} ${http.STATUS_CODES[code]}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+    };
+    if (!validHost(req.headers.host) || req.method !== 'GET' || !req.url.startsWith('/')
+        || req.url.startsWith('//') || req.url.includes('\\') || !socketPath(req.url)
+        || req.headers.upgrade?.toLowerCase() !== 'websocket'
+        || !req.headers.connection?.toLowerCase().split(',').map(value => value.trim()).includes('upgrade')) {
+      client.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return;
+    }
+    const supplied = Buffer.from(req.headers['x-carberk-gateway-key'] ?? '');
+    if (supplied.length !== expectedKey.length || !timingSafeEqual(supplied, expectedKey)) {
+      client.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return;
+    }
+    if (active >= maxConcurrent) { client.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
+    const headers = headersFor(req.headers);
+    headers.host = api.host;
+    headers.connection = 'Upgrade';
+    headers.upgrade = 'websocket';
+    if (signing) {
+      const ip = req.headers['x-real-ip'];
+      if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)
+          || typeof ip !== 'string' || ip.includes('%') || !isIP(ip)) {
+        client.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return;
+      }
+      const unsigned = `v1.${signing.keyId}.${now()}.${randomBytes(16).toString('hex')}.${Buffer.from(ip).toString('base64url')}`;
+      const signature = createHmac('sha256', Buffer.from(signing.secret, 'hex')).update(`${unsigned}\nGET\n${req.url}`).digest('hex');
+      headers['x-carberk-client-proof'] = `${unsigned}.${signature}`;
+    }
+    active++;
+    client.once('close', finish);
+    client.once('error', () => client.destroy());
+    timer = setTimeout(() => { outcome = 'deadline'; client.destroy(); }, deadlineMs);
+    outbound = https.request({ hostname: api.hostname, port: api.port || 443, method: 'GET',
+      path: req.url, headers, agent });
+    outbound.once('socket', socket => pendingConnections.get(socket)?.());
+    outbound.once('error', () => { outcome = 'upstream_unavailable'; if (!client.destroyed) reject(502, outcome); });
+    outbound.once('response', response => { response.resume(); reject(502, 'upgrade_refused'); });
+    outbound.once('upgrade', (response, peer, upstreamHead) => {
+      clearTimeout(timer);
+      upstreamSocket = peer;
+      status = 101;
+      const responseHeaders = headersFor(response.headers);
+      client.write(`HTTP/1.1 101 Switching Protocols\r\n${Object.entries(responseHeaders).map(([name, value]) => `${name}: ${value}`).join('\r\n')}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n`);
+      if (head.length) peer.write(head);
+      if (upstreamHead.length) client.write(upstreamHead);
+      peer.once('error', () => client.destroy());
+      peer.once('close', () => client.destroy());
+      client.pipe(peer); peer.pipe(client);
+    });
+    outbound.end();
+  });
   server.once('close', () => agent.destroy());
   return server;
 }

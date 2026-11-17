@@ -1,7 +1,8 @@
-# Additive virtual host in the existing Snikket nginx http context.
-# Render the owned staging hostname and its certificate before approved activation.
-# Persist as a read-only file mount at /etc/nginx/conf.d/carberk.conf.
-# Leave every existing Snikket server, certificate and port unchanged.
+map $http_upgrade $carberk_connection_upgrade {
+    default upgrade;
+    '' '';
+}
+
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
@@ -22,12 +23,13 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header Connection "";
+        proxy_set_header Connection $carberk_connection_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_request_buffering off;
         proxy_buffering off;
         proxy_connect_timeout 3s;
         proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
+        proxy_read_timeout 60s;
         proxy_redirect off;
         proxy_next_upstream off;
     }

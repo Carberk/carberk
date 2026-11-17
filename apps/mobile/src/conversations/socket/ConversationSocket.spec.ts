@@ -2,10 +2,12 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ConversationsSchemas } from "@auto-tm/contracts";
+import * as SecureStore from "expo-secure-store";
 
 import { loadAuthSession } from "../../auth/session";
+import { captureRouteSnapshot, provisionGatewayKey, removeGatewayKey, selectTesterRoute } from "../../api/routes";
 
-import { ConversationSocket } from "./ConversationSocket";
+import { ConversationSocket, getSharedConversationSocket } from "./ConversationSocket";
 
 const CONV_ID = "550e8400-e29b-41d4-a716-446655440001";
 const MSG_ID = "550e8400-e29b-41d4-a716-446655440002";
@@ -30,6 +32,7 @@ vi.mock("../../auth/session", () => ({
   loadAuthSession: vi.fn().mockResolvedValue({
     accessToken: "test-token",
   }),
+  subscribeAuthSession: vi.fn(() => () => {}),
 }));
 
 const mockLoadAuthSession = vi.mocked(loadAuthSession);
@@ -57,9 +60,120 @@ describe("ConversationSocket", () => {
       expect.any(String),
       expect.objectContaining({
         auth: { token: "test-token" },
-        transports: ["websocket"],
+        transports: ["websocket", "polling"],
+        tryAllTransports: true,
       }),
     );
+  });
+
+  it("shares one handshake when the global listener and screen connect together", async () => {
+    const socket = new ConversationSocket();
+    await Promise.all([socket.connect(), socket.connect()]);
+    expect(mockIo).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not deliver an old socket event after sign-out", async () => {
+    const socket = new ConversationSocket();
+    const listener = vi.fn();
+    socket.subscribeMessage(listener);
+    await socket.connect();
+    const handler = mockSocket.on.mock.calls.find(([event]) => event === "message:new")?.[1];
+    socket.disconnect();
+    handler?.({ message: {
+      id: MSG_ID, conversationId: CONV_ID, senderId: USER_ID,
+      kind: "text", text: "Late", createdAt: "2026-11-16T12:00:00.000Z",
+    } });
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("reconnects the shared socket through the selected entry with the existing gateway key", async () => {
+    vi.stubGlobal("__DEV__", true);
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+    vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+    vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue("synthetic-test-key-never-a-real-secret");
+    selectTesterRoute("global");
+    const socket = getSharedConversationSocket();
+    await socket.connect();
+
+    selectTesterRoute("tm");
+    await vi.waitFor(() => expect(mockIo).toHaveBeenCalledTimes(2));
+    expect(mockSocket.disconnect).toHaveBeenCalledTimes(1);
+    expect(mockIo).toHaveBeenLastCalledWith("https://tm-staging.bagtyyar.dev/ws/chat", expect.objectContaining({
+      auth: { token: "test-token" },
+      extraHeaders: { "X-Carberk-Gateway-Key": "synthetic-test-key-never-a-real-secret" },
+    }));
+    socket.disconnect();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("settles a sent message as uncertain when its acknowledgement is lost during a route change", async () => {
+    vi.stubGlobal("__DEV__", true);
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+    vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+    vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue("synthetic-test-key-never-a-real-secret");
+    selectTesterRoute("global");
+    const socket = getSharedConversationSocket();
+    await socket.connect();
+    mockSocket.emit.mockImplementation(() => {});
+    const pending = socket.sendTextMessage({ conversationId: CONV_ID, text: "Once", clientMessageId: "same-client-id" });
+    selectTesterRoute("tm");
+    expect(await pending).toMatchObject({ ok: false, code: "ACK_UNKNOWN" });
+    expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+    socket.disconnect();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("closes the old entry when the selected gateway has no configured access", async () => {
+    vi.stubGlobal("__DEV__", true);
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+    vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+    vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
+    selectTesterRoute("global");
+    const socket = getSharedConversationSocket();
+    await socket.connect();
+    selectTesterRoute("tm");
+    await vi.waitFor(() => expect(socket.getStatus()).toBe("error"));
+    expect(socket.isConnected()).toBe(false);
+    expect(mockSocket.disconnect).toHaveBeenCalledTimes(1);
+    socket.disconnect();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("replaces TM socket access without changing the selected route", async () => {
+    vi.stubGlobal("__DEV__", true);
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+    vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+    vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+    let key: string | null = "synthetic-test-key-never-a-real-secret";
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async () => key);
+    vi.mocked(SecureStore.setItemAsync).mockImplementation(async (_name, value) => { key = value; });
+    vi.mocked(SecureStore.deleteItemAsync).mockImplementation(async () => { key = null; });
+    selectTesterRoute("global");
+    const socket = getSharedConversationSocket();
+    await socket.connect();
+    selectTesterRoute("tm");
+    await vi.waitFor(() => expect(mockIo).toHaveBeenCalledTimes(2));
+    const route = captureRouteSnapshot();
+    await removeGatewayKey();
+    await vi.waitFor(() => expect(socket.getStatus()).toBe("error"));
+    expect(socket.isConnected()).toBe(false);
+    expect(captureRouteSnapshot()).toEqual(route);
+    await provisionGatewayKey("synthetic-replacement-gateway-access-key");
+    await vi.waitFor(() => expect(mockIo).toHaveBeenCalledTimes(3));
+    expect(mockIo).toHaveBeenLastCalledWith("https://tm-staging.bagtyyar.dev/ws/chat", expect.objectContaining({
+      extraHeaders: { "X-Carberk-Gateway-Key": "synthetic-replacement-gateway-access-key" },
+    }));
+    expect(captureRouteSnapshot()).toEqual(route);
+    socket.disconnect();
+    selectTesterRoute("global");
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it("reconnects with the current token when the signed-in user changes", async () => {

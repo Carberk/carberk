@@ -152,6 +152,20 @@ async function refreshOnce(route: RouteSnapshot, routeHeaders: Record<string, st
   finally { if (refreshInFlight === flight) refreshInFlight = null; }
 }
 
+export async function accessTokenForRoute(route: RouteSnapshot): Promise<string | null> {
+  const session = await loadAuthSession();
+  if (!session) return null;
+  if (isAccessTokenExpired(session)) {
+    const headers = await apiRouteHeaders(route).catch(() => { throw new ApiError("ROUTE_UNAVAILABLE", 503); });
+    await refreshOnce(route, headers, session);
+  }
+  const current = await loadAuthSession();
+  assertOwner(session, current);
+  if (!current) return null;
+  if (isAccessTokenExpired(current)) throw refreshUnavailable("Refresh is temporarily unavailable");
+  return current.accessToken;
+}
+
 async function rawRequest<TResponse>(
   path: string,
   opts: RequestOptions<TResponse>,

@@ -61,14 +61,14 @@ describe("useSendTextMessage", () => {
 
     const { result } = renderHook(() => useSendTextMessage(), { wrapper });
 
-    result.current.mutate({ conversationId: "conv-1", text: "Hello" });
+    result.current.mutate({ conversationId: "conv-1", text: "Hello", clientMessageId: "client-1" });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data?.id).toBe("m1");
     expect(mockPost).toHaveBeenCalledWith(
-      "/conversations/conv-1/messages",
-      { text: "Hello" },
+      "/conversations/conv-1/messages/rich",
+      { kind: "text", text: "Hello", clientMessageId: "client-1" },
       expect.any(Object),
     );
   });

@@ -2,7 +2,9 @@ import { io, type Socket } from "socket.io-client";
 import { ConversationsSchemas, DateTimeSchema } from "@auto-tm/contracts";
 import { z } from "zod";
 
-import { loadAuthSession } from "../../auth/session";
+import { subscribeAuthSession } from "../../auth/session";
+import { accessTokenForRoute } from "../../api/client";
+import { apiRouteHeaders, captureRouteSnapshot, subscribeRouteChanges } from "../../api/routes";
 
 const DEFAULT_WS_URL =
   process.env["EXPO_PUBLIC_WS_URL"] ?? "ws://localhost:3006/ws/chat";
@@ -69,7 +71,7 @@ let sharedSocket: ConversationSocket | null = null;
  */
 export function getSharedConversationSocket(): ConversationSocket {
   if (!sharedSocket) {
-    sharedSocket = new ConversationSocket();
+    sharedSocket = new ConversationSocket({}, true);
   }
   return sharedSocket;
 }
@@ -77,6 +79,12 @@ export function getSharedConversationSocket(): ConversationSocket {
 export class ConversationSocket {
   private socket: Socket | null = null;
   private authToken: string | null = null;
+  private routeGeneration: number | null = null;
+  private routeUnsubscribe: (() => void) | null = null;
+  private authUnsubscribe: (() => void) | null = null;
+  private connectionVersion = 0;
+  private connectInFlight: Promise<void> | null = null;
+  private readonly pendingSends = new Set<() => void>();
   private status: ConversationSocketStatus = "idle";
   private statusListeners = new Set<(status: ConversationSocketStatus) => void>();
   private messageListeners = new Set<(event: MessageNewEvent) => void>();
@@ -91,7 +99,7 @@ export class ConversationSocket {
     null;
   private readonly pendingJoins = new Map<string, Promise<JoinConversationAck | SocketErrorAck>>();
 
-  constructor(private readonly options: ConversationSocketOptions = {}) {}
+  constructor(private readonly options: ConversationSocketOptions = {}, private readonly followRoutes = false) {}
 
   getStatus(): ConversationSocketStatus {
     return this.status;
@@ -145,65 +153,118 @@ export class ConversationSocket {
     };
   }
 
-  async connect(): Promise<void> {
-    const token = this.options.token ?? (await loadAuthSession())?.accessToken;
+  connect(): Promise<void> {
+    if (this.connectInFlight) return this.connectInFlight;
+    const attempt = this.openConnection();
+    this.connectInFlight = attempt;
+    void attempt.then(() => {
+      if (this.connectInFlight === attempt) this.connectInFlight = null;
+    }, () => {
+      if (this.connectInFlight === attempt) this.connectInFlight = null;
+    });
+    return attempt;
+  }
+
+  private async openConnection(): Promise<void> {
+    const route = captureRouteSnapshot();
+    const version = this.connectionVersion;
+    if (this.followRoutes && !this.routeUnsubscribe) {
+      this.routeUnsubscribe = subscribeRouteChanges(() => this.restartConnection());
+      this.authUnsubscribe = subscribeAuthSession(() => this.restartConnection());
+    }
+    let token: string | null;
+    try {
+      token = this.options.token ?? await accessTokenForRoute(route);
+    } catch {
+      if (version === this.connectionVersion) this.setStatus("error");
+      return;
+    }
+    if (version !== this.connectionVersion) return;
     if (!token) {
+      this.failPendingSends();
       this.socket?.disconnect();
       this.socket = null;
       this.authToken = null;
+      this.routeGeneration = null;
       this.currentRoom = null;
       this.setStatus("error");
       return;
     }
 
-    if (this.socket?.connected && this.authToken === token) {
+    if (this.socket && this.authToken === token && (this.options.url || this.routeGeneration === route.generation)) {
       return;
     }
 
-    // Socket.IO applies auth during the connection handshake. A socket that
-    // survives an account switch otherwise keeps sending as the previous user.
-    this.socket?.disconnect();
+    let routeHeaders: Record<string, string>;
+    try {
+      routeHeaders = this.options.url ? {} : await apiRouteHeaders(route);
+    } catch {
+      if (version === this.connectionVersion) this.setStatus("error");
+      return;
+    }
+    if (version !== this.connectionVersion) return;
+    this.failPendingSends();
+    const previousSocket = this.socket;
     this.socket = null;
+    previousSocket?.disconnect();
+    if (previousSocket) this.setStatus("disconnected");
+    this.pendingJoins.clear();
+    this.activeJoinRequest = null;
+    if (this.authToken !== token) this.currentRoom = null;
     this.authToken = token;
+    this.routeGeneration = route.generation;
     this.setStatus("connecting");
 
-    this.socket = io(this.options.url ?? DEFAULT_WS_URL, {
+    const url = route.entry === "tm" && !this.options.url
+      ? new URL("/ws/chat", route.apiBaseUrl).toString().replace(/\/$/, "")
+      : this.options.url ?? DEFAULT_WS_URL;
+    const socket = io(url, {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
+      tryAllTransports: true,
+      ...(Object.keys(routeHeaders).length ? { extraHeaders: routeHeaders } : {}),
       autoConnect: true,
     });
+    this.socket = socket;
 
-    this.socket.on("connect", () => {
+    socket.on("connect", () => {
+      if (this.socket !== socket) return;
       this.setStatus("connected");
       if (this.currentRoom) {
         void this.joinRoomFromReconnect(this.currentRoom);
       }
     });
 
-    this.socket.on("disconnect", () => {
+    socket.on("disconnect", () => {
+      if (this.socket !== socket) return;
+      this.failPendingSends();
       this.pendingJoins.clear();
       this.setStatus("disconnected");
     });
 
-    this.socket.on("connect_error", () => {
+    socket.on("connect_error", () => {
+      if (this.socket !== socket) return;
       this.setStatus("error");
     });
 
-    this.socket.on("message:new", (event: unknown) => {
+    socket.on("message:new", (event: unknown) => {
+      if (this.socket !== socket) return;
       const parsed = ConversationsSchemas.ChatMessageEventSchema.safeParse(event);
       if (parsed.success) {
         this.messageListeners.forEach((listener) => listener(parsed.data));
       }
     });
 
-    this.socket.on("watermark", (event: unknown) => {
+    socket.on("watermark", (event: unknown) => {
+      if (this.socket !== socket) return;
       const parsed = ConversationsSchemas.WatermarkEventSchema.safeParse(event);
       if (parsed.success) {
         this.watermarkListeners.forEach((listener) => listener(parsed.data));
       }
     });
 
-    this.socket.on("message:deleted", (event: unknown) => {
+    socket.on("message:deleted", (event: unknown) => {
+      if (this.socket !== socket) return;
       const parsed =
         ConversationsSchemas.MessageDeletedEventSchema.safeParse(event);
       if (parsed.success) {
@@ -213,14 +274,16 @@ export class ConversationSocket {
       }
     });
 
-    this.socket.on("typing:peer", (event: unknown) => {
+    socket.on("typing:peer", (event: unknown) => {
+      if (this.socket !== socket) return;
       const parsed = ConversationsSchemas.TypingEventSchema.safeParse(event);
       if (parsed.success) {
         this.typingListeners.forEach((listener) => listener(parsed.data));
       }
     });
 
-    this.socket.on("presence", (event: unknown) => {
+    socket.on("presence", (event: unknown) => {
+      if (this.socket !== socket) return;
       const parsed = ConversationsSchemas.PresenceEventSchema.safeParse(event);
       if (parsed.success) {
         this.presenceListeners.forEach((listener) => listener(parsed.data));
@@ -229,12 +292,33 @@ export class ConversationSocket {
   }
 
   disconnect(): void {
+    this.connectionVersion++;
+    this.connectInFlight = null;
+    this.routeUnsubscribe?.();
+    this.routeUnsubscribe = null;
+    this.authUnsubscribe?.();
+    this.authUnsubscribe = null;
+    this.failPendingSends();
     this.pendingJoins.clear();
     this.currentRoom = null;
     this.socket?.disconnect();
     this.socket = null;
     this.authToken = null;
+    this.routeGeneration = null;
     this.setStatus("idle");
+  }
+
+  private restartConnection(): void {
+    this.connectionVersion++;
+    this.connectInFlight = null;
+    this.failPendingSends();
+    const previousSocket = this.socket;
+    this.socket = null;
+    previousSocket?.disconnect();
+    this.pendingJoins.clear();
+    this.activeJoinRequest = null;
+    this.setStatus("disconnected");
+    void this.connect();
   }
 
   async joinConversation(
@@ -507,6 +591,15 @@ export class ConversationSocket {
     const socket = this.socket;
 
     return new Promise((resolve) => {
+      let settled = false;
+      const settle = (result: SendMessageAck | SocketErrorAck) => {
+        if (settled) return;
+        settled = true;
+        this.pendingSends.delete(fail);
+        resolve(result);
+      };
+      const fail = () => settle({ ok: false, code: "ACK_UNKNOWN", message: "Message status is uncertain" });
+      this.pendingSends.add(fail);
       socket.emit(
         "message:send",
         payload,
@@ -516,18 +609,18 @@ export class ConversationSocket {
             message: ConversationsSchemas.MessageSummarySchema,
           }).safeParse(ack);
           if (wrapped.success) {
-            resolve(wrapped.data);
+            settle(wrapped.data);
             return;
           }
 
           const errorParsed =
             ConversationsSchemas.ConversationSocketErrorSchema.safeParse(ack);
           if (errorParsed.success) {
-            resolve(errorParsed.data);
+            settle(errorParsed.data);
             return;
           }
 
-          resolve({
+          settle({
             ok: false,
             code: SOCKET_CLIENT_ERROR_CODES.INVALID_ACK,
             message: "Invalid send response",
@@ -535,6 +628,10 @@ export class ConversationSocket {
         },
       );
     });
+  }
+
+  private failPendingSends(): void {
+    for (const fail of this.pendingSends) fail();
   }
 
   async sendTypingStart(conversationId: string): Promise<TypingAck | SocketErrorAck> {

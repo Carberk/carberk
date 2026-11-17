@@ -1,13 +1,17 @@
 import type { INestApplicationContext } from "@nestjs/common";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { IoAdapter } from "@nestjs/platform-socket.io";
 import { Redis } from "ioredis";
 import { createAdapter } from "@socket.io/redis-adapter";
 import type { Server, ServerOptions } from "socket.io";
 
+import { verifyGatewayAttribution, type AttributionOptions } from "../../../common/gateway-attribution";
+
 export interface RealtimeIoAdapterOptions {
   corsOrigin: string;
   redisAdapterEnabled: boolean;
   redisUrl: string | undefined;
+  gatewayAttribution: AttributionOptions;
 }
 
 export class RealtimeIoAdapter extends IoAdapter {
@@ -43,6 +47,12 @@ export class RealtimeIoAdapter extends IoAdapter {
         origin: this.options.corsOrigin,
       },
     }) as Server;
+    server.engine.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+      void verifyGatewayAttribution(req, this.options.gatewayAttribution).then(result => {
+        if (result.status === 200) next();
+        else { res.statusCode = result.status; res.end(); }
+      }).catch(() => { res.statusCode = 503; res.end(); });
+    });
     if (this.adapterConstructor) {
       server.adapter(this.adapterConstructor);
     }

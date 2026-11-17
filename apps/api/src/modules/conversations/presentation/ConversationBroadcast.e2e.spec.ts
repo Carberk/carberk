@@ -98,6 +98,7 @@ describe("Conversation message broadcast e2e", () => {
       corsOrigin: "*",
       redisAdapterEnabled: false,
       redisUrl: undefined,
+      gatewayAttribution: { keys: {}, claimNonce: async () => false },
     });
     await adapter.configure();
     app.useWebSocketAdapter(adapter);

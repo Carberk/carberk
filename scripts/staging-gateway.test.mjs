@@ -9,6 +9,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createGateway } from '../infra/gateway/gateway.mjs';
+import { Server } from 'socket.io';
+import { io } from 'socket.io-client';
 
 const key = 'controlled-staging-key-0123456789abcdef';
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
@@ -344,4 +346,116 @@ test('gateway replaces spoofed proofs with method/raw-target-bound observed-clie
   assert.ok(!JSON.stringify(f.logs).includes('203.0.113.7'));
   assert.ok(!JSON.stringify(f.logs).includes(parts[5]));
   assert.equal((await f.request()).status, 400);
+});
+
+test('Socket.IO polling and websocket upgrade reach the fixed API with auth and heartbeat traffic', async t => {
+  const f = await setup(t, (_req, res) => res.writeHead(404).end(), {
+    hostname: '127.0.0.1',
+    signing: { keyId: 'current', secret: 'ab'.repeat(32) },
+  });
+  const server = new Server(f.upstream, { path: '/socket.io/', pingInterval: 100, pingTimeout: 1000 });
+  const namespace = server.of('/ws/chat');
+  namespace.use((socket, next) => socket.handshake.auth.token === 'synthetic-bearer' ? next() : next(Error('unauthorized')));
+  namespace.on('connection', socket => {
+    const proof = socket.handshake.headers['x-carberk-client-proof'];
+    assert.equal(typeof proof, 'string');
+    assert.equal(socket.handshake.headers['x-carberk-gateway-key'], undefined);
+    assert.equal(socket.handshake.headers['x-real-ip'], undefined);
+    assert.equal(socket.handshake.headers.authorization, undefined);
+    const parts = proof.split('.');
+    assert.equal(parts[1], 'current');
+    assert.equal(Buffer.from(parts[4], 'base64url').toString(), '203.0.113.7');
+    assert.equal(parts[5], createHmac('sha256', Buffer.from('ab'.repeat(32), 'hex'))
+      .update(`${parts.slice(0, 5).join('.')}\nGET\n${socket.request.url}`).digest('hex'));
+    socket.on('echo', (message, ack) => ack(message));
+  });
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  assert.equal((await f.request({ path: '/socket.io/?EIO=4&transport=polling', headers: { host: '127.0.0.1', 'x-real-ip': '203.0.113.7' } })).status, 200);
+
+  for (const transport of ['polling', 'websocket']) {
+    const socket = io(`http://127.0.0.1:${f.port}/ws/chat`, {
+      path: '/socket.io/', transports: [transport], reconnection: false,
+      auth: { token: 'synthetic-bearer' },
+      extraHeaders: { 'x-carberk-gateway-key': key, 'x-real-ip': '203.0.113.7', 'x-carberk-client-proof': 'forged' },
+    });
+    await new Promise((resolve, reject) => {
+      socket.once('connect', resolve);
+      socket.once('connect_error', reject);
+      setTimeout(() => reject(Error(`${transport} did not connect`)), 3000).unref();
+    });
+    assert.equal(await socket.timeout(1000).emitWithAck('echo', transport), transport);
+    socket.disconnect();
+  }
+  const upgraded = io(`http://127.0.0.1:${f.port}/ws/chat`, {
+    path: '/socket.io/', transports: ['polling', 'websocket'], reconnection: false,
+    auth: { token: 'synthetic-bearer' },
+    extraHeaders: { 'x-carberk-gateway-key': key, 'x-real-ip': '203.0.113.7' },
+  });
+  t.after(() => upgraded.disconnect());
+  await new Promise((resolve, reject) => {
+    upgraded.once('connect', resolve);
+    upgraded.once('connect_error', reject);
+  });
+  if (upgraded.io.engine.transport.name !== 'websocket') {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(Error('Polling did not upgrade')), 1000);
+      upgraded.io.engine.once('upgrade', () => { clearTimeout(timeout); resolve(); });
+    });
+  }
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal(upgraded.connected, true);
+  assert.equal(await upgraded.timeout(1000).emitWithAck('echo', 'after-heartbeats'), 'after-heartbeats');
+  upgraded.disconnect();
+  const denied = io(`http://127.0.0.1:${f.port}/ws/chat`, {
+    path: '/socket.io/', transports: ['websocket'], reconnection: false,
+    auth: { token: 'wrong-token' },
+    extraHeaders: { 'x-carberk-gateway-key': key, 'x-real-ip': '203.0.113.7' },
+  });
+  await assert.rejects(new Promise((resolve, reject) => {
+    denied.once('connect', resolve);
+    denied.once('connect_error', reject);
+  }), /unauthorized/);
+  denied.disconnect();
+  assert.equal(f.logs.some(row => JSON.stringify(row).includes('synthetic-bearer')), false);
+  assert.equal(f.logs.some(row => JSON.stringify(row).includes(key)), false);
+});
+
+test('upgrade rejects missing edge access and unapproved paths before dialing the origin', async t => {
+  const f = await setup(t, (_req, res) => res.end('unreachable'), { hostname: '127.0.0.1' });
+  async function upgrade(path, suppliedKey) {
+    return new Promise((resolve, reject) => {
+      const headers = { connection: 'Upgrade', upgrade: 'websocket',
+        'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13' };
+      if (suppliedKey) headers['x-carberk-gateway-key'] = suppliedKey;
+      const req = http.request({ hostname: '127.0.0.1', port: f.port, path, headers }, res => {
+        res.resume(); res.on('end', () => resolve(res.statusCode));
+      });
+      req.once('upgrade', (res, socket) => { socket.destroy(); resolve(res.statusCode); });
+      req.once('error', reject);
+      req.end();
+    });
+  }
+  assert.equal(await upgrade('/socket.io/?EIO=4&transport=websocket'), 403);
+  assert.equal(await upgrade('/photos/listing-photos/file', key), 400);
+  assert.equal(await upgrade('/api/v1/other', key), 400);
+  assert.equal(f.tunnels(), 0);
+});
+
+test('ten concurrent authenticated sockets do not exhaust the upstream HTTP pool', async t => {
+  const f = await setup(t, (_req, res) => res.writeHead(404).end(), { hostname: '127.0.0.1' });
+  const server = new Server(f.upstream, { path: '/socket.io/' });
+  server.of('/ws/chat').on('connection', () => {});
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const sockets = Array.from({ length: 10 }, () => io(`http://127.0.0.1:${f.port}/ws/chat`, {
+    path: '/socket.io/', transports: ['websocket'], reconnection: false,
+    extraHeaders: { 'x-carberk-gateway-key': key },
+  }));
+  t.after(() => sockets.forEach(socket => socket.disconnect()));
+  await Promise.all(sockets.map(socket => new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(Error('Socket pool exhausted')), 1000);
+    socket.once('connect', () => { clearTimeout(timeout); resolve(); });
+    socket.once('connect_error', reject);
+  })));
+  assert.equal(sockets.filter(socket => socket.connected).length, 10);
+  sockets.forEach(socket => socket.disconnect());
 });

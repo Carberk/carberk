@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { captureRouteSnapshot, gatewayTesterEnabled, selectTesterRoute } from "./routes";
+import { captureRouteSnapshot, gatewayTesterEnabled, provisionGatewayKey, removeGatewayKey, selectTesterRoute, subscribeRouteChanges } from "./routes";
 
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
@@ -21,6 +21,42 @@ it("pins an approved entry before networking even when the override changes", ()
   expect(pinned).toMatchObject({ entry: "tm", apiBaseUrl: "https://tm-staging.bagtyyar.dev/api/v1" });
   expect(Object.isFrozen(pinned)).toBe(true);
   expect(captureRouteSnapshot().generation).toBeGreaterThan(pinned.generation);
+});
+
+it("notifies active transports only when the selected entry changes", () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  selectTesterRoute("global");
+  const listener = vi.fn();
+  const unsubscribe = subscribeRouteChanges(listener);
+  selectTesterRoute("tm");
+  selectTesterRoute("tm");
+  expect(listener).toHaveBeenCalledTimes(1);
+  expect(listener).toHaveBeenCalledWith(expect.objectContaining({ entry: "tm" }));
+  unsubscribe();
+  selectTesterRoute("global");
+  expect(listener).toHaveBeenCalledTimes(1);
+});
+
+it("notifies the selected TM transport when gateway access changes", async () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  selectTesterRoute("tm");
+  const observed: Array<{ entry: string; generation: number }> = [];
+  const unsubscribe = subscribeRouteChanges(route => observed.push(route));
+  const start = captureRouteSnapshot().generation;
+  await provisionGatewayKey("synthetic-test-key-never-a-real-secret");
+  await removeGatewayKey();
+  expect(observed).toEqual([
+    expect.objectContaining({ entry: "tm", generation: start }),
+    expect.objectContaining({ entry: "tm", generation: start }),
+  ]);
+  unsubscribe();
+  selectTesterRoute("global");
 });
 
 it.each([[false, "true", "staging"], [true, "false", "staging"], [true, "true", "production"]] as const)("refuses the tester control outside the closed development gate", (development, flag, environment) => {
