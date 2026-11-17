@@ -1669,13 +1669,18 @@ it("keeps fresh-session edits when an old initiating session receives its succes
   });
   const tree = await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }));
   const mounted = platform.requestCookies.run(oldToken, () => render(tree));
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Old session intent" } });
+  const oldInput = await screen.findByRole("textbox", { name: "Reply to customer" });
+  await waitFor(() => expect((oldInput as HTMLTextAreaElement).disabled).toBe(false));
+  fireEvent.change(oldInput, { target: { value: "Old session intent" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   await act(async () => platform.requestCookies.run(oldToken, () => fireEvent.click(screen.getByRole("button", { name: "Send reply" }))));
   expect(intent?.text).toBe("Old session intent");
   platform.token = freshToken;
   const replacement = await resolveServerTree(await HistoryDeskPage({ params: Promise.resolve({ locale: "en" }) }));
   await act(async () => platform.requestCookies.run(freshToken, () => mounted.rerender(replacement)));
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Fresh session edit" } });
+  const freshInput = await screen.findByRole("textbox", { name: "Reply to customer" });
+  await waitFor(() => expect((freshInput as HTMLTextAreaElement).disabled).toBe(false));
+  fireEvent.change(freshInput, { target: { value: "Fresh session edit" } });
   const stored = JSON.stringify(Object.values(localStorage));
   await act(async () => pending.resolve(Response.json({ ...message(1, intent?.text), clientMessageId: intent?.clientMessageId,
     author: { ...actor, kind: "operator" } })));
