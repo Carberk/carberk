@@ -168,6 +168,9 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     await h.assertProjectionAndPlayback();
     expect(await h.priorSnapshot()).toEqual(prior);
   });
+  it("rejects broken variant and segment references after serving a valid master", async () => {
+    await h.assertBrokenPlaybackChildren();
+  });
   it("canonical readiness repeats the deep rich check without writes, then reports changed mapping", async () => {
     const api = createServer((_request, response) => {
       response.setHeader("Content-Type", "application/json");
@@ -377,6 +380,54 @@ describe("rich video operator with real processor and storage", { concurrent: fa
     const read = new PrismaListingVideoReadRepository(prisma, access, identity);
     const serving = new ServeListingVideo(new PrismaVideoServingRepository(prisma), new BucketVideoStorage(config), identity,
       new PrismaSessionRepository(prisma, new RefreshTokenDigestAdapter()), { now: () => new Date() }, access, config);
+    async function servedFile(reference: string, boundary: string) {
+      const url = new URL(reference);
+      expect(url.origin).toBe("http://localhost:3006");
+      const parts = url.pathname.split("/");
+      expect(parts.slice(0, 5).join("/")).toBe("/api/v1/listings/video-files");
+      let result;
+      try {
+        result = await serving.file({ audience: parts[5], videoId: parts[6], generationId: parts[7], resource: parts[8], token: url.searchParams.get("grant"), head: false });
+      } catch (cause) {
+        throw new Error(`HLS ${boundary} unavailable`, { cause });
+      }
+      expect(result.status).toBe(200);
+      expect(result.body.byteLength).toBeGreaterThan(0);
+      expect(result.headers["Content-Length"]).toBe(String(result.body.byteLength));
+      return result;
+    }
+    function childReference(body: Buffer, parent: string) {
+      const text = body.toString("utf8");
+      expect(text).toMatch(/^#EXTM3U\n/);
+      const child = text.split(/\r?\n/).find((line) => line.trim() && !line.startsWith("#"));
+      if (!child) throw new Error("HLS child reference missing");
+      return new URL(child, parent).toString();
+    }
+    async function servedSegment(masterUrl: string) {
+      const master = await servedFile(masterUrl, "master");
+      expect(master.headers["Content-Type"]).toBe("application/vnd.apple.mpegurl");
+      expect(master.body.toString()).toContain("#EXT-X-STREAM-INF:");
+      const variantUrl = childReference(master.body, masterUrl);
+      const variant = await servedFile(variantUrl, "variant");
+      expect(variant.headers["Content-Type"]).toBe("application/vnd.apple.mpegurl");
+      expect(variant.body.toString()).toContain("#EXTINF:");
+      const segmentUrl = childReference(variant.body, variantUrl);
+      const segment = await servedFile(segmentUrl, "segment");
+      expect(segment.headers["Content-Type"]).toBe("video/mp2t");
+      const url = new URL(segmentUrl);
+      const member = Buffer.from(url.pathname.split("/").at(-1)?.split(".")[0] ?? "", "base64url").toString();
+      const generation = await prisma.videoGeneration.findUniqueOrThrow({ where: { id: url.pathname.split("/")[7] } });
+      const manifest = generation.manifest as Record<string, { key: string; sizeBytes: number }>;
+      const entry = manifest[member];
+      if (!entry) throw new Error("Served segment missing from worker manifest");
+      const stored = await s3.send(new GetObjectCommand({ Bucket: "listing-videos", Key: entry.key }));
+      if (!stored.Body) throw new Error("Stored segment has no body");
+      const bytes = Buffer.from(await stored.Body.transformToByteArray());
+      expect(segment.body.byteLength).toBe(entry.sizeBytes);
+      expect(segment.body.byteLength).toBe(stored.ContentLength);
+      expect(segment.body.equals(bytes)).toBe(true);
+      return segment.body as Buffer;
+    }
     return {
       async priorVideo() {
         await prisma.listing.create({ data: { id: "prior-listing", sellerId: "seller", status: "active", brandId: "brand", modelId: "model", cityId: "city", priceAmount: 123 } });
@@ -440,11 +491,51 @@ describe("rich video operator with real processor and storage", { concurrent: fa
         ] as const) {
           const playback = await serving.control(actor, audience, type, id, true);
           expect(playback.status).toBe("ready");
-          const url = new URL(playback.url);
-          const parts = url.pathname.split("/");
-          const result = await serving.file({ audience, videoId: playback.video.id, generationId: playback.video.generationId, resource: parts.at(-1), token: url.searchParams.get("grant"), head: false });
-          expect(result.status).toBe(200); expect(result.body.toString()).toContain("#EXTM3U");
+          const segment = await servedSegment(playback.url);
+          if (audience === "owner-preview") {
+            const dir = await mkdtemp(join(tmpdir(), "rich-served-segment-"));
+            try {
+              const path = join(dir, "segment.ts");
+              await writeFile(path, segment);
+              const { stdout } = await promisify(execFile)("ffprobe", ["-v", "error", "-select_streams", "v:0", "-count_frames", "-show_entries", "stream=codec_name,nb_read_frames", "-of", "json", path], { timeout: 30_000 });
+              const probe = JSON.parse(stdout);
+              expect(probe.streams[0].codec_name).toBe("h264");
+              expect(Number(probe.streams[0].nb_read_frames)).toBeGreaterThan(0);
+              const decoded = await promisify(execFile)("ffmpeg", ["-v", "error", "-xerror", "-threads", "1", "-i", path, "-map", "0:v:0", "-f", "null", "-"], { timeout: 30_000 });
+              expect(decoded.stderr).toBe("");
+            } finally {
+              await rm(dir, { recursive: true, force: true });
+            }
+          }
           await expect(serving.control({ sub: "viewer", sid: "viewer-session" }, "owner-preview", "draft", draft.id, true)).rejects.toThrow();
+        }
+      },
+      async assertBrokenPlaybackChildren() {
+        await prisma.session.upsert({ where: { id: "seller-session" }, create: { id: "seller-session", userId: "seller", refreshTokenHash: "disposable-test", expiresAt: new Date(Date.now() + 60_000) }, update: { expiresAt: new Date(Date.now() + 60_000) } });
+        const playback = await serving.control({ sub: "seller", sid: "seller-session" }, "owner-preview", "draft", "b1130000-0000-4000-8000-000000000003", true);
+        const generation = await prisma.videoGeneration.findUniqueOrThrow({ where: { id: playback.video.generationId } });
+        const manifest = generation.manifest as Record<string, { key: string }>;
+        const master = await servedFile(playback.url, "master");
+        const variantUrl = childReference(master.body, playback.url);
+        const variant = await servedFile(variantUrl, "variant");
+        const segmentUrl = childReference(variant.body, variantUrl);
+        for (const [boundary, reference] of [["variant", variantUrl], ["segment", segmentUrl]] as const) {
+          const resource = new URL(reference).pathname.split("/").at(-1) ?? "";
+          const member = Buffer.from(resource.split(".")[0] ?? "", "base64url").toString();
+          const key = manifest[member]?.key;
+          if (!key) throw new Error("Child missing from worker manifest");
+          const original = await s3.send(new GetObjectCommand({ Bucket: "listing-videos", Key: key }));
+          if (!original.Body) throw new Error("Stored child has no body");
+          const bytes = await original.Body.transformToByteArray();
+          try {
+            await s3.send(new DeleteObjectCommand({ Bucket: "listing-videos", Key: key }));
+            await servedFile(playback.url, "master");
+            if (boundary === "segment") await servedFile(variantUrl, "variant");
+            await expect(servedSegment(playback.url)).rejects.toThrow(`HLS ${boundary} unavailable`);
+          } finally {
+            await s3.send(new PutObjectCommand({ Bucket: "listing-videos", Key: key, Body: bytes, ContentType: original.ContentType }));
+          }
+          await servedSegment(playback.url);
         }
       },
       close: async () => { workerStorage.destroy(); await queue.close(); await prisma.onModuleDestroy(); },
