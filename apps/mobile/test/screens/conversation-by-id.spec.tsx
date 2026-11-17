@@ -44,6 +44,8 @@ const state = vi.hoisted(() => ({
     isError: false,
     isSuccess: true,
     isFetching: false,
+    isPaused: false,
+    failureCount: 0,
     dataUpdatedAt: 1,
     error: null as unknown,
     refetch: vi.fn(),
@@ -208,6 +210,8 @@ beforeEach(async () => {
   state.messages.isError = false;
   state.messages.isSuccess = true;
   state.messages.isFetching = false;
+  state.messages.isPaused = false;
+  state.messages.failureCount = 0;
   state.messages.dataUpdatedAt = 1;
   state.messages.error = null;
   state.messages.data = { pages: [{ items: [] }] };
@@ -296,8 +300,16 @@ describe("Conversation opened with only its ID", () => {
 
     state.messages.isError = false;
     state.messages.isSuccess = true;
+    state.messages.failureCount = 1;
     state.messages.error = null;
     state.messages.dataUpdatedAt = 2;
+    state.messages.data = { pages: [{ items: [serverMessage("live after failure", SELLER_ID)] }] };
+    await screen.rerender(<ConversationDetailScreen />);
+    expect(await screen.findByText("live after failure")).toBeTruthy();
+    expect(state.socket.markRead).toHaveBeenCalledTimes(1);
+
+    state.messages.failureCount = 0;
+    state.messages.dataUpdatedAt = 3;
     state.messages.data = { pages: [{ items: [serverMessage("recovered", SELLER_ID)] }] };
     await screen.rerender(<ConversationDetailScreen />);
     expect(await screen.findByText("recovered")).toBeTruthy();

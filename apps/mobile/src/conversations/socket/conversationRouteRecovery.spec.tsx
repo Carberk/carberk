@@ -8,6 +8,7 @@ import * as SecureStore from "expo-secure-store";
 import { server } from "../../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../../auth/session";
 import { apiClient } from "../../api/client";
+import { queryKeys } from "../../api/queryKeys";
 import { provisionGatewayKey, selectTesterRoute } from "../../api/routes";
 import { useConversationMessages } from "../../api/conversations/useConversationMessages";
 import { useUnreadCount } from "../../api/conversations/useUnreadCount";
@@ -15,6 +16,7 @@ import { useUnreadCount } from "../../api/conversations/useUnreadCount";
 import { useConversationSocket } from "./useConversationSocket";
 import { useGlobalConversationSocket } from "./useGlobalConversationSocket";
 import { getSharedConversationSocket } from "./ConversationSocket";
+import { handleMessageNew } from "./conversationCacheSync";
 
 const network = vi.hoisted(() => ({
   sockets: [] as Array<{ url: string; options: Record<string, unknown>; connected: boolean; disconnect: () => void }>,
@@ -106,6 +108,52 @@ it("reconnects through TM only after an expired bearer is refreshed", async () =
   await waitFor(() => expect(network.sockets.at(-1)?.options.auth).toEqual({ token: newToken }));
   expect(network.sockets.at(-1)?.url).toBe("https://tm-staging.bagtyyar.dev/ws/chat");
   socket.disconnect();
+});
+
+it("retains a failed authoritative history read after a live Message patches the cache", async () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", globalEntry);
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  vi.mocked(SecureStore.getItemAsync).mockImplementation(async key => storage.get(key) ?? null);
+  vi.mocked(SecureStore.setItemAsync).mockImplementation(async (key, value) => { storage.set(key, value); });
+  vi.mocked(SecureStore.deleteItemAsync).mockImplementation(async key => { storage.delete(key); });
+  selectTesterRoute("global");
+  const claims = Buffer.from(JSON.stringify({ sub: senderId, sid: "session-a", iat: 1000, exp: 4600 })).toString("base64url");
+  await storeAuthSession({
+    user: { id: senderId, phone: "+99361000001", email: null, displayName: null, role: "buyer" },
+    accessToken: `e30.${claims}.sig`, refreshToken: "refresh-a",
+  });
+  const live = { id: messageId, conversationId, senderId, kind: "text" as const,
+    text: "Live after failed recovery", createdAt: "2026-11-16T12:00:00.000Z" };
+  let response: "initial" | "failure" | "recovered" = "initial";
+  server.use(http.get(`${globalEntry}/conversations/${conversationId}/messages`, () => {
+    if (response === "failure") return HttpResponse.json({}, { status: 503 });
+    return HttpResponse.json({ items: response === "recovered" ? [live] : [], nextCursor: null });
+  }));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const hook = await renderHook(() => {
+    const messages = useConversationMessages({ conversationId });
+    return { data: messages.data, failureCount: messages.failureCount, isError: messages.isError, isSuccess: messages.isSuccess };
+  }, { wrapper });
+  await waitFor(() => expect(hook.result.current.data?.pages[0]?.items).toEqual([]));
+
+  response = "failure";
+  await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
+  expect(client.getQueryState(queryKeys.conversations.messages(conversationId))?.fetchFailureCount).toBe(1);
+  await waitFor(() => expect(hook.result.current.failureCount).toBe(1));
+  await act(() => handleMessageNew(client, { message: live }));
+  await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+  expect(hook.result.current.data?.pages[0]?.items).toEqual([live]);
+  expect(hook.result.current.failureCount).toBe(1);
+
+  response = "recovered";
+  await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
+  await waitFor(() => expect(hook.result.current.failureCount).toBe(0));
+  expect(hook.result.current.data?.pages[0]?.items).toEqual([live]);
+  await hook.unmount();
+  client.clear();
 });
 
 it("reconciles missed history and unread state through the new entry after a lost send ACK", async () => {
