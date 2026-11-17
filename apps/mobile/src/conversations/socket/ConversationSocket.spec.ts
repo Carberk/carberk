@@ -5,7 +5,7 @@ import { ConversationsSchemas } from "@auto-tm/contracts";
 import * as SecureStore from "expo-secure-store";
 
 import { loadAuthSession } from "../../auth/session";
-import { selectTesterRoute } from "../../api/routes";
+import { captureRouteSnapshot, provisionGatewayKey, removeGatewayKey, selectTesterRoute } from "../../api/routes";
 
 import { ConversationSocket, getSharedConversationSocket } from "./ConversationSocket";
 
@@ -140,6 +140,37 @@ describe("ConversationSocket", () => {
     expect(socket.isConnected()).toBe(false);
     expect(mockSocket.disconnect).toHaveBeenCalledTimes(1);
     socket.disconnect();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("replaces TM socket access without changing the selected route", async () => {
+    vi.stubGlobal("__DEV__", true);
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "https://api-staging-2861.up.railway.app/api/v1");
+    vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+    vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+    let key: string | null = "synthetic-test-key-never-a-real-secret";
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async () => key);
+    vi.mocked(SecureStore.setItemAsync).mockImplementation(async (_name, value) => { key = value; });
+    vi.mocked(SecureStore.deleteItemAsync).mockImplementation(async () => { key = null; });
+    selectTesterRoute("global");
+    const socket = getSharedConversationSocket();
+    await socket.connect();
+    selectTesterRoute("tm");
+    await vi.waitFor(() => expect(mockIo).toHaveBeenCalledTimes(2));
+    const route = captureRouteSnapshot();
+    await removeGatewayKey();
+    await vi.waitFor(() => expect(socket.getStatus()).toBe("error"));
+    expect(socket.isConnected()).toBe(false);
+    expect(captureRouteSnapshot()).toEqual(route);
+    await provisionGatewayKey("synthetic-replacement-gateway-access-key");
+    await vi.waitFor(() => expect(mockIo).toHaveBeenCalledTimes(3));
+    expect(mockIo).toHaveBeenLastCalledWith("https://tm-staging.bagtyyar.dev/ws/chat", expect.objectContaining({
+      extraHeaders: { "X-Carberk-Gateway-Key": "synthetic-replacement-gateway-access-key" },
+    }));
+    expect(captureRouteSnapshot()).toEqual(route);
+    socket.disconnect();
+    selectTesterRoute("global");
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });

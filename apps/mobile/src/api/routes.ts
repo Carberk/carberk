@@ -80,14 +80,14 @@ export async function provisionGatewayKey(key: string): Promise<void> {
   if (!validKey(key)) throw new Error("Invalid gateway access key");
   await SecureStore.setItemAsync(GATEWAY_KEY, key);
   invalidatePhotoReaders();
-  if (selection === "tm") { generation++; notifyRouteChanges(); }
+  if (selection === "tm") notifyRouteChanges();
 }
 
 export async function removeGatewayKey(): Promise<void> {
   assertTester();
   await SecureStore.deleteItemAsync(GATEWAY_KEY);
   invalidatePhotoReaders();
-  if (selection === "tm") { generation++; notifyRouteChanges(); }
+  if (selection === "tm") notifyRouteChanges();
 }
 
 export async function apiRouteHeaders(route: RouteSnapshot): Promise<Record<string, string>> {
