@@ -8,20 +8,20 @@ import { cn } from "@/lib/utils";
 
 type EmptyStateProps = ViewProps & {
   className?: string;
-  /** The composition above the title. Leave it out where the state is a brief note inside a list. */
+
   illustration?: IllustrationName;
   title: string;
   hint?: string;
-  /** The state's action, usually one full-width button. */
+
   children?: ReactNode;
 };
 
-/**
- * A screen with nothing to show yet, or one that needs a sign-in: a
- * composition, a bold title, up to two lines of explanation and the action.
- * It fills the space under the screen's own title and sits a little above the
- * middle, where the eye lands. See docs/prd/ui/75-illustration-style.md.
- */
+
+
+
+
+
+
 function EmptyState({
   illustration,
   title,

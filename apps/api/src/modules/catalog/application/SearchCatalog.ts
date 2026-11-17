@@ -30,12 +30,12 @@ type ScoredEntry =
   | { score: number; kind: "brand"; brand: Brand }
   | { score: number; kind: "model"; brand: Brand | undefined; model: Model };
 
-/**
- * One search over brands and models: any spelling (RU/EN/TK names and the
- * slug), Cyrillic–Latin transliteration, one forgiven typo, and year tokens.
- * Ranks exact matches above prefix matches above one-edit matches, brands
- * before models on ties, capped at RESULT_LIMIT.
- */
+
+
+
+
+
+
 @Injectable()
 export class SearchCatalog {
   constructor(

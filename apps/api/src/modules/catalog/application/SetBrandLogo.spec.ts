@@ -17,9 +17,9 @@ const PENDING = "pending/brands/toyota/0f8fad5b-d9cb-469f-a165-70867728950e";
 class FakeBrands implements BrandLogoRepository {
   brands = new Map<string, Brand>();
   failNextSet = false;
-  /** Models a concurrent activation: the key the atomic swap actually finds. */
+
   actualPreviousKey: string | null | undefined;
-  /** Models a brand deleted after the use case read it. */
+
   vanishOnSet = false;
   swaps: Array<{ id: string; logoKey: string | null }> = [];
 
@@ -204,7 +204,7 @@ describe("SetBrandLogo", () => {
       "db down",
     );
 
-    // The commit may have happened, so the candidate may be active: never delete it.
+
     expect(logoObjects().filter((k) => !k.endsWith("/v1/logo.png"))).toHaveLength(1);
     expect(storage.deletedVersions).toEqual([]);
     expect(storage.objects.has("brands/toyota/v1/logo.png")).toBe(true);

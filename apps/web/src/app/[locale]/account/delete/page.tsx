@@ -31,10 +31,10 @@ export async function generateMetadata({
   };
 }
 
-/**
- * Public account deletion (ADR-0054) — the page Google Play links to for
- * deleting an account without the app.
- */
+
+
+
+
 export default async function AccountDeletionPage({
   params,
 }: {

@@ -6,19 +6,19 @@ import { TextClassContext } from '@/components/ui/text';
 import { CONTROL_MAX_FONT_SCALE, TextScaleContext } from '@/lib/font-scale';
 import { cn } from '@/lib/utils';
 
-/**
- * Buttons have weight: 52 dp by default, 56 dp for the main action of a
- * screen, a 20 dp radius, and a filled surface in every variant but `ghost`
- * and `link`. The secondary button is a tonal fill, not an outline. Icon
- * buttons are 44 dp circles. See docs/prd/ui/components/78-01-button.md.
- *
- * A disabled button keeps its shape on the tonal surface with quiet text; it
- * is never dimmed with opacity, so its label stays readable.
- *
- * The heights are minimums. A label grows with the system font size up to
- * `CONTROL_MAX_FONT_SCALE`, then wraps, and the button grows around it; a
- * label is never cut to keep the button's height.
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
 const buttonVariants = cva(
   cn(
     'group shrink-0 flex-row items-center justify-center gap-2 rounded-xl border border-transparent shadow-none',
@@ -115,8 +115,8 @@ type ButtonProps = PressableScaleProps & VariantProps<typeof buttonVariants>;
 
 function Button({ className, variant, size, ...props }: ButtonProps) {
   return (
-    // A label is a Text, which is never itself disabled, so the quiet
-    // disabled tone is handed down here instead of through `disabled:`.
+
+
     <TextClassContext.Provider
       value={cn(buttonTextVariants({ variant, size }), props.disabled && 'text-muted-foreground')}
     >

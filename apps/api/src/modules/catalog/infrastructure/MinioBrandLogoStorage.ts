@@ -15,10 +15,10 @@ import { brandLogoCleanupTarget } from "../domain/BrandLogo";
 import type { BrandLogoStorage } from "../domain/ports/BrandLogoStorage";
 import type { Env } from "../../../env.schema";
 
-/** Public-read bucket for catalog assets; bootstrapped by `pnpm minio:bootstrap`. */
+
 export const CATALOG_ASSETS_BUCKET = "catalog-assets";
 
-/** S3 DeleteObjects accepts at most this many keys per request. */
+
 const DELETE_BATCH_SIZE = 1_000;
 
 @Injectable()
@@ -40,7 +40,7 @@ export class MinioBrandLogoStorage implements BrandLogoStorage {
       credentials,
       forcePathStyle: true,
     });
-    // Presigned URLs must name the public host the uploader can reach.
+
     this.signingS3 = new S3Client({
       endpoint: this.publicBaseUrl,
       region,
@@ -60,7 +60,7 @@ export class MinioBrandLogoStorage implements BrandLogoStorage {
       Key: key,
       ContentType: contentType,
       ContentLength: sizeBytes,
-      // Pending objects are private; attachment remains defense in depth.
+
       ContentDisposition: "attachment",
     });
     const url = await getSignedUrl(this.signingS3, command, {
@@ -102,7 +102,7 @@ export class MinioBrandLogoStorage implements BrandLogoStorage {
         Key: key,
         Body: bytes,
         ContentType: contentType,
-        // Keys are versioned, so an object never changes after it is written.
+
         CacheControl: "public, max-age=31536000, immutable",
       }),
     );

@@ -83,15 +83,15 @@ function Text({
   const controlScale = React.useContext(TextScaleContext);
   const Component = asChild ? Slot : RNText;
   const merged = cn(textVariants({ variant }), textClass, className);
-  // One font file per weight: map the family and weight classes to a face.
+
   const face = fontFaceClass(merged);
   return (
     <Component
       className={face ? cn(merged, face) : merged}
       role={variant ? ROLE[variant] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant] : undefined}
-      // Large roles and labels inside a control grow less with the system
-      // font size than reading text does; a caller's own cap wins.
+
+
       maxFontSizeMultiplier={controlScale ?? maxFontScaleFor(merged)}
       {...props}
     />

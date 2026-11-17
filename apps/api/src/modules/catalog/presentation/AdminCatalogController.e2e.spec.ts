@@ -406,7 +406,7 @@ describe("AdminCatalogController e2e", () => {
         .send({ contentType, sizeBytes });
     }
 
-    /** Presign, PUT the bytes to MinIO the way the admin app does, and return the key. */
+
     async function uploadPending(
       brandId: string,
       token: string,
@@ -475,7 +475,7 @@ describe("AdminCatalogController e2e", () => {
       expect(second.status).toBe(200);
       const secondKey = (await prisma.brand.findUniqueOrThrow({ where: { id: brand.id } }))
         .logoKey as string;
-      // An SVG upload is served as a rendered PNG, never as SVG.
+
       expect(secondKey).toMatch(/\/logo\.png$/);
       expect((await head(secondKey))?.ContentType).toBe("image/png");
       const rendered = await s3.send(new GetObjectCommand({ Bucket: "catalog-assets", Key: secondKey }));
@@ -533,7 +533,7 @@ describe("AdminCatalogController e2e", () => {
         expect(await head(pending)).toBeNull();
       }
 
-      // A different length is rejected before storage accepts the upload.
+
       const res = await presign(brand.id, token, "image/png", 100);
       const rejected = await fetch(res.body.uploadUrl, {
         method: "PUT",
@@ -542,7 +542,7 @@ describe("AdminCatalogController e2e", () => {
       });
       expect(rejected.status).toBe(403);
       expect(await head(res.body.key)).toBeNull();
-      // Privileged writes can bypass a presign; confirm still enforces its cap.
+
       await s3.send(new PutObjectCommand({ Bucket: "catalog-assets", Key: res.body.key,
         ContentType: "image/png", Body: new Uint8Array(200 * 1024 + 1) }));
       const tooLarge = await confirm(brand.id, token, res.body.key);

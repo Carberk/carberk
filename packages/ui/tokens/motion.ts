@@ -1,9 +1,9 @@
-/**
- * Design tokens — motion (durations + easings)
- *
- * Animations should feel snappy. Default to `fast` for most UI feedback.
- * `slow` only for big transitions (modal open, route change).
- */
+
+
+
+
+
+
 
 export const duration = {
   instant: 0,

@@ -76,8 +76,8 @@ describe("bestNameScore", () => {
 
   it("forgives one typo", () => {
     expect(bestNameScore("toyta", toyota)).toBe(50);
-    // "camri" transliterates to "камри" exactly: a phonetic Latin typo can
-    // still be an exact match for the Cyrillic name.
+
+
     expect(bestNameScore("camri", camry)).toBe(100);
   });
 
@@ -86,10 +86,10 @@ describe("bestNameScore", () => {
   });
 
   it("matches transliterated Latin against Cyrillic names", () => {
-    // "camry" transliterates to "камри" exactly
+
     expect(bestNameScore("camry", ["Камри"])).toBe(100);
-    // "toyota" transliterates to "тоиота"; й folds to и under NFD, so this
-    // is an exact match against "тойота"
+
+
     expect(bestNameScore("toyota", ["Тойота"])).toBe(100);
   });
 
@@ -104,7 +104,7 @@ describe("bestNameScore", () => {
     expect(bestNameScore("камрии", ["Camry"])).toBe(50);
     expect(bestNameScore("комрии", ["Camry"])).toBe(0);
     expect(bestNameScore("камри", ["Corolla", "Crown"])).toBe(0);
-    // Carry is one edit away in Cyrillic, but stays below exact Camry.
+
     expect(bestNameScore("камри", ["Carry"])).toBe(50);
   });
 

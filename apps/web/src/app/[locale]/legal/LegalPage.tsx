@@ -14,7 +14,7 @@ export function LegalPage({ locale, document, canonicalPath }: LegalPageProps) {
   const canonicalUrl = publicWebUrl(`/${locale}${canonicalPath}`);
   return (
     <main className="mx-auto min-w-0 max-w-3xl wrap-anywhere px-4 py-12 md:py-16 print:py-6">
-      {/* Header */}
+      { }
       <header className="mb-10 border-b border-border pb-6 print:mb-6 print:border-neutral-300">
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl print:text-2xl">
           {document.title}
@@ -39,7 +39,7 @@ export function LegalPage({ locale, document, canonicalPath }: LegalPageProps) {
         </div>
       </header>
 
-      {/* Sections */}
+      { }
       <article className="space-y-8 print:space-y-5">
         {document.sections.map((section, index) => (
           <section key={index} className="print:break-inside-avoid">
@@ -95,7 +95,7 @@ export function LegalPage({ locale, document, canonicalPath }: LegalPageProps) {
         ))}
       </article>
 
-      {/* Footer */}
+      { }
       <footer className="mt-12 border-t border-border pt-6 text-sm text-muted-foreground print:mt-8 print:border-neutral-300 print:text-neutral-600">
         <p>
           {locale === "tk"

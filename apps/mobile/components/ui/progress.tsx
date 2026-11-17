@@ -58,8 +58,8 @@ function WebIndicator({ value, className }: IndicatorProps) {
 function NativeIndicator({ value, className }: IndicatorProps) {
   const progress = useDerivedValue(() => value ?? 0);
 
-  // The fill is as wide as the track and slides in from the left, so progress
-  // animates a transform on the UI thread instead of a width (which is layout).
+
+
   const filled = useDerivedValue(() =>
     withSpring(interpolate(progress.value, [0, 100], [1, 100], Extrapolation.CLAMP), {
       ...mobileSpring.settle,

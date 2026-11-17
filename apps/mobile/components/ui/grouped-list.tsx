@@ -3,13 +3,13 @@ import { View } from "react-native";
 
 import { cn } from "@/lib/utils";
 
-/**
- * Rows on one raised surface, separated by inset dividers instead of lines
- * across the page (docs/prd/ui/components/78-04-list.md).
- *
- * `inset` is where the divider starts: `icon` clears a leading 32 to 40 dp
- * mark, `check` clears a checkbox, `text` starts at the row's text.
- */
+
+
+
+
+
+
+
 
 type Inset = "icon" | "check" | "text";
 
@@ -23,7 +23,7 @@ function GroupedDivider({ inset = "icon" }: { inset?: Inset }) {
   return <View className={cn("h-px bg-border", INSET[inset])} />;
 }
 
-/** A short, non-virtualized group: wrap the rows and the dividers are added. */
+
 function GroupedList({
   children,
   inset = "icon",
@@ -46,11 +46,11 @@ function GroupedList({
   );
 }
 
-/**
- * One row of a group inside a virtualized list: give it its place in the
- * section and it draws its share of the group's surface, corners and divider.
- * With no `count` (a list that does not report it) the row stands alone.
- */
+
+
+
+
+
 function GroupedItem({
   index = 0,
   count = 1,

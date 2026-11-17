@@ -8,17 +8,17 @@ import { cn } from "@/lib/utils";
 
 type SearchFieldProps = React.ComponentProps<typeof TextInput> &
   React.RefAttributes<TextInput> & {
-    /** Classes for the field's surface: margins, width. */
+
     className?: string;
   };
 
-/**
- * A search field: the filled tonal field of `Input` with a magnifier at its
- * leading edge, so a field that filters a list says so before it is read.
- * Focus draws the same foreground edge as `Input`. Every `TextInput` prop,
- * the ref, the placeholder and the accessibility label reach the input.
- * See docs/prd/ui/components/78-02-input.md.
- */
+
+
+
+
+
+
+
 function SearchField({ className, onFocus, onBlur, ...props }: SearchFieldProps) {
   const [focused, setFocused] = React.useState(false);
 

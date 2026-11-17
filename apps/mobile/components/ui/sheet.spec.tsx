@@ -8,11 +8,11 @@ import { act, fireEvent, renderMobile } from "../../test/render";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useReduceMotion } from "@/lib/motion";
 
-// The shared native shell replaces the Sheet in every other spec, so this one loads the real file.
+
 vi.unmock("@/components/ui/sheet");
 
-// The dialog primitive, Reanimated and react-native-screens need a device. This stand-in keeps
-// what the backdrop depends on: Close reports `onOpenChange(false)` through the Root.
+
+
 vi.mock("@rn-primitives/dialog", async () => {
   const React = await import("react");
   const { View, Text } = await import("react-native");
@@ -31,7 +31,7 @@ vi.mock("@rn-primitives/dialog", async () => {
 vi.mock("react-native-screens", async () => ({ FullWindowOverlay: (await import("react-native")).View }));
 vi.mock("@/components/ui/native-only-animated-view", async () => ({ NativeOnlyAnimatedView: (await import("react-native")).View }));
 
-// The backdrop is hidden from accessibility, so queries must include hidden elements.
+
 const hidden = { includeHiddenElements: true };
 
 async function renderSheet(closeOnBackdropPress?: boolean) {
@@ -96,7 +96,7 @@ describe("Sheet dismissal", () => {
     await act(() => vi.advanceTimersByTime(50));
     await view.rerender(sheet(false));
     await act(() => vi.advanceTimersByTime(70));
-    // First exit would finish now. The second exit still owes 150 ms.
+
     expect(view.getByText("Options", hidden)).toBeTruthy();
     await act(() => vi.advanceTimersByTime(149));
     expect(view.getByText("Options", hidden)).toBeTruthy();

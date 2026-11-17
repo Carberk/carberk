@@ -14,16 +14,16 @@ import { View } from "react-native";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
-/**
- * Compositions for empty and signed-out states
- * (docs/prd/ui/75-illustration-style.md). Each one is built from the app's
- * own shapes: the outline of a Listing card or of a chat bubble, an icon from
- * the icon set, and one brand-red accent. There is no bitmap art. Colours are
- * surface tokens, so every composition follows light and dark.
- *
- * A composition is decoration: it is hidden from screen readers, and the
- * title beside it carries the meaning.
- */
+
+
+
+
+
+
+
+
+
+
 
 type IllustrationName =
   | "favorites"
@@ -34,12 +34,12 @@ type IllustrationName =
   | "notifications"
   | "error";
 
-/** A quiet line of text, drawn as a bar. */
+
 function Line({ className }: { className?: string }) {
   return <View className={cn("h-2 rounded-full bg-accent", className)} />;
 }
 
-/** The outline of a Listing card: a photo, a price line and a title line. */
+
 function CardShape({
   className,
   icon = Car,
@@ -66,7 +66,7 @@ function CardShape({
   );
 }
 
-/** The card that sits behind, tilted, on the tonal surface. */
+
 function BackCard({ className }: { className?: string }) {
   return (
     <View
@@ -75,7 +75,7 @@ function BackCard({ className }: { className?: string }) {
   );
 }
 
-/** The one accent of a composition: a filled disc with an icon. */
+
 function Accent({
   icon,
   className,

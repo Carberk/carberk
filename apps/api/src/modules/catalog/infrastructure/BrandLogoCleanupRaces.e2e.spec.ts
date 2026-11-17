@@ -22,14 +22,14 @@ import { MinioBrandLogoStorage } from "./MinioBrandLogoStorage";
 import { PrismaBrandRepository } from "./PrismaBrandRepository";
 import { SharpLogoImageProcessor } from "./SharpLogoImageProcessor";
 
-/**
- * ADR-0072 runtime verification against real PostgreSQL and real MinIO, with
- * two independent PostgreSQL clients and deliberately delayed storage cleanup.
- * The suite clears the catalog brands of its worker's own database
- * (test/globalSetup.ts). MinIO is shared by spec files running in parallel, so
- * every brand here has a `races-` slug, and the suite clears only the objects
- * under `brands/races-` and `pending/brands/races-` in `catalog-assets`.
- */
+
+
+
+
+
+
+
+
 const BUCKET = "catalog-assets";
 const SLUG_PREFIX = "races-";
 const TOYOTA = `${SLUG_PREFIX}toyota`;
@@ -81,7 +81,7 @@ function buildStack(): Stack {
 
 type SdkCommand = { constructor: { name: string }; input: Record<string, unknown> };
 
-/** True for the storage calls a logo cleanup makes under `brands/`, never for pending uploads. */
+
 function isBrandCleanup(command: SdkCommand): boolean {
   const input = command.input;
   switch (command.constructor.name) {
@@ -96,7 +96,7 @@ function isBrandCleanup(command: SdkCommand): boolean {
   }
 }
 
-/** Stalls the first cleanup storage call of one API instance until released. */
+
 function delayCleanup(stack: Stack) {
   const client = (stack.storage as unknown as { s3: S3Client }).s3;
   const original = client.send.bind(client) as (command: unknown) => Promise<unknown>;
@@ -116,10 +116,10 @@ function delayCleanup(stack: Stack) {
   return { release, reached: reachedGate };
 }
 
-/**
- * Freezes the clock at "now", so two uploads share one millisecond without
- * putting SigV4 signing dates outside MinIO's allowed clock skew.
- */
+
+
+
+
 function freezeClock(): number {
   const frozen = Date.now();
   vi.spyOn(Date, "now").mockReturnValue(frozen);
@@ -341,8 +341,8 @@ describe("brand logo cleanup races (ADR-0072) - real PostgreSQL and MinIO", () =
     expect(results.filter((r) => r.status === "rejected")).toEqual([]);
     const final = (await stack.prisma.brand.findUniqueOrThrow({ where: { id: brand.id } })).logoKey;
     if (final !== null) expect(await exists(final)).toBe(true);
-    // Every activated directory was returned by the next swap and deleted once,
-    // so no losing object is left behind: only the active logo remains.
+
+
     expect(await listKeys(`brands/${AUDI}/`)).toEqual(final === null ? [] : [final]);
   });
 

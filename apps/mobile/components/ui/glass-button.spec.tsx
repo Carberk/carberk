@@ -6,8 +6,8 @@ import { renderMobile, fireEvent } from "../../test/render";
 import { GlassButton } from "./glass-button";
 import { Text } from "./text";
 
-// Off iOS 26 (what a spec renders, see test/native-setup.ts) a glass button is
-// a solid capsule with the floating shadow.
+
+
 describe("GlassButton without the system glass", () => {
   it("draws Call as a solid brand capsule and Message as a solid tonal capsule", async () => {
     const screen = await renderMobile(<>

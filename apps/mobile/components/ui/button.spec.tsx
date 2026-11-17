@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(__dirname, "button.tsx"), "utf-8");
 
-// Slice the source into two halves so we don't confuse buttonVariants with buttonTextVariants
+
 const textVariantsStart = source.indexOf("const buttonTextVariants");
 const textVariantsSource = source.slice(textVariantsStart);
 

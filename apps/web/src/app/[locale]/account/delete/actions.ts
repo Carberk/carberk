@@ -13,16 +13,16 @@ import type {
 import { confirmAccountDeletion, requestAccountDeletion } from "@/lib/account-deletion";
 import { readVisitorIpPolicy, visitorIp } from "@/lib/visitor-ip";
 
-// The API has no CORS, so the browser reaches it through these Server Functions.
+
 const API_BASE_URL =
   process.env["API_BASE_URL"] ||
   process.env["NEXT_PUBLIC_API_URL"] ||
   "http://localhost:3006/api/v1";
 
-// Read once; the environment does not change while the server runs.
+
 const VISITOR_IP_POLICY = readVisitorIpPolicy();
 
-// Server Function arguments come from the browser; accept only known values.
+
 function channelOf(value: unknown): DeletionChannel | null {
   return value === "phone" || value === "email" ? value : null;
 }

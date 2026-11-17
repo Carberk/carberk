@@ -7,8 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SharpLogoImageProcessor } from "./SharpLogoImageProcessor";
 
-// The SVG text guard in BrandLogo is defense in depth. What stops a logo from
-// reading server files is librsvg refusing file: references for buffer input.
+
+
 describe("SharpLogoImageProcessor", () => {
   const processor = new SharpLogoImageProcessor();
   let dir: string;

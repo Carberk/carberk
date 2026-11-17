@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { Text } from '@/components/ui/text';
 
 type ToastVariant = 'default' | 'destructive' | 'success' | 'warning' | 'info';
-/** `aboveTabBar` keeps a toast clear of the tab bar on a tab screen. */
+
 type ToastPlacement = 'top' | 'aboveTabBar';
 
 interface ToastAction {
@@ -25,9 +25,9 @@ interface Toast {
   variant?: ToastVariant;
   duration?: number;
   placement?: ToastPlacement;
-  /** Measured header height below the safe area, for a taller active screen. */
+
   topClearance?: number;
-  /** One button on the toast, such as Undo. Pressing it also closes the toast. */
+
   action?: ToastAction;
 }
 
@@ -91,7 +91,7 @@ function ToastViewport() {
       {top.length > 0 && (
         <View
           testID="toast-viewport-top"
-          // Taller callers supply their measured header height; ordinary headers retain 64 pt.
+
           style={{ top: insets.top + topClearance + 8 }}
           className="absolute left-0 right-0 z-[100] flex-col items-center gap-2 px-4 pointer-events-none">
           {top.map((toast) => (
@@ -118,15 +118,15 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   const dismissRef = React.useRef(onDismiss);
   dismissRef.current = onDismiss;
 
-  // Each toast owns its timer, so a later toast neither restarts nor shortens it.
+
   React.useEffect(() => {
     const timer = setTimeout(() => dismissRef.current(), duration);
     return () => clearTimeout(timer);
   }, [duration]);
 
-  // Announced on both platforms, with no live region to read it twice: iOS has
-  // no live regions, and Android may not read one that has just been mounted. Naming the action tells a screen-reader
-  // user that Undo is there.
+
+
+
   const announcement = toast.action ? `${toast.title}. ${toast.action.label}` : toast.title;
   React.useEffect(() => {
     AccessibilityInfo.announceForAccessibility(announcement);
@@ -139,7 +139,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       entering={(fromBottom ? FadeInDown : FadeInUp).duration(mobileDuration.base)}
       exiting={(fromBottom ? FadeOutDown : FadeOutUp).duration(mobileDuration.fast)}
       className="pointer-events-auto w-full max-w-sm">
-      {/* An accessible parent groups its children on iOS, which would hide the action from VoiceOver. */}
+      { }
       <Pressable onPress={onDismiss} accessible={!toast.action}>
         <View
           className={cn(

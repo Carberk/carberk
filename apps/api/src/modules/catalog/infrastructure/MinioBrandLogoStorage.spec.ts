@@ -49,7 +49,7 @@ describe("MinioBrandLogoStorage.deleteLogoVersion", () => {
 
   type Sent = { name: string; input: Record<string, unknown> };
 
-  /** Replaces the S3 transport so no network is involved; `respond` fakes each call. */
+
   function withFakeS3(respond: (sent: Sent) => unknown) {
     const calls: Sent[] = [];
     const client = (storage as unknown as { s3: S3Client }).s3;
