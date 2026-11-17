@@ -14,6 +14,14 @@ android {
   }
   testOptions {
     unitTests.includeAndroidResources = true
+    unitTests.all {
+      maxParallelForks = 1
+      maxHeapSize = '512m'
+      jvmArgs '-XX:ActiveProcessorCount=2'
+      testLogging {
+        events 'passed', 'failed', 'skipped'
+      }
+    }
   }
 }
 

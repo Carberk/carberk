@@ -16,7 +16,8 @@
     "build:android:local": "node scripts/local-android-release.mjs",
     "eas-build-post-install": "pnpm validate:eas-env && pnpm --filter @auto-tm/contracts build",
     "native:metro": "node scripts/native-session.mjs metro",
-    "native:ios": "node scripts/native-session.mjs ios"
+    "native:ios": "node scripts/native-session.mjs ios",
+    "test:native-exporter": "node ../../scripts/native-exporter-test.mjs"
   },
   "dependencies": {
     "@auto-tm/contracts": "workspace:*",
