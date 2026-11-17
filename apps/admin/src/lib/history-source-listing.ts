@@ -53,7 +53,7 @@ export async function readHistorySourceListing(
     await afterRead();
   }
   const parsed = publicListing.safeParse(value);
-  if (!parsed.success || parsed.data.id !== sourceId || parsed.data.status === "banned" ||
+  if (!parsed.success || parsed.data.id !== sourceId || !["active", "sold", "archived"].includes(parsed.data.status) ||
     new Set(parsed.data.media.map((item) => item.id)).size !== parsed.data.media.length) {
     throw new ApiError(502, "INVALID_PUBLIC_LISTING", null, "Public Listing unavailable");
   }

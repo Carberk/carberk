@@ -83,6 +83,12 @@ it("runs the production request-bound action through current History, public Lis
   }
   await prisma.listing.update({ where: { id: listingId }, data: { status: "banned" } });
   expect(await action("en", input)).toMatchObject({ status: "not-found" });
+  for (const status of ["draft", "pending_review", "rejected"] as const) {
+    await prisma.listing.update({ where: { id: listingId }, data: { status } });
+    const result = await action("en", input);
+    expect(result).toMatchObject({ status: "unavailable" });
+    expect(result.data).toBeUndefined();
+  }
   await prisma.listing.update({ where: { id: listingId }, data: { status: "active" } });
   // An actual History grant plus coincidental seller ownership grants no video access.
   for (const kind of ["cover", "play"]) expect(await action("en", { ...input, kind })).toMatchObject({ status: "video-unavailable" });

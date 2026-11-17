@@ -7,19 +7,20 @@ The separate `/vehicle-history/{tk|ru|en}` [inbox](src/app/vehicle-history/[loca
 The [inbox actions](src/app/vehicle-history/[locale]/actions.ts) provide scoped
 queue/context/transcript reads and atomic Claim for the connected inbox. They
 bind outcomes to the API-confirmed actor and stable session without exposing
-tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) uses a [serialized reader](src/app/vehicle-history/[locale]/useOperatorConversation.ts) to retain contiguous pages and reading position through refresh and recoverable failures, and remove them on observed authority loss. The same lane reconciles durable requester receipts and explicit Received before eligible visible Read. The [public Reply composer](src/app/vehicle-history/[locale]/ReplyComposer.tsx) uses that serialized lane with account/request/assignment-scoped durable intents, revision-safe acknowledgement and recoverable browser storage; private notes, reminders and full Listing viewing remain separate slices.
+tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) uses a [serialized reader](src/app/vehicle-history/[locale]/useOperatorConversation.ts) to retain contiguous pages and reading position through refresh and recoverable failures, and remove them on observed authority loss. The same lane reconciles durable requester receipts and explicit Received before eligible visible Read. The [public Reply composer](src/app/vehicle-history/[locale]/ReplyComposer.tsx) uses that serialized lane with account/request/assignment-scoped durable intents, revision-safe acknowledgement and recoverable browser storage; manual reminders remain a separate slice.
 
-The dormant [source Listing reader](src/lib/history-source-listing.ts) projects
+The [source Listing reader](src/lib/history-source-listing.ts) projects
 only anonymous public display facts; its [catalog resolver](src/lib/history-listing-catalog.ts)
 resolves all present references and lets a caller reauthorize after every read/page.
-These internal readers grant no History, owner or media authority. The dormant
+These internal readers grant no History, owner or media authority. The
 [Listing action](src/app/vehicle-history/[locale]/listing-actions.ts) derives its
 source from the existing authorized selected-request action, rechecks that
 selection after each read/page or failure, and uses only authenticated viewer
-cover/explicit Play controls. It has no mounted viewer; connected viewing and
-return remain separate slices. The dormant [scoped viewer](src/app/vehicle-history/[locale]/SourceListing.tsx)
-composes public facts with the request-bound media component; retained #1217 owns
-its inbox mount, preserved return context and connected browser proof.
+cover/explicit Play controls. The [scoped viewer](src/app/vehicle-history/[locale]/SourceListing.tsx)
+mounts in the selected enquiry and composes public facts with request-bound media.
+Its URL flag retains queue selection and locale without accepting a Listing target
+or return destination. Session-scoped reading bookmarks preserve position through
+refresh and language changes; native Listing return remains separate.
 
 The same action module has a strict message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. The public Reply composer connects sends through this same current-authority bridge, retaining uncertain intent IDs across navigation and reauthentication.
 
