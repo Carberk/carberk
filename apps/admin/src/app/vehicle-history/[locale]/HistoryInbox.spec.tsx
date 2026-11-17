@@ -161,7 +161,9 @@ it("keeps the same private-note Retry available when Refresh interrupts a pendin
     return network(input, init);
   });
   render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Internal note" }), { target: { value: "Keep one note intent" } });
+  const note = await screen.findByRole("textbox", { name: "Internal note" }) as HTMLTextAreaElement;
+  await waitFor(() => expect(note.disabled).toBe(false));
+  fireEvent.change(note, { target: { value: "Keep one note intent" } });
   const add = screen.getByRole("button", { name: "Add private note" }) as HTMLButtonElement;
   expect(add.disabled).toBe(true);
   await act(async () => initialNotes.resolve(Response.json({ items: [], nextCursor: null })));
