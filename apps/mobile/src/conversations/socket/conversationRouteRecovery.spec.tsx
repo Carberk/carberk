@@ -110,7 +110,7 @@ it("reconnects through TM only after an expired bearer is refreshed", async () =
   socket.disconnect();
 });
 
-it("retains a failed authoritative history read after a live Message patches the cache", async () => {
+it("retains newest-history recovery through live cache patches and older-page fetches", async () => {
   vi.stubGlobal("__DEV__", true);
   vi.stubEnv("EXPO_PUBLIC_API_URL", globalEntry);
   vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
@@ -127,11 +127,16 @@ it("retains a failed authoritative history read after a live Message patches the
   const live = { id: messageId, conversationId, senderId, kind: "text" as const,
     text: "Live after failed recovery", createdAt: "2026-11-16T12:00:00.000Z" };
   const older = { ...live, id: "550e8400-e29b-41d4-a716-446655440004", text: "Older page" };
-  let response: "initial" | "failure" | "recovered" = "initial";
+  const missed = { ...live, id: "550e8400-e29b-41d4-a716-446655440005", text: "Missed newest" };
+  let response: "initial" | "failure" | "partial" | "recovered" = "initial";
+  let olderFails = false;
   server.use(http.get(`${globalEntry}/conversations/${conversationId}/messages`, ({ request }) => {
-    if (new URL(request.url).searchParams.get("cursor") === "older") return HttpResponse.json({ items: [older], nextCursor: null });
+    const cursor = new URL(request.url).searchParams.get("cursor");
+    if (cursor === "older" && olderFails) return HttpResponse.json({}, { status: 503 });
+    if (cursor === "older") return HttpResponse.json({ items: [older], nextCursor: "older2" });
+    if (cursor === "older2") return HttpResponse.json({ items: [], nextCursor: null });
     if (response === "failure") return HttpResponse.json({}, { status: 503 });
-    return HttpResponse.json({ items: response === "recovered" ? [live] : [], nextCursor: response === "initial" ? "older" : null });
+    return HttpResponse.json({ items: response === "initial" ? [] : [missed, live], nextCursor: "older" });
   }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
@@ -141,6 +146,7 @@ it("retains a failed authoritative history read after a live Message patches the
       newestPagePending: messages.newestPagePending, fetchNextPage: messages.fetchNextPage };
   }, { wrapper });
   await waitFor(() => expect(hook.result.current.data?.pages[0]?.items).toEqual([]));
+  await waitFor(() => expect(hook.result.current.newestPagePending).toBe(false));
 
   response = "failure";
   await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
@@ -157,11 +163,24 @@ it("retains a failed authoritative history read after a live Message patches the
   expect(hook.result.current.data?.pages[1]?.items).toEqual([older]);
   expect(hook.result.current.newestPagePending).toBe(true);
 
+  response = "partial";
+  olderFails = true;
+  await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
+  await waitFor(() => expect(hook.result.current.failureCount).toBe(1));
+  expect(hook.result.current.data?.pages[0]?.items).toEqual([live]);
+  expect(hook.result.current.newestPagePending).toBe(true);
+
+  olderFails = false;
+  await act(async () => { await hook.result.current.fetchNextPage(); });
+  await waitFor(() => expect(hook.result.current.failureCount).toBe(0));
+  expect(hook.result.current.data?.pages[0]?.items).toEqual([live]);
+  expect(hook.result.current.newestPagePending).toBe(true);
+
   response = "recovered";
   await act(async () => { await client.invalidateQueries({ queryKey: queryKeys.conversations.messages(conversationId) }); });
   await waitFor(() => expect(hook.result.current.failureCount).toBe(0));
-  expect(hook.result.current.data?.pages[0]?.items).toEqual([live]);
-  expect(hook.result.current.newestPagePending).toBe(false);
+  await waitFor(() => expect(hook.result.current.data?.pages[0]?.items).toEqual([missed, live]));
+  await waitFor(() => expect(hook.result.current.newestPagePending).toBe(false));
   await hook.unmount();
   client.clear();
 });
