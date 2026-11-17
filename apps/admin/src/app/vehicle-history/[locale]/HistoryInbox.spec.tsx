@@ -1467,7 +1467,10 @@ it.each(["actor", "session", "assignment", "request", "disposal"] as const)("fen
     return network(input, init);
   });
   const mounted = render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Original operator draft" } });
+  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  await waitFor(() => expect((input as HTMLTextAreaElement).disabled).toBe(false));
+  fireEvent.change(input, { target: { value: "Original operator draft" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
   await waitFor(() => expect(intent?.text).toBe("Original operator draft"));
   fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Still private newer work" } });
