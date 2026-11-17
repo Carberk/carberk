@@ -5,11 +5,12 @@ import { apiClient } from "../client";
 
 export function usePresignUpload() {
   return useMutation({
-    mutationFn: (request: UploadsSchemas.PresignRequest) =>
+    mutationFn: ({ assertSession, ...request }: UploadsSchemas.PresignRequest & { assertSession?: () => Promise<unknown> }) =>
       apiClient.post(
         "/uploads/presign",
         request,
         UploadsSchemas.PresignResponseSchema,
+        { assertSession },
       ),
   });
 }

@@ -66,6 +66,16 @@ slicing, preserves signed Host/TLS identity, body, content and conditional heade
 and strips API credentials and private entry access before storage. Storage
 redirects fail closed. Video has no alias/configuration in this release.
 
+Listing/Profile retries retain the original grant, metadata and transfer phase.
+Uncertain transfers may inspect only the canonical public original through the
+selected entry: exact WebP/length indicates presence, never adoption. Same-key
+renewal retains the original empty fence; it never recreates a missing family
+or signs a completed ETag. Confirmed PUTs retry the same supported adoption.
+Chat renewal uses recorded sender issuance. `present` supplies no PUT authority;
+absent objects require signed `If-None-Match: *`. Only the existing send with the
+same client message ID can confirm/reconcile a Message. Original chat grants'
+overwrite behavior remains unchanged until their expiry.
+
 Before installed activation, prepare exact candidate/restore files, hashes,
 modes and service identity as in the upgrade procedure below. Preserve the R11
 observer and persistent reverse connector/signer. R05 requires no nginx, Xray or

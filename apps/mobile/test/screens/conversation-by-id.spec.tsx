@@ -8,6 +8,7 @@ import * as Notifications from "expo-notifications";
 import type { ConversationsSchemas, ListingsSchemas } from "@auto-tm/contracts";
 import { waitFor } from "@testing-library/react-native";
 
+import { signInPhotoUser } from "../profile-photo-api";
 import { activeKeyboardRegion } from "../keyboardAvoidance";
 import { act, fireEvent, renderMobile, routeParams, routerMock, within, getAllHosts, getHost, first } from "../render";
 import ConversationDetailScreen from "../../app/conversations/[id]";
@@ -22,6 +23,13 @@ const LISTING_ID = "00000000-0000-4000-8000-0000000000a1";
 const BUYER_ID = "00000000-0000-4000-8000-0000000000b1";
 const SELLER_ID = "00000000-0000-4000-8000-0000000000b2";
 const SELLER_PHONE = "+99361000000";
+
+vi.mock("expo-secure-store", async () => {
+  const { photoApiStorage } = await import("../profile-photo-storage");
+  return { getItemAsync: async (key: string) => photoApiStorage.get(key) ?? null,
+    setItemAsync: async (key: string, value: string) => { photoApiStorage.set(key, value); },
+    deleteItemAsync: async (key: string) => { photoApiStorage.delete(key); } };
+});
 
 const state = vi.hoisted(() => ({
   viewerId: "",
@@ -186,7 +194,8 @@ function routeGet(routes: Record<string, () => unknown>) {
   });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await signInPhotoUser();
   state.viewerId = BUYER_ID;
   state.cachedMessages = false;
   state.get.mockReset();
@@ -1149,6 +1158,7 @@ describe("Conversation about a closed Listing", () => {
     expect(state.mutation.mutateAsync).toHaveBeenCalledWith({
       conversationId: CONVERSATION_ID,
       request: { contentType: "image/webp", sizeBytes: 1000 },
+      assertSession: expect.any(Function),
     });
     expect(state.socket.sendImageMessage).not.toHaveBeenCalled();
     expect(await screen.findByText("You can't send messages in this Conversation")).toBeTruthy();
@@ -1158,19 +1168,17 @@ describe("Conversation about a closed Listing", () => {
     expect(screen.queryByRole("button", { name: "Attach photo" })).toBeNull();
   });
 
-  it("reloads the Conversation when image Retry presigning is refused", async () => {
+  it("retries the same uploaded image and reloads when its send is refused", async () => {
     let restricted = false;
     const readConversation = vi.fn(() =>
       conversation({ sendRestriction: restricted ? "participant_unavailable" : null }),
     );
     routeGet({ [`/conversations/${CONVERSATION_ID}`]: readConversation });
-    state.mutation.mutateAsync
-      .mockResolvedValueOnce({ uploadUrl: "https://upload", key: "chat-attachments/k.webp" })
-      .mockImplementationOnce(async () => {
-        restricted = true;
-        throw new ApiError("FORBIDDEN", 403, "Forbidden");
-      });
-    state.socket.sendImageMessage.mockResolvedValueOnce({ ok: false, code: "INTERNAL" });
+    state.mutation.mutateAsync.mockResolvedValue({ uploadUrl: "https://upload", key: "chat-attachments/k.webp" });
+    state.socket.sendImageMessage.mockResolvedValueOnce({ ok: false, code: "INTERNAL" }).mockImplementationOnce(async () => {
+      restricted = true;
+      return { ok: false, code: "FORBIDDEN" };
+    });
     const screen = await renderMobile(<ConversationDetailScreen />);
 
     await screen.findByText("Merdan");
@@ -1188,12 +1196,14 @@ describe("Conversation about a closed Listing", () => {
       void fireEvent.press(screen.getByRole("button", { name: "Retry" }));
     });
 
-    expect(state.mutation.mutateAsync).toHaveBeenCalledTimes(2);
+    expect(state.mutation.mutateAsync).toHaveBeenCalledTimes(1);
     expect(state.mutation.mutateAsync).toHaveBeenLastCalledWith({
       conversationId: CONVERSATION_ID,
       request: { contentType: "image/webp", sizeBytes: 1000 },
+      assertSession: expect.any(Function),
     });
-    expect(state.socket.sendImageMessage).toHaveBeenCalledTimes(1);
+    expect(state.socket.sendImageMessage).toHaveBeenCalledTimes(2);
+    expect(state.socket.sendImageMessage.mock.calls[1]?.[0]).toEqual(state.socket.sendImageMessage.mock.calls[0]?.[0]);
     expect(await screen.findByText("You can't send messages in this Conversation")).toBeTruthy();
     expect(readConversation).toHaveBeenCalledTimes(2);
     expect(screen.queryByPlaceholderText("Message")).toBeNull();

@@ -19,7 +19,7 @@ export const profilePhotoCopy = {
     "photoRmFail": "Couldn't remove the photo.",
     "offline": "No internet connection. Try again when you are online.",
     "preparing": "Preparing photo...",
-    "attached": "This upload belongs to a listing. Retry to upload a new copy.",
+    "attached": "This photo is used by a listing.",
     "retry": "Retry",
     "cancel": "Cancel"
   },
@@ -42,7 +42,7 @@ export const profilePhotoCopy = {
     "photoRmFail": "Не удалось удалить фото.",
     "offline": "Нет подключения к интернету. Попробуйте позже.",
     "preparing": "Подготовка фото...",
-    "attached": "Это фото уже используется в объявлении. Повторите загрузку новой копии.",
+    "attached": "Это фото уже используется в объявлении.",
     "retry": "Повторить",
     "cancel": "Отмена"
   },
@@ -65,7 +65,7 @@ export const profilePhotoCopy = {
     "photoRmFail": "Suraty aýryp bolmady.",
     "offline": "Internet baglanyşygy ýok. Soňrak synanyşyň.",
     "preparing": "Surat taýýarlanýar...",
-    "attached": "Bu surat bildirişde ulanylýar. Täze nusgasyny ýükläp, täzeden synanyşyň.",
+    "attached": "Bu surat bildirişde ulanylýar.",
     "retry": "Täzeden synanyş",
     "cancel": "Ýatyr"
   }

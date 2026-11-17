@@ -78,6 +78,7 @@ describe("useSendImageMessage", () => {
         metadata: { key: "chat-attachments/conv-1/msg-1/original.webp", width: 800, height: 600 },
       },
       expect.any(Object),
+      { assertSession: undefined },
     );
   });
 
@@ -102,6 +103,7 @@ describe("useSendImageMessage", () => {
         clientMessageId: "client-1",
       },
       expect.any(Object),
+      { assertSession: undefined },
     );
   });
 

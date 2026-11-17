@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as FileSystem from "expo-file-system/legacy";
 import { useTranslation } from "react-i18next";
-import type { ListingsSchemas } from "@auto-tm/contracts";
+import type { ListingsSchemas, UploadsSchemas } from "@auto-tm/contracts";
 
+import { capturePhotoSession, type ProfilePhotoSession } from "../../identity/profilePhotoSession";
+import { captureRouteSnapshot, type RouteSnapshot } from "../../api/routes";
+import { renewPhotoUpload } from "../../media/renewPhotoUpload";
+import { photoRequest } from "../../media/photoRoute";
 import { usePresignUpload } from "../../api/uploads/usePresignUpload";
 import { ApiError } from "../../api/client";
 
@@ -59,26 +63,29 @@ interface CompressionJob {
 async function uploadFileToPresignedUrl(
   uploadUrl: string,
   localUri: string,
-  headers?: Record<string, string>,
+  headers: Record<string, string> | undefined,
+  route: RouteSnapshot,
+  assertCurrent: () => Promise<unknown>,
 ): Promise<void> {
-  const uploadPromise = FileSystem.uploadAsync(uploadUrl, localUri, {
+  const request = await photoRequest(uploadUrl, headers ?? { "Content-Type": "image/webp" }, route);
+  await assertCurrent();
+  const uploadPromise = FileSystem.uploadAsync(request.uri, localUri, {
     httpMethod: "PUT",
     uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    headers: headers ?? {
-      "Content-Type": "image/webp",
-    },
+    headers: request.headers,
   });
 
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(
       () => reject(new ApiError("NETWORK_ERROR", 0, "Upload timed out")),
       UPLOAD_TIMEOUT_MS,
-    ),
-  );
+    );
+  });
 
-  const uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
+  const uploadResult = await Promise.race([uploadPromise, timeoutPromise]).finally(() => clearTimeout(timer));
 
-  if (uploadResult.status >= 400) {
+  if (uploadResult.status < 200 || uploadResult.status >= 300) {
     throw new Error(`PUT failed: ${uploadResult.status}`);
   }
 }
@@ -109,6 +116,8 @@ export function useUploadQueue(
   const initializingStagingKeys = useRef(new Set<string>());
   const activeStagingKey = useRef(stagingKey);
   const presignMutation = usePresignUpload();
+  const grants = useRef(new Map<string, { response: UploadsSchemas.PresignResponse; sizeBytes: number; owner: ProfilePhotoSession }>());
+  useEffect(() => () => { for (const grant of grants.current.values()) grant.owner.dispose(); grants.current.clear(); }, []);
   const queueRef = useRef(queue);
   queueRef.current = queue;
   activeStagingKey.current = stagingKey;
@@ -192,6 +201,8 @@ export function useUploadQueue(
     // before the key in between has settled is read from the device again. This
     // runs before both guards below for that reason.
     if (queueRef.current.stagingKey !== stagingKey) {
+      for (const grant of grants.current.values()) grant.owner.dispose();
+      grants.current.clear();
       for (const photoId of uploadQueue.current) uploadsInFlight.current.delete(photoId);
       uploadQueue.current = [];
       for (const job of compressionWaiting.current.values()) job.settle();
@@ -270,8 +281,10 @@ export function useUploadQueue(
 
   const uploadPhoto = useCallback(
     async (photoId: string) => {
+      const route = captureRouteSnapshot();
       const photo = findPhotoById(queueRef.current, photoId);
-      if (!photo) return;
+      const isCurrent = () => activeStagingKey.current === stagingKey && Boolean(findPhotoById(queueRef.current, photoId));
+      if (!photo || !isCurrent()) return;
 
       if (!networkAvailable.current) {
         queueRef.current = updatePhotoState(
@@ -313,6 +326,7 @@ export function useUploadQueue(
         transitionToFailed(photoId, buildUploadError(err, t));
         return;
       }
+      if (!isCurrent()) return;
       if (!fileInfo.exists) {
         transitionToFailed(photoId, {
           code: "LOCAL_FILE_MISSING",
@@ -322,35 +336,58 @@ export function useUploadQueue(
         return;
       }
 
+      let owner = grants.current.get(photoId)?.owner;
+      const assertCurrent = async () => {
+        if (!isCurrent()) throw new Error("Photo selection ended");
+        return owner?.current();
+      };
+      startUpload();
       try {
+        owner ??= await capturePhotoSession();
+        await assertCurrent();
         transitionToPresigned(photoId);
-        startUpload();
 
-        const presignResult = await presignMutation.mutateAsync({
+        const sizeBytes = fileSize ?? fileInfo.size;
+        const previous = grants.current.get(photoId);
+        if (previous && previous.sizeBytes !== sizeBytes) throw new Error("Photo file changed");
+        const presignResult = previous
+          ? await renewPhotoUpload(previous.response, sizeBytes, assertCurrent, route)
+          : await presignMutation.mutateAsync({
           kind: "image",
           contentType: "image/webp",
-          // A photo restored from staging has no recorded size; its file does.
-          sizeBytes: fileSize ?? fileInfo.size,
+          sizeBytes,
           writeProtocol: "conditional-v1",
+          assertSession: assertCurrent,
         });
 
+        await assertCurrent();
+        if (presignResult) grants.current.set(photoId, { response: presignResult, sizeBytes, owner });
         if (!networkAvailable.current) {
           queueRef.current = updatePhotoState(
             queueRef.current,
             photoId,
             "waiting_for_network",
-            { uploadUrl: presignResult.uploadUrl },
+            { uploadUrl: presignResult?.uploadUrl },
           );
           setQueue(queueRef.current);
           return;
         }
 
-        transitionToUploading(photoId, presignResult.uploadUrl);
-        await uploadFileToPresignedUrl(presignResult.uploadUrl, photo.localUri, presignResult.headers);
-        transitionToUploaded(photoId, presignResult.key);
+        if (presignResult) {
+          if (!Object.entries(presignResult.headers ?? {}).some(([name, value]) => name.toLowerCase() === "if-match" && value.length > 0)) throw new ApiError("CONTRACT_VIOLATION", 502, "Conditional upload headers are missing");
+          transitionToUploading(photoId, presignResult.uploadUrl);
+          await uploadFileToPresignedUrl(presignResult.uploadUrl, photo.localUri, presignResult.headers, route, assertCurrent);
+        }
+        await assertCurrent();
+        const key = presignResult?.key ?? previous?.response.key;
+        if (!key) throw new ApiError("CONTRACT_VIOLATION", 502);
+        transitionToUploaded(photoId, key);
+        grants.current.delete(photoId);
+        owner.dispose();
       } catch (err) {
         const uploadError = buildUploadError(err, t);
-        transitionToFailed(photoId, uploadError);
+        if (isCurrent()) transitionToFailed(photoId, uploadError);
+        if (!grants.current.has(photoId)) owner?.dispose();
       } finally {
         endUpload();
       }
@@ -455,6 +492,8 @@ export function useUploadQueue(
   // from it, possibly before React renders.
   const removePhoto = useCallback(
     (photoId: string) => {
+      grants.current.get(photoId)?.owner.dispose();
+      grants.current.delete(photoId);
       const photo = findPhotoById(queueRef.current, photoId);
       if (photo?.localUri) {
         void FileSystem.deleteAsync(photo.localUri, { idempotent: true });

@@ -6,6 +6,9 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { AdminSchemas, IdentitySchemas, UploadsSchemas } from "@auto-tm/contracts";
 
+import { captureRouteSnapshot } from "../api/routes";
+import { renewPhotoUpload } from "../media/renewPhotoUpload";
+import { photoRequest } from "../media/photoRoute";
 import { ApiError, apiClient } from "../api/client";
 import { useRemoveProfilePhoto } from "../api/identity/useRemoveProfilePhoto";
 import { useSetProfilePhoto } from "../api/identity/useSetProfilePhoto";
@@ -19,10 +22,12 @@ type PhotoUploadState =
   | { status: "idle" }
   | { status: "uploading"; uri: string; percent: number | null; preparing?: boolean }
   | { status: "removing" }
-  | { status: "failed" | "offline" | "too_large" | "unsupported"; operation?: "remove"; reason?: "listing" | "suspended" };
+  | { status: "failed" | "offline" | "too_large" | "unsupported"; operation?: "remove"; reason?: "listing" | "suspended" | "unusable" };
 interface SelectedPhoto {
   asset: ImagePicker.ImagePickerAsset;
   compressed?: CompressionResult;
+  grant?: UploadsSchemas.PresignResponse;
+  uploaded?: boolean;
   session: ProfilePhotoSession;
   job?: Promise<void>;
   stopWaiting?: () => void;
@@ -70,6 +75,7 @@ export function useProfilePhotoUpload() {
   }
 
   async function uploadPhoto(photo: SelectedPhoto) {
+    const route = captureRouteSnapshot();
     profilePhotoUploadStore.setState({ state: { status: "uploading", uri: photo.compressed?.uri ?? photo.asset.uri, percent: null } });
     try {
       await photo.session.current();
@@ -94,49 +100,58 @@ export function useProfilePhotoUpload() {
         return;
       }
       await photo.session.current();
-      const presign = await apiClient.post("/uploads/presign", {
+      const previous = photo.grant;
+      const presign = photo.uploaded ? null : previous
+        ? await renewPhotoUpload(previous, compressed.fileSize, () => photo.session.current(), route)
+        : await apiClient.post("/uploads/presign", {
         kind: "image", contentType: "image/webp", sizeBytes: compressed.fileSize, writeProtocol: "conditional-v1",
       } satisfies UploadsSchemas.PresignRequest, UploadsSchemas.PresignResponseSchema, { assertSession: () => photo.session.current() });
       await photo.session.current();
-      if (!presign.headers || !Object.entries(presign.headers).some(([name, value]) => name.toLowerCase() === "if-match" && value.length > 0)) {
-        throw new ApiError("CONTRACT_VIOLATION", 502, "Conditional upload headers are missing");
+      if (presign) {
+        photo.grant = presign;
+        if (!presign.headers || !Object.entries(presign.headers).some(([name, value]) => name.toLowerCase() === "if-match" && value.length > 0)) {
+          throw new ApiError("CONTRACT_VIOLATION", 502, "Conditional upload headers are missing");
+        }
+        let lastPercent: number | null = null;
+        let transferring = true;
+        const request = await photoRequest(presign.uploadUrl, presign.headers, route);
+        await photo.session.current();
+        const task = FileSystem.createUploadTask(request.uri, compressed.uri, {
+          httpMethod: "PUT", uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT, headers: request.headers,
+        }, ({ totalBytesSent, totalBytesExpectedToSend }) => {
+          const known = Number.isFinite(totalBytesExpectedToSend) && totalBytesExpectedToSend > 0 && Number.isFinite(totalBytesSent) && totalBytesSent >= 0;
+          const percent = known ? Math.max(lastPercent ?? 0, Math.min(100, Math.floor(100 * totalBytesSent / totalBytesExpectedToSend))) : lastPercent;
+          if (percent !== null) lastPercent = percent;
+          if (selected === photo && transferring) profilePhotoUploadStore.setState({ state: { status: "uploading", uri: compressed.uri, percent } });
+        });
+        let cancelled = false;
+        const stopTransfer = () => {
+          transferring = false;
+          if (cancelled) return;
+          cancelled = true;
+          void task.cancelAsync().catch(() => {});
+        };
+        photo.stopTransfer = stopTransfer;
+        let uploadTimer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_resolve, reject) => {
+          uploadTimer = setTimeout(() => {
+            stopTransfer();
+            reject(new Error("Photo upload timed out"));
+          }, 60_000);
+        });
+        let result: FileSystem.FileSystemUploadResult | null | undefined;
+        try { result = await Promise.race([task.uploadAsync(), timeout]); }
+        catch (error) { stopTransfer(); throw error; }
+        finally { transferring = false; photo.stopTransfer = undefined; clearTimeout(uploadTimer); }
+        if (!result || result.status < 200 || result.status >= 300) throw new Error("Photo upload failed");
       }
-      let lastPercent: number | null = null;
-      let transferring = true;
-      const task = FileSystem.createUploadTask(presign.uploadUrl, compressed.uri, {
-        httpMethod: "PUT", uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT, headers: presign.headers,
-      }, ({ totalBytesSent, totalBytesExpectedToSend }) => {
-        const known = Number.isFinite(totalBytesExpectedToSend) && totalBytesExpectedToSend > 0 && Number.isFinite(totalBytesSent) && totalBytesSent >= 0;
-        const percent = known ? Math.max(lastPercent ?? 0, Math.min(100, Math.floor(100 * totalBytesSent / totalBytesExpectedToSend))) : lastPercent;
-        if (percent !== null) lastPercent = percent;
-        if (selected === photo && transferring) profilePhotoUploadStore.setState({ state: { status: "uploading", uri: compressed.uri, percent } });
-      });
-      let cancelled = false;
-      const stopTransfer = () => {
-        transferring = false;
-        if (cancelled) return;
-        cancelled = true;
-        // SDK 55 removes its progress subscription only after a resolved upload.
-        // cancelAsync also releases it when the native upload promise rejects.
-        void task.cancelAsync().catch(() => {});
-      };
-      photo.stopTransfer = stopTransfer;
-      let uploadTimer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<never>((_resolve, reject) => {
-        uploadTimer = setTimeout(() => {
-          stopTransfer();
-          reject(new Error("Photo upload timed out"));
-        }, 60_000);
-      });
-      let result: FileSystem.FileSystemUploadResult | null | undefined;
-      try { result = await Promise.race([task.uploadAsync(), timeout]); }
-      catch (error) { stopTransfer(); throw error; }
-      finally { transferring = false; photo.stopTransfer = undefined; clearTimeout(uploadTimer); }
-      if (!result || result.status < 200 || result.status >= 300) throw new Error("Photo upload failed");
+      photo.uploaded = true;
+      const key = photo.grant?.key;
+      if (!key) throw new ApiError("CONTRACT_VIOLATION", 502);
       let preparingAttempts = 0;
       for (;;) {
         try {
-          await setPhoto.mutateAsync({ request: { key: presign.key }, session: photo.session });
+          await setPhoto.mutateAsync({ request: { key }, session: photo.session });
           break;
         } catch (error) {
           if (conflictReason(error) !== IdentitySchemas.ProfilePhotoConflictReason.UploadPreparing) throw error;
@@ -254,8 +269,9 @@ function conflictReason(error: unknown): IdentitySchemas.ProfilePhotoConflictRea
   return parsed.success ? parsed.data.reason : undefined;
 }
 
-function refusalReason(error: unknown): "listing" | "suspended" | undefined {
+function refusalReason(error: unknown): "listing" | "suspended" | "unusable" | undefined {
   if (conflictReason(error) === IdentitySchemas.ProfilePhotoConflictReason.UploadAttachedToListing) return "listing";
+  if (error instanceof ApiError && error.status === 400 && error.code === "UPLOAD_NOT_AVAILABLE") return "unusable";
   if (error instanceof ApiError && error.status === 403 &&
     (error.code === AdminSchemas.AdminErrorReason.UserSuspended || AdminSchemas.UserSuspendedDetailsSchema.safeParse(error.details).success)) return "suspended";
   return undefined;

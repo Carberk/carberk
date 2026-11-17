@@ -62,6 +62,7 @@ describe("usePresignChatAttachment", () => {
       "/conversations/conv-1/attachments/presign",
       { contentType: "image/webp", sizeBytes: 1_024_000 },
       expect.any(Object),
+      { assertSession: undefined },
     );
   });
 

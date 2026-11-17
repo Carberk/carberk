@@ -38,6 +38,8 @@ This area holds the Messages list, the Conversation screen's parts, the chat soc
 
 **Screen structure.** The route holds orchestration. `ConversationHeader` (Back, the participant, Call, the ⋯ button that opens `ConversationMenuSheet`), `ConversationListingCard` (the Listing strip) and `ConversationFooter` (blocked banner, or typing indicator and composer) render from props and have their own rendered tests. The menu holds Mute, Report and Block only (#352 D2); Report opens `ReportSheet` as a User report of the other participant and is hidden when `reportEntryEnabled` is false, as on Listing detail.
 
+Image transfer state belongs to each pending client message ID in the upload adapter. It retains issuance and its initiating User; renewal or storage presence never confirms a Message. Existing HTTP/socket send and deduplication remain authoritative, and only explicit Retry can repeat that same send identity.
+
 ## Start here
 
 - [Conversation route](../../app/conversations/[id].tsx)

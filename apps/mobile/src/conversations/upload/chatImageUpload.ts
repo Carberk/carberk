@@ -1,6 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
+import { captureRouteSnapshot } from "../../api/routes";
+import { photoRequest } from "../../media/photoRoute";
 import { ApiError } from "../../api/client";
 
 const CHAT_STAGING_ROOT = `${FileSystem.documentDirectory}chat-staging/`;
@@ -146,6 +148,9 @@ export async function compressChatImage(
 export async function uploadChatImageToPresignedUrl(
   uploadUrl: string,
   localUri: string,
+  headers: Record<string, string> = { "Content-Type": "image/webp" },
+  route = captureRouteSnapshot(),
+  assertCurrent?: () => Promise<unknown>,
 ): Promise<void> {
   const fileInfo = await FileSystem.getInfoAsync(localUri);
   if (!fileInfo.exists) {
@@ -156,12 +161,12 @@ export async function uploadChatImageToPresignedUrl(
     );
   }
 
-  const uploadResult = await FileSystem.uploadAsync(uploadUrl, localUri, {
+  const request = await photoRequest(uploadUrl, headers, route);
+  await assertCurrent?.();
+  const uploadResult = await FileSystem.uploadAsync(request.uri, localUri, {
     httpMethod: "PUT",
     uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    headers: {
-      "Content-Type": "image/webp",
-    },
+    headers: request.headers,
   });
 
   if (uploadResult.status < 200 || uploadResult.status >= 300) {

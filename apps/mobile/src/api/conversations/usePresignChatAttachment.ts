@@ -8,11 +8,13 @@ export function usePresignChatAttachment() {
     mutationFn: (input: {
       conversationId: string;
       request: ConversationsSchemas.PresignChatAttachmentRequest;
+      assertSession?: () => Promise<unknown>;
     }) =>
       apiClient.post(
         `/conversations/${input.conversationId}/attachments/presign`,
         input.request,
         ConversationsSchemas.PresignChatAttachmentResponseSchema,
+        { assertSession: input.assertSession },
       ),
   });
 }

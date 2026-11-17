@@ -3,8 +3,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import React from "react";
+import { http, HttpResponse } from "msw";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { deleteAsync, getInfoAsync, readDirectoryAsync, uploadAsync } from "expo-file-system/legacy";
+
+import { server } from "../../../test/msw";
 
 import { setupUploadResume } from "./appStateResume";
 import { compressPhoto } from "./compressor";
@@ -31,7 +34,8 @@ vi.mock("expo-image-manipulator", () => ({
 }));
 
 vi.mock("../../auth/session", () => ({
-  loadAuthSession: vi.fn(() => Promise.resolve(null)),
+  loadAuthSession: vi.fn(() => Promise.resolve({ user: { id: "queue-owner" }, accessToken: "synthetic", refreshToken: "synthetic" })),
+  subscribeAuthSession: vi.fn(() => () => {}),
   storeAuthSession: vi.fn(() => Promise.resolve()),
   clearAuthSession: vi.fn(() => Promise.resolve()),
 }));
@@ -114,7 +118,7 @@ describe("useUploadQueue — in grid order (#819)", () => {
       }));
     mockPresignMutateAsync.mockImplementation(() =>
       new Promise((resolve) => {
-        presigns.push(() => resolve({ uploadUrl: "http://localhost/presigned", key: "test-key" }));
+        presigns.push(() => resolve({ uploadUrl: "http://localhost/presigned", key: "test-key", headers: { "if-match": '"empty"' } }));
       }));
   });
 
@@ -300,7 +304,7 @@ describe("useUploadQueue — batch compression", () => {
       modificationTime: 0,
     });
     mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/webp" });
-    mockPresignMutateAsync.mockResolvedValue({ uploadUrl: "http://localhost/presigned", key: "test-key" });
+    mockPresignMutateAsync.mockResolvedValue({ uploadUrl: "http://localhost/presigned", key: "test-key", headers: { "if-match": '"empty"' } });
   });
 
   it("keeps isCompressing=true while any photo is still compressing", async () => {
@@ -691,6 +695,7 @@ describe("useUploadQueue — batch compression", () => {
     });
 
     it("can retry a photo after its upload failed", async () => {
+      server.use(http.post("*/uploads/renew", () => HttpResponse.json({ uploadUrl: "http://localhost/presigned", key: "test-key", expiresIn: 600, maxSizeBytes: 5242880, headers: { "if-match": '"empty"' } })));
       mockListLocalPhotoIds.mockResolvedValueOnce(["left-behind"]);
       mockUploadAsync.mockRejectedValueOnce(new Error("connection lost"));
       const { result } = renderHook(() => useUploadQueue("draft-9", payload), { wrapper });
@@ -825,7 +830,7 @@ describe("useUploadQueue — upgrading 2.0.3 staged JPEGs", () => {
     mockPresignMutateAsync.mockImplementation(async (input) => {
       expect(converted).toBe(true);
       expect(input).toMatchObject({ contentType: "image/webp", sizeBytes: 345, writeProtocol: "conditional-v1" });
-      return { uploadUrl: "http://localhost/upgrade", key: "pending/owned/original.webp" };
+      return { uploadUrl: "http://localhost/upgrade", key: "pending/owned/original.webp", headers: { "if-match": '"empty"', "Content-Type": "image/webp" } };
     });
     mockUploadAsync.mockResolvedValue({ status: 200, headers: {}, body: "", mimeType: "image/webp" });
     const photos = [0, 1, 2].map((n) => ({ photoId: `remote-${n}`, key: `remote-${n}.webp`, sortOrder: n }));
@@ -834,7 +839,7 @@ describe("useUploadQueue — upgrading 2.0.3 staged JPEGs", () => {
     await waitFor(() => expect(result.current.photos[3]).toMatchObject({ photoId, sortOrder: 3, state: "uploaded", width: 900, height: 1200, fileSize: 345 }));
     expect(result.current.publishGate.canPublish).toBe(true);
     expect(mockUploadAsync).toHaveBeenCalledWith("http://localhost/upgrade", destination,
-      expect.objectContaining({ headers: { "Content-Type": "image/webp" } }));
+      expect.objectContaining({ headers: { "Content-Type": "image/webp", "if-match": '"empty"' } }));
   });
 });
 
