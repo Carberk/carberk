@@ -55,6 +55,8 @@ Every reviewer, whatever its model, reviews without touching another session's c
 - Outside T3, to run tests or the app, make an owned temporary worktree: `git worktree add /tmp/review-<n> review-<n>`, then `pnpm install --frozen-lockfile` in it. Choose an unused path and owned review ref; remove only the worktree you created with `git worktree remove /tmp/review-<n>` when done.
 - For runtime behavior, use the fixture data from [local testing](local-testing.md) and follow the [owned-device procedure](native-fixture-signin.md#prepare-one-owned-device) for coordinated selection and handoff. Use your own ports and stop the processes you started.
 
+Standards review blocks changed mobile specs that read component or hook source and assert on its text, or mock this repository's own API hooks or API client. Use real components, hooks and client with MSW at the network boundary. The client's own transport spec retains its exact client exception; native, network and storage boundaries remain valid. `pnpm check:mobile-specs` rejects new violations and stale legacy allowances; existing allowances do not excuse these patterns in changed specs.
+
 Every review reply starts with `MERGE CONFIDENCE: N/10` for correctness and the issue's criteria.
 
 **UI changes** (any change a User sees in the app, Admin or public Web) get separate UI and readability scores that the founder reads before merging. The reviewer:

@@ -252,6 +252,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm check:mobile-specs
+
       - run: pnpm test:frontend
 
       # After the workspace tests: the reviewer-flow smoke imports the built

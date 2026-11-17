@@ -472,3 +472,14 @@ test("a rejected resolved import fails the required aggregate in either CI lane"
     }
   }
 });
+
+for (const name of ["pr-checks.yml", "ci.yml"]) {
+  test(`${name} runs the mobile spec policy uncached in the frontend job`, () => {
+    const frontend = jobs(workflow(name)).get("frontend");
+    assert.match(frontend, /run: pnpm check:mobile-specs/);
+    assert.ok(frontend.indexOf("pnpm check:mobile-specs") < frontend.indexOf("pnpm test:frontend"));
+    assert.doesNotMatch(frontend, /continue-on-error:/);
+    assert.equal(rootScripts["check:mobile-specs"], "pnpm exec tsx apps/mobile/test/policy/check-mobile-specs.ts");
+    assert.match(frontend, /fetch-depth: 0/);
+  });
+}
