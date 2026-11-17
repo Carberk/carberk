@@ -153,14 +153,25 @@ it("rejects a namespace client's spied transport method", () => {
   expect(checkMobileSpecs(root, [])).toEqual([expect.stringContaining("own-api-mock")]);
 });
 
-it("allows structural inventories that assert file ownership instead of rendered text", () => {
+it("allows structural inventories that assert filenames without reading component text", () => {
   const root = fixture({ "test/new.spec.ts": `
-    import { readFileSync } from 'node:fs';
-    const files = ['../components/Card.tsx'];
-    const owners = files.filter(file => readFileSync(new URL(file, import.meta.url), 'utf8').includes('server-only'));
-    expect(owners).toEqual([]);
+    import { readdirSync } from 'node:fs';
+    const files = readdirSync(new URL('../components/', import.meta.url));
+    const owners = files.filter(file => file.endsWith('.tsx'));
+    expect(owners).toEqual(['Card.tsx']);
   ` });
   expect(checkMobileSpecs(root, [])).toEqual([]);
+});
+
+it("rejects component text assertions derived through filter callbacks", () => {
+  const root = fixture({ "test/new.spec.ts": `
+    import { readFileSync } from 'node:fs';
+    const matches = [0].filter(() =>
+      readFileSync(new URL('../components/Card.tsx', import.meta.url), 'utf8').includes('Ready')
+    );
+    expect(matches.length).toBe(1);
+  ` });
+  expect(checkMobileSpecs(root, [])).toEqual([expect.stringContaining("source-text-assertion")]);
 });
 
 it("recognizes assertions through a Vitest namespace", () => {

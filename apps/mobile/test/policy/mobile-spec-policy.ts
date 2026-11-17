@@ -122,7 +122,6 @@ export function inspectMobileSpec(root: string, file: string): string[] {
         const returned = fn.body.statements.find(ts.isReturnStatement);
         if (returned) return evaluate(returned.expression, bound, depth + 1);
       }
-      if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "filter") return next(node.expression.expression);
       return { source: args.some(arg => arg.source) || next(node.expression).source };
     }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {

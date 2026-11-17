@@ -128,6 +128,7 @@
   {"file": "test/screens/delete-account.spec.tsx","rules": ["own-api-mock"]},
   {"file": "test/screens/favorites-sync.spec.tsx","rules": ["own-api-mock"]},
   {"file": "test/screens/favorites.spec.tsx","rules": ["own-api-mock"]},
+  {"file": "test/screens/help.spec.tsx","rules": ["source-text-assertion"]},
   {"file": "test/screens/messages-tab-badge.spec.tsx","rules": ["own-api-mock"]},
   {"file": "test/screens/open-listing.spec.tsx","rules": ["own-api-mock","source-text-assertion"]},
   {"file": "test/screens/parameters.spec.tsx","rules": ["own-api-mock"]},
