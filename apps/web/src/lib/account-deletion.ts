@@ -2,13 +2,13 @@ import { AuthSchemas, ErrorCode, ErrorResponseSchema } from "@auto-tm/contracts"
 
 import type { Locale } from "@/i18n/locales";
 
-/**
- * Server-side client for the public account deletion endpoints (ADR-0054).
- *
- * The API answers the same way whether or not a User holds the phone or
- * email, and every result here is derived only from that answer, so the page
- * cannot reveal more than the API does.
- */
+
+
+
+
+
+
+
 
 export type DeletionChannel = "phone" | "email";
 
@@ -26,23 +26,23 @@ export type RequestDeletionResult =
 export type ConfirmDeletionResult = { ok: true } | { ok: false; error: DeletionFailure };
 
 export interface DeletionApiContext {
-  /** API origin, with or without `/api/v1`; deployments set either form. */
+
   baseUrl: string;
   locale: Locale;
-  /**
-   * The visitor's IP, from `visitorIp`. The API applies its per-IP code budget
-   * to the address in the header it trusts (ADR-0078), so without it every
-   * visitor would share the web server's budget.
-   */
+
+
+
+
+
   clientIp: string | null;
-  /** The header the API trusts for `clientIp`; `x-real-ip` unless configured. */
+
   clientIpHeader?: string;
   fetch?: typeof fetch;
 }
 
 const TM_COUNTRY_CODE = "+993";
 
-/** Accepts `61234567`, `+993 61 23-45-67`, `99361234567` or `061234567`. */
+
 export function normalizePhoneInput(value: string): string {
   let digits = value.replace(/\D/g, "");
   if (digits.startsWith("993")) digits = digits.slice(3);
@@ -61,7 +61,7 @@ export function apiUrl(baseUrl: string, path: string): string {
   return `${origin}/api/v1${path}`;
 }
 
-/** Keeps a hung API from holding the Server Function and the pending form. */
+
 const API_TIMEOUT_MS = 10_000;
 
 async function post(
@@ -84,7 +84,7 @@ async function post(
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
   } catch (error) {
-    // Never log the destination or the code.
+
     console.error("[account-deletion] API unreachable", {
       path,
       error: error instanceof Error ? error.name : String(error),
@@ -96,7 +96,7 @@ async function post(
 const ErrorCodeBody = ErrorResponseSchema.pick({ code: true });
 
 async function failureFrom(response: Response): Promise<DeletionFailure> {
-  // The API's global throttler answers 429 with a code outside `ErrorCode`.
+
   if (response.status === 429) return "rate-limited";
   const parsed = ErrorCodeBody.safeParse(await response.json().catch(() => null));
 
@@ -146,9 +146,9 @@ export async function requestAccountDeletion(
   };
 }
 
-/**
- * `destination` is the normalized value returned by `requestAccountDeletion`.
- */
+
+
+
 export async function confirmAccountDeletion(
   channel: DeletionChannel,
   destination: string,
@@ -161,7 +161,7 @@ export async function confirmAccountDeletion(
     code: code.trim(),
   });
   if (!parsed.success) {
-    // A failed union hides which field broke, so check the destination alone.
+
     const destinationValid =
       AuthSchemas.AccountDeletionRequestSchema.safeParse(target).success;
     return {

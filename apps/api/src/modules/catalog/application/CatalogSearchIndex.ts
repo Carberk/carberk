@@ -16,11 +16,11 @@ export interface CatalogSearchSnapshot {
   models: Model[];
 }
 
-/**
- * Process-local snapshot of the whole catalog for search. The catalog is
- * small, so search loads it once per process and reuses it; admin catalog
- * writes call {@link invalidate} so the next search reloads.
- */
+
+
+
+
+
 @Injectable()
 export class CatalogSearchIndex {
   private snapshot: CatalogSearchSnapshot | undefined;

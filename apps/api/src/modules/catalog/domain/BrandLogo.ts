@@ -1,16 +1,16 @@
-/**
- * Rules for an uploaded brand logo. Pure functions: the use-cases supply the
- * bytes and the decoded image facts, and these decide whether to accept them.
- * The limits and rejection reasons mirror `@auto-tm/contracts` (checked by
- * BrandLogo.spec.ts) so clients can show a message for every reason.
- */
+
+
+
+
+
+
 
 export const BRAND_LOGO_MAX_BYTES = 200 * 1024;
 
-/** Longest side divided by shortest side. Logos must be roughly square. */
+
 export const BRAND_LOGO_MAX_ASPECT_RATIO = 1.25;
 
-/** Uploaded SVGs are rendered to a PNG this many pixels on the longest side. */
+
 export const BRAND_LOGO_RASTER_SIZE = 256;
 
 export const BRAND_LOGO_CONTENT_TYPES = [
@@ -20,7 +20,7 @@ export const BRAND_LOGO_CONTENT_TYPES = [
 ] as const;
 export type BrandLogoContentType = (typeof BRAND_LOGO_CONTENT_TYPES)[number];
 
-/** What is stored and served. SVG is never served; it is rasterized to PNG. */
+
 export type StoredBrandLogoType = "image/png" | "image/webp";
 
 const FORMAT_BY_CONTENT_TYPE: Record<BrandLogoContentType, string> = {
@@ -57,7 +57,7 @@ export function isBrandLogoContentType(value: string): value is BrandLogoContent
   return (BRAND_LOGO_CONTENT_TYPES as readonly string[]).includes(value);
 }
 
-/** Checks that need only the declared type and the size. */
+
 export function checkBrandLogoFile(
   contentType: string,
   sizeBytes: number,
@@ -68,7 +68,7 @@ export function checkBrandLogoFile(
   return null;
 }
 
-/** Checks against what the image decoder actually found in the bytes. */
+
 export function checkBrandLogoImage(
   contentType: BrandLogoContentType,
   image: { format: string; width: number; height: number } | null,
@@ -80,24 +80,24 @@ export function checkBrandLogoImage(
   return null;
 }
 
-// Uploaded SVG is only ever rendered to PNG on the server, never served, so
-// script cannot reach users. This guard stops the renderer from loading
-// anything outside the file and rejects markup a plain logo never needs.
+
+
+
 const UNSAFE_SVG_PATTERNS: RegExp[] = [
   /<!DOCTYPE/i,
   /<!ENTITY/i,
-  // Any namespace-prefixed element, e.g. <s:script> or <xi:include>.
+
   /<\s*\/?\s*[A-Za-z_][\w.-]*:[A-Za-z_]/,
   /<\s*script\b/i,
   /<\s*foreignObject\b/i,
   /<\s*(iframe|embed|object|image|animate\w*|set)\b/i,
   /\son[a-z]+\s*=/i,
   /javascript\s*:/i,
-  // Only same-document references such as href="#gradient" or url(#clip).
+
   /href\s*=\s*(?!\s|["']?\s*#)/i,
   /url\(\s*(?!\s|["']?\s*#)/i,
   /@import/i,
-  // CSS escapes can spell any of the above, e.g. @\69mport.
+
   /\\/,
 ];
 
@@ -111,54 +111,54 @@ export function storedBrandLogoType(contentType: BrandLogoContentType): StoredBr
   return contentType === "image/webp" ? "image/webp" : "image/png";
 }
 
-/**
- * Logos live in the `catalog-assets` bucket under a versioned, immutable key,
- * so a replaced logo gets a new URL and caches never go stale.
- */
+
+
+
+
 export function brandLogoKey(slug: string, version: string, type: StoredBrandLogoType): string {
   return `brands/${slug}/${version}/logo.${type === "image/webp" ? "webp" : "png"}`;
 }
 
 const UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
-/**
- * Admin activations use `v<epoch-ms>-<randomUUID>`. Time stays descriptive: the
- * UUID is what makes a directory that has never been active before, even for
- * two uploads in the same millisecond (ADR-0072).
- */
+
+
+
+
+
 export function newAdminLogoVersion(nowMs: number, uniqueId: string): string {
   return `v${nowMs}-${uniqueId}`;
 }
 
-// Legacy deterministic `imp-<hash12>` and `v<epoch-ms>` directories stay valid
-// while they are active; new activations carry a `-<uuid>` suffix.
+
+
 const STORED_LOGO_KEY = new RegExp(
   `^brands/([^/]+)/((imp-([0-9a-f]{12})|v\\d+)(?:-${UUID_PATTERN})?)/logo\\.(?:png|webp)$`,
 );
 
 export interface StoredBrandLogo {
-  /** The slug in the stored key, which may differ from the brand's current slug. */
+
   slug: string;
-  /** The whole version segment, for example `imp-0123456789ab-<uuid>` or `v1790000000000`. */
+
   version: string;
   owner: "imported" | "admin";
-  /** `brands/<stored-slug>/<version>/`, ready to use as a storage prefix. */
+
   directory: string;
-  /** For an imported key, the content/render identity `imp-<hash12>` without any activation id. */
+
   contentIdentity?: string;
 }
 
-/**
- * Reads ownership and directory from the key actually stored on a Brand,
- * independently of the brand's current slug. Returns null for a key outside the
- * known layouts.
- */
+
+
+
+
+
 export function parseStoredBrandLogoKey(key: string): StoredBrandLogo | null {
   const match = STORED_LOGO_KEY.exec(key);
   if (!match) return null;
   const slug = match[1] as string;
-  // Dot segments and backslashes can be normalized by storage HTTP paths.
-  // Keep unknown layouts on the single-object fallback instead of widening cleanup.
+
+
   if (slug === "." || slug === ".." || slug.includes("\\")) return null;
   const version = match[2] as string;
   const hash = match[4];
@@ -176,17 +176,17 @@ export type BrandLogoCleanupTarget =
   | { kind: "directory"; prefix: string }
   | { kind: "object"; key: string };
 
-/**
- * What to delete once a logo key is no longer active: the whole stored version
- * directory (an imported logo has `mono@Nx.png` siblings), or just the object
- * for a key outside the recognized layouts.
- */
+
+
+
+
+
 export function brandLogoCleanupTarget(key: string): BrandLogoCleanupTarget {
   const stored = parseStoredBrandLogoKey(key);
   return stored ? { kind: "directory", prefix: stored.directory } : { kind: "object", key };
 }
 
-/** Where an admin's upload waits until the API validates it. */
+
 export function pendingBrandLogoKey(slug: string, uploadId: string): string {
   return `pending/brands/${slug}/${uploadId}`;
 }

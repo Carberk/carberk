@@ -9,7 +9,7 @@ it.each(["en", "ru", "tk"])("shows the founder's reachable Trust contact in %s",
   expect(html).toContain('>bagtyyarkowusow.dev@gmail.com</a>');
 });
 
-// Temporary, while the demo Listings are public: their photographs must be credited.
+
 it.each(["en", "ru", "tk"])("links the demo photo credits in %s", async (locale) => {
   const html = renderToStaticMarkup(await TrustPage({ params: Promise.resolve({ locale }) }));
   expect(html).toContain(`href="/${locale}/demo-credits"`);

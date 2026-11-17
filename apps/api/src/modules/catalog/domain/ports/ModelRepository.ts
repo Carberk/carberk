@@ -10,7 +10,7 @@ export interface ModelRepository {
 
   getModelById(id: string): Promise<Model | null>;
 
-  /** Unpaginated full list for the in-memory catalog search snapshot. */
+
   listAllModels(): Promise<Model[]>;
 
   getBySlug(slug: string): Promise<Model | null>;

@@ -6,7 +6,7 @@ import { LegalPage } from "../LegalPage";
 import type { Locale } from "@/i18n/locales";
 import { locales } from "@/i18n/locales";
 
-// Canonical links read WEB_BASE_URL from the deployed environment.
+
 export const dynamic = "force-dynamic";
 
 export async function generateStaticParams() {

@@ -29,7 +29,7 @@ describe("presigned PUT length enforcement", () => {
 });
 
 
-// Hosted CI provisions disposable MinIO; local live proof stays explicitly opt-in.
+
 const liveEndpoint = process.env["AUTOTM_454_MINIO_ENDPOINT"]
   ?? (process.env["GITHUB_ACTIONS"] === "true" ? process.env["MINIO_ENDPOINT"] : undefined);
 

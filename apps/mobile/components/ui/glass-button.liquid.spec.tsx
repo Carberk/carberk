@@ -5,7 +5,7 @@ import { renderMobile } from "../../test/render";
 import { GlassButton } from "./glass-button";
 import { Text } from "./text";
 
-// iOS 26 and later: the button itself is an interactive Liquid Glass capsule.
+
 vi.mock("expo-glass-effect", async () => {
   const { View } = await import("react-native");
   return {
@@ -25,7 +25,7 @@ describe("GlassButton on the system glass", () => {
 
     const [call, message] = screen.getAllByTestId("glass");
     expect(call?.props.isInteractive).toBe(true);
-    // Light brand red, hsl(0 100% 45%).
+
     expect(call?.props.tintColor).toBe("#e60000");
     expect(call?.props.className).toMatch(/\brounded-full\b/);
     expect(call?.props.className).toMatch(/\bflex-1\b/);

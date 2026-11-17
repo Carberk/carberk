@@ -13,7 +13,7 @@ import { RemoveBrandLogo } from "./RemoveBrandLogo";
 
 class FakeBrands implements BrandLogoRepository {
   brands = new Map<string, Brand>();
-  /** Models a concurrent activation: the key the atomic swap actually finds. */
+
   actualPreviousKey: string | null | undefined;
   vanishOnSwap = false;
   failNextSwap = false;

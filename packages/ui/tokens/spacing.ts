@@ -1,9 +1,9 @@
-/**
- * Design tokens — spacing
- *
- * 4px base grid. Use these tokens for padding, margin, gap.
- * Avoid arbitrary pixel values in components.
- */
+
+
+
+
+
+
 
 export const spacing = {
   0:  0,

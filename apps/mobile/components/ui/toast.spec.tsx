@@ -40,13 +40,13 @@ describe("Toast", () => {
     announcements.length = 0;
     const view = await renderToasts();
     await act(() => { toast.show({ title: "Removed from Favorites", action: { label: "Undo", onPress: vi.fn() } }); });
-    // An accessible ancestor groups its children into one element on iOS, hiding Undo.
+
     let ancestor = view.getByRole("button", { name: "Undo" }).parent;
     while (ancestor) {
       expect(ancestor.props.accessible).not.toBe(true);
       ancestor = ancestor.parent;
     }
-    // The announcement names the action, so a screen-reader user knows Undo is there.
+
     expect(announcements).toEqual(["Removed from Favorites. Undo"]);
   });
 
@@ -64,7 +64,7 @@ describe("Toast", () => {
     const view = await renderToasts();
     await act(() => { toast.show({ title: "Скопировано" }); });
     const viewport = view.getByTestId("toast-viewport-top");
-    // Reserve 64 pt for the standard header, plus an 8 pt gap below it.
+
     expect(StyleSheet.flatten(viewport.props.style)?.top).toBe(top + 64 + 8);
     expect(viewport.props.className).not.toMatch(/\b(?:top-0|pt-12)\b/);
     expect(view.getByText("Скопировано")).toBeTruthy();
@@ -93,7 +93,7 @@ describe("Toast", () => {
     const view = await renderToasts();
     await act(() => { toast.show({ title: "Отмечено как проданное", description: "Saved", variant }); });
     const title = view.getByText("Отмечено как проданное");
-    // The native host passes utilities through; actual theme/layout needs native proof.
+
     let card = title.parent;
     while (card && !card.props.className?.split(" ").includes("border")) {
       card = card.parent;

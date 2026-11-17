@@ -1,6 +1,6 @@
-/**
- * Design tokens — border-radius
- */
+
+
+
 
 export const radius = {
   none:  0,

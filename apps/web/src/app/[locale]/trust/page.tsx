@@ -22,7 +22,7 @@ const trustFooterEmailPrefix: Record<Locale, string> = {
   en: "Questions? Reach us at ",
 };
 
-// Temporary: comes down with the demo Listings (runbook, "Demo inventory seed and removal").
+
 const trustDemoCreditsLabel: Record<Locale, string> = {
   tk: "Synag bildirişleriniň suratlarynyň awtorlary",
   ru: "Авторы фотографий демонстрационных объявлений",

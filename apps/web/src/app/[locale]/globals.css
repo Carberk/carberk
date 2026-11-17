@@ -133,7 +133,7 @@ html, body {
   }
 }
 
-/* Print-friendly styles for legal pages */
+
 @media print {
   @page {
     margin: 2cm;

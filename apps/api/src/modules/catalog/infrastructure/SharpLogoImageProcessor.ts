@@ -23,7 +23,7 @@ export class SharpLogoImageProcessor implements LogoImageProcessor {
 
   async rasterizeSvg(bytes: Uint8Array, size: number): Promise<Uint8Array> {
     const { width = size, height = size } = await sharp(bytes).metadata();
-    // Render the vector at the target size instead of upscaling a small bitmap.
+
     const density = Math.min(
       MAX_SVG_DENSITY,
       Math.ceil((DEFAULT_SVG_DENSITY * size) / Math.max(width, height)),

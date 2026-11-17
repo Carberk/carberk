@@ -49,7 +49,7 @@ describe("demo photo credits page", () => {
     ["en", "Photo credits", "resized and cropped", "under the same licence"],
   ])("credits every photo with its author, licence and source in %s", async (locale, title, changes, sameLicence) => {
     const html = await render(locale);
-    // CC BY asks for the changes to be stated; CC BY-SA for the adaptation to keep the licence.
+
     expect(html).toContain(changes);
     expect(html).toContain(sameLicence);
     expect(html).toContain(`<h1`);

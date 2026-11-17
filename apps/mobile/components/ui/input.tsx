@@ -2,13 +2,13 @@ import { Platform, TextInput } from 'react-native';
 
 import { cn } from '@/lib/utils';
 
-/**
- * A filled field on the tonal surface: it reads as a control on the page and
- * on a card without a box drawn around it. Focus draws an edge in the foreground
- * colour; an error state is the caller's `border-destructive`.
- * The height is a minimum: the field grows with the system font size.
- * See docs/prd/ui/components/78-02-input.md.
- */
+
+
+
+
+
+
+
 function Input({ className, ...props }: React.ComponentProps<typeof TextInput> & React.RefAttributes<TextInput>) {
   return (
     <TextInput

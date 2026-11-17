@@ -18,7 +18,7 @@ export function buildApp() {
   void app.register(rateLimit, { max: 120, timeWindow: "1 minute" });
 
   const sender = env.OTP_DRIVER === "fleet"
-    ? new OtpSenderMock() // placeholder until real fleet adapter lands
+    ? new OtpSenderMock()
     : new OtpSenderMock();
 
   void app.register(healthRoutes);

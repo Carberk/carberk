@@ -5,14 +5,14 @@ import credits from "./credits.json";
 import type { Locale } from "@/i18n/locales";
 import { defaultLocale, locales } from "@/i18n/locales";
 
-/**
- * Credits for the photographs on the temporary demo Listings (#703).
- *
- * The photos are Wikimedia Commons files under CC BY and CC BY-SA, which require naming the author
- * and the licence. `credits.json` is generated from the demo inventory photo manifest by
- * `pnpm --filter @auto-tm/db demo-inventory:credits`. The Trust page links here, and both the page
- * and that link come down with the demo content.
- */
+
+
+
+
+
+
+
+
 const copy: Record<Locale, { title: string; intro: string; by: string; licence: string }> = {
   ru: {
     title: "Авторы фотографий",

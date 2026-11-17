@@ -8,13 +8,13 @@ import { locales } from "@/i18n/locales";
 
 type LocalePhrases = Record<Locale, string>;
 
-/**
- * A promise the document makes in every language, with the phrase that carries it.
- *
- * The phrases are deliberately exact: these documents are what users agree to, so
- * rewording a material promise should fail here and force a re-read in all three
- * languages rather than pass silently in one.
- */
+
+
+
+
+
+
+
 interface CopyPromise {
   name: string;
   phrases: LocalePhrases;
@@ -220,10 +220,10 @@ function fullText(document: LegalDocument) {
   return document.sections.map((section) => `${section.title}\n${section.body}`).join("\n\n");
 }
 
-/**
- * The displayed date is hand-written per locale, so it can only be checked against
- * the machine-readable one by the parts every locale spells with digits.
- */
+
+
+
+
 function expectDisplayToMatchISO(display: string, iso: string) {
   const [year, , day] = iso.split("-");
   expect(display).toContain(year);
@@ -301,10 +301,10 @@ describe("terms of service promises", () => {
   });
 });
 
-/**
- * Every Posting rule maps to something the product or its moderators enforce today.
- * docs/prd/ops/83-legal.md ("Posting rules") records the mapping; these phrases pin the rules that carry it.
- */
+
+
+
+
 const postingRulesPromises: CopyPromise[] = [
   {
     name: "a Listing must be a real vehicle the seller owns or may sell",
@@ -405,7 +405,7 @@ describe("posting rules promises", () => {
 });
 
 describe("posting rules report reasons", () => {
-  // The Listing report sheet's labels (apps/mobile ReportSheet, `common` i18n namespace).
+
   const reasons: Record<Locale, string[]> = {
     en: ["**Spam**", "**Scam or fraud**", "**Misleading information**", "**Wrong category**"],
     ru: ["**Спам**", "**Мошенничество**", "**Вводящая в заблуждение информация**", "**Неверная категория**"],

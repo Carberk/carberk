@@ -545,8 +545,8 @@ describe("CatalogController e2e", () => {
           nameEn: "Haval",
         },
       });
-      // The use-case invalidation path is covered by application specs; direct
-      // seeding bypasses it, so invalidate through the module's index here.
+
+
       app.get(CatalogSearchIndex).invalidate();
 
       const res = await request

@@ -1,9 +1,9 @@
-/**
- * Design tokens — typography
- *
- * Inter is the primary sans-serif (already a dependency from the previous Flutter app).
- * Menlo for monospace (prices, VINs — anywhere numbers need to align).
- */
+
+
+
+
+
+
 
 export const fonts = {
   sans: "Inter",

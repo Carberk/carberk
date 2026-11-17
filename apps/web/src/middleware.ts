@@ -34,6 +34,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // /healthz must bypass locale routing so deploy healthchecks get a direct 200.
+
   matcher: ["/((?!_next|api|healthz|favicon.ico|.*\\..*).*)"],
 };

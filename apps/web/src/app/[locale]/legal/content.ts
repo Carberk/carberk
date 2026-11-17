@@ -480,12 +480,12 @@ Carberk düzgünleri bozýan akkaunty bloklap biler.`,
   },
 };
 
-/**
- * Every rule here maps to something the product or its moderators enforce today:
- * the Listing publish checks, the media upload limits, the Listing report reasons,
- * and the admin moderation actions (block a Listing, suspend an account).
- * Do not add a rule that nothing enforces.
- */
+
+
+
+
+
+
 export const postingRules: Record<Locale, LegalDocument> = {
   en: {
     title: "Posting rules",

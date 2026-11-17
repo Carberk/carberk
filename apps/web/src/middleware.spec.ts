@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { config } from "./middleware";
 
 function matcherMatches(pathname: string): boolean {
-  // Next.js matchers are anchored path patterns; anchor the raw regex the
-  // same way so substring matches (e.g. "/og" inside "/api/og") don't count.
+
+
   return config.matcher.some((pattern) =>
     new RegExp(`^${pattern}$`).test(pathname),
   );

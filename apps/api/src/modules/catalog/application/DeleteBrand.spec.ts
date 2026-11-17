@@ -19,7 +19,7 @@ class FakeSearchIndex {
 class FakeBrandRepository implements BrandRepository {
   brands: Brand[] = [];
   shouldThrowFkOnDelete = false;
-  /** Models a concurrent logo swap: the key of the row the delete really removed. */
+
   deletedLogoKey: string | null | undefined;
   vanishOnDelete = false;
 

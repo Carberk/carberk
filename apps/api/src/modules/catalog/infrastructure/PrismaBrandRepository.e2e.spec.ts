@@ -14,7 +14,7 @@ describe("PrismaBrandRepository — Testcontainers", () => {
   let container: StartedPostgreSqlContainer;
   let prisma: PrismaService;
   let repo: PrismaBrandRepository;
-  // A second PrismaService owns its own pool, so it is a second PostgreSQL client.
+
   let otherPrisma: PrismaService;
   let otherRepo: PrismaBrandRepository;
 
@@ -184,7 +184,7 @@ describe("PrismaBrandRepository — Testcontainers", () => {
       logoKey,
     });
 
-    /** Resolves once some query is waiting on a row lock held by another client. */
+
     async function untilLockWaiter(): Promise<void> {
       for (let attempt = 0; attempt < 200; attempt += 1) {
         const rows = await prisma.$queryRaw<{ n: bigint }[]>`
@@ -196,7 +196,7 @@ describe("PrismaBrandRepository — Testcontainers", () => {
       throw new Error("no query ever waited for the row lock");
     }
 
-    // A failed test must not leave a lock held, or the next cleanup would wait for it.
+
     const holders: Array<{ release: () => void; done: Promise<unknown> }> = [];
     afterEach(async () => {
       for (const holder of holders.splice(0)) {
@@ -205,7 +205,7 @@ describe("PrismaBrandRepository — Testcontainers", () => {
       }
     });
 
-    /** Holds the brand row lock on the other client until `release` is called. */
+
     function holdRowLock(
       mutate: (tx: Parameters<Parameters<PrismaService["$transaction"]>[0]>[0]) => Promise<void>,
     ) {
@@ -257,7 +257,7 @@ describe("PrismaBrandRepository — Testcontainers", () => {
       other.release();
       await other.done;
 
-      // The stale read said v1; the lock made the swap see what the other client committed.
+
       expect(await waiting).toEqual({
         replaced: true,
         previousKey: "brands/toyota/imp-0123456789ab-uuid/logo.png",
@@ -279,7 +279,7 @@ describe("PrismaBrandRepository — Testcontainers", () => {
       expect(previous.filter((key) => key === "brands/toyota/v0/logo.png")).toHaveLength(1);
       const finalKey = (await prisma.brand.findUniqueOrThrow({ where: { id: "b1" } })).logoKey;
       const keyOf = (r: typeof first, name: string) => (r.replaced ? name : "");
-      // The swap that ran second must have returned the key the first one wrote.
+
       const names = [keyOf(first, "brands/toyota/vA-a/logo.png"), keyOf(second, "brands/toyota/vB-b/logo.png")];
       const winnerIndex = previous.indexOf("brands/toyota/v0/logo.png");
       expect(previous[1 - winnerIndex]).toBe(names[winnerIndex]);

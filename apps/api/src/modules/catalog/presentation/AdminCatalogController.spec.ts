@@ -20,7 +20,7 @@ function controllerWithSpy() {
   return { controller, useCase };
 }
 
-// A valid brand id, so only the body can make the create-model row a 400.
+
 const BRAND_ID = "00000000-0000-4000-8000-000000000000";
 
 const req = { user: { sub: "admin-1" } } as unknown as FastifyRequest & { user?: { sub: string } };

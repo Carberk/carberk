@@ -19,7 +19,7 @@ export interface PresignBrandLogoUploadResult {
   headers: Record<string, string>;
 }
 
-/** Step 1 of a logo upload: a presigned PUT into the brand's pending area. */
+
 @Injectable()
 export class PresignBrandLogoUpload {
   constructor(

@@ -26,8 +26,8 @@ function sentHeaders(): Record<string, string> {
   return init.headers as Record<string, string>;
 }
 
-// Server Function arguments come straight from the browser, so the tests pass
-// values the TypeScript signature would not allow.
+
+
 const untrusted = <T,>(value: unknown) => value as T;
 
 describe("account deletion Server Functions", () => {

@@ -33,7 +33,7 @@ function SheetOverlay({
 }: Omit<React.ComponentProps<typeof DialogPrimitive.Overlay>, 'asChild'> & {
   children?: React.ReactNode;
   closeOnBackdropPress?: boolean;
-  /** Opt-in for sheets with fields; the full portal viewport owns keyboard avoidance. */
+
   avoidKeyboard?: boolean;
   progress: SharedValue<number>;
 }) {
@@ -55,9 +55,9 @@ function SheetOverlay({
             <Animated.View pointerEvents="none" className="absolute inset-0 bg-scrim/50" style={scrimStyle} />
           ) : null}
           <KeyboardAvoidingView enabled={avoidKeyboard} behavior="padding" className="w-full flex-1 justify-end">
-            {/* The overlay is `asChild`, so its press lands on an Animated.View that ignores it.
-                Opt-in: this backdrop sits behind the content and closes the sheet on a tap outside.
-                Sheets that hold typed input leave it off, so a stray tap cannot discard a draft. */}
+            {
+
+}
             {Platform.OS === 'web' || !closeOnBackdropPress ? null : (
               <DialogPrimitive.Close asChild>
                 <Pressable
@@ -88,7 +88,7 @@ function SheetContent({
   portalHost?: string;
   compact?: boolean;
   closeOnBackdropPress?: boolean;
-  /** Opt-in for sheets with fields; the full portal viewport owns keyboard avoidance. */
+
   avoidKeyboard?: boolean;
 }) {
   const { open } = DialogPrimitive.useRootContext();
@@ -96,8 +96,8 @@ function SheetContent({
   const { height } = useWindowDimensions();
   const [present, setPresent] = React.useState(open);
   const progress = useSharedValue(0);
-  // Parents may clear a picker step or selected photo as soon as they close.
-  // Preserve its committed contents and measured layout until the exit finishes.
+
+
   const exitingContent = React.useRef({ children, style: props.style });
   React.useLayoutEffect(() => {
     if (open) exitingContent.current = { children, style: props.style };
@@ -110,7 +110,7 @@ function SheetContent({
     if (Platform.OS === 'web') return;
     const duration = reducedMotion ? SHEET_FADE_MS : open ? SHEET_ENTER_MS : SHEET_EXIT_MS;
     if (open) setPresent(true);
-    // Updating this same value reverses an interrupted transition from its current position.
+
     progress.value = withTiming(open ? 1 : 0, {
       duration,
       easing: open ? easing.enter : easing.exit,
@@ -181,8 +181,8 @@ function SheetTitle({
 }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      // The primitive draws its own Text, so the face is picked here: without
-      // it the weight class selects no bundled face and the title draws medium.
+
+
       className={withFontFace(cn('font-heading text-headline font-semibold text-foreground', className))}
       {...props}
     />

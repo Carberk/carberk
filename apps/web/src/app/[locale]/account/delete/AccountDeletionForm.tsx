@@ -38,14 +38,14 @@ function failureMessage(
   }
 }
 
-/** `+99361234567` → `+993 61 23-45-67`; emails are shown as entered. */
+
 function displayDestination(channel: DeletionChannel, destination: string): string {
   if (channel === "email") return destination;
   const local = destination.slice(4);
   return `+993 ${local.slice(0, 2)} ${local.slice(2, 4)}-${local.slice(4, 6)}-${local.slice(6, 8)}`;
 }
 
-/** Seconds left before a new code may be requested. */
+
 function useResendCountdown() {
   const [deadline, setDeadline] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -81,8 +81,8 @@ export function AccountDeletionForm({ locale }: { locale: Locale }) {
   const [isPending, startTransition] = useTransition();
   const resend = useResendCountdown();
 
-  // Move focus into the new step (its heading, or the value field when going
-  // back) so keyboard and screen-reader users are not left on the page body.
+
+
   const headingRef = useRef<HTMLHeadingElement>(null);
   const valueInputRef = useRef<HTMLInputElement>(null);
   const firstRender = useRef(true);
@@ -94,8 +94,8 @@ export function AccountDeletionForm({ locale }: { locale: Locale }) {
     (step.kind === "value" ? valueInputRef.current : headingRef.current)?.focus();
   }, [step.kind]);
 
-  // Submit buttons stay enabled while pending so keyboard focus is kept;
-  // this guard stops a second submission instead.
+
+
   function run(action: () => Promise<void>) {
     if (isPending) return;
     setError(null);

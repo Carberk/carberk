@@ -1,9 +1,9 @@
 import type { Locale } from "@/i18n/locales";
 
-/**
- * Copy for the public account deletion page. Every message after a request is
- * worded so it is true whether or not a User holds the value (ADR-0054).
- */
+
+
+
+
 export interface AccountDeletionCopy {
   metaDescription: string;
   title: string;
