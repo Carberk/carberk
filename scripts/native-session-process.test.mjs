@@ -14,7 +14,13 @@ const SERVED = `https://${API}/api/v1;wss://${API}/ws/chat;${MEDIA}`;
 
 async function fixture(t, mode) {
   const dir = fs.mkdtempSync("/tmp/native-session-test-");
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  t.after(() => {
+    const started = path.join(dir, "started");
+    if (fs.existsSync(started)) {
+      try { process.kill(-Number(fs.readFileSync(started, "utf8")), "SIGKILL"); } catch {}
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
   const railway = path.join(dir, "railway");
   fs.writeFileSync(railway, `#!/usr/bin/env node\nconsole.log(JSON.stringify({ RAILWAY_PUBLIC_DOMAIN: "${API}", MINIO_PUBLIC_URL: "${MEDIA}", DATABASE_URL: "PRIVATE-SECRET" }));\n`, { mode: 0o755 });
   fs.writeFileSync(path.join(dir, "pnpm"), `#!/usr/bin/env node
@@ -22,21 +28,24 @@ if (process.argv.includes("start")) {
   const fs = require("node:fs");
   fs.writeFileSync(${JSON.stringify(path.join(dir, "started"))}, String(process.pid));
   ${mode === "signal" ? 'process.kill(process.pid, "SIGKILL");' : ""}
-  process.on("SIGINT", () => { fs.writeFileSync(${JSON.stringify(path.join(dir, "stopped"))}, "yes"); process.exit(0); });
-  setInterval(() => {}, 1000);
+  setTimeout(() => {
+    process.on("SIGINT", () => { fs.writeFileSync(${JSON.stringify(path.join(dir, "stopped"))}, "yes"); process.exit(0); });
+    fs.writeFileSync(${JSON.stringify(path.join(dir, "ready"))}, "yes");
+    setInterval(() => {}, 1000);
+  }, ${["missing-origins", "bundle-http"].includes(mode) ? 1000 : 0});
 }
 `, { mode: 0o755 });
   const preload = path.join(dir, "fetch.mjs");
   const bundle = mode === "ok" ? SERVED : "http://localhost:3006/api/v1";
-  fs.writeFileSync(preload, `globalThis.fetch = async (url) => {
+  fs.writeFileSync(preload, `import fs from "node:fs";
+  globalThis.fetch = async (url) => {
     const target = String(url);
     if (target.endsWith("/readyz")) return new Response("", { status: ${mode === "unready" ? 503 : 200} });
     if (target.endsWith("/status")) {
-      if (${mode === "signal"}) throw new Error("not listening");
+      if (${mode === "signal"} || !fs.existsSync(${JSON.stringify(path.join(dir, "ready"))})) throw new Error("not listening");
       return new Response("packager-status:running");
     }
     if (target.includes(".bundle")) {
-      await new Promise(resolve => setTimeout(resolve, 150));
       return new Response(${JSON.stringify(bundle)}, { status: ${mode === "bundle-http" ? 500 : 200} });
     }
     return new Response("", { status: 403 });
@@ -110,13 +119,31 @@ test("refuses an unready API before starting Metro", async t => {
   assert.doesNotMatch(output, /PRIVATE-SECRET/);
 });
 
+async function waitForShutdown(pid) {
+  const deadline = Date.now() + 10000;
+  while (true) {
+    try { process.kill(pid, 0); } catch (error) {
+      if (error.code === "ESRCH") return;
+      throw error;
+    }
+    assert.ok(Date.now() < deadline, `Fake Metro ${pid} did not exit`);
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
 for (const mode of ["missing-origins", "bundle-http"]) {
   test(`stops its own Metro when the served bundle fails: ${mode}`, async t => {
     const { dir, env } = await fixture(t, mode);
+    const listener = await listen();
+    t.after(() => listener.close());
     const { code, output } = await run(env, metroArgs(await freePort()));
     assert.equal(code, 1);
     assert.match(output, mode === "bundle-http" ? /bundle answered 500/ : /served bundle lacks/);
+    const metroPid = Number(fs.readFileSync(path.join(dir, "started"), "utf8"));
+    await waitForShutdown(metroPid);
+    assert.equal(fs.readFileSync(path.join(dir, "ready"), "utf8"), "yes");
     assert.equal(fs.readFileSync(path.join(dir, "stopped"), "utf8"), "yes");
+    assert.equal(listener.listening, true);
     assert.doesNotMatch(output, /PRIVATE-SECRET/);
   });
 }
