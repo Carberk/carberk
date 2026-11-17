@@ -22,6 +22,8 @@ Its URL flag retains queue selection and locale without accepting a Listing targ
 or return destination. Session-scoped reading bookmarks preserve position through
 refresh and language changes; native Listing return remains separate.
 
+`ReminderControl` uses the reader’s serialized lane and a device-retained, actor/request/assignment-scoped intent for one explicit reminder. Eligibility and stopped/declined/used outcomes come from the reminder HTTP boundary; uncertain sends retain their original key and waiting version.
+
 The same action module has a strict message/receipt bridge. It reuses the selected-detail authority fence before and after HTTP work; the [local envelope](src/lib/history-message-input.ts) permits only exact text sends, receipt reads and explicit Received/Read acknowledgements. The public Reply composer connects sends through this same current-authority bridge, retaining uncertain intent IDs across navigation and reauthentication.
 
 Browser JavaScript never receives API tokens. Server-side code stores them in HTTP-only cookies and forwards bearer authentication to the API. Preserve production `__Host-` cookie restrictions, origin validation on browser-posted handlers, and local-only `returnTo` validation. The Node `src/proxy.ts` renews expired requests before rendering or Server Actions, forwarding the rotated cookies to the handler and storing both on the response. Layout/API checks still enforce actual authentication and TOTP elevation. Server Components never rotate tokens or write cookies.

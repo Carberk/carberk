@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
-import { historyInboxAction, historyMessageAction, type HistoryInboxResult, type HistoryMessageResult } from "./actions";
+import { historyInboxAction, historyMessageAction, historyReminderAction, type HistoryReminderResult, type HistoryInboxResult, type HistoryMessageResult } from "./actions";
 
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
@@ -10,8 +10,9 @@ type Detail = Extract<HistoryInboxResult, { kind: "detail" | "claim" }>["data"];
 type Read = { message: V.HistoryMessage; eligible: () => boolean };
 export type ReplyIntent = { clientMessageId: string; text: string };
 type Send = { body: ReplyIntent; complete: (result: HistoryMessageResult) => void };
-type Work = "refresh" | "page" | "claim" | Read | Send;
-type Reader = { detail: Detail | null; messages: V.HistoryMessage[]; cursor: string | null;
+type Reminder = { reminder: { clientMessageId: string; expectedWaitingVersion: number }; complete: (result: HistoryReminderResult) => void };
+type Work = "refresh" | "page" | "claim" | Read | Send | Reminder;
+type Reader = { reminder: V.HistoryReminder | null; reminderError: boolean; detail: Detail | null; messages: V.HistoryMessage[]; cursor: string | null;
   receipts: ReturnType<typeof V.HistoryReceiptsSchema.parse>["items"]; receiptState: "" | "loading" | "error" | "updated";
   state: string; notice: string; busy: boolean; focusId: string | null };
 
@@ -22,7 +23,7 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
   entry: "loading" | "unclaimed" | "missing" | "conflict"; revision: number;
   invalidate: (result: HistoryInboxResult) => void; claimed: (version: number) => void;
 }) {
-  const [reader, setReader] = useState<Reader>({ detail: null, messages: [], cursor: null,
+  const [reader, setReader] = useState<Reader>({ reminder: null, reminderError: false, detail: null, messages: [], cursor: null,
     receipts: [], receiptState: "", state: entry, notice: "", busy: false, focusId: null });
   const driver = useRef<(work: Work) => boolean>(() => false);
   const callbacks = useRef({ invalidate, claimed });
@@ -30,19 +31,19 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
   useEffect(() => {
     let active = true, busy = false, refused = false, pendingRefresh = false;
     let received = 0n, read = 0n, pendingRead: Read | null = null;
-    let current: Reader = { detail: null, messages: [], cursor: null, receipts: [], receiptState: "", state: entry, notice: "", busy: false, focusId: null };
+    let current: Reader = { reminder: null, reminderError: false, detail: null, messages: [], cursor: null, receipts: [], receiptState: "", state: entry, notice: "", busy: false, focusId: null };
     const valid = () => active && !refused;
     function publish(patch: Partial<Reader>) {
       if (!valid()) return;
       current = { ...current, ...patch };
       setReader(current);
     }
-    function accept(result: HistoryInboxResult | HistoryMessageResult) {
+    function accept(result: HistoryInboxResult | HistoryMessageResult | HistoryReminderResult) {
       if (!valid()) return false;
       const failure = result.status !== "ok" ? result.status
         : result.scope !== scope || result.actor.id !== actorId ? "stale" : null;
       if (failure && failure !== "unavailable") {
-        publish({ detail: null, messages: [], receipts: [], receiptState: "", cursor: null, state: failure, notice: "", busy: false });
+        publish({ reminder: null, reminderError: false, detail: null, messages: [], receipts: [], receiptState: "", cursor: null, state: failure, notice: "", busy: false });
         refused = true;
         pendingRefresh = false;
         if (["stale", "expired", "denied"].includes(failure)) callbacks.current.invalidate({ status: failure as "stale" | "expired" | "denied" });
@@ -72,6 +73,14 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
       let receiptWork = typeof work === "object" && "message" in work;
       publish({ busy: true, ...(typeof work === "object" ? {} : { notice: recovering ? "reconnecting" : recovered ? "recovered" : "refreshing", focusId: null }) });
       try {
+        if (typeof work === "object" && "reminder" in work) {
+          const result = await historyReminderAction(locale, { id, scope, expectedAssignmentVersion: version,
+            body: { ...work.reminder, expectedAssignmentVersion: version } });
+          if (!accept(result)) return;
+          if (result.status === "ok") { publish({ reminder: result.data, reminderError: false }); pendingRefresh = true; }
+          work.complete(result);
+          return;
+        }
         if (typeof work === "object" && "body" in work) {
           const result = await historyMessageAction(locale, { id, scope, expectedAssignmentVersion: version, kind: "send", body: work.body });
           if (!accept(result)) return;
@@ -107,6 +116,10 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
         if (page.data.nextCursor && page.data.nextCursor !== page.data.items.at(-1)?.id) throw new Error("Invalid page frontier");
         publish({ detail: result.data, messages: [...current.messages, ...page.data.items], cursor: page.data.nextCursor,
           state: "ready", notice: recovering || recovered ? "recovered" : "", focusId: work === "page" ? page.data.items[0]?.id ?? null : null });
+        const reminder = await historyReminderAction(locale, { id, scope, expectedAssignmentVersion: version });
+        if (reminder.status === "unavailable") publish({ reminderError: true });
+        else if (!accept(reminder)) return;
+        else if (reminder.status === "ok") publish({ reminder: reminder.data, reminderError: false });
         receiptWork = true;
         publish({ receiptState: "loading" });
         const receipts = await historyMessageAction(locale, { ...selection, kind: "receipts" });
@@ -117,7 +130,7 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
         if (tail && BigInt(tail.order) > received && await acknowledge(tail, "received")) received = BigInt(tail.order);
         publish({ receiptState: "updated" });
       } catch {
-        if (typeof work === "object" && "body" in work) {
+        if (typeof work === "object" && ("body" in work || "reminder" in work)) {
           if (valid()) work.complete({ status: "unavailable" });
           if (!navigator.onLine) publish({ notice: "offline" });
           return;
@@ -132,7 +145,7 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
       }
     }
     driver.current = (work) => {
-      if (!valid() || typeof work === "object" && "body" in work && (busy || !navigator.onLine || current.state !== "ready")) return false;
+      if (!valid() || typeof work === "object" && ("body" in work || "reminder" in work) && (busy || !navigator.onLine || current.state !== "ready")) return false;
       void run(work);
       return true;
     };
@@ -167,5 +180,6 @@ export function useOperatorConversation({ locale, id, version, scope, actorId, e
   }, [revision, entry]);
   const acknowledgeRead = useCallback((message: V.HistoryMessage, eligible: () => boolean) => driver.current({ message, eligible }), []);
   const send = useCallback((body: ReplyIntent, complete: Send["complete"]) => driver.current({ body, complete }), []);
-  return { ...reader, acknowledgeRead, send, run: (work: Work) => driver.current(work) };
+  const remind = useCallback((reminder: Reminder["reminder"], complete: Reminder["complete"]) => driver.current({ reminder, complete }), []);
+  return { ...reader, acknowledgeRead, send, remind, run: (work: Work) => driver.current(work) };
 }

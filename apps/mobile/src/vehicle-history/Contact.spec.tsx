@@ -57,6 +57,8 @@ beforeEach(async () => {
     return HttpResponse.json(enquiry(body.sourceListingId));
   }));
   server.use(
+    http.get("*/vehicle-history/requests/:id/reminder", () => HttpResponse.json({ reason: null, since: null, version: 0,
+      eligibleAt: null, eligible: false, ineligibleReason: "not_waiting", declined: false, stopped: false, used: false, outcome: null })),
     http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get("*/vehicle-history/requests/:id/receipts", () => HttpResponse.json({ items: [] })),
   );

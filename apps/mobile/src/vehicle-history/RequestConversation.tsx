@@ -9,6 +9,7 @@ import { localeTag } from "../i18n/resources";
 import { mapErrorToCopy } from "../api/getErrorCopy";
 
 import type { HistoryViewer } from "./session";
+import { StopReminders } from "./StopReminders";
 import { useHistoryReply } from "./useHistoryReply";
 import { useRequestConversation } from "./useRequestConversation";
 
@@ -75,6 +76,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     refreshControl={<RefreshControl refreshing={metadataRefreshing || pages.isRefetching} onRefresh={retry} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
       {header}
+      {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
+        revision={pages.dataUpdatedAt} />}
       {!thread.connected && <Text accessibilityRole="alert">{t("vehicleHistory.offline")}</Text>}
       {notice}
     </View>}
