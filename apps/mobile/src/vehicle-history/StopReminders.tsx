@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, View } from "react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { focusManager, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
@@ -28,6 +28,9 @@ export function StopReminders({ viewer, request, ready, active, connected, revis
   const visibility = useRef({ active, generation: 0 });
   if (visibility.current.active && !active) visibility.current.generation++;
   visibility.current.active = active;
+  useEffect(() => focusManager.subscribe(() => {
+    if (!focusManager.isFocused()) visibility.current.generation++;
+  }), []);
   const restore = useCallback(async () => {
     try {
       const raw = await AsyncStorage.getItem(storageKey);
@@ -82,7 +85,10 @@ export function StopReminders({ viewer, request, ready, active, connected, revis
         }
         else setPhase("uncertain");
       } else setPhase(error instanceof ApiError && [401, 403, 404].includes(error.status) ? "denied" : "uncertain");
-    } finally { busy.current = false; }
+    } finally {
+      busy.current = false;
+      if (alive.current && historySessionCurrent(viewer)) setPhase((current) => current === "pending" ? "uncertain" : current);
+    }
   }
   const refused = phase === "denied" || state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const stopped = state.data?.stopped;

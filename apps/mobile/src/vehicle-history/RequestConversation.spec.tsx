@@ -887,3 +887,46 @@ it.each([
   await view.findByText(success);
   expect(view.queryByRole("button", { name: label })).toBeNull();
 });
+
+it("requires an explicit Stop retry after a background-and-return before token refresh completes", async () => {
+  const refresh = deferred<Response>(), refreshing = deferred<undefined>();
+  const writes: unknown[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/reminder/stop", async ({ request }) => {
+    writes.push(await request.json());
+    return writes.length === 1 ? HttpResponse.json({ code: "UNAUTHENTICATED" }, { status: 401 })
+      : HttpResponse.json({ ...reminder(), stopped: true, eligible: false, ineligibleReason: "stopped" });
+  }), http.post("*/auth/refresh", () => { refreshing.resolve(undefined); return refresh.promise; }));
+  const view = await renderMobile(<RequestScreen />);
+  const stop = await view.findByRole("button", { name: "Stop reminders" });
+  await vi.waitFor(() => expect(stop.props.accessibilityState.disabled).toBe(false));
+  await act(async () => { void fireEvent.press(stop); });
+  await refreshing.promise;
+  await act(() => { focusManager.setFocused(false); focusManager.setFocused(true); });
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await act(() => refresh.resolve(HttpResponse.json({ accessToken: session().accessToken, refreshToken: "rotated" })));
+  await vi.waitFor(() => expect(view.queryByText("Stopping reminders…")).toBeNull());
+  expect(writes).toEqual([{ expectedWaitingVersion: 3 }]);
+});
+
+it("recovers a conflict readback interrupted by leaving and returning to the conversation", async () => {
+  const readback = deferred<Response>(), reading = deferred<undefined>();
+  let conflict = false, completed = false;
+  server.use(http.get("*/vehicle-history/requests/:id/reminder", () => {
+    if (conflict && !completed) { reading.resolve(undefined); return readback.promise; }
+    return HttpResponse.json(reminder());
+  }), http.post("*/vehicle-history/requests/:id/reminder/stop", () => {
+    conflict = true; return HttpResponse.json({ code: "HISTORY_REMINDER_CONFLICT" }, { status: 409 });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  const stop = await view.findByRole("button", { name: "Stop reminders" });
+  await vi.waitFor(() => expect(stop.props.accessibilityState.disabled).toBe(false));
+  await act(async () => { void fireEvent.press(stop); });
+  await reading.promise;
+  screenFocus.focused = false; await view.rerender(<RequestScreen />);
+  completed = true;
+  await act(() => readback.resolve(HttpResponse.json(reminder())));
+  screenFocus.focused = true; await view.rerender(<RequestScreen />);
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await vi.waitFor(() => expect(view.queryByText("Stopping reminders…")).toBeNull());
+  expect(view.getByRole("button", { name: "Retry stopping reminders" }).props.accessibilityState.disabled).toBe(false);
+});
