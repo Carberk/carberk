@@ -15,6 +15,7 @@ const GENERATION_ID = "33333333-3333-4333-8333-333333333333";
 const masterUrl = (grant: string) => `http://localhost:3006/files/master.m3u8?grant=${grant}`;
 const variantUrl = (height: number, grant: string) => `http://localhost:3006/files/${height}.m3u8?grant=${grant}`;
 const MASTER = masterUrl("tok1");
+const PLAYBACK_URL = `http://localhost:3006/api/v1/listings/video-access/viewer/listing/${LISTING_ID}/playback`;
 const V360 = variantUrl(360, "tok1");
 const V720 = variantUrl(720, "tok1");
 
@@ -76,6 +77,29 @@ function servePlayback(
       });
     }),
   );
+}
+
+function responseGate() {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  return { pending, release };
+}
+
+async function releaseResponse(gate: ReturnType<typeof responseGate>, url: string) {
+  const delivered = responseGate();
+  const listener = ({ request }: { request: Request }) => {
+    if (request.url === url) delivered.release();
+  };
+  server.events.on("response:mocked", listener);
+  try {
+    await act(async () => {
+      gate.release();
+      await delivered.pending;
+    });
+    await act(async () => {});
+  } finally {
+    server.events.removeListener("response:mocked", listener);
+  }
 }
 
 async function renderPlayer(onClose = vi.fn()) {
@@ -475,6 +499,143 @@ describe("ListingVideoPlayer", () => {
       expect(screen.getByTestId("listing-video-player-play-pause").props.accessibilityLabel).toBe("Play");
     } finally {
       appState.restore();
+    }
+  });
+
+  it.each(["background", "foreground"] as const)("keeps a pending renewal paused when it arrives in the %s", async (arrival) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    servePlayback(shortGrant);
+    const gate = responseGate();
+    const appState = captureAppState();
+    try {
+      const { screen } = await renderPlayer();
+      const player = await startPlaying(screen);
+      await pickQuality(screen, "720p");
+      const chosen = playerOf(screen);
+      await act(async () => { chosen.emitStatus("readyToPlay"); chosen.emitTimeUpdate(25); });
+      await fireEvent.press(screen.getByRole("button", { name: "Mute" }));
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      server.use(http.post("*/listings/video-access/viewer/listing/:id/playback", async () => {
+        posts += 1;
+        const body = shortGrant();
+        await gate.pending;
+        return HttpResponse.json(body);
+      }));
+
+      advanceClock(60_000);
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      await waitFor(() => expect(posts).toBe(2));
+      expect(screen.getByText("Loading video")).toBeTruthy();
+      const builtBefore = createdPlayers.length;
+      await act(async () => { appState.emit("background"); });
+      expect(chosen.released).toBe(true);
+      expect(player.released).toBe(true);
+      expect(createdPlayers.every((p) => !p.playing)).toBe(true);
+
+      if (arrival === "foreground") await act(async () => { appState.emit("active"); });
+      await releaseResponse(gate, PLAYBACK_URL);
+      if (arrival === "background") {
+        expect(uriOf(playerOf(screen))).toBeUndefined();
+        expect(createdPlayers.every((p) => !p.playing)).toBe(true);
+        await act(async () => { appState.emit("active"); });
+      }
+      await waitFor(() => expect(uriOf(playerOf(screen))).toBe(variantUrl(720, "tok2")));
+      const renewed = playerOf(screen);
+      await act(async () => { renewed.emitStatus("readyToPlay"); });
+      expect(renewed.currentTime).toBe(25);
+      expect(renewed.muted).toBe(true);
+      expect(renewed.playing).toBe(false);
+      expect(screen.getByTestId("listing-video-player-play-pause").props.accessibilityLabel).toBe("Play");
+      expect(createdPlayers.slice(builtBefore).every((p) => uriOf(p) === undefined || uriOf(p) === variantUrl(720, "tok2"))).toBe(true);
+    } finally {
+      gate.release();
+      appState.restore();
+    }
+  });
+
+  it("does not reload or resume an exited player when its pending renewal arrives", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    servePlayback(shortGrant);
+    const gate = responseGate();
+    try {
+      const { screen } = await renderPlayer();
+      await startPlaying(screen);
+      await pickQuality(screen, "720p");
+      const chosen = playerOf(screen);
+      await act(async () => { chosen.emitStatus("readyToPlay"); chosen.emitTimeUpdate(18); });
+      await fireEvent.press(screen.getByRole("button", { name: "Mute" }));
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      server.use(http.post("*/listings/video-access/viewer/listing/:id/playback", async () => {
+        posts += 1;
+        const body = shortGrant();
+        await gate.pending;
+        return HttpResponse.json(body);
+      }));
+
+      advanceClock(60_000);
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      await waitFor(() => expect(posts).toBe(2));
+      await screen.unmount();
+      const sourcesAtExit = createdPlayers.map(uriOf);
+      expect(chosen.currentTime).toBe(18);
+      expect(chosen.muted).toBe(true);
+      expect(createdPlayers.every((p) => p.released && !p.playing)).toBe(true);
+
+      await releaseResponse(gate, PLAYBACK_URL);
+      await act(async () => { chosen.emitStatus("readyToPlay"); });
+      expect(createdPlayers.map(uriOf)).toEqual(sourcesAtExit);
+      expect(createdPlayers.every((p) => p.released && !p.playing)).toBe(true);
+      expect(chosen.currentTime).toBe(18);
+      expect(chosen.muted).toBe(true);
+    } finally {
+      gate.release();
+    }
+  });
+
+  it("keeps the renewed quality and paused intent when an older playlist arrives last", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const gate = responseGate();
+    const requested = responseGate();
+    servePlayback(shortGrant);
+    server.use(http.get("*/files/master.m3u8", async ({ request }) => {
+      const grant = new URL(request.url).searchParams.get("grant") ?? "";
+      if (grant === "tok1") {
+        requested.release();
+        await gate.pending;
+      }
+      return new HttpResponse(playlist(grant, "landscape"));
+    }));
+    try {
+      const { screen } = await renderPlayer();
+      const player = await startPlaying(screen);
+      await requested.pending;
+      await act(async () => { player.emitTimeUpdate(18); });
+      await fireEvent.press(screen.getByRole("button", { name: "Mute" }));
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      advanceClock(60_000);
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      await waitFor(() => expect(uriOf(playerOf(screen))).toBe(masterUrl("tok2")));
+      const renewed = playerOf(screen);
+      await act(async () => { renewed.emitStatus("readyToPlay"); });
+      await fireEvent.press(screen.getByTestId("listing-video-player-play-pause"));
+      await pickQuality(screen, "720p");
+      const chosen = playerOf(screen);
+      expect(uriOf(chosen)).toBe(variantUrl(720, "tok2"));
+      await act(async () => { chosen.emitStatus("readyToPlay"); });
+      const sourcesBeforeLateResponse = createdPlayers.map(uriOf);
+
+      await releaseResponse(gate, MASTER);
+      expect(playerOf(screen)).toBe(chosen);
+      expect(uriOf(chosen)).toBe(variantUrl(720, "tok2"));
+      expect(chosen.currentTime).toBe(18);
+      expect(chosen.muted).toBe(true);
+      expect(chosen.playing).toBe(false);
+      expect(createdPlayers.map(uriOf)).toEqual(sourcesBeforeLateResponse);
+      expect(screen.getByTestId("listing-video-player-play-pause").props.accessibilityLabel).toBe("Play");
+      await fireEvent.press(screen.getByRole("button", { name: "Quality" }));
+      expect(screen.getByRole("button", { name: "720p" }).props.accessibilityState).toMatchObject({ selected: true, disabled: false });
+    } finally {
+      gate.release();
     }
   });
 
