@@ -184,6 +184,7 @@ it("blocks a private note when its durable intent cannot be stored, then allows 
   const note = await screen.findByRole("textbox", { name: "Internal note" });
   fireEvent.change(note, { target: { value: "Durable note" } });
   const storage = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("Disk full"); });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Add private note" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
   await screen.findByText("Note draft not saved. Retry saving it.");
   expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/notes"))).toBe(false);
@@ -1379,6 +1380,7 @@ it("sends exact public text once, announces Pending and Sent, and keeps typing d
   });
   const mounted = render(view());
   fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "  Exact reply\nSalam  " } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
   await screen.findByText("Pending");
   await waitFor(() => expect(sent?.text).toBe("  Exact reply\nSalam  "));
@@ -1413,11 +1415,13 @@ it("retries an uncertain send after reload with the original intent and reconcil
   });
   const mounted = render(view());
   fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Retain this uncertain reply" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
   await screen.findByText("Send not confirmed. Retry sends the same reply.");
   mounted.unmount();
   const fresh = render(view());
   await screen.findByRole("button", { name: "Retry reply" });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Retry reply" }) as HTMLButtonElement).disabled).toBe(false));
   responseLost = false;
   fireEvent.click(screen.getByRole("button", { name: "Retry reply" }));
   await screen.findByText("Sent");
