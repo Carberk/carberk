@@ -12,7 +12,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "pnpm check:source-policy && pnpm check:import-architecture && turbo run lint",
+    "lint": "pnpm check:source-policy && pnpm check:import-architecture && pnpm lint:root && turbo run lint",
     "test": "pnpm test:root && turbo run test",
     "test:unit": "pnpm test:agent-github && pnpm test:native-session && pnpm test:native-fixture-signin && pnpm test:admin-access && turbo run test:unit",
     "test:api": "turbo run test --filter=@auto-tm/api --filter=@auto-tm/worker",
@@ -60,7 +60,9 @@
     "check:import-architecture": "node scripts/check-import-architecture.mjs",
     "test:import-architecture": "node --test scripts/check-import-architecture.test.mjs",
     "local-env": "node scripts/local-env.mjs",
-    "test:local-env": "node --test scripts/local-env*.test.mjs"
+    "test:local-env": "node --test scripts/local-env*.test.mjs",
+    "lint:root": "eslint '*.{js,cjs,mjs}' scripts infra --max-warnings=0",
+    "test:root-lint": "node --test scripts/root-lint.test.mjs"
   },
   "devDependencies": {
     "@auto-tm/contracts": "workspace:*",
@@ -88,7 +90,9 @@
     "typescript": "catalog:",
     "web-tree-sitter": "0.26.13",
     "ws": "8.21.0",
-    "yaml": "2.8.1"
+    "yaml": "2.8.1",
+    "eslint": "catalog:",
+    "globals": "^17.13.0"
   },
   "workspaces": [
     "apps/*",

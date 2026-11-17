@@ -390,7 +390,7 @@ for (const name of ["pr-checks.yml", "ci.yml"]) {
     }
     assert.equal(rootScripts["check:source-policy"], "node scripts/check-source-policy.mjs");
     assert.equal(rootScripts["test:source-policy"], "node --test scripts/check-source-policy.test.mjs 'scripts/source-policy*.test.mjs' 'scripts/source-policy/*.test.mjs'");
-    assert.match(rootScripts.lint, /^pnpm check:source-policy && pnpm check:import-architecture && turbo run lint$/);
+    assert.match(rootScripts.lint, /^pnpm check:source-policy && pnpm check:import-architecture && pnpm lint:root && turbo run lint$/);
     assert.match(rootScripts["test:root"], /node --test 'scripts\/\*\.test\.mjs'/);
   });
 }
@@ -406,7 +406,7 @@ for (const name of ["pr-checks.yml", "ci.yml"]) {
     }
     assert.equal(rootScripts["check:import-architecture"], "node scripts/check-import-architecture.mjs");
     assert.equal(rootScripts["test:import-architecture"], "node --test scripts/check-import-architecture.test.mjs");
-    assert.match(rootScripts.lint, /^pnpm check:source-policy && pnpm check:import-architecture && turbo run lint$/);
+    assert.match(rootScripts.lint, /^pnpm check:source-policy && pnpm check:import-architecture && pnpm lint:root && turbo run lint$/);
   });
 }
 
