@@ -840,7 +840,7 @@ export const resources: Resource = {
     },
     account: {
       testerRoute: {
-        title: "Тест подключения", scope: "Закрытый staging · API и фото используют выбранный вход. Видео и подключение к чату работают по обычному пути.",
+        title: "Тест подключения", scope: "Закрытый staging · API, фото и чат используют выбранный вход. Видео работает по обычному пути.",
         global: "Global", tm: "TM-шлюз", reset: "Выбор действует для новых запросов. При перезапуске — Global.",
         configured: "Доступ к шлюзу настроен", unconfigured: "Доступ к шлюзу не настроен", key: "Ключ доступа к шлюзу",
         save: "Сохранить ключ доступа", remove: "Удалить ключ доступа", check: "Проверить подключение",
@@ -1840,7 +1840,7 @@ export const resources: Resource = {
     },
     account: {
       testerRoute: {
-        title: "Birikmäni barlamak", scope: "Ýapyk staging · API we suratlar saýlanan girişi ulanýar. Wideolar we göni çat adaty ýoly ulanýar.",
+        title: "Birikmäni barlamak", scope: "Ýapyk staging · API, suratlar we çat saýlanan girişi ulanýar. Wideolar adaty ýoly ulanýar.",
         global: "Global", tm: "TM şlýuz", reset: "Saýlaw täze talaplara degişli. Täzeden açylanda — Global.",
         configured: "Şlýuza giriş sazlandy", unconfigured: "Şlýuza giriş sazlanmady", key: "Şlýuza giriş açary",
         save: "Giriş açaryny ýatda sakla", remove: "Giriş açaryny aýyr", check: "Birikmäni barla",
@@ -2838,7 +2838,7 @@ export const resources: Resource = {
     },
     account: {
       testerRoute: {
-        title: "Connection test", scope: "Closed staging · API and photos use the selected entry. Video and live chat keep their usual path.",
+        title: "Connection test", scope: "Closed staging · API, photos, and chat use the selected entry. Video keeps its usual path.",
         global: "Global", tm: "TM gateway", reset: "Applies to new requests. Restarts on Global.",
         configured: "Gateway access configured", unconfigured: "Gateway access not configured", key: "Gateway access key",
         save: "Save access key", remove: "Remove access key", check: "Check connection",
