@@ -161,6 +161,18 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Install and verify video test tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          for tool in ffmpeg ffprobe; do
+            "$tool" -version || {
+              echo "::error::Required media proof tool $tool is missing or not runnable" >&2
+              exit 1
+            }
+          done
+
       - name: Start disposable test services
         shell: bash
         run: bash scripts/ci-services.sh up

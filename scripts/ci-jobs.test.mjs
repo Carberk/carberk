@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -299,6 +299,40 @@ test("public Web prerender failures missed by typecheck fail the required gate",
 });
 
 for (const name of ["pr-checks.yml", "ci.yml"]) {
+  test(`${name} fails API and worker media setup clearly when either video tool is unavailable`, t => {
+    const api = jobs(workflow(name)).get("api");
+    const step = api.split("      - name: Install and verify video test tools\n")[1]?.split("\n      - ")[0];
+    assert.ok(step, "API/worker proof requires a video tool preflight");
+    assert.ok(api.indexOf("name: Install and verify video test tools") < api.indexOf("run: pnpm test:api"));
+    assert.doesNotMatch(step, /continue-on-error:|if:/);
+    const script = runBlock(step);
+    const cwd = mkdtempSync(join(tmpdir(), "ci-media-tools-"));
+    t.after(() => rmSync(cwd, { recursive: true, force: true }));
+    const put = (name, body) => {
+      const path = join(cwd, name);
+      writeFileSync(path, `#!/bin/sh\n${body}\n`);
+      chmodSync(path, 0o755);
+    };
+    put("sudo", "exit 0");
+    for (const unavailable of [null, "ffmpeg", "ffprobe"]) {
+      for (const tool of ["ffmpeg", "ffprobe"]) put(tool, `printf '${tool} fixture version\\n'`);
+      if (unavailable) rmSync(join(cwd, unavailable));
+      const result = spawnSync("/bin/bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", `${script}\nprintf 'MEDIA_SUITE_STARTED\\n'`], {
+        cwd, env: { PATH: cwd }, encoding: "utf8",
+      });
+      const output = result.stdout + result.stderr;
+      assert.equal(result.status, unavailable ? 1 : 0, output);
+      if (unavailable) {
+        assert.match(output, new RegExp(`::error::.*${unavailable}`));
+        assert.doesNotMatch(output, /MEDIA_SUITE_STARTED/);
+      } else {
+        assert.match(output, /ffmpeg fixture version/);
+        assert.match(output, /ffprobe fixture version/);
+        assert.match(output, /MEDIA_SUITE_STARTED/);
+      }
+    }
+  });
+
   test(`${name} provides runnable video tools before the real database video tests`, () => {
     const db = jobs(workflow(name)).get("db");
     const preparation = db.slice(0, db.indexOf("run: pnpm test:db"));
