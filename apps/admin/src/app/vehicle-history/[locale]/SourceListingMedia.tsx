@@ -156,10 +156,10 @@ function Media(props: Props & { current: () => boolean }) {
           className="aspect-[4/3] w-full rounded-md bg-muted object-contain" referrerPolicy="no-referrer" />
         }
         {failedPhotos.length > 0 && <Button type="button" size="lg" onClick={() => void read("detail")}>{copy.retryPhotos}</Button>}
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <Button type="button" variant="secondary" size="lg" disabled={index === 0} onClick={() => select(index - 1)}>{copy.previous}</Button>
-          <p aria-live="polite" className="text-sm tabular-nums">{copy.count(index + 1, photos.length)}</p>
-          <Button type="button" variant="secondary" size="lg" disabled={index === photos.length - 1} onClick={() => select(index + 1)}>{copy.next}</Button>
+        <div className="mt-3 flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center">
+          <Button type="button" variant="secondary" size="lg" className="whitespace-normal" disabled={index === 0} onClick={() => select(index - 1)}>{copy.previous}</Button>
+          <p aria-live="polite" className="text-center text-sm tabular-nums">{copy.count(index + 1, photos.length)}</p>
+          <Button type="button" variant="secondary" size="lg" className="whitespace-normal" disabled={index === photos.length - 1} onClick={() => select(index + 1)}>{copy.next}</Button>
         </div>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
           {photos.map((photo, n) => <button key={photo.id} type="button" aria-label={copy.thumbnail(n + 1)}
