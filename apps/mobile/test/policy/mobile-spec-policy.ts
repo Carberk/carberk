@@ -122,6 +122,7 @@ export function inspectMobileSpec(root: string, file: string): string[] {
         const returned = fn.body.statements.find(ts.isReturnStatement);
         if (returned) return evaluate(returned.expression, bound, depth + 1);
       }
+      if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "filter") return next(node.expression.expression);
       return { source: args.some(arg => arg.source) || next(node.expression).source };
     }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
@@ -165,7 +166,7 @@ export function inspectMobileSpec(root: string, file: string): string[] {
       const argument = call.arguments[0];
       let target = evaluate(argument).text;
       if (argument && ts.isCallExpression(argument) && argument.expression.kind === ts.SyntaxKind.ImportKeyword) target = evaluate(argument.arguments[0]).text;
-      if (method === "spyOn" && argument) target = imports.get(argument.getText(source))?.module;
+      if (method === "spyOn" && argument) target = imported(argument)?.module;
       if (target) {
         const path = resolveTarget(target);
         if (ownApi(path) && !(relative(root, file).replaceAll("\\", "/") === "src/api/client.spec.ts" && path === "src/api/client")) {
@@ -173,7 +174,9 @@ export function inspectMobileSpec(root: string, file: string): string[] {
         }
       }
     }
-    if ((ts.isIdentifier(call.expression) && (call.expression.text === "expect" || name?.name === "expect")) && call.arguments.some(argument => evaluate(argument).source)) rules.add("source-text-assertion");
+    const assertion = ts.isPropertyAccessExpression(call.expression) && ["soft", "poll"].includes(call.expression.name.text)
+      ? call.expression.expression : call.expression;
+    if (((ts.isIdentifier(assertion) && assertion.text === "expect") || imported(assertion)?.name === "expect") && call.arguments.some(argument => evaluate(argument).source)) rules.add("source-text-assertion");
   }
   return [...rules].sort();
 }

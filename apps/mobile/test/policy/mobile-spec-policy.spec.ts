@@ -134,3 +134,41 @@ it("resolves configured aliases and barrels exporting API hooks", () => {
   });
   expect(checkMobileSpecs(root, [])).toEqual([expect.stringContaining("own-api-mock")]);
 });
+
+it("rejects soft assertions on component source", () => {
+  const root = fixture({ "test/new.spec.ts": `
+    import { expect as check } from 'vitest';
+    import { readFileSync } from 'node:fs';
+    const source = readFileSync(new URL('../components/Card.tsx', import.meta.url), 'utf8');
+    check.soft(source).toContain('Ready');
+  ` });
+  expect(checkMobileSpecs(root, [])).toEqual([expect.stringContaining("source-text-assertion")]);
+});
+
+it("rejects a namespace client's spied transport method", () => {
+  const root = fixture({ "test/new.spec.ts": `
+    import * as client from '@/src/api/client';
+    vi.spyOn(client.apiClient, 'get').mockResolvedValue({});
+  ` });
+  expect(checkMobileSpecs(root, [])).toEqual([expect.stringContaining("own-api-mock")]);
+});
+
+it("allows structural inventories that assert file ownership instead of rendered text", () => {
+  const root = fixture({ "test/new.spec.ts": `
+    import { readFileSync } from 'node:fs';
+    const files = ['../components/Card.tsx'];
+    const owners = files.filter(file => readFileSync(new URL(file, import.meta.url), 'utf8').includes('server-only'));
+    expect(owners).toEqual([]);
+  ` });
+  expect(checkMobileSpecs(root, [])).toEqual([]);
+});
+
+it("recognizes assertions through a Vitest namespace", () => {
+  const root = fixture({ "test/new.spec.ts": `
+    import * as test from 'vitest';
+    import { readFileSync } from 'node:fs';
+    const source = readFileSync(new URL('../components/Card.tsx', import.meta.url), 'utf8');
+    test.expect.soft(source).toContain('Ready');
+  ` });
+  expect(checkMobileSpecs(root, [])).toEqual([expect.stringContaining("source-text-assertion")]);
+});
