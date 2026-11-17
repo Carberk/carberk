@@ -82,7 +82,7 @@ export function parseArgs(argv) {
     else if (flag === "--port") options.port = Number(value);
     index += 1;
   }
-  if (command === "ios" && !options.udid) throw new Error("--udid is required (xcrun simctl list devices available)");
+  if (command === "ios" && !options.udid) throw new Error("--udid is required; select the simulator owned by this session");
   if (options.port === undefined) throw new Error("--port is required; select a port that belongs to this session");
   if (!Number.isInteger(options.port) || options.port <= 0 || options.port > 65535) throw new Error("--port must be a number from 1 to 65535");
   return options;
@@ -202,8 +202,8 @@ async function metro({ env: target, port }) {
     fs.writeFileSync(path.join(mobileRoot, ".expo", `native-session-${port}.json`), JSON.stringify(publicEnv));
     console.log(
       `\nOK: Metro serves ${environment} (API, socket and media origins are in the bundle).\n` +
-        `    Launch the dev client: pnpm --filter @auto-tm/mobile native:ios -- --udid <SIMULATOR_UUID> --port ${port}\n` +
-        `    Or, already installed: xcrun simctl launch <SIMULATOR_UUID> ${BUNDLE_ID} -RCT_jsLocation 127.0.0.1:${port}\n` +
+        `    Build/install the dev client: pnpm --filter @auto-tm/mobile native:ios -- --udid <SIMULATOR_UUID> --port ${port}\n` +
+        `    Open with your bound device command: <agent-device> open ${BUNDLE_ID} --relaunch --metro-port ${port}\n` +
         "    Restart this command after editing tailwind.config.js: NativeWind's watcher crashes Metro on that change.",
     );
   } catch (error) {
@@ -213,7 +213,7 @@ async function metro({ env: target, port }) {
 }
 
 async function ios({ udid, port }) {
-  if (!udid) throw new Error("--udid is required (xcrun simctl list devices available)");
+  if (!udid) throw new Error("--udid is required; select the simulator owned by this session");
   const receipt = path.join(mobileRoot, ".expo", `native-session-${port}.json`);
   if (!fs.existsSync(receipt)) throw new Error("Start native:metro in this worktree on the selected port before installing a client");
   const publicEnv = JSON.parse(fs.readFileSync(receipt, "utf8"));
@@ -240,21 +240,11 @@ async function ios({ udid, port }) {
   ], { cwd: iosDir, env });
 
   const appPath = path.join(iosDir, "build/Build/Products/Debug-iphonesimulator", `${scheme}.app`);
-  try {
-    execFileSync("xcrun", ["simctl", "boot", udid], { stdio: "ignore" });
-  } catch {
-    // already booted
-  }
   run("Install on the simulator", "xcrun", ["simctl", "install", udid, appPath]);
-  try {
-    execFileSync("xcrun", ["simctl", "terminate", udid, BUNDLE_ID], { stdio: "ignore" });
-  } catch {
-    // not running
-  }
-  run(`Launch against Metro on 127.0.0.1:${port}`, "xcrun", [
-    "simctl", "launch", udid, BUNDLE_ID, "-RCT_jsLocation", `127.0.0.1:${port}`,
-  ]);
-  console.log(`\nOK: ${BUNDLE_ID} installed on ${udid} and pointed at Metro on port ${port}.`);
+  console.log(
+    `\nOK: ${BUNDLE_ID} installed on ${udid}. Metro port: ${port}.\n` +
+      `    Open with the device command bound to ${udid}: <agent-device> open ${BUNDLE_ID} --relaunch --metro-port ${port}`,
+  );
 }
 
 async function main() {
