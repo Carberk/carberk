@@ -357,6 +357,21 @@ describe("committed brand logo manifest", () => {
     expect(manifest.entries).toHaveLength(catalogSlugs.length);
   });
 
+  it("assigns the pinned IH emblem only to International Harvester", () => {
+    expect(manifest.entries.find((entry) => entry.slug === "international-harvester")).toMatchObject({
+      tier: "E", source: "commons",
+      commonsFile: "File:International Harvester Company logo.svg",
+      pageRevisionId: 1217491956,
+      sha256Master: "f05935521c919cb3aa34cff769f426cebac65fff8c40b62fc985552a9bf9ff05",
+      licence: "PD-shape", transform: "alpha",
+      trademark: "The IH emblem is a trademark of CNH Industrial, shown only to identify the maker.",
+    });
+    expect(manifest.entries.find((entry) => entry.slug === "international")).toMatchObject({
+      source: "bundled", masterFile: "international.png",
+      sha256Master: "914a1012b31d3d273391b29d6f003b35d606ae4e1428984aca66f64b6371ca34",
+    });
+  });
+
   it("records a source and checksum for selected artwork, or an explicit unresolved identity", () => {
     for (const entry of manifest.entries) {
       if (entry.source === null) {

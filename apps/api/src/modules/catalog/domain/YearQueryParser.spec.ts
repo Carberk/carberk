@@ -89,6 +89,25 @@ describe("parseYearQuery", () => {
     });
   });
 
+  it("retains known numeric model names outside the year range while parsing a valid year", () => {
+    expect(parseYearQuery("1055 1982", NOW, new Set(["1055"]))).toEqual({
+      text: "1055", yearFrom: 1982, yearTo: 1982,
+    });
+    expect(parseYearQuery("1500", NOW, new Set(["1500"]))).toEqual({ text: "1500" });
+  });
+
+  it("keeps valid years authoritative even when the catalog has that numeric model name", () => {
+    expect(parseYearQuery("2007", NOW, new Set(["2007"]))).toEqual({
+      text: "", yearFrom: 2007, yearTo: 2007,
+    });
+  });
+
+  it("continues ignoring unknown invalid years and invalid ranges beside known numeric models", () => {
+    const knownModels = new Set(["1055"]);
+    expect(parseYearQuery("1055 0000", NOW, knownModels)).toEqual({ text: "1055" });
+    expect(parseYearQuery("camry 1055-2028", NOW, knownModels)).toEqual({ text: "camry" });
+  });
+
   it("returns the text untouched when there are no years", () => {
     expect(parseYearQuery("camry", NOW)).toEqual({ text: "camry" });
   });
