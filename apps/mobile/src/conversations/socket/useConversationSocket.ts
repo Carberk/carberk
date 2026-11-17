@@ -154,11 +154,6 @@ export function useConversationSocket(
         void queryClient.invalidateQueries({
           queryKey: queryKeys.conversations.messages(conversationId),
         });
-        if (currentUserId) {
-          void Promise.resolve(socket.markConversationRead(conversationId, new Date().toISOString())).then(result => {
-            if (result?.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.unreadCounts() });
-          });
-        }
       }
     });
 
@@ -169,11 +164,7 @@ export function useConversationSocket(
 
       handleMessageNew(queryClient, event);
       if (currentUserId && event.message.senderId !== currentUserId) {
-        const timestamp = new Date().toISOString();
-        void socket.markDelivered(event.message.conversationId, timestamp);
-        void Promise.resolve(socket.markConversationRead(event.message.conversationId, timestamp)).then(result => {
-          if (result?.ok) void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.unreadCounts() });
-        });
+        void socket.markDelivered(event.message.conversationId, new Date().toISOString());
       }
     });
 

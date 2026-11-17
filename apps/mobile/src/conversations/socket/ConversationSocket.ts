@@ -2,7 +2,8 @@ import { io, type Socket } from "socket.io-client";
 import { ConversationsSchemas, DateTimeSchema } from "@auto-tm/contracts";
 import { z } from "zod";
 
-import { loadAuthSession } from "../../auth/session";
+import { subscribeAuthSession } from "../../auth/session";
+import { accessTokenForRoute } from "../../api/client";
 import { apiRouteHeaders, captureRouteSnapshot, subscribeRouteChanges } from "../../api/routes";
 
 const DEFAULT_WS_URL =
@@ -80,6 +81,7 @@ export class ConversationSocket {
   private authToken: string | null = null;
   private routeGeneration: number | null = null;
   private routeUnsubscribe: (() => void) | null = null;
+  private authUnsubscribe: (() => void) | null = null;
   private connectionVersion = 0;
   private connectInFlight: Promise<void> | null = null;
   private readonly pendingSends = new Set<() => void>();
@@ -167,19 +169,16 @@ export class ConversationSocket {
     const route = captureRouteSnapshot();
     const version = this.connectionVersion;
     if (this.followRoutes && !this.routeUnsubscribe) {
-      this.routeUnsubscribe = subscribeRouteChanges(() => {
-        this.connectionVersion++;
-        this.connectInFlight = null;
-        this.failPendingSends();
-        const previousSocket = this.socket;
-        this.socket = null;
-        previousSocket?.disconnect();
-        this.pendingJoins.clear();
-        this.setStatus("disconnected");
-        void this.connect();
-      });
+      this.routeUnsubscribe = subscribeRouteChanges(() => this.restartConnection());
+      this.authUnsubscribe = subscribeAuthSession(() => this.restartConnection());
     }
-    const token = this.options.token ?? (await loadAuthSession())?.accessToken;
+    let token: string | null;
+    try {
+      token = this.options.token ?? await accessTokenForRoute(route);
+    } catch {
+      if (version === this.connectionVersion) this.setStatus("error");
+      return;
+    }
     if (version !== this.connectionVersion) return;
     if (!token) {
       this.failPendingSends();
@@ -297,6 +296,8 @@ export class ConversationSocket {
     this.connectInFlight = null;
     this.routeUnsubscribe?.();
     this.routeUnsubscribe = null;
+    this.authUnsubscribe?.();
+    this.authUnsubscribe = null;
     this.failPendingSends();
     this.pendingJoins.clear();
     this.currentRoom = null;
@@ -305,6 +306,19 @@ export class ConversationSocket {
     this.authToken = null;
     this.routeGeneration = null;
     this.setStatus("idle");
+  }
+
+  private restartConnection(): void {
+    this.connectionVersion++;
+    this.connectInFlight = null;
+    this.failPendingSends();
+    const previousSocket = this.socket;
+    this.socket = null;
+    previousSocket?.disconnect();
+    this.pendingJoins.clear();
+    this.activeJoinRequest = null;
+    this.setStatus("disconnected");
+    void this.connect();
   }
 
   async joinConversation(

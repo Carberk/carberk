@@ -1,7 +1,3 @@
-# Additive virtual host in the existing Snikket nginx http context.
-# Render the owned staging hostname and its certificate before approved activation.
-# Persist as a read-only file mount at /etc/nginx/conf.d/carberk.conf.
-# Leave every existing Snikket server, certificate and port unchanged.
 map $http_upgrade $carberk_connection_upgrade {
     default upgrade;
     '' '';

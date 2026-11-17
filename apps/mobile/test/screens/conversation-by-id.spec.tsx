@@ -1,7 +1,7 @@
 import * as RN from "react-native";
 import { useState, type PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { focusManager, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
@@ -10,7 +10,7 @@ import { waitFor } from "@testing-library/react-native";
 
 import { signInPhotoUser } from "../profile-photo-api";
 import { activeKeyboardRegion } from "../keyboardAvoidance";
-import { act, fireEvent, renderMobile, routeParams, routerMock, within, getAllHosts, getHost, first } from "../render";
+import { act, fireEvent, renderMobile, routeParams, routerMock, screenFocus, within, getAllHosts, getHost, first } from "../render";
 import ConversationDetailScreen from "../../app/conversations/[id]";
 import { queryKeys } from "../../src/api/queryKeys";
 import { seedConversationDetail } from "../../src/api/conversations/useConversation";
@@ -42,6 +42,9 @@ const state = vi.hoisted(() => ({
     data: { pages: [{ items: [] as unknown[] }] } as unknown,
     isPending: false,
     isError: false,
+    isSuccess: true,
+    isFetching: false,
+    dataUpdatedAt: 1,
     error: null as unknown,
     refetch: vi.fn(),
     hasNextPage: false,
@@ -50,7 +53,7 @@ const state = vi.hoisted(() => ({
     fetchNextPage: vi.fn(),
   },
   mutation: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
-  socket: { sendTextMessage: vi.fn(), sendImageMessage: vi.fn(), deleteMessage: vi.fn() },
+  socket: { sendTextMessage: vi.fn(), sendImageMessage: vi.fn(), deleteMessage: vi.fn(), markRead: vi.fn(async () => ({ ok: true })) },
   toast: vi.fn(),
   clipboard: vi.fn(async (_text: string) => true),
   reportSheet: { current: null as null | { messageId: string; open: boolean; onReported: (id: string) => void } },
@@ -106,7 +109,7 @@ vi.mock("../../src/conversations/socket/useConversationSocket", () => ({
       const ack = await state.socket.sendImageMessage(input);
       return ack?.ok ? { ...ack, message: { ...serverMessage(ack.message.id, state.viewerId, new Date().toISOString()), kind: "image", text: null, metadata: input.metadata, clientMessageId: input.clientMessageId, ...ack.message } } : ack;
     },
-    markRead: vi.fn(async () => ({ ok: true })),
+    markRead: state.socket.markRead,
     deleteMessage: state.socket.deleteMessage,
   }),
 }));
@@ -203,6 +206,9 @@ beforeEach(async () => {
   state.mutation.mutate.mockReset();
   state.messages.isPending = false;
   state.messages.isError = false;
+  state.messages.isSuccess = true;
+  state.messages.isFetching = false;
+  state.messages.dataUpdatedAt = 1;
   state.messages.error = null;
   state.messages.data = { pages: [{ items: [] }] };
   state.messages.refetch.mockReset();
@@ -213,6 +219,7 @@ beforeEach(async () => {
   state.socket.sendTextMessage.mockReset();
   state.socket.sendImageMessage.mockReset();
   state.socket.deleteMessage.mockReset();
+  state.socket.markRead.mockClear();
   state.mutation.mutateAsync.mockReset();
   state.toast.mockReset();
   state.clipboard.mockClear();
@@ -246,6 +253,55 @@ describe("Conversation opened with only its ID", () => {
 
     await fireEvent.press(await screen.findByRole("button", { name: "Open: Toyota Camry, 2018, 285,000 TMT" }));
     expect(routerMock.push).toHaveBeenCalledWith(`/(public)/listings/${LISTING_ID}`);
+  });
+
+  it("keeps messages unread while another screen covers the Conversation", async () => {
+    screenFocus.focused = false;
+    state.messages.data = { pages: [{ items: [serverMessage("unseen", SELLER_ID)] }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = await renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("unseen")).toBeTruthy();
+    expect(state.socket.markRead).not.toHaveBeenCalled();
+    screenFocus.focused = true;
+    await screen.rerender(<ConversationDetailScreen />);
+    await waitFor(() => expect(state.socket.markRead).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps messages unread while the app is backgrounded", async () => {
+    await act(() => focusManager.setFocused(false));
+    state.messages.data = { pages: [{ items: [serverMessage("background", SELLER_ID)] }] };
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = await renderMobile(<ConversationDetailScreen />);
+
+    expect(await screen.findByText("background")).toBeTruthy();
+    expect(state.socket.markRead).not.toHaveBeenCalled();
+    await act(() => focusManager.setFocused(true));
+    await waitFor(() => expect(state.socket.markRead).toHaveBeenCalledTimes(1));
+  });
+
+  it("waits for recovered history to succeed before marking it read", async () => {
+    routeGet({ [`/conversations/${CONVERSATION_ID}`]: () => conversation() });
+    const screen = await renderMobile(<ConversationDetailScreen />);
+    await waitFor(() => expect(state.socket.markRead).toHaveBeenCalledTimes(1));
+
+    state.messages.isFetching = true;
+    await screen.rerender(<ConversationDetailScreen />);
+    state.messages.isFetching = false;
+    state.messages.isError = true;
+    state.messages.isSuccess = false;
+    state.messages.error = new Error("offline");
+    await screen.rerender(<ConversationDetailScreen />);
+    expect(state.socket.markRead).toHaveBeenCalledTimes(1);
+
+    state.messages.isError = false;
+    state.messages.isSuccess = true;
+    state.messages.error = null;
+    state.messages.dataUpdatedAt = 2;
+    state.messages.data = { pages: [{ items: [serverMessage("recovered", SELLER_ID)] }] };
+    await screen.rerender(<ConversationDetailScreen />);
+    expect(await screen.findByText("recovered")).toBeTruthy();
+    await waitFor(() => expect(state.socket.markRead).toHaveBeenCalledTimes(2));
   });
 
   it("shows header and strip skeletons while the Conversation loads", async () => {

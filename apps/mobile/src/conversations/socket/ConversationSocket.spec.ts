@@ -32,6 +32,7 @@ vi.mock("../../auth/session", () => ({
   loadAuthSession: vi.fn().mockResolvedValue({
     accessToken: "test-token",
   }),
+  subscribeAuthSession: vi.fn(() => () => {}),
 }));
 
 const mockLoadAuthSession = vi.mocked(loadAuthSession);

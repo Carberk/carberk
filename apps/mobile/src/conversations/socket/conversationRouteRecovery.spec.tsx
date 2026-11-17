@@ -7,12 +7,14 @@ import * as SecureStore from "expo-secure-store";
 
 import { server } from "../../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../../auth/session";
+import { apiClient } from "../../api/client";
 import { provisionGatewayKey, selectTesterRoute } from "../../api/routes";
 import { useConversationMessages } from "../../api/conversations/useConversationMessages";
 import { useUnreadCount } from "../../api/conversations/useUnreadCount";
 
 import { useConversationSocket } from "./useConversationSocket";
 import { useGlobalConversationSocket } from "./useGlobalConversationSocket";
+import { getSharedConversationSocket } from "./ConversationSocket";
 
 const network = vi.hoisted(() => ({
   sockets: [] as Array<{ url: string; options: Record<string, unknown>; connected: boolean; disconnect: () => void }>,
@@ -63,6 +65,47 @@ afterEach(async () => {
   storage.clear();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it("reconnects through TM only after an expired bearer is refreshed", async () => {
+  vi.stubGlobal("__DEV__", true);
+  vi.stubEnv("EXPO_PUBLIC_API_URL", globalEntry);
+  vi.stubEnv("EXPO_PUBLIC_GATEWAY_TESTER", "true");
+  vi.stubEnv("EXPO_PUBLIC_ENV", "staging");
+  vi.mocked(SecureStore.getItemAsync).mockImplementation(async key => storage.get(key) ?? null);
+  vi.mocked(SecureStore.setItemAsync).mockImplementation(async (key, value) => { storage.set(key, value); });
+  vi.mocked(SecureStore.deleteItemAsync).mockImplementation(async key => { storage.delete(key); });
+  selectTesterRoute("global");
+  await provisionGatewayKey(gatewayKey);
+  const oldClaims = Buffer.from(JSON.stringify({ sub: senderId, sid: "session-a", iat: 1000, exp: 1900 })).toString("base64url");
+  const newClaims = Buffer.from(JSON.stringify({ sub: senderId, sid: "session-a", iat: 1000, exp: 2800 })).toString("base64url");
+  const oldToken = `e30.${oldClaims}.sig`;
+  const newToken = `e30.${newClaims}.sig`;
+  await storeAuthSession({ user: { id: senderId, phone: "+99361000001", email: null, displayName: null, role: "buyer" }, accessToken: oldToken, refreshToken: "refresh-a" });
+  const socket = getSharedConversationSocket();
+  await socket.connect();
+  await waitFor(() => expect(network.sockets[0]?.connected).toBe(true));
+
+  const now = Date.now();
+  vi.spyOn(Date, "now").mockReturnValue(now + 901_000);
+  let refreshAvailable = false;
+  server.use(
+    http.post(`${tmEntry}/auth/refresh`, ({ request }) => {
+      expect(request.headers.get("x-carberk-gateway-key")).toBe(gatewayKey);
+      return refreshAvailable ? HttpResponse.json({ accessToken: newToken, refreshToken: "refresh-b" }) : HttpResponse.json({}, { status: 503 });
+    }),
+    http.get(`${tmEntry}/me`, ({ request }) => HttpResponse.json({ bearer: request.headers.get("authorization") })),
+  );
+  selectTesterRoute("tm");
+  await waitFor(() => expect(socket.getStatus()).toBe("error"));
+  expect(network.sockets.filter(item => item.url.startsWith("https://tm-staging"))).toHaveLength(0);
+
+  refreshAvailable = true;
+  expect(await apiClient.get("/me")).toEqual({ bearer: `Bearer ${newToken}` });
+  await waitFor(() => expect(network.sockets.at(-1)?.options.auth).toEqual({ token: newToken }));
+  expect(network.sockets.at(-1)?.url).toBe("https://tm-staging.bagtyyar.dev/ws/chat");
+  socket.disconnect();
 });
 
 it("reconciles missed history and unread state through the new entry after a lost send ACK", async () => {
@@ -115,8 +158,8 @@ it("reconciles missed history and unread state through the new entry after a los
   expect(await pending).toMatchObject({ ok: false, code: "ACK_UNKNOWN" });
   await waitFor(() => expect(network.sockets.map(socket => socket.url)).toHaveLength(2));
   await waitFor(() => expect(hook.result.current.messages.data?.pages[0]?.items).toEqual([committed]));
-  await waitFor(() => expect(network.reads).toContain(conversationId));
-  await waitFor(() => expect(hook.result.current.unread).toBe(0));
+  await waitFor(() => expect(hook.result.current.unread).toBe(1));
+  expect(network.reads).toEqual([]);
   expect(network.sockets.map(socket => socket.url)).toEqual([
     "ws://localhost:3006/ws/chat", "https://tm-staging.bagtyyar.dev/ws/chat",
   ]);

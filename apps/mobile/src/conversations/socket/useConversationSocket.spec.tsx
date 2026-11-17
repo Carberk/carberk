@@ -328,7 +328,7 @@ describe("useConversationSocket", () => {
         CONV_ID,
         expect.any(String),
       );
-      expect(mockSocket.markConversationRead).toHaveBeenCalledWith(CONV_ID, expect.any(String));
+      expect(mockSocket.markConversationRead).not.toHaveBeenCalled();
     });
   });
 

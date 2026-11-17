@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { KeyboardAvoidingView, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AppState, KeyboardAvoidingView, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
+import { focusManager, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { ConversationsSchemas } from "@auto-tm/contracts";
 
@@ -102,6 +102,9 @@ function generateClientMessageId(): string {
   return `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const subscribeFocus = (listener: () => void) => focusManager.subscribe(listener);
+const focused = () => focusManager.isFocused();
+
 export default function ConversationDetailScreen() {
   const { t } = useTranslation();
   // The route carries only the Conversation ID and an optional composer draft;
@@ -111,6 +114,8 @@ export default function ConversationDetailScreen() {
   const conversationId = typeof rawId === "string" ? rawId : "";
   const draft = typeof params.draft === "string" ? params.draft : undefined;
   const viewer = useViewer();
+  const isFocused = useIsFocused();
+  const foreground = useSyncExternalStore(subscribeFocus, focused);
   const router = useRouter();
   const goBack = useSafeBack(MESSAGES_HREF);
   // Nothing is read until a User is signed in; signed out, the screen offers
@@ -123,7 +128,7 @@ export default function ConversationDetailScreen() {
   useChatPushTokenRegistration(hasChatAction && !!viewer?.userId);
 
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
-  const readMarkedRef = useRef(false);
+  const lastMarkedDataAtRef = useRef(0);
   const [confirmAction, setConfirmAction] = useState<
     "block" | "unblock" | null
   >(null);
@@ -400,9 +405,9 @@ export default function ConversationDetailScreen() {
   ]);
 
   const markRead = useCallback(
-    async (timestamp = new Date().toISOString()) => {
-      if (!viewer?.userId || !conversationId || readMarkedRef.current) return;
-      readMarkedRef.current = true;
+    async (dataUpdatedAt: number, timestamp = new Date().toISOString()) => {
+      if (!viewer?.userId || !conversationId || dataUpdatedAt <= lastMarkedDataAtRef.current) return;
+      lastMarkedDataAtRef.current = dataUpdatedAt;
 
       const result = await socketMarkRead(conversationId, timestamp);
       if (!result.ok) {
@@ -411,25 +416,25 @@ export default function ConversationDetailScreen() {
           conversationId,
           lastReadAt: timestamp,
         });
+      } else {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.conversations.unreadCounts() });
       }
     },
-    [conversationId, socketMarkRead, updateWatermark, viewer?.userId],
+    [conversationId, queryClient, socketMarkRead, updateWatermark, viewer?.userId],
   );
 
-  // Mark conversation read once messages have loaded and the user is viewing it.
+  useEffect(() => { lastMarkedDataAtRef.current = 0; }, [conversationId]);
+
   useEffect(() => {
-    if (
-      !messagesQuery.isPending &&
-      !messagesQuery.isError &&
-      viewer?.userId &&
-      conversationId &&
-      !readMarkedRef.current
-    ) {
-      void markRead();
-    }
+    if (!isFocused || !foreground || AppState.currentState !== "active") { lastMarkedDataAtRef.current = 0; return; }
+    if (messagesQuery.isSuccess && !messagesQuery.isFetching && viewer?.userId && conversationId &&
+      messagesQuery.dataUpdatedAt > lastMarkedDataAtRef.current) void markRead(messagesQuery.dataUpdatedAt);
   }, [
-    messagesQuery.isPending,
-    messagesQuery.isError,
+    isFocused,
+    foreground,
+    messagesQuery.isSuccess,
+    messagesQuery.isFetching,
+    messagesQuery.dataUpdatedAt,
     viewer?.userId,
     conversationId,
     markRead,
