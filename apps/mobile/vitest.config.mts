@@ -7,10 +7,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   oxc: { jsx: { runtime: "automatic" } },
   plugins: [{
-    name: "native-switch-jsx",
+    name: "native-package-jsx",
     enforce: "pre",
     transform(code, id) {
-      if (id.includes("/@rn-primitives/switch/") && id.endsWith(".mjs")) {
+      if ((id.includes("/@rn-primitives/switch/") && id.endsWith(".mjs"))
+        || (id.includes("/expo-clipboard/") && id.endsWith("/ClipboardPasteButton.js"))) {
         return transformWithOxc(code, id, { lang: "jsx", jsx: { runtime: "automatic" } });
       }
     },

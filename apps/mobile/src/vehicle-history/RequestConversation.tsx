@@ -1,6 +1,9 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { AccessibilityInfo, ActivityIndicator, FlatList, KeyboardAvoidingView, RefreshControl, View, type ViewToken } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, Keyboard, KeyboardAvoidingView, RefreshControl, View, type ViewToken } from "react-native";
+import { focusManager, onlineManager } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import * as Linking from "expo-linking";
+import * as Clipboard from "expo-clipboard";
 import type { VehicleHistorySchemas } from "@auto-tm/contracts";
 
 import { ApiError } from "../api/client";
@@ -8,7 +11,7 @@ import { useDisplayName } from "../identity/useDisplayName";
 import { localeTag } from "../i18n/resources";
 import { mapErrorToCopy } from "../api/getErrorCopy";
 
-import type { HistoryViewer } from "./session";
+import { historySessionCurrent, type HistoryViewer } from "./session";
 import { StopReminders } from "./StopReminders";
 import { useHistoryReply } from "./useHistoryReply";
 import { useRequestConversation } from "./useRequestConversation";
@@ -18,11 +21,55 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { ErrorState } from "@/components/ErrorState";
 
+function reportTargets(text: string) {
+  const targets: string[] = [];
+  const scanner = /https:\/\/[^\s<>"“”‘’«»]+/giu;
+  let match: RegExpExecArray | null;
+  while ((match = scanner.exec(text)) !== null) {
+    const before = text[match.index - 1] ?? "";
+    if (before && !/[\s([{"'<“‘«]/u.test(before)) continue;
+    let target = match[0];
+    const closing = new Map([["(", ")"], ["[", "]"], ["{", "}"], ["'", "'"],
+      ['"', '"'], ["<", ">"], ["“", "”"], ["‘", "’"], ["«", "»"]]).get(before);
+    const after = text[match.index + match[0].length];
+    if (after && !/\s/u.test(after) && after !== closing) continue;
+    if (before === "'") {
+      const end = target.lastIndexOf("'");
+      if (end >= 0) target = target.slice(0, end);
+    } else if (closing) {
+      let depth = 0;
+      for (let index = 0; index < target.length; index++) {
+        if (target[index] === closing && depth === 0) { target = target.slice(0, index); break; }
+        if (target[index] === before) depth++;
+        else if (target[index] === closing) depth--;
+      }
+    } else if (target !== text && !/[?#]/u.test(target)) target = target.replace(/[.,;!]+$/u, "");
+    scanner.lastIndex = match.index + target.length;
+    try {
+      const parsed = new URL(target);
+      if (parsed.protocol === "https:" && !parsed.username && !parsed.password
+        && /^https:\/\/[^/?#@]+/iu.test(target) && !/[\s\\\p{Cc}]/u.test(target)
+        && !/%(?![\da-f]{2})/iu.test(target)) targets.push(target);
+    } catch { continue; }
+  }
+  return targets;
+}
+
 export function RequestConversation({ viewer, request, header, metadataError, metadataCurrent, metadataRefreshing }: {
   viewer: HistoryViewer; request: VehicleHistorySchemas.HistoryRequest; header: ReactNode;
   metadataError: unknown; metadataCurrent: boolean; metadataRefreshing: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [copyFailure, setCopyFailure] = useState<string | null>(null);
+  const [openFailure, setOpenFailure] = useState<string | null>(null);
+  const [pendingLink, setPendingLink] = useState<{ key: string; action: "open" | "copy" } | null>(null);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const linkAttempt = useRef(0);
+  const linkReader = useRef({ mounted: true, ready: false });
+  const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
+  const position = useRef({ offset: 0, height: 0 });
+  const browserPosition = useRef<{ offset: number; height: number; away: boolean; keyboardReady: boolean } | null>(null);
   const name = useDisplayName();
   const thread = useRequestConversation(viewer, request, metadataCurrent);
   const { pages, receipts } = thread;
@@ -33,6 +80,73 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const denied = [pages.error, receipts.error, thread.receiptError].some((error) =>
     error instanceof ApiError && [401, 403, 404].includes(error.status));
   const ready = metadataCurrent && thread.connected && thread.active && !denied && !pages.isPending && !pages.error;
+  linkReader.current.ready = ready;
+  const linkCurrent = () => linkReader.current.mounted && linkReader.current.ready
+    && historySessionCurrent(viewer) && AppState.currentState === "active"
+    && focusManager.isFocused() && onlineManager.isOnline();
+  const restoreBrowserPosition = () => {
+    const saved = browserPosition.current;
+    if (!saved?.away || !saved.keyboardReady || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
+    requestAnimationFrame(() => {
+      if (browserPosition.current !== saved || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
+      browserPosition.current = null;
+      list.current?.scrollToOffset({ offset: saved.offset, animated: false });
+    });
+  };
+  useEffect(() => {
+    if (!thread.active && browserPosition.current) browserPosition.current.away = true;
+    else restoreBrowserPosition();
+    const keyboard = Keyboard.addListener("keyboardDidShow", () => {
+      if (browserPosition.current?.away) {
+        browserPosition.current.keyboardReady = true;
+        restoreBrowserPosition();
+      }
+    });
+    return () => keyboard.remove();
+  });
+  useEffect(() => {
+    if (!ready) {
+      linkAttempt.current++;
+      setCopiedLink(null);
+      setCopyFailure(null);
+      setOpenFailure(null);
+      setPendingLink(null);
+    }
+  }, [ready]);
+  useEffect(() => {
+    const reader = linkReader.current;
+    reader.mounted = true;
+    return () => { reader.mounted = false; };
+  }, []);
+  const actOnReport = async (key: string, target: string, action: "open" | "copy") => {
+    if (!linkCurrent()) return;
+    const attempt = ++linkAttempt.current;
+    setPendingLink({ key, action });
+    if (action === "copy") { setCopiedLink(null); setCopyFailure(null); }
+    else setOpenFailure(null);
+    const beforeOpen = action === "open" && position.current.height > 0
+      ? { ...position.current, away: false, keyboardReady: !Keyboard.isVisible() } : null;
+    browserPosition.current = beforeOpen;
+    let succeeded = false;
+    try {
+      if (action === "copy") succeeded = await Clipboard.setStringAsync(target) === true;
+      else {
+        const result: unknown = await Linking.openURL(target);
+        succeeded = result !== false;
+      }
+    } catch { succeeded = false; }
+    if (!succeeded && browserPosition.current === beforeOpen) browserPosition.current = null;
+    if (attempt !== linkAttempt.current || !linkCurrent()) return;
+    setPendingLink(null);
+    if (action === "copy") {
+      if (succeeded) setCopiedLink(key);
+      else setCopyFailure(key);
+      AccessibilityInfo.announceForAccessibility(t(succeeded ? "vehicleHistory.linkCopied" : "vehicleHistory.copyLinkFailed"));
+    } else if (!succeeded) {
+      setOpenFailure(key);
+      AccessibilityInfo.announceForAccessibility(t("vehicleHistory.openReportFailed"));
+    }
+  };
   const reply = useHistoryReply(viewer, request, ready, thread.active, thread.messages, thread.refresh);
   const outgoing = reply.outgoing.filter((intent) => !thread.messages.some((message) =>
     message.author.kind === "requester" && message.author.id === viewer.userId
@@ -58,6 +172,11 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     return t("conversations:messageSent");
   };
   const retry = () => { void thread.refresh(); };
+  const pullRefresh = async () => {
+    setPullRefreshing(true);
+    try { await thread.refresh(); }
+    finally { if (linkReader.current.mounted) setPullRefreshing(false); }
+  };
   let notice: ReactNode = null;
   if (denied) notice = <Text accessibilityRole="alert">{t("vehicleHistory.denied")}</Text>;
   else if (pages.isPending) notice = <ActivityIndicator accessibilityLabel={t("loading")} />;
@@ -68,12 +187,17 @@ export function RequestConversation({ viewer, request, header, metadataError, me
 
   return <KeyboardAvoidingView behavior="padding" className="flex-1">
     <FlatList
+    ref={list}
     className="flex-1" contentContainerClassName="gap-3 px-5 pb-8 pt-3"
     data={notice ? [] : thread.messages} keyExtractor={(message) => message.id}
     keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
     maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+    scrollEventThrottle={16}
+    onScroll={(event) => { position.current.offset = event.nativeEvent.contentOffset.y; }}
+    onScrollBeginDrag={() => { browserPosition.current = null; }}
+    onLayout={(event) => { position.current.height = event.nativeEvent.layout.height; restoreBrowserPosition(); }}
     onViewableItemsChanged={onVisible} viewabilityConfig={viewabilityConfig}
-    refreshControl={<RefreshControl refreshing={metadataRefreshing || pages.isRefetching} onRefresh={retry} />}
+    refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
       {header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
@@ -83,9 +207,42 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     </View>}
     renderItem={({ item }) => {
       const own = item.author.kind === "requester" && item.author.id === viewer.userId;
+      const targets = reportTargets(item.text);
       return <View className={own ? "ml-8 gap-2 rounded-2xl bg-message-own p-4" : "mr-8 gap-2 rounded-2xl bg-card p-4"}>
         <Text className="text-footnote font-semibold text-foreground">{own ? t("vehicleHistory.you") : name(item.author)}</Text>
         <Text selectable className="text-body leading-6 text-foreground">{item.text}</Text>
+        {targets.map((reportTarget, index) => {
+          const linkKey = `${item.id}:${index}`;
+          const opening = pendingLink?.key === linkKey && pendingLink.action === "open";
+          const copying = pendingLink?.key === linkKey && pendingLink.action === "copy";
+          const suffix = targets.length > 1 ? ` ${index + 1}` : "";
+          const openLabel = t(openFailure === linkKey ? "vehicleHistory.retryOpenReport" : "vehicleHistory.openReport") + suffix;
+          const copyLabel = t(copyFailure === linkKey ? "vehicleHistory.retryCopyLink" : "vehicleHistory.copyLink") + suffix;
+          return <View key={linkKey} className="gap-2">
+          <View className="flex-row flex-wrap gap-1">
+            <Button variant="link" className="relative max-w-full" disabled={!ready}
+              accessibilityLabel={openLabel}
+              accessibilityState={{ busy: opening }}
+              onPress={() => actOnReport(linkKey, reportTarget, "open")}>
+              <Text className={opening ? "opacity-0" : undefined}>{openLabel}</Text>
+              {opening && <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+                <ActivityIndicator accessible={false} />
+              </View>}
+            </Button>
+            <Button variant="link" className="relative max-w-full" disabled={!ready}
+              accessibilityLabel={copyLabel}
+              accessibilityState={{ busy: copying }}
+              onPress={() => actOnReport(linkKey, reportTarget, "copy")}>
+              <Text className={copying ? "opacity-0" : undefined}>{copyLabel}</Text>
+              {copying && <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+                <ActivityIndicator accessible={false} />
+              </View>}
+            </Button>
+          </View>
+        {openFailure === linkKey && <Text accessibilityRole="alert">{t("vehicleHistory.openReportFailed")}</Text>}
+        {copyFailure === linkKey && <Text accessibilityRole="alert">{t("vehicleHistory.copyLinkFailed")}</Text>}
+        {copiedLink === linkKey && <Text accessibilityLiveRegion="polite">{t("vehicleHistory.linkCopied")}</Text>}
+        </View>; })}
         <View className="flex-row flex-wrap gap-x-3 gap-y-1">
           <Text className="text-caption text-foreground/70">{new Date(item.createdAt).toLocaleString(localeTag(i18n.language))}</Text>
           {own && <Text className="text-caption text-foreground/70">{status(item)}</Text>}

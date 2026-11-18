@@ -3,12 +3,39 @@ import { http, HttpResponse } from "msw";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { focusManager, onlineManager } from "@tanstack/react-query";
+import { AccessibilityInfo, AppState, Keyboard, Linking } from "react-native";
+import * as ReactNative from "react-native";
+import * as ExpoLinking from "expo-linking";
+import * as Clipboard from "expo-clipboard";
 
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
 import { act, fireEvent, getHost, renderMobile, routeParams, screenFocus } from "../../test/render";
 import { server } from "../../test/msw";
 import { NativeViewability } from "../../test/native-viewability";
 import { storeAuthSession } from "../auth/session";
+
+const nativeClipboard = vi.hoisted(() => ({
+  setStringAsync: vi.fn<(text: string, options: object) => Promise<boolean>>(),
+}));
+
+vi.unmock("expo-linking");
+vi.unmock("expo-clipboard");
+vi.mock("react-native", async (importOriginal) => {
+  const native = await importOriginal<typeof ReactNative>();
+  return { ...native, Linking: { openURL: vi.fn(async () => true) },
+    Keyboard: { ...native.Keyboard, isVisible: () => false },
+  };
+});
+vi.mock("expo-modules-core", async () => {
+  const native = await import("react-native");
+  return {
+    UnavailabilityError: Error,
+    requireNativeModule: (name: string) => name === "ExpoClipboard" ? nativeClipboard : {},
+    requireNativeViewManager: () => native.View,
+    Platform: native.Platform,
+  };
+});
+vi.mock("expo-constants", () => ({ default: {}, ExecutionEnvironment: {} }));
 
 vi.mock("react-native-safe-area-context", async () => ({
   SafeAreaView: (await import("react-native")).View,
@@ -48,8 +75,11 @@ beforeEach(async () => {
   vi.mocked(AsyncStorage.getItem).mockResolvedValue(null);
   vi.mocked(AsyncStorage.setItem).mockResolvedValue();
   vi.mocked(AsyncStorage.removeItem).mockResolvedValue();
+  AppState.currentState = "active";
   stored = null;
   acknowledgements = [];
+  vi.mocked(Linking.openURL).mockReset().mockResolvedValue(true);
+  nativeClipboard.setStringAsync.mockReset().mockResolvedValue(true);
   vi.mocked(SecureStore.getItemAsync).mockImplementation(async () => stored);
   vi.mocked(SecureStore.setItemAsync).mockImplementation(async (_key, value) => { stored = value; });
   vi.stubEnv("EXPO_PUBLIC_ENV", "development");
@@ -69,6 +99,660 @@ beforeEach(async () => {
   await storeAuthSession(session());
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); focusManager.setFocused(true); onlineManager.setOnline(true); vi.unstubAllEnvs(); });
+
+it("opens the exact report target in the external browser", async () => {
+  const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  expect(vi.isMockFunction(ExpoLinking.openURL)).toBe(false);
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(Linking.openURL).toHaveBeenCalledWith("https://reports.example.test/report?token=A%2fb%2B&part=1&part=2");
+});
+
+it.each(["same reader", "replacement session", "unmounted reader"] as const)("restores the focused report action position only for the same reader (%s)", async (change) => {
+  const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
+  const requests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
+  let shown: ((event: ReactNative.KeyboardEvent) => void) | undefined;
+  vi.spyOn(Keyboard, "isVisible").mockReturnValue(true);
+  const subscribeKeyboard = Keyboard.addListener;
+  vi.spyOn(Keyboard, "addListener").mockImplementation((event, listener) => {
+    if (event === "keyboardDidShow") shown = listener;
+    return subscribeKeyboard(event, listener);
+  });
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { frames.push(callback); return frames.length; });
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  const list = getHost(view.container, "RCTScrollView");
+  const input = view.getByLabelText("Your message");
+  await fireEvent.changeText(input, "Keep this focused unsent question");
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 180 } } });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 800 } } });
+  requests.length = 0;
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/report?token=A%2fb%2B&part=1&part=2");
+  await act(() => { AppState.currentState = "background"; focusManager.setFocused(false); });
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 480 } } });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 500 } } });
+  await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
+  expect(requests).toEqual([]);
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 180 } } });
+  expect(requests).toEqual([]);
+  await act(() => shown?.({ duration: 250, easing: "keyboard",
+    endCoordinates: { screenX: 0, screenY: 540, width: 390, height: 304 },
+  }));
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 650 } } });
+  if (change === "replacement session") {
+    await act(() => storeAuthSession(session("session-two")));
+    await view.findByText(target);
+  }
+  if (change === "unmounted reader") await view.unmount();
+  await act(() => frames.splice(0).forEach((frame) => frame(16)));
+  if (change !== "same reader") {
+    expect(requests).toEqual([]);
+    return;
+  }
+  expect(requests).toEqual([{ method: "scrollToOffset", offset: 800, animated: false }]);
+  expect(getHost(view.container, "RCTScrollView")).toBe(list);
+  expect(view.getByLabelText("Your message")).toBe(input);
+  expect(view.getByDisplayValue("Keep this focused unsent question")).toBeTruthy();
+  expect(view.getByRole("button", { name: "Open report" })).toBeEnabled();
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 180 } } });
+  expect(requests).toHaveLength(1);
+});
+
+it("keeps the focused report action at its captured screen position through return and later reconciliation", async () => {
+  const requests = (ReactNative as unknown as { scrollRequests: { method: string; offset: number }[] }).scrollRequests;
+  const polls: (() => void)[] = [];
+  const interval = globalThis.setInterval;
+  vi.spyOn(globalThis, "setInterval").mockImplementation((callback, delay, ...args) => {
+    if (delay === 15_000) polls.push(callback as () => void);
+    return interval(callback, delay, ...args);
+  });
+  let shown: ((event: ReactNative.KeyboardEvent) => void) | undefined;
+  vi.spyOn(Keyboard, "isVisible").mockReturnValue(true);
+  const subscribeKeyboard = Keyboard.addListener;
+  vi.spyOn(Keyboard, "addListener").mockImplementation((event, listener) => {
+    if (event === "keyboardDidShow") shown = listener;
+    return subscribeKeyboard(event, listener);
+  });
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { frames.push(callback); return frames.length; });
+  let detailGate: ReturnType<typeof deferred<Response>> | null = null;
+  let detailRequests = 0;
+  let reminderGate: ReturnType<typeof deferred<Response>> | null = null;
+  server.use(
+    http.get("*/vehicle-history/requests/:id/reminder", () => reminderGate?.promise.then((response) => response.clone()) ?? HttpResponse.json(reminder())),
+    http.get("*/vehicle-history/requests/:id", () => { detailRequests++; return detailGate?.promise.then((response) => response.clone()) ?? HttpResponse.json(enquiry); }),
+    http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+      items: [{ ...message(), text: "(https://reports.example.test/a),(https://reports.example.test/b)" }], nextCursor: null,
+    })),
+  );
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByRole("button", { name: "Open report 2" });
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await vi.waitFor(() => expect(view.queryByText("Could not load your reminder preference.")).toBeNull());
+  expect(view.getByText("Stop follow-up reminders for this request. Your conversation stays available.")).toBeTruthy();
+  const list = getHost(view.container, "RCTScrollView");
+  const input = view.getByLabelText("Your message");
+  await fireEvent.changeText(input, "Keep this focused question");
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 176.667 } } });
+  let nativeOffset = 1051.667;
+  let nativeHeaderHeight = 336.333;
+  let nativeRefreshing = false;
+  const settleNativeViewport = async () => {
+    const headerHeight = view.queryByText("Could not load your reminder preference.") ? 382.333 : 336.333;
+    nativeOffset += headerHeight - nativeHeaderHeight;
+    nativeHeaderHeight = headerHeight;
+    const refreshing = list.props.refreshControl.props.refreshing;
+    if (refreshing && !nativeRefreshing) nativeOffset -= 60;
+    nativeRefreshing = refreshing;
+    for (const request of requests.splice(0)) if (request.method === "scrollToOffset") nativeOffset = request.offset;
+    await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: nativeOffset },
+      contentSize: { width: 402, height: nativeHeaderHeight + 892 },
+      layoutMeasurement: { width: 402, height: 176.667 },
+    } });
+    return 1271.167 + nativeHeaderHeight - 336.333 - nativeOffset;
+  };
+  expect(await settleNativeViewport()).toBeCloseTo(219.5, 3);
+  await fireEvent.press(view.getByRole("button", { name: "Open report 2" }));
+  await act(() => { AppState.currentState = "background"; focusManager.setFocused(false); });
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 0 } } });
+  await act(() => shown?.({ duration: 250, easing: "keyboard",
+    endCoordinates: { screenX: 0, screenY: 539, width: 402, height: 335 },
+  }));
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 176.667 } } });
+  detailGate = deferred<Response>();
+  reminderGate = deferred<Response>();
+  const returningRequest = detailRequests + 1;
+  await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
+  await vi.waitFor(() => expect(detailRequests).toBe(returningRequest));
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(1));
+  await settleNativeViewport();
+  await act(() => detailGate?.resolve(HttpResponse.json(enquiry)));
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Open report 2" })).toBeEnabled());
+  await act(() => frames.splice(0).forEach((frame) => frame(16)));
+  await settleNativeViewport();
+  await act(() => reminderGate?.resolve(HttpResponse.json(reminder())));
+  reminderGate = null;
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await vi.waitFor(() => expect(view.queryByText("Could not load your reminder preference.")).toBeNull());
+  expect(view.getByText("Stop follow-up reminders for this request. Your conversation stays available.")).toBeTruthy();
+  expect(await settleNativeViewport()).toBeCloseTo(219.5, 3);
+  detailGate = deferred<Response>();
+  const laterRequest = detailRequests + 1;
+  await act(() => polls.at(-1)?.());
+  await vi.waitFor(() => expect(detailRequests).toBe(laterRequest));
+  const settledActionCenter = await settleNativeViewport();
+  await act(() => detailGate?.resolve(HttpResponse.json(enquiry)));
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  expect(settledActionCenter).toBeCloseTo(219.5, 3);
+  expect(getHost(view.container, "RCTScrollView")).toBe(list);
+  expect(view.getByLabelText("Your message")).toBe(input);
+  expect(view.getByDisplayValue("Keep this focused question")).toBeTruthy();
+});
+
+it.each([200, 503])("shows pull feedback only for an explicit refresh and settles after HTTP %s", async (status) => {
+  const response = deferred<Response>();
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Questions are welcome.");
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  const list = getHost(view.container, "RCTScrollView");
+  const input = view.getByLabelText("Your message");
+  await fireEvent.changeText(input, "Keep this question through refresh");
+  expect(list.props.refreshControl.props.refreshing).toBe(false);
+  server.use(http.get("*/vehicle-history/requests/:id", () => response.promise));
+  await act(() => list.props.refreshControl.props.onRefresh());
+  await vi.waitFor(() => expect(list.props.refreshControl.props.refreshing).toBe(true));
+  await act(() => response.resolve(status === 200 ? HttpResponse.json(enquiry)
+    : HttpResponse.json({ code: "UNAVAILABLE" }, { status })));
+  await vi.waitFor(() => expect(list.props.refreshControl.props.refreshing).toBe(false));
+  expect(getHost(view.container, "RCTScrollView")).toBe(list);
+  expect(view.getByLabelText("Your message")).toBe(input);
+  expect(view.getByDisplayValue("Keep this question through refresh")).toBeTruthy();
+});
+
+it.each(["Copy link", "failed Open", "user scroll"])("does not restore an old report position after %s", async (action) => {
+  const requests = (ReactNative as unknown as { scrollRequests: unknown[] }).scrollRequests;
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
+  })));
+  if (action === "failed Open") vi.mocked(Linking.openURL).mockResolvedValueOnce(false);
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a");
+  const list = getHost(view.container, "RCTScrollView");
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 480 } } });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 800 } } });
+  requests.length = 0;
+  await fireEvent.press(view.getByRole("button", { name: action === "Copy link" ? "Copy link" : "Open report" }));
+  if (action === "user scroll") await fireEvent(list, "scrollBeginDrag");
+  await act(() => { AppState.currentState = "background"; focusManager.setFocused(false); });
+  await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: 500 } } });
+  await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
+  await fireEvent(list, "layout", { nativeEvent: { layout: { width: 390, height: 480 } } });
+  expect(requests).toEqual([]);
+});
+
+it("copies the complete report link and confirms only after clipboard success", async () => {
+  const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
+  const copied = deferred<boolean>();
+  const sentMessages: unknown[] = [];
+  nativeClipboard.setStringAsync.mockReset().mockReturnValueOnce(copied.promise);
+  vi.mocked(Linking.openURL).mockClear();
+  server.use(
+    http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+      items: [{ ...message(), text: target }], nextCursor: null,
+    })),
+    http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+      sentMessages.push(await request.json());
+      return HttpResponse.error();
+    }),
+  );
+  expect(vi.isMockFunction(Clipboard.setStringAsync)).toBe(false);
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Keep my question");
+  expect(view.queryByText("Link copied")).toBeNull();
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Copy link" })); });
+  await vi.waitFor(() => expect(nativeClipboard.setStringAsync).toHaveBeenCalledWith(
+    "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2", {},
+  ));
+  expect(view.queryByText("Link copied")).toBeNull();
+  await act(() => copied.resolve(true));
+  expect(await view.findByText("Link copied")).toBeTruthy();
+  expect(view.getByDisplayValue("Keep my question")).toBeTruthy();
+  expect(Linking.openURL).not.toHaveBeenCalled();
+  expect(sentMessages).toEqual([]);
+});
+
+it.each(["reject", "false"] as const)("keeps the link and draft available after clipboard %s, then explicitly retries", async (failure) => {
+  const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
+  nativeClipboard.setStringAsync.mockReset();
+  if (failure === "reject") nativeClipboard.setStringAsync.mockRejectedValueOnce(new Error("Synthetic clipboard failure"));
+  else nativeClipboard.setStringAsync.mockResolvedValueOnce(false);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Keep my question");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(await view.findByText("Could not copy the link. Try again, or select and copy the address.")).toBeTruthy();
+  expect(view.queryByText("Link copied")).toBeNull();
+  expect(view.getByDisplayValue("Keep my question")).toBeTruthy();
+  expect(view.getByText(target)).toBeTruthy();
+  nativeClipboard.setStringAsync.mockResolvedValueOnce(true);
+  await fireEvent.press(view.getByRole("button", { name: "Retry copy link" }));
+  expect(await view.findByText("Link copied")).toBeTruthy();
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith(
+    "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2", {},
+  );
+});
+
+it("discards clipboard feedback from before leaving and returning to the reader", async () => {
+  const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
+  const copied = deferred<boolean>();
+  nativeClipboard.setStringAsync.mockReset().mockReturnValueOnce(copied.promise);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Copy link" })); });
+  await vi.waitFor(() => expect(nativeClipboard.setStringAsync).toHaveBeenCalledWith(target, {}));
+  screenFocus.focused = false;
+  await view.rerender(<RequestScreen />);
+  screenFocus.focused = true;
+  await view.rerender(<RequestScreen />);
+  await view.findByText(target);
+  await act(() => copied.resolve(true));
+  expect(view.queryByText("Link copied")).toBeNull();
+  nativeClipboard.setStringAsync.mockResolvedValueOnce(true);
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(await view.findByText("Link copied")).toBeTruthy();
+});
+
+it.each(["account", "session", "request", "assignment"] as const)("does not carry pending clipboard feedback into a new %s reader", async (change) => {
+  const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
+  const copied = deferred<boolean>();
+  let currentRequest = enquiry;
+  nativeClipboard.setStringAsync.mockReset().mockReturnValueOnce(copied.promise);
+  server.use(
+    http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(currentRequest)),
+    http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+      items: [{ ...message(), text: target }], nextCursor: null,
+    })),
+  );
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Copy link" })); });
+  await vi.waitFor(() => expect(nativeClipboard.setStringAsync).toHaveBeenCalledWith(target, {}));
+  if (change === "account" || change === "session") {
+    await act(() => storeAuthSession(session("session-two", change === "account" ? operatorId : userId)));
+  } else if (change === "request") {
+    routeParams.id = nextId;
+    currentRequest = { ...enquiry, id: nextId };
+    await view.rerender(<RequestScreen />);
+  } else {
+    currentRequest = { ...enquiry, assignmentVersion: 2 };
+    await act(() => view.queryClient.invalidateQueries({
+      queryKey: ["vehicle-history", userId, "session-one", "requests", requestId], exact: true,
+    }));
+  }
+  await view.findByText(target);
+  await act(() => copied.resolve(true));
+  expect(view.queryByText("Link copied")).toBeNull();
+  expect(view.queryByText("Could not copy the link. Try again, or select and copy the address.")).toBeNull();
+  nativeClipboard.setStringAsync.mockResolvedValueOnce(true);
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Copy link" })).toBeEnabled());
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(await view.findByText("Link copied")).toBeTruthy();
+  expect(Linking.openURL).not.toHaveBeenCalled();
+});
+
+it("keeps prose selectable and maps multiple punctuated links to their exact targets", async () => {
+  const text = "First (https://reports.example.test/a?token=A%2fb%2B&part=1&part=2),\nthen <https://reports.example.test/b?opaque=one,;.!&next=(two)>; done.";
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  expect((await view.findByText(text)).props.selectable).toBe(true);
+  for (const name of ["Open report 1", "Copy link 1", "Open report 2", "Copy link 2"]) {
+    expect(view.getByRole("button", { name }).props.accessibilityHint).toBeUndefined();
+  }
+  await fireEvent.press(view.getByRole("button", { name: "Open report 1" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/a?token=A%2fb%2B&part=1&part=2");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link 2" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/b?opaque=one,;.!&next=(two)", {});
+  await fireEvent.press(view.getByRole("button", { name: "Open report 2" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/b?opaque=one,;.!&next=(two)");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link 1" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/a?token=A%2fb%2B&part=1&part=2", {});
+});
+
+it.each([
+  "https://reports.example.test/report?opaque=a,b;c.!?&empty=&part=1&&part=2#A%2fb%2B",
+  "HTTPS://REPORTS.EXAMPLE.TEST:443/a%2fb?x=%2F&x=%2f&flag#synthetic",
+])("passes original URI bytes without normalization: %s", async (target) => {
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith(target);
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith(target, {});
+});
+
+it.each([
+  "http://reports.example.test/a", "javascript:https://reports.example.test/a",
+  'https://reports.example.test/a?token=one"two', "https://reports.example.test/a<unsafe",
+  "https://user:secret@reports.example.test/a", "https://@reports.example.test/a",
+  "https:///reports.example.test/a", "https://reports.example.test:99999/a",
+  "https://reports.example.test/a%zz", "https://reports.example.test/a\\unsafe",
+  "https://[broken/a", "ftp://reports.example.test/a",
+])("keeps unsafe or malformed addresses as non-executable selectable text: %s", async (text) => {
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  expect((await view.findByText(text)).props.selectable).toBe(true);
+  expect(view.queryByRole("button", { name: "Open report" })).toBeNull();
+  expect(view.queryByRole("button", { name: "Copy link" })).toBeNull();
+  expect(Linking.openURL).not.toHaveBeenCalled();
+  expect(nativeClipboard.setStringAsync).not.toHaveBeenCalled();
+});
+
+it.each(["reject", "false"] as const)("recovers from external opening %s with Retry and exact Copy without exposing the error", async (failure) => {
+  const target = "https://reports.example.test/report?private=synthetic";
+  if (failure === "reject") vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error(target));
+  else vi.mocked(Linking.openURL).mockResolvedValueOnce(false);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(target);
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Keep my question");
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(await view.findByText("Could not open the link. Try again or copy the link.")).toBeTruthy();
+  expect(view.getAllByText(target)).toHaveLength(1);
+  expect(view.getByDisplayValue("Keep my question")).toBeTruthy();
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/report?private=synthetic", {});
+  await fireEvent.press(view.getByRole("button", { name: "Retry open report" }));
+  expect(view.queryByText("Could not open the link. Try again or copy the link.")).toBeNull();
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/report?private=synthetic");
+});
+
+it("ignores queued native link actions after the reader unmounts", async () => {
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a");
+  const open = view.getByRole("button", { name: "Open report" }).props.onPress;
+  const copy = view.getByRole("button", { name: "Copy link" }).props.onPress;
+  await view.unmount();
+  await act(async () => { await open(); await copy(); });
+  expect(Linking.openURL).not.toHaveBeenCalled();
+  expect(nativeClipboard.setStringAsync).not.toHaveBeenCalled();
+});
+
+it.each(["session", "request", "assignment", "hidden", "unmount"] as const)("discards a delayed opening refusal after %s changes", async (change) => {
+  const opened = deferred<boolean>();
+  let currentRequest = enquiry;
+  vi.mocked(Linking.openURL).mockReturnValueOnce(opened.promise);
+  server.use(
+    http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(currentRequest)),
+    http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+      items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
+    })),
+  );
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Open report" })); });
+  expect(Linking.openURL).toHaveBeenCalledWith("https://reports.example.test/a");
+  if (change === "session") await act(() => storeAuthSession(session("session-two")));
+  else if (change === "request") {
+    routeParams.id = nextId;
+    currentRequest = { ...enquiry, id: nextId };
+    await view.rerender(<RequestScreen />);
+  } else if (change === "assignment") {
+    currentRequest = { ...enquiry, assignmentVersion: 2 };
+    await act(() => view.queryClient.invalidateQueries({
+      queryKey: ["vehicle-history", userId, "session-one", "requests", requestId], exact: true,
+    }));
+  } else if (change === "hidden") {
+    screenFocus.focused = false;
+    await view.rerender(<RequestScreen />);
+  } else await view.unmount();
+  await act(() => opened.resolve(false));
+  if (change !== "unmount") {
+    expect(view.queryByText("Could not open the link. Try again or copy the link.")).toBeNull();
+    expect(view.queryByText("Link copied")).toBeNull();
+  }
+});
+
+it("confirms Copy beside only the message whose action was selected", async () => {
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [
+      { ...message(), text: "https://reports.example.test/a" },
+      { ...message(nextId, "2"), text: "Again: https://reports.example.test/a" },
+    ], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Again: https://reports.example.test/a");
+  const secondCopy = view.getAllByRole("button", { name: "Copy link" })[1];
+  if (!secondCopy) throw new Error("Expected two Copy actions");
+  await fireEvent.press(secondCopy);
+  expect(view.getAllByText("Link copied")).toHaveLength(1);
+});
+
+it.each(["Open report", "Copy link"])("overlays pending %s feedback without changing the action, reader or composer layout", async (action) => {
+  const copied = deferred<boolean>();
+  if (action === "Copy link") nativeClipboard.setStringAsync.mockReturnValueOnce(copied.promise);
+  else vi.mocked(Linking.openURL).mockReturnValueOnce(copied.promise);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a");
+  const composer = view.getByLabelText("Your message");
+  const list = getHost(view.container, "RCTScrollView");
+  const label = view.getByText(action);
+  await fireEvent.changeText(composer, "Unsent question");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: action })); });
+  const button = view.getByRole("button", { name: action, busy: true });
+  expect(button.props.accessibilityLabel).toBe(action);
+  const indicator = getHost(view.container, "ActivityIndicator");
+  expect(indicator.parent?.parent).toBe(button);
+  expect(indicator.parent?.props.className).toContain("absolute");
+  expect(indicator.parent?.props.pointerEvents).toBe("none");
+  expect(view.getByText(action)).toBe(label);
+  expect(label.props.className).toContain("opacity-0");
+  expect(view.queryByText("Link copied")).toBeNull();
+  await act(() => copied.resolve(true));
+  expect(view.getByRole("button", { name: action, busy: false })).toBeTruthy();
+  expect(label.props.className).not.toContain("opacity-0");
+  expect(view.getByLabelText("Your message")).toBe(composer);
+  expect(view.getByDisplayValue("Unsent question")).toBeTruthy();
+  expect(getHost(view.container, "RCTScrollView")).toBe(list);
+});
+
+it.each([
+  ["en", "Open report", "Copy link", "Link copied", "Could not copy the link. Try again, or select and copy the address.", "Could not open the link. Try again or copy the link."],
+  ["ru", "Открыть отчёт", "Скопировать ссылку", "Ссылка скопирована", "Не удалось скопировать ссылку. Повторите попытку или выделите и скопируйте адрес.", "Не удалось открыть ссылку. Повторите попытку или скопируйте ссылку."],
+  ["tk", "Hasabaty aç", "Salgyny göçür", "Salgy göçürildi", "Salgyny göçürip bolmady. Gaýtadan synanyşyň ýa-da salgyny saýlap göçüriň.", "Salgyny açyp bolmady. Gaýtadan synanyşyň ýa-da salgyny göçüriň."],
+])("names the target and confirms actual Copy accessibly in %s", async (language, open, copy, confirmation, copyFailure, openFailure) => {
+  const announce = vi.spyOn(AccessibilityInfo, "announceForAccessibility");
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a#synthetic" }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />, { locale: language });
+  await view.findByText("https://reports.example.test/a#synthetic");
+  expect(view.getByRole("button", { name: open }).props.accessibilityHint).toBeUndefined();
+  expect(view.getByRole("button", { name: copy }).props.accessibilityHint).toBeUndefined();
+  await fireEvent.press(view.getByRole("button", { name: copy }));
+  expect(await view.findByText(confirmation)).toBeTruthy();
+  expect(announce).toHaveBeenCalledWith(confirmation);
+  nativeClipboard.setStringAsync.mockResolvedValueOnce(false);
+  await fireEvent.press(view.getByRole("button", { name: copy }));
+  expect(await view.findByText(copyFailure)).toBeTruthy();
+  expect(announce).toHaveBeenCalledWith(copyFailure);
+  vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("Synthetic refusal"));
+  await fireEvent.press(view.getByRole("button", { name: open }));
+  expect(await view.findByText(openFailure)).toBeTruthy();
+  expect(announce).toHaveBeenCalledWith(openFailure);
+});
+
+it("keeps the latest explicit Copy result when rapid actions finish out of order", async () => {
+  const first = deferred<boolean>();
+  const second = deferred<boolean>();
+  nativeClipboard.setStringAsync.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a https://reports.example.test/b" }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a https://reports.example.test/b");
+  await act(async () => {
+    void fireEvent.press(view.getByRole("button", { name: "Copy link 1" }));
+    void fireEvent.press(view.getByRole("button", { name: "Copy link 2" }));
+  });
+  expect(nativeClipboard.setStringAsync.mock.calls).toEqual([
+    ["https://reports.example.test/a", {}], ["https://reports.example.test/b", {}],
+  ]);
+  await act(() => second.resolve(true));
+  await act(() => first.resolve(false));
+  expect(view.getAllByText("Link copied")).toHaveLength(1);
+  expect(view.queryByText("Could not copy the link. Try again, or select and copy the address.")).toBeNull();
+});
+
+it.each(["background", "offline", "hidden", "refresh"] as const)("rejects queued native actions while the current reader is %s", async (change) => {
+  const metadata = deferred<Response>();
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a");
+  const open = view.getByRole("button", { name: "Open report" }).props.onPress;
+  const copy = view.getByRole("button", { name: "Copy link" }).props.onPress;
+  if (change === "background") AppState.currentState = "background";
+  else if (change === "offline") await act(() => onlineManager.setOnline(false));
+  else if (change === "hidden") {
+    screenFocus.focused = false;
+    await view.rerender(<RequestScreen />);
+  } else {
+    server.use(http.get("*/vehicle-history/requests/:id", () => metadata.promise));
+    await act(async () => { void view.queryClient.invalidateQueries({
+      queryKey: ["vehicle-history", userId, "session-one", "requests", requestId], exact: true,
+    }); });
+  }
+  if (change === "refresh") await vi.waitFor(() => expect(view.getByRole("button", { name: "Copy link" })).toBeDisabled());
+  try {
+    await act(async () => { await open(); await copy(); });
+    expect(Linking.openURL).not.toHaveBeenCalled();
+    expect(nativeClipboard.setStringAsync).not.toHaveBeenCalled();
+  } finally {
+    AppState.currentState = "active";
+    await act(() => metadata.resolve(HttpResponse.json(enquiry)));
+  }
+});
+
+it("does not announce a pending Copy after its reader unmounts", async () => {
+  const copied = deferred<boolean>();
+  const announce = vi.spyOn(AccessibilityInfo, "announceForAccessibility");
+  nativeClipboard.setStringAsync.mockReturnValueOnce(copied.promise);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: "https://reports.example.test/a" }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("https://reports.example.test/a");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Copy link" })); });
+  await view.unmount();
+  announce.mockClear();
+  await act(() => copied.resolve(true));
+  expect(announce).not.toHaveBeenCalled();
+});
+
+it("retains the complete long target and causes no network or service mutations through Open and Copy", async () => {
+  const target = "https://reports.example.test/report?opaque=" + "A%2fb%2B".repeat(300) + "&part=1&part=2";
+  const sideEffects: string[] = [];
+  const observe = ({ request }: { request: Request }) => {
+    const url = new URL(request.url);
+    if (url.hostname === "reports.example.test" || (request.method !== "GET" && !url.pathname.endsWith("/receipts"))) {
+      sideEffects.push(request.method + " " + url.pathname);
+    }
+  };
+  server.events.on("request:start", observe);
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text: target }], nextCursor: null,
+  })));
+  try {
+    const view = await renderMobile(<RequestScreen />);
+    expect((await view.findByText(target)).props.selectable).toBe(true);
+    expect(Linking.openURL).not.toHaveBeenCalled();
+    expect(nativeClipboard.setStringAsync).not.toHaveBeenCalled();
+    await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+    await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+    expect(Linking.openURL).toHaveBeenLastCalledWith(target);
+    expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith(target, {});
+    expect(sideEffects).toEqual([]);
+  } finally { server.events.removeListener("request:start", observe); }
+});
+
+it.each([
+  ["Read https://reports.example.test/report.", "https://reports.example.test/report"],
+  ["Read [https://reports.example.test/report?x=(one)&part=1&part=2].", "https://reports.example.test/report?x=(one)&part=1&part=2"],
+  ["Read “https://reports.example.test/report?x=a%2Eb”; done.", "https://reports.example.test/report?x=a%2Eb"],
+  ["https://reports.example.test/report?opaque=a,;.!", "https://reports.example.test/report?opaque=a,;.!"],
+])("separates clear prose delimiters while preserving query punctuation: %s", async (text, target) => {
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(text);
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith(target);
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith(target, {});
+});
+
+it("preserves legal apostrophes inside a quoted opaque query", async () => {
+  const text = "Read 'https://reports.example.test/report?token=O'Reilly&part=1&part=2'.";
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(text);
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/report?token=O'Reilly&part=1&part=2");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/report?token=O'Reilly&part=1&part=2", {});
+});
+
+it("offers each adjacent delimited target without whitespace", async () => {
+  const text = "(https://reports.example.test/a),(https://reports.example.test/b)";
+  server.use(http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
+    items: [{ ...message(), text }], nextCursor: null,
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(text);
+  await fireEvent.press(view.getByRole("button", { name: "Open report 1" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/a");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link 1" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/a", {});
+  await fireEvent.press(view.getByRole("button", { name: "Open report 2" }));
+  expect(Linking.openURL).toHaveBeenLastCalledWith("https://reports.example.test/b");
+  await fireEvent.press(view.getByRole("button", { name: "Copy link 2" }));
+  expect(nativeClipboard.setStringAsync).toHaveBeenLastCalledWith("https://reports.example.test/b", {});
+});
 
 it("appends ascending pages, retains earlier messages on failure, and retries the exact forward cursor", async () => {
   const cursors: (string | null)[] = [];
@@ -815,6 +1499,27 @@ it.each(["blur", "background"])("requires explicit same-intent retry after %s an
 
 function reminder() { return { reason: "customer_answer", since: "2026-11-14T01:00:00.000Z", version: 3,
   eligibleAt: "2026-11-15T01:00:00.000Z", eligible: true, ineligibleReason: null, declined: false, stopped: false, used: false, outcome: null }; }
+it.each(["network", "server"] as const)("keeps reminder reload available after a genuine %s failure", async (failure) => {
+  let unavailable = false;
+  server.use(http.get("*/vehicle-history/requests/:id/reminder", () => unavailable
+    ? failure === "network" ? HttpResponse.error() : HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 })
+    : HttpResponse.json(reminder())));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByRole("button", { name: "Stop reminders" });
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  unavailable = true;
+  await act(() => view.queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("reminder") }));
+  await view.findByText("Could not load your reminder preference.");
+  expect(view.getByRole("button", { name: "Stop reminders" })).toBeDisabled();
+  const reload = view.getByRole("button", { name: "Reload reminders" });
+  await vi.waitFor(() => expect(reload).toBeEnabled());
+  unavailable = false;
+  await fireEvent.press(reload);
+  await vi.waitFor(() => expect(view.queryByText("Could not load your reminder preference.")).toBeNull());
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Stop reminders" })).toBeEnabled());
+  expect(view.getByText("Questions are welcome.")).toBeTruthy();
+});
+
 it("stops reminders explicitly, retries the same uncertain version and keeps the conversation readable", async () => {
   const writes: unknown[] = []; let stopped = false;
   server.use(http.get("*/vehicle-history/requests/:id/reminder", () => HttpResponse.json(stopped
