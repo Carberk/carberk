@@ -67,9 +67,9 @@ it("places the exact enquiry and Messages history behind a cold Listing link anc
   const dispatch = vi.fn();
   const current = { name: "(public)", key: "public-cold", state: { index: 0,
     routes: [{ name: "listings/[id]", key: "source-cold", params: { id: listingId, historyRequest: requestId } }] } };
-  vi.mocked(useNavigation).mockReturnValue({ dispatch, getState: () => ({ index: 1,
+  vi.mocked(useNavigation).mockImplementation((parent) => (parent ? { dispatch, getState: () => ({ index: 1,
     routes: [{ name: "(tabs)", state: { index: 0, routes: [{ name: "(search)" }, { name: "chat" }] } }, current],
-  }) } as ReturnType<typeof useNavigation>);
+  }) } : { getState: () => current.state }) as ReturnType<typeof useNavigation>);
   const view = await renderMobile(<ListingScreen />);
   await view.findByText("Current public description — Döwlet / Ответ");
   const action = dispatch.mock.calls[0]?.[0];
@@ -94,6 +94,21 @@ it("preserves the genuine enquiry caller and its existing native stack", async (
   expect(dispatch).not.toHaveBeenCalled();
   await fireEvent.press(view.getByRole("button", { name: "Back to enquiry" }));
   expect(routerMock.back).toHaveBeenCalledOnce();
+});
+
+it("restores cold parents when native root state omits the mounted public navigator state", async () => {
+  const dispatch = vi.fn();
+  const current = { name: "(public)", key: "public-cold" };
+  vi.mocked(useNavigation).mockImplementation((parent) => (parent ? { dispatch,
+    getState: () => ({ index: 1, routes: [{ name: "(tabs)" }, current] }),
+  } : { getState: () => ({ index: 0, routes: [{ name: "listings/[id]",
+    params: { id: listingId, historyRequest: requestId } }] }) }) as ReturnType<typeof useNavigation>);
+  const view = await renderMobile(<ListingScreen />);
+  await view.findByText("Current public description — Döwlet / Ответ");
+  expect(dispatch.mock.calls[0]?.[0]).toMatchObject({ type: "RESET", payload: { index: 3,
+    routes: [{ name: "(tabs)" }, { name: "vehicle-history/requests/index" },
+      { name: "vehicle-history/requests/[id]", params: { id: requestId } }, current],
+  } });
 });
 
 it.each([

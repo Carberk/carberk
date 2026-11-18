@@ -29,11 +29,12 @@ export function HistorySourceListing({ requestId, listingId }: { requestId: stri
   const { maps } = useCatalogMaps(data?.brandId, data?.modelId, data?.regionId);
   const back = useSafeBack(`/vehicle-history/requests/${encodeURIComponent(requestId)}`);
   const navigation = useNavigation("/");
+  const publicNavigation = useNavigation();
   useEffect(() => {
     const state = navigation.getState();
     const previous = state?.routes[(state.index ?? 0) - 1];
     const current = state?.routes[state.index];
-    const publicState = current?.state;
+    const publicState = publicNavigation.getState();
     const source = publicState?.routes[publicState.index ?? 0];
     const params = source?.params as { id?: string; historyRequest?: string } | undefined;
     if (state?.index !== 1 || previous?.name !== "(tabs)" || current?.name !== "(public)"
@@ -47,7 +48,7 @@ export function HistorySourceListing({ requestId, listingId }: { requestId: stri
       { name: "vehicle-history/requests/[id]", params: { id: requestId } },
       current,
     ] } });
-  }, [navigation, requestId, listingId]);
+  }, [navigation, publicNavigation, requestId, listingId]);
   const error = request.error ?? (authorized ? listing.error : null);
   const denied = error instanceof ApiError && [401, 403, 404].includes(error.status);
   const loading = available && viewer !== null && (viewer === undefined || request.isPending || authorized && listing.isPending);
