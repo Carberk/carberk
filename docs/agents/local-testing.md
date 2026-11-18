@@ -66,33 +66,37 @@ grep -E '^(DATABASE_URL|MINIO_ENDPOINT|MINIO_ACCESS_KEY|MINIO_SECRET_KEY|MINIO_R
 
 The shared local database can lag behind `main`. A readiness/schema failure requires coordinated setup (section 1a), not an automatic migration or reseed.
 
-Start the API in the background on a free port, with its own log. Several agents share this Mac, so check `lsof -nP -iTCP:<port> -sTCP:LISTEN` first; `3006` is the default. In Claude Code or Codex, use the tool's background mode instead of the trailing `&`:
+For an existing legacy environment, start only your missing API on a selected free port. Run this foreground helper in the tool's background/PTY mode:
 
 ```bash
-PORT=3006 LISTING_VIDEO_API_ORIGIN=http://localhost:3006 pnpm --filter @auto-tm/api dev > /tmp/carberk-api-3006.log 2>&1 &
+node scripts/local-api-start.mjs --port 3006
 ```
 
-Use the same port in all three places. `LISTING_VIDEO_API_ORIGIN` puts that port into video URLs; with the wrong port, video plays from another agent's API. Then check it until it answers, usually within a few seconds:
+The helper starts the API from this checkout, sets matching `PORT` and `LISTING_VIDEO_API_ORIGIN`, and refuses a busy loopback port without stopping its owner. It creates a unique `/tmp/carberk-api-*` directory (0700) and `api.log` (0600), including under umask 022. Its public output contains only session status, paths, ownership and port metadata; API stdout/stderr stay in the private log. Use that reported `logFile` for request-correlated sign-in code retrieval; never print or attach its contents. Retain the private log until the owned session and code retrieval are finished, then remove only its reported directory.
+
+The reported starting status does not establish readiness. Check the selected port until it answers:
 
 ```bash
 curl -sf http://localhost:3006/readyz && echo ready
 ```
 
-Start Admin in the background too, using the same tool background mode or trailing `&`:
+Start only your missing Admin through the existing launcher, selecting the same API and its effective env file plus your exact Admin origin. Include any API process overrides in that selected private env file. Use the tool's background/PTY mode:
 
 ```bash
-pnpm --filter @auto-tm/admin dev > /tmp/carberk-admin.log 2>&1 &
+pnpm admin:access serve \
+  --api http://localhost:3006/api/v1 --admin http://localhost:4301 \
+  --api-env /absolute/path/to/running-api.env
 ```
 
-Then check its login page until it answers:
+Keep Admin output private and follow [Admin access](admin-access.md) for origin/session selection and sign-in. Check the selected targets after Admin is listening:
 
 ```bash
-curl -sf http://localhost:3001/login > /dev/null && echo ready
+pnpm admin:access check \
+  --api http://localhost:3006/api/v1 --admin http://localhost:4301 \
+  --api-env /absolute/path/to/running-api.env
 ```
 
-If port `3001` is taken, check the existing process before starting another. Stop only processes you started.
-
-Starting the API also builds `@auto-tm/db` and contracts, which the scripts below need. The API serves the code of the worktree that started it. If a port is taken, another session's API is running: pick another port rather than stopping it.
+Both launchers refuse busy ports; select another port and keep all dependent origins consistent. Stop an owned invocation with Ctrl-C: it terminates and waits for its own process group, including descendants, without stopping reused services. Starting the API also builds `@auto-tm/db` and contracts, which the scripts below need. It serves the code of the worktree that started it.
 
 ## 1a. Seed test data
 
