@@ -29,6 +29,19 @@ export const resources: Resource = {
   ru: {
     common: {
       vehicleHistory: {
+        reminderTitle: "Напоминания",
+        reminderOffline: "Для изменения напоминаний нужно подключение.",
+        reminderStorage: "Не удалось сохранить попытку на устройстве. Загрузите настройку снова.",
+        reminderStop: "Отключить напоминания",
+        reminderRetryStop: "Повторить отключение",
+        reminderReload: "Обновить напоминания",
+        reminderStopped: "Напоминания отключены. Переписка остаётся доступной.",
+        reminderUncertain: "Отключение не подтверждено. Повторите попытку для этого запроса.",
+        reminderError: "Не удалось загрузить настройку напоминаний.",
+        reminderStopping: "Отключение напоминаний…",
+        reminderHint: "Отключить последующие напоминания по этому запросу. Переписка сохранится.",
+        reminderChanged: "Состояние изменилось. Проверьте его и снова нажмите «Отключить напоминания».",
+        reminderDeclined: "Вы отказались от предложения. Напоминаний не будет.",
         replyLabel: "Ваше сообщение", replyPlaceholder: "Задайте вопрос, даже без VIN",
         sendMessage: "Отправить сообщение", sendNew: "Отправить как новое сообщение",
         sending: "Отправляется…", sendUncertain: "Отправка не подтверждена. Повторите то же сообщение.",
@@ -1029,6 +1042,19 @@ export const resources: Resource = {
   tk: {
     common: {
       vehicleHistory: {
+        reminderTitle: "Ýatlatmalar",
+        reminderOffline: "Ýatlatmalary üýtgetmek üçin tor gerek.",
+        reminderStorage: "Synanyşyk enjamda saklanmady. Sazlamany täzeden ýükläň.",
+        reminderStop: "Ýatlatmalary bes et",
+        reminderRetryStop: "Bes etmegi gaýtadan synan",
+        reminderReload: "Ýatlatmalary täzele",
+        reminderStopped: "Ýatlatmalar bes edildi. Hat alyşma elýeterli bolmagynda galýar.",
+        reminderUncertain: "Ýatlatmalaryň bes edilendigi tassyklanmady. Şol ýüz tutma üçin gaýtadan synanyşyň.",
+        reminderError: "Ýatlatmalaryň sazlamasy ýüklenmedi.",
+        reminderStopping: "Ýatlatmalar bes edilýär…",
+        reminderHint: "Şu ýüz tutma boýunça geljekki ýatlatmalary bes ediň. Hat alyşma saklanar.",
+        reminderChanged: "Ýagdaý üýtgedi. Ony barlap, Ýatlatmalary bes et düwmesine täzeden basyň.",
+        reminderDeclined: "Siz teklibi ret etdiňiz. Ýatlatma iberilmez.",
         replyLabel: "Habaryňyz", replyPlaceholder: "VIN bolmasa-da sorag beriň",
         sendMessage: "Habar iber", sendNew: "Täze habar hökmünde iber",
         sending: "Iberilýär…", sendUncertain: "Iberilendigi tassyklanmady. Şol habary gaýtadan iberiň.",
@@ -2029,6 +2055,19 @@ export const resources: Resource = {
   en: {
     common: {
       vehicleHistory: {
+        reminderTitle: "Reminders",
+        reminderOffline: "Connect to change your reminder preference.",
+        reminderStorage: "Could not save this attempt on the device. Reload your preference.",
+        reminderStop: "Stop reminders",
+        reminderRetryStop: "Retry stopping reminders",
+        reminderReload: "Reload reminders",
+        reminderStopped: "Reminders stopped. Your conversation stays available.",
+        reminderUncertain: "Stopping reminders is unconfirmed. Retry to check the same request.",
+        reminderError: "Could not load your reminder preference.",
+        reminderStopping: "Stopping reminders…",
+        reminderHint: "Stop follow-up reminders for this request. Your conversation stays available.",
+        reminderChanged: "The request changed. Check its status, then choose Stop reminders again.",
+        reminderDeclined: "You declined the offer. No reminders will be sent.",
         replyLabel: "Your message", replyPlaceholder: "Ask a question, even without a VIN",
         sendMessage: "Send message", sendNew: "Send as new message",
         sending: "Sending…", sendUncertain: "Send not confirmed. Retry the same message.",

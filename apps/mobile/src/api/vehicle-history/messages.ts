@@ -64,6 +64,9 @@ export function historyTranscript(viewer: HistoryViewer, requestId: string, sign
       // A committed send is not contiguous fetched-page or receipt evidence.
       return message;
     },
+    reminder: (current: () => boolean) => transport("/reminder", VehicleHistorySchemas.HistoryReminderSchema, undefined, current),
+    stopReminders: (expectedWaitingVersion: number, current: () => boolean) => transport("/reminder/stop",
+      VehicleHistorySchemas.HistoryReminderSchema, VehicleHistorySchemas.StopHistoryRemindersSchema.parse({ expectedWaitingVersion }), current),
     receipts: () => transport("/receipts", VehicleHistorySchemas.HistoryReceiptsSchema),
     async acknowledge(cursor: string, kind: "received" | "read", visible = () => true) {
       const revision = generation;

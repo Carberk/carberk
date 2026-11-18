@@ -34,7 +34,9 @@ beforeEach(async () => {
   vi.mocked(SecureStore.setItemAsync).mockImplementation(async (_key, value) => { stored = value; });
   vi.stubEnv("EXPO_PUBLIC_ENV", "development");
   vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", "true");
-  server.use(http.get("*/catalog/brands", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })));
+  server.use(
+    http.get("*/vehicle-history/requests/:id/reminder", () => HttpResponse.json({ reason: null, since: null, version: 0,
+      eligibleAt: null, eligible: false, ineligibleReason: "not_waiting", declined: false, stopped: false, used: false, outcome: null })),http.get("*/catalog/brands", () => HttpResponse.json({ items: [], nextCursor: null, hasMore: false })));
   server.use(
     http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get("*/vehicle-history/requests/:id/receipts", () => HttpResponse.json({ items: [] })),

@@ -203,3 +203,46 @@ export async function historyPrivateNoteAction(locale: DeskLocale, value: unknow
     data.data.text !== body.data.text || data.data.author.id !== after.actor.id) return { status: "unavailable", scope };
   return { status: "ok", scope, actor: after.actor, kind, data: data.data };
 }
+
+export type HistoryReminderResult = Exclude<HistoryInboxResult, { status: "ok" }> |
+  (Scope & { status: "ok"; kind: "reminder"; data: V.HistoryReminder; refused: boolean });
+
+export async function historyReminderAction(locale: DeskLocale, value: unknown): Promise<HistoryReminderResult> {
+  await rejectExpiredSession();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { status: "validation" };
+  const input = value as Record<string, unknown>;
+  const selection = V.HistoryInboxActionSchema.safeParse({ kind: "detail", id: input["id"], scope: input["scope"],
+    expectedAssignmentVersion: input["expectedAssignmentVersion"] });
+  const body = input["body"] === undefined ? null : V.SendHistoryReminderSchema.safeParse(input["body"]);
+  if (!selection.success || selection.data.kind !== "detail" || !["tk", "ru", "en"].includes(locale)
+    || Object.keys(input).some((key) => !["id", "scope", "expectedAssignmentVersion", "body"].includes(key))
+    || body && (!body.success || body.data.expectedAssignmentVersion !== selection.data.expectedAssignmentVersion)) return { status: "validation" };
+  const before = await historyInboxAction(locale, selection.data);
+  if (before.status !== "ok") return before;
+  const path = `/vehicle-history/operator/requests/${selection.data.id}/reminder`;
+  let response: unknown, failure: unknown, refused = false;
+  try {
+    try {
+      response = await apiFetchOptional<unknown>(body ? path : `${path}?expectedAssignmentVersion=${selection.data.expectedAssignmentVersion}`, {
+        method: body ? "POST" : "GET", cache: "no-store", headers: { "Accept-Language": locale },
+        ...(body?.success ? { body: body.data } : {}),
+      });
+    } catch (error) {
+      unstable_rethrow(error);
+      if (!(body && error instanceof ApiError && error.status === 409 && error.code === "HISTORY_REMINDER_CONFLICT")) throw error;
+      refused = true;
+      response = await apiFetchOptional<unknown>(`${path}?expectedAssignmentVersion=${selection.data.expectedAssignmentVersion}`,
+        { cache: "no-store", headers: { "Accept-Language": locale } });
+    }
+  } catch (error) { unstable_rethrow(error); failure = error; }
+  const after = await historyInboxAction(locale, selection.data);
+  if (after.status !== "ok") return after;
+  if (after.scope !== before.scope || after.actor.id !== before.actor.id) return { status: "stale", scope: after.scope };
+  if (failure instanceof ApiError && failure.status === 403) return { status: "denied", scope: after.scope };
+  if (failure instanceof ApiError && failure.status === 409) return { status: "conflict", scope: after.scope };
+  if (failure) return { status: "unavailable", scope: after.scope };
+  if (response === null) return { status: "expired", scope: after.scope };
+  const data = V.HistoryReminderSchema.safeParse(response);
+  if (!data.success) return { status: "unavailable", scope: after.scope };
+  return { status: "ok", kind: "reminder", scope: after.scope, actor: after.actor, data: data.data, refused };
+}

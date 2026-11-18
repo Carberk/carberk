@@ -46,6 +46,7 @@ const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request
     }
     if (url.pathname.endsWith("/messages")) return Response.json({ items: [{ id, clientMessageId: id, order: "1", kind: "TEXT",
       text: "Can you check this car?", author: { ...actor, kind: "requester" }, createdAt: row.createdAt }], nextCursor: null });
+    if (url.pathname.endsWith("/reminder")) return Response.json(reminder());
     if (url.pathname.endsWith("/notes")) {
       if (init?.method === "POST") {
         const body = JSON.parse(String(init.body));
@@ -1814,4 +1815,74 @@ it("offers keyboard reading of a long pending reply while keeping newer writing 
   await act(async () => pending.resolve(Response.json({ ...message(1, text), clientMessageId: sent?.clientMessageId, author: { ...actor, kind: "operator" } })));
   await screen.findByText("Sent");
   expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("Next reply remains editable");
+});
+
+function reminder() { return { reason: "customer_answer", since: "2026-11-14T01:00:00.000Z", version: 3,
+  eligibleAt: "2026-11-15T01:00:00.000Z", eligible: true, ineligibleReason: null, declined: false, stopped: false, used: false, outcome: null }; }
+it("offers one secondary reminder manually and retains the same uncertain intent after navigation", async () => {
+  selectAssigned();
+  const writes: unknown[] = [];
+  server.use(http.post("http://api.test/api/v1/vehicle-history/operator/requests/:id/reminder", async ({ request }) => {
+    writes.push(await request.json());
+    return Response.json({ code: "HISTORY_REMINDER_UNAVAILABLE" }, { status: 503 });
+  }));
+  const mounted = render(view());
+  const send = await screen.findByRole("button", { name: "Send one reminder" });
+  await waitFor(() => expect((send as HTMLButtonElement).disabled).toBe(false));
+  expect(writes).toEqual([]);
+  fireEvent.click(send); fireEvent.click(send);
+  await screen.findByRole("button", { name: "Retry reminder" });
+  expect(writes).toHaveLength(1);
+  mounted.unmount(); render(view());
+  const retry = await screen.findByRole("button", { name: "Retry reminder" });
+  await waitFor(() => expect((retry as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(retry);
+  await waitFor(() => expect(writes).toHaveLength(2));
+  expect(writes[1]).toEqual(writes[0]);
+  expect(writes[0]).toMatchObject({ expectedWaitingVersion: 3, expectedAssignmentVersion: 1 });
+});
+it("reads authoritative stopped suppression after a stale eligible reminder tap", async () => {
+  selectAssigned(); let stopped = false;
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/:id/reminder", () => Response.json(stopped
+    ? { ...reminder(), stopped: true, eligible: false, ineligibleReason: "stopped", version: 4 } : reminder())),
+  http.post("http://api.test/api/v1/vehicle-history/operator/requests/:id/reminder", () => {
+    stopped = true; return Response.json({ code: "HISTORY_REMINDER_CONFLICT" }, { status: 409 });
+  }));
+  render(view());
+  const send = await screen.findByRole("button", { name: "Send one reminder" });
+  await waitFor(() => expect((send as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(send);
+  await screen.findByText("The customer stopped reminders.");
+  expect((screen.getByRole("button", { name: "Send one reminder" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("textbox", { name: "Reply to customer" })).toBeDefined();
+});
+
+it.each([
+  ["en", "too_early", "Available after 24 hours waiting for the customer."],
+  ["ru", "declined", "Клиент отказался от предложения. Напоминаний не будет."],
+  ["tk", "not_waiting", "Müşderiniň jogabyna garaşylmaýar."],
+  ["en", "used", "The one reminder was already sent."],
+  ["ru", "stopped", "Клиент отключил напоминания."],
+])("explains server reminder refusal %s/%s without sending", async (locale, reason, text) => {
+  selectAssigned();
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/:id/reminder", () => Response.json({
+    ...reminder(), eligible: false, ineligibleReason: reason, used: reason === "used", stopped: reason === "stopped", declined: reason === "declined",
+  })));
+  render(<HistoryWorkbench locale={locale as "en" | "ru" | "tk"} section="desk"><HistoryInbox locale={locale as "en" | "ru" | "tk"} /></HistoryWorkbench>);
+  await screen.findByText(text);
+  expect(requests.filter((request) => request.method === "POST" && request.path.endsWith("/reminder"))).toEqual([]);
+});
+it("does not publish a late reminder result into another selected request", async () => {
+  selectAssigned();
+  const pending = deferred<Response>();
+  server.use(http.post("http://api.test/api/v1/vehicle-history/operator/requests/:id/reminder", () => pending.promise));
+  render(view());
+  const send = await screen.findByRole("button", { name: "Send one reminder" });
+  await waitFor(() => expect((send as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(send);
+  await screen.findByText("Pending");
+  fireEvent.click(screen.getByRole("button", { name: "Unassigned" }));
+  await act(async () => pending.resolve(Response.json({ ...reminder(), used: true, eligible: false, ineligibleReason: "used" })));
+  expect(screen.queryByText("The one reminder was already sent.")).toBeNull();
+  expect(localStorage.getItem(`carberk.history.reminder.v1:${actor.id}:${id}:1`)).toContain("expectedWaitingVersion");
 });
