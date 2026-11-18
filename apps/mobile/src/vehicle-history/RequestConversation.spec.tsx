@@ -186,8 +186,10 @@ it("keeps the focused report action at its captured screen position through retu
   vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { frames.push(callback); return frames.length; });
   let detailGate: ReturnType<typeof deferred<Response>> | null = null;
   let detailRequests = 0;
+  let reminderGate: ReturnType<typeof deferred<Response>> | null = null;
   server.use(
-    http.get("*/vehicle-history/requests/:id", () => { detailRequests++; return detailGate?.promise ?? HttpResponse.json(enquiry); }),
+    http.get("*/vehicle-history/requests/:id/reminder", () => reminderGate?.promise.then((response) => response.clone()) ?? HttpResponse.json(reminder())),
+    http.get("*/vehicle-history/requests/:id", () => { detailRequests++; return detailGate?.promise.then((response) => response.clone()) ?? HttpResponse.json(enquiry); }),
     http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({
       items: [{ ...message(), text: "(https://reports.example.test/a),(https://reports.example.test/b)" }], nextCursor: null,
     })),
@@ -195,24 +197,30 @@ it("keeps the focused report action at its captured screen position through retu
   const view = await renderMobile(<RequestScreen />);
   await view.findByRole("button", { name: "Open report 2" });
   await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await vi.waitFor(() => expect(view.queryByText("Could not load your reminder preference.")).toBeNull());
+  expect(view.getByText("Stop follow-up reminders for this request. Your conversation stays available.")).toBeTruthy();
   const list = getHost(view.container, "RCTScrollView");
   const input = view.getByLabelText("Your message");
   await fireEvent.changeText(input, "Keep this focused question");
   await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 176.667 } } });
-  let nativeOffset = 871.667;
+  let nativeOffset = 1051.667;
+  let nativeHeaderHeight = 336.333;
   let nativeRefreshing = false;
   const settleNativeViewport = async () => {
+    const headerHeight = view.queryByText("Could not load your reminder preference.") ? 382.333 : 336.333;
+    nativeOffset += headerHeight - nativeHeaderHeight;
+    nativeHeaderHeight = headerHeight;
     const refreshing = list.props.refreshControl.props.refreshing;
     if (refreshing && !nativeRefreshing) nativeOffset -= 60;
     nativeRefreshing = refreshing;
     for (const request of requests.splice(0)) if (request.method === "scrollToOffset") nativeOffset = request.offset;
     await fireEvent.scroll(list, { nativeEvent: { contentOffset: { x: 0, y: nativeOffset },
-      contentSize: { width: 402, height: 1048.333 },
+      contentSize: { width: 402, height: nativeHeaderHeight + 892 },
       layoutMeasurement: { width: 402, height: 176.667 },
     } });
-    return 1090.167 - nativeOffset;
+    return 1271.167 + nativeHeaderHeight - 336.333 - nativeOffset;
   };
-  expect(await settleNativeViewport()).toBeCloseTo(218.5, 3);
+  expect(await settleNativeViewport()).toBeCloseTo(219.5, 3);
   await fireEvent.press(view.getByRole("button", { name: "Open report 2" }));
   await act(() => { AppState.currentState = "background"; focusManager.setFocused(false); });
   await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 0 } } });
@@ -221,14 +229,22 @@ it("keeps the focused report action at its captured screen position through retu
   }));
   await fireEvent(list, "layout", { nativeEvent: { layout: { width: 402, height: 176.667 } } });
   detailGate = deferred<Response>();
+  reminderGate = deferred<Response>();
   const returningRequest = detailRequests + 1;
   await act(() => { AppState.currentState = "active"; focusManager.setFocused(true); });
   await vi.waitFor(() => expect(detailRequests).toBe(returningRequest));
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(1));
   await settleNativeViewport();
   await act(() => detailGate?.resolve(HttpResponse.json(enquiry)));
-  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Open report 2" })).toBeEnabled());
   await act(() => frames.splice(0).forEach((frame) => frame(16)));
-  expect(await settleNativeViewport()).toBeCloseTo(218.5, 3);
+  await settleNativeViewport();
+  await act(() => reminderGate?.resolve(HttpResponse.json(reminder())));
+  reminderGate = null;
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  await vi.waitFor(() => expect(view.queryByText("Could not load your reminder preference.")).toBeNull());
+  expect(view.getByText("Stop follow-up reminders for this request. Your conversation stays available.")).toBeTruthy();
+  expect(await settleNativeViewport()).toBeCloseTo(219.5, 3);
   detailGate = deferred<Response>();
   const laterRequest = detailRequests + 1;
   await act(() => polls.at(-1)?.());
@@ -236,7 +252,7 @@ it("keeps the focused report action at its captured screen position through retu
   const settledActionCenter = await settleNativeViewport();
   await act(() => detailGate?.resolve(HttpResponse.json(enquiry)));
   await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
-  expect(settledActionCenter).toBeCloseTo(218.5, 3);
+  expect(settledActionCenter).toBeCloseTo(219.5, 3);
   expect(getHost(view.container, "RCTScrollView")).toBe(list);
   expect(view.getByLabelText("Your message")).toBe(input);
   expect(view.getByDisplayValue("Keep this focused question")).toBeTruthy();
@@ -1483,6 +1499,27 @@ it.each(["blur", "background"])("requires explicit same-intent retry after %s an
 
 function reminder() { return { reason: "customer_answer", since: "2026-11-14T01:00:00.000Z", version: 3,
   eligibleAt: "2026-11-15T01:00:00.000Z", eligible: true, ineligibleReason: null, declined: false, stopped: false, used: false, outcome: null }; }
+it.each(["network", "server"] as const)("keeps reminder reload available after a genuine %s failure", async (failure) => {
+  let unavailable = false;
+  server.use(http.get("*/vehicle-history/requests/:id/reminder", () => unavailable
+    ? failure === "network" ? HttpResponse.error() : HttpResponse.json({ code: "UNAVAILABLE" }, { status: 503 })
+    : HttpResponse.json(reminder())));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByRole("button", { name: "Stop reminders" });
+  await vi.waitFor(() => expect(view.queryClient.isFetching()).toBe(0));
+  unavailable = true;
+  await act(() => view.queryClient.invalidateQueries({ predicate: (query) => query.queryKey.includes("reminder") }));
+  await view.findByText("Could not load your reminder preference.");
+  expect(view.getByRole("button", { name: "Stop reminders" })).toBeDisabled();
+  const reload = view.getByRole("button", { name: "Reload reminders" });
+  await vi.waitFor(() => expect(reload).toBeEnabled());
+  unavailable = false;
+  await fireEvent.press(reload);
+  await vi.waitFor(() => expect(view.queryByText("Could not load your reminder preference.")).toBeNull());
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Stop reminders" })).toBeEnabled());
+  expect(view.getByText("Questions are welcome.")).toBeTruthy();
+});
+
 it("stops reminders explicitly, retries the same uncertain version and keeps the conversation readable", async () => {
   const writes: unknown[] = []; let stopped = false;
   server.use(http.get("*/vehicle-history/requests/:id/reminder", () => HttpResponse.json(stopped

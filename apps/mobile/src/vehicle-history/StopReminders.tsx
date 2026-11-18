@@ -92,7 +92,7 @@ export function StopReminders({ viewer, request, ready, active, connected, revis
   }
   const refused = phase === "denied" || state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const stopped = state.data?.stopped;
-  const failed = !!state.error;
+  const failed = !!state.error && !(state.error instanceof ApiError && state.error.code === "HISTORY_READER_CHANGED");
   return <View className="gap-3 rounded-2xl border border-border p-4">
     <Text className="text-footnote font-semibold">{t("vehicleHistory.reminderTitle")}</Text>
     <Text accessibilityLiveRegion="polite" accessibilityRole={refused || failed ? "alert" : undefined} className="text-footnote text-muted-foreground">
