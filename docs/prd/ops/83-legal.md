@@ -16,7 +16,7 @@ Plus EU GDPR (if we ever serve EU users — relevant for TM diaspora) and TM dat
 - Mobile selects `EXPO_PUBLIC_WEB_URL` per EAS build profile. Web uses runtime `WEB_BASE_URL` for canonical links, set to the same public origin.
 - The founder must confirm Railway custom domains and external-network TLS/page loads before Play submission. #496 tracks this hosting evidence; recording these URLs does not establish availability.
 - Served by `apps/web` as static markdown rendered server-side
-- Linked from mobile app: the Terms of Service, Privacy Policy and Posting rules rows on Cabinet, signed in or out ([20 — Information architecture](../20-information-architecture.md#tab-5--cabinet-menu))
+- Linked from mobile app: the Terms of Service, Privacy Policy and Posting rules rows on Cabinet, signed in or out ([Cabinet route](../../../apps/mobile/app/(tabs)/services.tsx))
 - Linked from admin app (footer)
 - Required versions: RU + TK + EN (trilingual)
 

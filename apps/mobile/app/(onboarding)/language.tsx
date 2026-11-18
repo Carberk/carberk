@@ -14,11 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
 
-/**
- * First onboarding screen: choose a language
- * (docs/prd/ui/hifi/mobile-onboarding.md). The rows store the choice, so
- * Continue only moves on.
- */
 export default function LanguagePickerScreen() {
   const { t } = useTranslation("onboarding");
   const locale = localeStore((state) => state.locale) ?? "ru";

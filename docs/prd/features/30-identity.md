@@ -47,7 +47,7 @@ Per [ADR-0054](../../adr/0054-phone-or-email-sign-in-share-one-user.md):
 
 ### Profile screens
 
-Cabinet is a menu, and Profile is one screen below it ([20 — Information architecture](../20-information-architecture.md#tab-5--cabinet-menu)). There is no Settings screen.
+Cabinet is a menu, and Profile is one screen below it ([Cabinet route](../../../apps/mobile/app/(tabs)/services.tsx)). There is no Settings screen.
 
 - **Cabinet** holds the profile row that opens Profile, plus Language and Theme (system / light / dark, as bottom-sheet pickers). Language and theme are not edited on Profile.
 - **Profile (own)** shows the avatar, the display name, and the two Sign-in Methods (a masked value, or Add). It also holds **Log out** and **Delete account** at the bottom.

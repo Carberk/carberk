@@ -1,23 +1,9 @@
-/**
- * Carberk mobile Tailwind config — v3 + NativeWind v4 preset.
- * Extends @auto-tm/ui/theme/tailwind with shadcn-style semantic colors
- * resolving via CSS vars from global.css. Locked to v3 due to NativeWind +
- * Metro constraints. Web/admin use v4 in a different config shape.
- *
- * The mobile surface system (issue #695) comes from
- * packages/ui/tokens/mobile.ts through `mobileTailwindTheme`: radii, type
- * roles, one font family per bundled face, control heights and elevation.
- * Surface colours are CSS variables in global.css so they follow the theme.
- * Rules: docs/agents/nativewind-v4.md (component and theme conventions) and
- * docs/prd/ui/71-design-tokens.md.
- */
 const { hairlineWidth } = require("nativewind/theme");
 const {
   tailwindTheme,
   mobileTailwindTheme,
 } = require("@auto-tm/ui/theme/tailwind");
 
-/** A semantic colour that takes an opacity modifier, such as `bg-glass/90`. */
 const themed = (name) => `hsl(var(--${name}) / <alpha-value>)`;
 
 module.exports = {
@@ -67,22 +53,16 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Functional text links and read indicators share the same light/dark blue.
         link: themed("message-read"),
-        // The fill of a Message the user sent: a soft tint of the brand colour;
-        // and the ✓✓ once the other person has read it.
         message: {
           own: "hsl(var(--message-own))",
           read: "hsl(var(--message-read))",
         },
-        // Floating navigation and controls above scrolling content.
         glass: {
           DEFAULT: themed("glass"),
           edge: themed("glass-edge"),
         },
-        // Dimming behind sheets and dialogs.
         scrim: themed("scrim"),
-        // Chips and controls that sit on a photo, and what is drawn on them.
         media: {
           scrim: themed("media-scrim"),
           foreground: themed("media-foreground"),
@@ -98,7 +78,6 @@ module.exports = {
       transitionDuration: mobileTailwindTheme.transitionDuration,
       height: mobileTailwindTheme.height,
       minHeight: mobileTailwindTheme.height,
-      // A square control (`aspect-square`) keeps its control size where no sibling stretches it.
       minWidth: mobileTailwindTheme.height,
       borderWidth: {
         hairline: hairlineWidth(),

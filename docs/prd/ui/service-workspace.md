@@ -16,6 +16,8 @@ Delivered artifact card names provider, confirmed VIN, original date and the agr
 
 Private customer native and operator web conversations expose clickable report links and explicit full-link Copy while retaining surrounding text, selection and long wrapping. Open uses the normal external browser, respecting its user-selected default; require no embedded reader, Chrome installation, provider login, extra payment or operator credentials. Open and Copy preserve the exact original safe address/query/percent-encoding even if its display is shortened. Use accessible localized actions and truthful success/failure feedback, preserving focus, scroll, drafts and return. A URL in chat or browser launch is not paid delivery or proof of remote loading. #1278 owns this conversation slice; #1188/#1189/#1190 retain validation and paid-card/native/PDF integration. No automatic unfurl or token leakage in logs/analytics/public errors; runtime proof and screenshots use synthetic destinations only.
 
+Before activation, Cabinet Help retains email/phone contact. Once Support is ready, one Messages Support row and Cabinet Help open the same case/history; add no Support links in Favorites or Listing Conversation menus. Support readiness does not activate paid providers or payments. Returning History actions are Open previous reports and New request, with no promise of updated provider history.
+
 General Support is visually separate and uses Carberk business identity, header contact/info sheet and text/image composer. Staff notes are never visible as replies. Signed-out/no access/removed-history states do not leak private contents. Appeal remains reachable for restricted users. No extra Support entry links, PDF picker or promotional broadcast affordance is added.
 
 ## Operator surfaces
@@ -28,7 +30,7 @@ Original dated provider artifacts and attributed notes are distinct. A reused re
 
 ## Accessibility, localization and state coverage
 
-TK/RU/EN applies to shell, navigation, filters, charts, forms, labels, timestamps, validation and empty/loading/error/denied/conflict states, generated notices and user-facing exports. Preserve technical identifiers and original documents. Locale switch retains current work/filter context, handles long translations and accessible names. No Russian-only Improvement exception remains.
+TK/RU/EN applies to all admin, service, analytics and inspection areas, including shell, navigation, filters, charts, forms, labels, timestamps, validation and empty/loading/error/denied/conflict states, generated notices and user-facing exports. Preserve technical identifiers and original documents. Locale switch retains current work/filter context, handles long translations and accessible names. No Russian-only Improvement exception remains.
 
 Use visible labels, keyboard focus/sequence, announced async status/errors and buttons with specific actions. Reading body/files/reasons must not require color alone. Expose accessible loading/empty/error/retry and uncertain-payment states; never present receipt upload or pending PDF as a completed order. Time labels explain service schedule/day and do not depend on operator server timezone. Shared diagnostic/analytics shell retains their independent permissions and report audiences.
 

@@ -61,6 +61,19 @@ Implementers and reviewers apply these rules to product UI in Mobile, Admin and 
 
 The [delivery workflow](coding-workflow.md#4-review) owns runtime evidence, readability scoring and the merge gate. Record unrelated existing copy problems as audit findings for a separate ticket.
 
+## Accessible product UI
+
+Production screens target WCAG 2.1 AA: at least 4.5:1 contrast for normal text and 3:1 for large text. Measure rendered light/dark pairs rather than trusting old palette contrast tables. Reachable targets are at least 44×44 pt on iOS, 48×48 dp on Android and 44×44 CSS px on web; a small visual mark still needs that reachable area.
+
+- Give inputs visible associated labels, required/invalid state and associated actionable errors. Expose disabled, busy, checked and selected state to assistive technology; explain unavailable actions where needed.
+- Localize accessible names, including icon-only actions, unread counts and photo position/title. Hide decorative images/icons and offscreen duplicate content. Reading order follows visual order; an interactive card and its independent actions remain separately reachable.
+- Web controls support keyboard operation and visible focus. Dialogs have a named title, contain focus, close with Escape when dismissible and restore focus to their opener. Tabs, radio groups and sliders support their keyboard conventions; announce asynchronous status and errors without unnecessary focus changes.
+- Support system text scaling and long RU/TK/EN copy without clipping essential content or actions. Check Cyrillic and Ä, Ç, Ň, Ö, Ş, Ü, Ý, Ž in every used font weight; missing-glyph fallback blocks release. Format numbers for the locale and retain original user-written language rather than forcing or automatically translating it.
+- Never communicate state through color alone or require hover or a gesture without an accessible alternative. Respect Reduce Motion and Reduce Transparency; stop decorative loops and flashing above three times per second. Loading placeholders expose busy state and remain static with reduced motion.
+- Verify affected interactions with VoiceOver/TalkBack or the applicable web screen reader, keyboard, large text and both themes. Automated checks and token values alone do not establish this proof.
+
+Product claims must match available behavior: no invented trust/verification, urgency, paid ranking or pay-to-skip-moderation. Keep sign-in gated to actions, anonymous browsing available, and system copy direct and respectful without decorative emoji. Preserve actual inspection/verification authority and licensed-asset attribution.
+
 ## Where this comes from
 
 The vocabulary and tests follow John Ousterhout's deep modules, Michael Feathers's seams, and the `codebase-design`, `improve-codebase-architecture` and `tdd` skills. Test-first work follows the [tdd](../../.claude/skills/tdd/SKILL.md) skill; mobile test mechanics follow [Mobile component tests](mobile-testing.md).
