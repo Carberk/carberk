@@ -5,7 +5,6 @@ import { Photo as Image } from "../../media/photoRoute";
 
 import { containRect, coverRect, dragRect, lerpRect, type PhotoGeometry, type PhotoRect } from "./photoTransitionMath";
 
-/** One absolute clip is the documented layout-animation exception in 76-motion. */
 export function PhotoTransitionOverlay({ geometry, page, progress, drag, onDisplay, onError }: {
   geometry: PhotoGeometry; page: PhotoRect; progress: SharedValue<number>;
   drag: SharedValue<{ x: number; y: number }>; onDisplay: () => void; onError: () => void;
