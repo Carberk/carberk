@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { AppState } from "react-native";
+import { useNavigation } from "expo-router";
 
 import ListingScreen from "../../app/(public)/listings/[id]";
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
@@ -15,6 +16,9 @@ const userId = "00000000-0000-4000-8000-000000000001";
 const requestId = "10000000-0000-4000-8000-000000000001";
 const listingId = "20000000-0000-4000-8000-000000000001";
 const catalogId = "30000000-0000-4000-8000-000000000001";
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 59, left: 4, right: 6, bottom: 34 }),
+}));
 const enquiry = { id: requestId, sourceListingId: listingId, status: "enquiry", assignmentVersion: 0,
   assignedOperator: null, createdAt: "2026-11-14T08:00:00.000Z" };
 const listing = { id: listingId, publicNumber: 12, sellerId: userId, status: "active", brandId: catalogId, modelId: catalogId,
@@ -25,6 +29,7 @@ const listing = { id: listingId, publicNumber: 12, sellerId: userId, status: "ac
   publishedAt: "2026-01-01T00:00:00.000Z", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" };
 
 beforeEach(async () => {
+  vi.mocked(useNavigation).mockReturnValue({ getState: () => undefined } as ReturnType<typeof useNavigation>);
   const disk = new Map<string, string>();
   vi.mocked(AsyncStorage.getItem).mockImplementation(async (key) => disk.get(key) ?? null);
   vi.mocked(AsyncStorage.setItem).mockImplementation(async (key, value) => { disk.set(key, value); });
@@ -46,7 +51,50 @@ beforeEach(async () => {
       eligibleAt: null, eligible: false, ineligibleReason: "not_waiting", declined: false, stopped: false, used: false, outcome: null })),
   );
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); routerMock.canGoBack.mockReturnValue(true); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); routerMock.canGoBack.mockReturnValue(true); routerMock.back.mockReset(); });
+
+it("keeps the source Listing header and Back inside nonzero device safe areas", async () => {
+  const view = await renderMobile(<ListingScreen />);
+  await view.findByText("Current public description — Döwlet / Ответ");
+  for (const content of [view.getByText("Source listing"), view.getByRole("button", { name: "Back to enquiry" })]) {
+    let node = content.parent;
+    while (node && node.props.style?.paddingTop !== 59) node = node.parent;
+    expect(node?.props.style).toMatchObject({ paddingTop: 59, paddingLeft: 4, paddingRight: 6, paddingBottom: 34 });
+  }
+});
+
+it("places the exact enquiry and Messages history behind a cold Listing link anchored to Tabs", async () => {
+  const dispatch = vi.fn();
+  const current = { name: "(public)", key: "public-cold", state: { index: 0,
+    routes: [{ name: "listings/[id]", key: "source-cold", params: { id: listingId, historyRequest: requestId } }] } };
+  vi.mocked(useNavigation).mockReturnValue({ dispatch, getState: () => ({ index: 1,
+    routes: [{ name: "(tabs)", state: { index: 0, routes: [{ name: "(search)" }, { name: "chat" }] } }, current],
+  }) } as ReturnType<typeof useNavigation>);
+  const view = await renderMobile(<ListingScreen />);
+  await view.findByText("Current public description — Döwlet / Ответ");
+  const action = dispatch.mock.calls[0]?.[0];
+  expect(action).toMatchObject({ type: "RESET", payload: { index: 3 } });
+  expect(action?.payload.routes.map((route: { name: string }) => route.name))
+    .toEqual(["(tabs)", "vehicle-history/requests/index", "vehicle-history/requests/[id]", "(public)"]);
+  expect(action?.payload.routes[0].state).toEqual({ index: 1, routes: [{ name: "(search)" }, { name: "chat" }] });
+  expect(action?.payload.routes[2]).toMatchObject({ name: "vehicle-history/requests/[id]", params: { id: requestId } });
+  expect(action?.payload.routes[3]).toEqual(current);
+  await fireEvent.press(view.getByRole("button", { name: "Back to enquiry" }));
+  expect(routerMock.back).toHaveBeenCalledOnce();
+});
+
+it("preserves the genuine enquiry caller and its existing native stack", async () => {
+  const dispatch = vi.fn();
+  vi.mocked(useNavigation).mockReturnValue({ dispatch, getState: () => ({ index: 2, routes: [
+    { name: "(tabs)" }, { name: "vehicle-history/requests/[id]", params: { id: requestId } },
+    { name: "(public)", state: { index: 0, routes: [{ name: "listings/[id]", params: { id: listingId, historyRequest: requestId } }] } },
+  ] }) } as ReturnType<typeof useNavigation>);
+  const view = await renderMobile(<ListingScreen />);
+  await view.findByText("Current public description — Döwlet / Ответ");
+  expect(dispatch).not.toHaveBeenCalled();
+  await fireEvent.press(view.getByRole("button", { name: "Back to enquiry" }));
+  expect(routerMock.back).toHaveBeenCalledOnce();
+});
 
 it.each([
   ["en", "Your message", "View listing", "Back to enquiry", "Send message"],
