@@ -326,7 +326,7 @@
       if (mode === 'edit') {
         document.getElementById('stepLabel').textContent = 'Edit mode';
         document.querySelector('.header-title').textContent = 'Edit listing';
-        // Lock identity fields
+
         ['rowBrand','rowModel','rowGeneration','yearInput'].forEach(id => {
           const el = document.getElementById(id);
           if (!el) return;
@@ -371,7 +371,7 @@
       window.parent.postMessage({ action: 'navigate', to: 'discard' }, '*');
     }
     function openPicker(type) {
-      // Would open bottom sheet in real app
+
     }
   </script>
 </body>

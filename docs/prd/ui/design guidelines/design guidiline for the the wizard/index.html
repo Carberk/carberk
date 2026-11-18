@@ -20,7 +20,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Page header */
+
     .page-header {
       text-align: center;
       padding: 48px 24px 32px;
@@ -39,7 +39,7 @@
       line-height: 1.5;
     }
 
-    /* Section */
+
     .flow-section {
       padding: 0 48px 48px;
     }
@@ -52,7 +52,7 @@
       letter-spacing: -0.01em;
     }
 
-    /* Device row */
+
     .frames-row {
       display: flex;
       flex-wrap: wrap;
@@ -78,7 +78,7 @@
       font-weight: 600;
     }
 
-    /* iPhone 15 Pro frame */
+
     .iphone {
       position: relative;
       width: 390px;
@@ -177,7 +177,7 @@
       opacity: 0.85;
     }
 
-    /* Android frame */
+
     .android {
       position: relative;
       width: 412px;
@@ -250,7 +250,7 @@
       border-radius: 999px;
     }
 
-    /* Tweaks panel */
+
     .tweaks {
       margin-top: 24px;
       background: #ffffff;
@@ -321,7 +321,7 @@
     <p class="page-subtitle">Tabbed app shell with inline create-listing wizard + standalone auth flow</p>
   </div>
 
-  <!-- App Shell — Primary -->
+
   <section class="flow-section" id="appShellFlow">
     <h2 class="section-title">App Shell — Tab Navigation + Create Listing Wizard</h2>
     <div class="frames-row">
@@ -363,7 +363,7 @@
     </div>
   </section>
 
-  <!-- Auth Flow -->
+
   <section class="flow-section" id="authFlow">
     <h2 class="section-title">Auth Flow</h2>
     <div class="frames-row">
@@ -443,7 +443,7 @@
   </section>
 
   <script>
-    /* ─── OTP state management ─── */
+
     (function() {
       const otpFrame = document.getElementById('otpFrame');
       let status = 'default';
@@ -506,7 +506,7 @@
       });
     })();
 
-    /* ─── App Shell draft state ─── */
+
     const appShellFrame = document.getElementById('appShellFrame');
     window.setDraftState = function(state, btn) {
       appShellFrame.src = 'app-shell.html?draft=' + state;

@@ -21,7 +21,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Page header */
+
     .page-header {
       text-align: center;
       padding: 48px 24px 32px;
@@ -40,7 +40,7 @@
       line-height: 1.5;
     }
 
-    /* Section */
+
     .flow-section {
       padding: 0 48px 48px;
     }
@@ -53,7 +53,7 @@
       letter-spacing: -0.01em;
     }
 
-    /* Device row */
+
     .frames-row {
       display: flex;
       flex-wrap: wrap;
@@ -79,7 +79,7 @@
       font-weight: 600;
     }
 
-    /* iPhone 15 Pro frame */
+
     .iphone {
       position: relative;
       width: 390px;
@@ -176,7 +176,7 @@
       opacity: 0.85;
     }
 
-    /* Android frame */
+
     .android {
       position: relative;
       width: 412px;
@@ -235,7 +235,7 @@
       border-radius: 999px;
     }
 
-    /* Mini device strip */
+
     .steps-strip {
       display: flex;
       gap: 16px;
@@ -282,7 +282,7 @@
       height: 4px;
     }
 
-    /* Tweaks panel */
+
     .tweaks {
       margin-top: 24px;
       background: #ffffff;
@@ -353,7 +353,7 @@
     <p class="page-subtitle">Uber design system — Auth flow + Create listing wizard</p>
   </div>
 
-  <!-- Auth Flow -->
+
   <section class="flow-section" id="authFlow">
     <h2 class="section-title">Auth Flow</h2>
     <div class="frames-row">
@@ -432,7 +432,7 @@
     </div>
   </section>
 
-  <!-- Create Listing Wizard -->
+
   <section class="flow-section" id="wizardFlow">
     <h2 class="section-title">Create Listing Wizard</h2>
     <div class="frames-row">
@@ -491,16 +491,16 @@
     </div>
   </section>
 
-  <!-- All Steps Strip -->
+
   <section class="flow-section" id="allSteps">
     <h2 class="section-title">All Wizard Steps</h2>
     <div class="steps-strip" id="stepsStrip">
-      <!-- Populated by JS -->
+
     </div>
   </section>
 
   <script>
-    /* ─── OTP state management ─── */
+
     (function() {
       const otpFrame = document.getElementById('otpFrame');
       let status = 'default';
@@ -563,7 +563,7 @@
       });
     })();
 
-    /* ─── Wizard navigation ─── */
+
     const WIZARD_ROUTES = {
       'sell': 'screens/00-sell-entry.html',
       'vin': 'screens/01-vin.html',
@@ -630,7 +630,7 @@
       }
     });
 
-    /* ─── Build mini steps strip ─── */
+
     (function() {
       const strip = document.getElementById('stepsStrip');
       const steps = [
