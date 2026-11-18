@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>AutoTM — App</title>
   <style>
-    /* ─── Fonts ─── */
+
     @font-face { font-family: 'UberMove'; src: url('fonts/UberMoveBold.otf') format('opentype'); font-weight: 700; }
     @font-face { font-family: 'UberMove'; src: url('fonts/UberMoveMedium.otf') format('opentype'); font-weight: 500; }
     @font-face { font-family: 'UberMoveText'; src: url('fonts/UberMoveTextRegular.otf') format('opentype'); font-weight: 400; }
@@ -15,7 +15,7 @@
     @font-face { font-family: 'UberMoveMono'; src: url('fonts/UberMoveMono-Regular.woff2') format('woff2'); font-weight: 400; }
     @font-face { font-family: 'UberMoveMono'; src: url('fonts/UberMoveMono-Medium.woff2') format('woff2'); font-weight: 500; }
 
-    /* ─── Reset & tokens ─── */
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --black: #000000;
@@ -47,7 +47,7 @@
       overscroll-behavior-y: none;
     }
 
-    /* ─── App shell ─── */
+
     #app {
       max-width: 430px;
       height: 100dvh;
@@ -59,7 +59,7 @@
       overflow: hidden;
     }
 
-    /* ─── Tab content ─── */
+
     .tab-content {
       flex: 1;
       overflow-y: auto;
@@ -69,7 +69,7 @@
     }
     .tab-content.active { display: flex; }
 
-    /* ─── Sell tab header ─── */
+
     .sell-header {
       padding: calc(16px + env(safe-area-inset-top)) 20px 16px;
       display: flex;
@@ -91,7 +91,7 @@
       gap: 16px;
     }
 
-    /* ─── Empty states ─── */
+
     .empty-state {
       flex: 1;
       display: flex;
@@ -123,7 +123,7 @@
       max-width: 260px;
     }
 
-    /* ─── Draft card ─── */
+
     .draft-card {
       border: 1px solid var(--gray-200);
       border-radius: 12px;
@@ -206,7 +206,7 @@
       border-radius: 999px;
     }
 
-    /* ─── Skeleton ─── */
+
     .skeleton-card {
       height: 180px;
       border-radius: 12px;
@@ -219,7 +219,7 @@
       100% { background-position: -200% 0; }
     }
 
-    /* ─── Error row ─── */
+
     .error-row {
       display: flex;
       align-items: center;
@@ -235,7 +235,7 @@
     }
     .error-row svg { width: 16px; height: 16px; flex-shrink: 0; stroke: var(--error); stroke-width: 2; fill: none; }
 
-    /* ─── Buttons ─── */
+
     .btn-primary {
       height: 52px;
       border-radius: 999px;
@@ -274,7 +274,7 @@
 
     .btn-group { display: flex; flex-direction: column; gap: 12px; }
 
-    /* ─── Helper rows ─── */
+
     .helper-row {
       display: flex;
       align-items: center;
@@ -304,7 +304,7 @@
       fill: none;
     }
 
-    /* ─── Bottom tab bar ─── */
+
     .tab-bar {
       flex: 0 0 auto;
       height: calc(64px + env(safe-area-inset-bottom));
@@ -370,7 +370,7 @@
     }
     .tab-btn[data-tab="sell"] .tab-label { margin-top: 18px; }
 
-    /* ─── Wizard overlay ─── */
+
     .wizard-overlay {
       position: fixed;
       top: 0;
@@ -504,7 +504,7 @@
     .wizard-footer .btn-primary,
     .wizard-footer .btn-outline { flex: 1; }
 
-    /* ─── Wizard step typography ─── */
+
     .step-title {
       font-family: var(--font-display);
       font-size: 24px;
@@ -518,7 +518,7 @@
       color: var(--gray-600);
     }
 
-    /* ─── Inputs ─── */
+
     .field-label {
       font-size: 14px;
       font-weight: 500;
@@ -586,7 +586,7 @@
       margin-top: 4px;
     }
 
-    /* ─── Picker rows ─── */
+
     .picker-row {
       display: flex;
       align-items: center;
@@ -626,7 +626,7 @@
       flex-shrink: 0;
     }
 
-    /* ─── Segmented control ─── */
+
     .segmented {
       display: flex;
       background: var(--gray-100);
@@ -653,7 +653,7 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
 
-    /* ─── Photo grid ─── */
+
     .photo-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -715,7 +715,7 @@
     .photo-actions button:hover { background: var(--gray-100); }
     .photo-actions button svg { width: 18px; height: 18px; stroke-width: 2; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; }
 
-    /* ─── Switch ─── */
+
     .switch-row {
       display: flex;
       align-items: center;
@@ -756,7 +756,7 @@
     }
     .switch-track.on .switch-knob { transform: translateX(20px); }
 
-    /* ─── Review rows ─── */
+
     .review-row {
       display: flex;
       align-items: center;
@@ -800,7 +800,7 @@
     }
     .review-row-value.incomplete { color: var(--error); }
 
-    /* ─── Dialogs ─── */
+
     .dialog-overlay {
       position: absolute;
       inset: 0;
@@ -850,7 +850,7 @@
       border-color: var(--error);
     }
 
-    /* ─── Overflow menu ─── */
+
     .overflow-menu {
       position: absolute;
       top: 56px;
@@ -881,7 +881,7 @@
     }
     .overflow-item:hover { background: var(--error-bg); }
 
-    /* ─── Toast ─── */
+
     .toast {
       position: absolute;
       top: calc(12px + env(safe-area-inset-top));
@@ -900,7 +900,7 @@
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* ─── Phone input ─── */
+
     .phone-composed {
       display: flex;
       align-items: center;
@@ -941,14 +941,14 @@
     }
     .phone-input-inner::placeholder { font-family: var(--font-body); color: var(--gray-400); }
 
-    /* ─── Section divider ─── */
+
     .section-divider {
       height: 8px;
       background: var(--gray-100);
       margin: 0 -20px;
     }
 
-    /* ─── Price helper ─── */
+
     .price-fx {
       font-size: 13px;
       color: var(--gray-600);
@@ -960,7 +960,7 @@
       gap: 6px;
     }
 
-    /* ─── Spinner ─── */
+
     .spinner {
       width: 18px; height: 18px;
       border: 2px solid var(--gray-200);
@@ -981,9 +981,9 @@
 <body>
   <div id="app">
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- TAB: HOME                                 -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="tab-content" data-tab="home">
       <div class="sell-header">
         <h1 class="sell-title">AutoTM</h1>
@@ -998,9 +998,9 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- TAB: FAVORITES                            -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="tab-content" data-tab="favorites">
       <div class="sell-header">
         <h1 class="sell-title">Favorites</h1>
@@ -1012,9 +1012,9 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- TAB: SELL                                 -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="tab-content active" data-tab="sell">
       <div class="sell-header">
         <h1 class="sell-title">Sell</h1>
@@ -1054,9 +1054,9 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- TAB: CHAT                                 -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="tab-content" data-tab="chat">
       <div class="sell-header">
         <h1 class="sell-title">Messages</h1>
@@ -1068,9 +1068,9 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- TAB: SERVICES                             -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="tab-content" data-tab="services">
       <div class="sell-header">
         <h1 class="sell-title">Services</h1>
@@ -1095,9 +1095,9 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- WIZARD OVERLAY                            -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="wizard-overlay" id="wizardOverlay">
       <div class="wizard-header">
         <div class="wizard-topbar">
@@ -1120,12 +1120,12 @@
         </div>
       </div>
 
-      <!-- Overflow menu -->
+
       <div class="overflow-menu" id="overflowMenu">
         <button class="overflow-item" onclick="showDiscardDialog()">Discard draft</button>
       </div>
 
-      <!-- ── Step 1: VIN ── -->
+
       <div class="wizard-body active" data-step="0">
         <div class="step-title">VIN or chassis number</div>
         <p class="step-subtitle">Optional. You can fill details manually.</p>
@@ -1136,7 +1136,7 @@
         </div>
       </div>
 
-      <!-- ── Step 2: Photos ── -->
+
       <div class="wizard-body" data-step="1">
         <div class="step-title">Add photos</div>
         <p class="step-subtitle">Photos under 5 MB upload faster. First photo is cover.</p>
@@ -1162,7 +1162,7 @@
         <p class="field-hint">You have 2 photos. Drag to reorder.</p>
       </div>
 
-      <!-- ── Step 3: Vehicle ── -->
+
       <div class="wizard-body" data-step="2">
         <div class="step-title">Vehicle</div>
         <div>
@@ -1186,7 +1186,7 @@
         </div>
       </div>
 
-      <!-- ── Step 4: Specs ── -->
+
       <div class="wizard-body" data-step="3">
         <div class="step-title">Specs</div>
         <div>
@@ -1211,7 +1211,7 @@
         </div>
       </div>
 
-      <!-- ── Step 5: Price ── -->
+
       <div class="wizard-body" data-step="4">
         <div class="step-title">Price</div>
         <div>
@@ -1241,7 +1241,7 @@
         <p class="field-hint">Enter the full asking price. AutoTM does not finance or verify seller payment terms.</p>
       </div>
 
-      <!-- ── Step 6: Location ── -->
+
       <div class="wizard-body" data-step="5">
         <div class="step-title">Car location</div>
         <div>
@@ -1255,7 +1255,7 @@
         <p class="field-hint">Choose where the car can be inspected. Do not enter your home address.</p>
       </div>
 
-      <!-- ── Step 7: Description ── -->
+
       <div class="wizard-body" data-step="6">
         <div class="step-title">Description</div>
         <div>
@@ -1287,7 +1287,7 @@
         </div>
       </div>
 
-      <!-- ── Step 8: Review ── -->
+
       <div class="wizard-body" data-step="7">
         <div class="step-title">Review</div>
         <p class="step-subtitle">Check everything before publishing.</p>
@@ -1319,16 +1319,16 @@
         </div>
       </div>
 
-      <!-- Wizard footer -->
+
       <div class="wizard-footer">
         <button class="btn-outline" id="backBtn" onclick="wizardBack()">Back</button>
         <button class="btn-primary" id="continueBtn" onclick="wizardNext()">Continue</button>
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- DIALOG: DISCARD DRAFT                     -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="dialog-overlay" id="discardDialog">
       <div class="dialog-card">
         <div class="dialog-title">Discard draft?</div>
@@ -1340,14 +1340,14 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- TOAST                                     -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <div class="toast" id="toast">Listing published</div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- BOTTOM TAB BAR                            -->
-    <!-- ═══════════════════════════════════════════ -->
+
+
+
     <nav class="tab-bar">
       <button class="tab-btn" data-tab="home" onclick="switchTab('home')">
         <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -1375,9 +1375,9 @@
   </div>
 
   <script>
-    // ═══════════════════════════════════════════
-    // STATE
-    // ═══════════════════════════════════════════
+
+
+
     const STEPS = ['VIN', 'Photos', 'Vehicle', 'Specs', 'Price', 'Location', 'Description', 'Review'];
     let currentStep = 0;
     let wizardOpen = false;
@@ -1392,9 +1392,9 @@
       phone: '62 12-34-56', calls: true, chat: true,
     };
 
-    // ═══════════════════════════════════════════
-    // TAB SWITCHING
-    // ═══════════════════════════════════════════
+
+
+
     function switchTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -1402,15 +1402,15 @@
       document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
     }
 
-    // ═══════════════════════════════════════════
-    // WIZARD
-    // ═══════════════════════════════════════════
+
+
+
     function startWizard(mode) {
       wizardOpen = true;
       currentStep = mode === 'draft' ? 5 : 0;
       const overlay = document.getElementById('wizardOverlay');
       overlay.classList.add('active', 'animating');
-      // Remove animating class after animation completes
+
       setTimeout(() => overlay.classList.remove('animating'), 350);
       updateWizardUI();
     }
@@ -1438,7 +1438,7 @@
       continueBtn.textContent = currentStep === 7 ? 'Publish' : 'Continue';
       continueBtn.disabled = false;
 
-      // Save status animation
+
       const status = document.getElementById('saveStatus');
       status.className = 'wizard-save-status saving';
       status.innerHTML = `<svg viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Saving...`;
@@ -1483,9 +1483,9 @@
       }
     }
 
-    // ═══════════════════════════════════════════
-    // OVERFLOW & DISCARD
-    // ═══════════════════════════════════════════
+
+
+
     function toggleOverflow() {
       document.getElementById('overflowMenu').classList.toggle('active');
     }
@@ -1507,9 +1507,9 @@
       showToast('Draft discarded');
     }
 
-    // ═══════════════════════════════════════════
-    // TOAST
-    // ═══════════════════════════════════════════
+
+
+
     let toastTimer;
     function showToast(msg) {
       const toast = document.getElementById('toast');
@@ -1519,9 +1519,9 @@
       toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    // ═══════════════════════════════════════════
-    // FORM INTERACTIONS
-    // ═══════════════════════════════════════════
+
+
+
     function setCondition(val, btn) {
       formData.condition = val;
       btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
@@ -1561,12 +1561,12 @@
       showToast(`Open ${source} picker`);
     }
 
-    // Character count
+
     document.getElementById('descInput')?.addEventListener('input', function() {
       document.getElementById('charCount').textContent = `${this.value.length} / 2000`;
     });
 
-    // Phone formatting
+
     document.getElementById('phoneInput')?.addEventListener('input', function(e) {
       const digits = this.value.replace(/\D/g, '').slice(0, 8);
       if (digits.length <= 2) this.value = digits;
@@ -1575,9 +1575,9 @@
       else this.value = digits.slice(0, 2) + ' ' + digits.slice(2, 4) + '-' + digits.slice(4, 6) + '-' + digits.slice(6);
     });
 
-    // ═══════════════════════════════════════════
-    // DRAFT SECTION RENDERING
-    // ═══════════════════════════════════════════
+
+
+
     function renderDraftSection() {
       const section = document.getElementById('draftSection');
       if (draftState === 'loading') {
@@ -1609,7 +1609,7 @@
       }
     }
 
-    // Demo URL param for draft states
+
     (function() {
       const qs = new URLSearchParams(location.search);
       const state = qs.get('draft');

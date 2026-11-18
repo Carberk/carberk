@@ -17,7 +17,7 @@ FONT = sys.argv[2]
 REPO = sys.argv[1]
 GEIST = REPO + "/apps/mobile/assets/fonts/"
 RED, INK, WHITE, GREY = "#E60000", "#17191D", "#FFFFFF", "#646B73"
-TRACK, DOT_D, DOT_GAP = -0.035, 0.215, 0.045  # in em
+TRACK, DOT_D, DOT_GAP = -0.035, 0.215, 0.045
 ICON_TRACK = -0.02
 
 font = TTFont(FONT)
@@ -93,7 +93,7 @@ def raster(text, track, width_px, letters, dot):
     """Tight RGBA render of the mark, exactly width_px wide."""
     items, cx, r, (x0, y0, x1, y1) = layout(text, track)
     SS = 4
-    s = width_px * SS / (x1 - x0)  # px per font unit
+    s = width_px * SS / (x1 - x0)
     W, H = int(round((x1 - x0) * s)), int(round((y1 - y0) * s))
     f = ImageFont.truetype(FONT, int(round(UPM * s)))
     s = f.size / UPM
@@ -156,7 +156,7 @@ M = REPO + "/apps/mobile/assets/"
 B = REPO + "/docs/prd/ops/brand/"
 S = REPO + "/docs/prd/ops/play-console-submission/"
 
-# vector masters
+
 word_svg, aspect = svg("carberk", TRACK, INK, RED)
 write(B + "carberk-wordmark.svg", word_svg)
 write(B + "carberk-wordmark-white.svg", svg("carberk", TRACK, WHITE, WHITE)[0])
@@ -165,7 +165,7 @@ write(B + "carberk-mark.svg", svg("c", ICON_TRACK, RED, RED)[0])
 write(M + "logo-carberk-red.svg", svg("carberk", TRACK, RED, RED)[0].replace(' role="img" aria-label="Carberk"', ""))
 print("wordmark aspect %.3f" % aspect)
 
-# mobile icons: the mark keeps the 493 px width of the artwork it replaces
+
 mark_w = rgb(WHITE), rgb(WHITE)
 write(M + "images/icon.png", centred(1024, rgb(RED), raster("c", ICON_TRACK, 493, *mark_w)))
 write(M + "images/android-icon-background.png", Image.new("RGBA", (1024, 1024), rgb(RED)))
@@ -173,12 +173,12 @@ write(M + "images/android-icon-foreground.png", centred(1024, (0, 0, 0, 0), rast
 write(M + "images/android-icon-monochrome.png", centred(1024, (0, 0, 0, 0), raster("c", ICON_TRACK, 493, (0, 0, 0, 255), (0, 0, 0, 255))))
 write(M + "images/splash-icon.png", centred(1024, (0, 0, 0, 0), raster("c", ICON_TRACK, 721, rgb(RED), rgb(RED))))
 
-# store pack
+
 write(S + "graphics/app-icon-512.png", centred(512, rgb(RED), raster("c", ICON_TRACK, 246, *mark_w)))
 write(S + "graphics/feature-graphic-1024x500-en.png", feature("Buy and sell cars in Turkmenistan"))
 write(S + "graphics/feature-graphic-1024x500-ru.png", feature("Покупка и продажа авто в Туркменистане"))
 write(S + "not-used-on-store/feature-graphic-1024x500-tk.png", feature("Türkmenistanda ulag al we sat", by="Alpha Motors bilen", quote="Arzan däl-de, amatly ulag satyn al."))
 
-# social
+
 av = centred(1080, rgb(RED), raster("c", ICON_TRACK, 470, *mark_w))
 write(B + "social/instagram-avatar-1080.png", av.convert("RGB"))
