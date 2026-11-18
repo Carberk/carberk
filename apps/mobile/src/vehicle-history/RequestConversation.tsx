@@ -274,7 +274,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         {intent.error instanceof ApiError && [401, 403, 404, 409].includes(intent.error.status) && intent.error.code !== "HISTORY_READER_CHANGED"
           ? <View className="gap-2"><Text accessibilityRole="alert">{t(intent.error.status === 409 ? "vehicleHistory.threadChanged" : "vehicleHistory.denied")}</Text>
             <Button variant="secondary" disabled={metadataRefreshing} onPress={() => { void thread.refresh().then(reply.resume); }}><Text>{t("vehicleHistory.refreshRequest")}</Text></Button></View>
-          : intent.error != null && <Button variant="secondary" disabled={!ready || reply.pending || reply.blocked}
+            : intent.error != null && <Button variant="secondary" disabled={!ready || reply.pending || reply.blocked || !reply.saved || !!reply.storageError}
             accessibilityLabel={t("vehicleHistory.retryMessage", { text: intent.text, interpolation: { escapeValue: false } })} onPress={() => void reply.retry(intent)}>
             <Text>{t("retry")}</Text>
           </Button>}
@@ -291,9 +291,18 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       <Text nativeID="history-reply-label" className="text-footnote font-semibold">{t("vehicleHistory.replyLabel")}</Text>
       <Input accessibilityLabel={t("vehicleHistory.replyLabel")} accessibilityLabelledBy="history-reply-label"
         className="max-h-36 min-h-20 py-3" multiline textAlignVertical="top" maxLength={4000}
+        editable={reply.loaded}
         placeholder={t("vehicleHistory.replyPlaceholder")} value={reply.draft} onChangeText={reply.edit} />
+      {!reply.loaded && !reply.storageError && <ActivityIndicator accessibilityLabel={t("loading")} />}
+      {reply.storageError && <View className="gap-2">
+        <Text accessibilityRole="alert">{t(reply.storageError === "load" ? "vehicleHistory.draftLoadError"
+          : reply.storageError === "corrupt" ? "vehicleHistory.draftCorrupt" : "vehicleHistory.draftSaveError")}</Text>
+        {reply.storageError === "corrupt"
+          ? <Button variant="secondary" onPress={reply.resetDraft}><Text>{t("vehicleHistory.newDraft")}</Text></Button>
+          : <Button variant="secondary" onPress={() => void reply.retryStorage()}><Text>{t(reply.storageError === "load" ? "vehicleHistory.retryDraftLoad" : "vehicleHistory.retryDraft")}</Text></Button>}
+      </View>}
       {unresolved && <Text className="text-footnote text-muted-foreground">{t("vehicleHistory.newIntentHint")}</Text>}
-      <Button disabled={!ready || !reply.valid || reply.pending || reply.blocked} accessibilityState={{ busy: reply.pending }}
+      <Button disabled={!ready || !reply.valid || reply.pending || reply.blocked || !reply.saved || !!reply.storageError} accessibilityState={{ busy: reply.pending }}
         onPress={() => void reply.send()}>
         <Text>{t(reply.pending ? "vehicleHistory.sending" : unresolved ? "vehicleHistory.sendNew" : "vehicleHistory.sendMessage")}</Text>
       </Button>

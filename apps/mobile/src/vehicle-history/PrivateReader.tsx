@@ -190,7 +190,13 @@ export function RequestDetail({ id }: { id: string }) {
           </Text>
         </View>
         {request.sourceListingId && (
-          <Text className="text-callout text-muted-foreground">{t("vehicleHistory.listingContext")}</Text>
+          <View className="gap-3">
+            <Text className="text-callout text-muted-foreground">{t("vehicleHistory.listingContext")}</Text>
+            <Button variant="secondary" disabled={!viewer || !!query.error || query.isFetching} onPress={() => {
+              if (historySessionCurrent(viewer) && request.sourceListingId) router.push({ pathname: "/(public)/listings/[id]",
+                params: { id: request.sourceListingId, historyRequest: request.id } });
+            }}><Text>{t("vehicleHistory.viewListing")}</Text></Button>
+          </View>
         )}
       </>} />}
     </Reader>

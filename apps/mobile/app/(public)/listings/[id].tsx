@@ -29,6 +29,7 @@ import { OwnerActions } from "../../../src/listings/components/OwnerActions";
 import { HOME_HREF } from "../../../src/navigation/homeHref";
 import { useConfig } from "../../../src/api/admin/useConfig";
 import { ReportSheet } from "../../../src/admin/components/ReportSheet";
+import { HistorySourceListing } from "../../../src/vehicle-history/SourceListing";
 
 import { ErrorState } from "@/components/ErrorState";
 import { StickyActionBar, useStickyActionBar } from "@/components/navigation/StickyActionBar";
@@ -61,6 +62,11 @@ function UnavailableState({
 }
 
 export default function ListingDetailScreen() {
+  const { id, historyRequest } = useLocalSearchParams<{ id: string; historyRequest?: string }>();
+  return historyRequest ? <HistorySourceListing key={`${historyRequest}:${id}`} requestId={historyRequest} listingId={id ?? ""} /> : <PublicListingDetail />;
+}
+
+function PublicListingDetail() {
   const { id, media } = useLocalSearchParams<{ id: string; media?: string }>();
   const goBack = useSafeBack();
   const insets = useSafeAreaInsets();

@@ -35,6 +35,7 @@ interface ListingDetailProps {
   listing: ListingDetail;
   maps: CatalogMaps;
   isOwner?: boolean;
+  readOnly?: boolean;
   onReport?: () => void;
   onSeeSimilar?: () => void;
   onScroll?: ScrollViewProps["onScroll"];
@@ -47,6 +48,7 @@ export function ListingDetailView({
   listing,
   maps,
   isOwner = false,
+  readOnly = false,
   onReport,
   onSeeSimilar,
   onScroll,
@@ -59,9 +61,7 @@ export function ListingDetailView({
   const [expanded, setExpanded] = useState(false);
   const closed = !isOwner && isClosedForContact(listing.status);
   const banner = closed ? closedListingBannerKey(listing.status) : null;
-  // The viewer's ♡ and Call + Message follow the screen's own rules: not for
-  // the owner, and not on a Listing closed for contact.
-  const showViewerActions = !isOwner && !closed;
+  const showViewerActions = !readOnly && !isOwner && !closed;
   const brandName = maps.brandName(listing.brandId);
   const modelName = maps.modelName(listing.modelId);
   const specs = keySpecs(
@@ -139,10 +139,10 @@ export function ListingDetailView({
         }
       />
       <View testID="detail-body" className="gap-6 px-4 py-5">
-        {isOwner && (
+        {!readOnly && isOwner && (
           <OwnerStatusCard status={listing.status} favoriteCount={listing.favoriteCount} />
         )}
-        {isOwner && <ListingVideoCard videoUploadTarget={{ type: "listing", id: listing.id }} />}
+        {!readOnly && isOwner && <ListingVideoCard videoUploadTarget={{ type: "listing", id: listing.id }} />}
         <View className="gap-3">
         <Text
           accessibilityRole="header"
@@ -176,7 +176,7 @@ export function ListingDetailView({
             <Icon as={ChevronRight} className="size-4" />
           </Button>
         )}
-        <HistoryEntry listingId={listing.id} />
+        {!readOnly && <HistoryEntry listingId={listing.id} />}
         <SpecificationsSection specs={specs} rows={rows} />
         {listing.vinHistory?.decoded === true && (
           <View className="gap-3">
@@ -214,13 +214,13 @@ export function ListingDetailView({
             )}
           </View>
         )}
-        {!isOwner && (
+        {!readOnly && !isOwner && (
           <View className="gap-3">
             <Separator />
             <SellerBlock seller={listing.seller} />
           </View>
         )}
-        {!isOwner && !closed && listing.allowChat && (
+        {!readOnly && !isOwner && !closed && listing.allowChat && (
           <View className="gap-3">
             <Separator />
             <AskSellerChips
@@ -231,7 +231,7 @@ export function ListingDetailView({
             />
           </View>
         )}
-        {!isOwner && listing.status === "active" && onReport && (
+        {!readOnly && !isOwner && listing.status === "active" && onReport && (
           <Button
             variant="ghost"
             size="sm"
