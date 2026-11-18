@@ -638,16 +638,6 @@ function TabButton({
   );
 }
 
-/**
- * The five-tab bar (ADR-0051), drawn as a floating capsule on the glass
- * surface. Tab screens run underneath it. The selected tab sits in one
- * lighter capsule that encloses its icon and its label; the capsule stretches
- * toward the next tab and settles into it when the selection moves, the icon
- * cross-fades from outline to filled and the label to semibold. Sell is a
- * brand red pill, level with its neighbours' icons; it is its own marker, so
- * the capsule steps aside while Sell is selected.
- * See docs/prd/ui/hifi/mobile-tabs-_layout.md.
- */
 export function AutoTmTabBar({
   state,
   descriptors,
@@ -804,7 +794,6 @@ export function AutoTmTabBar({
   if (tabBarStyle?.display === "none") {
     return <View style={{ height: 0 }} />;
   }
-
 
   return (
     <>

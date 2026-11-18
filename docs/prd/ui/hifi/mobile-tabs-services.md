@@ -2,7 +2,7 @@
 
 > Maps to: `apps/mobile/app/(tabs)/services.tsx` (Tab 5; the route keeps its `services` name)
 > Derived from wireframe: [Cabinet decisions](https://github.com/Carberk/carberk/issues/353#issuecomment-5946561929)
-> Governed by: [20 — Information architecture, Tab 5 — Cabinet menu](../../20-information-architecture.md#tab-5--cabinet-menu), the founder's [screen map amendment](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/344#issuecomment-5947347989) and the [#353 decisions](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/353#issuecomment-5946561929). This page describes what the app does on `main`. Notifications comes before My listings, as in the information architecture since #665.
+> Governed by: [current Cabinet route](../../../../apps/mobile/app/(tabs)/services.tsx), the founder's [screen map amendment](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/344#issuecomment-5947347989) and the [#353 decisions](https://github.com/bagtyyarkovusov/auto.tm-rewrite/issues/353#issuecomment-5946561929). This page describes what the app does on `main`. Notifications comes before My listings, as implemented since #665.
 > History: this page first specified a "Services" list with Profile, Settings, Bortzhurnal and Help & Support rows (#124, design archive `app-shell.html`). The 2026-10-02 amendment removed the Settings screen; that design is retired and not kept here.
 
 ==============================================

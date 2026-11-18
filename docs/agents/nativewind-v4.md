@@ -29,6 +29,14 @@ RNR composite descendants use the project's [Text](../../apps/mobile/components/
 
 For a new visual variant, inspect both container and text variant maps and change them together. Check enabled, disabled, light, and dark states. A base-class change affects every consumer; retain the project's ADR requirement for universal base changes or primitive forks. Prefer an existing primitive or a feature composition before forking it. Feature-specific wrappers belong under `components/<feature>/`, with the native primitive inside and merged className support.
 
+## Preserved design constraints
+
+Use the mobile type, radius, control and motion roles in `packages/ui/tokens/mobile.ts`, with the platform mappings above; keep literal color, radius and type values out of screen styling. Geist and Geist Mono remain bundled with their SIL Open Font License. Prices remain prominent, aligned numeric values use tabular figures, and VIN/Sign-in Code text uses the semantic mono family. Do not restore shared web font defaults over mobile mappings.
+
+Content uses solid surfaces; translucent controls use the existing `GlassSurface`/`GlassButton` boundary, with opaque Reduce Transparency fallback. Keep native push/pop, scrolling and gestures. Motion communicates state, stays interruptible and normally animates transform/opacity on the UI thread. Preserve the photo viewer's measured absolute clip reveal; it is not permission to animate surrounding layout. Reduce Motion skips entrances/loops and uses existing fade or instant alternatives; never add autoplay carousels or feed video playback.
+
+Onboarding artwork remains original, flat and themed through `currentColor`, with one recurring car, tonal fills and a single red accent plus headlight; outlined plate letters retain their font license. Its flexible panel may exceed empty-state illustration sizes, but gives way to scrollable words and reachable controls in compact/large-text layouts. Keep decorative artwork hidden from assistive technology. Source and tests under `components/onboarding`, `src/onboarding` and `test/routes/onboarding-*` own the flow; the approved two-slide choice and deferred proof remain recorded in [#1311](https://github.com/Carberk/carberk/issues/1311).
+
 ## Diagnose before changing configuration
 
 - Missing styles: check complete class literals, scanned paths, the imported global stylesheet, and actual utility definitions. Do not construct class names from arbitrary fragments.

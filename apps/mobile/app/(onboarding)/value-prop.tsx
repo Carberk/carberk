@@ -38,11 +38,6 @@ const PAGES = [
 ] as const;
 const LAST = PAGES.length - 1;
 
-/**
- * The onboarding pages after Language: Find, then Chat
- * (docs/prd/ui/hifi/mobile-onboarding.md). One route, a horizontal pager.
- * The top bar and the footer stay put while the pages move.
- */
 export default function ValuePropScreen() {
   const { t } = useTranslation("onboarding");
   const reduceMotion = useReduceMotion();
