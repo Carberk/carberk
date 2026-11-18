@@ -1,6 +1,5 @@
 import { freemem, totalmem, loadavg } from 'node:os';
 
-// No target, identity, header, error string or body is retained in this observer.
 export function observeGateway(server, { now = () => performance.now(), resources = () => ({
   rssBytes: process.memoryUsage().rss, hostFreeBytes: freemem(), hostTotalBytes: totalmem(),
   hostLoad1: loadavg()[0], cpuMicros: process.cpuUsage().user + process.cpuUsage().system,
@@ -27,7 +26,6 @@ export function observeGateway(server, { now = () => performance.now(), resource
     const state = { row, lastProgress: start, stalled: false };
     row.active++; pending.add(state);
     const progress = () => { state.lastProgress = now(); state.stalled = false; };
-    // Observe flow without reading, storing, wrapping or buffering any body.
     req.on('data', progress);
     let source;
     const pipe = stream => { source = stream; source.on('data', progress); };

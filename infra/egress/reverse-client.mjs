@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { origins } from './reverse-connector.mjs';
 
-/** Isolate API from bulk media queues; supervise one immutable connection per fixed origin. */
 export async function runClient(env = process.env, binary = '/app/chisel') {
   if (env.RAILWAY_ENVIRONMENT_ID !== '652abc79-fdb0-48b0-9f6c-ad0ff572d7b2'
       || !/^[a-z0-9.-]+$/.test(env.GATEWAY_HOST ?? '') || !env.TUNNEL_AUTH
@@ -13,7 +12,6 @@ export async function runClient(env = process.env, binary = '/app/chisel') {
       `R:127.0.0.1:${11901 + i}:${origin}:443`],
     { env: { PATH: env.PATH, AUTH: env.TUNNEL_AUTH, CHISEL_PING_TIMEOUT: '10s',
       HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '', NO_PROXY: '*' }, stdio: ['ignore', 'pipe', 'pipe'] });
-    // Raw diagnostics can contain endpoints/credentials. Each stream buffer is bounded.
     let pending = '';
     const capture = chunk => {
       pending = (pending + chunk).slice(-8192);
@@ -29,7 +27,7 @@ export async function runClient(env = process.env, binary = '/app/chisel') {
     return child;
   });
   const closed = children.map(child => new Promise(resolve => {
-    child.once('error', () => {}); // close also follows a spawn error; suppress raw details.
+    child.once('error', () => {});
     child.once('close', resolve);
   }));
   let stopping = false;

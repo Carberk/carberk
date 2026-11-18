@@ -1,4 +1,3 @@
-// One-shot Railway Function preflight. No incoming listener, business secrets, or persistent adoption.
 import https from 'node:https';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
@@ -14,7 +13,6 @@ const artifact = 'https://github.com/jpillora/chisel/releases/download/v1.12.0/c
 const checksum = 'f3f180f1d93aa72cce4e6386f98cc06569a0146fbd65eb4423cf83e6434bcfe6';
 const origins = ['api-staging-2861.up.railway.app', 'minio-staging-5795.up.railway.app', 't3.storageapi.dev'];
 
-// Own the subprocess from observation through bounded termination. Never treat an early exit as survival.
 export async function observeTunnel(child, durationMs) {
   const started = performance.now();
   let log = '';
@@ -108,7 +106,6 @@ async function main() {
     if (sha256(compressed) !== checksum) throw Error('artifact checksum');
     const binary = join(directory, 'chisel');
     await writeFile(binary, gunzipSync(compressed, { maxOutputLength: 32 * 1024 * 1024 }), { mode: 0o700 });
-    // AUTH stays in the private environment, never process arguments or log output.
     child = spawn(binary, ['client', '--fingerprint', fingerprint, '--keepalive', '10s',
       '--max-retry-interval', '5s', `https://${host}:24443`, ...remotes],
       { env: { ...process.env, AUTH: auth, HTTP_PROXY: '', HTTPS_PROXY: '', ALL_PROXY: '', NO_PROXY: '*', http_proxy: '', https_proxy: '', all_proxy: '' }, stdio: ['ignore', 'pipe', 'pipe'] });

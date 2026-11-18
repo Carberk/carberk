@@ -162,7 +162,7 @@ test("writes the session receipt and leaves its Metro running on success", { tim
   const session = start(env, metroArgs(port));
   let metroPid;
   t.after(async () => {
-    if (metroPid) try { process.kill(-metroPid, "SIGKILL"); } catch { /* already stopped */ }
+    if (metroPid) try { process.kill(-metroPid, "SIGKILL"); } catch { }
     session.child.kill("SIGKILL");
     await session.exited;
   });

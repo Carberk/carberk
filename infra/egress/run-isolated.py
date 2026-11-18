@@ -43,7 +43,7 @@ try:
         return child
 
     emit({'kind': 'phase', 'phase': 'direct-diagnostic'})
-    probe('--read-only', '--timeout', '8')  # Diagnostic only; never implicit fallback.
+    probe('--read-only', '--timeout', '8')
     results = []
     for round_number in [1, 2]:
         relay = start()
@@ -83,5 +83,3 @@ finally:
     if relay:
         relay.terminate()
         relay.wait(timeout=5)
-    # Credentials/config are caller-owned: retain on failure for reconciliation;
-    # the procedure requires removing their private scratch directory afterward.

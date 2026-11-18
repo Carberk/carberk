@@ -4,7 +4,6 @@ import { observeGateway } from './monitor-metrics.mjs';
 
 try {
   const config = JSON.parse(await readFile(process.argv[2], 'utf8'));
-  // This release is a closed staging gateway. Production requires its own rollout.
   const transport = config.transport ?? 'relay';
   const proxy = { relay: 'http://127.0.0.1:11809', reverse: 'http://127.0.0.1:11819' }[transport];
   if (config.origin !== 'https://api-staging-2861.up.railway.app'

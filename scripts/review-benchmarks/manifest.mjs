@@ -8,5 +8,4 @@ function freeze(value) {
   return value;
 }
 
-// Pure definition only: no environment, filesystem, network, device or service access.
 export const BENCHMARK = freeze(definition);

@@ -12,7 +12,6 @@ test("requires an explicit offline pack directory", async () => {
   await assert.rejects(verifyBenchmark(), /explicit pack directory/);
 });
 
-// Small stand-in bytes at the filesystem boundary; decoder/probe are external tools.
 const bytes = Buffer.from("a licensed input");
 const definition = {
   corpus: "test-input", version: 1, assets: [{

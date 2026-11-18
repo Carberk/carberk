@@ -4,7 +4,6 @@ import { pathToFileURL } from 'node:url';
 
 const routes = ['api', 'photo', 'video'];
 
-/** Run outside the gateway request process. A private manifest owns canary grants. */
 export async function probeGateway(config, { fetchImpl = fetch, now = () => performance.now() } = {}) {
   const base = new URL(config.baseUrl);
   if (base.origin !== config.baseUrl || base.username || base.password

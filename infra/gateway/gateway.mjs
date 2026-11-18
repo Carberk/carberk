@@ -33,8 +33,6 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
   agent.createConnection = options => {
     const upstream = origins.find(value => value.hostname === options.host && (value.port || '443') === String(options.port));
     if (!upstream) throw Error('Unconfigured origin');
-    // Count the TLS socket immediately, but do not dial until Node assigns it
-    // to a live request. Cancelled queued requests never start a transport.
     let peer;
     let tunnel;
     let timer;
@@ -126,8 +124,6 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
     headers.host = upstream.host;
     if (photo) { delete headers.authorization; delete headers.cookie; }
     if (signing && !photo) {
-      // The loopback-only listener is behind our nginx, which overwrites this
-      // single address with $remote_addr. Never use caller X-Forwarded-For.
       const ip = req.headers['x-real-ip'];
       if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)
           || typeof ip !== 'string' || ip.includes('%') || !isIP(ip)) { fail(400, 'invalid_observed_client'); return; }
@@ -135,8 +131,6 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
       const signature = createHmac('sha256', Buffer.from(signing.secret, 'hex')).update(`${unsigned}\n${req.method}\n${req.url}`).digest('hex');
       headers['x-carberk-client-proof'] = `${unsigned}.${signature}`;
     }
-    // Rebuild framing from the parsed message after hop-by-hop filtering. Node
-    // otherwise omits chunked bodies for methods such as DELETE/GET/OPTIONS.
     if (req.headers['content-length'] !== undefined) headers['content-length'] = req.headers['content-length'];
     else if (req.headers['transfer-encoding']) headers['transfer-encoding'] = req.headers['transfer-encoding'];
     outbound = https.request({ hostname: upstream.hostname, port: upstream.port || 443, method: req.method,
@@ -154,7 +148,6 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
         } catch { fail(502, 'redirect_refused'); return; }
       }
       if (done || res.writableEnded) { originResponse.destroy(); return; }
-      // A final early response must not retain an unfinished upload/client slot.
       if (!req.complete) responseHeaders.connection = 'close';
       res.writeHead(originResponse.statusCode, responseHeaders);
       originResponse.once('aborted', () => fail(502, 'upstream_interrupted'));

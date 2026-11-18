@@ -23,7 +23,6 @@ test('a fresh package assembled by the installer can start with its observer dep
   await mkdir(join(dir, 'systemd'), { recursive: true });
   await mkdir(join(dir, 'snikket'), { recursive: true });
   await mkdir(join(dir, 'volume'), { recursive: true });
-  // Supply the real source directory. The installer alone decides what ships.
   for (const name of ['gateway.mjs', 'serve.mjs', 'monitor-metrics.mjs']) {
     await copyFile(join('infra/gateway', name), join(runtime, name));
   }
@@ -37,8 +36,6 @@ test('a fresh package assembled by the installer can start with its observer dep
   for (const name of ['gateway.conf', 'docker-compose.override.yml', 'carberk-egress.service', 'carberk-gateway.service', 'tls/fullchain.pem', 'tls/privkey.pem']) {
     await writeFile(join(prepared, name), 'synthetic host boundary');
   }
-  // Exercise the public installer CLI with filesystem/process/network boundaries
-  // redirected to this disposable package. Repository functions stay real.
   const fixture = `import builtins,io,json,os,pathlib,runpy,subprocess,sys,types,urllib.request
 from unittest.mock import patch
 root=sys.argv[1]; installer=sys.argv[2]

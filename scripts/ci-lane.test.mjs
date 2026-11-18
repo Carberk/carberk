@@ -82,7 +82,6 @@ test("the command writes the lane to GITHUB_OUTPUT for the workflow", (t) => {
   assert.equal(readFileSync(output, "utf8"), "lane=docs\n");
 });
 
-// The workflow checks out a synthetic merge, not the PR branch itself.
 function pullRequest(t) {
   const r = repo(t);
   const base = r.commit({ "src/app.ts": "base\n", "docs/a.md": "base\n" });
@@ -325,8 +324,6 @@ test("a stale event base SHA still uses the synthetic merge's current main paren
   r.git("switch", "-");
   r.commit({ "docs/a.md": "docs evidence\n" });
   const event = r.finish();
-  // Observed on GitHub: PR base.sha still named the old base while the
-  // synchronize checkout's HEAD^1 named the updated main commit.
   event.pull_request.base.sha = r.base;
   const result = await select(r, event);
   assert.equal(result.lane, "docs", result.reason);

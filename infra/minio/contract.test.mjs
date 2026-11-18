@@ -148,7 +148,6 @@ test("video bootstrap removes an old public grant and backup records private acc
   await backupBuckets(client, dir, ["listing-videos"]);
   assert.equal(JSON.parse(await readFile(join(dir, "policies/listing-videos.json"), "utf8")), null);
 
-  // A historical backup can restore its bytes, but never its anonymous grant.
   await writeFile(join(dir, "policies/listing-videos.json"), JSON.stringify(publicReadPolicy("listing-videos")));
   const target = new FakeS3Client();
   await restoreBuckets(target, dir);

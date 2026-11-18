@@ -1,4 +1,3 @@
-// Local-only sign-in target validation and exact mock-request correlation.
 export class FixtureError extends Error {}
 
 export function codeFor(log, requestId, fixture, requestedAt, now) {
@@ -16,7 +15,7 @@ export function codeFor(log, requestId, fixture, requestedAt, now) {
       try {
         const structured = JSON.parse(line);
         time = typeof structured.time === "number" ? structured.time : Date.parse(structured.time);
-      } catch { /* malformed lines remain undated and fail closed */ }
+      } catch { }
     }
     return [{ suffix: match[1], tag: match[2], code: match[3], time }];
   });
@@ -38,7 +37,6 @@ export function localApi(value) {
       url.username || url.password || url.search || url.hash || url.pathname !== "/api/v1") {
     throw new FixtureError("Use an explicit http loopback API URL ending in /api/v1");
   }
-  // Pin localhost instead of trusting name resolution or following redirects.
   if (url.hostname === "localhost") url.hostname = "127.0.0.1";
   return url;
 }

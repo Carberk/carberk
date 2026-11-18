@@ -77,7 +77,6 @@ def collect(entries, resolver, directory):
         response = json.loads(body)
         allowed_names = {host}
         records = response.get('Answer', [])
-        # Follow only the answer's CNAME chain, never unrelated additional records.
         for _ in records:
             for record in records:
                 if record.get('type') == 5 and record['name'].rstrip('.') in allowed_names:

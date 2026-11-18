@@ -1,37 +1,4 @@
 #!/usr/bin/env node
-/**
- * Integrated reviewer-flow smoke against a deployed AutoTM environment.
- *
- * Proves, in one pass and against real HTTP/WebSocket/S3 surfaces, the
- * store-review path required by issue #279: two distinct reserved reviewer
- * accounts authenticate through the ADR-0030 OTP bypass while general signup
- * is disabled, browse and create a listing, exchange rich chat, report and
- * block, and an elevated admin moderates the report with the ban visible to
- * anonymous readers.
- *
- * Secret hygiene is the point of the credentials file: reviewer codes, the
- * admin TOTP secret, and the admin refresh token live only in a local 0600
- * JSON file. Nothing in this script prints a credential, a token, or a phone
- * number — only check names, status codes, roles, identifiers, timings, and
- * PASS/FAIL. Run it with its output going anywhere; it stays secret-free.
- *
- * Usage:
- *   SMOKE_CREDENTIALS_FILE=~/.autotm-ops/staging/smoke-credentials.json \
- *     node scripts/staging-reviewer-flow-smoke.mjs
- *
- *   # Two-step signup-gate probe: step 1 asks for a code, the operator reads
- *   # it from the API's mock-SMS log line, step 2 proves the gate rejects it.
- *   node scripts/staging-reviewer-flow-smoke.mjs signup-probe-request
- *   printf '%s' <code> | node scripts/staging-reviewer-flow-smoke.mjs signup-probe-verify
- *
- * Credentials file shape:
- *   {
- *     "apiUrl": "https://<api host>",
- *     "reviewerAccounts": [{ "phone": "+993...", "code": "NNNNNN" }, ...],
- *     "admin": { "phone": "+993...", "totpSecret": "BASE32", "refreshToken": "..." },
- *     "signupProbePhone": "+993..."
- *   }
- */
 
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { createHmac, randomUUID } from "node:crypto";
@@ -39,27 +6,16 @@ import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
-// Resolved through apps/mobile's package rather than a root dependency, on
-// purpose: the harness should drive the flow with the exact Socket.IO client
-// the shipped app uses, and this survives pnpm-workspace.yaml's shamefullyHoist being
-// turned off or Expo re-aligning the mobile dependency set.
 const { io } = createRequire(new URL("../apps/mobile/package.json", import.meta.url))(
   "socket.io-client",
 );
 
 const { ListingsSchemas } = createRequire(new URL("../packages/contracts/package.json", import.meta.url))("@auto-tm/contracts");
 
-// The one identifier this harness has to know: the reviewer scenario's primary
-// seeded listing, from packages/db/src/reviewer-scenario-seed.ts. Everything
-// else the flow needs — brand, model, region, city — is read back off that
-// listing rather than copied here, so the catalogue ids can never drift out of
-// sync with the seed and the read itself proves the catalogue is reachable.
 const SEEDED_PRIMARY_LISTING_ID = "e042b037-1e59-495d-8380-e497ad7d035e";
 
 const results = [];
 let failed = false;
-// Errors check() has already turned into a FAIL row. Anything thrown outside a
-// check() is absent from this set and must still reach the summary.
 const recordedFailures = new WeakSet();
 
 function expandHome(p) {
@@ -75,8 +31,6 @@ function loadCredentials() {
 
 function saveCredentials(path, credentials) {
   writeFileSync(path, JSON.stringify(credentials, null, 2), { mode: 0o600 });
-  // `mode` only applies when writeFileSync creates the file. This file already
-  // exists on every run after the first, so tighten it explicitly.
   chmodSync(path, 0o600);
 }
 
@@ -102,7 +56,6 @@ async function check(name, fn) {
   }
 }
 
-/** Minimal JSON HTTP client. Never logs bodies — callers decide what to report. */
 async function request(baseUrl, method, path, { token, body, headers } = {}) {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
@@ -126,15 +79,12 @@ async function request(baseUrl, method, path, { token, body, headers } = {}) {
 function expectStatus(res, expected, what) {
   const allowed = Array.isArray(expected) ? expected : [expected];
   if (!allowed.includes(res.status)) {
-    // GlobalErrorFilter's envelope is flat: { statusCode, code, message, details }.
-    // It carries a code but never a secret value.
     const code = res.json?.code;
     throw new Error(`${what}: expected ${allowed.join("|")}, got ${res.status}${code ? ` (${code})` : ""}`);
   }
   return res.json;
 }
 
-/** RFC 6238 TOTP, so the admin elevation step needs no authenticator app. */
 export function base32Decode(input) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   const clean = input.replace(/=+$/, "").toUpperCase().replace(/\s+/g, "");
@@ -179,15 +129,10 @@ async function signIn(apiUrl, account) {
     refreshToken: body.refreshToken,
     userId: body.user.id,
     role: body.user.role,
-    // Kept for the Listing contact phone, never printed.
     phone: account.phone,
   };
 }
 
-/**
- * A complete draft for the seller's smoke listing. The contact phone is the
- * seller's own sign-in phone, which publish accepts without a code (ADR-0081).
- */
 export function smokeDraftBody({ catalogue, photoKeys, sellerPhone, now }) {
   return {
     ...catalogue,
@@ -207,7 +152,6 @@ export function smokeDraftBody({ catalogue, photoKeys, sellerPhone, now }) {
   };
 }
 
-/** A 1x1 WebP. Real bytes exercise the signed PUT and media read. */
 const TINY_WEBP = Buffer.from("UklGRjwAAABXRUJQVlA4IDAAAADQAQCdASoBAAEAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA=", "base64");
 
 async function uploadSignedImage(apiUrl, token, presignPath, extraBody = {}) {
@@ -284,7 +228,6 @@ function waitForEvent(socket, event, predicate, timeoutMs = 15000) {
   });
 }
 
-// ── Signup-gate probe (two-step; the code comes from the API's mock-SMS log) ──
 
 async function signupProbeRequest() {
   const { credentials } = loadCredentials();
@@ -294,9 +237,6 @@ async function signupProbeRequest() {
     body: { phone },
   });
   expectStatus(res, [200, 201], "signup probe OTP request");
-  // The mock-SMS log line carries the phone's last four digits and the start
-  // of this request's id, so two phones that share their last four still grep
-  // apart. Keep in step with requestTag in apps/api's HttpOtpSenderAdapter.
   const requestId = res.json?.requestId;
   if (typeof requestId !== "string" || requestId.length < 8) {
     throw new Error("signup probe OTP request returned no requestId");
@@ -317,8 +257,6 @@ async function readCodeFromStdin() {
 }
 
 async function signupProbeVerify() {
-  // The code arrives on stdin rather than argv: argv lands in shell history
-  // and in `ps` output, and this is a live (if single-use) credential.
   const code = await readCodeFromStdin();
   const { credentials } = loadCredentials();
   const res = await request(credentials.apiUrl, "POST", "/api/v1/auth/otp/verify", {
@@ -334,7 +272,6 @@ async function signupProbeVerify() {
   process.exit(ok ? 0 : 1);
 }
 
-// ── The integrated reviewer flow ──
 
 async function main() {
   const { path: credentialsPath, credentials } = loadCredentials();
@@ -356,7 +293,6 @@ async function main() {
   let admin = null;
 
   try {
-    // 1 — two distinct reserved accounts authenticate through the bypass
     const signedIn = [];
     await check("two distinct reserved accounts authenticate", async () => {
       for (const account of accounts) {
@@ -371,8 +307,6 @@ async function main() {
       return `${signedIn.length} accounts, roles=${signedIn.map((s) => s.role).join("/")}`;
     });
 
-    // 2 — browse. The seeded listing's detail doubles as the catalogue source
-    // for check 3, so a drifted seed fails here rather than deep in publishing.
     let catalogue = null;
     await check("browse: authenticated feed and anonymous listing detail", async () => {
       const feed = expectStatus(
@@ -397,7 +331,6 @@ async function main() {
       return `feed items=${feed.items?.length ?? 0}, seeded listing status=${detail.status}`;
     });
 
-    // 3 — the seller creates and publishes a listing through the real wizard path
     await check("seller creates a listing (signed upload → draft → publish)", async () => {
       const photoKeys = [];
       for (let i = 0; i < ListingsSchemas.MIN_LISTING_PHOTOS; i++) {
@@ -442,7 +375,6 @@ async function main() {
       return `listingId=${publishedListingId}`;
     });
 
-    // 4 — rich chat between the two distinct accounts, over the real socket
     await check("rich chat: text over WebSocket and an image message", async () => {
       const opened = expectStatus(
         await request(apiUrl, "POST", "/api/v1/conversations", {
@@ -475,12 +407,6 @@ async function main() {
       });
       const textEvent = await delivered;
 
-      // Image message. The mobile app sends images over HTTP
-      // (POST /messages/rich), and that path persists the message and fires
-      // the push event but does NOT broadcast message:new — only the socket
-      // handler does. Both are exercised here: the image goes over the socket
-      // so realtime delivery is provable, and the HTTP rich endpoint is
-      // exercised separately and asserted through message history.
       const imageDelivered = waitForEvent(
         buyerSocket,
         "message:new",
@@ -531,7 +457,6 @@ async function main() {
       return `conversationId=${conversationId}, socket text+image delivered, http image persisted`;
     });
 
-    // 5 — report and block
     await check("buyer reports the listing and blocks the seller", async () => {
       const report = expectStatus(
         await request(apiUrl, "POST", `/api/v1/listings/${publishedListingId}/report`, {
@@ -559,7 +484,6 @@ async function main() {
         "block state",
       );
       if (blocked.blocked !== true) throw new Error("block did not take effect");
-      // Leave the environment as it was found: the block is proven, then undone.
       expectStatus(
         await request(apiUrl, "DELETE", `/api/v1/me/blocked-users/${seller.userId}`, {
           token: buyer.accessToken,
@@ -570,7 +494,6 @@ async function main() {
       return `reportId=${reportId}, status=${report.status}, block asserted and released`;
     });
 
-    // 6 — live admin moderation and public enforcement
     if (!credentials.admin?.refreshToken || !credentials.admin?.totpSecret) {
       record(
         "live admin moderation and public enforcement",
@@ -586,7 +509,6 @@ async function main() {
           [200, 201],
           "admin refresh",
         );
-        // POST /auth/refresh returns tokens only, so the role comes from /me.
         const me = expectStatus(
           await request(apiUrl, "GET", "/api/v1/me", { token: refreshed.accessToken }),
           200,
@@ -594,7 +516,6 @@ async function main() {
         );
         admin = { accessToken: refreshed.accessToken, userId: me.id, role: me.role };
         if (admin.role !== "admin") throw new Error(`refreshed session role is ${admin.role}`);
-        // Refresh tokens rotate; persist the new one so the next run works.
         credentials.admin.refreshToken = refreshed.refreshToken;
         saveCredentials(credentialsPath, credentials);
 
@@ -656,9 +577,6 @@ async function main() {
       });
     }
   } catch (err) {
-    // check() already recorded whatever it caught. A throw from between checks
-    // (credential load, socket setup) was never recorded, and without this row
-    // it would disappear into an "N/M checks passed" line with no FAIL.
     if (!(err instanceof Object) || !recordedFailures.has(err)) {
       record(
         "smoke run aborted between checks",
@@ -668,9 +586,6 @@ async function main() {
     }
   } finally {
     for (const socket of sockets) socket.close();
-    // Leave the reviewer scenario as it was found. A completed run ends with
-    // the listing banned and therefore invisible; a run that fails partway
-    // would otherwise leave a live smoke listing in the reviewer feed.
     if (publishedListingId && seller) {
       const detail = await request(apiUrl, "GET", `/api/v1/listings/${publishedListingId}`);
       if (detail.status === 200) {

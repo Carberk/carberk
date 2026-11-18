@@ -34,8 +34,6 @@ async function enterCode(device, sleep, fixture, code) {
     await device(["fill", currentRef(fields[0], state), "--text-stdin"], { input: code });
     return;
   }
-  // OtpCells' transparent TextInput is absent from iOS accessibility snapshots.
-  // Its focused native number pad is observable; never guess a tap coordinate.
   if (fields.length) throw new FixtureError("OTP UI has ambiguous editable fields; stop without resending");
   const readDigits = snapshot => (snapshot.nodes ?? []).filter(node => node.type === "Cell")
     .map(node => /^\d(?:, \d)*$/.test(node.label ?? "") ? node.label.replaceAll(", ", "") : "?").join("");
@@ -68,13 +66,10 @@ async function run(options, ports, context) {
   if (!health.ok) throw new FixtureError("Local API health check failed");
   const metadata = await health.json();
   if (metadata.service !== "api" || metadata.environment !== env.APP_ENV) throw new FixtureError("Running API environment does not match local config");
-  // Exact-request delivery stays on the genuine Code screen and preserves auth intent.
   if (!options.requestId) {
     await ports.device(["open", "tm.auto.app"]);
     await ports.device(["open", "autotm:///services"]);
     let cabinet;
-    // Initial Cabinet preparation only: at most 10 fresh snapshots, 500 ms apart
-    // (4.5 s of sleeps). Device commands keep their separate boundary timeout.
     for (let attempt = 0; attempt < 10; attempt++) {
       cabinet = await ports.device(["snapshot", "-i"]);
       const snapshot = JSON.stringify(cabinet);
@@ -124,7 +119,6 @@ async function run(options, ports, context) {
   if (!options.requestId) await ports.device(["open", route.href]);
   const code = codeFor(await ports.readFile(options.apiLog, "utf8"), requestId, fixture, requestedAt, ports.now());
   await enterCode(ports.device, ports.sleep, fixture, code);
-  // Verification is asynchronous. Read fresh snapshots; never re-enter or resend.
   let leftOtp = false;
   for (let attempt = 0; attempt < 10; attempt++) {
     const state = await ports.device(["snapshot", "-i"]);
@@ -136,12 +130,8 @@ async function run(options, ports, context) {
   }
   if (options.requestId) {
     if (!leftOtp) throw new FixtureError("OTP UI verification did not complete; stop without resending");
-    // The caller may be replaying a mutation. Moving to Cabinet here would
-    // correctly cancel that work on focus loss before it reaches the API.
     return { fixture: options.fixture, status: "verified", identityConfirmed: false };
   }
-  // A standalone OTP deep link can remain mounted after normal verification.
-  // Only the native account identity below establishes success, never timing.
   await ports.device(["open", "autotm:///services"]);
   const identity = JSON.stringify(await ports.device(["snapshot", "-i"]));
   if (!identity.includes(fixture.name) || !identity.includes(fixture.masked)) throw new FixtureError(leftOtp
@@ -169,13 +159,11 @@ function execute(executable, args, { input, ...options }) {
       if (error) reject(Object.assign(error, { stdout }));
       else resolve({ stdout, stderr });
     });
-    child.stdin.on("error", () => { /* execFile reports the process failure */ });
+    child.stdin.on("error", () => { });
     child.stdin.end(input);
   });
 }
 
-// device_open returns a wrapper already pinned to the caller's target/session.
-// Never add target overrides or invoke the underlying global agent-device CLI.
 export function callerDevice(receipt, { cwd = process.cwd(), executeFile = execute } = {}) {
   const { command, session, deviceId, worktree } = receipt;
   if (worktree !== cwd || !Array.isArray(command) || command.length !== 1 ||
@@ -200,9 +188,8 @@ export function callerDevice(receipt, { cwd = process.cwd(), executeFile = execu
       return response.data;
     } catch (error) {
       if (error instanceof FixtureError) throw error;
-      // execFile errors include argv (the code) and stdout; neither may escape.
       let code;
-      try { code = JSON.parse(error.stdout).error?.code; } catch { /* no safe structured status */ }
+      try { code = JSON.parse(error.stdout).error?.code; } catch { }
       throw new FixtureError(`Device command failed${/^[A-Z_]{2,50}$/.test(code ?? "") ? ` (${code})` : ""}; raw diagnostics suppressed. Stop and consult help on your own session`);
     }
   };
