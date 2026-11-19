@@ -116,12 +116,13 @@ only the worker can establish Ready. Local MinIO/S3 paths remain unchanged.
 
 Installed verification needs a coordinated candidate-to-rollback window. Save
 fresh installed source/config/vhost hashes, modes and exact restore copies before
-activation. Add only a `/video-uploads/` nginx location using the existing photo
-location's streaming, header and no-retry directives; preserve the other locations
-and vhosts. Validate the complete candidate in scratch nginx, then replace only
-the gateway sources and owned vhost, restart only `carberk-gateway.service` and
-gracefully reload the shared proxy under its owner's approval. Restore those exact
-files and verify all hashes/services afterward. Keep the reverse connector,
+activation. The installed `location /` already streams this alias with buffering
+and retries disabled; preserve its exact vhost bytes. This candidate replaces only
+`gateway.mjs` and `serve.mjs` and restarts only `carberk-gateway.service` under the
+shared owner's approval. No nginx write or reload is needed. Verify nginx syntax
+and unchanged included-file hashes, then restore the exact gateway source files
+and restart only that service after proof. Verify baseline hashes, modes and
+health afterward. Keep the reverse connector,
 signer, monitor, credentials, certificates and other virtual hosts intact. Refresh
 an actual staging API deployment SUCCESS and public readiness before the window;
 SKIPPED is not a successful baseline. Source/tests alone do not establish installed
