@@ -16,11 +16,12 @@ function headersFor(headers) {
     && !/^(forwarded$|x-forwarded-|x-real-ip$|x-carberk-|x-railway-|cf-|true-client-ip$|x-client-ip$|refresh$)/i.test(name)));
 }
 
-export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey, ca, log = () => {}, now = Date.now,
+export function createGateway({ origin, photoOrigin, videoOrigin, proxy, hostname, accessKey, ca, log = () => {}, now = Date.now,
   deadlineMs = 30_000, connectMs = 6_000, maxBodyBytes = 16 * 1024 * 1024, maxConcurrent = 16, signing }) {
   const api = new URL(origin);
   const photos = photoOrigin ? new URL(photoOrigin) : undefined;
-  const origins = [api, ...(photos ? [photos] : [])];
+  const videos = videoOrigin ? new URL(videoOrigin) : undefined;
+  const origins = [api, ...(photos ? [photos] : []), ...(videos ? [videos] : [])];
   const relay = new URL(proxy);
   if (origins.some(upstream => upstream.protocol !== 'https:' || upstream.username || upstream.password || upstream.pathname !== '/' || upstream.search || upstream.hash)
       || relay.protocol !== 'http:' || relay.hostname !== '127.0.0.1' || relay.username || relay.password
@@ -78,10 +79,14 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
   const validHost = value => value === hostname || value === `${hostname}:${server.address()?.port}`;
   const server = http.createServer({ maxHeaderSize: 16 * 1024, highWaterMark: 64 * 1024 }, (req, res) => {
     const photo = Boolean(photos && req.url.startsWith('/photos/'));
-    const upstream = photo ? photos : api;
-    const target = photo ? req.url.slice('/photos'.length) : req.url;
+    const video = Boolean(videos && req.url.startsWith('/video-uploads/'));
+    const storage = photo || video;
+    const upstream = video ? videos : photo ? photos : api;
+    const target = video ? req.url.slice('/video-uploads'.length) : photo ? req.url.slice('/photos'.length) : req.url;
+    const bodyLimit = video ? Math.min(maxBodyBytes, 5 * 1024 * 1024) : maxBodyBytes;
     const permitted = photo ? ['GET', 'HEAD', 'PUT'].includes(req.method)
-      && /^\/(listing-photos|chat-attachments)\//.test(target) : allowedPath(target)
+      && /^\/(listing-photos|chat-attachments)\//.test(target) : video ? req.method === 'PUT'
+        && /^\/[a-z0-9.-]+\/video-sources\/[0-9a-f-]{36}\/source\.mp4\?/.test(target) : allowedPath(target)
         && (!socketPath(target) || ['GET', 'POST'].includes(req.method));
     const started = now();
     let counted = false;
@@ -117,13 +122,13 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
         || req.url.includes('\\') || !permitted) { fail(400, 'invalid_target'); return; }
     const supplied = Buffer.from(req.headers['x-carberk-gateway-key'] ?? '');
     if (supplied.length !== expectedKey.length || !timingSafeEqual(supplied, expectedKey)) { fail(403, 'gateway_access_denied'); return; }
-    if (Number(req.headers['content-length'] ?? 0) > maxBodyBytes) { fail(413, 'body_limit'); return; }
+    if (Number(req.headers['content-length'] ?? 0) > bodyLimit) { fail(413, 'body_limit'); return; }
     if (active >= maxConcurrent) { fail(503, 'capacity'); return; }
     active++; counted = true;
     const headers = headersFor(req.headers);
     headers.host = upstream.host;
-    if (photo) { delete headers.authorization; delete headers.cookie; }
-    if (signing && !photo) {
+    if (storage) { delete headers.authorization; delete headers.cookie; }
+    if (signing && !storage) {
       const ip = req.headers['x-real-ip'];
       if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)
           || typeof ip !== 'string' || ip.includes('%') || !isIP(ip)) { fail(400, 'invalid_observed_client'); return; }
@@ -137,11 +142,11 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
       path: target, headers, agent }, originResponse => {
       responseStream = originResponse;
       const responseHeaders = headersFor(originResponse.headers);
-      if (photo) delete responseHeaders['set-cookie'];
+      if (storage) delete responseHeaders['set-cookie'];
       const location = responseHeaders.location;
       if (location !== undefined) {
         try {
-          if (photo) throw Error('Photo redirects are not supported');
+          if (storage) throw Error('Storage redirects are not supported');
           const target = new URL(location, upstream.origin + req.url);
           if (target.origin !== upstream.origin || target.username || target.password || !allowedPath(target.pathname)) throw Error('Unapproved redirect');
           responseHeaders.location = target.pathname + target.search + target.hash;
@@ -158,7 +163,7 @@ export function createGateway({ origin, photoOrigin, proxy, hostname, accessKey,
     outbound.once('error', () => fail(502, 'upstream_unavailable'));
     outbound.once('close', () => { outboundClosed = true; release(); });
     let bytes = 0;
-    req.on('data', chunk => { bytes += chunk.length; if (bytes > maxBodyBytes) fail(413, 'body_limit'); });
+    req.on('data', chunk => { bytes += chunk.length; if (bytes > bodyLimit) fail(413, 'body_limit'); });
     req.once('aborted', () => { outbound.destroy(); res.destroy(); });
     req.once('error', () => { outbound.destroy(); res.destroy(); });
     req.pipe(outbound);

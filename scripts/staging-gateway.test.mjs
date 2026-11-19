@@ -14,7 +14,7 @@ import { io } from 'socket.io-client';
 
 const key = 'controlled-staging-key-0123456789abcdef';
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
-async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHandler) {
+async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHandler, videoHandler) {
   const dir = await mkdtemp(join(tmpdir(), 'gateway-test-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost', '-keyout', join(dir, 'key'), '-out', join(dir, 'cert')], { stdio: 'ignore' });
@@ -23,6 +23,8 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHand
   const port = await listen(upstream);
   const photos = photoHandler ? https.createServer({ key: await readFile(join(dir, 'key')), cert: ca }, photoHandler) : undefined;
   const photoPort = photos ? await listen(photos) : undefined;
+  const videos = videoHandler ? https.createServer({ key: await readFile(join(dir, 'key')), cert: ca }, videoHandler) : undefined;
+  const videoPort = videos ? await listen(videos) : undefined;
   let tunnels = 0;
   const sockets = new Set();
   const peers = new Set();
@@ -30,7 +32,7 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHand
   const proxy = http.createServer();
   proxy.on('connect', (req, client, head) => {
     tunnels++;
-    assert.ok([`localhost:${port}`, ...(photoPort ? [`localhost:${photoPort}`] : [])].includes(req.url));
+    assert.ok([`localhost:${port}`, ...(photoPort ? [`localhost:${photoPort}`] : []), ...(videoPort ? [`localhost:${videoPort}`] : [])].includes(req.url));
     const destination = Number(req.url.split(':')[1]);
     sockets.add(client); peers.add(client); peakPeers = Math.max(peakPeers, peers.size);
     client.on('error', () => {});
@@ -53,6 +55,7 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHand
   const logs = [];
   const gateway = createGateway({ origin: `https://localhost:${port}`, proxy: `http://127.0.0.1:${proxyPort}`,
     ...(photoPort ? { photoOrigin: `https://localhost:${photoPort}` } : {}),
+    ...(videoPort ? { videoOrigin: `https://localhost:${videoPort}` } : {}),
     hostname: 'gateway.example.test', accessKey: key, ca, log: row => logs.push(row), ...overrides });
   const gatewayPort = await listen(gateway);
   t.after(async () => {
@@ -60,6 +63,7 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHand
     for (const s of sockets) s.destroy();
     upstream.closeAllConnections(); await Promise.all([new Promise(r => upstream.close(r)), new Promise(r => proxy.close(r))]);
     if (photos) { photos.closeAllConnections(); await new Promise(r => photos.close(r)); }
+    if (videos) { videos.closeAllConnections(); await new Promise(r => videos.close(r)); }
   });
   async function request({ path = '/healthz', method = 'GET', body, headers = {} } = {}) {
     return new Promise((resolve, reject) => {
@@ -73,6 +77,73 @@ async function setup(t, handler, overrides = {}, proxyMode = 'normal', photoHand
   }
   return { request, logs, tunnels: () => tunnels, upstream, proxy, gateway, port: gatewayPort, peakPeers: () => peakPeers, peerCount: () => peers.size };
 }
+
+test('multipart video alias preserves the raw signature, required headers and bytes, and waits for origin acceptance', { timeout: 5_000 }, async t => {
+  let accept;
+  let received;
+  const arrived = new Promise(resolve => { received = resolve; });
+  const f = await setup(t, (_req, res) => res.end('api'), {
+    signing: { keyId: 'current', secret: 'ab'.repeat(32) },
+  }, 'normal', undefined, (req, res) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      received({ target: req.url, headers: req.headers, bytes: Buffer.concat(chunks), host: req.headers.host, tls: req.socket.servername });
+      accept = () => { res.writeHead(200, { etag: '"origin-part-etag"', 'x-amz-checksum-crc32': 'checksum', 'x-amz-request-id': 'origin-request' }); res.end(); };
+    });
+  });
+  const target = '/synthetic-bucket/video-sources/10000000-0000-4000-8000-000000000001/source.mp4?partNumber=1&uploadId=a%2Fb%2Bc&X-Amz-Signature=synthetic&x=1+2&x=%2f';
+  const body = Buffer.from([0, 255, 13, 10, 42]);
+  let answered = false;
+  const sending = f.request({ method: 'PUT', path: `/video-uploads${target}`, body, headers: {
+    authorization: 'Bearer never-storage', cookie: 'private', 'content-type': 'video/mp4',
+    'x-amz-checksum-crc32': 'signed-checksum',
+  } }).then(result => { answered = true; return result; });
+  const origin = await Promise.race([arrived, sending.then(result => { throw Error(`Premature gateway response: ${result.status}`); })]);
+  assert.equal(answered, false);
+  assert.equal(origin.target, target);
+  assert.deepEqual(origin.bytes, body);
+  assert.equal(origin.headers['content-type'], 'video/mp4');
+  assert.equal(origin.headers['x-amz-checksum-crc32'], 'signed-checksum');
+  for (const name of ['authorization', 'cookie', 'x-carberk-gateway-key', 'x-carberk-client-proof']) assert.equal(origin.headers[name], undefined);
+  assert.match(origin.host, /^localhost:\d+$/);
+  assert.equal(origin.tls, 'localhost');
+  accept();
+  const response = await sending;
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.etag, '"origin-part-etag"');
+  assert.equal(response.headers['x-amz-checksum-crc32'], 'checksum');
+  assert.equal(response.headers['x-amz-request-id'], 'origin-request');
+  assert.ok(!JSON.stringify(f.logs).includes('Signature'));
+});
+
+test('video parts retain origin refusal and cannot escape their namespace, redirect, or exceed 5 MiB', async t => {
+  let status = 403;
+  let uploads = 0;
+  const f = await setup(t, (_req, res) => res.end('api'), {}, 'normal', undefined, (req, res) => {
+    uploads++;
+    req.resume();
+    req.on('end', () => { res.writeHead(status, status === 307 ? { location: 'https://other.test/part' } : {}); res.end('origin-result'); });
+  });
+  const path = '/video-uploads/synthetic-bucket/video-sources/10000000-0000-4000-8000-000000000001/source.mp4?partNumber=1&uploadId=synthetic';
+  for (const refusal of [403, 500]) {
+    status = refusal;
+    const result = await f.request({ path, method: 'PUT', body: 'part' });
+    assert.equal(result.status, refusal);
+    assert.equal(result.body.toString(), 'origin-result');
+  }
+  status = 307;
+  assert.equal((await f.request({ path, method: 'PUT', body: 'part' })).status, 502);
+  const before = uploads;
+  for (const input of [
+    { path, method: 'GET' }, { path, method: 'POST' },
+    { path: '/video-uploads/synthetic-bucket/private/source.mp4?uploadId=synthetic', method: 'PUT' },
+    { path: '/video-uploads/https://other.test/part', method: 'PUT' },
+    { path, method: 'PUT', headers: { 'x-carberk-gateway-key': '' } },
+  ]) assert.ok([400, 403].includes((await f.request(input)).status));
+  assert.equal((await f.request({ path, method: 'PUT', headers: { 'content-length': '5242881' } })).status, 413);
+  assert.equal(uploads, before);
+});
 
 test('controlled client preserves method, raw signed target, body and API status through verified TLS', async t => {
   const f = await setup(t, (req, res) => {

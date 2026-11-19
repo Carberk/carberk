@@ -1,10 +1,13 @@
+import { VideoUploadsSchemas } from "@auto-tm/contracts";
+
 import { ApiError } from "../../api/client";
+
+import { videoUploadRequest } from "./videoUploadRoute";
 
 export interface VideoUploadPart {
   uri: string;
   offset: number;
   sizeBytes: number;
-  /** Owned preparation directory; terminal cleanup also removes parts left by a process kill. */
   temporaryDirectory?: string;
 }
 
@@ -14,9 +17,13 @@ export interface VideoUploadTransport {
 
 const UPLOAD_TIMEOUT_MS = 60_000;
 
-/** RN cannot construct a Blob from typed arrays. Upload a bounded native file instead. */
 export const nativeVideoUploadTransport: VideoUploadTransport = {
   async put(url, part, signal) {
+    if (!Number.isSafeInteger(part.offset) || part.offset < 0 || !Number.isSafeInteger(part.sizeBytes)
+      || part.sizeBytes < 1 || part.sizeBytes > VideoUploadsSchemas.VIDEO_UPLOAD_PART_SIZE_BYTES) {
+      throw new Error("Invalid video part");
+    }
+    const request = await videoUploadRequest(url);
     const fs = await import("expo-file-system/legacy");
     const temporaryUri = `${part.temporaryDirectory ?? fs.cacheDirectory}listing-video-part-${Date.now()}-${Math.random().toString(36).slice(2)}.mp4`;
     let task: ReturnType<typeof fs.createUploadTask> | undefined;
@@ -39,10 +46,10 @@ export const nativeVideoUploadTransport: VideoUploadTransport = {
       if (signal.aborted) throw new ApiError("NETWORK_ERROR", 0, "Upload interrupted");
       await fs.writeAsStringAsync(temporaryUri, bytes, { encoding: fs.EncodingType.Base64 });
       if (signal.aborted) throw new ApiError("NETWORK_ERROR", 0, "Upload interrupted");
-      task = fs.createUploadTask(url, temporaryUri, {
+      task = fs.createUploadTask(request.uri, temporaryUri, {
         httpMethod: "PUT", uploadType: fs.FileSystemUploadType.BINARY_CONTENT,
         sessionType: fs.FileSystemSessionType.FOREGROUND,
-        headers: { "Content-Type": "video/mp4" },
+        headers: { "Content-Type": "video/mp4", ...request.headers },
       });
       timeout = setTimeout(() => interrupt(new ApiError("VIDEO_UPLOAD_TIMEOUT", 408, "Upload timed out")), UPLOAD_TIMEOUT_MS);
       const response = await Promise.race([task.uploadAsync(), interrupted]);
@@ -52,7 +59,6 @@ export const nativeVideoUploadTransport: VideoUploadTransport = {
     } finally {
       if (timeout) clearTimeout(timeout);
       signal.removeEventListener("abort", abort);
-      // The upload task has been cancelled before removing its private part file.
       await cancellation;
       await fs.deleteAsync(temporaryUri, { idempotent: true });
     }
