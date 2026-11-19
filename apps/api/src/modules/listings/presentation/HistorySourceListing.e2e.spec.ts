@@ -69,7 +69,10 @@ beforeAll(async () => {
   vi.stubEnv("API_BASE_URL", await app.getUrl());
   action = (await import(actionPath) as { historyListingAction: ListingAction }).historyListingAction;
 });
-afterAll(async () => { await app?.close(); vi.unstubAllEnvs(); });
+afterAll(async () => {
+  try { if (prisma && input) await prisma.vehicleHistoryRequest.deleteMany({ where: { id: input.id } }); }
+  finally { await app?.close(); vi.unstubAllEnvs(); }
+});
 
 it("runs the production request-bound action through current History, public Listing and catalog HTTP/DB", async () => {
   for (const status of ["active", "sold", "archived"] as const) {
