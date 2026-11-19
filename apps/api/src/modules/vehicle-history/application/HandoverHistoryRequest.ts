@@ -17,7 +17,8 @@ export class HandoverHistoryRequest {
       throw new HistoryRequestError("HISTORY_REQUEST_INVALID");
     }
     const target = await this.operator.requireAssignable(targetId);
-    await this.assignments.handover(actor.id, target.id, id, expectedVersion, async () => {
+    await this.assignments.handover({ userId: actor.id, sessionId: claims.sid ?? "", purpose: "vehicle-history",
+      recipientId: target.id }, id, expectedVersion, async () => {
       await this.operator.require(claims);
       await this.operator.requireAssignable(target.id);
     });

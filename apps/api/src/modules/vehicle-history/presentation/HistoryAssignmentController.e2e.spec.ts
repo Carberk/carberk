@@ -113,6 +113,27 @@ describe("Current History assignment over listening HTTP", () => {
     expect((await f.prisma.vehicleHistoryRequest.findUniqueOrThrow({ where: { id: body.id } })).assignedOperatorId).toBe(first.user.id);
     expect((await f.prisma.vehicleHistoryRequest.findUniqueOrThrow({ where: { id: body.id } })).assignmentVersion).toBe(1);
   });
+  it.each(["source", "target"] as const)("refuses handover when %s authority is revoked while waiting on the recipient User", async (lost) => {
+    const { body } = await enquiry(), first = await f.actor(), next = await f.actor();
+    await claim(first, body.id).expect(201);
+    let pending: Promise<{ status: number }> | undefined;
+    await f.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${next.user.id} FOR UPDATE`;
+      pending = handover(first, body.id, next.user.id).then((result) => result);
+      await eventually(async () => {
+        const [row] = await tx.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock'
+          AND pg_backend_pid() = ANY(pg_blocking_pids(pid))
+        ) AS waiting`;
+        return row?.waiting ? true : null;
+      }, { timeoutMs: 2500, intervalMs: 20, description: "handover waiting on the recipient User lock" });
+      await tx.staffGrant.update({ where: { userId_purpose: { userId: (lost === "source" ? first : next).user.id,
+        purpose: "vehicle_history" } }, data: { revokedAt: new Date() } });
+    });
+    expect((await pending)?.status).toBe(403);
+    expect(await f.prisma.vehicleHistoryRequest.findUnique({ where: { id: body.id },
+      select: { assignedOperatorId: true, assignmentVersion: true } })).toEqual({ assignedOperatorId: first.user.id, assignmentVersion: 1 });
+  });
   it("exposes public enquiry metadata and requires a claim before selected reads", async () => {
     const customer = await f.actor(null), operator = await f.actor();
     const created = (await f.request.post("/api/v1/vehicle-history/requests").auth(customer.token, { type: "bearer" })

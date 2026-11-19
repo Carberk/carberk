@@ -177,7 +177,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
           <span>{t.assignment}: {selected?.assignedOperator ? IdentitySchemas.formatDisplayName(selected.assignedOperator, locale) : t.unassigned}</span>
         </div>
         {state === "ready" && <div className="mt-4"><HandoverControl locale={locale} id={id} version={version} scope={scope} actorId={actor.id}
-          onSuccess={handedOver} onRefresh={() => refresh(true)} /></div>}
+          onSuccess={handedOver} onRefresh={() => refresh(true)} onInvalidate={(status) => invalidate({ status })} /></div>}
       </header>
       {state === "unclaimed" ? <div className="space-y-4 p-5 text-sm">
       <p>{t.claimBody}</p>

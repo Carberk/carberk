@@ -129,12 +129,12 @@ it("confirms a named handover and keeps the operator's queue filter after access
   expect(window.location.search).toContain("filter=mine");
   expect(window.location.search).not.toContain("selected=");
 });
-it.each([403, 503])("keeps a handover HTTP %s refusal off the replay path until the operator refreshes", async (status) => {
+it("keeps an uncertain handover off the replay path until the operator refreshes", async () => {
   selectAssigned();
   let attempts = 0;
   server.use(http.post(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/handover`, () => {
     attempts++;
-    return Response.json({ code: status === 403 ? "HISTORY_OPERATOR_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE" }, { status });
+    return Response.json({ code: "HISTORY_MESSAGE_UNAVAILABLE" }, { status: 503 });
   }));
   render(view());
   await screen.findByText("Can you check this car?");
@@ -147,6 +147,29 @@ it.each([403, 503])("keeps a handover HTTP %s refusal off the replay path until 
   fireEvent.click(within(screen.getByRole("group", { name: "Hand over" })).getByRole("button", { name: "Refresh" }));
   await screen.findByText("Select an enquiry to view its details.");
   expect(attempts).toBe(1);
+});
+it.each([
+  ["load", 403, "Access denied"],
+  ["send", 403, "Access denied"],
+  ["send", 409, "Assignment changed. Refresh before continuing."],
+] as const)("removes the protected reader when a handover %s returns HTTP %s", async (step, status, notice) => {
+  selectAssigned();
+  const refused = () => Response.json({ code: status === 409 ? "HISTORY_ASSIGNMENT_CONFLICT" : "HISTORY_OPERATOR_DENIED" }, { status });
+  if (step === "load") server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/assignees", refused));
+  else server.use(http.post(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/handover`, refused));
+  render(view());
+  await screen.findByText("Can you check this car?");
+  expect(screen.getByRole("textbox", { name: "Internal note" })).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "Hand over" }));
+  if (step === "send") {
+    fireEvent.change(await screen.findByRole("combobox", { name: "New operator" }), { target: { value: colleague.id } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm handover" }));
+  }
+  await screen.findByText(notice);
+  expect(screen.queryByText("Can you check this car?")).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Internal note" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Confirm handover" })).toBeNull();
 });
 it("shows a recoverable candidate-load error and a truthful empty handover state", async () => {
   selectAssigned();

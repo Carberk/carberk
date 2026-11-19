@@ -8,9 +8,14 @@ import { historyAssigneesAction, historyHandoverAction } from "./actions";
 import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
 
 type Operator = V.HistoryDesk["actor"];
-export function HandoverControl({ locale, id, version, scope, actorId, onSuccess, onRefresh }: {
+type Refusal = "denied" | "stale" | "expired" | "conflict";
+function isRefusal(status: string): status is Refusal {
+  return status === "denied" || status === "stale" || status === "expired" || status === "conflict";
+}
+export function HandoverControl({ locale, id, version, scope, actorId, onSuccess, onRefresh, onInvalidate }: {
   locale: DeskLocale; id: string; version: number; scope: string; actorId: string;
   onSuccess: (name: string) => void; onRefresh: () => void;
+  onInvalidate: (status: Refusal) => void;
 }) {
   const t = deskCopy[locale];
   const live = useRef(true);
@@ -21,7 +26,7 @@ export function HandoverControl({ locale, id, version, scope, actorId, onSuccess
   const [busy, setBusy] = useState(false);
   const [operators, setOperators] = useState<Operator[] | null>(null);
   const [targetId, setTargetId] = useState("");
-  const [notice, setNotice] = useState<"load" | "lost" | "uncertain" | null>(null);
+  const [notice, setNotice] = useState<"load" | "uncertain" | null>(null);
   const target = operators?.find((operator) => operator.id === targetId);
   const targetName = target ? IdentitySchemas.formatDisplayName(target, locale) : "";
   const selection = { id, scope, expectedAssignmentVersion: version };
@@ -33,7 +38,8 @@ export function HandoverControl({ locale, id, version, scope, actorId, onSuccess
       const result = await historyAssigneesAction(locale, selection);
       if (!live.current || current !== generation.current) return;
       if (result.status === "ok") { setOperators(result.data.items.filter((operator) => operator.id !== actorId)); setTargetId(""); }
-      else setNotice(["conflict", "denied", "stale", "expired"].includes(result.status) ? "lost" : "load");
+      else if (isRefusal(result.status)) onInvalidate(result.status);
+      else setNotice("load");
     } catch { if (live.current && current === generation.current) setNotice("load"); }
     finally { if (live.current && current === generation.current) setLoading(false); }
   }
@@ -44,7 +50,8 @@ export function HandoverControl({ locale, id, version, scope, actorId, onSuccess
       const result = await historyHandoverAction(locale, { ...selection, targetOperatorId: target.id });
       if (!live.current) return;
       if (result.status === "ok") onSuccess(targetName);
-      else setNotice(["conflict", "stale"].includes(result.status) ? "lost" : "uncertain");
+      else if (isRefusal(result.status)) onInvalidate(result.status);
+      else setNotice("uncertain");
     } catch { if (live.current) setNotice("uncertain"); }
     finally { sending.current = false; if (live.current) setBusy(false); }
   }
@@ -63,7 +70,7 @@ export function HandoverControl({ locale, id, version, scope, actorId, onSuccess
       <Button type="button" size="lg" disabled={!target || busy || !!notice} aria-busy={busy} onClick={() => void confirm()}>{t.confirmHandover}</Button>
     </>}
     {notice && <div role="alert" className="space-y-2 text-sm">
-      <p>{notice === "load" ? t.handoverError : notice === "lost" ? t.assignmentLost : t.handoverUncertain}</p>
+      <p>{notice === "load" ? t.handoverError : t.handoverUncertain}</p>
       <Button type="button" size="lg" variant="secondary" onClick={() => notice === "load" ? void load() : onRefresh()}>
         {notice === "load" ? t.retry : t.refresh}
       </Button>
