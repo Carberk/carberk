@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { parseEnv } from "node:util";
+import YAML from "yaml";
 import { command, localEnv } from "./local-env.mjs";
 import { sessionRequest, startSession } from "./local-env-session.mjs";
 
@@ -58,6 +59,44 @@ test("a named runtime resumes its identity and publishes only nonsecret endpoint
   }
   const state = JSON.parse(await readFile(join(first.directory, "state.json")));
   for (const key of ["controlSecret", "storageSecret", "accessSecret", "refreshSecret", "sessionSecret", "totpSecret"]) assert(!JSON.stringify(f.output).includes(state[key]));
+});
+
+test("a stopped runtime resumes the same Docker origins even when ephemeral ports would change", async t => {
+  const f = await fixture(t);
+  const first = await localEnv(["up", "1356-a", "--infra-only"], f.options);
+  const original = f.options.run;
+  f.options.run = async (cmd, args, options) => {
+    if (cmd === "docker" && args.includes("port")) {
+      const config = YAML.parse(await readFile(args[args.indexOf("-f") + 1], "utf8"));
+      const publication = config.services[args.at(-2)].ports[0];
+      const fallback = 45200 + Number(args.at(-1)) % 100;
+      return "127.0.0.1:" + (publication.published ?? fallback);
+    }
+    return original(cmd, args, options);
+  };
+  await localEnv(["stop", "1356-a"], f.options);
+  const resumed = await localEnv(["up", "1356-a", "--infra-only"], f.options);
+  assert.equal(resumed.endpoints.minio, first.endpoints.minio);
+  assert.equal(resumed.endpoints.postgres, first.endpoints.postgres);
+  assert.equal(resumed.endpoints.redis, first.endpoints.redis);
+  const api = parseEnv(await readFile(join(resumed.directory, "api.env"), "utf8"));
+  assert.equal(api.MINIO_PUBLIC_URL, first.endpoints.minio);
+  assert(!f.commands.some(row => row.includes("down") || row.includes("prune")));
+});
+
+test("unexpected Docker ports on resume preserve the recorded origins and env", async t => {
+  const f = await fixture(t);
+  const first = await localEnv(["up", "1356-a", "--infra-only"], f.options);
+  await localEnv(["stop", "1356-a"], f.options);
+  const file = join(first.directory, "api.env");
+  const before = await readFile(file, "utf8");
+  const original = f.options.run;
+  f.options.run = (cmd, args, options) => cmd === "docker" && args.includes("port") && args.at(-2) === "minio"
+    ? "127.0.0.1:45104" : original(cmd, args, options);
+  await assert.rejects(localEnv(["up", "1356-a", "--infra-only"], f.options), /bindings changed.*stop\/up/);
+  assert.equal(await readFile(file, "utf8"), before);
+  const after = await localEnv(["status", "1356-a"], f.options);
+  assert.equal(after.endpoints.minio, first.endpoints.minio);
 });
 
 test("generated Next and Expo declarations preserve source identity while app edits invalidate it", async t => {
