@@ -13,6 +13,7 @@ import { sessionRequest, startSession } from "./local-env-session.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LABEL = "io.carberk.local-env";
 const APPS = ["api", "worker", "admin", "web", "metro"];
+const DOCKER_PORTS = [["postgres", 5432], ["redis", 6379], ["minio", 9000]];
 const GENERATED = [":(exclude)apps/web/next-env.d.ts", ":(exclude)apps/mobile/.expo/types/router.d.ts"];
 const HELP = "pnpm local-env up|status|stop|reset-signin-quota <ticket-name>. up accepts --profile empty|history|native, --with admin,web,metro and --infra-only. reset-signin-quota clears completed or expired synthetic phone sign-ins in the owned named runtime.";
 const digest = value => createHash("sha256").update(value).digest("hex");
@@ -168,6 +169,15 @@ async function composeFile(state, directory, config) {
   config.services.postgres.environment.POSTGRES_DB = state.database;
   config.services.postgres.healthcheck.test = ["CMD-SHELL", `pg_isready -U auto_tm_ci -d ${state.database}`];
   config.services.minio.environment.MINIO_ROOT_PASSWORD = state.storageSecret;
+  if (state.dockerPortsPinned) {
+    const ports = DOCKER_PORTS.map(([service]) => state.dockerPorts?.[service]);
+    if (!ports.every(port => Number.isInteger(port) && port > 0 && port <= 65535) || new Set(ports).size !== ports.length) {
+      throw new Error("Recorded Docker ports are invalid; inspect private runtime state");
+    }
+    for (const [service, target] of DOCKER_PORTS) {
+      config.services[service].ports.find(binding => binding.target === target).published = String(state.dockerPorts[service]);
+    }
+  }
   for (const service of Object.values(config.services)) service.labels = { [LABEL]: state.identity };
   for (const name of Object.keys(config.volumes)) config.volumes[name] = { labels: { [LABEL]: state.identity } };
   config.networks = { default: { labels: { [LABEL]: state.identity } } };
@@ -285,18 +295,21 @@ export async function localEnv(argv, { root = `/tmp/carberk-local-${process.getu
       state.source = source;
       state.ports = await bindings(state.ports);
     }
+    if (state.dockerPorts && !containers.some(container => container.running)) state.dockerPortsPinned = true;
     const compose = await composeFile(state, directory, config);
     state.phase = "starting-infra";
     await save(directory, state);
     await run("docker", [...compose, "up", "-d", "--wait", "--wait-timeout", "120"], { log: join(directory, "docker.log") });
     const dockerPorts = {};
-    for (const [service, port] of [["postgres", "5432"], ["redis", "6379"], ["minio", "9000"]]) {
-      const published = await run("docker", [...compose, "port", service, port]);
+    for (const [service, port] of DOCKER_PORTS) {
+      const published = await run("docker", [...compose, "port", service, String(port)]);
       if (!/^127\.0\.0\.1:\d+$/.test(published)) throw new Error("Docker did not publish one loopback port; inspect owned docker.log");
       dockerPorts[service] = Number(published.split(":")[1]);
     }
-    if (Object.values(live).some(Boolean) && Object.entries(dockerPorts).some(([service, port]) => state.dockerPorts?.[service] !== port)) throw new Error("Docker bindings changed under live sessions; stop/up to rebind owned services");
-    state.dockerPorts = dockerPorts;
+    if (state.dockerPorts && Object.entries(dockerPorts).some(([service, port]) => state.dockerPorts[service] !== port)) {
+      throw new Error("Docker bindings changed; previous ports and env files retained. Use stop/up to restore owned bindings");
+    }
+    state.dockerPorts ??= dockerPorts;
     await save(directory, state);
     const envs = await environments(state, directory);
     state.environment = digest(JSON.stringify(envs));
