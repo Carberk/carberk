@@ -23,6 +23,19 @@ const query = `filter=mine&search=Merdan&cursor=${id}&selected=${id}&v=1`;
 function view(locale: "en" | "ru" | "tk" = "en") {
   return <HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>;
 }
+async function editableDraft(name: string) {
+  return waitFor(() => {
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox", { name });
+    expect(input.disabled).toBe(false);
+    return input;
+  });
+}
+async function writeDraft(name: string, value: string) {
+  const input = await editableDraft(name);
+  fireEvent.change(input, { target: { value } });
+  expect(input.value).toBe(value);
+  return input;
+}
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
@@ -57,10 +70,8 @@ it("opens the real request-derived public Listing without replacing the enquiry 
   render(view());
   await screen.findByText("Keep my enquiry");
   const pane = screen.getByRole("list", { name: "Enquiry conversation" });
-  const reply = screen.getByRole("textbox", { name: "Reply to customer" });
-  const note = screen.getByRole("textbox", { name: "Internal note" });
-  fireEvent.change(reply, { target: { value: "Public draft — Döwlet / Ответ" } });
-  fireEvent.change(note, { target: { value: "Separate private draft" } });
+  const reply = await writeDraft("Reply to customer", "Public draft — Döwlet / Ответ");
+  const note = await writeDraft("Internal note", "Separate private draft");
   pane.scrollTop = 37;
   fireEvent.scroll(pane);
   const open = screen.getByRole("button", { name: "View full listing" }); open.focus();
@@ -78,8 +89,8 @@ it("opens the real request-derived public Listing without replacing the enquiry 
   expect(screen.getByRole("list", { name: "Enquiry conversation" })).toBe(pane);
   expect(pane.scrollTop).toBe(37);
   expect(screen.getByRole("textbox", { name: "Reply to customer" })).toBe(reply);
-  expect((reply as HTMLTextAreaElement).value).toBe("Public draft — Döwlet / Ответ");
-  expect((note as HTMLTextAreaElement).value).toBe("Separate private draft");
+  expect(reply.value).toBe("Public draft — Döwlet / Ответ");
+  expect(note.value).toBe("Separate private draft");
   await waitFor(() => expect(document.activeElement).toBe(open));
 });
 
@@ -115,8 +126,8 @@ it("keeps a newer public draft when a pending reply is acknowledged while the Li
     return network(input, init);
   });
   render(view()); await screen.findByText("Keep my enquiry");
-  const reply = screen.getByRole("textbox", { name: "Reply to customer" });
-  await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(true));
+  const reply = await editableDraft("Reply to customer");
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Send reply" }).disabled).toBe(true);
   fireEvent.change(reply, { target: { value: "Reply being sent" } });
   await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
@@ -198,8 +209,8 @@ it.each(["draft", "pending_review", "rejected"])("does not display a %s Listing 
 
 it.each(["ru", "tk"] as const)("reopens the current source after a refresh or language change to %s", async (locale) => {
   render(view()); await screen.findByText("Keep my enquiry");
-  fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Newer public draft — täze / новый" } });
-  fireEvent.change(screen.getByRole("textbox", { name: "Internal note" }), { target: { value: "Private draft stays separate" } });
+  await writeDraft("Reply to customer", "Newer public draft — täze / новый");
+  await writeDraft("Internal note", "Private draft stays separate");
   fireEvent.click(screen.getByRole("button", { name: "View full listing" }));
   await screen.findByText("Public car");
   const target = within(screen.getByRole("dialog")).getByRole("link", { name: locale.toUpperCase() }).getAttribute("href");
@@ -212,9 +223,11 @@ it.each(["ru", "tk"] as const)("reopens the current source after a refresh or la
   expect(window.location.pathname).toBe(`/vehicle-history/${locale}`);
   expect(window.location.search).toBe(`?${query}`);
   expect(screen.getByText("Keep my enquiry")).toBeTruthy();
-  expect((screen.getByRole("textbox", { name: locale === "ru" ? "Ответ клиенту" : "Müşderä jogap" }) as HTMLTextAreaElement).value)
-    .toBe("Newer public draft — täze / новый");
-  expect((document.getElementById("history-private-note") as HTMLTextAreaElement).value).toBe("Private draft stays separate");
+  await waitFor(() => {
+    expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: locale === "ru" ? "Ответ клиенту" : "Müşderä jogap" }).value)
+      .toBe("Newer public draft — täze / новый");
+    expect((document.getElementById("history-private-note") as HTMLTextAreaElement).value).toBe("Private draft stays separate");
+  });
 });
 
 it("restores the conversation anchor and queue position across a real component reload", async () => {
