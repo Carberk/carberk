@@ -8,7 +8,7 @@ import ChatScreen from "../../app/(tabs)/chat";
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
 import { queryKeys } from "../api/queryKeys";
 import HistoryScreen from "../../app/vehicle-history/requests";
-import { act, fireEvent, renderMobile, routerMock, routeParams } from "../../test/render";
+import { act, fireEvent, getHost, renderMobile, routerMock, routeParams } from "../../test/render";
 import { server } from "../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../auth/session";
 
@@ -25,6 +25,7 @@ const session = (sid = "session-one", id = userId) => ({
   user: { id, phone: null, email: "synthetic@example.test", displayName: null, role: "buyer" as const },
 });
 const enquiry = (id = requestId) => ({ id, sourceListingId: null, createdAt: "2026-11-14T08:00:00.000Z", status: "enquiry", assignedOperator: null });
+const successor = { id: "30000000-0000-4000-8000-000000000103", displayName: "Murat", nameNumber: 1214 };
 let stored: string | null;
 beforeEach(async () => {
   vi.mocked(useNavigation).mockReturnValue({ getState: () => undefined } as ReturnType<typeof useNavigation>);
@@ -59,6 +60,31 @@ it("browses older enquiries and reopens with reads only", async () => {
   await fireEvent.press(view.getByRole("button", { name: "Open request 20000000" }));
   expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/vehicle-history/requests/[id]", params: { id: secondId } });
   expect(methods).toEqual(["GET", "GET"]);
+});
+it.each([
+  ["en", "Your operator changed to Murat."],
+  ["ru", "Ваш оператор сменился: Murat."],
+  ["tk", "Jogapkär işgäriňiz üýtgedi: Murat."],
+] as const)("shows the named operator change while retaining the customer's enquiry in %s", async (locale, notice) => {
+  routeParams.id = requestId;
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry(), assignmentVersion: 2,
+    assignedOperator: successor })));
+  const view = await renderMobile(<RequestScreen />, { locale });
+  expect(await view.findByText(notice)).toBeTruthy();
+  expect(view.getByText(/10000000/)).toBeTruthy();
+});
+it("updates the same customer's header after a real pull refresh observes handover", async () => {
+  routeParams.id = requestId;
+  let current = { ...enquiry(), assignmentVersion: 1,
+    assignedOperator: { ...successor, id: secondId, displayName: "Ayna" } };
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(current)));
+  const view = await renderMobile(<RequestScreen />, { locale: "en" });
+  await view.findByText("Operator: Ayna");
+  const list = getHost(view.container, "RCTScrollView");
+  current = { ...current, assignmentVersion: 2, assignedOperator: successor };
+  await act(() => list.props.refreshControl.props.onRefresh());
+  expect(await view.findByText("Your operator changed to Murat.")).toBeTruthy();
+  expect(view.getByText(/10000000/)).toBeTruthy();
 });
 
 afterEach(() => { onlineManager.setOnline(true); vi.unstubAllEnvs(); });

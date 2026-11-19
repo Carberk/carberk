@@ -180,8 +180,9 @@ export function RequestDetail({ id }: { id: string }) {
           <Text accessibilityRole="header" className="text-headline font-semibold">
             {t("vehicleHistory.enquiry")}
           </Text>
-          <Text className="text-body">{request.assignedOperator
-            ? t("vehicleHistory.assignedOperator", { name: name(request.assignedOperator) }) : t("vehicleHistory.awaitingOperator")}</Text>
+          <Text accessibilityLiveRegion={request.assignmentVersion > 1 ? "polite" : undefined} className="text-body">{request.assignedOperator
+            ? t(request.assignmentVersion > 1 ? "vehicleHistory.operatorChanged" : "vehicleHistory.assignedOperator",
+              { name: name(request.assignedOperator) }) : t("vehicleHistory.awaitingOperator")}</Text>
           <Text className="text-callout text-muted-foreground">
             {new Date(request.createdAt).toLocaleString(localeTag(i18n.language))}
           </Text>

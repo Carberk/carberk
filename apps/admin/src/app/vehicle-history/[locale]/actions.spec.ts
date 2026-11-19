@@ -14,11 +14,12 @@ vi.mock("next/headers", () => ({ headers: async () => (requests.getStore() ?? st
   } }) }));
 vi.mock("next/navigation", async (original) => ({ ...await original<typeof Navigation>(),
   redirect: (url: string) => { throw Object.assign(new Error(url), { digest: `NEXT_REDIRECT;replace;${url};307;` }); } }));
-import { historyInboxAction, historyMessageAction } from "./actions";
+import { historyInboxAction, historyMessageAction, historyAssigneesAction, historyHandoverAction } from "./actions";
 
 import { proxy } from "@/proxy";
 
 const actor = { id: "10000000-0000-4000-8000-000000001213", displayName: "Ayna", nameNumber: 1213 };
+const target = { id: "10000000-0000-4000-8000-000000001214", displayName: "Murat", nameNumber: 1214 };
 const requestId = "10000000-0000-4000-8000-000000001231";
 const session = "10000000-0000-4000-8000-000000000001";
 const jwt = (sid = session, sub = actor.id, exp = Math.floor(Date.now() / 1000) + 900) =>
@@ -34,7 +35,7 @@ const receipt = { participantId: actor.id, assignmentVersion: 1, receivedOrder: 
 let messageBody: unknown, receiptBody: unknown;
 let intercept: ((path: string, method: string) => Promise<void>) | undefined;
 const revoked = new Set<string>();
-let server: Server, origin: string, queueBody: unknown, detailBody: unknown, status: number, refreshStatus: number;
+let server: Server, origin: string, queueBody: unknown, detailBody: unknown, assigneesBody: unknown, handoverBody: unknown, status: number, refreshStatus: number;
 let delay: (() => Promise<void>) | undefined;
 let seen: { path: string; method: string; body: string; auth: string | undefined }[];
 beforeAll(async () => {
@@ -51,7 +52,8 @@ beforeAll(async () => {
       response = { purpose: "vehicle-history", mode: "synthetic", actor: { ...actor, id: claims.sub }, requests: [] };
     } else {
       if (delay) { const work = delay; delay = undefined; await work(); }
-      response = path.includes("/receipts") ? receiptBody : path.includes("/messages") ? req.method === "POST" ? messageBody : transcript : path.endsWith("/claim") ? selected
+      response = path.endsWith("/assignees") ? assigneesBody : path.endsWith("/handover") ? handoverBody
+        : path.includes("/receipts") ? receiptBody : path.includes("/messages") ? req.method === "POST" ? messageBody : transcript : path.endsWith("/claim") ? selected
         : path.includes(requestId) ? detailBody : queueBody;
     }
     res.writeHead(path.endsWith("/auth/refresh") ? refreshStatus : revoked.has(req.headers.authorization ?? "") ? 403 : path.endsWith("/desk") ? 200 : status, { "Content-Type": "application/json" });
@@ -66,6 +68,7 @@ beforeEach(() => {
   state.headers = new Headers({ origin: "http://admin.test", "x-real-ip": "203.0.113.7" });
   state.cookies = new Map([["auto_tm_admin_access", jwt()]]);
   queueBody = page; detailBody = selected; status = 200; seen = []; delay = undefined;
+  assigneesBody = { items: [target] }; handoverBody = { id: requestId, assignmentVersion: 2, assignedOperator: target };
   messageBody = sent; receiptBody = receipt;
   intercept = undefined; revoked.clear(); refreshStatus = 200;
 });
@@ -76,6 +79,36 @@ async function scope() {
 }
 
 describe("History actions through the real HTTP-only network bridge", () => {
+  it("confirms a named eligible colleague before handing over the current selected enquiry", async () => {
+    const current = await scope(); seen = [];
+    const selection = { id: requestId, scope: current, expectedAssignmentVersion: 1 };
+    expect(await historyAssigneesAction("en", selection)).toEqual({ status: "ok", scope: current, actor, data: assigneesBody });
+    expect(await historyHandoverAction("en", { ...selection, targetOperatorId: target.id })).toEqual({
+      status: "ok", scope: current, actor, data: handoverBody,
+    });
+    expect(seen.filter((entry) => entry.method === "POST").map(({ path, body }) => ({ path, body: JSON.parse(body) }))).toEqual([
+      { path: `/api/v1/vehicle-history/operator/requests/${requestId}/handover`,
+        body: { targetOperatorId: target.id, expectedAssignmentVersion: 1 } },
+    ]);
+  });
+  it("does not send handover from a stale selected assignment or session", async () => {
+    const current = await scope(); seen = [];
+    const command = { id: requestId, scope: current, expectedAssignmentVersion: 1, targetOperatorId: target.id };
+    detailBody = { ...selected, assignmentVersion: 2 };
+    expect(await historyHandoverAction("ru", command)).toEqual({ status: "conflict", scope: current });
+    expect(await historyAssigneesAction("ru", { id: requestId, scope: current, expectedAssignmentVersion: 1 }))
+      .toEqual({ status: "conflict", scope: current });
+    detailBody = selected;
+    state.cookies.set("auto_tm_admin_access", jwt(requestId));
+    expect(await historyHandoverAction("ru", command)).toEqual({ status: "stale", scope: expect.any(String) });
+    expect(seen.filter((entry) => entry.method === "POST")).toEqual([]);
+  });
+  it("does not claim success for a mismatched handover response", async () => {
+    const current = await scope();
+    handoverBody = { id: requestId, assignmentVersion: 2, assignedOperator: actor };
+    expect(await historyHandoverAction("en", { id: requestId, scope: current,
+      expectedAssignmentVersion: 1, targetOperatorId: target.id })).toEqual({ status: "unavailable", scope: current });
+  });
   it("reads attributed receipt facts and acknowledges only an explicit Received or Read command", async () => {
     const current = await scope(); seen = [];
     const selection = { id: requestId, scope: current, expectedAssignmentVersion: 1 };

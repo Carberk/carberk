@@ -22,4 +22,5 @@ export interface StaffAccessPort {
     sessionId: string;
     purpose: StaffPurpose;
   }): Promise<StaffActor | null>;
+  findAssignableActor(input: { userId: string; purpose: "vehicle-history" }): Promise<StaffActor | null>;
 }

@@ -156,6 +156,19 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
     });
   }
 
+  async handover(operatorId: string, targetId: string, id: string, expectedVersion: number,
+    confirmAuthority: () => Promise<void>) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM vehicle_history_requests WHERE id = ${id} FOR UPDATE`;
+      await confirmAuthority();
+      const result = await tx.vehicleHistoryRequest.updateMany({
+        where: { id, assignedOperatorId: operatorId, assignmentVersion: expectedVersion },
+        data: { assignedOperatorId: targetId, assignmentVersion: { increment: 1 } },
+      });
+      if (result.count !== 1) throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
+    });
+  }
+
   async findAssigned(operatorId: string, id: string) {
     return this.prisma.vehicleHistoryRequest.findFirst({ where: { id, assignedOperatorId: operatorId },
       select: { id: true, requesterId: true, createdAt: true, sourceListingId: true, assignedOperatorId: true, assignmentVersion: true } });

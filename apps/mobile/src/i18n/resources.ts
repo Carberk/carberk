@@ -61,7 +61,7 @@ export const resources: Resource = {
         refreshRequest: "Обновить запрос", recentSends: "Недавно отправленные",
 
         requestRefreshFailed: "Не удалось обновить обращение.",
-        assignedOperator: "Оператор: {{name}}", you: "Вы",
+        assignedOperator: "Оператор: {{name}}", operatorChanged: "Ваш оператор сменился: {{name}}.", you: "Вы",
         moreMessages: "Загрузить ещё сообщения", pageFailed: "Не удалось загрузить следующие сообщения.",
         receiptFailed: "Не удалось обновить отметки сообщений.", retryReceipts: "Повторить обновление отметок",
         threadChanged: "Обращение изменилось. Обновите его и продолжите.",
@@ -1085,7 +1085,7 @@ export const resources: Resource = {
         refreshRequest: "Ýüz tutmany täzele", recentSends: "Soňky iberilenler",
 
         requestRefreshFailed: "Ýüz tutmany täzeläp bolmady.",
-        assignedOperator: "Operator: {{name}}", you: "Siz",
+        assignedOperator: "Operator: {{name}}", operatorChanged: "Jogapkär işgäriňiz üýtgedi: {{name}}.", you: "Siz",
         moreMessages: "Ýene habarlary ýükle", pageFailed: "Indiki habarlary ýükläp bolmady.",
         receiptFailed: "Habarlaryň ýagdaýyny täzeläp bolmady.", retryReceipts: "Habar ýagdaýyny gaýtadan täzele",
         threadChanged: "Ýüz tutma üýtgedi. Täzeläp, dowam ediň.",
@@ -2109,7 +2109,7 @@ export const resources: Resource = {
         refreshRequest: "Refresh request", recentSends: "Recent sends",
 
         requestRefreshFailed: "Could not refresh this request.",
-        assignedOperator: "Operator: {{name}}", you: "You",
+        assignedOperator: "Operator: {{name}}", operatorChanged: "Your operator changed to {{name}}.", you: "You",
         moreMessages: "Load more messages", pageFailed: "Could not load more messages.",
         receiptFailed: "Could not update message status.", retryReceipts: "Retry message status",
         threadChanged: "This request changed. Refresh it to continue.",

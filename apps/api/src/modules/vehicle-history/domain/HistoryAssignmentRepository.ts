@@ -28,6 +28,8 @@ export interface HistoryAssignmentRepository {
   confirmQueue(operatorId: string, query: HistoryQueueQuery, items: HistoryQueueItem[]): Promise<void>;
   /** The database arbitrates competing claims; no prior read grants a write. */
   claimUnassigned(operatorId: string, id: string, expectedVersion: number, confirmAuthority: () => Promise<void>): Promise<void>;
+  handover(operatorId: string, targetId: string, id: string, expectedVersion: number,
+    confirmAuthority: () => Promise<void>): Promise<void>;
   findAssigned(operatorId: string, id: string): Promise<(HistoryRequest & { requesterId: string }) | null>;
 }
 export const HISTORY_ASSIGNMENT_REPOSITORY = Symbol("HistoryAssignmentRepository");

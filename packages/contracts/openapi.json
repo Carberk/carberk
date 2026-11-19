@@ -12941,6 +12941,180 @@
         }
       }
     },
+    "/api/v1/vehicle-history/operator/requests/assignees": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Named eligible synthetic History operators other than the current actor",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store eligible colleagues",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nameNumber": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "displayName",
+                          "nameNumber"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current History operator refused"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/handover": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "summary": "Explicit named handover from the current assignee at the current assignment version",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedAssignmentVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "targetOperatorId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "expectedAssignmentVersion",
+                  "targetOperatorId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store new assignee and version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "assignmentVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "assignedOperator": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "nameNumber": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "displayName",
+                        "nameNumber"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "assignmentVersion",
+                    "assignedOperator"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid target or version"
+          },
+          "401": {
+            "description": "Sign in again"
+          },
+          "403": {
+            "description": "Current operator or named recipient refused"
+          },
+          "409": {
+            "description": "Assignment changed; refresh the inbox"
+          }
+        }
+      }
+    },
     "/api/v1/vehicle-history/operator/requests/{id}/claim": {
       "post": {
         "tags": [

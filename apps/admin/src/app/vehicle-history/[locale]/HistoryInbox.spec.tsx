@@ -3,7 +3,7 @@ import { PassThrough } from "node:stream";
 
 import { act, cloneElement, isValidElement, type ReactNode } from "react";
 import { renderToPipeableStream } from "react-dom/server";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { http } from "msw";
 import { setupServer } from "msw/node";
@@ -24,10 +24,11 @@ import HistoryDeskPage from "./page";
 
 import { HistoryWorkbench } from "@/components/HistoryWorkbench";
 const actor = { id: "12150000-0000-4000-8000-000000000001", displayName: "Ayna", nameNumber: 1215 };
+const colleague = { id: "12150000-0000-4000-8000-000000000003", displayName: "Murat", nameNumber: 1216 };
 const id = "12150000-0000-4000-8000-000000000002";
 const row = { id, status: "enquiry", createdAt: "2026-11-15T01:00:00.000Z", mine: false, assignmentVersion: 0,
   requester: { displayName: "Merdan", nameNumber: 4444, deleted: false }, assignedOperator: null };
-let assigned: boolean;
+let assigned: boolean, handedOver: boolean;
 let requests: { path: string; method: string; body: unknown }[];
 const token = (sid = id, sub = actor.id) => `e30.${Buffer.from(JSON.stringify({ sub, sid })).toString("base64url")}.synthetic`;
 function view() { return <HistoryWorkbench locale="en" section="desk"><HistoryInbox locale="en" /></HistoryWorkbench>; }
@@ -51,6 +52,11 @@ const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request
     const init = { method: request.method, body: request.method === "POST" ? await request.text() : undefined };
     const url = new URL(input); requests.push({ path: url.pathname + url.search, method: init?.method ?? "GET", body: init?.body });
     if (url.pathname.endsWith("/desk")) return Response.json({ purpose: "vehicle-history", mode: "synthetic", actor, requests: [] });
+    if (url.pathname.endsWith("/assignees")) return Response.json({ items: [colleague] });
+    if (url.pathname.endsWith("/handover")) {
+      handedOver = true;
+      return Response.json({ id, assignmentVersion: 2, assignedOperator: colleague }, { status: 201 });
+    }
     if (url.pathname.endsWith("/claim")) { assigned = true; return Response.json(detail()); }
     if (url.pathname.endsWith("/receipts")) {
       if (init?.method !== "POST") return Response.json({ items: [] });
@@ -69,7 +75,8 @@ const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request
       }
       return Response.json({ items: [], nextCursor: null });
     }
-    if (url.pathname.endsWith(id)) return Response.json(detail());
+    if (url.pathname.endsWith(id)) return handedOver ? Response.json({}, { status: 403 }) : Response.json(detail());
+    if (handedOver && url.searchParams.get("filter") === "mine") return Response.json({ items: [], nextCursor: null });
     return Response.json({ items: [assigned ? { ...row, mine: true, assignmentVersion: 1, assignedOperator: actor } : row], nextCursor: null });
 }));
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -79,7 +86,7 @@ beforeEach(() => {
   sessionStorage.clear();
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubEnv("API_BASE_URL", "http://api.test");
-  platform.token = token(); assigned = false; requests = [];
+  platform.token = token(); assigned = false; handedOver = false; requests = [];
   window.history.replaceState(null, "", "/vehicle-history/en");
   vi.stubGlobal("fetch", vi.fn(fetch));
 });
@@ -104,6 +111,69 @@ it("shows safe enquiry metadata, then claims atomically before opening the real 
   expect(requests.filter((r) => r.path.includes("receipts") && r.method === "POST").every((r) => JSON.parse(String(r.body)).kind === "received")).toBe(true);
   expect(screen.getByRole("textbox", { name: "Reply to customer" })).toBeDefined();
   expect(screen.getByRole("textbox", { name: "Internal note" })).toBeDefined();
+});
+it("confirms a named handover and keeps the operator's queue filter after access moves", async () => {
+  selectAssigned();
+  render(view());
+  await screen.findByText("Can you check this car?");
+  fireEvent.click(screen.getByRole("button", { name: "Hand over" }));
+  const picker = await screen.findByRole("combobox", { name: "New operator" });
+  fireEvent.change(picker, { target: { value: colleague.id } });
+  await screen.findByText("Hand over to Murat?");
+  fireEvent.click(screen.getByRole("button", { name: "Confirm handover" }));
+  await screen.findByText("Handed over to Murat.");
+  expect(requests.filter((entry) => entry.method === "POST" && entry.path.endsWith("/handover"))).toEqual([
+    { path: `/api/v1/vehicle-history/operator/requests/${id}/handover`, method: "POST",
+      body: JSON.stringify({ targetOperatorId: colleague.id, expectedAssignmentVersion: 1 }) },
+  ]);
+  expect(window.location.search).toContain("filter=mine");
+  expect(window.location.search).not.toContain("selected=");
+});
+it.each([403, 503])("keeps a handover HTTP %s refusal off the replay path until the operator refreshes", async (status) => {
+  selectAssigned();
+  let attempts = 0;
+  server.use(http.post(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/handover`, () => {
+    attempts++;
+    return Response.json({ code: status === 403 ? "HISTORY_OPERATOR_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE" }, { status });
+  }));
+  render(view());
+  await screen.findByText("Can you check this car?");
+  fireEvent.click(screen.getByRole("button", { name: "Hand over" }));
+  fireEvent.change(await screen.findByRole("combobox", { name: "New operator" }), { target: { value: colleague.id } });
+  fireEvent.click(screen.getByRole("button", { name: "Confirm handover" }));
+  await screen.findByText("Handover not confirmed. Refresh the queue.");
+  expect((screen.getByRole("button", { name: "Confirm handover" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(attempts).toBe(1);
+  fireEvent.click(within(screen.getByRole("group", { name: "Hand over" })).getByRole("button", { name: "Refresh" }));
+  await screen.findByText("Select an enquiry to view its details.");
+  expect(attempts).toBe(1);
+});
+it("shows a recoverable candidate-load error and a truthful empty handover state", async () => {
+  selectAssigned();
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/assignees",
+    () => Response.json({}, { status: 503 })));
+  render(view());
+  await screen.findByText("Can you check this car?");
+  fireEvent.click(screen.getByRole("button", { name: "Hand over" }));
+  await screen.findByText("Could not load operators. Try again.");
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/assignees",
+    () => Response.json({ items: [] })));
+  fireEvent.click(within(screen.getByRole("group", { name: "Hand over" })).getByRole("button", { name: "Try again" }));
+  await screen.findByText("No other History operator is available.");
+  expect(screen.queryByRole("button", { name: "Confirm handover" })).toBeNull();
+});
+it.each([
+  ["en", "Hand over", "New operator", "Confirm handover"],
+  ["ru", "Передать другому сотруднику", "Новый исполнитель", "Подтвердить передачу"],
+  ["tk", "Başga işgäre geçir", "Täze jogapkär işgär", "Geçirmegi tassykla"],
+] as const)("offers the named handover control in %s", async (locale, open, label, confirm) => {
+  selectAssigned();
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  await screen.findByText("Can you check this car?");
+  fireEvent.click(screen.getByRole("button", { name: open }));
+  const picker = await screen.findByRole("combobox", { name: label });
+  fireEvent.change(picker, { target: { value: colleague.id } });
+  expect(screen.getByRole("button", { name: confirm })).toBeDefined();
 });
 it("keeps an attributed private note in the staff panel and out of the customer conversation", async () => {
   selectAssigned();
@@ -828,7 +898,7 @@ it.each(["version", "owner", "mine"])("hides text as soon as the queue observes 
   await waitFor(() => expect(captured).toBe(true));
   lost = true;
   await act(async () => window.dispatchEvent(new Event("focus")));
-  await screen.findByText("Assignment changed. Refresh before continuing.");
+  await screen.findByText("This enquiry moved to another operator. Refresh the queue.");
   expect(screen.queryByText("Reader message 1")).toBeNull();
   await act(async () => pending.resolve(Response.json({ items: [message(2)], nextCursor: null })));
   expect(screen.queryByText("Reader message 2")).toBeNull();

@@ -9,6 +9,10 @@ queue/context/transcript reads and atomic Claim for the connected inbox. They
 bind outcomes to the API-confirmed actor and stable session without exposing
 tokens. The [selected enquiry](src/app/vehicle-history/[locale]/SelectedRequest.tsx) uses a [serialized reader](src/app/vehicle-history/[locale]/useOperatorConversation.ts) to retain contiguous pages and reading position through refresh and recoverable failures, and remove them on observed authority loss. The same lane reconciles durable requester receipts and explicit Received before eligible visible Read. The [public Reply composer](src/app/vehicle-history/[locale]/ReplyComposer.tsx) uses that serialized lane with account/request/assignment-scoped durable intents, revision-safe acknowledgement and recoverable browser storage; manual reminders remain a separate slice.
 
+The selected enquiry can hand off to a named eligible History operator after an
+explicit confirmation. The server action checks the selected assignment before
+the mutation; the old operator refreshes the same queue context afterward.
+
 The [source Listing reader](src/lib/history-source-listing.ts) projects
 only anonymous public display facts; its [catalog resolver](src/lib/history-listing-catalog.ts)
 resolves all present references and lets a caller reauthorize after every read/page.

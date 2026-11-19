@@ -4,6 +4,8 @@ import type { FastifyRequest } from "fastify";
 import { ListOperatorHistoryRequests } from "../application/ListOperatorHistoryRequests";
 import { GetOperatorHistoryRequest } from "../application/GetOperatorHistoryRequest";
 import { ClaimHistoryRequest } from "../application/ClaimHistoryRequest";
+import { HandoverHistoryRequest } from "../application/HandoverHistoryRequest";
+import { CurrentHistoryOperator } from "../application/CurrentHistoryOperator";
 import type { HistoryRequesterClaims } from "../application/CurrentHistoryRequester";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HistoryRequestExceptionFilter } from "./HistoryRequestExceptionFilter";
@@ -16,7 +18,15 @@ export class HistoryAssignmentController {
     @Inject(ListOperatorHistoryRequests) private readonly listRequests: ListOperatorHistoryRequests,
     @Inject(GetOperatorHistoryRequest) private readonly getRequest: GetOperatorHistoryRequest,
     @Inject(ClaimHistoryRequest) private readonly claimRequest: ClaimHistoryRequest,
+    @Inject(HandoverHistoryRequest) private readonly handoverRequest: HandoverHistoryRequest,
+    @Inject(CurrentHistoryOperator) private readonly operator: CurrentHistoryOperator,
   ) {}
+
+  @Get("assignees")
+  @Header("Cache-Control", "private, no-store")
+  async assignees(@Req() request: Request) {
+    return this.operator.listAssignable(request.user ?? {});
+  }
 
   @Get()
   @Header("Cache-Control", "private, no-store")
@@ -43,5 +53,13 @@ export class HistoryAssignmentController {
     if (!input.success || !VehicleHistorySchemas.HistoryRequestSchema.shape.id.safeParse(id).success) throw new HistoryRequestError("HISTORY_REQUEST_INVALID");
     const item = await this.claimRequest.execute(request.user ?? {}, id, input.data.expectedAssignmentVersion);
     return { ...item, createdAt: item.createdAt.toISOString(), status: "enquiry" };
+  }
+
+  @Post(":id/handover")
+  @Header("Cache-Control", "private, no-store")
+  async handover(@Req() request: Request, @Param("id") id: string, @Body() body: unknown) {
+    const input = VehicleHistorySchemas.HandoverHistoryRequestSchema.safeParse(body);
+    if (!input.success || !VehicleHistorySchemas.HistoryRequestSchema.shape.id.safeParse(id).success) throw new HistoryRequestError("HISTORY_REQUEST_INVALID");
+    return this.handoverRequest.execute(request.user ?? {}, id, input.data.targetOperatorId, input.data.expectedAssignmentVersion);
   }
 }
