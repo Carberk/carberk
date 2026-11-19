@@ -525,6 +525,16 @@ describe("photo conversion maintenance setting", () => {
 
 
 describe("Listing video rollout defaults", () => {
+  it("keeps the five-minute video grant when the local setting is absent or blank", () => {
+    expect(EnvSchema.parse(baseEnv).LISTING_VIDEO_GRANT_TTL_SECONDS).toBe(300);
+    expect(EnvSchema.parse({ ...baseEnv, LISTING_VIDEO_GRANT_TTL_SECONDS: "" }).LISTING_VIDEO_GRANT_TTL_SECONDS).toBe(300);
+    expect(EnvSchema.parse({ ...baseEnv, LISTING_VIDEO_GRANT_TTL_SECONDS: "20" }).LISTING_VIDEO_GRANT_TTL_SECONDS).toBe(20);
+  });
+
+  it.each(["0", "9", "301", "invalid"])("refuses the invalid local video grant lifetime %s", (value) => {
+    expect(EnvSchema.safeParse({ ...baseEnv, LISTING_VIDEO_GRANT_TTL_SECONDS: value }).success).toBe(false);
+  });
+
   it("starts with no upload or view testers and new uploads disabled", () => {
     expect(EnvSchema.parse(baseEnv)).toMatchObject({
       LISTING_VIDEO_UPLOADS_ENABLED: false,

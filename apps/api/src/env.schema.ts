@@ -77,7 +77,7 @@ const BaseSchema = z.object({
   LISTING_VIDEO_API_ORIGIN: videoOriginSchema.optional(),
   LISTING_VIDEO_GATEWAY_ORIGIN: videoOriginSchema.optional(),
   /** Local testing only: a shorter Listing video grant, so expiry checks take seconds. Deployed environments always use five minutes. */
-  LISTING_VIDEO_GRANT_TTL_SECONDS: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().int().min(10).max(300).optional()),
+  LISTING_VIDEO_GRANT_TTL_SECONDS: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().int().min(10).max(300).default(300)),
   MINIO_ENDPOINT: z.string().default("http://localhost:9000"),
   MINIO_PUBLIC_URL: z.string().default("http://localhost:9000"),
   MINIO_ACCESS_KEY: z.string().default("minioadmin"),
