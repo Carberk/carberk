@@ -8,7 +8,7 @@ try {
   const proxy = { relay: 'http://127.0.0.1:11809', reverse: 'http://127.0.0.1:11819' }[transport];
   if (config.origin !== 'https://api-staging-2861.up.railway.app'
       || !proxy || config.proxy !== proxy) throw Error('Unexpected destination');
-  const server = createGateway({ origin: config.origin, photoOrigin: 'https://minio-staging-5795.up.railway.app', proxy: config.proxy, hostname: config.hostname,
+  const server = createGateway({ origin: config.origin, photoOrigin: 'https://minio-staging-5795.up.railway.app', videoOrigin: 'https://t3.storageapi.dev', proxy: config.proxy, hostname: config.hostname,
     accessKey: config.accessKey, signing: config.signing, log: row => console.log(JSON.stringify(row)) });
   server.on('error', () => { console.error('{"event":"gateway_start_failed"}'); process.exitCode = 1; });
   if (process.argv[3] === '--check') { server.close(); console.log('{"configuration_valid":true}'); }

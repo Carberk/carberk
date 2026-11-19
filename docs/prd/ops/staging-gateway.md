@@ -3,7 +3,7 @@
 [R02](https://github.com/Carberk/carberk/issues/1155) adds a controlled-client API
 entry on the VPS. [R01](staging-egress.md) owns fixed-relay selection and its
 independence proof. R05 adds the fixed photo alias below; R08 adds Socket.IO
-forwarding. Video remains a separate ticket. R03 adds
+forwarding. R06 adds the multipart video alias below. R03 adds
 optional signed client attribution as described below. A gateway key does not grant API business permissions.
 
 ## Runtime contract
@@ -15,7 +15,7 @@ optional signed client attribution as described below. A gateway key does not gr
 settings fail `--check`; unavailable transport fails requests without fallback.
 The [reverse procedure](staging-egress.md#persistent-reverse-connector-1224) owns the
 supervised Railway connector and isolated VPS listener/adapter. The CLI permits
-only the staging API/photo origins and these fixed loopback proxies. The configured
+only the staging API/photo/video origins and these fixed loopback proxies. The configured
 hostname must match the request Host. A client supplies `X-Carberk-Gateway-Key` in
 addition to its normal API bearer token. Never put the gateway key in a URL, git,
 logs or a public build. Generate it into a mode-0600 file in a private directory.
@@ -79,7 +79,7 @@ Only GET, HEAD and PUT under `/photos/listing-photos/…` and
 `/photos/chat-attachments/…` are accepted. The gateway removes `/photos` by raw
 slicing, preserves signed Host/TLS identity, body, content and conditional headers,
 and strips API credentials and private entry access before storage. Storage
-redirects fail closed. Video has no alias/configuration in this release.
+redirects fail closed.
 
 Listing/Profile retries retain the original grant, metadata and transfer phase.
 Uncertain transfers may inspect only the canonical public original through the
@@ -95,6 +95,38 @@ Before installed activation, prepare exact candidate/restore files, hashes,
 modes and service identity as in the upgrade procedure below. Preserve the R11
 observer and persistent reverse connector/signer. R05 requires no nginx, Xray or
 transport changes; never run the initial installer or its rollback on this host.
+
+## Multipart video uploads (R06)
+
+The only upload origin is `https://t3.storageapi.dev`. Native parts map signed
+`/<bucket>/video-sources/<source-id>/source.mp4?...` URLs to the same raw suffix
+under `https://tm-staging.bagtyyar.dev/video-uploads`. Only PUT is accepted; the
+gateway removes `/video-uploads`, restores the fixed upstream Host/TLS identity,
+strips API credentials and gateway access, and preserves signing parameters,
+content/checksum headers, ETag and storage status. Storage redirects are refused.
+Each part is limited to 5 MiB, including chunked requests. Existing connection,
+concurrency, deadline, cancellation and stream-buffer limits apply. No response
+acknowledges acceptance until storage answers.
+
+Open, status, complete and cancel use the existing authenticated API paths.
+Changing entries affects later requests; an in-flight part stays pinned. Lost
+responses reconcile the same session against server-listed parts and completion
+state, without adopting another source. Multipart completion means Processing;
+only the worker can establish Ready. Local MinIO/S3 paths remain unchanged.
+
+Installed verification needs a coordinated candidate-to-rollback window. Save
+fresh installed source/config/vhost hashes, modes and exact restore copies before
+activation. The installed `location /` already streams this alias with buffering
+and retries disabled; preserve its exact vhost bytes. This candidate replaces only
+`gateway.mjs` and `serve.mjs` and restarts only `carberk-gateway.service` under the
+shared owner's approval. No nginx write or reload is needed. Verify nginx syntax
+and unchanged included-file hashes, then restore the exact gateway source files
+and restart only that service after proof. Verify baseline hashes, modes and
+health afterward. Keep the reverse connector,
+signer, monitor, credentials, certificates and other virtual hosts intact. Refresh
+an actual staging API deployment SUCCESS and public readiness before the window;
+SKIPPED is not a successful baseline. Source/tests alone do not establish installed
+activation or the real staging upload/processing journey.
 
 ## Prepare before approval
 
