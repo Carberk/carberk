@@ -42,6 +42,14 @@ test("check names the exact browser and API origins without spending a code", as
   assert(ports.requests.every(([, init]) => !init.method || init.method === "GET"));
 });
 
+test("History check supplies the purpose-specific target and sign-in URL", async () => {
+  const ports = boundary();
+  assert.equal(await cli(["check", ...baseArgs, "--purpose", "vehicle-history"], ports), 0);
+  const { targetUrl, loginUrl } = JSON.parse(ports.output[0]);
+  assert.equal(targetUrl, "http://localhost:4301/vehicle-history/tk");
+  assert.equal(new URL(loginUrl).searchParams.get("returnTo"), "/vehicle-history/tk");
+});
+
 test("TOTP uses the selected API database/key and never prints the process output", async () => {
   const directory = await mkdtemp(join("/tmp", "admin-access-test-"));
   const ports = boundary({ tempRoot: directory });
@@ -74,7 +82,8 @@ test("invalid, duplicate or unrelated purpose flags refuse before env, HTTP or s
   for (const [command, flags] of [
     ...["unknown", "", "vehicle_history", "toString", "__proto__"].map(value => ["totp", ["--purpose", value]]),
     ["totp", ["--purpose"]], ["totp", ["--purpose", "vehicle-history", "--purpose", "legacyAdmin"]],
-    ...["check", "serve", "otp"].map(command => [command, ["--purpose", "vehicle-history"]]),
+    ...["serve", "otp"].map(command => [command, ["--purpose", "vehicle-history"]]),
+    ["check", ["--purpose", "legacyAdmin"]],
   ]) {
     const ports = boundary({ readFile: async () => { throw new Error("env must not be read"); } });
     assert.equal(await cli([command, ...baseArgs, "--phone", "+99365000901", ...flags], ports), 1);
@@ -151,13 +160,15 @@ test("serve starts its own Admin with the exact API and browser origins", async 
   assert.notEqual(launch[2].env.TOTP_SECRET_ENCRYPTION_KEY, "selected-key");
 });
 
-test("near-expiry TOTP is refused without creating a code file", async () => {
+test("near-expiry TOTP waits for the next window before generating the code", async () => {
   const directory = await mkdtemp(join("/tmp", "admin-access-test-"));
-  const ports = boundary({ tempRoot: directory, now: () => NOW + 29_000 });
+  let now = NOW + 29_000;
+  const ports = boundary({ tempRoot: directory, now: () => now, sleep: async ms => { now += ms; } });
   try {
-    assert.equal(await cli(["totp", ...baseArgs, "--phone", "+99365000901"], ports), 1);
-    assert.match(ports.errors.join("\n"), /TOTP_WINDOW_ENDING/);
-    assert.equal(ports.output.length, 0);
+    assert.equal(await cli(["totp", ...baseArgs, "--phone", "+99365000901"], ports), 0);
+    const result = JSON.parse(ports.output[0]);
+    assert.equal(result.expiresAt, "2026-11-14T02:01:00.000Z");
+    assert.equal(await readFile(result.codeFile, "utf8"), "852013");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 

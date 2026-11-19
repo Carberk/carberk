@@ -12,6 +12,7 @@ import purposes from "../packages/db/src/local-admin-totp-purposes.json" with { 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HELP = `Usage: pnpm admin:access check|serve|otp|totp --api http://127.0.0.1:3006/api/v1
   --admin http://127.0.0.1:3001 --api-env /absolute/running-api.env
+  check: [--purpose vehicle-history]
   otp:  --phone <existing-local-admin> --api-log /absolute/private-api.log
         --request-id UUID --requested-at ISO_TIMESTAMP
   totp: --phone <existing-local-actor> [--purpose legacyAdmin|vehicle-history|
@@ -29,7 +30,11 @@ function argumentsFor(argv) {
     options[key] = argv[++i];
   }
   if (!["check", "serve", "otp", "totp"].includes(options.command)) throw new FixtureError("Choose check, serve, otp or totp; use --help");
-  if (options.purpose !== undefined && (options.command !== "totp" || !Object.hasOwn(purposes, options.purpose))) throw new FixtureError("Use a supported --purpose only with totp; use --help");
+  if (options.purpose !== undefined &&
+      !(options.command === "check" && options.purpose === "vehicle-history") &&
+      !(options.command === "totp" && Object.hasOwn(purposes, options.purpose))) {
+    throw new FixtureError("Use --purpose vehicle-history with check or a supported purpose with totp; use --help");
+  }
   if (!isAbsolute(options.apiEnv ?? "")) throw new FixtureError("Use an absolute selected API env path; use --help");
   if (["otp", "totp"].includes(options.command) && !/^\+993\d{8}$/.test(options.phone ?? "")) throw new FixtureError("Use an existing local actor phone; use --help");
   if (options.command === "otp" && (!isAbsolute(options.apiLog ?? "") || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(options.requestId ?? "") || !Number.isFinite(Date.parse(options.requestedAt)))) throw new FixtureError("OTP needs an absolute log path and exact request ID/time from the current browser form");
@@ -135,7 +140,7 @@ async function saveCode(code, kind, expiresAt, ports) {
 
 export async function cli(argv, overrides = {}) {
   const { out = console.log, err = console.error } = overrides;
-  const ports = { readFile, fetch, now: Date.now, spawn, ...overrides };
+  const ports = { readFile, fetch, now: Date.now, spawn, sleep: delay, ...overrides };
   try {
     if (argv.includes("--help")) { out(HELP); return 0; }
     const options = argumentsFor(argv), api = localApi(options.api);
@@ -147,7 +152,11 @@ export async function cli(argv, overrides = {}) {
       const readiness = await ports.fetch(new URL("/readyz", api), { redirect: "error", signal: AbortSignal.timeout(5000) });
       if (!readiness.ok) throw new FixtureError("API_NOT_READY: selected API dependencies are unavailable; coordinate setup with its owner");
       await health(admin, "admin", ports);
-      out(JSON.stringify({ status: "ready", api: api.href, admin: admin.origin, loginUrl: `${admin.origin}/login`, session: "Verify and reuse the existing browser identity first; no code requested." }));
+      const targetUrl = options.purpose === "vehicle-history" ? `${admin.origin}/vehicle-history/tk` : undefined;
+      const login = new URL("/login", admin);
+      if (targetUrl) login.searchParams.set("returnTo", new URL(targetUrl).pathname);
+      out(JSON.stringify({ status: "ready", api: api.href, admin: admin.origin, loginUrl: login.href, targetUrl,
+        session: "Verify and reuse the existing browser identity first; no code requested." }));
       return 0;
     }
     if (options.command === "serve") {
@@ -157,6 +166,9 @@ export async function cli(argv, overrides = {}) {
     }
     if (options.command === "totp") {
       if (!env.TOTP_SECRET_ENCRYPTION_KEY) throw new FixtureError("TOTP_KEY_MISSING: use the effective env file of the selected local API");
+      const currentTime = ports.now();
+      const boundary = (Math.floor(currentTime / 30_000) + 1) * 30_000;
+      if (boundary - currentTime < 15_000) await ports.sleep(boundary - currentTime + 100);
       const expiresAt = (Math.floor(ports.now() / 30_000) + 1) * 30_000;
       let result;
       try {

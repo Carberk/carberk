@@ -14,7 +14,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LABEL = "io.carberk.local-env";
 const APPS = ["api", "worker", "admin", "web", "metro"];
 const GENERATED = [":(exclude)apps/web/next-env.d.ts", ":(exclude)apps/mobile/.expo/types/router.d.ts"];
-const HELP = "pnpm local-env up|status|stop <ticket-name> [--profile empty|history|native] [--with admin,web,metro] [--infra-only]. Profiles cannot change; choose a second name for History/native. Stop preserves all data. No destroy command.";
+const HELP = "pnpm local-env up|status|stop|reset-signin-quota <ticket-name>. up accepts --profile empty|history|native, --with admin,web,metro and --infra-only. reset-signin-quota clears completed or expired synthetic phone sign-ins in the owned named runtime.";
 const digest = value => createHash("sha256").update(value).digest("hex");
 const secret = () => randomBytes(32).toString("hex");
 
@@ -90,7 +90,7 @@ function optionsFor(argv) {
     profile: { type: "string" }, with: { type: "string" }, "infra-only": { type: "boolean" },
   } });
   const [operation, name] = positionals;
-  if (positionals.length !== 2 || !["up", "status", "stop"].includes(operation) || !/^\d+-[a-z0-9][a-z0-9-]{0,39}$/.test(name)) throw new Error(HELP);
+  if (positionals.length !== 2 || !["up", "status", "stop", "reset-signin-quota"].includes(operation) || !/^\d+-[a-z0-9][a-z0-9-]{0,39}$/.test(name)) throw new Error(HELP);
   if (values.profile && !["empty", "history", "native"].includes(values.profile)) throw new Error("Choose one profile: empty, history or native; use separate names for History and native");
   const apps = values.with ? values.with.split(",") : [];
   if (new Set(apps).size !== apps.length || apps.some(app => !["admin", "web", "metro"].includes(app))) throw new Error("--with accepts admin,web,metro");
@@ -182,6 +182,41 @@ async function sessions(state, directory) {
   return result;
 }
 
+async function resetSignInQuota(state, containers, run) {
+  const fixtureIds = state.profile === "history" && state.preparation === "history-initialized"
+    ? ["12530000-0000-4000-8000-000000000001", "12530000-0000-4000-8000-000000000002"]
+    : state.profile === "native" && state.preparation === "native-rich-checked"
+      ? ["f1000000-0000-4000-8000-000000000001", "f1000000-0000-4000-8000-000000000010"]
+      : [];
+  if (state.database !== "local_ui" || !fixtureIds.length) {
+    throw new Error("Quota reset requires a prepared History or native runtime; use a named fixture profile");
+  }
+  const postgres = containers.filter(container => container.service === "postgres" && container.running && container.health === "healthy");
+  if (postgres.length !== 1) throw new Error("Start the selected named runtime before resetting its fixture sign-in quota");
+  const sql = `
+    WITH fixture AS (
+      SELECT id, phone FROM users WHERE id IN ('${fixtureIds.join("','")}') AND phone IS NOT NULL
+    ), cleared AS (
+      DELETE FROM otp_requests AS request USING fixture
+      WHERE (SELECT count(*) FROM fixture) = 2
+        AND request.channel = 'phone' AND request.purpose = 'sign_in'
+        AND request.destination = fixture.phone
+        AND (request."userId" IS NULL OR request."userId" = fixture.id)
+        AND request."createdAt" >= CURRENT_TIMESTAMP - interval '24 hours'
+        AND (request."verifiedAt" IS NOT NULL OR request."expiresAt" <= CURRENT_TIMESTAMP)
+      RETURNING 1
+    )
+    SELECT json_build_object(
+      'fixtures', (SELECT count(*) FROM fixture),
+      'cleared', (SELECT count(*) FROM cleared)
+    );
+  `;
+  const result = JSON.parse(await run("docker", ["exec", postgres[0].id, "psql", "-XAt", "-v", "ON_ERROR_STOP=1",
+    "-U", "auto_tm_ci", "-d", state.database, "-c", sql]));
+  if (result.fixtures !== 2) throw new Error("Expected fixture Users are missing; no sign-in records cleared");
+  return { name: state.name, profile: state.profile, cleared: result.cleared };
+}
+
 function report(state, directory, live, containers = []) {
   return {
     name: state.name, project: state.project, identity: state.identity, directory,
@@ -228,6 +263,11 @@ export async function localEnv(argv, { root = `/tmp/carberk-local-${process.getu
     const containers = await ownedResources(state, run, config);
     if (options.operation === "status") {
       const result = report(state, directory, live, containers); out(result); return result;
+    }
+    if (options.operation === "reset-signin-quota") {
+      const result = await resetSignInQuota(state, containers, run);
+      out(result);
+      return result;
     }
     if (options.operation === "stop") {
       for (const app of APPS) if (live[app]) await sessionRequest(directory, app, state.controlSecret, "stop");
