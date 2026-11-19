@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { historyFixture } from "../../../../test/helpers/historyFixture";
 import { eventually } from "../../../../test/helpers/eventually";
+import { HISTORY_CLOCK, type HistoryClock } from "../vehicle-history.public";
 
 const requests = "/api/v1/vehicle-history/requests";
 const operatorRequests = "/api/v1/vehicle-history/operator/requests";
@@ -11,6 +12,47 @@ describe("Current operator private notes over listening HTTP", () => {
   let f: Awaited<ReturnType<typeof historyFixture>>;
   beforeAll(async () => { f = await historyFixture(); });
   afterAll(async () => { await f?.close(); });
+
+  it("joins public exchange, private-note retries, explicit receipts and one stopped reminder without changing the waiting clock", async () => {
+    const customer = await f.actor(null), operator = await f.actor();
+    const id = (await f.request.post(requests).auth(customer.token, { type: "bearer" })
+      .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
+    const customerPath = `${requests}/${id}`, staffPath = `${operatorRequests}/${id}`;
+    await f.request.post(staffPath + "/claim").auth(operator.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: 0 }).expect(201);
+    const question = { clientMessageId: randomUUID(), text: "Question without a VIN — Döwlet / Ответ" };
+    const sent = (await f.request.post(customerPath + "/messages").auth(customer.token, { type: "bearer" }).send(question).expect(201)).body;
+    expect((await f.request.post(customerPath + "/messages").auth(customer.token, { type: "bearer" }).send(question).expect(201)).body).toEqual(sent);
+    const reply = (await f.request.post(staffPath + "/messages").auth(operator.token, { type: "bearer" })
+      .send({ clientMessageId: randomUUID(), text: "Please send the VIN when available", expectedAssignmentVersion: 1 }).expect(201)).body;
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date(new Date(reply.createdAt).getTime() + 86_400_000);
+    const readReminder = () => f.request.get(customerPath + "/reminder").auth(customer.token, { type: "bearer" }).expect(200);
+    const waiting = (await readReminder()).body;
+    expect(waiting).toMatchObject({ eligible: true, reason: "customer_answer", since: reply.createdAt, used: false });
+    const note = { clientNoteId: randomUUID(), text: "PRIVATE: staff assessment only", expectedAssignmentVersion: 1 };
+    const saved = (await f.request.post(staffPath + "/notes").auth(operator.token, { type: "bearer" }).send(note).expect(201)).body;
+    expect((await f.request.post(staffPath + "/notes").auth(operator.token, { type: "bearer" }).send(note).expect(201)).body).toEqual(saved);
+    expect((await readReminder()).body).toEqual(waiting);
+    expect((await f.request.get(staffPath + "/notes?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" }).expect(200)).body.items).toEqual([saved]);
+    const reminder = { expectedAssignmentVersion: 1, expectedWaitingVersion: waiting.version, clientMessageId: randomUUID() };
+    const reminded = (await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" }).send(reminder).expect(201)).body;
+    expect((await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" }).send(reminder).expect(201)).body).toEqual(reminded);
+    const page = (await f.request.get(customerPath + "/messages").auth(customer.token, { type: "bearer" }).expect(200)).body;
+    expect(page).toEqual({ items: [sent, reply, reminded.outcome], nextCursor: null });
+    expect(JSON.stringify(page)).not.toContain(note.text);
+    expect((await f.request.get(customerPath + "/receipts").auth(customer.token, { type: "bearer" }).expect(200)).body).toEqual({ items: [] });
+    for (const kind of ["received", "read"]) await f.request.post(customerPath + "/receipts").auth(customer.token, { type: "bearer" })
+      .send({ cursor: reminded.outcome.id, kind }).expect(201);
+    const receipts = (await f.request.get(staffPath + "/receipts?expectedAssignmentVersion=1").auth(operator.token, { type: "bearer" }).expect(200)).body;
+    expect(receipts.items).toContainEqual({ participantId: customer.user.id, assignmentVersion: 0, receivedOrder: "3", readOrder: "3" });
+    const stopped = (await f.request.post(customerPath + "/reminder/stop").auth(customer.token, { type: "bearer" })
+      .send({ expectedWaitingVersion: reminded.version }).expect(201)).body;
+    expect(stopped).toMatchObject({ stopped: true, ineligibleReason: "stopped", outcome: reminded.outcome });
+    await f.request.post(staffPath + "/notes").auth(operator.token, { type: "bearer" }).send(note).expect(201);
+    expect((await readReminder()).body).toEqual(stopped);
+    const retried = (await f.request.post(staffPath + "/reminder").auth(operator.token, { type: "bearer" }).send(reminder).expect(201)).body;
+    expect(retried).toEqual(stopped);
+  });
 
   it("keeps an attributed note outside the customer's public conversation", async () => {
     const customer = await f.actor(null);

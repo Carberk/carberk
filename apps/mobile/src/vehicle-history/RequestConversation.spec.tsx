@@ -9,7 +9,7 @@ import * as ExpoLinking from "expo-linking";
 import * as Clipboard from "expo-clipboard";
 
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
-import { act, fireEvent, getHost, renderMobile, routeParams, screenFocus } from "../../test/render";
+import { act, fireEvent, getHost, renderMobile, routeParams, routerMock, screenFocus } from "../../test/render";
 import { server } from "../../test/msw";
 import { NativeViewability } from "../../test/native-viewability";
 import { storeAuthSession } from "../auth/session";
@@ -70,11 +70,13 @@ async function visible(view: Awaited<ReturnType<typeof renderMobile>>, ids = [fi
   }));
 }
 let stored: string | null;
+let draftDisk: Map<string, string>;
 let acknowledgements: { cursor: string; kind: string }[];
 beforeEach(async () => {
-  vi.mocked(AsyncStorage.getItem).mockResolvedValue(null);
-  vi.mocked(AsyncStorage.setItem).mockResolvedValue();
-  vi.mocked(AsyncStorage.removeItem).mockResolvedValue();
+  draftDisk = new Map();
+  vi.mocked(AsyncStorage.getItem).mockImplementation(async (key) => draftDisk.get(key) ?? null);
+  vi.mocked(AsyncStorage.setItem).mockImplementation(async (key, value) => { draftDisk.set(key, value); });
+  vi.mocked(AsyncStorage.removeItem).mockImplementation(async (key) => { draftDisk.delete(key); });
   AppState.currentState = "active";
   stored = null;
   acknowledgements = [];
@@ -99,6 +101,219 @@ beforeEach(async () => {
   await storeAuthSession(session());
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); focusManager.setFocused(true); onlineManager.setOnline(true); vi.unstubAllEnvs(); });
+
+it("restores the customer's unsent draft after reopening with a new session", async () => {
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Questions are welcome.");
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Döwlet — Ответ without a VIN");
+  await view.unmount();
+  await storeAuthSession(session("session-two"));
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByDisplayValue("Döwlet — Ответ without a VIN");
+  expect(reopened.getByRole("button", { name: "Send message" })).toBeEnabled();
+});
+
+it("opens the source Listing with the exact request context and keeps the draft", async () => {
+  const sourceListingId = "30000000-0000-4000-8000-000000000001";
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, sourceListingId })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Questions are welcome.");
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Keep this question");
+  await fireEvent.press(view.getByRole("button", { name: "View listing" }));
+  expect(routerMock.push).toHaveBeenLastCalledWith({ pathname: "/(public)/listings/[id]", params: { id: sourceListingId, historyRequest: requestId } });
+  expect(view.getByDisplayValue("Keep this question")).toBeTruthy();
+});
+
+it("restores uncertain sends with their original identity and preserves a newer edit through retry", async () => {
+  const bodies: { clientMessageId: string; text: string }[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as { clientMessageId: string; text: string };
+    bodies.push(body);
+    return bodies.length === 1 ? new HttpResponse(null, { status: 503 })
+      : HttpResponse.json({ ...message(nextId, "2", true), ...body });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Original exact text\nDöwlet — Ответ");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  await view.findByRole("button", { name: "Retry message: Original exact text\nDöwlet — Ответ" });
+  await fireEvent.changeText(view.getByLabelText("Your message"), "A newer question");
+  await view.unmount();
+  await storeAuthSession(session("fresh-session"));
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByDisplayValue("A newer question");
+  expect(bodies).toHaveLength(1);
+  await fireEvent.press(reopened.getByRole("button", { name: "Retry message: Original exact text\nDöwlet — Ответ" }));
+  await reopened.findByText("Sent");
+  expect(bodies).toEqual([bodies[0], bodies[0]]);
+  expect(reopened.getByDisplayValue("A newer question")).toBeTruthy();
+  await reopened.unmount();
+  const again = await renderMobile(<RequestScreen />);
+  await again.findByDisplayValue("A newer question");
+  expect(again.queryByRole("button", { name: /Retry message:/ })).toBeNull();
+});
+
+it.each(["account", "request"])("isolates saved drafts after changing %s", async (change) => {
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Private draft for the first request");
+  if (change === "account") await act(() => storeAuthSession(session("different", operatorId)));
+  else {
+    routeParams.id = "10000000-0000-4000-8000-000000000102";
+    server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, id: routeParams.id })));
+    await view.rerender(<RequestScreen />);
+  }
+  await view.findByLabelText("Your message");
+  expect(view.queryByDisplayValue("Private draft for the first request")).toBeNull();
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Second scope draft");
+  if (change === "account") await act(() => storeAuthSession(session("original")));
+  else {
+    routeParams.id = requestId;
+    server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry)));
+    await view.rerender(<RequestScreen />);
+  }
+  await view.findByDisplayValue("Private draft for the first request");
+  expect(view.queryByDisplayValue("Second scope draft")).toBeNull();
+});
+
+it("keeps a delayed old write ahead of replacement-session edits and restart hydration", async () => {
+  const gate = deferred<undefined>();
+  const write = vi.mocked(AsyncStorage.setItem).getMockImplementation();
+  if (!write) throw new Error("Missing storage boundary");
+  vi.mocked(AsyncStorage.setItem).mockImplementation((key, value) => value.includes("Slow original draft")
+    ? gate.promise.then(() => write(key, value)) : write(key, value));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Slow original draft");
+  await act(() => storeAuthSession(session("replacement")));
+  await view.findByLabelText("Your message");
+  expect(view.getByLabelText("Your message")).toBeDisabled();
+  await act(() => gate.resolve(undefined));
+  await view.findByDisplayValue("Slow original draft");
+  await fireEvent.changeText(view.getByLabelText("Your message"), "New session draft");
+  await view.unmount();
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByDisplayValue("New session draft");
+});
+
+it.each(["account", "unmount"])("discards delayed draft hydration after %s changes", async (change) => {
+  const gate = deferred<string | null>();
+  vi.mocked(AsyncStorage.getItem).mockImplementation((key) => key.includes(`customer-reply.v1:${userId}:`)
+    ? gate.promise : Promise.resolve(null));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByLabelText("Your message");
+  expect(view.getByLabelText("Your message")).toBeDisabled();
+  if (change === "account") await act(() => storeAuthSession(session("other", operatorId)));
+  else await view.unmount();
+  await act(() => gate.resolve(JSON.stringify({ text: "Do not reveal this draft", revision: 1, intents: [] })));
+  if (change === "account") expect(view.queryByDisplayValue("Do not reveal this draft")).toBeNull();
+});
+
+it.each(["load", "save", "intent"])("recovers a %s storage failure without losing text or sending an unrecorded intent", async (fault) => {
+  const bodies: unknown[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json(); bodies.push(body);
+    return HttpResponse.json({ ...message(nextId, "2", true), ...body as object });
+  }));
+  const read = vi.mocked(AsyncStorage.getItem).getMockImplementation();
+  const write = vi.mocked(AsyncStorage.setItem).getMockImplementation();
+  if (!read || !write) throw new Error("Missing storage boundary");
+  let broken = fault === "load";
+  vi.mocked(AsyncStorage.getItem).mockImplementation((key) => broken && key.includes("customer-reply")
+    ? Promise.reject(new Error("disk unavailable")) : read(key));
+  vi.mocked(AsyncStorage.setItem).mockImplementation((key, value) => broken && key.includes("customer-reply")
+    ? Promise.reject(new Error("disk full")) : write(key, value));
+  const view = await renderMobile(<RequestScreen />);
+  if (fault === "load") {
+    await view.findByText("Could not open the saved draft. Retry before writing.");
+    expect(view.getByLabelText("Your message")).toBeDisabled();
+    broken = false;
+    await fireEvent.press(view.getByRole("button", { name: "Retry loading draft" }));
+  }
+  await view.findByLabelText("Your message");
+  broken = fault === "save";
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Keep this until acknowledged");
+  if (fault === "intent") {
+    broken = true;
+    await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  }
+  if (fault !== "load") {
+    await view.findByText("Draft not saved. Keep this screen open and retry saving.");
+    expect(bodies).toEqual([]);
+    expect(view.getByDisplayValue("Keep this until acknowledged")).toBeTruthy();
+    broken = false;
+    await fireEvent.press(view.getByRole("button", { name: "Retry saving draft" }));
+  }
+  await fireEvent.press(view.getByRole("button", { name: fault === "intent" ? "Retry message: Keep this until acknowledged" : "Send message" }));
+  await view.findByText("Sent");
+  expect(bodies).toHaveLength(1);
+  await view.unmount();
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByLabelText("Your message");
+  expect(reopened.queryByDisplayValue("Keep this until acknowledged")).toBeNull();
+});
+
+it("keeps unreadable retained data until the customer explicitly replaces it", async () => {
+  draftDisk.set(`carberk.history.customer-reply.v1:${userId}:${requestId}`, '{"channel":"private-note","text":"Never restore as a public reply"}');
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("The saved draft is unreadable. Start a new draft to replace it.");
+  expect(view.getByLabelText("Your message")).toBeDisabled();
+  expect(view.queryByText("Never restore as a public reply")).toBeNull();
+  await fireEvent.press(view.getByRole("button", { name: "Start a new draft" }));
+  await fireEvent.changeText(view.getByLabelText("Your message"), "A new public question");
+  await view.unmount();
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByDisplayValue("A new public question");
+});
+
+it("retains a newer revision even when its text matches the retried message", async () => {
+  let fail = true;
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as object;
+    return fail ? new HttpResponse(null, { status: 503 }) : HttpResponse.json({ ...message(nextId, "2", true), ...body });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Exact question");
+  await fireEvent.press(view.getByRole("button", { name: "Send message" }));
+  await view.findByRole("button", { name: "Retry message: Exact question" });
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Edit then restore");
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Exact question");
+  fail = false;
+  await fireEvent.press(view.getByRole("button", { name: "Retry message: Exact question" }));
+  await view.findByText("Sent");
+  expect(view.getByDisplayValue("Exact question")).toBeTruthy();
+  await view.unmount();
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByDisplayValue("Exact question");
+});
+
+it("recovers a failed acknowledgement write without resending or clearing newer text", async () => {
+  const response = deferred<Response>();
+  const posted = deferred<{ clientMessageId: string; text: string }>();
+  const bodies: unknown[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/messages", async ({ request }) => {
+    const body = await request.json() as { clientMessageId: string; text: string };
+    bodies.push(body); posted.resolve(body); return response.promise;
+  }));
+  const write = vi.mocked(AsyncStorage.setItem).getMockImplementation();
+  if (!write) throw new Error("Missing storage boundary");
+  let broken = false;
+  vi.mocked(AsyncStorage.setItem).mockImplementation((key, value) => broken && key.includes("customer-reply")
+    ? Promise.reject(new Error("disk full")) : write(key, value));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("Your message"), "Original question");
+  await act(async () => { void fireEvent.press(view.getByRole("button", { name: "Send message" })); });
+  const body = await posted.promise;
+  await fireEvent.changeText(view.getByLabelText("Your message"), "Newer unsent question");
+  broken = true;
+  await act(() => response.resolve(HttpResponse.json({ ...message(nextId, "2", true), ...body })));
+  await view.findByText("Draft not saved. Keep this screen open and retry saving.");
+  expect(view.getByDisplayValue("Newer unsent question")).toBeTruthy();
+  broken = false;
+  await fireEvent.press(view.getByRole("button", { name: "Retry saving draft" }));
+  expect(bodies).toHaveLength(1);
+  await view.unmount();
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByDisplayValue("Newer unsent question");
+  expect(reopened.queryByRole("button", { name: "Retry message: Original question" })).toBeNull();
+});
 
 it("opens the exact report target in the external browser", async () => {
   const target = "https://reports.example.test/report?token=A%2fb%2B&part=1&part=2";
@@ -1261,12 +1476,14 @@ it.each(["account", "session", "request", "assignment", "unmount"])("fences a la
   }
   if (change === "unmount") await view.unmount();
   else {
-    await vi.waitFor(() => expect(view.queryByText("Original request only")).toBeNull());
+    if (change === "session" || change === "assignment") await view.findByText("Send not confirmed. Retry the same message.");
+    else await vi.waitFor(() => expect(view.queryByText("Original request only")).toBeNull());
     await fireEvent.changeText(await view.findByLabelText("Your message"), "New scope draft");
   }
   await act(() => response.resolve(HttpResponse.json({ ...message(nextId, "2", true), ...body })));
   if (change !== "unmount") {
-    expect(view.queryByText("Original request only")).toBeNull();
+    if (change === "session" || change === "assignment") expect(view.getByText("Original request only")).toBeTruthy();
+    else expect(view.queryByText("Original request only")).toBeNull();
     expect(view.getByDisplayValue("New scope draft")).toBeTruthy();
     expect(view.queryByText("Sent")).toBeNull();
   }
