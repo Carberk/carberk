@@ -32,6 +32,20 @@ let requests: { path: string; method: string; body: unknown }[];
 const token = (sid = id, sub = actor.id) => `e30.${Buffer.from(JSON.stringify({ sub, sid })).toString("base64url")}.synthetic`;
 function view() { return <HistoryWorkbench locale="en" section="desk"><HistoryInbox locale="en" /></HistoryWorkbench>; }
 function detail() { return { ...row, mine: true, assignmentVersion: 1, assignedOperator: actor, sourceListingId: null }; }
+async function editableComposer(name: string) {
+  return waitFor(() => {
+    const input = screen.getByRole<HTMLTextAreaElement>("textbox", { name });
+    expect(input.disabled).toBe(false);
+    return input;
+  });
+}
+async function enabledButton(name: string) {
+  return waitFor(() => {
+    const button = screen.getByRole<HTMLButtonElement>("button", { name });
+    expect(button.disabled).toBe(false);
+    return button;
+  });
+}
 const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request }) => {
     const input = request.url;
     const init = { method: request.method, body: request.method === "POST" ? await request.text() : undefined };
@@ -95,10 +109,10 @@ it("keeps an attributed private note in the staff panel and out of the customer 
   selectAssigned();
   render(view());
   await screen.findByText("Can you check this car?");
-  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  const note = await editableComposer("Internal note");
   expect(note).not.toBe(screen.getByRole("textbox", { name: "Reply to customer" }));
   fireEvent.change(note, { target: { value: "Check the record before replying" } });
-  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  fireEvent.click(await enabledButton("Add private note"));
   await waitFor(() => expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/notes"))).toBe(true));
   expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/messages"))).toBe(false);
   expect(screen.getByRole("list", { name: "Enquiry conversation" }).textContent).not.toContain("Check the record before replying");
@@ -107,7 +121,7 @@ it("keeps an attributed private note in the staff panel and out of the customer 
 it("restores an unsent private note separately from the public reply after remount", async () => {
   selectAssigned();
   const mounted = render(view());
-  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  const note = await editableComposer("Internal note");
   fireEvent.change(note, { target: { value: "Staff-only draft" } });
   await screen.findByText("Draft saved on this device.");
   expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("");
@@ -131,12 +145,12 @@ it("retries an unconfirmed private note with its original identity while retaini
     return network(input, init);
   });
   render(view());
-  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  const note = await editableComposer("Internal note");
   fireEvent.change(note, { target: { value: "First staff note" } });
-  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  fireEvent.click(await enabledButton("Add private note"));
   await screen.findByRole("button", { name: "Retry this note" });
   fireEvent.change(note, { target: { value: "Newer staff draft" } });
-  fireEvent.click(screen.getByRole("button", { name: "Retry this note" }));
+  fireEvent.click(await enabledButton("Retry this note"));
   await waitFor(() => expect(screen.queryByRole("button", { name: "Retry this note" })).toBeNull());
   expect((note as HTMLTextAreaElement).value).toBe("Newer staff draft");
   const posts = requests.filter((request) => request.method === "POST" && request.path.endsWith("/notes"));
@@ -185,16 +199,16 @@ it("keeps the same private-note Retry available when Refresh interrupts a pendin
 it("blocks a private note when its durable intent cannot be stored, then allows explicit recovery", async () => {
   selectAssigned();
   render(view());
-  const note = await screen.findByRole("textbox", { name: "Internal note" });
+  const note = await editableComposer("Internal note");
   fireEvent.change(note, { target: { value: "Durable note" } });
+  const add = await enabledButton("Add private note");
   const storage = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("Disk full"); });
-  await waitFor(() => expect((screen.getByRole("button", { name: "Add private note" }) as HTMLButtonElement).disabled).toBe(false));
-  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  fireEvent.click(add);
   await screen.findByText("Note draft not saved. Retry saving it.");
   expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/notes"))).toBe(false);
   storage.mockRestore();
   fireEvent.click(screen.getByRole("button", { name: "Retry saving note draft" }));
-  fireEvent.click(screen.getByRole("button", { name: "Retry this note" }));
+  fireEvent.click(await enabledButton("Retry this note"));
   await waitFor(() => expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/notes"))).toBe(true));
 });
 it("shows a separate private-note read failure and recovers through its own Retry", async () => {
@@ -1349,7 +1363,7 @@ it.each(["received", "read"])("refetches a fresh session before ACK while old %s
 it("keeps the public reply draft through request navigation, reload and same-account reauthentication", async () => {
   selectAssigned();
   const mounted = render(view());
-  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  const input = await editableComposer("Reply to customer");
   fireEvent.change(input, { target: { value: "  Here is the history\nTäze maglumat · Новые сведения  " } });
   await screen.findByText("Draft saved on this device.");
   fireEvent.click(screen.getByRole("button", { name: "Unassigned" }));
@@ -1383,7 +1397,7 @@ it("sends exact public text once, announces Pending and Sent, and keeps typing d
     return network(input, init);
   });
   const mounted = render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "  Exact reply\nSalam  " } });
+  fireEvent.change(await editableComposer("Reply to customer"), { target: { value: "  Exact reply\nSalam  " } });
   await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
   await screen.findByText("Pending");
@@ -1418,7 +1432,7 @@ it("retries an uncertain send after reload with the original intent and reconcil
     return network(input, init);
   });
   const mounted = render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Retain this uncertain reply" } });
+  fireEvent.change(await editableComposer("Reply to customer"), { target: { value: "Retain this uncertain reply" } });
   await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
   await screen.findByText("Send not confirmed. Retry sends the same reply.");
@@ -1434,7 +1448,7 @@ it("retries an uncertain send after reload with the original intent and reconcil
   expect(bodies[1]).toEqual(bodies[0]);
   expect((screen.getByRole("textbox", { name: "Reply to customer" }) as HTMLTextAreaElement).value).toBe("");
   fresh.unmount(); render(view());
-  await screen.findByRole("textbox", { name: "Reply to customer" });
+  await editableComposer("Reply to customer");
   expect(screen.queryByRole("button", { name: "Retry reply" })).toBeNull();
 });
 
@@ -1443,7 +1457,8 @@ it.each(["read", "write"])("recovers a storage %s failure without claiming saved
   const storage = vi.spyOn(window.localStorage, fault === "read" ? "getItem" : "setItem");
   storage.mockImplementation(() => { throw new Error("Storage unavailable"); });
   render(view());
-  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  const input = fault === "write" ? await editableComposer("Reply to customer")
+    : await screen.findByRole("textbox", { name: "Reply to customer" });
   if (fault === "write") fireEvent.change(input, { target: { value: "Keep my unsaved work" } });
   await screen.findByText(fault === "read" ? "Could not open the saved draft. Retry before writing." : "Draft not saved. Keep this page open and retry saving.");
   expect(screen.queryByText("Draft saved on this device.")).toBeNull();
@@ -1527,24 +1542,24 @@ it("keeps each request and account draft separate and never restores a previous 
     return network(input, init);
   });
   let mounted = render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Ayna first request" } });
+  fireEvent.change(await editableComposer("Reply to customer"), { target: { value: "Ayna first request" } });
   mounted.unmount(); selectedId = actor.id;
   window.history.replaceState(null, "", `?filter=mine&selected=${selectedId}&v=1`);
   mounted = render(view());
-  let input = await screen.findByRole("textbox", { name: "Reply to customer" });
-  expect((input as HTMLTextAreaElement).value).toBe("");
+  let input = await editableComposer("Reply to customer");
+  expect(input.value).toBe("");
   fireEvent.change(input, { target: { value: "Ayna second request" } });
   mounted.unmount(); selectedId = id; currentActor = { ...actor, id }; platform.token = token(actor.id, id);
   window.history.replaceState(null, "", `?filter=mine&selected=${id}&v=1`);
   mounted = render(view());
-  input = await screen.findByRole("textbox", { name: "Reply to customer" });
-  expect((input as HTMLTextAreaElement).value).toBe("");
+  input = await editableComposer("Reply to customer");
+  expect(input.value).toBe("");
   fireEvent.change(input, { target: { value: "Other operator draft" } });
   mounted.unmount(); currentActor = actor; platform.token = token(); selectedVersion = 2;
   window.history.replaceState(null, "", `?filter=mine&selected=${id}&v=2`);
   render(view());
-  input = await screen.findByRole("textbox", { name: "Reply to customer" });
-  expect((input as HTMLTextAreaElement).value).toBe("");
+  input = await editableComposer("Reply to customer");
+  expect(input.value).toBe("");
   expect(Object.values(localStorage).join("")).toContain("Ayna first request");
   expect(Object.values(localStorage).join("")).toContain("Other operator draft");
 });
@@ -1562,9 +1577,10 @@ it("never sends if recording the intent fails, then recovers the same draft with
     return network(input, init);
   });
   render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Do not lose this reply" } });
+  fireEvent.change(await editableComposer("Reply to customer"), { target: { value: "Do not lose this reply" } });
+  const send = await enabledButton("Send reply");
   const storage = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("Disk full"); });
-  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  fireEvent.click(send);
   await screen.findByText("Draft not saved. Keep this page open and retry saving.");
   expect(bodies).toEqual([]);
   storage.mockRestore();
@@ -1708,10 +1724,10 @@ it("keeps every acknowledged reply visible while transcript refresh is unavailab
     return network(input, init);
   });
   render(view());
-  const input = await screen.findByRole("textbox", { name: "Reply to customer" });
+  const input = await editableComposer("Reply to customer");
   for (const text of ["First acknowledged reply", "Second acknowledged reply"]) {
     fireEvent.change(input, { target: { value: text } });
-    fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+    fireEvent.click(await enabledButton("Send reply"));
     await screen.findByText(text);
     await waitFor(() => expect((screen.getByRole("button", { name: "Send reply" }) as HTMLButtonElement).disabled).toBe(true));
     await screen.findByText("Could not update messages. Showing previously loaded messages.");
@@ -1733,8 +1749,8 @@ it("retains a newer draft when acknowledgement storage fails and recovers it wit
     return network(input, init);
   });
   const mounted = render(view());
-  fireEvent.change(await screen.findByRole("textbox", { name: "Reply to customer" }), { target: { value: "Acknowledged revision" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
+  fireEvent.change(await editableComposer("Reply to customer"), { target: { value: "Acknowledged revision" } });
+  fireEvent.click(await enabledButton("Send reply"));
   await waitFor(() => expect(intent?.text).toBe("Acknowledged revision"));
   fireEvent.change(screen.getByRole("textbox", { name: "Reply to customer" }), { target: { value: "Retain my newer revision" } });
   const writes = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => { throw new Error("Storage unavailable"); });
@@ -1772,13 +1788,13 @@ it.each([
     })),
   );
   render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
-  const input = await screen.findByRole("textbox", { name: label });
+  const input = await editableComposer(label);
   const text = "Ähli maglumatlar\nПодробные сведения\nFull details ".repeat(50);
   fireEvent.change(input, { target: { value: text } });
-  fireEvent.click(screen.getByRole("button", { name: send }));
+  fireEvent.click(await enabledButton(send));
   await screen.findByText(pendingLabel);
   await act(async () => response.resolve(Response.json({}, { status: 503 })));
-  fireEvent.click(await screen.findByRole("button", { name: retry }));
+  fireEvent.click(await enabledButton(retry));
   await screen.findByText(sent);
   expect(bodies).toHaveLength(2);
   expect(bodies[0]).toEqual(bodies[1]);
