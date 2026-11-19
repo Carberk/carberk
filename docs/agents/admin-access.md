@@ -13,7 +13,7 @@ pnpm admin:access check \
   --api-env /absolute/path/to/running-api.env
 ```
 
-`check` verifies local configuration, API identity/environment/readiness and Admin liveness; it spends no code. It does not establish which API a pre-existing Admin process actually uses, browser identity, TOTP elevation or served revision. Confirm those with the owner and running UI. A missing API is started through [local testing](local-testing.md#start-only-missing-owned-services); readiness failure is not permission to reset/reseed shared data.
+`check` verifies local configuration, API identity/environment/readiness and Admin liveness without spending a code. Add `--purpose vehicle-history` to get the History desk target URL and its scoped login URL. Start at the target page to check for a usable session. Use the scoped login URL when the browser is signed out. Confirm the running Admin's API binding, served revision, actor and elevation in the running UI. Start a missing API through [local testing](local-testing.md#start-only-missing-owned-services).
 
 Follow the [browser proof policy](environment.md#browser-proof-and-service-administration). In T3, call `preview_status`, then use `preview_open` for an owned usable tab when needed; an empty active-tab status alone is not an unsupported-browser result. Open the helper’s returned `loginUrl` with `preview_open({url: loginUrl})`, preserving the **exact** host. The port-based preview target can resolve to `localhost`; if Admin was configured for `127.0.0.1`, its origin check rejects the POST. Verify `location.origin` matches the configured Admin origin before submitting the form. Check the current signed-in identity and target page before requesting a code. Keep a suitable session. Cookies are host-scoped, not port-scoped: parallel Admin ports on the same host can share cookies in one browser profile. Use an appropriately isolated profile/session and coordinate ownership rather than clearing another agent's cookies or silently switching accounts.
 
@@ -33,7 +33,7 @@ This starts Admin from the caller's checkout with matching `API_BASE_URL`, `ADMI
 
 Use an existing local actor authorized for the selected flow. The documented shared-local legacy Admin fixture is `+99365000901`; an owned disposable database can have its own explicitly prepared fixture. The helper does not promote an account. For a missing fixture, follow the explicit setup branch below.
 
-1. In the real `/login` form, request a phone code **once**. On refusal/rate limit, retain the error and wait for the applicable backoff; never clear quotas or request again just to repair automation.
+1. In the real scoped login form, request a phone code once. For a short backoff, wait for the reported time before making one new attempt. For an exhausted disposable fixture quota, use the [named-runtime reset](environment.md#local-development) before a new attempt. Shared, staging and production sign-ins follow their normal backoff.
 2. Read the non-secret request metadata from the current OTP form using the browser tool:
 
    ```js
@@ -62,7 +62,7 @@ Use an existing local actor authorized for the selected flow. The documented sha
      --api-env /absolute/path/to/running-api.env --phone +99365000901
    ```
 
-   Fill the authenticator field with the private file using the same handoff and cleanup. The existing TOTP helper also supports completing pending enrollment; the real browser verify action performs it. If the window is ending, generate a new TOTP after the boundary rather than sending an expired code. Never inject tokens/cookies, skip TOTP or use CI code-return flags for UI preparation.
+   Fill the authenticator field with the private file using the same handoff and cleanup. The helper waits for a new 30-second window if fewer than 15 seconds remain. If the file expires before input, retrieve a fresh TOTP for the existing browser challenge. The real browser verify action completes pending enrollment and elevates the session.
 
    For an existing purpose-granted History staff actor, keep the same explicit targets and effective env, and select the browser flow's purpose:
 
@@ -95,11 +95,11 @@ node scripts/history-ui-fixture.mjs run --api http://127.0.0.1:3067/api/v1 --adm
 ```
 
 `init` requires an empty target and atomically creates only two default buyers, one History grant and an initial-fixture audit. It seeds no Session, TOTP enrollment or elevation, and is not a staff-management workflow.
-`run` logs in each fixed client once through ordinary OTP and purpose-specific operator TOTP, then creates populated/empty claimed requests and three operator/fifty requester texts. Tokens remain in process memory.
+`run` logs in each fixed client once through ordinary OTP and purpose-specific operator TOTP, then confirms enrollment, elevation, and the expected synthetic operator identity at the protected desk API. It creates populated and empty claimed requests and three operator and fifty requester texts. Tokens remain in process memory.
 Wait for its safe summary before entering deliberate stdin stages: `delivered`, then `read` fetch contiguous requester pages before explicit acknowledgement; `unassigned` and `incoming` each permit one ordinary HTTP write.
 `facts` reads actual receipt facts through GET only, without acknowledging messages; `quit` ends the client. Client activity proves no native or Admin visibility.
-The reported browser eligibility time is only a pre-attempt gate. A later browser login uses the real forms separately; never transfer client credentials into a browser or automatically wait/resend/retry.
-Any refusal or uncertain operation stops the invocation. Preserve partial data and inspect it with the owner; there is no resume, refresh, repair, quota reset or deletion mode.
+The reported browser eligibility time is a preflight hint. A browser session uses the real forms separately. If the process exits with Node status 13 after printing request IDs, inspect those IDs before running another fixture setup. Older helpers could lose piped commands while authentication was in progress.
+Any refusal or uncertain operation stops the invocation. Preserve partial data and inspect the reported stage. If a sign-in quota is exhausted, use the named runtime recovery above for the next deliberate attempt.
 The utility removes only code directories returned by the existing private-code helper after use. Stop only your owned runtime processes separately and retain fixture/storage data; the utility owns no service lifecycle.
 
 ## Refusals and proof limits
@@ -107,7 +107,9 @@ The utility removes only code directories returned by the existing private-code 
 - `API_UNREACHABLE` / `ADMIN_UNREACHABLE`: check the actual origin and owned process. Default ports do not prove a server is running there.
 - `API_NOT_READY`: coordinate the failed dependency; do not reset a shared stack to make the check green.
 - Target/config mismatch: use the running API's effective env file. Production, remote databases/endpoints, redirects and CI OTP bypasses refuse.
-- Missing/stale/ambiguous/superseded OTP: stop without resending; inspect the exact request metadata and selected log. A new request needs the normal backoff and a deliberate fresh sign-in attempt.
+- Missing/stale/ambiguous/superseded OTP: inspect the exact request metadata and selected log. Use the current request if still valid, or make a deliberate fresh request after the applicable backoff.
 - `TOTP_UNAVAILABLE`: check the selected purpose's role/grant, User lifecycle, pending enrollment, selected key/database and compiled DB prerequisites. Coordinate missing authority with the fixture owner. Never print subprocess diagnostics that might contain codes or credentials.
+- If the old Admin server refused the Next.js security startup check, use the current pinned dependency in a current checkout, with `pnpm install --frozen-lockfile` and a fresh owned Admin process. A browser cookie cannot bring back a stopped listener.
+- If the preview reports “The browser is not producing screenshot frames,” its page may still be available. On an owned tab, read the current origin, form state and exact request metadata with the browser's page evaluation capability. Use the supported browser fallback for visual evidence if screenshot frames remain unavailable.
 
 These helpers prove preparation only. Authorization, session rotation, wrong-code handling and expired/revoked elevation still need their real application tests. Staging/production access follows the [environment authority](environment.md); this helper is deliberately local-only and refuses those targets.

@@ -1,5 +1,15 @@
 export class FixtureError extends Error {}
 
+export async function signInRequestError(response) {
+  const body = await response.json().catch(() => null);
+  if (response.status !== 429 && body?.code !== "RATE_LIMITED") return null;
+  const { reason, retryInSeconds } = body?.details ?? {};
+  const cause = ["backoff", "destination_limit", "ip_limit"].includes(reason) ? " (" + reason + ")" : "";
+  const wait = reason === "backoff" && Number.isSafeInteger(retryInSeconds) &&
+    retryInSeconds >= 0 && retryInSeconds <= 86_400 ? "; retry in " + retryInSeconds + "s" : "";
+  return new FixtureError("RATE_LIMITED" + cause + wait + "; stop without resending");
+}
+
 export function codeFor(log, requestId, fixture, requestedAt, now) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId ?? "") ||
       !Number.isFinite(requestedAt) || now - requestedAt < 0 || now - requestedAt >= 240_000) {

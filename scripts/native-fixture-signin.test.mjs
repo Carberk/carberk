@@ -164,6 +164,23 @@ test("requests once, enters the correlated code in the genuine OTP UI, and confi
   assert.deepEqual(port.inputs, ["709814"]);
 });
 
+test("waits for Cabinet identity after OTP verification without spending a second code", async () => {
+  const port = boundary();
+  const device = port.device;
+  let cabinetOpens = 0;
+  let sawPendingCabinet = false;
+  port.device = async (args, options) => {
+    if (args[0] === "open" && args[1] === "autotm:///services") cabinetOpens++;
+    if (args[0] === "snapshot" && cabinetOpens === 2 && !sawPendingCabinet) {
+      sawPendingCabinet = true;
+      return { nodes: [{ label: "Loading" }] };
+    }
+    return device(args, options);
+  };
+  assert.deepEqual(await signInFixture(options, port), { fixture: "seller", status: "signed-in", identityConfirmed: true });
+  assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 1);
+});
+
 test("uses an existing exact request without spending another code", async () => {
   const port = boundary({ currentOtp: true });
   assert.deepEqual(await signInFixture({ ...options, requestId: ID, requestedAt: "2026-11-12T06:00:00Z" }, port),
@@ -210,6 +227,17 @@ test("stops at a rate limit without reading any code or replaying the request", 
   const read = port.readFile;
   port.readFile = path => path.endsWith(".env") ? read(path) : assert.fail("must not read OTP log");
   await assert.rejects(signInFixture(options, port), /RATE_LIMITED/);
+  assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 1);
+});
+
+test("reports the HTTP 400 rate limit reason and wait without exposing the response", async () => {
+  const port = boundary({ response: Response.json({ code: "RATE_LIMITED",
+    details: { reason: "backoff", retryInSeconds: 42 }, secret: "private-value" }, { status: 400 }) });
+  await assert.rejects(signInFixture(options, port), error => {
+    assert.match(error.message, /RATE_LIMITED.*backoff.*42/);
+    assert.doesNotMatch(error.message, /private-value/);
+    return true;
+  });
   assert.equal(port.requests.filter(([url]) => url.endsWith("/otp/request")).length, 1);
 });
 

@@ -8,7 +8,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseEnv } from "node:util";
 import { adminOrigin, cli as adminAccess, health, localConfig } from "./admin-access.mjs";
-import { FixtureError, localApi } from "./local-signin.mjs";
+import { FixtureError, localApi, signInRequestError } from "./local-signin.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const IDS = ["12530000-0000-4000-8000-000000000001", "12530000-0000-4000-8000-000000000002"];
@@ -110,14 +110,21 @@ async function run(config, options, ports, progress) {
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (!response.ok) throw new FixtureError("HTTP refusal " + response.status + "; stop without retry");
+    if (!response.ok) {
+      if (route === "/auth/otp/request") {
+        const error = await signInRequestError(response);
+        if (error) throw error;
+      }
+      throw new FixtureError("HTTP refusal " + response.status + "; stop without retry");
+    }
     return response.json();
   }
   async function privateCode(kind, actor, metadata = []) {
+    progress.stage = "retrieve private " + kind;
     let record;
     const status = await adminAccess([kind, "--api", api.href, "--admin", admin.origin,
       "--api-env", options.envFile, "--phone", actor.phone, ...metadata], {
-      ...ports, out: value => { record = JSON.parse(value); }, err: () => {},
+      ...ports, out: value => { record = JSON.parse(value); }, err: value => { throw new FixtureError(value); },
     });
     assert(status === 0 && record?.codeFile, "Private authentication helper refused");
     try {
@@ -143,6 +150,10 @@ async function run(config, options, ports, progress) {
       if (!status.enrolled) await http("/auth/admin/totp/enroll" + purpose, "POST", {}, session.accessToken);
       const totp = await privateCode("totp", actor, ["--purpose", "vehicle-history"]);
       await http("/auth/admin/totp/verify" + purpose, "POST", { code: totp }, session.accessToken);
+      const verified = await http("/auth/admin/totp/status" + purpose, "GET", undefined, session.accessToken);
+      assert(verified.enrolled === true && verified.elevated === true, "Expected verified and elevated History session");
+      const desk = await http("/vehicle-history/desk", "GET", undefined, session.accessToken);
+      assert(desk.mode === "synthetic" && desk.actor?.id === actor.id, "Unexpected History desk identity");
     }
     return session.accessToken;
   }
@@ -164,7 +175,8 @@ async function run(config, options, ports, progress) {
     { clientMessageId: ports.uuid(), text: index === 0 ? "Uzyn habar — Длинный текст — Long message\n".repeat(65) :
       "Synthetic requester message " + (index + 1) }, requester);
   ports.out(JSON.stringify({ requestIds: requests, assignmentVersion: 1, operatorTexts: 3,
-    requesterTexts: 50, operatorBrowserResendEligibleAt: browserEligibleAt, stages: ["delivered", "read", "unassigned", "incoming", "facts", "quit"] }));
+    requesterTexts: 50, operatorSessionVerified: true, operatorBrowserResendEligibleAt: browserEligibleAt,
+    stages: ["delivered", "read", "unassigned", "incoming", "facts", "quit"] }));
   let nextStage = 0;
   let unassignedCreated = false, incomingCreated = false;
   for await (const command of ports.input) {
@@ -224,11 +236,16 @@ async function run(config, options, ports, progress) {
   }
 }
 
+async function* commands(stdin) {
+  const input = createInterface({ input: stdin, terminal: false });
+  try { yield* input; }
+  finally { input.close(); }
+}
+
 export async function cli(argv, overrides = {}) {
   const ports = { lstat, readFile, rm, fetch, now: Date.now, uuid: randomUUID,
     dbFactory: databaseFor, out: console.log, err: console.error, ...overrides };
   const progress = { stage: "configuration" };
-  let ownedInput;
   try {
     if (argv.length === 1 && argv[0] === "--help") { ports.out(HELP); return 0; }
     const options = optionsFor(argv), config = await configuration(options, ports);
@@ -236,7 +253,7 @@ export async function cli(argv, overrides = {}) {
       progress.stage = "initial empty fixture";
       await initialize(config, options, ports);
     } else {
-      if (!ports.input) ports.input = ownedInput = createInterface({ input: process.stdin, terminal: false });
+      ports.input ??= commands(ports.stdin ?? process.stdin);
       await run(config, options, ports, progress);
     }
     return 0;
@@ -244,7 +261,7 @@ export async function cli(argv, overrides = {}) {
     ports.err("History fixture stopped at " + progress.stage + "; " +
       (error instanceof FixtureError ? error.message : "raw diagnostics suppressed; no retry"));
     return 1;
-  } finally { ownedInput?.close(); }
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

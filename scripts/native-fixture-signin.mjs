@@ -6,11 +6,13 @@ import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { FixtureError, codeFor, localApi } from "./local-signin.mjs";
+import { FixtureError, codeFor, localApi, signInRequestError } from "./local-signin.mjs";
 
 const FIXTURES = {
   seller: { phone: "+99361000001", name: "Aýgül Amanowa", masked: "+993 61 XX-XX-01" },
   buyer: { phone: "+99361000009", name: "Öwez Berdiýew", masked: "+993 61 XX-XX-09" },
+  "history-requester": { phone: "+99361000009", name: "Merdan · Local History", masked: "+993 61 XX-XX-09",
+    syntheticUserId: "12530000-0000-4000-8000-000000000002" },
 };
 const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const editableFields = state => (state.nodes ?? []).filter(node => node.editable === true || /text.?field|edittext/i.test(node.type ?? node.role ?? ""));
@@ -55,12 +57,16 @@ async function enterCode(device, sleep, fixture, code) {
 async function run(options, ports, context) {
   const api = localApi(options.api);
   const fixture = FIXTURES[options.fixture];
-  if (!fixture) throw new FixtureError("Choose --fixture seller or buyer");
+  if (!Object.hasOwn(FIXTURES, options.fixture)) throw new FixtureError("Choose --fixture seller, buyer or history-requester");
   const env = parseEnv(await ports.readFile(options.apiEnv, "utf8"));
   if (!["development", "test"].includes(env.APP_ENV) || !["development", "test"].includes(env.NODE_ENV) ||
       env.SMS_DRIVER !== "mock" || env.OTP_TEST_MODE !== "false" || env.OTP_TEST_CODE_RESPONSE !== "false" ||
       (env.PORT ?? "3006") !== (api.port || "80")) {
     throw new FixtureError("API config must match the port and use mock development/test with CI OTP flags disabled");
+  }
+  if (fixture.syntheticUserId && (env.CARBERK_LOCAL_ENV !== "true" || env.VEHICLE_HISTORY_SYNTHETIC_ENABLED !== "true" ||
+      !env.VEHICLE_HISTORY_SYNTHETIC_USER_IDS?.split(",").includes(fixture.syntheticUserId))) {
+    throw new FixtureError("The History requester requires the selected named History runtime");
   }
   const health = await ports.fetch(new URL("/healthz", api), { redirect: "error", signal: AbortSignal.timeout(5000) });
   if (!health.ok) throw new FixtureError("Local API health check failed");
@@ -103,10 +109,8 @@ async function run(options, ports, context) {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(5000),
       headers: { "content-type": "application/json" }, body: JSON.stringify({ phone: fixture.phone }),
     });
-    if (response.status === 429) throw new FixtureError("RATE_LIMITED: stop and wait; no resend or quota reset");
-    if (!response.ok) throw new FixtureError("OTP request refused; stop without resending");
+    if (!response.ok) throw await signInRequestError(response) ?? new FixtureError("OTP request refused; stop without resending");
     const body = await response.json();
-    if (body.code === "RATE_LIMITED") throw new FixtureError("RATE_LIMITED: stop and wait; no resend or quota reset");
     if (body.testCode !== undefined) throw new FixtureError("CI OTP response mode detected; stop");
     requestId = body.requestId;
     rememberRequest();
@@ -133,11 +137,18 @@ async function run(options, ports, context) {
     return { fixture: options.fixture, status: "verified", identityConfirmed: false };
   }
   await ports.device(["open", "autotm:///services"]);
-  const identity = JSON.stringify(await ports.device(["snapshot", "-i"]));
-  if (!identity.includes(fixture.name) || !identity.includes(fixture.masked)) throw new FixtureError(leftOtp
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const cabinet = await ports.device(["snapshot", "-i"]);
+    const identity = JSON.stringify(cabinet);
+    if (identity.includes(fixture.name) && identity.includes(fixture.masked)) {
+      return { fixture: options.fixture, status: "signed-in", identityConfirmed: true };
+    }
+    if (!leftOtp && (otpScreen(cabinet) || editableFields(cabinet).length)) break;
+    if (attempt < 9) await ports.sleep(500);
+  }
+  throw new FixtureError(leftOtp
     ? "OTP UI did not confirm the expected fixture identity; stop without resending"
     : "OTP UI verification did not complete; stop without resending");
-  return { fixture: options.fixture, status: "signed-in", identityConfirmed: true };
 }
 
 export async function signInFixture(options, ports) {
@@ -195,7 +206,7 @@ export function callerDevice(receipt, { cwd = process.cwd(), executeFile = execu
   };
 }
 
-const HELP = `Usage: pnpm native:signin --fixture seller|buyer --api http://127.0.0.1:3006/api/v1
+const HELP = `Usage: pnpm native:signin --fixture seller|buyer|history-requester --api http://127.0.0.1:3006/api/v1
   --api-env /absolute/path/to/running-api/.env --api-log /tmp/that-api.log
   --device-command-file /tmp/owned-device.json
   [--reuse-only] [--request-id UUID --requested-at ISO_TIMESTAMP]

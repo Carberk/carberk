@@ -21,12 +21,17 @@ For fresh ticket environments, use the opt-in runtime helper:
 ```bash
 pnpm local-env up 1356-history --profile history --with admin
 pnpm local-env status 1356-history
+pnpm local-env reset-signin-quota 1356-history
 pnpm local-env stop 1356-history
 ```
 
 Choose a ticket number and unique suffix. `up` binds the name to this worktree, discovers Docker-assigned loopback ports, builds API/worker sequentially, migrates and bootstraps project-scoped storage. It writes private env, logs and ownership state under `/tmp/carberk-local-<uid>/<name>`, outside git. API and worker have distinct loopback listeners; optional `--with admin,web,metro` uses the same generated origins. Reruns retain named containers, volumes, fixture data and live sessions. After source changes, stop/up rebuilds owned services; it does not replace fixtures. `--infra-only` starts just the empty infrastructure profile.
 
 Profiles are exclusive for the life of the runtime. `empty` only prepares schema/buckets. `history` initializes the existing empty-table History actors/grant. `native` installs the existing canonical catalog/UI fixture, then plans/applies rich photos, private drafts and real-worker video sources in that order, and runs canonical `native:ready`. Sparse fixture installation never establishes native readiness. Use separate names for History and native; profile switching refuses before writes. Existing photo/logo source caches and the rich renderer cache are reused by their existing commands.
+
+If an ordinary mock SMS sign-in returns `RATE_LIMITED`, use the reason to decide between waiting for a short backoff and calling `reset-signin-quota` on the owned disposable runtime. Restarting the API or logging out has no effect on the PostgreSQL request ledger. The command needs a prepared History or native profile and its verified running PostgreSQL container. It clears only the last 24 hours of completed or expired phone sign-in requests for the profile's two canonical fixture Users. Active challenges and codes for other purposes remain valid. A limit caused by other traffic requires its normal backoff or a fresh named runtime. Make one ordinary sign-in attempt after the recovery step.
+
+After stop/up, rerun readiness before using the reported origins. Docker may assign a different MinIO port. A retained fixture that embeds the previous media origin can then fail readiness as modified or occupied. Keep that runtime's data and prepare a fresh owned named runtime for origin-dependent proof.
 
 `stop` authenticates owned process sessions and checks ownership labels on containers, networks and volumes. It stops only those sessions and verified containers and preserves data. There is no destroy command. Inspect private logs on startup failure; ordinary infrastructure/startup recovery is stop/up. Interrupted fixture writes refuse replay: inspect the exact fixture receipt and follow its recovery, or use a new named runtime. An interrupted CLI can leave `operation.lock`: inspect its private owner record, verify that process ended, then remove only that lock directory. Never remove a live operation's lock. `/tmp` state is required to prove ownership; if it is lost, choose a new name and coordinate recovery of the old resources rather than adopting them.
 

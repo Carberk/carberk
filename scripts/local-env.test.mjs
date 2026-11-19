@@ -100,6 +100,14 @@ test("a worktree cannot adopt another worktree's named runtime", async t => {
   assert.deepEqual(f.commands.map(row => row[0]), ["git"]);
 });
 
+test("quota reset refuses an empty profile before issuing a database command", async t => {
+  const f = await fixture(t);
+  await localEnv(["up", "1356-a", "--infra-only"], f.options);
+  f.commands.length = 0;
+  await assert.rejects(localEnv(["reset-signin-quota", "1356-a"], f.options), /prepared History or native runtime/);
+  assert(!f.commands.some(row => row.includes("exec")));
+});
+
 test("foreign project containers, networks and volumes block changes", async t => {
   for (const kind of ["container", "network", "volume"]) {
     const f = await fixture(t);

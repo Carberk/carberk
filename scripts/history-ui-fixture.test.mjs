@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { cli } from "./history-ui-fixture.mjs";
@@ -98,9 +99,15 @@ async function boundary(commands = []) {
       }
       if (path.includes("/auth/admin/totp/")) {
         assert.equal(parsed.searchParams.get("purpose"), "vehicle-history");
-        if (path.endsWith("/status")) return Response.json({ enrolled: false, elevated: false });
-        if (path.endsWith("/verify")) assert.equal(body.code, state.code);
+        if (path.endsWith("/status")) return Response.json({ enrolled: !!state.elevated, elevated: !!state.elevated });
+        if (path.endsWith("/verify")) {
+          assert.equal(body.code, state.code);
+          state.elevated = true;
+        }
         return Response.json({});
+      }
+      if (path.endsWith("/vehicle-history/desk") && init.headers.Authorization === "Bearer " + state.tokens[0]) {
+        return Response.json({ mode: "synthetic", actor: { id: IDS[0] } });
       }
       if (path === "/api/v1/vehicle-history/requests" && request.method === "POST") {
         const item = { id: randomUUID(), sourceListingId: null, createdAt: new Date(NOW).toISOString(),
@@ -242,6 +249,17 @@ test("ordinary login, explicit contiguous fetch and requester-v0 receipts produc
   assert.equal(state.removed.length, 3);
   assert(state.spawns[0][1].includes("vehicle-history"));
   assertPrivate(state);
+});
+
+test("piped commands survive fixture preparation and quit after the requested stage", { timeout: 2000 }, async () => {
+  const { state, ports } = await boundary();
+  const stdin = new PassThrough();
+  delete ports.input;
+  const fixture = cli(["run", ...ARGS], { ...ports, stdin });
+  stdin.end("unassigned\nquit\n");
+  assert.equal(await fixture, 0, state.errors.join("\n"));
+  assert.equal(state.requests.length, 3);
+  assert.equal(state.output[1].stage, "unassigned");
 });
 
 test("protected OTP refusal stops without another request or alternate actor", async () => {
