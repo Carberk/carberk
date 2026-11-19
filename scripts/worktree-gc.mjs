@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// A safe worktree cleanup gate as code (originally docs/agents/worktree-lifecycle.md, retired by ADR-0108).
-//
-// Default run is read-only: it lists every linked worktree with a verdict,
-// `remove` or `keep: <exact reason>`, plus stale local branches and Railway PR
-// environments whose PR is closed. `--apply` then removes only `remove` rows
-// with `git worktree remove` (never --force), deletes their task and scaffold
-// branches with a conditional `git update-ref -d <ref> <expected-sha>`, and
-// prunes. It stops at the first failure.
-//
-// Usage: node scripts/worktree-gc.mjs [--apply] [--json] [--no-size]
-//          [--no-railway] [--prs-file <json>]
-// `--prs-file` is for read-only experiments; `--apply` refuses it.
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, readlinkSync, realpathSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -52,9 +40,6 @@ export function parseWorktreePorcelain(text) {
   return entries;
 }
 
-// `claude agents --json` output as running-process records. A Claude session
-// may run in a worktree that holds no lock, so its cwd counts as a running
-// agent. Anything unreadable is unknown (null), never an empty list.
 export function parseClaudeSessions(text) {
   let sessions;
   try {
@@ -66,28 +51,17 @@ export function parseClaudeSessions(text) {
   const found = [];
   let withoutCwd = 0;
   for (const session of sessions) {
-    // An entry that is not a plain object means the format is not what we expect.
     if (!session || typeof session !== "object" || Array.isArray(session)) return null;
-    // A session with no directory (a remote one, say) cannot sit in any
-    // worktree, so it cannot be matched. Among sessions that do have one it is
-    // counted and reported, not silently dropped.
     if (typeof session.cwd !== "string" || !session.cwd) {
       withoutCwd += 1;
       continue;
     }
     found.push({ pid: session.pid ?? "?", command: `claude session "${session.name ?? session.sessionId ?? "unnamed"}"`, cwd: session.cwd });
   }
-  // A non-empty list in which no entry has a directory is the signature of a
-  // changed format (the field renamed or nested), not of "no local sessions":
-  // it is unreadable, so --apply refuses.
   if (!found.length && withoutCwd > 0) return null;
   return { sessions: found, withoutCwd };
 }
 
-// Resolves symlinks so a path from `lsof` or a Claude session compares equal
-// to the path git lists. A path that does not exist (a deleted worktree)
-// keeps its missing tail and resolves only the part that does exist; a path
-// with no existing ancestor comes back unchanged.
 export function realpathOrSelf(path) {
   let existing = path;
   const tail = [];
@@ -107,17 +81,12 @@ function inside(cwd, path) {
   return cwd === path || cwd.startsWith(`${path}/`);
 }
 
-// Codex keeps its app-managed worktrees under `<home>/.codex/worktrees/`. Match
-// the directory wherever it sits, so a different HOME (a sandbox, sudo, a
-// wrapper) does not strip the protection.
 const CODEX_MANAGED = "/.codex/worktrees/";
 
 function isCodexManaged(entry) {
   return [entry.path, entry.listedPath].some((path) => path && `${path}/`.includes(CODEX_MANAGED));
 }
 
-// The branch, or the directory's name as git lists it or as it resolves (a
-// final-component symlink can carry the evidence name on either side).
 function isEvidenceWorktree(entry) {
   return EVIDENCE.test(entry.branch ?? "") || [entry.path, entry.listedPath].some((path) => path && EVIDENCE.test(basename(path)));
 }
@@ -125,7 +94,6 @@ function isEvidenceWorktree(entry) {
 function matchingPrs(entry, context) {
   const { prs, onMain, isAncestor } = context;
   const sameName = entry.branch ? prs.filter((pr) => pr.headRefName === entry.branch) : [];
-  // This branch's own open PR decides, whatever other branches' merged PRs contain.
   const ownOpen = sameName.find((pr) => pr.state === "OPEN");
   if (ownOpen) return { prs: [ownOpen], how: "own-open" };
   const direct = prs.filter((pr) => pr.headRefOid === entry.head);
@@ -138,8 +106,6 @@ function matchingPrs(entry, context) {
   return others.length ? { prs: others, how: "ancestor" } : { prs: [], how: null };
 }
 
-// First matching keep reason wins. Order puts identity and ownership checks
-// ahead of work-in-progress checks, and PR state last.
 export function classifyWorktree(entry, context) {
   const keep = (reason) => ({ verdict: "keep", reason, pr: null });
   if (entry.path === context.mainPath) return keep("the main checkout");
@@ -177,8 +143,6 @@ export function classifyWorktree(entry, context) {
   if (open) return { verdict: "keep", reason: `PR #${open.number} is open`, pr: open };
   const mergedPrs = prs.filter((pr) => pr.state === "MERGED");
   if (mergedPrs.length) {
-    // A PR merged into a stacked parent branch has not reached main, so its
-    // work is not on main yet. Only a merge into main lets the worktree go.
     const merged = mergedPrs.find((pr) => pr.baseRefName === MAIN_BRANCH);
     if (!merged) {
       const first = mergedPrs[0];
@@ -194,8 +158,6 @@ function isManagedBranch(name) {
   return name.startsWith(TASK_BRANCH) || name.startsWith(SCAFFOLD_BRANCH);
 }
 
-// Local task and scaffold branches that no worktree holds and whose tip is
-// already inside a merged PR head.
 export function findStaleBranches({ branches, worktrees, prs, isAncestor, mainSha = null }) {
   const held = new Set(worktrees.map((entry) => entry.branch).filter(Boolean));
   const mergedPrs = prs.filter((pr) => pr.state === "MERGED" && pr.baseRefName === MAIN_BRANCH);
@@ -205,7 +167,6 @@ export function findStaleBranches({ branches, worktrees, prs, isAncestor, mainSh
     const contains = (pr) => pr.headRefOid === branch.sha || isAncestor(branch.sha, pr.headRefOid) === true;
     const sameName = mergedPrs.filter((pr) => pr.headRefName === branch.name);
     const pr = sameName.find(contains) ?? mergedPrs.find((candidate) => !sameName.includes(candidate) && contains(candidate));
-    // A tip already on main is reported as such, whichever PR also contains it.
     const onMain = Boolean(mainSha) && isAncestor(branch.sha, mainSha) === true;
     if (pr) stale.push({ name: branch.name, sha: branch.sha, pr, onMain });
   }
@@ -227,8 +188,6 @@ export function findStaleRailwayEnvironments({ environments, prs }) {
   return result;
 }
 
-// Ordered steps for --apply. Worktrees go first, then conditional ref
-// deletes, then prune. Nothing here forces anything.
 export function planApply({ rows, staleBranches }) {
   const steps = [];
   const refs = [];
@@ -272,8 +231,6 @@ function humanSize(kb) {
   return `${kb} KB`;
 }
 
-// One line saying what the Claude session scan covered. The report never
-// implies the scan ran when it did not.
 function describeClaudeScan(claude) {
   if (!claude) return "not recorded";
   if (claude.status === "missing") return "not checked (`claude` was not found on PATH)";
@@ -357,7 +314,6 @@ export function formatReport({ rows, staleBranches, railway, applied, scans }) {
   return `${out.join("\n")}\n`;
 }
 
-// --- IO ---------------------------------------------------------------------
 
 function run(argv, cwd) {
   return execFileSync(argv[0], argv.slice(1), { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -370,7 +326,6 @@ function scanProcesses() {
       try {
         found.push({ pid: Number(pid), command: readFileSync(`/proc/${pid}/comm`, "utf8").trim(), cwd: readlinkSync(`/proc/${pid}/cwd`) });
       } catch {
-        // The process ended or belongs to another user.
       }
     }
     return found;
@@ -387,10 +342,6 @@ function scanProcesses() {
   return found;
 }
 
-// Live Claude sessions, interactive and background, with the directory each one
-// works in. A missing `claude` binary is reported as "missing", never as an
-// empty list, so the report cannot claim the scan ran. A binary that fails or
-// prints something unreadable is unknown (null).
 export function scanClaudeSessions(spawn = spawnSync) {
   const result = spawn("claude", ["agents", "--json"], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: 60_000 });
   if (result.error?.code === "ENOENT") return { status: "missing", sessions: [], withoutCwd: 0 };
@@ -399,7 +350,6 @@ export function scanClaudeSessions(spawn = spawnSync) {
   return parsed && { status: "ok", ...parsed };
 }
 
-// Untracked files count whatever the user's status.showUntrackedFiles says.
 function changedPaths(path) {
   return run(["git", "--no-optional-locks", "status", "--porcelain", "--untracked-files=all"], path)
     .split("\n")
@@ -418,7 +368,6 @@ function makeAncestry(mainPath, oids) {
     });
     present = new Set(out.split("\n").filter((line) => line.endsWith(" commit")).map((line) => line.split(" ")[0]));
   } catch {
-    // Without object lookups every ancestry answer stays unknown.
   }
   const cache = new Map();
   return (ancestor, descendant) => {
@@ -437,9 +386,6 @@ function makeAncestry(mainPath, oids) {
   };
 }
 
-// `gh pr list` stops silently at --limit. When a result fills the limit, ask
-// again with a larger one; a result that fills the largest limit is reported as
-// possibly truncated.
 const PR_LIMITS = [1000, 5000, 20000];
 
 export function loadPrs(prsFile, cwd, runCommand = run) {
@@ -485,8 +431,6 @@ function parseArgs(argv) {
   return options;
 }
 
-// `io` lets tests inject the environment, the process and Claude scans, the
-// command runner used by --apply, and the output streams.
 export function main(argv = process.argv.slice(2), cwd = process.cwd(), io = {}) {
   const env = io.env ?? process.env;
   const out = io.stdout ?? ((text) => process.stdout.write(text));
@@ -500,15 +444,11 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd(), io = {})
     return 2;
   }
 
-  // Hand-written PR data must never drive removals. The test suite sets the
-  // variable; nothing else should.
   if (options.apply && options.prsFile && env.WORKTREE_GC_ALLOW_PRS_FILE_APPLY !== "1") {
     err("--prs-file cannot be combined with --apply: removals must follow live PR data from gh.");
     return 2;
   }
 
-  // Compare real paths on both sides: `lsof`, Claude sessions and git's own
-  // listing can each spell the same directory differently.
   const entries = parseWorktreePorcelain(run(["git", "worktree", "list", "--porcelain"], cwd)).map((entry) => ({
     ...entry,
     listedPath: entry.path,
@@ -540,8 +480,6 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd(), io = {})
     }
     err("Warning: could not scan running processes; running agents are not detected.");
   }
-  // A scan that cannot see this very process is partial (a sandbox can hide
-  // processes from `lsof`), so what it did not list proves nothing.
   const includesCurrentProcess = Boolean(scannedProcesses?.some((proc) => proc.pid === pid));
   if (scannedProcesses && !includesCurrentProcess) {
     if (options.apply) {
@@ -584,7 +522,6 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd(), io = {})
       mainSha = run(["git", "rev-parse", "--verify", "--quiet", ref], mainPath).trim();
       break;
     } catch {
-      // Try the next ref.
     }
   }
   const heads = entries.map((entry) => entry.head).filter((head) => head && !ZERO_SHA.test(head));
@@ -640,9 +577,6 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd(), io = {})
     const steps = planApply({ rows, staleBranches });
     for (const step of steps) {
       if (step.kind !== "worktree") continue;
-      // Recheck just before removal. Git refuses a locked tree and, by default,
-      // a dirty one, but not untracked files under status.showUntrackedFiles=no,
-      // so this recheck (HEAD unchanged, nothing changed or untracked) is the guard.
       step.verify = () => {
         const head = run(["git", "rev-parse", "HEAD"], step.entry.path).trim();
         if (head !== step.entry.head) throw new Error(`HEAD moved from ${step.entry.head} to ${head}`);

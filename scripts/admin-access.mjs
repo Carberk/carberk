@@ -60,7 +60,6 @@ export async function health(url, service, ports, environment) {
   if (result.service !== service || !["development", "test"].includes(result.environment) || (environment && result.environment !== environment)) throw new FixtureError(`${service.toUpperCase()}_TARGET_MISMATCH: running service does not match the selected local environment`);
 }
 
-// A detached POSIX group contains pnpm and its descendants, not other agents' servers.
 async function runOwned(args, options, ports, timeoutMs) {
   const child = ports.spawn("pnpm", args, { cwd: ROOT, detached: true, ...options });
   let stdout = "", bytes = 0, interrupted = false, stopping;
@@ -70,7 +69,7 @@ async function runOwned(args, options, ports, timeoutMs) {
     child.once("exit", (code, signal) => done({ code: signal ? 1 : code ?? 1 }));
   });
   const group = signal => {
-    if (!child.pid) return false; // Spawn failed before a process was created.
+    if (!child.pid) return false;
     try { process.kill(-child.pid, signal); return true; }
     catch (error) { if (error.code === "ESRCH") return false; throw error; }
   };
@@ -95,7 +94,7 @@ async function runOwned(args, options, ports, timeoutMs) {
   try {
     const result = await exited;
     await stop();
-    await closed; // Reap the child and close captured pipes before returning.
+    await closed;
     return { ...result, code: interrupted ? 1 : result.code, stdout };
   } finally {
     clearTimeout(timer);

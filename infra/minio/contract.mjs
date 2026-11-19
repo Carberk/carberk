@@ -57,8 +57,6 @@ export function assertPublicReadOnlyPolicy(policy, bucket) {
     if (!isAnonymous) continue;
     const actions = Array.isArray(statement.Action) ? statement.Action : [statement.Action];
     const resources = Array.isArray(statement.Resource) ? statement.Resource : [statement.Resource];
-    // Backup/restore accept only the repository-owned anonymous grant. Checking
-    // every anonymous statement also catches broad grants and narrower writes.
     if (!actions.length || actions.some((action) => action !== "s3:GetObject") ||
         !resources.length || resources.some((resource) => resource !== publicReadResource(bucket))) {
       throw new Error(`Bucket ${bucket} policy must grant anonymous s3:GetObject only on ${publicReadResource(bucket)}`);
@@ -106,7 +104,6 @@ export async function bootstrapBuckets(client, buckets = MEDIA_BUCKETS) {
     }
 
     if (bucket === "listing-videos") {
-      // Reconcile existing public buckets too; retaining bytes grants no serving access.
       await client.send(new DeleteBucketPolicyCommand({ Bucket: bucket }));
     } else {
       const policy = publicReadPolicy(bucket);
@@ -184,8 +181,6 @@ export async function restoreBuckets(client, backupDir) {
     await bootstrapBuckets(client, [bucket.name]);
 
     const policy = await readFile(join(backupDir, bucket.policyFile), "utf8");
-    // Historical video backups contain an anonymous grant. Restore their bytes
-    // under today's private contract, never the captured public policy.
     if (bucket.name !== "listing-videos") {
       assertPublicReadOnlyPolicy(policy, bucket.name);
       await client.send(new PutBucketPolicyCommand({ Bucket: bucket.name, Policy: policy }));

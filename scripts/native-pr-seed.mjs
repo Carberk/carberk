@@ -11,23 +11,17 @@ const LOCAL_MODE_REMOVED =
   + '--service <api> node /app/scripts/native-pr-seed.mjs --remote';
 const USAGE = 'Usage: native-pr-seed.mjs --remote';
 
-// Every step runs on this Node binary and loads TypeScript through the tsx loader the db workspace
-// ships, because the API image has no pnpm. The first path exists only in that image: its Dockerfile
-// copies infra/minio/bootstrap.mjs and contract.mjs into packages/db/scripts/native-minio/ so the
-// bucket step resolves its dependencies from the db workspace. In a source checkout that step fails.
 export const nativePrSeedSteps = [
   { name: 'buckets', command: process.execPath, args: ['packages/db/scripts/native-minio/bootstrap.mjs'] },
   { name: 'canonical baseline', command: process.execPath, args: ['--import', 'tsx', 'packages/db/src/canonical-seed.ts'] },
   { name: 'native fixtures', command: process.execPath, args: ['--import', 'tsx', 'packages/db/scripts/ui-fixture.ts', '--railway-pr'] },
 ];
 
-/** The only supported invocation is `--remote`, inside the PR API container. */
 export function parseNativePrSeedArguments(args) {
   if (args.length === 1 && args[0] === '--remote') return;
   throw new Error(args.length === 0 ? LOCAL_MODE_REMOVED : USAGE);
 }
 
-/** Refuse before launching any child; the guard runs here and again inside the fixture step. */
 export function runNativePrSeed(env = process.env, args = []) {
   parseNativePrSeedArguments(args);
   assertNativePrSeedEnvironment(env);
@@ -43,7 +37,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     runNativePrSeed(process.env, process.argv.slice(2));
   } catch (error) {
-    // Guard messages never contain a value; print nothing but the message so no URL or credential leaks.
     console.error(error instanceof Error ? error.message : 'Native PR seed refused');
     process.exitCode = 1;
   }

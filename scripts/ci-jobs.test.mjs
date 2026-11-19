@@ -7,11 +7,6 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-// PR Checks and CI split the workspace tests between an api job (api and
-// worker, with Compose services), a db job (Testcontainers only) and a frontend
-// job (no services). These checks keep every workspace's tests in exactly one
-// of them, give each job only the services it needs, and keep the required
-// `pr` check meaningful.
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const readJson = (path) => JSON.parse(readFileSync(join(root, path), "utf8"));
@@ -37,7 +32,6 @@ function workspacesWithTests() {
 
 const filters = (script) => [...script.matchAll(/--filter=(\S+)/g)].map((match) => match[1]);
 
-/** Top-level job ids and each job's text, from a workflow without a YAML parser. */
 function jobs(source) {
   const body = source.slice(source.indexOf("\njobs:\n") + "\njobs:\n".length);
   const result = new Map();
@@ -187,8 +181,6 @@ test("production rootDir errors missed by typecheck fail the required PR gate", 
     mkdirSync(join(cwd, dir));
     writeFileSync(join(cwd, dir, "fixture.ts"), "export const fixture = 1;\n");
   }
-  // Reuse current worker compiler settings, removing ambient Node types from
-  // this dependency-free fixture. Only the historical scripts exclusion differs.
   writeJson("tsconfig.json", {
     extends: join(root, "apps/worker/tsconfig.json"),
     compilerOptions: { types: [], outDir: "./dist" },

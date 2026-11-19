@@ -1,26 +1,9 @@
 #!/usr/bin/env node
-/**
- * Probe an S3-compatible bucket for the Listing video storage contract (#1037).
- *
- * Checks, with disposable objects under one random prefix:
- * presigned upload/download, multipart upload (part retry + double completion),
- * byte-range reads, conditional writes/deletes, versioning, and cleanup.
- *
- * Credentials come only from the environment. Nothing secret, no signed URL,
- * no endpoint, no bucket name and no object content is ever printed.
- *
- * Required env: S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY
- * Optional env: S3_REGION (default "auto"), S3_URL_STYLE ("virtual-host" | "path")
- * Run: node scripts/listing-video-bucket-probe.mjs
- *
- * Exit code is 0 only when every core check passes and no probe object remains.
- */
 import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 
-// Use the installed API SDK versions without adding root dependencies.
 const require = createRequire(new URL("../apps/api/package.json", import.meta.url));
 const {
   AbortMultipartUploadCommand,
@@ -61,8 +44,6 @@ const client = new S3Client({
 });
 
 const fetchInit = (init = {}) => ({ ...init, signal: AbortSignal.timeout(60_000) });
-// Only allowlisted categories are printed: raw error messages can embed
-// endpoint hosts, bucket names, or signed URLs.
 const errDetail = (err) => `${codeOf(err)} http=${statusOf(err) ?? "none"}`;
 class ProbeAbort extends Error {}
 
@@ -100,8 +81,6 @@ async function bodyBytes(body) {
 }
 
 async function interruptPart(url, body) {
-  // Send only a prefix of the declared body, then close the connection. A
-  // fully accepted PUT retried below also covers a lost acknowledgement.
   await new Promise((resolve, reject) => {
     let interrupted = false;
     const request = (url.startsWith("https:") ? httpsRequest : httpRequest)(url, {
@@ -156,8 +135,6 @@ async function listAllObjects() {
 
 async function cleanup() {
   let verified = true;
-  // Abort every upload under the prefix, including one whose creation
-  // response was lost. A listing error means cleanup cannot be verified.
   const discovered = await listAllUploads().catch((err) => { note("cleanup list uploads", errDetail(err)); verified = false; return []; });
   if (uploadId && !discovered.some((u) => u.UploadId === uploadId)) discovered.push({ Key: multiKey, UploadId: uploadId });
   uploadId = undefined;
@@ -176,17 +153,13 @@ async function cleanup() {
 }
 
 try {
-  // Versioning: the conditional-write contract expects an unversioned bucket.
   const versioning = await s3send(new GetBucketVersioningCommand({ Bucket: bucket }));
   note("versioning", versioning.Status ? `status=${versioning.Status}` : "unversioned (no status returned)");
   record("versioning: bucket is unversioned", versioning.Status === undefined,
     versioning.Status ? `status=${versioning.Status}` : "no status");
-  // Plain deletes cannot prove removal on a versioned bucket (delete markers
-  // hide retained versions), so stop before creating any object.
   if (versioning.Status !== undefined) throw new ProbeAbort("versioned bucket");
   writesStarted = true;
 
-  // Presigned upload + download.
   const small = fill(256 * 1024, 7);
   const putUrl = await getSignedUrl(client, new PutObjectCommand({
     Bucket: bucket, Key: smallKey, ContentType: "video/mp4", ContentLength: small.length,
@@ -201,7 +174,6 @@ try {
   record("presigned download (GET)", getRes.ok && sha256(downloaded) === sha256(small),
     `http=${getRes.status}, bytes=${downloaded.length}`);
 
-  // Byte-range reads: direct and through a presigned URL.
   const start = 1000;
   const end = 4999;
   const ranged = await s3send(new GetObjectCommand({ Bucket: bucket, Key: smallKey, Range: `bytes=${start}-${end}` }));
@@ -223,8 +195,6 @@ try {
     && rangedUrlBytes.equals(small.subarray(start, end + 1)),
   `http=${rangedUrlRes.status}, content-range=${rangedUrlRes.headers.get("content-range") ?? "none"}, accept-ranges=${rangedUrlRes.headers.get("accept-ranges") ?? "none"}, content-length=${rangedUrlRes.headers.get("content-length") ?? "none"}`);
 
-  // Multipart: part 1 direct, part 2 via presigned URL uploaded twice (retry),
-  // then completion attempted twice.
   const part1 = fill(5 * 1024 * 1024, 11);
   const part2 = fill(1024 * 1024, 23);
   const whole = Buffer.concat([part1, part2]);
@@ -268,14 +238,13 @@ try {
     secondComplete = `refused (${codeOf(err)}, http=${statusOf(err) ?? "none"})`;
     secondCompleteSafe = statusOf(err) === 404 && codeOf(err) === "NoSuchUpload";
   }
-  uploadId = undefined; // completed or consumed; cleanup re-checks open uploads
+  uploadId = undefined;
   const multiHead = await s3send(new HeadObjectCommand({ Bucket: bucket, Key: multiKey }));
   const multiGet = await s3send(new GetObjectCommand({ Bucket: bucket, Key: multiKey }), 300_000);
   const multiBytes = await bodyBytes(multiGet.Body);
   record("multipart: completing twice is safe", secondCompleteSafe && sha256(multiBytes) === sha256(whole) && multiHead.ContentLength === whole.length,
     `second completion ${secondComplete}; object intact afterwards`);
 
-  // Conditional writes, mirroring ConditionalImageStorage expectations.
   const c1 = await s3send(new PutObjectCommand({
     Bucket: bucket, Key: condKey, Body: Buffer.from("probe-v1"), IfNoneMatch: "*",
   }));
@@ -299,8 +268,6 @@ try {
     && (await bodyBytes(updated.Body)).equals(Buffer.from("probe-v2")), "etag and updated bytes checked");
   if (!c2.ETag) throw new ProbeAbort("updated conditional write has no ETag");
 
-  // Conditional delete is informational: S3 delete conditions are newer than
-  // the write contract the storage code relies on today.
   let condDelete = "not attempted";
   try {
     await s3send(new DeleteObjectCommand({ Bucket: bucket, Key: condKey, IfMatch: '"not-the-current-etag"' }));
@@ -311,7 +278,6 @@ try {
   }
   note("conditional delete with wrong If-Match", condDelete);
 
-  // Delete, then a late conditional write must not recreate the object.
   await s3send(new DeleteObjectCommand({ Bucket: bucket, Key: condKey }));
   const unreadable = await s3send(new GetObjectCommand({ Bucket: bucket, Key: condKey }))
     .then(async (result) => { await bodyBytes(result.Body); return false; }, isMissing);

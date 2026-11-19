@@ -41,7 +41,6 @@ function matchesMedia(probe, expected) {
   return true;
 }
 
-/** Explicit operator action; never runs during app startup or readiness. */
 export async function verifyBenchmark(directory, { definition = BENCHMARK, tools = localTools } = {}) {
   if (typeof directory !== "string" || !directory.trim()) {
     throw new Error("Provide an explicit pack directory; see scripts/review-benchmarks/README.md");

@@ -59,7 +59,7 @@ def apply(prepared, runtime):
     state = {'container': container_id, 'tls_dir': str(tls_dir), 'files': {}}
     def record():
         (CONFIG / 'install-state.json').write_text(json.dumps(state))
-    record()  # Retain a receipt even if installation stops part-way.
+    record()
     for name in ['gateway.json', 'relay.json']:
         destination = CONFIG / ('egress.json' if name == 'relay.json' else name)
         shutil.copyfile(runtime / name, destination)
@@ -96,7 +96,6 @@ def apply(prepared, runtime):
     run('docker', 'exec', CONTAINER, 'nginx', '-t')
     run('systemctl', 'daemon-reload')
     run('systemctl', 'enable', '--now', *UNITS)
-    # A failed readiness gate leaves the old nginx workers serving unchanged.
     request = urllib.request.Request('http://127.0.0.1:11880/healthz', headers={
         'Host': config['hostname'], 'X-Carberk-Gateway-Key': config['accessKey']})
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -111,7 +110,7 @@ def apply(prepared, runtime):
         except OSError:
             if time.monotonic() >= deadline:
                 raise
-            time.sleep(0.5)  # Only this side-effect-free readiness GET is retried.
+            time.sleep(0.5)
     run('docker', 'exec', CONTAINER, 'nginx', '-s', 'reload')
     print(json.dumps({'installed': True, 'nginx_gracefully_reloaded': True}))
 

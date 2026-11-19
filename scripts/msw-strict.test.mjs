@@ -23,7 +23,6 @@ function runVitest(config) {
 }
 
 test("mobile MSW setup fails a caught unhandled request and permits handled responses in adjacent tests", { timeout: 20_000 }, async () => {
-  // A non-spec suffix keeps the intentional failure out of the ordinary suite.
   const directory = await mkdtemp(join(mobileRoot, "test", ".msw-guard-"));
   const probe = join(directory, "probe.fixture.ts");
   const config = join(directory, "vitest.config.mts");

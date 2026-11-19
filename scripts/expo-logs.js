@@ -1,18 +1,12 @@
 #!/usr/bin/env node
-// Connect to Hermes debugger via CDP to read JS console logs programmatically.
-// Usage: node scripts/expo-logs.js              — connect and tail logs
-//        node scripts/expo-logs.js --once       — grab current logs and exit
-//        node scripts/expo-logs.js --json       — JSON output for AI consumption
-//
-// Requires: Metro bundler running on localhost:8081 with a device connected.
 
 const WebSocket = require("ws");
 
 const METRO_HOST = "http://localhost:8081";
-const EXPO_START_TIMEOUT = 15_000; // ms to wait for Metro
+const EXPO_START_TIMEOUT = 15_000;
 
 let pendingId = 1;
-let formatMode = "pretty"; // pretty | json
+let formatMode = "pretty";
 
 function cdp(ws, method, params = {}) {
   const id = pendingId++;
@@ -34,7 +28,6 @@ function cdp(ws, method, params = {}) {
 }
 
 async function getDebugTargets() {
-  // Also check the React Native DevTools port (8097 by default)
   for (const port of [8081, 8097]) {
     try {
       const res = await fetch(`http://localhost:${port}/json/list`);
@@ -49,9 +42,8 @@ async function getDebugTargets() {
 
 function formatConsoleEvent(ev) {
   const { type, args, timestamp } = ev.params;
-  const level = type; // "log", "error", "warn", "info", "debug", etc.
+  const level = type;
 
-  // Extract values from CDP RemoteObject args
   const values = args.map((arg) => {
     if (arg.type === "string") return arg.value;
     if (arg.type === "number") return arg.value;
@@ -112,10 +104,8 @@ async function main() {
 
   ws.on("open", async () => {
     try {
-      // Enable Runtime domain to get console and exceptions
       await cdp(ws, "Runtime.enable");
 
-      // Enable Log domain if available
       try {
         await cdp(ws, "Log.enable");
       } catch (_) {}
@@ -163,7 +153,6 @@ async function main() {
   });
 
   if (once) {
-    // Wait a bit for buffered logs to arrive, then exit
     setTimeout(() => process.exit(0), 3000);
   }
 }

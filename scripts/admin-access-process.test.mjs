@@ -49,7 +49,7 @@ async function fixture(mode) {
     async cleanup() {
       if (driver.exitCode === null) driver.kill("SIGKILL");
       for (const name of ["worker.pid", "pnpm.pid"]) {
-        try { process.kill(Number(await readFile(join(directory, name), "utf8")), "SIGKILL"); } catch { /* exact owned fixture already gone */ }
+        try { process.kill(Number(await readFile(join(directory, name), "utf8")), "SIGKILL"); } catch { }
       }
       for (const socket of connections) socket.destroy();
       await Promise.all([new Promise(done => api.close(done)), new Promise(done => database.close(done))]);

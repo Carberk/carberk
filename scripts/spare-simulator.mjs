@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-/**
- * Prints a free iOS Simulator that has the Carberk development build, for an
- * agent whose usual Simulator is held by another device session.
- *
- *   pnpm sim:spare
- *
- * Picks a shut-down Simulator that already has the build. If there is none,
- * it creates "Carberk Agent N" with the iPhone 17 device type and runtime,
- * installs the build copied from a Simulator that has it, and shuts it down
- * again. Then open it with the T3 device tools (`device_open`, host `local`).
- * It never touches a booted Simulator, which another session may hold.
- */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -22,7 +10,6 @@ const DEVICES_DIR = path.join(homedir(), 'Library/Developer/CoreSimulator/Device
 
 const simctl = (...args) => execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8' });
 
-/** Path of the installed Carberk build on a Simulator, if any. */
 export function installedApp(udid, devicesDir = DEVICES_DIR) {
   const root = path.join(devicesDir, udid, 'data/Containers/Bundle/Application');
   if (!existsSync(root)) return undefined;
@@ -33,29 +20,25 @@ export function installedApp(udid, devicesDir = DEVICES_DIR) {
       try {
         const id = execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleIdentifier', path.join(app, 'Info.plist')], { encoding: 'utf8' }).trim();
         if (id === BUNDLE_ID) return app;
-      } catch { /* not a readable app bundle */ }
+      } catch { }
     }
   }
   return undefined;
 }
 
-/** iOS Simulators from `simctl list devices available -j`, flattened with their runtime. */
 export function iosDevices(listing) {
   return Object.entries(listing.devices)
     .filter(([runtime]) => runtime.includes('.iOS-'))
     .flatMap(([runtime, devices]) => devices.map((device) => ({ ...device, runtime })));
 }
 
-/** A shut-down Simulator with the build, preferring Carberk-named ones. */
 export function pickSpare(devices, hasApp) {
   const free = devices.filter((device) => device.state === 'Shutdown' && hasApp(device.udid));
   return free.find((device) => device.name.startsWith('Carberk')) ?? free[0];
 }
 
-/** The documented Carberk iPhone 17 (iOS 26.2); other "iPhone 17" devices may run a newer iOS. */
 export const TEMPLATE_UDID = '38747B85-BB39-48A2-BF0D-4DD6A5ED1D13';
 
-/** Template for a new spare: the documented iPhone 17, else the first iPhone 17, else any iPhone. */
 export function pickTemplate(devices) {
   return devices.find((device) => device.udid === TEMPLATE_UDID)
     ?? devices.find((device) => device.name === 'iPhone 17')

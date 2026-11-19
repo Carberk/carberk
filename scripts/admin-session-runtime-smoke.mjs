@@ -1,4 +1,3 @@
-/** Run after `pnpm --filter @auto-tm/admin build`. Local loopback only; no deployment. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -37,7 +36,7 @@ const api = createServer(async (req, res) => {
   if (req.url === "/api/v1/auth/refresh" && req.method === "POST") {
     const record = sessions.get(JSON.parse(body).refreshToken);
     rotations++;
-    await delay(75); // Force overlapping GET/POST requests to share an owner.
+    await delay(75);
     if (!record || record.used) { res.writeHead(401); res.end(JSON.stringify({ code: "TOKEN_ALREADY_USED" })); return; }
     if (record.failure === "network") { res.destroy(); return; }
     if (record.failure === "malformed") { res.end("{}"); return; }
@@ -116,7 +115,7 @@ try {
   let healthy = false;
   for (let i = 0; i < 100; i++) {
     if (running.child.exitCode !== null) throw new Error("standalone exited before health readiness");
-    try { healthy = (await fetch(`${origin}/healthz`)).ok; } catch { /* starting */ }
+    try { healthy = (await fetch(`${origin}/healthz`)).ok; } catch { }
     if (healthy) break;
     await delay(100);
   }
@@ -156,8 +155,6 @@ try {
   console.log("PASS expired GET: cookies persisted; rendering uses renewed bearer");
 
   const currentCookie = `__Host-auto_tm_admin_access=${first.pair.accessToken}; __Host-auto_tm_admin_refresh=${first.pair.refreshToken}`;
-  // Real standalone HTTP/rendering seam; the external API response is the
-  // fixture. Current authority itself is covered by API/disposable-DB tests.
   for (const [locale, loading, empty, denied, error] of [
     ["tk", "Rugsat barlanýar", "Entek ýüz tutma ýok", "Rugsat ýok", "Iş ýeri açylmady"],
     ["ru", "Проверяем доступ", "Обращений пока нет", "Нет доступа", "Не удалось открыть рабочее место"],
@@ -220,8 +217,6 @@ try {
   assert.equal(rotations, before + 1, "short handoff must not spend refresh again");
   await delay(5_100);
   const loser = await request(concurrent.old, true);
-  // Next.js 16.3+ answers a client-handled action redirect with 200 plus
-  // x-action-redirect (vercel/next.js#96310); 16.2 sent 303 without Location.
   assert.equal(loser.status, 200, "client-handled action redirect must not look like an HTTP redirect");
   assert.equal(mutations, 1, "losing action must never execute or replay");
   const redirect = loser.headers.get("x-action-redirect");
@@ -230,8 +225,6 @@ try {
   assert(loser.headers.getSetCookie().filter((value) => /Max-Age=0/i.test(value)).length === 2, "loser must clear both cookies");
   const login = await fetch(new URL(redirect.split(";")[0], origin), { redirect: "manual" });
   assert.equal(login.status, 200, "login must not redirect-loop");
-  // Login is statically prerendered with a client useSearchParams boundary.
-  // Hydrated Russian copy is covered by the rendered login DOM tests.
   await login.text();
   console.log("PASS cache expiry/loser: action redirect to login, both cookies cleared, no mutation, login GET without loop");
 
@@ -245,7 +238,7 @@ try {
   const restarted = start(listenPort, apiUrl);
   try {
     for (let i = 0; i < 100; i++) {
-      try { if ((await fetch(`${origin}/healthz`)).ok) break; } catch { /* starting */ }
+      try { if ((await fetch(`${origin}/healthz`)).ok) break; } catch { }
       await delay(100);
     }
     const restartLoser = await request(first.old, true);

@@ -13,11 +13,8 @@ const { nativePrSeedSteps, parseNativePrSeedArguments } = entry;
 const root = fileURLToPath(new URL('..', import.meta.url));
 const entryPath = path.join(root, 'scripts/native-pr-seed.mjs');
 const fixtureScript = 'packages/db/scripts/ui-fixture.ts';
-// Traces guard calls and client module loads to stderr; see the probe for the line format.
 const loadProbe = path.join(root, 'scripts/native-pr-seed-load-probe.cjs');
 
-// Every value is fake. No test here builds a database, MinIO or Railway client, and the spawned
-// processes below only run inputs that must be refused before any client exists.
 const SECRET = 'sk-FAKE-SECRET-must-never-be-printed';
 const valid = {
   RAILWAY_ENVIRONMENT_NAME: 'auto.tm-rewrite-pr-481',
@@ -35,21 +32,15 @@ const NAME_REFUSAL = 'Native seed requires an auto.tm-rewrite-pr-<number> PR env
 const badNames = ['production', 'staging', undefined, 'production-pr-481', 'auto.tm-rewrite-pr-481-production', 'auto.tm-rewrite-pr-0'];
 const foreignMediaHosts = ['https://minio-staging-5795.up.railway.app', 'https://minio-autotm-rewrite-pr-480.up.railway.app'];
 
-/** Run a script in a clean environment so the parent's real variables can never reach it. */
 function spawnClean(args, env) {
   const result = spawnSync(process.execPath, args, { cwd: root, env, encoding: 'utf8', timeout: 60_000 });
   return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
-/** Run the fixture under the load probe, which traces the guard call and every client module load. */
 function spawnFixture(argv, env) {
   return spawnClean(['--require', loadProbe, '--import', 'tsx', fixtureScript, ...argv], env);
 }
 
-/**
- * The guard must have run and no database or bucket client module may have loaded. A client cannot
- * be constructed before its module loads, so this fails if the guard moves after any client.
- */
 function assertGuardBeforeAnyClient(stderr, label) {
   assert.match(stderr, /^LOAD-PROBE guard assertFixtureTarget$/m, `${label}: the probe must see the guard run`);
   assert.doesNotMatch(stderr, /^LOAD-PROBE client /m, `${label}: no client module may load before the guard refuses`);
@@ -126,8 +117,6 @@ test('the fixture target without --railway-pr accepts only a localhost stack and
   assert.throws(() => assertFixtureTarget({ ...local, DATABASE_URL: `not a url ${SECRET}` }, []), error => /DATABASE_URL/.test(error.message) && !error.message.includes(SECRET));
 });
 
-// An unencoded "/" in a password ends the authority early, so the parsed hostname is the secret
-// fragment. The refusal must name the variable and nothing the input contained.
 const secretAsHost = `postgresql://${SECRET}/rest@db.example.com/demo`;
 
 test('the fixture target refuses a connection whose parsed host holds a secret fragment without printing it', () => {
@@ -172,7 +161,6 @@ test('local mode is gone: no arguments is refused with the remote command to run
   assert.throws(() => parseNativePrSeedArguments(['--local']), /Usage: native-pr-seed\.mjs --remote/);
   assert.throws(() => parseNativePrSeedArguments(['--remote', '--local']), /Usage: native-pr-seed\.mjs --remote/);
   assert.doesNotThrow(() => parseNativePrSeedArguments(['--remote']));
-  // An empty environment can never reach a step, so this spawn cannot start a seed.
   const result = spawnClean([entryPath], {});
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Local native:seed mode was removed/);
@@ -201,7 +189,6 @@ test('a spawned fixture with production, staging, non-mock SMS or a foreign medi
     const result = spawnFixture(['--railway-pr'], { ...valid, ...patch });
     assert.notEqual(result.status, 0, JSON.stringify(patch));
     assert.match(result.stderr, /Native seed requires/, JSON.stringify(patch));
-    // The refusal must come from the guard, not from a missing generated client or a dependency.
     assert.doesNotMatch(result.stderr, /Cannot find module/, JSON.stringify(patch));
     assertGuardBeforeAnyClient(result.stderr, JSON.stringify(patch));
     assertNoLeak(result.stdout + result.stderr);
@@ -209,8 +196,6 @@ test('a spawned fixture with production, staging, non-mock SMS or a foreign medi
 });
 
 test('a spawned fixture with a malformed DATABASE_URL is refused without printing it', () => {
-  // NATIVE_PR_SEED_REMOTE is the flag the retired local/remote split used to pass to the child. It is
-  // ignored now, and kept here so the path that once threw a raw `Invalid URL` stays covered.
   const env = { ...valid, NATIVE_PR_SEED_REMOTE: 'true', DATABASE_URL: `not a url ${SECRET}` };
   for (const argv of [['--railway-pr'], []]) {
     const result = spawnFixture(argv, env);
@@ -248,7 +233,6 @@ test('every bare import the seed steps load is declared by the db workspace', ()
       if (!declared.has(name)) missing.add(name);
     }
   }
-  // The packaged image does not hoist undeclared packages, so each must be declared where the steps run.
   assert.deepEqual([...missing], []);
 });
 

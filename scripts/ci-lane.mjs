@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Chooses the CI lane for the change between a base commit and HEAD. The
-// docs lane applies to an all-docs diff, or docs hand changes after a green
-// previous PR head. Missing or ambiguous evidence selects the full lane.
-// Usage: node scripts/ci-lane.mjs <base-commit>
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -15,8 +11,6 @@ export function laneFor(paths) {
   return paths.length > 0 && paths.every(isDocsPath) ? "docs" : "full";
 }
 
-// --no-renames lists both sides of a rename, so moving code into docs/ is
-// still a code change.
 export function changedPaths(base, cwd) {
   const output = execFileSync("git", ["diff", "--name-only", "--no-renames", "-z", base, "HEAD"], {
     cwd,
@@ -27,7 +21,6 @@ export function changedPaths(base, cwd) {
 }
 
 export function chooseLane(base, cwd) {
-  // A push that creates a branch reports an all-zero "before" commit.
   if (!base || /^0+$/.test(base)) {
     return { lane: "full", reason: "no base commit" };
   }
@@ -46,8 +39,6 @@ function git(args, cwd) {
 }
 
 function parents(commit, cwd) {
-  // cat-file reads real parents even at a shallow boundary. rev-list/show
-  // otherwise present a shallow commit as a root.
   return git(["cat-file", "-p", commit], cwd).split("\n\n", 1)[0].split("\n")
     .filter(line => line.startsWith("parent ")).map(line => line.slice(7));
 }
@@ -63,8 +54,6 @@ function ancestor(from, to, cwd) {
 function automaticMerge(first, second, cwd) {
   const bases = git(["merge-base", "--all", first, second], cwd).split("\n");
   if (!bases.every(isSha)) throw new Error("missing merge base");
-  // A hidden ancestor could change merge-base or the automatic merge. Stop
-  // only once every still-visible history boundary is behind a merge base.
   const remaining = git(["rev-list", first, second, "--not", ...bases], cwd).split("\n").filter(Boolean);
   for (const commit of remaining) {
     const visible = git(["rev-list", "--parents", "-n", "1", commit], cwd).split(" ").slice(1);
@@ -99,8 +88,6 @@ function handChangedPaths(before, head, main, cwd) {
     } else if (ps.length === 2) {
       ancestor(ps[1], main, cwd);
       const { tree, conflicts } = automaticMerge(ps[0], ps[1], cwd);
-      // Binary conflicts can keep ours in the automatic tree. The conflict
-      // still needed a human decision, even when the final diff is empty.
       for (const path of [...conflicts, ...diffPaths(tree, commit, cwd)]) paths.add(path);
     } else {
       throw new Error("root or octopus merge since previous head");
@@ -111,7 +98,6 @@ function handChangedPaths(before, head, main, cwd) {
   return [...paths];
 }
 
-// This is the only network read. The decision accepts a replacement in tests.
 export async function readPreviousChecks(repository, sha, token = process.env.GITHUB_TOKEN) {
   if (!token) throw new Error("missing workflow token");
   const url = `https://api.github.com/repos/${repository}/commits/${sha}/check-runs?check_name=pr&filter=latest&per_page=100`;
@@ -124,7 +110,6 @@ export async function readPreviousChecks(repository, sha, token = process.env.GI
 }
 
 function previousIsGreen(data, before, number) {
-  // Do not select a convenient success among duplicate or paginated results.
   if (data?.total_count !== 1 || !Array.isArray(data.check_runs) || data.check_runs.length !== 1) return false;
   const check = data.check_runs[0];
   return check?.name === "pr" && check.head_sha === before && check.status === "completed"
@@ -137,7 +122,6 @@ export async function chooseLaneForEvent(base, cwd, {
 } = {}) {
   const existing = chooseLane(base, cwd);
   if (existing.lane === "docs") return existing;
-  // An unreadable original diff must not be rescued by another rule.
   if (!existing.paths) return existing;
   try {
     const pr = event?.pull_request;
@@ -155,13 +139,8 @@ export async function chooseLaneForEvent(base, cwd, {
     if (ps.length !== 2 || !isSha(ps[0]) || ps[1] !== pr.head.sha
       || git(["rev-parse", base], cwd) !== ps[0]) throw new Error("checkout does not match event merge parents");
     let paths;
-    // Start with the depth-2 checkout. Fetch exact event SHAs, never moving
-    // branch tips. Stop as soon as the proof works; at most 255 more levels.
     for (let attempt = 0; ; attempt++) {
       try {
-        // PR base.sha can remain at the old base after main moves. The
-        // synthetic merge's first parent is the main snapshot actually used
-        // by this run. Prove the event base belongs to that history too.
         ancestor(pr.base.sha, ps[0], cwd);
         paths = handChangedPaths(event.before, pr.head.sha, ps[0], cwd);
         break;
@@ -183,7 +162,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let event;
   try {
     if (process.env.GITHUB_EVENT_PATH) event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
-  } catch { /* Missing event evidence keeps the new rule closed. */ }
+  } catch { }
   const { lane, paths, reason } = await chooseLaneForEvent(process.argv[2], undefined, {
     eventName: process.env.GITHUB_EVENT_NAME, event, fetchHistory: true,
   });

@@ -4,7 +4,6 @@ import { pathToFileURL } from 'node:url';
 
 export const origins = Object.freeze(['api-staging-2861.up.railway.app', 'minio-staging-5795.up.railway.app', 't3.storageapi.dev']);
 
-/** Fixed CONNECT seam for consumers; only Railway-owned loopback reverse listeners are dialed. */
 export function createReverseConnector({ ports = [11901, 11902, 11903], connectMs = 6000, idleMs = 30000,
   maxConnections = 32 } = {}) {
   if (ports.length !== 3 || ports.some(p => !Number.isInteger(p) || p < 1 || p > 65535)) throw Error('Invalid reverse listeners');
@@ -41,7 +40,6 @@ export function createReverseConnector({ ports = [11901, 11902, 11903], connectM
   server.headersTimeout = 10000;
   server.requestTimeout = 10000;
   server.maxConnections = maxConnections + 8;
-  // CONNECT sockets are detached from HTTP's closeAllConnections accounting.
   server.stop = () => { for (const peer of peers) peer.destroy(); server.close(); };
   return server;
 }

@@ -1,4 +1,3 @@
-/** Exercise packaged DB commands in the final API image; Docker resources are disposable. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";

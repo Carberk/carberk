@@ -5,8 +5,6 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import test from "node:test";
 
-// Exercise the CLI against the storage HTTP boundary, including SDK XML parsing.
-// This fixture does not establish Railway compatibility; the live probe does.
 async function runProbe(t, fault) {
   const objects = new Map();
   const parts = new Map();
@@ -50,7 +48,7 @@ async function runProbe(t, fault) {
     const chunks = [];
     try {
       for await (const chunk of req) chunks.push(chunk);
-    } catch { interrupted = true; return; } // Never store an incomplete part.
+    } catch { interrupted = true; return; }
     const body = Buffer.concat(chunks);
     if (query.has("partNumber")) {
       parts.set(Number(query.get("partNumber")), body);

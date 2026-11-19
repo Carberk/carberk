@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Railway staging credentials stay on the operator host, never on the VPS.
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -42,7 +41,7 @@ async function main() {
     for (const d of destinations) {
       const c = client(d);
       const entry = { label: d.label, bucket: d.bucket, downloadKey: `${m.prefix}/download.bin`, uploadKey: `${m.prefix}/upload.bin` };
-      m.storage.push(entry); save(m); // Record ownership before writing.
+      m.storage.push(entry); save(m);
       await send(c, new s3.PutObjectCommand({ Bucket: d.bucket, Key: entry.downloadKey, Body: body, ContentType: 'application/octet-stream', CacheControl: 'no-store' }));
       entry.downloadUrl = await getSignedUrl(c, new s3.GetObjectCommand({ Bucket: d.bucket, Key: entry.downloadKey }), { expiresIn: 3600 });
       entry.headUrl = await getSignedUrl(c, new s3.HeadObjectCommand({ Bucket: d.bucket, Key: entry.downloadKey }), { expiresIn: 3600 });
@@ -76,7 +75,6 @@ async function main() {
       console.log(JSON.stringify({ removed: entry.label, objects: 2, absent: true }));
     }
     if (m.api?.token) {
-      // Recover a lost create response using this run's unguessable ownership marker.
       const drafts = await api('/api/v1/me/drafts?limit=20', 'GET', undefined, m.api.token);
       for (const draft of drafts.items.filter(d => (d.id === m.api.draftId || d.payload.locationText === m.prefix))) {
         await api(`/api/v1/listings/drafts/${draft.id}`, 'DELETE', undefined, m.api.token);

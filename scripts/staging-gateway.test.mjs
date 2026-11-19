@@ -319,7 +319,6 @@ test('cancelled queued clients never dial later and release their admission slot
   for (const req of running) req.destroy();
   await Promise.all(peerClosed);
   assert.equal(f.tunnels(), 8);
-  // All cancelled work drains; a fresh client is admitted and reaches the proxy.
   const result = await f.request();
   assert.equal(result.status, 504);
   assert.equal(f.tunnels(), 9);
