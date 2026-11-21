@@ -8,6 +8,9 @@ import { setupServer } from "msw/native";
 export const sentVideoTelemetry: unknown[] = [];
 
 export const server = setupServer(
+  http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({
+    version: 0, vin: null, preflight: null, proposal: null, synthetic: true,
+  })),
   // Video screens report measurements fire-and-forget; every test gets a
   // fake endpoint so they never reach the unhandled-request guard.
   http.post("*/listings/video-telemetry", async ({ request }) => {

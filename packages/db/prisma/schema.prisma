@@ -178,6 +178,7 @@ model VehicleHistoryRequest {
   assignedOperator   User? @relation("HistoryAssignee", fields: [assignedOperatorId], references: [id], onDelete: Restrict)
   assignmentVersion  Int @default(0)
   privateNotes       HistoryPrivateNote[]
+  offer              Json?
 
   waitingReason          String?
   waitingSince           DateTime? @db.Timestamptz(3)

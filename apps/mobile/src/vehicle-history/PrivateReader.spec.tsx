@@ -330,3 +330,107 @@ it.each(["(tabs)", "vehicle-history/requests/index"])("leaves %s navigation alon
   await renderMobile(<RequestScreen />);
   expect(dispatch).not.toHaveBeenCalled();
 });
+
+it.each([
+  ["en", "pdf", "PDF only"], ["ru", "link", "Только ссылка провайдера"], ["tk", "both", "PDF we üpjün edijiniň salgysy"],
+] as const)("shows the persisted %s proposal before any acceptance, preserving the original dates and explicit %s format", async (locale, format, label) => {
+  routeParams.id = requestId;
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry())),
+    http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({ version: 2, vin: "DEMA0000000000001", synthetic: true,
+      preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+      proposal: { format, priceTmt: 100, providerRule: "either_available_both_when_obtainable", terms: "service_failure_review",
+        deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" } })));
+  const view = await renderMobile(<RequestScreen />, { locale });
+  expect(await view.findByText(/VIN: DEMA0000000000001/)).toBeTruthy();
+  expect(view.getByText(new RegExp(label))).toBeTruthy();
+  expect(view.getByText(/2026-10-14/)).toBeTruthy();
+  expect(view.getByText(/100 TMT/)).toBeTruthy();
+  expect(view.queryByRole("button", { name: /accept|pay|оплат|töle/i })).toBeNull();
+});
+it("submits the exact VIN for review through the real client and rereads the cleared proposal", async () => {
+  routeParams.id = requestId;
+  let offer = { version: 0, vin: null as string | null, synthetic: true, preflight: null, proposal: null };
+  let submitted: unknown;
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry())),
+    http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json(offer)),
+    http.post("*/vehicle-history/requests/:id/offer", async ({ request }) => {
+      submitted = await request.json(); offer = { ...offer, version: 1, vin: "DEMA0000000000001" };
+      return HttpResponse.json(offer);
+    }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.changeText(await view.findByLabelText("VIN"), " dema 0000000000001 ");
+  await fireEvent.press(view.getByRole("button", { name: "Send VIN for review" }));
+  await view.findByText("VIN: DEMA0000000000001");
+  expect(submitted).toEqual({ kind: "vin", vin: " dema 0000000000001 ", expectedVersion: 0 });
+  expect(view.getByText("Awaiting an operator availability check.")).toBeTruthy();
+});
+
+it("keeps the saved quote visible during a request refresh and removes it on denial", async () => {
+  routeParams.id = requestId;
+  const pending = deferred<Response>();
+  const started = deferred<undefined>();
+  let holdRefresh = false;
+  server.use(http.get("*/vehicle-history/requests/:id", () => {
+    if (!holdRefresh) return HttpResponse.json(enquiry());
+    started.resolve(undefined);
+    return pending.promise;
+  }), http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({
+    version: 2, vin: "DEMA0000000000001", synthetic: true,
+    preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+    proposal: { format: "pdf", priceTmt: 100, providerRule: "either_available_both_when_obtainable",
+      terms: "service_failure_review", deliveryFrom: "2026-11-21T06:00:00Z", deliveryBy: "2026-11-21T07:00:00Z" },
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Offer preview · 100 TMT");
+  await fireEvent.changeText(view.getByLabelText("VIN"), "DEMA0000000000006");
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Send VIN for review" })).not.toBeDisabled());
+  holdRefresh = true;
+  await act(async () => {
+    void getHost(view.container, "RCTScrollView").props.refreshControl.props.onRefresh();
+    await started.promise;
+  });
+  expect(view.queryByText("Offer preview · 100 TMT")).toBeTruthy();
+  expect(view.getByRole("button", { name: "Send VIN for review" })).toBeDisabled();
+  await act(() => pending.resolve(HttpResponse.json({ code: "FORBIDDEN" }, { status: 403 })));
+  expect(await view.findByText("This request is unavailable for this session. Go back to your requests.")).toBeTruthy();
+  expect(view.queryByText("Offer preview · 100 TMT")).toBeNull();
+});
+
+it.each([
+  ["malformed", "Use 17 Latin letters"], ["unsupported", "This vehicle, product or market"], ["no_history", "No history was found"],
+  ["mismatch", "Vehicle details do not match"], ["outage", "The provider check is temporarily unavailable"],
+])("renders %s separately with recovery and no quote", async (status, copy) => {
+  routeParams.id = requestId;
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry())),
+    http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({ version: 1, vin: "DEMA0000000000001", synthetic: true,
+      preflight: { status }, proposal: null })));
+  const view = await renderMobile(<RequestScreen />);
+  expect(await view.findByText(new RegExp(copy))).toBeTruthy();
+  expect(view.queryByText("Offer preview · 100 TMT")).toBeNull();
+});
+
+it("discards a delayed proposal after the viewer signs out", async () => {
+  routeParams.id = requestId;
+  const response = deferred<null>();
+  let started = false;
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry())),
+    http.get("*/vehicle-history/requests/:id/offer", async () => {
+      started = true; await response.promise;
+      return HttpResponse.json({ version: 1, vin: "DEMA0000000000001", synthetic: true, preflight: null, proposal: null });
+    }));
+  const view = await renderMobile(<RequestScreen />);
+  await vi.waitFor(() => expect(started).toBe(true));
+  await act(() => clearAuthSession());
+  await act(() => response.resolve(null));
+  expect(view.queryByText("VIN: DEMA0000000000001")).toBeNull();
+  expect(view.queryByRole("button", { name: "Send VIN for review" })).toBeNull();
+});
+it("hides failed proposal reads and offers an explicit refresh", async () => {
+  routeParams.id = requestId;
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry())),
+    http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({}, { status: 503 })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Could not update the offer. Refresh its current state before trying again.");
+  expect(view.getByRole("button", { name: "Refresh offer" })).toBeTruthy();
+  expect(view.queryByText("Offer preview · 100 TMT")).toBeNull();
+});

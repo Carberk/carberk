@@ -52,6 +52,7 @@ const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request
     const init = { method: request.method, body: request.method === "POST" ? await request.text() : undefined };
     const url = new URL(input); requests.push({ path: url.pathname + url.search, method: init?.method ?? "GET", body: init?.body });
     if (url.pathname.endsWith("/desk")) return Response.json({ purpose: "vehicle-history", mode: "synthetic", actor, requests: [] });
+    if (url.pathname.endsWith("/offer")) return Response.json({ version: 0, vin: null, preflight: null, proposal: null, synthetic: true });
     if (url.pathname.endsWith("/assignees")) return Response.json({ items: [colleague] });
     if (url.pathname.endsWith("/handover")) {
       handedOver = true;
@@ -2013,4 +2014,82 @@ it("does not publish a late reminder result into another selected request", asyn
   await act(async () => pending.resolve(Response.json({ ...reminder(), used: true, eligible: false, ineligibleReason: "used" })));
   expect(screen.queryByText("The one reminder was already sent.")).toBeNull();
   expect(localStorage.getItem(`carberk.history.reminder.v1:${actor.id}:${id}:1`)).toContain("expectedWaitingVersion");
+});
+
+it.each(["pdf", "link", "both"] as const)("preflights the explicit VIN and proposes %s independently of available providers", async (format) => {
+  assigned = true;
+  window.history.replaceState(null, "", `/vehicle-history/en?selected=${id}&v=1`);
+  let offer: unknown = { version: 0, vin: null, preflight: null, proposal: null, synthetic: true };
+  const mutations: unknown[] = [];
+  server.use(http.all("http://api.test/api/v1/vehicle-history/operator/requests/:id/offer", async ({ request }) => {
+    if (request.method === "POST") {
+      const body = await request.json() as { kind: string; format: string; vin: string; deliveryFrom: string; deliveryBy: string };
+      mutations.push(body);
+      offer = body.kind === "check" ? { version: 1, vin: "DEMA0000000000001", synthetic: true, proposal: null,
+        preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] } }
+        : { version: 2, vin: "DEMA0000000000001", synthetic: true,
+          preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+          proposal: { format: body.format, deliveryFrom: body.deliveryFrom, deliveryBy: body.deliveryBy, priceTmt: 100,
+            providerRule: "either_available_both_when_obtainable", terms: "service_failure_review" } };
+    }
+    return Response.json(offer);
+  }));
+  render(view());
+  fireEvent.change(await screen.findByLabelText("VIN"), { target: { value: "DEMA0000000000001" } });
+  fireEvent.click(await enabledButton("Check synthetic availability"));
+  await screen.findByText("History available in the synthetic fixture");
+  expect((screen.getByLabelText("Delivery format") as HTMLSelectElement).value).toBe("");
+  fireEvent.change(screen.getByLabelText("Delivery format"), { target: { value: format } });
+  fireEvent.change(screen.getByLabelText("Delivery from (Ashgabat time)"), { target: { value: "2026-11-21T11:00" } });
+  fireEvent.change(screen.getByLabelText("Delivery by (Ashgabat time)"), { target: { value: "2026-11-21T12:00" } });
+  fireEvent.click(await enabledButton("Propose 100 TMT offer"));
+  await screen.findByText("Offer preview · 100 TMT");
+  expect(screen.getByText("2026-10-14")).toBeTruthy();
+  expect(mutations).toEqual([{ kind: "check", vin: "DEMA0000000000001", expectedVersion: 0, expectedAssignmentVersion: 1 },
+    { kind: "propose", format, expectedVersion: 1, expectedAssignmentVersion: 1,
+      deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" }]);
+  expect(screen.queryByRole("button", { name: /accept|pay/i })).toBeNull();
+});
+
+it("keeps the quote and date editors when the proposed delivery window is refused", async () => {
+  assigned = true;
+  window.history.replaceState(null, "", `/vehicle-history/en?selected=${id}&v=1`);
+  server.use(http.all("http://api.test/api/v1/vehicle-history/operator/requests/:id/offer", ({ request }) => {
+    if (request.method === "POST") return Response.json({ code: "HISTORY_OFFER_INVALID" }, { status: 400 });
+    return Response.json({ version: 2, vin: "DEMA0000000000001", synthetic: true,
+      preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+      proposal: { format: "pdf", priceTmt: 100, providerRule: "either_available_both_when_obtainable",
+        terms: "service_failure_review", deliveryFrom: "2026-11-21T06:00:00Z", deliveryBy: "2026-11-21T07:00:00Z" },
+    });
+  }));
+  render(view());
+  await screen.findByText("Delivery format: PDF only");
+  fireEvent.change(screen.getByLabelText("Delivery format"), { target: { value: "both" } });
+  const fromLabel = "Delivery from (Ashgabat time)";
+  const byLabel = "Delivery by (Ashgabat time)";
+  fireEvent.change(screen.getByLabelText(fromLabel), { target: { value: "2026-11-21T08:00" } });
+  fireEvent.change(screen.getByLabelText(byLabel), { target: { value: "2026-11-21T08:30" } });
+  fireEvent.click(await enabledButton("Propose 100 TMT offer"));
+  expect((await screen.findByRole("alert")).textContent).toMatch(/today or tomorrow.*09:00–20:00/);
+  expect(screen.getByText("Delivery format: PDF only")).toBeTruthy();
+  expect(screen.getByLabelText<HTMLInputElement>(fromLabel).value).toBe("2026-11-21T08:00");
+  expect(screen.getByLabelText<HTMLInputElement>(byLabel).disabled).toBe(false);
+});
+
+it("discards a proposal when the current session changes during its HTTP read", async () => {
+  assigned = true;
+  window.history.replaceState(null, "", `/vehicle-history/en?selected=${id}&v=1`);
+  let release!: () => void;
+  const response = new Promise<void>((resolve) => { release = resolve; });
+  let started = false;
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/:id/offer", async () => {
+    started = true; await response;
+    return Response.json({ version: 1, vin: "DEMA0000000000001", synthetic: true, preflight: null, proposal: null });
+  }));
+  render(view());
+  await waitFor(() => expect(started).toBe(true));
+  platform.token = token(colleague.id);
+  await act(async () => { release(); });
+  await screen.findByRole("link", { name: "Sign in again" });
+  expect(screen.queryByText("VIN: DEMA0000000000001")).toBeNull();
 });
