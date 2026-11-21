@@ -9,6 +9,7 @@ import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
 import { act, fireEvent, renderMobile, routeParams } from "../../test/render";
 import { server } from "../../test/msw";
+import { queryKeys } from "../api/queryKeys";
 import { clearAuthSession, storeAuthSession } from "../auth/session";
 
 import { proofDevice } from "./application/testing/paymentProofDevice";
@@ -20,6 +21,8 @@ vi.mock("react-native-safe-area-context", async () => ({
 
 const userId = "00000000-0000-4000-8000-000000000001";
 const id = "10000000-0000-4000-8000-000000000101";
+const enquiry = { id, sourceListingId: null, createdAt: "2026-11-21T04:00:00.000Z", status: "enquiry", assignmentVersion: 1, assignedOperator: null };
+const metadataQuery = { queryKey: queryKeys.vehicleHistory.detail(userId, "session-one", id), exact: true };
 const quote: H.AcceptHistoryQuote["offer"] = { version: 2, vin: "DEMA0000000000001", synthetic: true,
   preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
   proposal: { format: "both", priceTmt: 100, providerRule: "either_available_both_when_obtainable", terms: "service_failure_review",
@@ -58,8 +61,7 @@ beforeEach(async () => {
     http.put("*/vehicle-history/requests/:id/payment-proofs/:fileId/content", () => { proofStatus = "uploaded"; return HttpResponse.json(proof()); }),
     http.post("*/vehicle-history/requests/:id/payment-proofs/:fileId/submit", () => { proofStatus = "submitted"; return HttpResponse.json(proof(), { status: 201 }); }),
     http.get("*/vehicle-history/requests/:id/payment-proofs/:fileId/content", () => HttpResponse.json({ file: proof(), dataBase64: "c3ludGhldGlj" })),
-    http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ id, sourceListingId: null,
-      createdAt: "2026-11-21T04:00:00.000Z", status: "enquiry", assignmentVersion: 1, assignedOperator: null })),
+    http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry)),
     http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get("*/vehicle-history/requests/:id/receipts", () => HttpResponse.json({ items: [] })),
     http.get("*/vehicle-history/requests/:id/reminder", () => HttpResponse.json({ reason: null, since: null, version: 0,
@@ -201,4 +203,82 @@ it("shows submitted receipts and allows another selection when the retained loca
   await reopened.findByText("Receipt submitted");
   expect(reopened.getByRole("button", { name: "Choose receipt" })).toBeTruthy();
   expect(reopened.queryByLabelText("Selected receipt preview")).toBeNull();
+});
+
+it("keeps the receipt preview open during request refresh and closes it on access denial", async () => {
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Choose receipt" }));
+  await fireEvent.press(await view.findByRole("button", { name: "Selected receipt preview" }));
+  await view.findByRole("button", { name: "Close receipt" });
+
+  const metadata = Promise.withResolvers<Response>();
+  server.use(http.get("*/vehicle-history/requests/:id", () => metadata.promise));
+  try {
+    await act(async () => { void view.queryClient.refetchQueries(metadataQuery); });
+    await vi.waitFor(() => expect(view.getByRole("button", { name: "Details" })).toBeDisabled());
+    expect(view.getByRole("button", { name: "Close receipt" })).toBeTruthy();
+  } finally { await act(() => metadata.resolve(HttpResponse.json(enquiry))); }
+  expect(view.getByRole("button", { name: "Close receipt" })).toBeTruthy();
+
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ code: "HISTORY_REQUEST_DENIED" }, { status: 403 })));
+  await act(() => view.queryClient.refetchQueries(metadataQuery));
+  await vi.waitFor(() => expect(view.queryByRole("button", { name: "Close receipt" })).toBeNull());
+  expect(view.queryByLabelText("Selected receipt preview")).toBeNull();
+});
+
+it("keeps the receipt preview open when offer readback finishes during request refresh", async () => {
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Choose receipt" }));
+  await fireEvent.press(await view.findByRole("button", { name: "Selected receipt preview" }));
+  await view.findByRole("button", { name: "Close receipt" });
+
+  const metadata = Promise.withResolvers<Response>();
+  const offerRead = Promise.withResolvers<Response>();
+  const offerQuery = { queryKey: [...metadataQuery.queryKey, "offer", enquiry.assignmentVersion], exact: true };
+  server.use(http.get("*/vehicle-history/requests/:id", () => metadata.promise),
+    http.get("*/vehicle-history/requests/:id/offer", () => offerRead.promise));
+  let refreshOffer: Promise<void> | undefined;
+  try {
+    await act(async () => { refreshOffer = view.queryClient.refetchQueries(offerQuery); });
+    await vi.waitFor(() => expect(view.queryClient.isFetching(offerQuery)).toBe(1));
+    await act(async () => { void view.queryClient.refetchQueries(metadataQuery); });
+    await vi.waitFor(() => expect(view.getByRole("button", { name: "Details" })).toBeDisabled());
+    await act(async () => { offerRead.resolve(HttpResponse.json(quote)); await refreshOffer; });
+    expect(view.queryClient.getQueryState(offerQuery.queryKey)?.status).toBe("success");
+    expect(view.getByRole("button", { name: "Close receipt" })).toBeTruthy();
+  } finally {
+    await act(() => offerRead.resolve(HttpResponse.json(quote)));
+    await act(() => metadata.resolve(HttpResponse.json(enquiry)));
+  }
+});
+
+it("finishes one upload and submission while request refresh is still pending", async () => {
+  const upload = Promise.withResolvers<undefined>();
+  let submissions = 0;
+  server.use(
+    http.put("*/vehicle-history/requests/:id/payment-proofs/:fileId/content", async () => {
+      await upload.promise; proofStatus = "uploaded"; return HttpResponse.json(proof());
+    }),
+    http.post("*/vehicle-history/requests/:id/payment-proofs/:fileId/submit", () => {
+      submissions++; proofStatus = "submitted"; return HttpResponse.json(proof(), { status: 201 });
+    }),
+  );
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Choose receipt" }));
+  const send = await view.findByRole("button", { name: "Send receipt" });
+  await act(async () => { void fireEvent.press(send); });
+  await view.findByRole("progressbar", { value: { min: 0, max: 100, now: 50 } });
+
+  const metadata = Promise.withResolvers<Response>();
+  server.use(http.get("*/vehicle-history/requests/:id", () => metadata.promise));
+  try {
+    await act(async () => { void view.queryClient.refetchQueries(metadataQuery); });
+    await vi.waitFor(() => expect(view.queryClient.isFetching(metadataQuery)).toBe(1));
+    await act(() => upload.resolve(undefined));
+    await view.findByText("Receipt submitted");
+    expect(submissions).toBe(1);
+  } finally {
+    await act(() => upload.resolve(undefined));
+    await act(() => metadata.resolve(HttpResponse.json(enquiry)));
+  }
 });
