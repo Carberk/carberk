@@ -4,13 +4,16 @@ import { useContext, useEffect, useReducer, useState, useCallback, useMemo, useR
 import { BackHandler } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ListingsSchemas, type WizardSchemas } from "@auto-tm/contracts";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useListingVideoTasks } from "../../src/listings/video/ListingVideoTasks";
 import { ApiError } from "../../src/api/client";
+import { isUncertainWrite } from "../../src/api/uncertainWrite";
 import { useCreateDraft } from "../../src/api/listings/useCreateDraft";
 import { useDiscardDraft } from "../../src/api/listings/useDiscardDraft";
 import { useMyContactPhones } from "../../src/api/listings/useMyContactPhones";
 import { useMyDrafts } from "../../src/api/listings/useMyDrafts";
+import { myListingsQueryOptions } from "../../src/api/listings/useInfiniteMyListings";
 import { usePublishDraft } from "../../src/api/listings/usePublishDraft";
 import { useBrands } from "../../src/api/catalog/useBrands";
 import { useModels } from "../../src/api/catalog/useModels";
@@ -94,6 +97,7 @@ function withinCloseWait<T>(work: Promise<T>, onTimeout: T): Promise<T> {
 
 export default function SellScreen() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   // `phone` follows the live auth session, so signing in from this tab's own
   // sign-in sheet preselects the Contact step's account phone (ADR-0081).
   const { isAuthenticated, phone: accountPhone } = useAuth();
@@ -114,6 +118,8 @@ export default function SellScreen() {
   const [publishPhoneError, setPublishPhoneError] = useState(false);
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [isInspecting, setIsInspecting] = useState(false);
+  const inspectingRef = useRef(false);
   const closingRef = useRef(false);
   const publishingRef = useRef(false);
   // The draft that tapping New listing created in this session. Only that draft is
@@ -158,6 +164,8 @@ export default function SellScreen() {
 
   const createDraft = useCreateDraft();
   const publishDraft = usePublishDraft();
+  const publishUncertain = machineState.publishError === "uncertain" ||
+    (publishDraft.variables === machineState.draftId && publishDraft.isError && isUncertainWrite(publishDraft.error));
   const videoTasks = useListingVideoTasks();
   const discardDraft = useDiscardDraft();
 
@@ -232,9 +240,9 @@ export default function SellScreen() {
   // Autosave when payload changes. Not before the queue holds this draft's photos:
   // a save built from the queue until then would write the draft without them.
   useEffect(() => {
-    if (!queueReady || machineState.status !== "step") return;
+    if (publishUncertain || !queueReady || machineState.status !== "step") return;
     save(fullPayload);
-  }, [fullPayload, machineState.draftId, machineState.status, queueReady, save]);
+  }, [fullPayload, machineState.draftId, machineState.status, queueReady, publishUncertain, save]);
 
   const handleCreateNewDraft = useCallback(() => {
     if (!isAuthenticated) {
@@ -336,6 +344,7 @@ export default function SellScreen() {
   }, [params.confirmedContactPhone]);
 
   const handleBack = useCallback(() => {
+    if (publishUncertain) return;
     dispatch({ type: "BACK" });
     // Force save on navigation, with the step it moves to: the payload in hand
     // still names the step being left.
@@ -346,10 +355,10 @@ export default function SellScreen() {
       validatedSteps: moved.validatedSteps,
     };
     void forceSave(fullPayload);
-  }, [machineState, photosToSave, forceSave]);
+  }, [machineState, photosToSave, forceSave, publishUncertain]);
 
   const handleContinue = useCallback(() => {
-    if (discardDraft.isPending || publishDraft.isPending) return;
+    if (publishUncertain || discardDraft.isPending || publishDraft.isPending) return;
     // The Contact step's Continue stays tappable so its selection error can
     // appear (same pattern as the specs step): a number whose 7-day window
     // ended, or no number at all, must be confirmed or changed first. A
@@ -392,9 +401,20 @@ export default function SellScreen() {
       validatedSteps: moved.validatedSteps,
     };
     void forceSave(fullPayload);
-  }, [ctx.canContinue, ctx.editDetourActive, machineState, photosToSave, forceSave, discardDraft.isPending, publishDraft.isPending, accountPhone, contactPhonesData, publishPhoneError]);
+  }, [ctx.canContinue, ctx.editDetourActive, machineState, photosToSave, forceSave, discardDraft.isPending, publishDraft.isPending, accountPhone, contactPhonesData, publishPhoneError, publishUncertain]);
 
   const handlePublish = useCallback(async () => {
+    if (publishUncertain) {
+      if (inspectingRef.current) return;
+      inspectingRef.current = true;
+      setIsInspecting(true);
+      try {
+        await queryClient.fetchInfiniteQuery({ ...myListingsQueryOptions(), staleTime: 0, retry: false, networkMode: "always" });
+        router.push("/listings/manage");
+      } catch { return; }
+      finally { inspectingRef.current = false; setIsInspecting(false); }
+      return;
+    }
     // One publish at a time: a second tap lands before the button re-renders disabled.
     if (!machineState.draftId || publishingRef.current) return;
     publishingRef.current = true;
@@ -445,7 +465,7 @@ export default function SellScreen() {
     } finally {
       publishingRef.current = false;
     }
-  }, [machineState, photosToSave, flush, publishDraft, videoTasks, show, t]);
+  }, [machineState, photosToSave, flush, publishDraft, videoTasks, show, t, publishUncertain, queryClient]);
 
   const closeWizard = useCallback(() => {
     newDraftIdRef.current = null;
@@ -463,6 +483,11 @@ export default function SellScreen() {
       const id = machineState.draftId;
       if (!id || closingRef.current) return;
       if (machineState.status !== "step" && machineState.status !== "publishError") return;
+      if (publishUncertain) {
+        discardPending();
+        closeWizard();
+        return;
+      }
 
       const payload: WizardSchemas.WizardDraftPayload = {
         ...machineState.payload,
@@ -517,6 +542,7 @@ export default function SellScreen() {
       machineState.status,
       machineState.payload,
       machineState.validatedSteps,
+      publishUncertain,
       uploadQueue.photos,
       photosToSave,
       saveStatus,
@@ -547,12 +573,12 @@ export default function SellScreen() {
         setUnsavedDialogOpen(false);
         return true;
       }
-      if (ctx.canGoBack) handleBack();
+      if (ctx.canGoBack && !publishUncertain) handleBack();
       else void handleClose();
       return true;
     });
     return () => subscription.remove();
-  }, [backIsWizards, ctx.canGoBack, isClosing, unsavedDialogOpen, handleBack, handleClose]);
+  }, [backIsWizards, ctx.canGoBack, isClosing, unsavedDialogOpen, handleBack, handleClose, publishUncertain]);
 
   const handlePayloadChange = useCallback(
     (updates: Partial<WizardSchemas.WizardDraftPayload>) => {
@@ -630,26 +656,26 @@ export default function SellScreen() {
           (ctx.canContinue || currentStep === "specs" || currentStep === "contact") &&
           !discardDraft.isPending && !publishDraft.isPending
         }
-        canPublish={ctx.canPublish && queueReady && uploadQueue.publishGate.canPublish}
-        canGoBack={ctx.canGoBack}
+        canPublish={!isInspecting && (publishUncertain || (ctx.canPublish && queueReady && uploadQueue.publishGate.canPublish))}
+        publishLabel={isInspecting ? t("loading") : publishUncertain ? t("myListings") : undefined}
+        canGoBack={ctx.canGoBack && !publishUncertain}
         isLastStep={ctx.isLastStep}
-        saveStatus={saveStatus}
-        saveError={saveError}
+        saveStatus={publishUncertain ? "idle" : saveStatus}
+        saveError={publishUncertain ? null : saveError}
         onRetrySave={retrySave}
         progressPercent={ctx.progressPercent}
         disabledReason={disabledReason}
         publishBlockers={publishBlockers}
         isPublishing={machineState.status === "publishing"}
         publishError={
-          machineState.status === "publishError"
+          publishUncertain ? t("publishResultUncertain") : machineState.status === "publishError"
             ? publishFailureMessage(t, machineState.publishError, machineState.payload.priceCurrency)
             : null
         }
         uploadStatus={uploadStatus}
-        onUploadStatusPress={() =>
-          // From Check the chip opens Photos as a change, so Done comes back.
-          dispatch({ type: ctx.isLastStep ? "CHANGE_FROM_REVIEW" : "GO_TO_STEP", step: "photos" })
-        }
+        onUploadStatusPress={() => {
+          if (!publishUncertain) dispatch({ type: ctx.isLastStep ? "CHANGE_FROM_REVIEW" : "GO_TO_STEP", step: "photos" });
+        }}
       >
         {currentStep === "photos" && (
           <Step2Photos
@@ -725,10 +751,11 @@ export default function SellScreen() {
         )}
         {currentStep === "review" && (
           <CheckAndPublish
+            readOnly={publishUncertain}
             videoTarget={machineState.draftId ? { type: "draft", id: machineState.draftId } : undefined}
             payload={machineState.payload}
             validatedSteps={machineState.validatedSteps}
-            onChangeStep={(step) => dispatch({ type: "CHANGE_FROM_REVIEW", step })}
+            onChangeStep={(step) => { if (!publishUncertain) dispatch({ type: "CHANGE_FROM_REVIEW", step }); }}
             photos={uploadQueue.photos}
             photosReady={queueReady}
           />

@@ -77,8 +77,9 @@ export function CodeEntryForm({
     __DEV__ ? initialTestCode : undefined,
   );
   const [secondsRemaining, setSecondsRemaining] = useState(initialResendSeconds);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ action: "verify" | "resend"; cause: unknown } | null>(null);
   const [terminalError, setTerminalError] = useState(false);
+  const [verificationUncertain, setVerificationUncertain] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(false);
@@ -87,7 +88,7 @@ export function CodeEntryForm({
   // A focus call lands only once the cells are editable again; focusing the
   // disabled input after a wrong code is a silent no-op on Android (#781).
   const refocusWhenEnabled = useRef(false);
-  const cellsDisabled = isVerifying || isResending || terminalError || dailyLimit;
+  const cellsDisabled = isVerifying || isResending || terminalError || dailyLimit || verificationUncertain;
 
   useEffect(() => {
     if (refocusWhenEnabled.current && !cellsDisabled) {
@@ -134,9 +135,10 @@ export function CodeEntryForm({
       lastSubmittedCode.current = null;
 
       const copy = getVerifyCodeErrorCopy(verifyError, t, method);
-      setError(copy.message);
+      setError({ action: "verify", cause: verifyError });
       setTerminalError(copy.terminal);
-      if (!copy.terminal) {
+      setVerificationUncertain(copy.uncertain === true);
+      if (!copy.terminal && !copy.uncertain) {
         refocusWhenEnabled.current = true;
       }
     } finally {
@@ -170,10 +172,11 @@ export function CodeEntryForm({
       setSecondsRemaining(result.resendInSeconds);
       setHasResent(true);
       setTestCode(__DEV__ ? result.testCode : undefined);
+      setVerificationUncertain(false);
       refocusWhenEnabled.current = true;
     } catch (resendError) {
       const copy = getResendCodeErrorCopy(resendError, t);
-      setError(copy.message);
+      setError({ action: "resend", cause: resendError });
       setDailyLimit(copy.dailyLimit);
     } finally {
       setIsResending(false);
@@ -184,6 +187,10 @@ export function CodeEntryForm({
     method === "email" &&
     !dailyLimit &&
     (hasResent || secondsRemaining === 0);
+
+  const errorMessage = error === null ? null : error.action === "verify"
+    ? getVerifyCodeErrorCopy(error.cause, t, method).message
+    : getResendCodeErrorCopy(error.cause, t).message;
 
   return (
     <View className="gap-6">
@@ -224,7 +231,7 @@ export function CodeEntryForm({
             accessibilityLiveRegion="polite"
             className="flex-1 text-callout leading-snug text-destructive"
           >
-            {error}
+            {errorMessage}
           </Text>
         </View>
       ) : null}

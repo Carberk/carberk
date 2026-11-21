@@ -1,6 +1,7 @@
 import { RateLimitReason, RateLimitedDetailsSchema } from "@auto-tm/contracts";
 
-import type { ApiError } from "../api/client";
+import { ApiError } from "../api/client";
+import { isUncertainWrite } from "../api/uncertainWrite";
 
 type Translate = (key: string) => string;
 
@@ -19,16 +20,21 @@ export function isDailyCodeLimit(error: ApiError): boolean {
   );
 }
 
+export function getRequestOtpErrorKey(
+  error: unknown,
+  invalidKey: "phoneFormatError" | "emailFormatError",
+) {
+  if (!(error instanceof ApiError) || isUncertainWrite(error)) return "codeRequestUncertain";
+  if (error.code === "VALIDATION_FAILED") return invalidKey;
+  if (isDailyCodeLimit(error)) return "dailyCodeLimit";
+  if (error.code === "RATE_LIMITED" || error.status === 429) return "rateLimitedCode";
+  return "requestFailed";
+}
+
 export function getRequestOtpErrorCopy(
-  error: ApiError,
+  error: unknown,
   t: Translate,
   invalidKey: "phoneFormatError" | "emailFormatError",
 ): string {
-  if (error.code === "VALIDATION_FAILED") return t(invalidKey);
-  if (error.code === "NETWORK_ERROR" || error.status === 0) return t("offline");
-  if (isDailyCodeLimit(error)) return t("dailyCodeLimit");
-  if (error.code === "RATE_LIMITED" || error.status === 429) {
-    return t("rateLimitedCode");
-  }
-  return t("requestFailed");
+  return t(getRequestOtpErrorKey(error, invalidKey));
 }

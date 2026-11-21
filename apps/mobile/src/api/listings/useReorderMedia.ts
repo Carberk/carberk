@@ -8,6 +8,8 @@ export function useReorderMedia(listingId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    retry: false,
+    networkMode: "always",
     mutationFn: (input: ListingsSchemas.ReorderMediaRequest) =>
       apiClient.put(
         `/listings/${listingId}/media/order`,

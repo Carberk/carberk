@@ -41,6 +41,7 @@ export interface CheckAndPublishProps {
    * says nothing about the draft, so Check does not claim there are none.
    */
   photosReady?: boolean;
+  readOnly?: boolean;
 }
 
 /** "Brand Model, year", as the Listing card titles it. Also heads an edit's steps. */
@@ -187,11 +188,13 @@ function SectionRow({
   summary,
   needsSeller,
   onPress,
+  disabled = false,
 }: {
   title: string;
   summary: string;
   needsSeller: boolean;
   onPress: () => void;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const action = needsSeller ? t("checkFillIn") : t("checkChange");
@@ -201,10 +204,12 @@ function SectionRow({
   return (
     <Pressable
       testID="check-section"
-      accessibilityRole="button"
-      accessibilityLabel={join([title, summary, action], ", ")}
+      accessibilityRole={disabled ? undefined : "button"}
+      accessibilityState={{ disabled }}
+      accessibilityLabel={join([title, summary, disabled ? "" : action], ", ")}
       className="min-h-14 flex-row items-center gap-3 border-b border-border py-3 active:opacity-70"
       onPress={onPress}
+      disabled={disabled}
     >
       <View className="min-w-0 flex-1 gap-0.5">
         <Text className="text-body text-foreground">{title}</Text>
@@ -212,7 +217,7 @@ function SectionRow({
           <Text className="text-callout text-muted-foreground" numberOfLines={2}>{summary}</Text>
         ) : null}
       </View>
-      {needsSeller ? (
+      {disabled ? null : needsSeller ? (
         <Text key="fill-in" className="text-callout font-medium text-destructive">{action}</Text>
       ) : (
         <Text key="change" className="text-callout font-medium text-link">{action}</Text>
@@ -316,6 +321,7 @@ export default function CheckAndPublish({
   photos: queuePhotos,
   photosReady = true,
   videoTarget,
+  readOnly = false,
 }: CheckAndPublishProps) {
   const { t, i18n } = useTranslation();
   const photos = photosReady ? queuePhotos : NO_PHOTOS;
@@ -332,6 +338,7 @@ export default function CheckAndPublish({
       <View className="border-t border-border">
         {DATA_STEPS.map((step) => (
           <SectionRow
+            disabled={readOnly}
             key={step}
             title={t(`wizardSteps.${step}`)}
             summary={summaries[step]}

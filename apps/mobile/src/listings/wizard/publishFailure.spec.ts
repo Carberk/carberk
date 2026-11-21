@@ -13,9 +13,9 @@ function translator(locale: string) {
 }
 
 describe("publishFailureOf (#588)", () => {
-  it("is offline for a request that never reached the server", () => {
-    expect(publishFailureOf(new ApiError("NETWORK_ERROR", 0, "Network request failed"))).toBe("offline");
-    expect(publishFailureOf(new ApiError("NETWORK_ERROR", 0, "Request timed out"))).toBe("offline");
+  it("cannot infer rollback from a network failure or timeout", () => {
+    expect(publishFailureOf(new ApiError("NETWORK_ERROR", 0, "Network request failed"))).toBe("uncertain");
+    expect(publishFailureOf(new ApiError("NETWORK_ERROR", 0, "Request timed out"))).toBe("uncertain");
   });
 
   it("is rateMissing when the server has no exchange rate for the draft's currency", () => {
@@ -35,10 +35,10 @@ describe("publishFailureOf (#588)", () => {
   });
 
   it("is server for every other refusal or error", () => {
-    expect(publishFailureOf(new ApiError("INTERNAL_ERROR", 500))).toBe("server");
+    expect(publishFailureOf(new ApiError("INTERNAL_ERROR", 500))).toBe("uncertain");
     expect(publishFailureOf(new ApiError("INVALID_DRAFT_PAYLOAD", 400, "Draft is missing required fields"))).toBe("server");
-    expect(publishFailureOf(new Error("boom"))).toBe("server");
-    expect(publishFailureOf(undefined)).toBe("server");
+    expect(publishFailureOf(new Error("boom"))).toBe("uncertain");
+    expect(publishFailureOf(undefined)).toBe("uncertain");
   });
 });
 

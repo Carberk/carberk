@@ -4,12 +4,11 @@ import { BackHandler, type TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from "react-native-reanimated";
 
-import { ApiError } from "../../src/api/client";
 import { useRequestOtp } from "../../src/api/identity/useRequestOtp";
 import { closeAuth } from "../../src/auth/closeAuth";
 import { normalizeEmail } from "../../src/auth/email";
 import { useAuthIntentStore } from "../../src/auth/intentStore";
-import { getRequestOtpErrorCopy } from "../../src/auth/requestOtpError";
+import { getRequestOtpErrorKey } from "../../src/auth/requestOtpError";
 import { registerSignInEntryReturn } from "../../src/auth/signInEntryReturn";
 import { usePhoneField } from "../../src/auth/usePhoneField";
 
@@ -37,7 +36,7 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
   const phone = usePhoneField(t, firstParam(params.phone));
   const [email, setEmail] = useState(firstParam(params.email) ?? "");
   const [emailTouched, setEmailTouched] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
+  const [requestErrors, setRequestErrors] = useState<Partial<Record<SignInMethod, ReturnType<typeof getRequestOtpErrorKey>>>>({});
   const canonicalEmail = useMemo(() => normalizeEmail(email), [email]);
   const { mutateAsync: requestOtp, isPending: isSubmitting } = useRequestOtp();
   const input = useRef<TextInput>(null);
@@ -98,18 +97,25 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
 
   const isPhone = method === "phone";
   const destination = isPhone ? phone.canonicalPhone : canonicalEmail;
-  const showError = isPhone ? phone.showError : emailTouched && canonicalEmail === null || emailError !== null;
-  const emailShowError = emailTouched && canonicalEmail === null || emailError !== null;
-  const phoneHelper = phone.helperText === t("phoneInputHelper") ? t("phoneHelper") : phone.helperText;
-  const emailHelper = emailError ?? (emailShowError ? t("emailFormatError") : t("emailHelper"));
+  const { phone: phoneError, email: emailError } = requestErrors;
+  const phoneShowError = phone.showError || phoneError !== undefined;
+  const emailShowError = (emailTouched && canonicalEmail === null) || emailError !== undefined;
+  const showError = isPhone ? phoneShowError : emailShowError;
+  const phoneHelper = phoneError ? t(phoneError)
+    : phone.helperText === t("phoneInputHelper") ? t("phoneHelper") : phone.helperText;
+  const emailHelper = emailError ? t(emailError) : t(emailShowError ? "emailFormatError" : "emailHelper");
   const previousIsPhone = previousMethod === "phone";
-  const previousError = previousIsPhone ? phone.showError : emailShowError;
+  const previousError = previousIsPhone ? phoneShowError : emailShowError;
   const previousValue = previousIsPhone ? phone.display : email;
+
+  function setRequestError(key?: ReturnType<typeof getRequestOtpErrorKey>) {
+    setRequestErrors((current) => ({ ...current, [method]: key }));
+  }
 
   async function submit() {
     if (isPhone) phone.touch(); else setEmailTouched(true);
     if (!destination || isSubmitting) return;
-    if (isPhone) phone.setRequestError(null); else setEmailError(null);
+    setRequestError();
     try {
       const result = await requestOtp(isPhone ? { phone: destination } : { email: destination });
       router.push({
@@ -123,10 +129,7 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
         },
       });
     } catch (error) {
-      const copy = error instanceof ApiError
-        ? getRequestOtpErrorCopy(error, t, isPhone ? "phoneFormatError" : "emailFormatError")
-        : t("offline");
-      if (isPhone) phone.setRequestError(copy); else setEmailError(copy);
+      setRequestError(getRequestOtpErrorKey(error, isPhone ? "phoneFormatError" : "emailFormatError"));
     }
   }
 
@@ -162,15 +165,16 @@ export function SignInEntryScreen({ initialMethod }: { initialMethod: SignInMeth
             value={isPhone ? phone.display : email}
             onBlur={() => { if (isPhone) phone.touch(); else setEmailTouched(true); }}
             onChangeText={(value) => {
+              setRequestError();
               if (isPhone) phone.onChangeText(value);
-              else { setEmail(value); setEmailError(null); }
+              else setEmail(value);
             }}
             onSubmitEditing={() => void submit()}
             placeholder={t(isPhone ? "phonePlaceholder" : "emailPlaceholder")}
           />
         </View>
         <SignInMethodContent method={method}
-          phone={<Text className={phone.showError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{phoneHelper}</Text>}
+          phone={<Text className={phoneShowError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{phoneHelper}</Text>}
           email={<Text className={emailShowError ? "text-callout leading-snug text-destructive" : "text-callout leading-snug text-muted-foreground"}>{emailHelper}</Text>}
         />
       </Animated.View>
