@@ -132,15 +132,19 @@ export async function historyHandoverAction(locale: DeskLocale, value: unknown):
     method: "POST", cache: "no-store", headers: { "Accept-Language": locale },
     body: { targetOperatorId: input.data.targetOperatorId, expectedAssignmentVersion: input.data.expectedAssignmentVersion },
   }); } catch (error) { unstable_rethrow(error); failure = error; }
-  let after: Scope | null = null;
-  try { after = await currentScope(locale); } catch (error) { unstable_rethrow(error); return { status: "unavailable", scope: before.scope }; }
+  if (response === null) return { status: "expired" };
+  if (failure instanceof ApiError && failure.status === 403) return { status: "denied", scope: before.scope };
+  if (failure instanceof ApiError && failure.status === 409) return { status: "conflict", scope: before.scope };
+  let after: Scope | null;
+  try { after = await currentScope(locale); }
+  catch (error) {
+    unstable_rethrow(error);
+    return { status: error instanceof ApiError && error.status === 403 ? "denied" : "unavailable", scope: before.scope };
+  }
   if (!after) return { status: "expired" };
   if (after.scope !== before.scope || after.actor.id !== before.actor.id) return { status: "stale", scope: after.scope };
-  if (failure instanceof ApiError && failure.status === 403) return { status: "denied", scope: after.scope };
-  if (failure instanceof ApiError && failure.status === 409) return { status: "conflict", scope: after.scope };
   if (failure instanceof ApiError && failure.status === 400) return { status: "validation", scope: after.scope };
   if (failure) return { status: "unavailable", scope: after.scope };
-  if (response === null) return { status: "expired", scope: after.scope };
   const data = V.HandoverHistoryResponseSchema.safeParse(response);
   if (!data.success || data.data.id !== input.data.id || data.data.assignmentVersion !== input.data.expectedAssignmentVersion + 1 ||
     data.data.assignedOperator.id !== input.data.targetOperatorId) return { status: "unavailable", scope: after.scope };

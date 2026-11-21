@@ -171,6 +171,25 @@ it.each([
   expect(screen.queryByRole("textbox", { name: "Internal note" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Confirm handover" })).toBeNull();
 });
+it.each([201, 403, 503])("removes the protected reader if desk access is revoked during handover (HTTP %s)", async (status) => {
+  selectAssigned();
+  server.use(http.post(`http://api.test/api/v1/vehicle-history/operator/requests/${id}/handover`, () => {
+    server.use(http.get("http://api.test/api/v1/vehicle-history/desk",
+      () => Response.json({ code: "HISTORY_OPERATOR_DENIED" }, { status: 403 })));
+    return Response.json(status === 201 ? { id, assignmentVersion: 2, assignedOperator: colleague } : {}, { status });
+  }));
+  render(view());
+  await screen.findByText("Can you check this car?");
+  expect(screen.getByRole("textbox", { name: "Internal note" })).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "Hand over" }));
+  fireEvent.change(await screen.findByRole("combobox", { name: "New operator" }), { target: { value: colleague.id } });
+  fireEvent.click(screen.getByRole("button", { name: "Confirm handover" }));
+  await screen.findByText("Access denied");
+  expect(screen.queryByText("Can you check this car?")).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Reply to customer" })).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Internal note" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Confirm handover" })).toBeNull();
+});
 it("shows a recoverable candidate-load error and a truthful empty handover state", async () => {
   selectAssigned();
   server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/assignees",
