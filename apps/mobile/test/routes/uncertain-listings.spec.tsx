@@ -129,16 +129,16 @@ it("keeps changed fields in the editor after a lost save and opens the same auth
   expect(edits).toBe(1);
 });
 
-it("closes an uncertain publication on system Back without writing the potentially consumed draft", async () => {
-  let publicationSent = false;
+it("closes and reopens an uncertain publication without writing the potentially consumed draft", async () => {
+  let publications = 0;
   const postPublicationDraftWrites: unknown[] = [];
   server.use(
     http.post("*/listings/drafts/:id/publish", () => {
-      publicationSent = true;
+      publications++;
       return HttpResponse.error();
     }),
     http.patch("*/listings/drafts/:id", async ({ request }) => {
-      if (publicationSent) postPublicationDraftWrites.push(await request.json());
+      if (publications > 0) postPublicationDraftWrites.push(await request.json());
       return HttpResponse.json({ id, userId: id, payload, createdAt: "2026-11-01T00:00:00Z", updatedAt: "2026-11-01T00:00:00Z" });
     }),
   );
@@ -152,5 +152,10 @@ it("closes an uncertain publication on system Back without writing the potential
   expect(screen.getByText("Sell")).toBeTruthy();
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.queryByText("Saved to Drafts")).toBeNull();
+
+  await fireEvent.press(await screen.findByRole("button", { name: "Continue" }));
+  await screen.findByText("Publication was not confirmed. The listing may be in My listings. Check before publishing again.");
+  expect(screen.queryByRole("button", { name: "Publish" })).toBeNull();
+  expect(publications).toBe(1);
   expect(postPublicationDraftWrites).toEqual([]);
 });
