@@ -4,6 +4,9 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_OFFER_INVALID: "Check the VIN, format and delivery window. Use today or tomorrow, 09:00–20:00 Ashgabat time.",
+    HISTORY_OFFER_CONFLICT: "The offer changed. Refresh it before trying again.",
+    HISTORY_OFFER_UNAVAILABLE: "Offers are temporarily unavailable. Reopen the enquiry and retry.",
     HISTORY_NOTE_INVALID: "Check the private note and page details. Text must contain 1–4,000 characters.",
     HISTORY_NOTE_CURSOR: "This private-note page is unavailable. Reopen the enquiry.",
     HISTORY_NOTE_CONFLICT: "This note attempt already saved different text. Reopen the enquiry before trying again.",
@@ -22,6 +25,9 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_OFFER_INVALID: "Проверьте VIN, формат и срок. Выберите сегодня или завтра, 09:00–20:00 по Ашхабаду.",
+    HISTORY_OFFER_CONFLICT: "Предложение изменилось. Обновите его перед повторной попыткой.",
+    HISTORY_OFFER_UNAVAILABLE: "Предложения временно недоступны. Откройте обращение заново и повторите попытку.",
     HISTORY_NOTE_INVALID: "Проверьте заметку и параметры страницы. Текст должен содержать от 1 до 4 000 символов.",
     HISTORY_NOTE_CURSOR: "Эта страница личных заметок недоступна. Откройте обращение заново.",
     HISTORY_NOTE_CONFLICT: "Эта попытка уже сохранила другой текст заметки. Откройте обращение перед повтором.",
@@ -40,6 +46,9 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_OFFER_INVALID: "VIN-i, görnüşi we möhleti barlaň. Şu güni ýa-da ertiri, Aşgabat wagty bilen 09:00–20:00 aralygyny saýlaň.",
+    HISTORY_OFFER_CONFLICT: "Teklip üýtgedi. Gaýtadan synanyşmazdan öň ony täzeläň.",
+    HISTORY_OFFER_UNAVAILABLE: "Teklipler wagtlaýyn elýeterli däl. Ýüz tutmany täzeden açyp synanyşyň.",
     HISTORY_NOTE_INVALID: "Şahsy belligi we sahypanyň maglumatlaryny barlaň. Tekst 1–4 000 nyşandan ybarat bolmaly.",
     HISTORY_NOTE_CURSOR: "Şahsy bellikleriň bu sahypasy elýeterli däl. Ýüz tutmany täzeden açyň.",
     HISTORY_NOTE_CONFLICT: "Bu bellik synanyşygy başga teksti eýýäm saklady. Gaýtadan synanyşmazdan öň ýüz tutmany açyň.",
@@ -94,13 +103,22 @@ export class HistoryRemindersExceptionFilter extends HistoryRequestExceptionFilt
   }
 }
 
+@Catch()
+export class HistoryOffersExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    const unavailable = error instanceof HistoryRequestError && error.code === "HISTORY_MESSAGE_UNAVAILABLE";
+    super.catch(!unavailable && (error instanceof HistoryRequestError || error instanceof HttpException)
+      ? error : new HistoryRequestError("HISTORY_OFFER_UNAVAILABLE"), host);
+  }
+}
+
 export function historyRequestFailure(error: unknown, language: string | undefined) {
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
-    : code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
-      : code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
+  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
+    : code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
+      : code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
         || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
 }

@@ -60,3 +60,5 @@ History staff controls at `/vehicle-history/{locale}/staff` use the existing wor
 - [Identity implementation](../api/src/modules/identity/CONTEXT.md)
 
 Listing moderation pages show current video status, a private cover and duration. Play/Retry alone calls the authenticated playback control; HLS.js (native HLS fallback) plays grant URLs without exposing API tokens. Closing, leaving or hiding the page releases playback. Listing report summaries show video presence and link to the Listing page. The API rechecks current elevated Admin permission for each media request, including on banned/archived Listings.
+
+The selected History context includes a VIN preflight and quote preview. Its [offer action](src/app/vehicle-history/[locale]/offer-actions.ts) reuses the selected-request authority bridge before and after HTTP; the panel stays mounted through the existing contextual Listing viewer. Explicit format/window choices create only a synthetic proposal.

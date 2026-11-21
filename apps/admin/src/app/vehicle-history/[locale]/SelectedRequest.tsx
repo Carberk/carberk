@@ -10,6 +10,7 @@ import { ReminderControl } from "./ReminderControl";
 import { ReplyComposer } from "./ReplyComposer";
 import { useOperatorConversation } from "./useOperatorConversation";
 import { SourceListing } from "./SourceListing";
+import { OfferPanel } from "./OfferPanel";
 import { HandoverControl } from "./HandoverControl";
 
 
@@ -222,6 +223,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
       {state !== "loading" && <p className="break-all text-sm">{detail ? detail.sourceListingId ?? t.noSource : state === "unclaimed" ? t.claimContext : t.contextUnavailable}</p>}
       {detail?.sourceListingId && <p className="mt-3 text-sm text-muted-foreground">{t.sourceBody}</p>}
       {state === "ready" && detail?.sourceListingId && <Button ref={sourceControl} type="button" size="lg" variant="secondary" className="mt-4 max-w-full whitespace-normal" onClick={() => { remember(); listing(true); }}>{t.viewListing}</Button>}
+      {state === "ready" && <OfferPanel key={`${scope}:${actor.id}:${id}:${version}`} locale={locale} id={id} version={version} scope={scope} actorId={actor.id} revision={revision} invalidate={invalidate} />}
       {state === "ready" && <PrivateNotesPanel locale={locale} id={id} version={version} scope={scope} actorId={actor.id}
         revision={revision} invalidate={invalidate} />}
     </aside>

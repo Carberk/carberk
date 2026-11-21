@@ -1388,7 +1388,7 @@ it("retries a response-lost commit with the same ID and original exact text, the
   await vi.waitFor(() => expect(sends).toHaveLength(2));
   expect(sends).toEqual([sends[0], sends[0]]);
   expect(sends[0]?.text).toBe("  VIN?\nÝ / Ж  ");
-  expect(view.getByDisplayValue("")).toBeTruthy();
+  expect(view.getByLabelText("Your message").props.value).toBe("");
   expect(view.getAllByText("  VIN?\nÝ / Ж  ")).toHaveLength(1);
   expect(view.getByText("Sent")).toBeTruthy();
 });
@@ -1628,7 +1628,7 @@ it("reconciles a lost response from fetched pages without leaving the original t
   await act(() => onlineManager.setOnline(false));
   await act(() => onlineManager.setOnline(true));
   await view.findByText("Sent");
-  expect(view.getByDisplayValue("")).toBeTruthy();
+  expect(view.getByLabelText("Your message").props.value).toBe("");
   expect(view.queryByRole("button", { name: /Retry message:/ })).toBeNull();
   expect(view.getAllByText("Committed despite response loss")).toHaveLength(1);
 });

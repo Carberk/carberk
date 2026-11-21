@@ -3,6 +3,10 @@ import {
   OpenApiGeneratorV3,
 } from "@asteasolutions/zod-to-openapi";
 
+import {
+  HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
+  ReadHistoryOfferSchema, ReadOperatorHistoryOfferSchema,
+} from "./schemas/history-offer";
 import { DateTimeSchema, z } from "./zod";
 import { RoutingPolicySchema } from "./schemas/routing-policy";
 import {
@@ -459,6 +463,20 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
   // Reports fake-door schemas
   registry.register("HistoryDesk", HistoryDeskSchema);
   registry.register("HistoryRequest", HistoryRequestSchema);
+  registry.register("HistoryOffer", HistoryOfferSchema);
+  for (const operator of [false, true]) for (const method of ["get", "post"] as const) registry.registerPath({
+    method, path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/offer`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: method === "get" ? "Read the current synthetic VIN and offer preview" : operator ? "Check fixture availability or propose an offer preview" : "Submit a VIN for operator review",
+    request: { params: z.object({ id: z.string().guid() }),
+      query: operator && method === "get" ? ReadOperatorHistoryOfferSchema : ReadHistoryOfferSchema,
+      ...(method === "post" ? { body: { content: { "application/json": { schema: operator ? HistoryOperatorOfferMutationSchema : HistoryOfferMutationSchema } } } } : {}),
+    },
+    responses: { [method === "get" ? 200 : 201]: { description: "Current request-bound preview; no acceptance, booking or payment",
+      content: { "application/json": { schema: HistoryOfferSchema } } },
+      400: { description: "Invalid offer input" }, 403: { description: "Current request authority required" },
+      409: { description: "Offer or assignment changed; refresh" }, 503: { description: "Temporarily unavailable" } },
+  });
   registry.register("HistoryReminder", HistoryReminderSchema);
   registry.registerPath({
     method: "post", path: "/api/v1/vehicle-history/operator/requests/{id}/reminder",

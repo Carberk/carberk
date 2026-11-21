@@ -1,3 +1,5 @@
+import { HistoryOfferSchemas as O } from "@auto-tm/contracts";
+import type { HistoryOfferStore } from "../domain/HistoryOffer";
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
 import type { HistoryAssignmentRepository, HistoryQueueQuery, HistoryQueueItem, HistoryMessageRequest, HistoryWaitingStore, HistoryMessageAuthority, HistoryHandoverAuthority } from "../domain/HistoryAssignmentRepository";
@@ -45,7 +47,7 @@ export class HistoryMessageLocks {
     this.pool.on("error", () => { /* A lost idle connection holds no request fence. */ });
   }
   async withRequest<T>(id: string, authority: HistoryMessageAuthority,
-    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore) => Promise<T>): Promise<T> {
+    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore) => Promise<T>): Promise<T> {
     return this.withRequestTransaction(id, authority, async (client, request) => {
       let active = true;
       const assertActive = () => { if (!active) throw new Error("History waiting lock has ended"); };
@@ -83,7 +85,19 @@ export class HistoryMessageLocks {
           await client.query(`UPDATE vehicle_history_requests SET ${columns.join(", ")} WHERE id = $1`, [id, ...Object.values(data)]);
         },
       };
-      try { return await operation(request, waiting); }
+      const offer: HistoryOfferStore = {
+        read: async () => {
+          assertActive();
+          const { rows } = await client.query<{ offer: unknown }>("SELECT offer FROM vehicle_history_requests WHERE id = $1", [id]);
+          if (!rows[0]) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
+          return O.HistoryOfferSchema.parse(rows[0].offer ?? { version: 0, vin: null, preflight: null, proposal: null, synthetic: true });
+        },
+        save: async (value) => {
+          assertActive();
+          await client.query("UPDATE vehicle_history_requests SET offer = $2::jsonb WHERE id = $1", [id, JSON.stringify(O.HistoryOfferSchema.parse(value))]);
+        },
+      };
+      try { return await operation(request, waiting, offer); }
       finally { active = false; }
     });
   }
@@ -130,7 +144,7 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
     @Inject(HistoryMessageLocks) private readonly messageLocks: HistoryMessageLocks) {}
 
   withMessageLock<T>(id: string, authority: HistoryMessageAuthority,
-    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore) => Promise<T>): Promise<T> {
+    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore) => Promise<T>): Promise<T> {
     return this.messageLocks.withRequest<T>(id, authority, operation);
   }
 

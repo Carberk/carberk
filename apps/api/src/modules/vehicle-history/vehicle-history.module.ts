@@ -1,3 +1,7 @@
+import { HistoryOffersController } from "./presentation/HistoryOffersController";
+import { HistoryOffers } from "./application/HistoryOffers";
+import { HISTORY_PREFLIGHT } from "./domain/HistoryOffer";
+import { SyntheticHistoryPreflight } from "./infrastructure/SyntheticHistoryPreflight";
 import { Inject, Module, type MiddlewareConsumer, type NestModule } from "@nestjs/common";
 import type { ServerResponse } from "node:http";
 import { HttpAdapterHost } from "@nestjs/core";
@@ -54,8 +58,8 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
-  controllers: [VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
-  providers: [AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
+  controllers: [HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
+  providers: [HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
     AddHistoryPrivateNote, ReadHistoryPrivateNotes, HistoryPrivateNoteProjection,
     { provide: HISTORY_PRIVATE_NOTE_REPOSITORY, useClass: PrismaHistoryPrivateNoteRepository },
     SyncHistoryWaiting, ChangeHistoryWaiting, ReadHistoryReminder, StopHistoryReminders, SendHistoryReminder, HistoryReminderProjection,
@@ -74,19 +78,20 @@ export class VehicleHistoryModule implements NestModule {
     fastify.addHook("onRoute", (route) => {
       const message = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(messages|receipts)$/.test(route.url);
       const reminder = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/reminder(?:\/stop)?$/.test(route.url);
+      const offer = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/offer$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
-      if (!message && !reminder && !note && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
+      if (!message && !reminder && !note && !offer && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
       route.errorHandler = (error, request, reply) => {
         const response = historyRequestFailure(new HistoryRequestError(error.statusCode && error.statusCode < 500
-          ? reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
-          : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
+          ? offer ? "HISTORY_OFFER_INVALID" : reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
+          : offer ? "HISTORY_OFFER_UNAVAILABLE" : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
         void reply.header("Cache-Control", "private, no-store").status(response.statusCode).send(response);
       };
     });
     // Runs before JSON parsing, so malformed payloads are private as well.
     consumer.apply((_request: unknown, response: ServerResponse, next: () => void) => {
       response.setHeader("Cache-Control", "private, no-store"); next();
-    }).forRoutes(HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController);
+    }).forRoutes(HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController, HistoryOffersController);
   }
 }

@@ -25,4 +25,6 @@ The [server lifecycle port](vehicle-history.public.ts) uses current authority an
 readback, permanent requester Stop and one manual operator reminder after 24 hours.
 It reconciles without participant fetch/ACK effects and preserves the original
 once outcome across retries. Actual controls remain #1222 and connected completion
-#1178; quote consumers remain separate. No automatic reminder or outbound action.
+#1178; VIN/offer preview consumers use a separate request-bound state. No automatic reminder or outbound action.
+
+[Offer HTTP](presentation/HistoryOffersController.ts) stores VIN review and explicit-format proposal previews on the existing request/Identity transaction. The provider port admits only fixed synthetic VIN fixtures, without egress. Rechecking VIN clears a proposal; version conflicts require readback. Customer and Admin consumers expose original dates and proposed terms without acceptance, booking or payment.
