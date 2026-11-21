@@ -20,8 +20,6 @@ export class PostgresMessageAuthorityFence implements MessageAuthorityFencePort 
     try {
       await client.query("BEGIN");
       await client.query("SET LOCAL lock_timeout = '5s'");
-      // Same User -> Session -> Grant order as identity's grant management.
-      // SHARE blocks revocation/lifecycle writes but permits message FK checks.
       const users = recipientId ? [userId, recipientId] : [userId];
       await client.query("SELECT id FROM users WHERE id = ANY($1::text[]) ORDER BY id FOR SHARE", [users]);
       await client.query('SELECT id FROM sessions WHERE id = $1 AND "userId" = $2 FOR SHARE', [sessionId, userId]);
