@@ -39,7 +39,6 @@
   {"file": "src/api/listings/useMarkSold.spec.tsx","rules": ["source-text-assertion"]},
   {"file": "src/api/listings/useMyFavorites.spec.tsx","rules": ["own-api-mock"]},
   {"file": "src/api/listings/useMyListingCounts.spec.tsx","rules": ["own-api-mock"]},
-  {"file": "src/api/listings/usePublishDraft.spec.tsx","rules": ["own-api-mock"]},
   {"file": "src/api/listings/useUnfavoriteListing.spec.tsx","rules": ["own-api-mock","source-text-assertion"]},
   {"file": "src/api/notifications/usePushTokens.spec.tsx","rules": ["own-api-mock"]},
   {"file": "src/api/notifications/useRegisterPushToken.spec.tsx","rules": ["own-api-mock","source-text-assertion"]},
