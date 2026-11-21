@@ -1,3 +1,4 @@
+import type { HistoryOrderStore } from "../domain/HistoryOrder";
 import type { HistoryOfferStore } from "../domain/HistoryOffer";
 import { Inject, Injectable } from "@nestjs/common";
 import { ServiceMessagesSchemas } from "@auto-tm/contracts";
@@ -15,7 +16,7 @@ export class HistoryMessageAccess {
     @Inject(CurrentHistoryOperator) private readonly operator: CurrentHistoryOperator,
     @Inject(HISTORY_ASSIGNMENT_REPOSITORY) private readonly assignments: HistoryAssignmentRepository,
   ) {}
-  async run<T>(actor: HistoryMessageActor, id: string, operation: (requesterId: string, senderId: string, objectId: string, participant: ServiceParticipant, waiting: HistoryWaitingStore, offer: HistoryOfferStore) => Promise<T>) {
+  async run<T>(actor: HistoryMessageActor, id: string, operation: (requesterId: string, senderId: string, objectId: string, participant: ServiceParticipant, waiting: HistoryWaitingStore, offer: HistoryOfferStore, orders: HistoryOrderStore) => Promise<T>) {
     const authorize = async () => actor.operator ? (await this.operator.require(actor.claims)).id
       : (await this.requester.require(actor.claims)).requesterId;
     const userId = await authorize();
@@ -24,7 +25,7 @@ export class HistoryMessageAccess {
     try {
       return await this.assignments.withMessageLock(key.data, {
         userId, sessionId: actor.claims.sid ?? "", purpose: actor.operator ? "vehicle-history" : null,
-      }, async (request, waiting, offer) => {
+      }, async (request, waiting, offer, orders) => {
         // Authority is current after any DB wait, before intent/cursor lookup.
         const senderId = await authorize();
         if (!request || (actor.operator ? request.assignedOperatorId !== senderId : request.requesterId !== senderId)) {
@@ -34,7 +35,7 @@ export class HistoryMessageAccess {
           throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
         }
         const result = await operation(request.requesterId, senderId, request.id, { participantId: senderId,
-          sessionId: actor.claims.sid ?? "", assignmentVersion: actor.operator ? request.assignmentVersion : 0 }, waiting, offer);
+          sessionId: actor.claims.sid ?? "", assignmentVersion: actor.operator ? request.assignmentVersion : 0 }, waiting, offer, orders);
         // Row fences prevent revocation writes; elapsed Session/TOTP deadlines
         // still require current authority after messaging waits, before commit.
         await authorize();

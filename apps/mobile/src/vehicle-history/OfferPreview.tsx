@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
 import { focusManager, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { VehicleHistorySchemas as V } from "@auto-tm/contracts";
+import { HistoryOrderSchemas as H, type VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
 import { historyTranscript } from "../api/vehicle-history/messages";
 import { queryKeys } from "../api/queryKeys";
@@ -14,12 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, active, connected }: {
-  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; active: boolean; connected: boolean;
+export function OfferPreview({ viewer, request, ready, active, connected, reconcileOrder }: {
+  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; active: boolean; connected: boolean; reconcileOrder: () => Promise<unknown>;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
   const [vin, setVin] = useState(""), [saving, setSaving] = useState(false), [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [orderFailure, setOrderFailure] = useState<string | null>(null);
   const mounted = useRef(true), busy = useRef(false), generation = useRef(0);
   const latest = useRef({ ready, active, connected });
   if (latest.current.active && !active || latest.current.ready && !ready) generation.current++;
@@ -31,10 +33,38 @@ export function OfferPreview({ viewer, request, ready, active, connected }: {
   const current = () => mounted.current && latest.current.ready && latest.current.active && latest.current.connected && historySessionCurrent(viewer)
     && AppState.currentState === "active" && focusManager.isFocused();
   const state = useQuery({ queryKey: [...queryKeys.vehicleHistory.detail(viewer.userId, viewer.sessionId, request.id), "offer", request.assignmentVersion],
-    queryFn: () => { const attempt = generation.current; return stream.offer(() => current() && attempt === generation.current); },
+    queryFn: () => { const attempt = generation.current;
+      const owns = () => current() && attempt === generation.current;
+      return Promise.all([stream.offer(owns), stream.order(owns)]).then(([offer, order]) => ({ offer, order })); },
     enabled: ready && active && connected, retry: false, staleTime: 0, networkMode: "always",
     refetchOnWindowFocus: false, refetchOnReconnect: false });
-  const data = state.data;
+  const refresh = state.refetch;
+  const orderState = state.data?.order;
+  const accepted = orderState?.order;
+  const data = accepted?.acceptedOffer ?? state.data?.offer;
+  useEffect(() => {
+    if (!active || !ready || !connected || !accepted || orderState.status !== "awaiting_synthetic_payment") return;
+    const remaining = new Date(accepted.holdExpiresAt).getTime() - new Date(orderState.serverNow).getTime();
+    const timer = setTimeout(() => { void refresh(); }, Math.max(0, remaining));
+    return () => clearTimeout(timer);
+  }, [active, ready, connected, accepted, orderState, refresh]);
+  async function accept() {
+    if (!data || !current() || busy.current || state.isFetching || state.error || accepted || vin.trim()) return;
+    const parsed = H.AcceptHistoryQuoteSchema.safeParse({ offer: data });
+    if (!parsed.success) return;
+    busy.current = true; setSaving(true); setOrderFailure(null);
+    const attempt = generation.current;
+    const owns = () => current() && attempt === generation.current;
+    try {
+      await stream.acceptQuote(parsed.data.offer, owns);
+      if (owns()) { await state.refetch(); if (owns()) await reconcileOrder(); }
+    } catch (error) {
+      if (!owns()) return;
+      setOrderFailure(error instanceof ApiError && error.code === "HISTORY_ORDER_CAPACITY" ? "orderFull"
+        : error instanceof ApiError && ["HISTORY_ORDER_STALE", "HISTORY_ORDER_CONFLICT"].includes(error.code) ? "orderStale" : "orderError");
+      await state.refetch(); if (owns()) await reconcileOrder();
+    } finally { busy.current = false; if (mounted.current) setSaving(false); }
+  }
   async function send() {
     if (!data || !current() || !vin.trim() || busy.current || state.isFetching || state.error) return;
     busy.current = true; setSaving(true); setFailed(false);
@@ -54,35 +84,49 @@ export function OfferPreview({ viewer, request, ready, active, connected }: {
   const denied = state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const error = failed || !!state.error;
   const proposal = data?.proposal;
-  const canEdit = ready && connected && !saving;
+  const canEdit = ready && active && connected && !saving && !accepted;
   return <View className="gap-3 rounded-2xl border border-border p-4">
-    <Text accessibilityRole="header" className="text-headline font-semibold">{copy("title")}</Text>
+    <Text accessibilityRole="header" className="text-headline font-semibold">{accepted ? copy(orderState?.status === "hold_expired" ? "orderExpired" : "orderWaiting") : copy("title")}</Text>
     <Text className="text-footnote text-muted-foreground">{copy("synthetic")}</Text>
     {!active || (!ready && !data) ? null : state.isPending && !error ? <ActivityIndicator accessibilityLabel={copy("loading")} />
       : error ? <View className="gap-3"><Text accessibilityRole="alert">{copy(denied ? "denied" : "error")}</Text>
-        <Button variant="secondary" disabled={!ready || !connected || state.isFetching} onPress={() => { setFailed(false); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
+        <Button variant="secondary" disabled={!ready || !connected || state.isFetching} onPress={() => { setFailed(false); setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
         : data && <>
           <Text accessibilityLiveRegion="polite">{copy(data.preflight?.status ?? (data.vin ? "unchecked" : "empty"))}</Text>
           {data.vin && <Text selectable className="text-body font-mono">VIN: {data.vin}</Text>}
-          {data.preflight?.status === "available" && <>
+          {data.preflight?.status === "available" && (!accepted || expanded) && <>
             <Text className="text-callout">{copy("rule")}</Text>
             {data.preflight.providers.map((provider) => <Text key={provider.name} className="text-callout">{provider.name} · {copy("date")}: {provider.originalReportDate ?? copy("unknown")}</Text>)}
             <Text className="text-footnote text-muted-foreground">{copy("limits")}</Text>
           </>}
           {proposal && <View className="gap-3 border-y border-border py-4">
-            <Text accessibilityRole="header" className="text-headline font-semibold">{copy("preview")}</Text>
+            <Text accessibilityRole="header" className="text-headline font-semibold">{copy(accepted ? "orderSummary" : "preview")}</Text>
             <Text>{copy("format")}: {copy(proposal.format)}</Text>
             <Text>{copy("window")}: {timestamp(proposal.deliveryFrom)} – {timestamp(proposal.deliveryBy)}</Text>
-            {proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
-            <Text className="text-callout">{copy("rights")}</Text><Text className="text-callout">{copy("terms")}</Text>
-            <Text className="text-footnote text-muted-foreground">{copy("next")}</Text>
+            {(!accepted || expanded) && proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
+            {(!accepted || expanded) && <><Text className="text-callout">{copy("rights")}</Text><Text className="text-callout">{copy("terms")}</Text></>}
+            {accepted ? <>
+              <Text>{copy("orderAccepted")}: {timestamp(accepted.acceptedAt)}</Text>
+              <Text>{copy("orderHold")}: {timestamp(accepted.holdExpiresAt)}</Text>
+              <Text accessibilityLiveRegion="polite">{copy(orderState?.status === "hold_expired" ? "orderExpiredNext" : "orderNext")}</Text>
+              {orderState?.wallet && ready && active && connected && !state.isFetching && <Text selectable className="font-mono text-callout">{orderState.wallet}</Text>}
+              <Button variant="secondary" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)}><Text>{copy(expanded ? "orderHideDetails" : "orderDetails")}</Text></Button>
+            </> : <>
+              <Text className="text-footnote text-muted-foreground">{copy("orderBefore")}</Text>
+              <Button disabled={!canEdit || state.isFetching || !!vin.trim() || !!orderFailure} accessibilityState={{ busy: saving }} onPress={() => { void accept(); }}>
+                <Text>{copy(saving ? "orderPending" : "orderConfirm")}</Text>
+              </Button>
+            </>}
+            {orderFailure && !accepted && <View className="gap-3"><Text accessibilityRole="alert">{copy(orderFailure)}</Text>
+              <Button variant="secondary" disabled={!ready || !active || !connected || state.isFetching} onPress={() => { setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button>
+            </View>}
           </View>}
-          <Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
+          {!accepted && <><Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
           <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={setVin} maxLength={80}
             autoCapitalize="characters" autoCorrect={false} editable={canEdit} />
           <Button variant="secondary" disabled={!vin.trim() || !canEdit || state.isFetching} accessibilityState={{ busy: saving }} onPress={() => { void send(); }}>
             <Text>{copy(saving ? "pending" : "sendVin")}</Text>
-          </Button>
+          </Button></>}
         </>}
   </View>;
 }

@@ -1,3 +1,5 @@
+import { historyOrderStore } from "./historyOrderStore";
+import type { HistoryOrderStore } from "../domain/HistoryOrder";
 import { HistoryOfferSchemas as O } from "@auto-tm/contracts";
 import type { HistoryOfferStore } from "../domain/HistoryOffer";
 import { Inject, Injectable } from "@nestjs/common";
@@ -47,7 +49,7 @@ export class HistoryMessageLocks {
     this.pool.on("error", () => { /* A lost idle connection holds no request fence. */ });
   }
   async withRequest<T>(id: string, authority: HistoryMessageAuthority,
-    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore) => Promise<T>): Promise<T> {
+    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore, orders: HistoryOrderStore) => Promise<T>): Promise<T> {
     return this.withRequestTransaction(id, authority, async (client, request) => {
       let active = true;
       const assertActive = () => { if (!active) throw new Error("History waiting lock has ended"); };
@@ -97,7 +99,7 @@ export class HistoryMessageLocks {
           await client.query("UPDATE vehicle_history_requests SET offer = $2::jsonb WHERE id = $1", [id, JSON.stringify(O.HistoryOfferSchema.parse(value))]);
         },
       };
-      try { return await operation(request, waiting, offer); }
+      try { return await operation(request, waiting, offer, historyOrderStore(client, id, assertActive)); }
       finally { active = false; }
     });
   }
@@ -144,7 +146,7 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
     @Inject(HistoryMessageLocks) private readonly messageLocks: HistoryMessageLocks) {}
 
   withMessageLock<T>(id: string, authority: HistoryMessageAuthority,
-    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore) => Promise<T>): Promise<T> {
+    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore, orders: HistoryOrderStore) => Promise<T>): Promise<T> {
     return this.messageLocks.withRequest<T>(id, authority, operation);
   }
 

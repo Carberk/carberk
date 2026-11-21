@@ -1,3 +1,4 @@
+import type { HistoryOrderStore } from "./HistoryOrder";
 import type { HistoryOfferStore } from "./HistoryOffer";
 import type { HistoryRequest } from "./HistoryRequestRepository";
 import type { HistoryWaitingFacts } from "./HistoryWaiting";
@@ -25,7 +26,7 @@ export interface HistoryAssignmentRepository {
   /** Retain request and public Identity fences through the same-connection commit.
    * The callback must revalidate authority after both lock waits. */
   withMessageLock<T>(id: string, authority: HistoryMessageAuthority,
-    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore) => Promise<T>): Promise<T>;
+    operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore, orders: HistoryOrderStore) => Promise<T>): Promise<T>;
   list(operatorId: string, query: HistoryQueueQuery): Promise<{ items: HistoryQueueItem[]; nextCursor: string | null; anchor: HistoryQueueItem | null }>;
   confirmQueue(operatorId: string, query: HistoryQueueQuery, items: HistoryQueueItem[]): Promise<void>;
   /** The database arbitrates competing claims; no prior read grants a write. */

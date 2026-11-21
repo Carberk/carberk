@@ -3,6 +3,7 @@ import {
   OpenApiGeneratorV3,
 } from "@asteasolutions/zod-to-openapi";
 
+import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema } from "./schemas/history-order";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
   ReadHistoryOfferSchema, ReadOperatorHistoryOfferSchema,
@@ -476,6 +477,18 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       content: { "application/json": { schema: HistoryOfferSchema } } },
       400: { description: "Invalid offer input" }, 403: { description: "Current request authority required" },
       409: { description: "Offer or assignment changed; refresh" }, 503: { description: "Temporarily unavailable" } },
+  });
+  registry.register("HistoryOrderState", HistoryOrderStateSchema);
+  for (const [operator, method] of [[false, "get"], [false, "post"], [true, "get"]] as const) registry.registerPath({
+    method, path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/order`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: method === "get" ? "Read the immutable accepted order and current synthetic hold" : "Explicitly accept the exact displayed quote and reserve a two-hour synthetic hold",
+    request: { params: z.object({ id: z.string().guid() }), query: operator ? ReadOperatorHistoryOfferSchema : ReadHistoryOfferSchema,
+      ...(method === "post" ? { body: { content: { "application/json": { schema: AcceptHistoryQuoteSchema } } } } : {}) },
+    responses: { [method === "get" ? 200 : 201]: { description: "Private synthetic state; collection is disabled",
+      content: { "application/json": { schema: HistoryOrderStateSchema } } },
+      400: { description: "Complete explicit quote acceptance required" }, 403: { description: "Current request and assignment authority required" },
+      409: { description: "Quote stale, capacity full or order already accepted; refresh" }, 503: { description: "Synthetic instructions unavailable" } },
   });
   registry.register("HistoryReminder", HistoryReminderSchema);
   registry.registerPath({

@@ -344,8 +344,8 @@ it.each([
   expect(await view.findByText(/VIN: DEMA0000000000001/)).toBeTruthy();
   expect(view.getByText(new RegExp(label))).toBeTruthy();
   expect(view.getByText(/2026-10-14/)).toBeTruthy();
-  expect(view.getByText(/100 TMT/)).toBeTruthy();
-  expect(view.queryByRole("button", { name: /accept|pay|оплат|töle/i })).toBeNull();
+  expect(view.getAllByText(/100 TMT/).length).toBeGreaterThan(0);
+  expect(view.queryByText(/SYNTHETIC-/)).toBeNull();
 });
 it("submits the exact VIN for review through the real client and rereads the cleared proposal", async () => {
   routeParams.id = requestId;

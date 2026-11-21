@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, Keyboard, KeyboardAvoidingView, RefreshControl, View, type ViewToken } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, Keyboard, Platform, RefreshControl, View, type ViewToken } from "react-native";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import * as Linking from "expo-linking";
@@ -12,6 +12,7 @@ import { localeTag } from "../i18n/resources";
 import { mapErrorToCopy } from "../api/getErrorCopy";
 
 import { historySessionCurrent, type HistoryViewer } from "./session";
+import { OrderStatus } from "./OrderStatus";
 import { OfferPreview } from "./OfferPreview";
 import { StopReminders } from "./StopReminders";
 import { useHistoryReply } from "./useHistoryReply";
@@ -66,6 +67,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const [openFailure, setOpenFailure] = useState<string | null>(null);
   const [pendingLink, setPendingLink] = useState<{ key: string; action: "open" | "copy" } | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
   const linkAttempt = useRef(0);
   const linkReader = useRef({ mounted: true, ready: false });
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
@@ -94,6 +96,11 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       list.current?.scrollToOffset({ offset: saved.offset, animated: false });
     });
   };
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   useEffect(() => {
     if (!thread.active && browserPosition.current) browserPosition.current.away = true;
     else restoreBrowserPosition();
@@ -186,7 +193,9 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     title={pages.error instanceof ApiError && pages.error.status === 409 ? t("vehicleHistory.threadChanged") : undefined} />;
   else if (thread.messages.length === 0) notice = <Text className="text-body text-muted-foreground">{t("vehicleHistory.emptyEnquiry")}</Text>;
 
-  return <KeyboardAvoidingView behavior="padding" className="flex-1">
+  return <View className="flex-1">
+    {!denied && thread.active && thread.order.data?.order && !thread.order.error && <OrderStatus state={thread.order.data}
+      compact={keyboardVisible} ready={metadataCurrent && thread.connected} onDetails={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />}
     <FlatList
     ref={list}
     className="flex-1" contentContainerClassName="gap-3 px-5 pb-8 pt-3"
@@ -201,7 +210,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
       {header}
-      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected} />}
+      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
       {!thread.connected && <Text accessibilityRole="alert">{t("vehicleHistory.offline")}</Text>}
@@ -309,5 +318,5 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         <Text>{t(reply.pending ? "vehicleHistory.sending" : unresolved ? "vehicleHistory.sendNew" : "vehicleHistory.sendMessage")}</Text>
       </Button>
     </View>}
-  </KeyboardAvoidingView>;
+  </View>;
 }

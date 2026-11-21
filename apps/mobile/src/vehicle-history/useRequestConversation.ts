@@ -41,6 +41,10 @@ export function useRequestConversation(viewer: HistoryViewer, request: VehicleHi
   const alive = useRef(true);
   const visibility = useRef({ active, visibleIds, metadataCurrent });
   visibility.current = { active: active && metadataCurrent && !pages.error && !receiptAccessDenied, visibleIds, metadataCurrent };
+  const order = useQuery({ ...options, queryKey: [...key, "order"],
+    queryFn: () => stream.order(() => visibility.current.metadataCurrent && visibility.current.active),
+    enabled: active && metadataCurrent && connected,
+    refetchOnWindowFocus: false, refetchOnReconnect: false });
   const received = useRef<string | undefined>(undefined);
   const read = useRef<string | undefined>(undefined);
   const busy = useRef(false);
@@ -52,7 +56,7 @@ export function useRequestConversation(viewer: HistoryViewer, request: VehicleHi
     const current = client.getQueryData<VehicleHistorySchemas.HistoryRequest>(detailKey);
     if (!alive.current || client.getQueryState(detailKey)?.error || current?.assignmentVersion !== request.assignmentVersion
       || current?.assignedOperator?.id !== request.assignedOperator?.id) return;
-    await Promise.all([pages.refetch(), receipts.refetch()]);
+    await Promise.all([pages.refetch(), receipts.refetch(), order.refetch()]);
   };
   useEffect(() => () => { alive.current = false; controller.abort(); }, [controller]);
   useEffect(() => {
@@ -86,7 +90,7 @@ export function useRequestConversation(viewer: HistoryViewer, request: VehicleHi
       }
     })();
   }, [active, metadataCurrent, connected, pages.isFetching, pages.error, receiptAccessDenied, tail, visible, receiptError, retry, stream]);
-  return { messages, pages, receipts, receiptError, connected, active, setVisibleIds,
+  return { messages, pages, receipts, order, receiptError, connected, active, setVisibleIds,
     refresh: () => reconcile.current(),
     retryReceipt: () => { setReceiptError(null); setRetry((value) => value + 1); },
   };

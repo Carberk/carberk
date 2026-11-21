@@ -1,7 +1,16 @@
 export const offerCopy = {
   "en": {
+    "orderWaiting": "Awaiting synthetic payment",
+    "orderExpired": "Payment hold expired",
+    "orderAccepted": "Accepted",
+    "orderHold": "Payment hold until · Ashgabat time",
+    "orderNext": "Await a fictional transfer reference from the customer. Do not collect real money. Manual wallet verification is separate; a receipt never confirms payment. After 20:00, verification resumes at 09:00.",
+    "orderExpiredNext": "The slot is released. Contact the operator for a new feasible agreement. If you transferred money, tell the operator; do not pay again.",
+
     "title": "VIN and offer",
-    "synthetic": "Synthetic preview · no booking or payment",
+    "orderDetails": "Agreed details",
+    "orderSummary": "Accepted order · 100 TMT",
+    "synthetic": "Synthetic service · no real payment",
     "vin": "VIN",
     "sendVin": "Send VIN for review",
     "check": "Check synthetic availability",
@@ -36,11 +45,20 @@ export const offerCopy = {
     "refresh": "Refresh offer",
     "pending": "Saving…",
     "preview": "Offer preview · 100 TMT",
-    "next": "Review the exact VIN, format and terms with the operator. Acceptance is not available in this preview."
+    "next": "Review the exact VIN, format and terms with the operator. The customer confirms the quote in their conversation."
   },
   "ru": {
+    "orderWaiting": "Ожидается тестовая оплата",
+    "orderExpired": "Срок брони оплаты истёк",
+    "orderAccepted": "Принято",
+    "orderHold": "Бронь оплаты до · время Ашхабада",
+    "orderNext": "Ожидайте вымышленный номер перевода от клиента. Не принимайте реальные деньги. Проверка кошелька выполняется отдельно; чек не подтверждает оплату. После 20:00 проверка возобновляется в 09:00.",
+    "orderExpiredNext": "Место освобождено. Согласуйте с оператором новый доступный срок. Если уже перевели деньги, сообщите оператору; не платите повторно.",
+
     "title": "VIN и предложение",
-    "synthetic": "Тестовый просмотр · без бронирования и оплаты",
+    "orderDetails": "Согласованные условия",
+    "orderSummary": "Принятый заказ · 100 TMT",
+    "synthetic": "Тестовый сервис · без реальной оплаты",
     "vin": "VIN",
     "sendVin": "Отправить VIN на проверку",
     "check": "Проверить тестовую доступность",
@@ -75,11 +93,20 @@ export const offerCopy = {
     "refresh": "Обновить предложение",
     "pending": "Сохраняем…",
     "preview": "Предложение · 100 TMT",
-    "next": "Обсудите точный VIN, формат и условия с оператором. Принятие в этом просмотре недоступно."
+    "next": "Обсудите точный VIN, формат и условия с оператором. Клиент подтверждает предложение в своём обращении."
   },
   "tk": {
+    "orderWaiting": "Synag tölegine garaşylýar",
+    "orderExpired": "Töleg bronunyň möhleti gutardy",
+    "orderAccepted": "Kabul edildi",
+    "orderHold": "Töleg bronunyň soňky wagty · Aşgabat wagty",
+    "orderNext": "Müşderiden oýlanyp tapylan geçiriş belgisine garaşyň. Hakyky pul kabul etmäň. Gapjyk aýratyn el bilen barlanýar; çek tölegi tassyklamaýar. 20:00-dan soň barlag 09:00-da dowam edýär.",
+    "orderExpiredNext": "Ýer boşadyldy. Işgär bilen täze mümkin möhleti ylalaşyň. Pul geçiren bolsaňyz, işgäre habar beriň; täzeden tölemäň.",
+
     "title": "VIN we teklip",
-    "synthetic": "Synag görnüşi · bron we töleg ýok",
+    "orderDetails": "Ylalaşylan şertler",
+    "orderSummary": "Kabul edilen sargyt · 100 TMT",
+    "synthetic": "Synag hyzmaty · hakyky töleg ýok",
     "vin": "VIN",
     "sendVin": "VIN-i barlawa iber",
     "check": "Synag elýeterliligini barla",
@@ -114,6 +141,6 @@ export const offerCopy = {
     "refresh": "Teklibi täzele",
     "pending": "Saklanýar…",
     "preview": "Teklip · 100 TMT",
-    "next": "Takyk VIN-i, görnüşi we şertleri işgär bilen maslahatlaşyň. Bu synagda kabul etmek elýeterli däl."
+    "next": "Takyk VIN-i, görnüşi we şertleri işgär bilen maslahatlaşyň. Müşderi teklibi öz söhbetinde tassyklaýar."
   }
 } as const;

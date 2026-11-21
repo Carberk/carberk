@@ -4,6 +4,12 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_ORDER_INVALID: "Check the complete quote before confirming.",
+    HISTORY_ORDER_STALE: "The quote changed or its window is no longer feasible. Refresh and ask the operator for a new quote.",
+    HISTORY_ORDER_CAPACITY: "This day or window is full. Ask the operator for another quote; do not transfer money.",
+    HISTORY_ORDER_CONFLICT: "This request already has an accepted order. Reopen its order status.",
+    HISTORY_ORDER_UNAVAILABLE: "Order instructions are unavailable. Refresh the enquiry or contact the operator; do not transfer money.",
+
     HISTORY_OFFER_INVALID: "Check the VIN, format and delivery window. Use today or tomorrow, 09:00–20:00 Ashgabat time.",
     HISTORY_OFFER_CONFLICT: "The offer changed. Refresh it before trying again.",
     HISTORY_OFFER_UNAVAILABLE: "Offers are temporarily unavailable. Reopen the enquiry and retry.",
@@ -25,6 +31,12 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_ORDER_INVALID: "Проверьте полное предложение перед подтверждением.",
+    HISTORY_ORDER_STALE: "Предложение изменилось или срок уже недоступен. Обновите его и запросите новое у оператора.",
+    HISTORY_ORDER_CAPACITY: "На этот день или срок мест нет. Запросите другое предложение; не переводите деньги.",
+    HISTORY_ORDER_CONFLICT: "В этом обращении уже есть принятый заказ. Откройте его статус.",
+    HISTORY_ORDER_UNAVAILABLE: "Инструкции заказа недоступны. Обновите обращение или напишите оператору; не переводите деньги.",
+
     HISTORY_OFFER_INVALID: "Проверьте VIN, формат и срок. Выберите сегодня или завтра, 09:00–20:00 по Ашхабаду.",
     HISTORY_OFFER_CONFLICT: "Предложение изменилось. Обновите его перед повторной попыткой.",
     HISTORY_OFFER_UNAVAILABLE: "Предложения временно недоступны. Откройте обращение заново и повторите попытку.",
@@ -46,6 +58,12 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_ORDER_INVALID: "Tassyklamazdan öň doly teklibi barlaň.",
+    HISTORY_ORDER_STALE: "Teklip üýtgedi ýa-da möhleti indi mümkin däl. Täzeläp, işgärden täze teklip soraň.",
+    HISTORY_ORDER_CAPACITY: "Bu güne ýa-da wagta ýer ýok. Işgärden başga teklip soraň; pul geçirmäň.",
+    HISTORY_ORDER_CONFLICT: "Bu ýüz tutmada eýýäm kabul edilen sargyt bar. Sargydyň ýagdaýyny açyň.",
+    HISTORY_ORDER_UNAVAILABLE: "Sargydyň görkezmeleri elýeterli däl. Ýüz tutmany täzeläň ýa-da işgäre ýazyň; pul geçirmäň.",
+
     HISTORY_OFFER_INVALID: "VIN-i, görnüşi we möhleti barlaň. Şu güni ýa-da ertiri, Aşgabat wagty bilen 09:00–20:00 aralygyny saýlaň.",
     HISTORY_OFFER_CONFLICT: "Teklip üýtgedi. Gaýtadan synanyşmazdan öň ony täzeläň.",
     HISTORY_OFFER_UNAVAILABLE: "Teklipler wagtlaýyn elýeterli däl. Ýüz tutmany täzeden açyp synanyşyň.",
@@ -112,13 +130,22 @@ export class HistoryOffersExceptionFilter extends HistoryRequestExceptionFilter 
   }
 }
 
+@Catch()
+export class HistoryOrdersExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    const unavailable = error instanceof HistoryRequestError && error.code === "HISTORY_MESSAGE_UNAVAILABLE";
+    super.catch(!unavailable && (error instanceof HistoryRequestError || error instanceof HttpException)
+      ? error : new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE"), host);
+  }
+}
+
 export function historyRequestFailure(error: unknown, language: string | undefined) {
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
-    : code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
-      : code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
+  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
+    : code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
+      : code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
         || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
 }
