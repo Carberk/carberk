@@ -188,3 +188,17 @@ it("opens the local private preview at screen size and closes back to the retain
   expect(view.queryByLabelText("Private payment receipt")).toBeNull();
   expect(view.getByRole("button", { name: "Send receipt" })).toBeTruthy();
 });
+
+it("shows submitted receipts and allows another selection when the retained local file is gone", async () => {
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Choose receipt" }));
+  await view.findByLabelText("Selected receipt preview");
+  await view.unmount();
+  proofDevice.files.clear();
+  proofStatus = "submitted";
+
+  const reopened = await renderMobile(<RequestScreen />);
+  await reopened.findByText("Receipt submitted");
+  expect(reopened.getByRole("button", { name: "Choose receipt" })).toBeTruthy();
+  expect(reopened.queryByLabelText("Selected receipt preview")).toBeNull();
+});

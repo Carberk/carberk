@@ -27,10 +27,11 @@ export function retainedPaymentProof(userId: string, requestId: string) {
       await writes.get(key)?.catch(() => undefined);
       const raw = await AsyncStorage.getItem(key);
       if (!raw) return null;
-      const selection = validate(JSON.parse(raw));
+      let selection: PaymentProofSelection;
+      try { selection = validate(JSON.parse(raw)); }
+      catch { return null; }
       const info = await FileSystem.getInfoAsync(selection.uri);
-      if (!info.exists || info.isDirectory || info.size !== selection.sizeBytes) throw new Error("Receipt file unavailable");
-      return selection;
+      return info.exists && !info.isDirectory && info.size === selection.sizeBytes ? selection : null;
     },
     save(selection: PaymentProofSelection) { const valid = validate(selection); return write(() => AsyncStorage.setItem(key, JSON.stringify(valid))); },
     remove(selection: PaymentProofSelection | null) {

@@ -39,14 +39,19 @@ export function PaymentProofPanel({ locale, id, version, scope, actorId, revisio
       if (result.scope !== scope || result.actorId !== actorId) { setItems([]); setPhase("denied"); return; }
       if (!fileId) setItems(result.items);
       setContent(result.content); setPhase("ready");
-    } catch { if (alive.current && current.current === expected) { setItems([]); setPhase("error"); } }
+    } catch { if (alive.current && current.current === expected && generation.current === attempt) { setItems([]); setPhase("error"); } }
     finally { busy.current = false; if (queued.current) { queued.current = false; queueMicrotask(() => load.current()); } }
   }
   load.current = () => { void run(); };
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => { setContent(null); setItems([]); load.current(); }, [binding, revision]);
   useEffect(() => {
-    const hide = () => { if (document.hidden || !document.hasFocus()) { generation.current++; setContent(null); } };
+    const hide = () => {
+      if (!document.hidden && document.hasFocus()) return;
+      generation.current++;
+      setContent(null);
+      if (busy.current) setPhase("error");
+    };
     window.addEventListener("blur", hide); document.addEventListener("visibilitychange", hide);
     return () => { window.removeEventListener("blur", hide); document.removeEventListener("visibilitychange", hide); };
   }, []);

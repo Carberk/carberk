@@ -96,6 +96,31 @@ it("does not reveal delayed bytes after selection changes", async () => {
   await act(async () => release());
   expect(container.querySelector("img")).toBeNull();
 });
+
+it("discards receipt bytes after losing focus and permits a fresh read", async () => {
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  const original = vi.mocked(fetch).getMockImplementation();
+  if (!original) throw new Error("Missing HTTP boundary");
+  vi.mocked(fetch).mockImplementation(async (...args) => {
+    const response = await original(...args);
+    if (String(args[0]).includes("/content")) await hold;
+    return response;
+  });
+  await act(async () => root.render(panel()));
+  await waitFor(() => expect(button("View receipt")).toBeTruthy());
+  await act(async () => button("View receipt").click());
+  await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes("/content"))).toBe(true));
+  const focus = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+  try { await act(async () => window.dispatchEvent(new Event("blur"))); }
+  finally { focus.mockRestore(); }
+  await act(async () => release());
+
+  expect(container.querySelector("img")).toBeNull();
+  expect(button("Refresh receipts").disabled).toBe(false);
+  await act(async () => button("Refresh receipts").click());
+  await waitFor(() => expect(button("View receipt")).toBeTruthy());
+});
 it("requires an exact receipt and a reason for historical access, retaining work on denied/retry", async () => {
   await act(async () => root.render(<HistoricalPaymentEvidence locale="en" />));
   const edit = async (name: string, value: string) => act(async () => fireEvent.change(element(`[name="${name}"]`), { target: { value } }));
