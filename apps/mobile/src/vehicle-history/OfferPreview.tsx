@@ -8,6 +8,7 @@ import { historyTranscript } from "../api/vehicle-history/messages";
 import { queryKeys } from "../api/queryKeys";
 import { ApiError } from "../api/client";
 
+import { PaymentProof } from "./PaymentProof";
 import { historySessionCurrent, type HistoryViewer } from "./session";
 
 import { Button } from "@/components/ui/button";
@@ -121,6 +122,7 @@ export function OfferPreview({ viewer, request, ready, active, connected, reconc
               <Button variant="secondary" disabled={!ready || !active || !connected || state.isFetching} onPress={() => { setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button>
             </View>}
           </View>}
+          {accepted && <PaymentProof key={`${userId}:${sessionId}:${request.id}:${accepted.id}`} viewer={viewer} requestId={request.id} orderId={accepted.id} ready={ready && active && connected && !state.isFetching && !state.error} />}
           {!accepted && <><Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
           <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={setVin} maxLength={80}
             autoCapitalize="characters" autoCorrect={false} editable={canEdit} />

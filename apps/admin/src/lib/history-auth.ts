@@ -3,12 +3,14 @@ import { validateReturnTo } from "./validators";
 /** Intent selects a flow, never authority. The API rechecks the stored grant. */
 export function historyAuth(returnTo: unknown): { locale: "tk" | "ru" | "en"; returnTo: string } | null {
   const safe = typeof returnTo === "string" ? validateReturnTo(returnTo) : null;
-  const locale = safe?.match(/^\/vehicle-history\/(tk|ru|en)(?:\/staff)?(?:\?|$)/)?.[1];
+  const locale = safe?.match(/^\/vehicle-history\/(tk|ru|en)(?:\/(?:staff|payment-evidence))?(?:\?|$)/)?.[1];
   return (locale === "tk" || locale === "ru" || locale === "en") && safe ? { locale, returnTo: safe } : null;
 }
 
 export function totpPath(action: "status" | "enroll" | "verify", returnTo?: unknown) {
-  return `/auth/admin/totp/${action}${historyAuth(returnTo) ? "?purpose=vehicle-history" : ""}`;
+  const intent = historyAuth(returnTo);
+  const purpose = intent?.returnTo.split("?")[0]?.endsWith("/payment-evidence") ? "vehicle-history-payment-evidence" : "vehicle-history";
+  return `/auth/admin/totp/${action}${intent ? `?purpose=${purpose}` : ""}`;
 }
 
 export const authCopy = {

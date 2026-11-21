@@ -218,3 +218,19 @@ test("backup and restore accept the scoped catalog policy and restore pending ex
   assertPublicReadOnlyPolicy(target.policies.get("catalog-assets"), "catalog-assets");
   assert.equal(target.lifecycles.get("catalog-assets").Rules[0].Expiration.Days, 1);
 });
+
+test("History receipt bootstrap and restore never install an anonymous bucket policy", async () => {
+  const source = new FakeS3Client();
+  await bootstrapBuckets(source, ["vehicle-history-private"]);
+  source.buckets.get("vehicle-history-private").set("payment-evidence/request/object", Buffer.from("synthetic"));
+  assert.equal(source.policies.has("vehicle-history-private"), false);
+  const directory = await mkdtemp(join(tmpdir(), "history-private-backup-"));
+  await backupBuckets(source, directory, ["vehicle-history-private"]);
+  assert.equal(JSON.parse(await readFile(join(directory, "policies/vehicle-history-private.json"), "utf8")), null);
+  await writeFile(join(directory, "policies/vehicle-history-private.json"), JSON.stringify(publicReadPolicy("vehicle-history-private")));
+  const target = new FakeS3Client();
+  await restoreBuckets(target, directory);
+  assert.equal(target.policies.has("vehicle-history-private"), false);
+  source.policies.set("vehicle-history-private", JSON.stringify(publicReadPolicy("vehicle-history-private")));
+  await assert.rejects(() => backupBuckets(source, directory, ["vehicle-history-private"]), /re-bootstrap before backup/);
+});

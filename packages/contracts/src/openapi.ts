@@ -3,6 +3,7 @@ import {
   OpenApiGeneratorV3,
 } from "@asteasolutions/zod-to-openapi";
 
+import * as PaymentProof from "./schemas/history-payment-proof";
 import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema } from "./schemas/history-order";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -489,6 +490,30 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       content: { "application/json": { schema: HistoryOrderStateSchema } } },
       400: { description: "Complete explicit quote acceptance required" }, 403: { description: "Current request and assignment authority required" },
       409: { description: "Quote stale, capacity full or order already accepted; refresh" }, 503: { description: "Synthetic instructions unavailable" } },
+  });
+  for (const operator of [false, true]) for (const content of [false, true]) registry.registerPath({
+    method: "get", path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/payment-proofs${content ? "/{fileId}/content" : ""}`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }], summary: content ? "Read exact private receipt bytes with current authority" : "Read authorized receipt metadata",
+    request: { params: z.object({ id: z.string().guid(), ...(content ? { fileId: z.string().guid() } : {}) }), query: operator ? ReadOperatorHistoryOfferSchema : ReadHistoryOfferSchema },
+    responses: { 200: { description: "Private, no-store evidence; never payment confirmation", content: { "application/json": { schema: content ? PaymentProof.ReadPaymentProofSchema : PaymentProof.PaymentProofsSchema } } },
+      403: { description: "Current owner, assignment, session or purpose refused" }, 409: { description: "Evidence or assignment changed" }, 503: { description: "Retry without another payment" } },
+  });
+  for (const [method, suffix, schema] of [
+    ["post", "", PaymentProof.StagePaymentProofSchema], ["post", "/{fileId}/submit", PaymentProof.SubmitPaymentProofSchema],
+    ["delete", "/{fileId}", null], ["put", "/{fileId}/content", null],
+  ] as const) registry.registerPath({
+    method, path: `/api/v1/vehicle-history/requests/{id}/payment-proofs${suffix}`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }], summary: method === "put" ? "Upload bounded private JPEG, PNG or WebP bytes" : method === "delete" ? "Discard an unsubmitted exact object" : suffix ? "Atomically submit the uploaded receipt for the accepted order" : "Stage a retry-safe receipt for the exact accepted order",
+    request: { params: z.object({ id: z.string().guid(), ...(suffix ? { fileId: z.string().guid() } : {}) }), query: ReadHistoryOfferSchema,
+      ...(schema ? { body: { content: { "application/json": { schema } } } } : method === "put" ? { body: { content: Object.fromEntries(["image/jpeg", "image/png", "image/webp"].map((type) => [type, { schema: z.string().openapi({ type: "string", format: "binary" }) }])) } } : {}) },
+    responses: { [method === "post" ? 201 : 200]: { description: "Private, no-store receipt state; no payment confirmation or hold renewal", content: { "application/json": { schema: PaymentProof.PaymentProofSchema } } },
+      400: { description: "Invalid bounded image or input" }, 403: { description: "Current owner/session refused" }, 409: { description: "Exact order, attempt or lifecycle conflict" }, 503: { description: "Retry the same receipt without paying again" } },
+  });
+  registry.registerPath({ method: "post", path: "/api/v1/vehicle-history/payment-evidence/read", tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: "Reasoned and audited exact-object historical receipt read with a separate current capability",
+    request: { query: ReadHistoryOfferSchema, body: { content: { "application/json": { schema: PaymentProof.HistoricalPaymentEvidenceSchema } } } },
+    responses: { 201: { description: "Private, no-store bytes after current session/purpose/lifecycle checks and access audit", content: { "application/json": { schema: PaymentProof.ReadPaymentProofSchema } } },
+      400: { description: "Exact request/object, purpose and bounded reason required" }, 403: { description: "Separate historical evidence authority refused" }, 503: { description: "Evidence unavailable; retry" } },
   });
   registry.register("HistoryReminder", HistoryReminderSchema);
   registry.registerPath({
