@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, active, connected }: {
-  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; active: boolean; connected: boolean;
+export function OfferPreview({ viewer, request, ready, active, connected, reconcileOrder }: {
+  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; active: boolean; connected: boolean; reconcileOrder: () => Promise<unknown>;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
@@ -57,12 +57,12 @@ export function OfferPreview({ viewer, request, ready, active, connected }: {
     const owns = () => current() && attempt === generation.current;
     try {
       await stream.acceptQuote(parsed.data.offer, owns);
-      if (owns()) await state.refetch();
+      if (owns()) { await state.refetch(); if (owns()) await reconcileOrder(); }
     } catch (error) {
       if (!owns()) return;
       setOrderFailure(error instanceof ApiError && error.code === "HISTORY_ORDER_CAPACITY" ? "orderFull"
         : error instanceof ApiError && ["HISTORY_ORDER_STALE", "HISTORY_ORDER_CONFLICT"].includes(error.code) ? "orderStale" : "orderError");
-      await state.refetch();
+      await state.refetch(); if (owns()) await reconcileOrder();
     } finally { busy.current = false; if (mounted.current) setSaving(false); }
   }
   async function send() {

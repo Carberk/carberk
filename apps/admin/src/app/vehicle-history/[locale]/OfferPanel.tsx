@@ -77,7 +77,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
         onClick={() => { void run({ kind: "check", vin, expectedVersion: data.version, expectedAssignmentVersion: version }); }}>{phase === "pending" ? t.pending : t.check}</Button></>}
       <p role="status" aria-live="polite">{data.preflight ? t[data.preflight.status] : data.vin ? t.unchecked : t.empty}</p>
       {data.vin && !proposal && <p className="break-all font-mono">VIN: {data.vin}</p>}
-      {data.preflight?.status === "available" && <>
+      {data.preflight?.status === "available" && !accepted && <>
         <p>{t.rule}</p>
         <dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt className="font-medium">{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl>
         <p className="text-muted-foreground">{t.limits}</p>
@@ -102,11 +102,15 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       {proposal && <div className="space-y-3 rounded-lg border p-4">
         <h5 className="font-semibold">{accepted ? t.orderSummary : t.preview}</h5><p className="break-all font-mono">{data.vin}</p>
         <p>{t.format}: {t[proposal.format]}</p><p>{t.window}: {timestamp(proposal.deliveryFrom)} – {timestamp(proposal.deliveryBy)}</p>
-        {proposal.format !== "pdf" && <p>{t.links}</p>}<p>{t.rights}</p><p>{t.terms}</p>{accepted ? <>
+        {accepted ? <>
           <p>{t.orderAccepted}: {timestamp(accepted.acceptedAt)}</p><p>{t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>
           <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>
           {orderState?.wallet && phase === "ready" && <p className="break-all font-mono">{orderState.wallet}</p>}
-        </> : <p className="text-muted-foreground">{t.next}</p>}
+          <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>
+            {data.preflight?.status === "available" && <><p>{t.rule}</p><dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt>{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl><p>{t.limits}</p></>}
+            {proposal.format !== "pdf" && <p>{t.links}</p>}<p>{t.rights}</p><p>{t.terms}</p>
+          </details>
+        </> : <>{proposal.format !== "pdf" && <p>{t.links}</p>}<p>{t.rights}</p><p>{t.terms}</p><p className="text-muted-foreground">{t.next}</p></>}
       </div>}
     </>}
   </section>;

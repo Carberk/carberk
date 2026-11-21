@@ -8,6 +8,7 @@ export const offerCopy = {
     "orderExpiredNext": "The slot is released. Contact the operator for a new feasible agreement. If you transferred money, tell the operator; do not pay again.",
 
     "title": "VIN and offer",
+    "orderDetails": "Agreed details",
     "orderSummary": "Accepted order · 100 TMT",
     "synthetic": "Synthetic service · no real payment",
     "vin": "VIN",
@@ -55,6 +56,7 @@ export const offerCopy = {
     "orderExpiredNext": "Место освобождено. Согласуйте с оператором новый доступный срок. Если уже перевели деньги, сообщите оператору; не платите повторно.",
 
     "title": "VIN и предложение",
+    "orderDetails": "Согласованные условия",
     "orderSummary": "Принятый заказ · 100 TMT",
     "synthetic": "Тестовый сервис · без реальной оплаты",
     "vin": "VIN",
@@ -102,6 +104,7 @@ export const offerCopy = {
     "orderExpiredNext": "Ýer boşadyldy. Işgär bilen täze mümkin möhleti ylalaşyň. Pul geçiren bolsaňyz, işgäre habar beriň; täzeden tölemäň.",
 
     "title": "VIN we teklip",
+    "orderDetails": "Ylalaşylan şertler",
     "orderSummary": "Kabul edilen sargyt · 100 TMT",
     "synthetic": "Synag hyzmaty · hakyky töleg ýok",
     "vin": "VIN",

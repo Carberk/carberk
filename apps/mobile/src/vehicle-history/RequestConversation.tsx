@@ -12,6 +12,7 @@ import { localeTag } from "../i18n/resources";
 import { mapErrorToCopy } from "../api/getErrorCopy";
 
 import { historySessionCurrent, type HistoryViewer } from "./session";
+import { OrderStatus } from "./OrderStatus";
 import { OfferPreview } from "./OfferPreview";
 import { StopReminders } from "./StopReminders";
 import { useHistoryReply } from "./useHistoryReply";
@@ -187,6 +188,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   else if (thread.messages.length === 0) notice = <Text className="text-body text-muted-foreground">{t("vehicleHistory.emptyEnquiry")}</Text>;
 
   return <KeyboardAvoidingView behavior="padding" className="flex-1">
+    {!denied && thread.active && thread.order.data?.order && !thread.order.error && <OrderStatus state={thread.order.data}
+      ready={metadataCurrent && thread.connected} onDetails={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />}
     <FlatList
     ref={list}
     className="flex-1" contentContainerClassName="gap-3 px-5 pb-8 pt-3"
@@ -201,7 +204,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
       {header}
-      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected} />}
+      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
       {!thread.connected && <Text accessibilityRole="alert">{t("vehicleHistory.offline")}</Text>}

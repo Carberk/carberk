@@ -64,7 +64,7 @@ it.each([
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(view.getByText(/2026-10-14/)).toBeTruthy();
   await fireEvent.press(button);
-  await view.findByText(waiting);
+  await view.findAllByText(new RegExp(`^${waiting}`));
   await view.findByText("SYNTHETIC-VH07-NO-TRANSFER");
   expect(sent).toEqual([{ offer: quote }]);
   expect(view.queryByLabelText("VIN")).toBeNull();
@@ -72,7 +72,7 @@ it.each([
   expect(view.getByText(/2026-10-14/)).toBeTruthy();
   await view.unmount();
   const reopened = await renderMobile(<RequestScreen />, { locale });
-  await reopened.findByText(waiting);
+  await reopened.findAllByText(new RegExp(`^${waiting}`));
   await reopened.findByText("SYNTHETIC-VH07-NO-TRANSFER");
   expect(sent).toEqual([{ offer: quote }]);
 });
@@ -82,7 +82,7 @@ it("recovers a committed acceptance after response loss through readback without
   }));
   const view = await renderMobile(<RequestScreen />);
   await fireEvent.press(await view.findByRole("button", { name: "Confirm VIN and quote · 100 TMT" }));
-  await view.findByText("Awaiting synthetic payment");
+  await view.findAllByText(/^Awaiting synthetic payment/);
   await view.findByText("SYNTHETIC-VH07-NO-TRANSFER");
   expect(sent).toEqual([{ offer: quote }]);
 });
@@ -100,7 +100,7 @@ it.each([
 it("shows expiry with the original promise and a contact-operator next action", async () => {
   current = { ...accepted, serverNow: "2026-11-21T07:00:00.000Z", status: "hold_expired", wallet: null };
   const view = await renderMobile(<RequestScreen />);
-  await view.findByText("Payment hold expired");
+  await view.findAllByText(/^Payment hold expired/);
   expect(view.getByText(/The slot is released/)).toBeTruthy();
   expect(view.getByText(/VIN: DEMA0000000000001/)).toBeTruthy();
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
@@ -136,4 +136,14 @@ it("refuses wallet instructions when the accepted-format readback is incomplete"
   await view.findByText("Could not update the offer. Refresh its current state before trying again.");
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(view.queryByRole("button", { name: "Confirm VIN and quote · 100 TMT" })).toBeNull();
+});
+
+it("shows accepted facts and the next action with access to the agreed details", async () => {
+  current = accepted;
+  const view = await renderMobile(<RequestScreen />);
+  const details = await view.findByRole("button", { name: "Details" });
+  expect(view.getByText("DEMA0000000000001 · PDF and provider link")).toBeTruthy();
+  expect(view.getByText("Send a test reference here.")).toBeTruthy();
+  await fireEvent.press(details);
+  expect(view.getByText("Accepted order · 100 TMT")).toBeTruthy();
 });

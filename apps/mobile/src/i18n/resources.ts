@@ -30,6 +30,9 @@ export const resources: Resource = {
     common: {
       vehicleHistory: {
         "offerTitle": "VIN и предложение",
+        "offerOrderStatusNext": "Отправьте тестовый номер перевода.",
+        "offerOrderStatusExpired": "Запросите у оператора новый срок.",
+        "offerOrderStatusDetails": "Условия",
         "offerOrderSummary": "Принятый заказ · 100 TMT",
         "offerOrderConfirm": "Подтвердить VIN и предложение · 100 TMT",
         "offerOrderBefore": "Подтверждение создаст тестовую бронь на два часа для этого VIN, формата и срока. Реальные переводы не принимаются.",
@@ -1111,6 +1114,9 @@ export const resources: Resource = {
     common: {
       vehicleHistory: {
         "offerTitle": "VIN we teklip",
+        "offerOrderStatusNext": "Şu ýerde synag geçiriş belgisini iberiň.",
+        "offerOrderStatusExpired": "Işgärden täze möhlet soraň.",
+        "offerOrderStatusDetails": "Şertler",
         "offerOrderSummary": "Kabul edilen sargyt · 100 TMT",
         "offerOrderConfirm": "VIN-i we teklibi tassykla · 100 TMT",
         "offerOrderBefore": "Tassyklamak şu VIN, görnüş we möhlet üçin iki sagatlyk synag bronuny döredýär. Hakyky pul geçirilmeýär.",
@@ -2192,6 +2198,9 @@ export const resources: Resource = {
     common: {
       vehicleHistory: {
         "offerTitle": "VIN and offer",
+        "offerOrderStatusNext": "Send a test reference here.",
+        "offerOrderStatusExpired": "Ask the operator for a new window.",
+        "offerOrderStatusDetails": "Details",
         "offerOrderSummary": "Accepted order · 100 TMT",
         "offerOrderConfirm": "Confirm VIN and quote · 100 TMT",
         "offerOrderBefore": "Confirming creates a two-hour test hold for this exact VIN, format and window. No real transfer is accepted.",
