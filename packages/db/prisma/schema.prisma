@@ -179,6 +179,7 @@ model VehicleHistoryRequest {
   assignmentVersion  Int @default(0)
   privateNotes       HistoryPrivateNote[]
   offer              Json?
+  order              HistoryOrder?
 
   waitingReason          String?
   waitingSince           DateTime? @db.Timestamptz(3)
@@ -201,6 +202,21 @@ model VehicleHistoryRequest {
   @@unique([requesterId, attemptKey])
   @@index([requesterId, createdAt, id])
   @@map("vehicle_history_requests")
+}
+
+model HistoryOrder {
+  requestId     String @id
+  request       VehicleHistoryRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  id            String @unique @db.Uuid
+  snapshot      Json
+  wallet        String
+  deliveryDay   String
+  deliveryFrom  DateTime @db.Timestamptz(3)
+  deliveryBy    DateTime @db.Timestamptz(3)
+  holdExpiresAt DateTime @db.Timestamptz(3)
+
+  @@index([deliveryDay, holdExpiresAt])
+  @@map("vehicle_history_orders")
 }
 
 model HistoryPrivateNote {

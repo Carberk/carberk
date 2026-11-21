@@ -1,4 +1,4 @@
-import { HistoryOfferSchemas as O, VehicleHistorySchemas } from "@auto-tm/contracts";
+import { HistoryOrderSchemas as H, HistoryOfferSchemas as O, VehicleHistorySchemas } from "@auto-tm/contracts";
 import { onlineManager } from "@tanstack/react-query";
 import type { ZodSchema } from "zod";
 
@@ -64,6 +64,9 @@ export function historyTranscript(viewer: HistoryViewer, requestId: string, sign
       // A committed send is not contiguous fetched-page or receipt evidence.
       return message;
     },
+    order: (current: () => boolean) => transport("/order", H.HistoryOrderStateSchema, undefined, current),
+    acceptQuote: (offer: H.AcceptHistoryQuote["offer"], current: () => boolean) => transport("/order", H.HistoryOrderStateSchema,
+      H.AcceptHistoryQuoteSchema.parse({ offer }), current),
     offer: (current: () => boolean) => transport("/offer", O.HistoryOfferSchema, undefined, current),
     sendVin: (vin: string, expectedVersion: number, current: () => boolean) => transport("/offer", O.HistoryOfferSchema,
       O.HistoryOfferMutationSchema.parse({ kind: "vin", vin, expectedVersion }), current),

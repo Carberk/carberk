@@ -8,6 +8,9 @@ import { setupServer } from "msw/native";
 export const sentVideoTelemetry: unknown[] = [];
 
 export const server = setupServer(
+  http.get("*/vehicle-history/requests/:id/order", () => HttpResponse.json({
+    order: null, status: "enquiry", serverNow: "2026-11-21T05:00:00.000Z", wallet: null, collectionEnabled: false,
+  })),
   http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({
     version: 0, vin: null, preflight: null, proposal: null, synthetic: true,
   })),

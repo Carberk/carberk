@@ -16,7 +16,8 @@ export class HistoryOffers {
   }
 
   change(actor: HistoryMessageActor, id: string, input: O.HistoryOperatorOfferMutation | { kind: "vin"; vin: string; expectedVersion: number }) {
-    return this.access.run(actor, id, async (_requester, _sender, _object, _participant, _waiting, store) => {
+    return this.access.run(actor, id, async (_requester, _sender, _object, _participant, _waiting, store, orders) => {
+      if (await orders.read()) throw new HistoryRequestError("HISTORY_ORDER_CONFLICT");
       const previous = await store.read();
       if (previous.version !== input.expectedVersion || previous.version === 2147483647) throw new HistoryRequestError("HISTORY_OFFER_CONFLICT");
       let next: O.HistoryOffer;

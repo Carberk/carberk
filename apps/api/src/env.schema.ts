@@ -91,6 +91,9 @@ const BaseSchema = z.object({
   INSPECTION_INTEREST_ENABLED: booleanFlag,
   VEHICLE_HISTORY_SYNTHETIC_ENABLED: booleanFlag,
   VEHICLE_HISTORY_SYNTHETIC_USER_IDS: z.string().default(""),
+  VEHICLE_HISTORY_SYNTHETIC_WALLET: z.string().regex(/^SYNTHETIC-[A-Z0-9-]{1,64}$/).or(z.literal("")).default(""),
+  VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS: z.coerce.number().int().min(0).max(11).default(0),
+  VEHICLE_HISTORY_SYNTHETIC_MORNING_SLOTS: z.coerce.number().int().min(0).max(1).default(0),
 
   /** Listing video uploads (ADR-0112): off by default; testers are User IDs. */
   LISTING_VIDEO_UPLOADS_ENABLED: booleanFlag,

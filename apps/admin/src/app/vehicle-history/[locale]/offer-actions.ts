@@ -1,5 +1,5 @@
 "use server";
-import { HistoryOfferSchemas as O } from "@auto-tm/contracts";
+import { HistoryOrderSchemas as H, HistoryOfferSchemas as O } from "@auto-tm/contracts";
 import { unstable_rethrow } from "next/navigation";
 
 import { historyInboxAction, type HistoryInboxResult } from "./actions";
@@ -9,7 +9,7 @@ import { ApiError, apiFetchOptional } from "@/lib/api-client";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
 type Failure = Exclude<HistoryInboxResult, { status: "ok" }>;
-export type HistoryOfferResult = Failure | { status: "ok"; scope: string; actorId: string; data: O.HistoryOffer };
+export type HistoryOfferResult = Failure | { status: "ok"; scope: string; actorId: string; data: O.HistoryOffer; order: H.HistoryOrderState };
 export async function historyOfferAction(locale: DeskLocale, value: unknown): Promise<HistoryOfferResult> {
   await rejectExpiredSession();
   const parsed = O.HistoryOfferActionSchema.safeParse(value);
@@ -19,11 +19,14 @@ export async function historyOfferAction(locale: DeskLocale, value: unknown): Pr
   const selection = { kind: "detail", id: input.id, scope: input.scope, expectedAssignmentVersion: input.expectedAssignmentVersion };
   const before = await historyInboxAction(locale, selection);
   if (before.status !== "ok") return before;
-  let response: unknown, failure: unknown;
+  let response: unknown, orderResponse: unknown, failure: unknown;
   try {
     response = await apiFetchOptional<unknown>(`/vehicle-history/operator/requests/${input.id}/offer${input.mutation ? "" : `?expectedAssignmentVersion=${input.expectedAssignmentVersion}`}`, {
       method: input.mutation ? "POST" : "GET", cache: "no-store", headers: { "Accept-Language": locale },
       ...(input.mutation ? { body: input.mutation } : {}),
+    });
+    orderResponse = await apiFetchOptional<unknown>(`/vehicle-history/operator/requests/${input.id}/order?expectedAssignmentVersion=${input.expectedAssignmentVersion}`, {
+      cache: "no-store", headers: { "Accept-Language": locale },
     });
   } catch (error) { unstable_rethrow(error); failure = error; }
   const after = await historyInboxAction(locale, selection);
@@ -35,5 +38,6 @@ export async function historyOfferAction(locale: DeskLocale, value: unknown): Pr
   if (failure) return { status: "unavailable", scope: after.scope };
   if (response === null) return { status: "expired", scope: after.scope };
   const result = O.HistoryOfferSchema.safeParse(response);
-  return result.success ? { status: "ok", scope: after.scope, actorId: after.actor.id, data: result.data } : { status: "unavailable", scope: after.scope };
+  const order = H.HistoryOrderStateSchema.safeParse(orderResponse);
+  return result.success && order.success ? { status: "ok", scope: after.scope, actorId: after.actor.id, data: result.data, order: order.data } : { status: "unavailable", scope: after.scope };
 }

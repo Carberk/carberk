@@ -9143,6 +9143,191 @@
         ],
         "additionalProperties": false
       },
+      "HistoryOrderState": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "acceptedOffer": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "vin": {
+                    "type": "string",
+                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                  },
+                  "preflight": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "available"
+                        ]
+                      },
+                      "providers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "enum": [
+                                "Carfax",
+                                "AutoCheck"
+                              ]
+                            },
+                            "originalReportDate": {
+                              "type": "string",
+                              "nullable": true,
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "originalReportDate"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "maxItems": 2
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "providers"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "proposal": {
+                    "type": "object",
+                    "properties": {
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "pdf",
+                          "link",
+                          "both"
+                        ]
+                      },
+                      "deliveryFrom": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deliveryBy": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "priceTmt": {
+                        "type": "number",
+                        "enum": [
+                          100
+                        ]
+                      },
+                      "providerRule": {
+                        "type": "string",
+                        "enum": [
+                          "either_available_both_when_obtainable"
+                        ]
+                      },
+                      "terms": {
+                        "type": "string",
+                        "enum": [
+                          "service_failure_review"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "format",
+                      "deliveryFrom",
+                      "deliveryBy",
+                      "priceTmt",
+                      "providerRule",
+                      "terms"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "synthetic": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "version",
+                  "vin",
+                  "preflight",
+                  "proposal",
+                  "synthetic"
+                ],
+                "additionalProperties": false
+              },
+              "acceptedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "holdExpiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "deliveryDay": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            },
+            "required": [
+              "id",
+              "acceptedOffer",
+              "acceptedAt",
+              "holdExpiresAt",
+              "deliveryDay"
+            ],
+            "additionalProperties": false
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enquiry",
+              "awaiting_synthetic_payment",
+              "hold_expired"
+            ]
+          },
+          "serverNow": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wallet": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^SYNTHETIC-[A-Z0-9-]{1,64}$"
+          },
+          "collectionEnabled": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "order",
+          "status",
+          "serverNow",
+          "wallet",
+          "collectionEnabled"
+        ],
+        "additionalProperties": false
+      },
       "HistoryReminder": {
         "type": "object",
         "properties": {
@@ -11731,6 +11916,837 @@
           },
           "503": {
             "description": "Temporarily unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/order": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the immutable accepted order and current synthetic hold",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private synthetic state; collection is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "acceptedOffer": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "vin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                            },
+                            "preflight": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "available"
+                                  ]
+                                },
+                                "providers": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Carfax",
+                                          "AutoCheck"
+                                        ]
+                                      },
+                                      "originalReportDate": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "originalReportDate"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 2
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "providers"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "proposal": {
+                              "type": "object",
+                              "properties": {
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "priceTmt": {
+                                  "type": "number",
+                                  "enum": [
+                                    100
+                                  ]
+                                },
+                                "providerRule": {
+                                  "type": "string",
+                                  "enum": [
+                                    "either_available_both_when_obtainable"
+                                  ]
+                                },
+                                "terms": {
+                                  "type": "string",
+                                  "enum": [
+                                    "service_failure_review"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "format",
+                                "deliveryFrom",
+                                "deliveryBy",
+                                "priceTmt",
+                                "providerRule",
+                                "terms"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "synthetic": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "vin",
+                            "preflight",
+                            "proposal",
+                            "synthetic"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "acceptedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "holdExpiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deliveryDay": {
+                          "type": "string",
+                          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "acceptedOffer",
+                        "acceptedAt",
+                        "holdExpiresAt",
+                        "deliveryDay"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "enquiry",
+                        "awaiting_synthetic_payment",
+                        "hold_expired"
+                      ]
+                    },
+                    "serverNow": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^SYNTHETIC-[A-Z0-9-]{1,64}$"
+                    },
+                    "collectionEnabled": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "status",
+                    "serverNow",
+                    "wallet",
+                    "collectionEnabled"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Complete explicit quote acceptance required"
+          },
+          "403": {
+            "description": "Current request and assignment authority required"
+          },
+          "409": {
+            "description": "Quote stale, capacity full or order already accepted; refresh"
+          },
+          "503": {
+            "description": "Synthetic instructions unavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Explicitly accept the exact displayed quote and reserve a two-hour synthetic hold",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "offer": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "vin": {
+                        "type": "string",
+                        "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                      },
+                      "preflight": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "available"
+                            ]
+                          },
+                          "providers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Carfax",
+                                    "AutoCheck"
+                                  ]
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "originalReportDate"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "minItems": 1,
+                            "maxItems": 2
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "providers"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "proposal": {
+                        "type": "object",
+                        "properties": {
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
+                          },
+                          "deliveryFrom": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "deliveryBy": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "priceTmt": {
+                            "type": "number",
+                            "enum": [
+                              100
+                            ]
+                          },
+                          "providerRule": {
+                            "type": "string",
+                            "enum": [
+                              "either_available_both_when_obtainable"
+                            ]
+                          },
+                          "terms": {
+                            "type": "string",
+                            "enum": [
+                              "service_failure_review"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "format",
+                          "deliveryFrom",
+                          "deliveryBy",
+                          "priceTmt",
+                          "providerRule",
+                          "terms"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "synthetic": {
+                        "type": "boolean",
+                        "enum": [
+                          true
+                        ]
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "vin",
+                      "preflight",
+                      "proposal",
+                      "synthetic"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "offer"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private synthetic state; collection is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "acceptedOffer": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "vin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                            },
+                            "preflight": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "available"
+                                  ]
+                                },
+                                "providers": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Carfax",
+                                          "AutoCheck"
+                                        ]
+                                      },
+                                      "originalReportDate": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "originalReportDate"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 2
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "providers"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "proposal": {
+                              "type": "object",
+                              "properties": {
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "priceTmt": {
+                                  "type": "number",
+                                  "enum": [
+                                    100
+                                  ]
+                                },
+                                "providerRule": {
+                                  "type": "string",
+                                  "enum": [
+                                    "either_available_both_when_obtainable"
+                                  ]
+                                },
+                                "terms": {
+                                  "type": "string",
+                                  "enum": [
+                                    "service_failure_review"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "format",
+                                "deliveryFrom",
+                                "deliveryBy",
+                                "priceTmt",
+                                "providerRule",
+                                "terms"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "synthetic": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "vin",
+                            "preflight",
+                            "proposal",
+                            "synthetic"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "acceptedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "holdExpiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deliveryDay": {
+                          "type": "string",
+                          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "acceptedOffer",
+                        "acceptedAt",
+                        "holdExpiresAt",
+                        "deliveryDay"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "enquiry",
+                        "awaiting_synthetic_payment",
+                        "hold_expired"
+                      ]
+                    },
+                    "serverNow": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^SYNTHETIC-[A-Z0-9-]{1,64}$"
+                    },
+                    "collectionEnabled": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "status",
+                    "serverNow",
+                    "wallet",
+                    "collectionEnabled"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Complete explicit quote acceptance required"
+          },
+          "403": {
+            "description": "Current request and assignment authority required"
+          },
+          "409": {
+            "description": "Quote stale, capacity full or order already accepted; refresh"
+          },
+          "503": {
+            "description": "Synthetic instructions unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/order": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the immutable accepted order and current synthetic hold",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private synthetic state; collection is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "acceptedOffer": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "vin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                            },
+                            "preflight": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "available"
+                                  ]
+                                },
+                                "providers": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string",
+                                        "enum": [
+                                          "Carfax",
+                                          "AutoCheck"
+                                        ]
+                                      },
+                                      "originalReportDate": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "originalReportDate"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 2
+                                }
+                              },
+                              "required": [
+                                "status",
+                                "providers"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "proposal": {
+                              "type": "object",
+                              "properties": {
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "priceTmt": {
+                                  "type": "number",
+                                  "enum": [
+                                    100
+                                  ]
+                                },
+                                "providerRule": {
+                                  "type": "string",
+                                  "enum": [
+                                    "either_available_both_when_obtainable"
+                                  ]
+                                },
+                                "terms": {
+                                  "type": "string",
+                                  "enum": [
+                                    "service_failure_review"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "format",
+                                "deliveryFrom",
+                                "deliveryBy",
+                                "priceTmt",
+                                "providerRule",
+                                "terms"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "synthetic": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "vin",
+                            "preflight",
+                            "proposal",
+                            "synthetic"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "acceptedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "holdExpiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deliveryDay": {
+                          "type": "string",
+                          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "acceptedOffer",
+                        "acceptedAt",
+                        "holdExpiresAt",
+                        "deliveryDay"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "enquiry",
+                        "awaiting_synthetic_payment",
+                        "hold_expired"
+                      ]
+                    },
+                    "serverNow": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "wallet": {
+                      "type": "string",
+                      "nullable": true,
+                      "pattern": "^SYNTHETIC-[A-Z0-9-]{1,64}$"
+                    },
+                    "collectionEnabled": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    }
+                  },
+                  "required": [
+                    "order",
+                    "status",
+                    "serverNow",
+                    "wallet",
+                    "collectionEnabled"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Complete explicit quote acceptance required"
+          },
+          "403": {
+            "description": "Current request and assignment authority required"
+          },
+          "409": {
+            "description": "Quote stale, capacity full or order already accepted; refresh"
+          },
+          "503": {
+            "description": "Synthetic instructions unavailable"
           }
         }
       }

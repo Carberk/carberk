@@ -52,6 +52,7 @@ const server = setupServer(http.all("http://api.test/api/v1/*", async ({ request
     const init = { method: request.method, body: request.method === "POST" ? await request.text() : undefined };
     const url = new URL(input); requests.push({ path: url.pathname + url.search, method: init?.method ?? "GET", body: init?.body });
     if (url.pathname.endsWith("/desk")) return Response.json({ purpose: "vehicle-history", mode: "synthetic", actor, requests: [] });
+    if (url.pathname.endsWith("/order")) return Response.json({ order: null, status: "enquiry", serverNow: "2026-11-21T05:00:00.000Z", wallet: null, collectionEnabled: false });
     if (url.pathname.endsWith("/offer")) return Response.json({ version: 0, vin: null, preflight: null, proposal: null, synthetic: true });
     if (url.pathname.endsWith("/assignees")) return Response.json({ items: [colleague] });
     if (url.pathname.endsWith("/handover")) {
@@ -2092,4 +2093,35 @@ it("discards a proposal when the current session changes during its HTTP read", 
   await act(async () => { release(); });
   await screen.findByRole("link", { name: "Sign in again" });
   expect(screen.queryByText("VIN: DEMA0000000000001")).toBeNull();
+});
+
+
+it.each([
+  ["en", "Awaiting synthetic payment", "Payment hold expired"],
+  ["ru", "Ожидается тестовая оплата", "Срок брони оплаты истёк"],
+  ["tk", "Synag tölegine garaşylýar", "Töleg bronunyň möhleti gutardy"],
+] as const)("keeps the accepted %s order immutable in the current assigned workbench", async (locale, waiting, expired) => {
+  assigned = true;
+  platform.path = `/vehicle-history/${locale}`;
+  window.history.replaceState(null, "", `/vehicle-history/${locale}?selected=${id}&v=1`);
+  const acceptedOffer = { version: 2, vin: "DEMA0000000000001", synthetic: true,
+    preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+    proposal: { format: "both", priceTmt: 100, providerRule: "either_available_both_when_obtainable", terms: "service_failure_review",
+      deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" } };
+  let state = { order: { id, acceptedOffer, acceptedAt: "2026-11-21T05:00:00.000Z", holdExpiresAt: "2026-11-21T07:00:00.000Z", deliveryDay: "2026-11-21" },
+    status: "awaiting_synthetic_payment", serverNow: "2026-11-21T05:00:00.000Z", wallet: "SYNTHETIC-VH07-NO-TRANSFER" as string | null, collectionEnabled: false };
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests/:id/offer", () => Response.json(acceptedOffer)),
+    http.get("http://api.test/api/v1/vehicle-history/operator/requests/:id/order", () => Response.json(state)));
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  await screen.findByText(waiting);
+  expect(screen.getByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeTruthy();
+  expect(screen.getByText("2026-10-14")).toBeTruthy();
+  expect(screen.queryByLabelText("VIN")).toBeNull();
+  expect(screen.queryByRole("combobox", { name: /Delivery format|Формат получения|Gowşuryş görnüşi/ })).toBeNull();
+  state = { ...state, status: "hold_expired", serverNow: "2026-11-21T07:00:00.000Z", wallet: null };
+  cleanup();
+  render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
+  await screen.findByText(expired);
+  expect(screen.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
+  expect(requests.filter((request) => request.method === "POST" && /\/(order|offer)$/.test(request.path))).toEqual([]);
 });
