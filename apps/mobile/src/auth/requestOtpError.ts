@@ -20,16 +20,21 @@ export function isDailyCodeLimit(error: ApiError): boolean {
   );
 }
 
+export function getRequestOtpErrorKey(
+  error: unknown,
+  invalidKey: "phoneFormatError" | "emailFormatError",
+) {
+  if (!(error instanceof ApiError) || isUncertainWrite(error)) return "codeRequestUncertain";
+  if (error.code === "VALIDATION_FAILED") return invalidKey;
+  if (isDailyCodeLimit(error)) return "dailyCodeLimit";
+  if (error.code === "RATE_LIMITED" || error.status === 429) return "rateLimitedCode";
+  return "requestFailed";
+}
+
 export function getRequestOtpErrorCopy(
   error: unknown,
   t: Translate,
   invalidKey: "phoneFormatError" | "emailFormatError",
 ): string {
-  if (!(error instanceof ApiError) || isUncertainWrite(error)) return t("codeRequestUncertain");
-  if (error.code === "VALIDATION_FAILED") return t(invalidKey);
-  if (isDailyCodeLimit(error)) return t("dailyCodeLimit");
-  if (error.code === "RATE_LIMITED" || error.status === 429) {
-    return t("rateLimitedCode");
-  }
-  return t("requestFailed");
+  return t(getRequestOtpErrorKey(error, invalidKey));
 }

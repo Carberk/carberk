@@ -123,6 +123,25 @@ it("requests the selected method and opens the existing code route with its purp
 
 
 it.each([
+  ["phone", PhoneScreen, "6X XX-XX-XX", "61234567"],
+  ["email", EmailScreen, "name@example.com", "held@example.com"],
+] as const)("translates the uncertain %s Code request after switching languages without resending", async (_method, Screen, placeholder, value) => {
+  let attempts = 0;
+  server.use(http.post("*/auth/otp/request", () => { attempts++; return HttpResponse.error(); }));
+  const view = await renderMobile(<Screen />);
+  await fireEvent.changeText(view.getByPlaceholderText(placeholder), value);
+  await fireEvent.press(view.getByRole("button", { name: "Get code" }));
+  await view.findByText("Could not confirm whether a code was sent. Wait before requesting another.");
+
+  await act(async () => { await view.i18n.changeLanguage("ru"); });
+  expect(view.getByText("Не удалось подтвердить отправку кода. Подождите перед новым запросом.")).toBeTruthy();
+  await act(async () => { await view.i18n.changeLanguage("tk"); });
+  expect(view.getByText("Kodyň iberilendigini tassyklap bolmady. Täze kod soramazdan öň garaşyň.")).toBeTruthy();
+  expect(routerMock.push).not.toHaveBeenCalled();
+  expect(attempts).toBe(1);
+});
+
+it.each([
   ["en", "Phone", "Email", "Phone number", "Sign in to Carberk", "Close"],
   ["ru", "Телефон", "Эл. почта", "Номер телефона", "Вход в Carberk", "Закрыть"],
   ["tk", "Telefon", "E-poçta", "Telefon belgisi", "Carberk-e giriň", "Ýap"],
