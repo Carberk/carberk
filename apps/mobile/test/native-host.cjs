@@ -94,7 +94,7 @@ module.exports = {
   Switch: host("RCTSwitch", { accessible: true }),
   KeyboardAvoidingView: host("KeyboardAvoidingView"),
   // No keyboard opens in a host test; listeners are accepted and never called.
-  Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
+  Keyboard: { addListener: () => ({ remove() {} }), dismiss() {}, isVisible: () => false },
   // The host keeps `visible`, which a spec reads from this node.
   Modal: ({ visible = true, children, ...props }) => visible
     ? React.createElement("Modal", { ...props, visible }, children) : null,

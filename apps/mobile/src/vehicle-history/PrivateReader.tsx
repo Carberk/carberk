@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { AccessibilityInfo, ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, KeyboardAvoidingView, RefreshControl, ScrollView, View } from "react-native";
 import { router, useNavigation } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -95,8 +95,8 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
     );
   }
 
-  return (
-    <SafeScreen>
+  const screen = (
+    <>
       <StackHeader large
         title={detail ? `Carberk · ${t("vehicleHistory.title")}` : t("vehicleHistory.historyTitle")}
         leading={<BackButton ref={heading} onPress={back}
@@ -109,8 +109,11 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
           ? <RefreshControl refreshing={refreshing} onRefresh={retry} /> : undefined}>
         {content}
       </ScrollView>}
-    </SafeScreen>
+    </>
   );
+  return <SafeScreen>{detail ? <KeyboardAvoidingView behavior="padding" className="flex-1">
+    {screen}
+  </KeyboardAvoidingView> : screen}</SafeScreen>;
 }
 
 export function HistoryList() {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as SecureStore from "expo-secure-store";
 import { focusManager } from "@tanstack/react-query";
+import { Keyboard, type KeyboardEvent } from "react-native";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
@@ -146,4 +147,30 @@ it("shows accepted facts and the next action with access to the agreed details",
   expect(view.getByText("Send a test reference here.")).toBeTruthy();
   await fireEvent.press(details);
   expect(view.getByText("Accepted order · 100 TMT")).toBeTruthy();
+});
+
+it("keeps the accepted status and reply available while typing and restores details after the keyboard closes", async () => {
+  current = accepted;
+  const callbacks = new Map<string, (event: KeyboardEvent) => void>();
+  const subscribe = Keyboard.addListener;
+  const listenerSpy = vi.spyOn(Keyboard, "addListener").mockImplementation((event, callback) => {
+    callbacks.set(event, callback);
+    return subscribe(event, callback);
+  });
+  const openKeyboard: KeyboardEvent = { duration: 250, easing: "keyboard",
+    endCoordinates: { screenX: 0, screenY: 540, width: 402, height: 334 } };
+  try {
+    const view = await renderMobile(<RequestScreen />);
+    await view.findByRole("button", { name: "Details" });
+    const draft = await view.findByLabelText("Your message");
+    await fireEvent.changeText(draft, "Test acceptance reference");
+    await act(() => callbacks.get("keyboardWillShow")?.(openKeyboard));
+    expect(view.getByText("Awaiting synthetic payment · 100 TMT")).toBeTruthy();
+    expect(view.queryByText("DEMA0000000000001 · PDF and provider link")).toBeNull();
+    expect(view.getByDisplayValue("Test acceptance reference")).toBeTruthy();
+    expect(await view.findByRole("button", { name: "Send message", disabled: false })).toBeTruthy();
+    await act(() => callbacks.get("keyboardDidHide")?.(openKeyboard));
+    expect(view.getByRole("button", { name: "Details" })).toBeTruthy();
+    expect(view.getByText("DEMA0000000000001 · PDF and provider link")).toBeTruthy();
+  } finally { listenerSpy.mockRestore(); }
 });
