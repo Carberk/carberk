@@ -2051,6 +2051,31 @@ it.each(["pdf", "link", "both"] as const)("preflights the explicit VIN and propo
   expect(screen.queryByRole("button", { name: /accept|pay/i })).toBeNull();
 });
 
+it("keeps the quote and date editors when the proposed delivery window is refused", async () => {
+  assigned = true;
+  window.history.replaceState(null, "", `/vehicle-history/en?selected=${id}&v=1`);
+  server.use(http.all("http://api.test/api/v1/vehicle-history/operator/requests/:id/offer", ({ request }) => {
+    if (request.method === "POST") return Response.json({ code: "HISTORY_OFFER_INVALID" }, { status: 400 });
+    return Response.json({ version: 2, vin: "DEMA0000000000001", synthetic: true,
+      preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+      proposal: { format: "pdf", priceTmt: 100, providerRule: "either_available_both_when_obtainable",
+        terms: "service_failure_review", deliveryFrom: "2026-11-21T06:00:00Z", deliveryBy: "2026-11-21T07:00:00Z" },
+    });
+  }));
+  render(view());
+  await screen.findByText("Delivery format: PDF only");
+  fireEvent.change(screen.getByLabelText("Delivery format"), { target: { value: "both" } });
+  const fromLabel = "Delivery from (Ashgabat time)";
+  const byLabel = "Delivery by (Ashgabat time)";
+  fireEvent.change(screen.getByLabelText(fromLabel), { target: { value: "2026-11-21T08:00" } });
+  fireEvent.change(screen.getByLabelText(byLabel), { target: { value: "2026-11-21T08:30" } });
+  fireEvent.click(await enabledButton("Propose 100 TMT offer"));
+  expect((await screen.findByRole("alert")).textContent).toMatch(/today or tomorrow.*09:00–20:00/);
+  expect(screen.getByText("Delivery format: PDF only")).toBeTruthy();
+  expect(screen.getByLabelText<HTMLInputElement>(fromLabel).value).toBe("2026-11-21T08:00");
+  expect(screen.getByLabelText<HTMLInputElement>(byLabel).disabled).toBe(false);
+});
+
 it("discards a proposal when the current session changes during its HTTP read", async () => {
   assigned = true;
   window.history.replaceState(null, "", `/vehicle-history/en?selected=${id}&v=1`);

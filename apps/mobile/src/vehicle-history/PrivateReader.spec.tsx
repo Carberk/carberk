@@ -364,6 +364,38 @@ it("submits the exact VIN for review through the real client and rereads the cle
   expect(submitted).toEqual({ kind: "vin", vin: " dema 0000000000001 ", expectedVersion: 0 });
   expect(view.getByText("Awaiting an operator availability check.")).toBeTruthy();
 });
+
+it("keeps the saved quote visible during a request refresh and removes it on denial", async () => {
+  routeParams.id = requestId;
+  const pending = deferred<Response>();
+  const started = deferred<undefined>();
+  let holdRefresh = false;
+  server.use(http.get("*/vehicle-history/requests/:id", () => {
+    if (!holdRefresh) return HttpResponse.json(enquiry());
+    started.resolve(undefined);
+    return pending.promise;
+  }), http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({
+    version: 2, vin: "DEMA0000000000001", synthetic: true,
+    preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+    proposal: { format: "pdf", priceTmt: 100, providerRule: "either_available_both_when_obtainable",
+      terms: "service_failure_review", deliveryFrom: "2026-11-21T06:00:00Z", deliveryBy: "2026-11-21T07:00:00Z" },
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("Offer preview · 100 TMT");
+  await fireEvent.changeText(view.getByLabelText("VIN"), "DEMA0000000000006");
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Send VIN for review" })).not.toBeDisabled());
+  holdRefresh = true;
+  await act(async () => {
+    void getHost(view.container, "RCTScrollView").props.refreshControl.props.onRefresh();
+    await started.promise;
+  });
+  expect(view.queryByText("Offer preview · 100 TMT")).toBeTruthy();
+  expect(view.getByRole("button", { name: "Send VIN for review" })).toBeDisabled();
+  await act(() => pending.resolve(HttpResponse.json({ code: "FORBIDDEN" }, { status: 403 })));
+  expect(await view.findByText("This request is unavailable for this session. Go back to your requests.")).toBeTruthy();
+  expect(view.queryByText("Offer preview · 100 TMT")).toBeNull();
+});
+
 it.each([
   ["malformed", "Use 17 Latin letters"], ["unsupported", "This vehicle, product or market"], ["no_history", "No history was found"],
   ["mismatch", "Vehicle details do not match"], ["outage", "The provider check is temporarily unavailable"],

@@ -201,8 +201,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
       {header}
-      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
-        revision={pages.dataUpdatedAt} />}
+      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected} />}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
       {!thread.connected && <Text accessibilityRole="alert">{t("vehicleHistory.offline")}</Text>}

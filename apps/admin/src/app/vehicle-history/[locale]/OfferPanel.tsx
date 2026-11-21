@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { HistoryOfferSchemas as O } from "@auto-tm/contracts";
 import { Button } from "@auto-tm/ui/components";
 
@@ -19,6 +19,8 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   const [vin, setVin] = useState("");
   const [format, setFormat] = useState<"" | "pdf" | "link" | "both">("");
   const [from, setFrom] = useState(""), [by, setBy] = useState("");
+  const [windowInvalid, setWindowInvalid] = useState(false);
+  const windowHelp = useId();
   const alive = useRef(true), busy = useRef(false), generation = useRef(0);
   const binding = `${id}:${version}:${scope}:${actorId}:${locale}`;
   const currentBinding = useRef(binding); currentBinding.current = binding;
@@ -32,6 +34,10 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
     try {
       const result = await historyOfferAction(locale, { id, scope, expectedAssignmentVersion: version, ...(mutation ? { mutation } : {}) });
       if (!alive.current || expected !== currentBinding.current || attempt !== generation.current) return;
+      if (result.status === "validation" && mutation?.kind === "propose") {
+        setWindowInvalid(true); setPhase("ready");
+        return;
+      }
       if (result.status !== "ok") {
         setData(null); setPhase("error");
         if (["expired", "denied", "stale"].includes(result.status)) invalidate({ status: result.status });
@@ -39,6 +45,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       }
       if (result.scope !== scope || result.actorId !== actorId) { setData(null); setPhase("error"); return; }
       setData(result.data); setPhase("ready");
+      if (mutation) setWindowInvalid(false);
       if (!vin || mutation?.kind === "check") setVin(result.data.vin ?? "");
     } catch { if (alive.current && expected === currentBinding.current) { setData(null); setPhase("error"); } }
     finally { busy.current = false; }
@@ -72,8 +79,12 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
           onChange={(event) => setFormat(event.target.value as typeof format)}>
           <option value="">{t.choose}</option>{(["pdf", "link", "both"] as const).map((value) => <option key={value} value={value}>{t[value]}</option>)}
         </select></label>
-        <label className="block">{t.fromLabel}<input className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-        <label className="block">{t.byLabel}<input className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" type="datetime-local" value={by} onChange={(event) => setBy(event.target.value)} /></label>
+        <label className="block">{t.fromLabel}<input className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" type="datetime-local" value={from}
+          aria-invalid={windowInvalid || undefined} aria-describedby={windowHelp} onChange={(event) => { setFrom(event.target.value); setWindowInvalid(false); }} /></label>
+        <label className="block">{t.byLabel}<input className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" type="datetime-local" value={by}
+          aria-invalid={windowInvalid || undefined} aria-describedby={windowHelp} onChange={(event) => { setBy(event.target.value); setWindowInvalid(false); }} /></label>
+        <p key={String(windowInvalid)} id={windowHelp} role={windowInvalid ? "alert" : undefined}
+          className={windowInvalid ? "text-destructive" : "text-muted-foreground"}>{t.windowHelp}</p>
         <Button className="h-auto min-h-11 w-full whitespace-normal" disabled={!format || !from || !by || from >= by} onClick={() => {
           if (!format) return;
           void run({ kind: "propose", format, expectedVersion: data.version, expectedAssignmentVersion: version,

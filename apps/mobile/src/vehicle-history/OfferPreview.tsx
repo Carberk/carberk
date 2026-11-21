@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, active, connected, revision }: {
-  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; active: boolean; connected: boolean; revision: number;
+export function OfferPreview({ viewer, request, ready, active, connected }: {
+  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; active: boolean; connected: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
@@ -32,9 +32,8 @@ export function OfferPreview({ viewer, request, ready, active, connected, revisi
     && AppState.currentState === "active" && focusManager.isFocused();
   const state = useQuery({ queryKey: [...queryKeys.vehicleHistory.detail(viewer.userId, viewer.sessionId, request.id), "offer", request.assignmentVersion],
     queryFn: () => { const attempt = generation.current; return stream.offer(() => current() && attempt === generation.current); },
-    enabled: ready && active && connected, retry: false, staleTime: 0, networkMode: "always" });
-  const reload = useRef(state.refetch); reload.current = state.refetch;
-  useEffect(() => { if (ready && active && connected && !busy.current) void reload.current(); }, [revision, ready, active, connected]);
+    enabled: ready && active && connected, retry: false, staleTime: 0, networkMode: "always",
+    refetchOnWindowFocus: false, refetchOnReconnect: false });
   const data = state.data;
   async function send() {
     if (!data || !current() || !vin.trim() || busy.current || state.isFetching || state.error) return;
@@ -55,12 +54,13 @@ export function OfferPreview({ viewer, request, ready, active, connected, revisi
   const denied = state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const error = failed || !!state.error;
   const proposal = data?.proposal;
+  const canEdit = ready && connected && !saving;
   return <View className="gap-3 rounded-2xl border border-border p-4">
     <Text accessibilityRole="header" className="text-headline font-semibold">{copy("title")}</Text>
     <Text className="text-footnote text-muted-foreground">{copy("synthetic")}</Text>
-    {!ready || !active ? null : state.isPending && !error ? <ActivityIndicator accessibilityLabel={copy("loading")} />
+    {!active || (!ready && !data) ? null : state.isPending && !error ? <ActivityIndicator accessibilityLabel={copy("loading")} />
       : error ? <View className="gap-3"><Text accessibilityRole="alert">{copy(denied ? "denied" : "error")}</Text>
-        <Button variant="secondary" disabled={!connected || state.isFetching} onPress={() => { setFailed(false); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
+        <Button variant="secondary" disabled={!ready || !connected || state.isFetching} onPress={() => { setFailed(false); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
         : data && <>
           <Text accessibilityLiveRegion="polite">{copy(data.preflight?.status ?? (data.vin ? "unchecked" : "empty"))}</Text>
           {data.vin && <Text selectable className="text-body font-mono">VIN: {data.vin}</Text>}
@@ -79,8 +79,8 @@ export function OfferPreview({ viewer, request, ready, active, connected, revisi
           </View>}
           <Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
           <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={setVin} maxLength={80}
-            autoCapitalize="characters" autoCorrect={false} editable={!saving} />
-          <Button variant="secondary" disabled={!vin.trim() || saving || !connected || state.isFetching} accessibilityState={{ busy: saving }} onPress={() => { void send(); }}>
+            autoCapitalize="characters" autoCorrect={false} editable={canEdit} />
+          <Button variant="secondary" disabled={!vin.trim() || !canEdit || state.isFetching} accessibilityState={{ busy: saving }} onPress={() => { void send(); }}>
             <Text>{copy(saving ? "pending" : "sendVin")}</Text>
           </Button>
         </>}
