@@ -52,7 +52,13 @@ Use an existing local actor authorized for the selected flow. The documented sha
      --phone +99365000901 --request-id <UUID> --requested-at <ISO_TIMESTAMP>
    ```
 
-   The JSON result contains `codeFile`, its private `directory` and `expiresAt`; it contains no code. The directory is owner-only and the file is mode 0600. Read its contents inside tool orchestration and pass them directly to the real code field without printing them into the conversation, command arguments, logs or reports. Use a current snapshot locator. Stop screenshots/recording during code entry. Remove this returned directory after use. Never choose the latest suffix-matching log entry.
+   The JSON result contains `codeFile`, its private `directory` and `expiresAt`; it contains no code. The directory is owner-only and the file is mode 0600. Read its contents inside tool orchestration and pass them directly to the real code field without printing them into the conversation, command arguments, logs or reports. Use a current snapshot locator. Stop screenshots/recording during code entry. Never choose the latest suffix-matching log entry.
+
+   Clean up using the exact paths returned by this invocation. Unlink the code file first, then remove its empty directory. Recursive shell removal can trigger a separate T3 approval.
+
+   ```bash
+   unlink "$code_file" && rmdir "$code_directory"
+   ```
 
 4. When Admin shows authenticator verification or its enrollment QR, retrieve the current TOTP from the **same selected API database/key**:
 

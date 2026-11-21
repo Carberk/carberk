@@ -210,9 +210,12 @@ const HELP = `Usage: pnpm native:signin --fixture seller|buyer|history-requester
   --api-env /absolute/path/to/running-api/.env --api-log /tmp/that-api.log
   --device-command-file /tmp/owned-device.json
   [--reuse-only] [--request-id UUID --requested-at ISO_TIMESTAMP]
+Use the receipt from your current T3 device_open call and try --reuse-only first.
+If Code is already open, use the original request ID and timestamp.
 See docs/agents/native-fixture-signin.md. No code is printed or saved.`;
 
 export async function cli(argv, { out = console.log, err = console.error, ...ports } = {}) {
+  let deviceContext;
   try {
     if (argv.includes("--help")) { out(HELP); return 0; }
     const options = {};
@@ -228,15 +231,20 @@ export async function cli(argv, { out = console.log, err = console.error, ...por
     if (!options.fixture || ![options.apiEnv, options.apiLog, options.deviceFile].every(value => value && isAbsolute(value)) ||
         Boolean(options.requestId) !== Boolean(options.requestedAt)) throw new FixtureError("Missing fixture, absolute input paths or paired existing-request context; use --help");
     const read = ports.readFile ?? readFile;
-    const device = callerDevice(JSON.parse(await read(options.deviceFile, "utf8")), ports);
+    const receipt = JSON.parse(await read(options.deviceFile, "utf8"));
+    const device = callerDevice(receipt, ports);
+    const { hostId, deviceId, session } = receipt;
+    deviceContext = Object.fromEntries(Object.entries({ hostId, deviceId, session })
+      .filter(([, value]) => typeof value === "string" && /^[a-zA-Z0-9._:-]{1,128}$/.test(value)));
     const result = await signInFixture(options, {
       readFile: read, fetch: ports.fetch ?? fetch, device, now: ports.now ?? Date.now,
       sleep: ports.sleep ?? (ms => new Promise(done => setTimeout(done, ms))),
     });
-    out(JSON.stringify(result));
+    out(JSON.stringify({ ...result, device: deviceContext }));
     return 0;
   } catch (error) {
-    err(error instanceof FixtureError ? error.message : "Local fixture setup failed; raw diagnostics suppressed. Stop without resending.");
+    const message = error instanceof FixtureError ? error.message : "Local fixture setup failed; raw diagnostics suppressed. Stop without resending.";
+    err(deviceContext ? `${message} Device receipt: ${JSON.stringify(deviceContext)}` : message);
     return 1;
   }
 }

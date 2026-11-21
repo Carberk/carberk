@@ -370,8 +370,36 @@ test("public CLI signs in without printing or saving the OTP or response", async
     },
   });
   assert.equal(code, 0);
-  assert.deepEqual(output, ['{"fixture":"seller","status":"signed-in","identityConfirmed":true}']);
+  assert.deepEqual(output.map(JSON.parse), [{
+    fixture: "seller", status: "signed-in", identityConfirmed: true,
+    device: { deviceId: "device", session: "owned" },
+  }]);
   assert.doesNotMatch(output.join("\n"), /709814|99361000001|abcdef01/);
+});
+
+test("public CLI reports the selected simulator and exact request when the Code screen has no available input", async () => {
+  const port = boundary();
+  const output = [];
+  const code = await cli(["--fixture", "seller", "--api", options.api, "--api-env", options.apiEnv,
+    "--api-log", options.apiLog, "--device-command-file", "/tmp/device.json",
+    "--request-id", ID, "--requested-at", "2026-11-12T06:00:00Z"], {
+    ...port, cwd: "/tmp/own-worktree", err: value => output.push(value), out: () => assert.fail("expected a safe failure"),
+    readFile: path => path.endsWith("device.json") ? JSON.stringify({ ...receipt, hostId: "local" }) : port.readFile(path),
+    executeFile: async (_exe, args, config) => {
+      assert.deepEqual(args, ["snapshot", "-i", "--json", "--no-record"]);
+      assert.equal(config.input, undefined);
+      return { stdout: JSON.stringify({ success: true, data: { nodes: [
+        { label: "Enter the code" }, { label: "+993 61 XX-XX-01" }, { label: "raw-private-snapshot-value" },
+      ] } }) };
+    },
+  });
+  assert.equal(code, 1);
+  assert.equal(output.length, 1);
+  assert.match(output[0], /OTP UI editable input did not become ready/);
+  assert.ok(output[0].includes(ID));
+  assert.match(output[0], /Device receipt: {"hostId":"local","deviceId":"device","session":"owned"}/);
+  assert.doesNotMatch(output[0], /709814|raw-private-snapshot-value|agent-device|own-worktree/);
+  assert.deepEqual(port.requests.map(([url]) => new URL(url).pathname), ["/healthz"]);
 });
 
 test("supports buyer identity and its own correlated request", async () => {

@@ -7,47 +7,60 @@ Implementers and Sol UI reviewers **must use `pnpm native:signin` for ordinary s
 1. Run the [canonical read-only readiness check](local-testing.md#1-check-and-reuse-the-local-baseline) with the selected API and worker env files and explicit existing owner/denial-account mappings. Keep its rich baseline/media versions and local target in the proof record; it does not establish device identity or the served bundle. Start sign-in with `--reuse-only`, using that API's private mock log. Confirm the installed app is running your intended Metro bundle with the same local API origin. The helper checks the API config and live environment; it cannot identify which Metro bundle an already installed app loaded.
 2. Coordinate a single free iOS 26.2 simulator. In T3, call `device_list`, then `device_open` with its host and ID. Use only its returned `agent-device` command. A held device is a blocker; preserve its owner and session. Do not boot extra devices to work around contention.
 3. Read `help open`, `help snapshot`, `help fill` and `help press` using that exact command on your session. Open the app with that command before reading its UI. Stop on device errors and follow the documented advice once; repeated failure requires a handoff, not a new session or alternate driver.
-4. Put the returned bound executable alone in a JSON array in `/tmp/owned-device.json`, together with `worktree` (your absolute checkout path), `session` and `deviceId` from that command. The T3 wrapper already carries the target/session flags; do not add them. This is structured process input, never shell text. For example, its shape is:
+4. Save a private receipt at an owned path such as `/tmp/owned-device.json`. Copy `session` and the bound executable from `device_open.agentDevice`, and copy `hostId` and `deviceId` from `device_open.device.hostId` and `device_open.device.id`. Keep the simulator name and OS version in your proof record. The worktree is your absolute checkout path. Put only the executable in the command array. The T3 wrapper already carries its target and session flags.
 
 ```json
 {
   "worktree": "/absolute/path/to/your/worktree",
   "session": "YOUR_DEVICE_OPEN_SESSION",
+  "hostId": "local",
   "deviceId": "YOUR_SELECTED_DEVICE_ID",
   "command": ["/absolute/path/to/device/targets/YOUR_DEVICE_OPEN_SESSION/agent-device"]
 }
 ```
 
-The helper never selects, boots, closes, resets or takes over another device. All UI operations compose the caller's command with argument arrays, sequential fresh snapshots and current field refs. It passes code text over stdin when an editable field is exposed. For the transparent iOS OTP input, it uses the focused native number pad with fresh semantic key selectors and digit readback; it stops if focus, selectors or readback change. It suppresses action recording and captures command output in memory so code entry never becomes a saved report. Keep screenshots and recordings off during code entry; take proof only after the code screen has gone.
+Create a fresh receipt after a T3 restart or device handoff. The helper reports the selected device ID and automation session with the result or safe error, and includes the host ID if supplied. The helper never selects, boots, closes, resets or takes over another device. All UI operations compose the caller's command with argument arrays, sequential fresh snapshots and current field refs. It passes code text over stdin when an editable field is exposed. For the transparent iOS OTP input, it uses the focused native number pad with fresh semantic key selectors and digit readback; it stops if focus, selectors or readback change. It suppresses action recording and captures command output in memory so code entry never becomes a saved report. Keep screenshots and recordings off during code entry; take proof only after the code screen has gone.
 
 At handoff, use your own bound command's documented `close` first and confirm `Closed: <your-session>` with exit 0, then close the T3 device panel with `device_close`. Closing only the panel can leave the native automation lock held. Preserve the app's signed-in data: closing automation needs no logout, reset or app reopen. Never close another owner's CLI session or change its locks.
 
 ## Reuse, then sign in
 
+Use the bound command from the receipt and the Metro port reported by the selected runtime. Confirm the served bundle uses that runtime's API origin.
+
 ```bash
-pnpm native:signin --fixture seller \
-  --api http://127.0.0.1:3006/api/v1 \
-  --api-env /absolute/path/to/running-api/apps/api/.env \
-  --api-log /tmp/your-api-3006.log \
-  --device-command-file /tmp/owned-device.json
+"$bound_device" open tm.auto.app --relaunch --metro-port "$metro_port"
 ```
 
-Use `buyer` for the native buyer fixture or `history-requester` for the requester in a named History runtime. The normal command first checks for a reusable session and signs in if Cabinet is signed out. Add `--reuse-only` when checking identity without spending a code. Cabinet must show the fixture's Display Name and masked Sign-in Method. The helper waits for that identity to settle after verification and returns `identityConfirmed: true`. If another account is signed in, use normal sign-out on an owned device before starting a new fixture session.
+Build the reusable sign-in command from the runtime's reported API origin, effective env and private API log. Use `history-requester` for a named History runtime, or `seller` or `buyer` for the native fixtures.
+
+```bash
+signin=(pnpm native:signin --fixture history-requester --api "${api_origin}/api/v1"
+  --api-env "$api_env" --api-log "$api_log" --device-command-file "$device_receipt")
+"${signin[@]}" --reuse-only
+```
+
+If Cabinet shows the expected Display Name and masked Sign-in Method, `identityConfirmed: true` means the session is ready. If Cabinet is signed out, run `"${signin[@]}"` for one ordinary sign-in. If another account is signed in, use normal sign-out on the owned device before starting a new fixture session.
 
 If signed out, the helper issues one API request, matches its returned request ID and the chosen fixture in that API's dated mock log, opens the existing OTP route with `method`, `destination` and `resendInSeconds`, and enters the code in its real native field. The app's normal verification stores the session. The helper never calls verification itself or reads/injects tokens. It then confirms the fixture identity in Cabinet. Preserve the signed-in app data for the next run.
 
-For a code already requested through the real entry flow, add both:
+For a code already requested, keep the genuine Code screen focused and use the exact request ID and UTC timestamp from the successful request or the helper’s safe error.
 
-```text
---request-id FULL_UUID_FROM_THAT_SUCCESSFUL_REQUEST --requested-at ISO_TIMESTAMP_OF_THAT_REQUEST
+```bash
+"${signin[@]}" --request-id "$request_id" --requested-at "$requested_at"
 ```
 
-This retrieves that exact code and delivers it to the currently focused genuine verification UI without issuing another request or navigating away from its auth intent. Exact-request delivery reports `verified`, with `identityConfirmed: false`, after Code leaves; it keeps the calling flow in focus so replay can finish. Observe its result, then run `--reuse-only` separately to confirm the fixture in Cabinet. If a successful request is followed by a UI failure, the error includes only the validated request ID, request timestamp, fixture role and masked destination. Reuse that context with these flags before expiry; do not request again just because UI setup failed. Keep the context in memory or a private temporary note; never save an unredacted response. No option prints the code.
+This retrieves that exact code and delivers it to the currently focused genuine verification UI without issuing another request or navigating away from its auth intent. Exact-request delivery reports `verified`, with `identityConfirmed: false`, after Code leaves; it keeps the calling flow in focus so replay can finish. Observe its result, then run `--reuse-only` separately to confirm the fixture in Cabinet. If a successful request is followed by a UI failure, the request context includes only the validated request ID, request timestamp, fixture role and masked destination. Reuse that context with these flags before expiry; do not request again just because UI setup failed. Keep the context in memory or a private temporary note; never save an unredacted response. No option prints the code.
+
+## When sign-in stalls
+
+- **`OTP UI editable input did not become ready`.** On the Carberk Video Review iOS 26.2 simulator after a T3 restart, the correct Turkmen Code screen showed six empty boxes, while the bound snapshot exposed neither an editable field nor a number pad. The highlighted first box alone does not confirm focus. Refocusing the boxes and replaying the same request also failed. Use the bound device and its documented help to check the current input. Resume the original request only when an editable field or the genuine number pad is available. Record the simulator name, OS, device ID, Metro and API origins, and whether either input was visible.
+- **`OTP UI verification did not complete`.** Check the selected API's private request log at the saved timestamp. A successful request with no verify request at that API calls for checking the served API origin and the Code screen. If verification succeeded, confirm Cabinet with `--reuse-only`. Record route, status and UI outcome without copying log lines or codes.
+- **`RATE_LIMITED`.** Use the safe reason and retry time. Wait out a backoff, or recover an exhausted quota in the owned disposable runtime using [the named-runtime command](environment.md#local-development) before one ordinary attempt.
 
 ## Refusals and privacy
 
 Only loopback HTTP APIs are accepted; `localhost` is pinned to IPv4 loopback and redirects are refused. The env file must describe the running port, `APP_ENV`/`NODE_ENV` development or test, `SMS_DRIVER=mock`, and both CI-only OTP response flags explicitly false. `/healthz` must confirm the same environment. Never enable `OTP_TEST_MODE` for native setup.
 
-Codes require one matching request tag, the fixture's last four digits and a dated log line within five seconds of the request. Missing, undated, superseded, ambiguous or four-minute-old codes fail closed (the API's phone TTL is five minutes). The helper reports `RATE_LIMITED` with the safe reason and, for backoff, seconds remaining. Recover an exhausted disposable fixture quota with [the named-runtime command](environment.md#local-development), then make one ordinary sign-in attempt. Shared runtimes use the normal budget of five codes per destination daily and ten per IP hourly, with increasing backoff. If the code was accepted but Cabinet confirmation timed out, use `--reuse-only` to confirm the settled state before spending another code.
+Codes require one matching request tag, the fixture's last four digits and a dated log line within five seconds of the request. Missing, undated, superseded, ambiguous or four-minute-old codes fail closed (the API's phone TTL is five minutes). Shared runtimes use the normal budget of five codes per destination daily and ten per IP hourly, with increasing backoff. If the code was accepted but Cabinet confirmation timed out, use `--reuse-only` to confirm the settled state before spending another code.
 
 Failures are bounded and redact raw process/network output. Diagnose with non-secret status and your session's documented help. Keep API env files and mock logs private. Codes, tokens, credentials and raw API responses belong in neither git nor screenshots, reports, PRs or normal tool output. Evidence lives outside git and states the fixture role, device/runtime, final identity assertion and limits. If the helper cannot complete, preserve the work and report the blocker; it does not waive runtime acceptance.
