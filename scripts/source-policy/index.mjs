@@ -11,6 +11,7 @@ import { parseShell, shellExecutableOption } from "./shell.mjs";
 import { parseDocker } from "./docker.mjs";
 import { parseMake } from "./make.mjs";
 import { parsePython } from "./python.mjs";
+import { parseRuby } from "./ruby.mjs";
 import { parseCss } from "./css.mjs";
 import { parseMarkup } from "./markup.mjs";
 import { parseYaml } from "./yaml.mjs";
@@ -215,6 +216,7 @@ for (const [names, adapter] of [
     return { comments, deferred: [] };
   }],
   [["python", "py", "python3"], (input) => parsePython({ ...input, fileType: "python", executable: true })],
+  [["ruby"], parseRuby],
   [["shell", "sh", "bash"], (input) => parseShell({ ...input, fileType: "shell", dialect: input.fileType === "sh" ? "posix" : "bash", executable: true })],
   [["css"], parseCss], [["html", "xml"], markup], [["yaml", "yml"], executableYaml],
   [["docker", "dockerfile"], (input) => parseDocker({ ...input, fileType: "docker" })], [["make", "makefile"], (input) => parseMake({ ...input, fileType: "make" })],
