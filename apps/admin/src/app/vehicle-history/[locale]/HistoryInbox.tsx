@@ -29,6 +29,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   );
   const [offline, setOffline] = useState(false);
   const [failure, setFailure] = useState<{ key: string; state: string } | null>(null);
+  const [handoverNotice, setHandoverNotice] = useState<string | null>(null);
   const t = deskCopy[locale];
   const current = queue?.key === key && queue.source === initial ? queue.result : null;
   function navigate(changes: Record<string, string | null>, replace = false) {
@@ -97,6 +98,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
       </p>}</div>
       <span className="rounded-md bg-muted px-3 py-2 text-sm">{t.synthetic}</span>
     </header>
+    {handoverNotice && <p role="status" aria-live="polite" className="mb-5 rounded-md border p-3 text-sm">{handoverNotice}</p>}
     <div className="mb-5 flex flex-wrap items-end gap-3">
       <div className="flex flex-wrap gap-2" aria-label={t.filter}>
         {(["unassigned", "mine"] as const).map((filter) => <Button key={filter} variant={query.success && query.data.filter === filter ? "primary" : "secondary"}
@@ -141,7 +143,8 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
             row={selectedRow} scope={admitted.scope} actor={admitted.actor}
             listingOpen={url.get("source") === "listing"} listing={listing} returnQuery={raw}
             refresh={refresh} invalidate={(result) => { queueGeneration.current++; setQueue({ key, source: initial, result }); }}
-            claimed={(assignmentVersion) => navigate({ selected: id.data, v: String(assignmentVersion) }, true)} />
+            claimed={(assignmentVersion) => navigate({ selected: id.data, v: String(assignmentVersion) }, true)}
+            handedOver={(name) => { refresh(true); setHandoverNotice(t.handoverComplete.replace("{name}", name)); }} />
             : <p className="p-6 text-sm text-muted-foreground lg:col-span-1 xl:col-span-2">{t.select}</p>}
         </div>}
   </>;

@@ -1,10 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService, type Prisma } from "@auto-tm/db";
-import type { HistoryAssignmentRepository, HistoryQueueQuery, HistoryQueueItem, HistoryMessageRequest, HistoryWaitingStore, HistoryMessageAuthority } from "../domain/HistoryAssignmentRepository";
+import type { HistoryAssignmentRepository, HistoryQueueQuery, HistoryQueueItem, HistoryMessageRequest, HistoryWaitingStore, HistoryMessageAuthority, HistoryHandoverAuthority } from "../domain/HistoryAssignmentRepository";
 import { assertHistoryWaitingProgress, type HistoryWaitingFacts, type HistoryWaitReason } from "../domain/HistoryWaiting";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { ConfigService } from "@nestjs/config";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { isDeepStrictEqual } from "node:util";
 import type { Env } from "../../../env.schema";
 import { MESSAGE_AUTHORITY_FENCE_PORT, type MessageAuthorityFencePort } from "../../identity/identity.public";
@@ -46,43 +46,63 @@ export class HistoryMessageLocks {
   }
   async withRequest<T>(id: string, authority: HistoryMessageAuthority,
     operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore) => Promise<T>): Promise<T> {
+    return this.withRequestTransaction(id, authority, async (client, request) => {
+      let active = true;
+      const assertActive = () => { if (!active) throw new Error("History waiting lock has ended"); };
+      const waiting: HistoryWaitingStore = {
+        read: async () => {
+          assertActive();
+          const { rows } = await client.query<WaitingRow>("SELECT * FROM vehicle_history_requests WHERE id = $1", [id]);
+          if (!rows[0]) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
+          return waitingFacts(rows[0]);
+        },
+        save: async (facts) => {
+          assertActive();
+          const previous = await waiting.read();
+          if (isDeepStrictEqual(previous, facts)) return;
+          assertHistoryWaitingProgress(previous, facts);
+          const data = {
+            waitingReason: facts.reason,
+            waitingSince: facts.since,
+            waitingVersion: facts.version,
+            publicMessageId: facts.publicMessageId,
+            publicMessageOrder: facts.publicMessageOrder,
+            reminderUsed: facts.used,
+            reminderMessageId: facts.outcome?.messageId ?? null,
+            reminderSenderId: facts.outcome?.senderId ?? null,
+            reminderClientMessageId: facts.outcome?.clientMessageId ?? null,
+            reminderText: facts.outcome?.text ?? null,
+            reminderOrder: facts.outcome?.order ?? null,
+            reminderSentAt: facts.outcome?.sentAt ?? null,
+            declined: facts.declined,
+            remindersStopped: facts.stopped,
+            lifecycleSourceId: facts.sourceId,
+            lifecycleSourceVersion: facts.sourceVersion,
+          };
+          const columns = Object.keys(data).map((name, index) => `"${name}" = $${index + 2}`);
+          await client.query(`UPDATE vehicle_history_requests SET ${columns.join(", ")} WHERE id = $1`, [id, ...Object.values(data)]);
+        },
+      };
+      try { return await operation(request, waiting); }
+      finally { active = false; }
+    });
+  }
+
+  async handover(authority: HistoryHandoverAuthority, id: string, expectedVersion: number, confirmAuthority: () => Promise<void>) {
+    await this.withRequestTransaction(id, authority, async (client) => {
+      await confirmAuthority();
+      const { rowCount } = await client.query(`UPDATE vehicle_history_requests
+        SET "assignedOperatorId" = $1, "assignmentVersion" = "assignmentVersion" + 1
+        WHERE id = $2 AND "assignedOperatorId" = $3 AND "assignmentVersion" = $4`,
+      [authority.recipientId, id, authority.userId, expectedVersion]);
+      if (rowCount !== 1) throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
+      await confirmAuthority();
+    });
+  }
+
+  private async withRequestTransaction<T>(id: string, authority: HistoryMessageAuthority | HistoryHandoverAuthority,
+    operation: (client: PoolClient, request: HistoryMessageRequest | null) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
-    let active = true;
-    const assertActive = () => { if (!active) throw new Error("History waiting lock has ended"); };
-    const waiting: HistoryWaitingStore = {
-      read: async () => {
-        assertActive();
-        const { rows } = await client.query<WaitingRow>("SELECT * FROM vehicle_history_requests WHERE id = $1", [id]);
-        if (!rows[0]) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
-        return waitingFacts(rows[0]);
-      },
-      save: async (facts) => {
-        assertActive();
-        const previous = await waiting.read();
-        if (isDeepStrictEqual(previous, facts)) return;
-        assertHistoryWaitingProgress(previous, facts);
-        const data = {
-          waitingReason: facts.reason,
-          waitingSince: facts.since,
-          waitingVersion: facts.version,
-          publicMessageId: facts.publicMessageId,
-          publicMessageOrder: facts.publicMessageOrder,
-          reminderUsed: facts.used,
-          reminderMessageId: facts.outcome?.messageId ?? null,
-          reminderSenderId: facts.outcome?.senderId ?? null,
-          reminderClientMessageId: facts.outcome?.clientMessageId ?? null,
-          reminderText: facts.outcome?.text ?? null,
-          reminderOrder: facts.outcome?.order ?? null,
-          reminderSentAt: facts.outcome?.sentAt ?? null,
-          declined: facts.declined,
-          remindersStopped: facts.stopped,
-          lifecycleSourceId: facts.sourceId,
-          lifecycleSourceVersion: facts.sourceVersion,
-        };
-        const columns = Object.keys(data).map((name, index) => `"${name}" = $${index + 2}`);
-        await client.query(`UPDATE vehicle_history_requests SET ${columns.join(", ")} WHERE id = $1`, [id, ...Object.values(data)]);
-      },
-    };
     // pg emits a checked-out connection failure on the client rather than pool.
     const connectionError = () => { /* Subsequent query/commit rejects safely. */ };
     client.on("error", connectionError);
@@ -92,14 +112,14 @@ export class HistoryMessageLocks {
       const { rows } = await client.query<HistoryMessageRequest>(`SELECT id, "requesterId", "assignedOperatorId", "assignmentVersion"
         FROM vehicle_history_requests WHERE id = $1 FOR NO KEY UPDATE`, [id]);
       return await this.identityFence.withSession(authority, async () => {
-        const result = await operation(rows[0] ?? null, waiting);
+        const result = await operation(client, rows[0] ?? null);
         await client.query("COMMIT");
         return result;
       });
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
-    } finally { active = false; client.removeListener("error", connectionError); client.release(); }
+    } finally { client.removeListener("error", connectionError); client.release(); }
   }
   async onModuleDestroy() { await this.pool.end(); }
 }
@@ -154,6 +174,11 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
         data: { assignedOperatorId: operatorId, assignmentVersion: { increment: 1 } },
       });
     });
+  }
+
+  async handover(authority: HistoryHandoverAuthority, id: string, expectedVersion: number,
+    confirmAuthority: () => Promise<void>) {
+    await this.messageLocks.handover(authority, id, expectedVersion, confirmAuthority);
   }
 
   async findAssigned(operatorId: string, id: string) {

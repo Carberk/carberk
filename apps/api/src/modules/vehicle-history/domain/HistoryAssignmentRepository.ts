@@ -19,6 +19,7 @@ export interface HistoryMessageRequest {
   id: string; requesterId: string; assignedOperatorId: string | null; assignmentVersion: number;
 }
 export interface HistoryMessageAuthority { userId: string; sessionId: string; purpose: "vehicle-history" | null }
+export interface HistoryHandoverAuthority { userId: string; sessionId: string; purpose: "vehicle-history"; recipientId: string }
 export interface HistoryAssignmentRepository {
   /** Retain request and public Identity fences through the same-connection commit.
    * The callback must revalidate authority after both lock waits. */
@@ -28,6 +29,8 @@ export interface HistoryAssignmentRepository {
   confirmQueue(operatorId: string, query: HistoryQueueQuery, items: HistoryQueueItem[]): Promise<void>;
   /** The database arbitrates competing claims; no prior read grants a write. */
   claimUnassigned(operatorId: string, id: string, expectedVersion: number, confirmAuthority: () => Promise<void>): Promise<void>;
+  handover(authority: HistoryHandoverAuthority, id: string, expectedVersion: number,
+    confirmAuthority: () => Promise<void>): Promise<void>;
   findAssigned(operatorId: string, id: string): Promise<(HistoryRequest & { requesterId: string }) | null>;
 }
 export const HISTORY_ASSIGNMENT_REPOSITORY = Symbol("HistoryAssignmentRepository");

@@ -10,14 +10,16 @@ import { ReminderControl } from "./ReminderControl";
 import { ReplyComposer } from "./ReplyComposer";
 import { useOperatorConversation } from "./useOperatorConversation";
 import { SourceListing } from "./SourceListing";
+import { HandoverControl } from "./HandoverControl";
 
 
 import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
 
 type Row = Extract<HistoryInboxResult, { kind: "queue" }>["data"]["items"][number];
-export function SelectedRequest({ locale, id, version, row, scope, actor, revision, refresh, invalidate, claimed, listingOpen, listing, returnQuery }: {
+export function SelectedRequest({ locale, id, version, row, scope, actor, revision, refresh, invalidate, claimed, handedOver, listingOpen, listing, returnQuery }: {
   locale: DeskLocale; id: string; version: number; row: Row | undefined; scope: string; actor: V.HistoryDesk["actor"];
   revision: number; refresh: (resetSelection?: boolean) => void; invalidate: (result: HistoryInboxResult) => void; claimed: (version: number) => void;
+  handedOver: (name: string) => void;
   listingOpen: boolean; listing: (open: boolean) => void; returnQuery: string;
 }) {
   const t = deskCopy[locale];
@@ -174,13 +176,15 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
       <span className="rounded bg-muted px-2 py-1">{t.enquiry}</span>
           <span>{t.assignment}: {selected?.assignedOperator ? IdentitySchemas.formatDisplayName(selected.assignedOperator, locale) : t.unassigned}</span>
         </div>
+        {state === "ready" && <div className="mt-4"><HandoverControl locale={locale} id={id} version={version} scope={scope} actorId={actor.id}
+          onSuccess={handedOver} onRefresh={() => refresh(true)} onInvalidate={(status) => invalidate({ status })} /></div>}
       </header>
       {state === "unclaimed" ? <div className="space-y-4 p-5 text-sm">
       <p>{t.claimBody}</p>
       <Button disabled={reader.busy} aria-busy={reader.busy} onClick={() => reader.run("claim")}>{t.claim}</Button>
       {["offline", "unavailable"].includes(reader.notice) && <InboxNotice locale={locale} state={reader.notice} retry={() => reader.run("claim")} />}
       </div>
-        : state !== "ready" ? <InboxNotice locale={locale} state={reader.notice === "unavailable" ? "conversationUnavailable" : reader.notice === "offline" ? "offline" : state}
+        : state !== "ready" ? <InboxNotice locale={locale} state={lost ? "assignmentLost" : reader.notice === "unavailable" ? "conversationUnavailable" : reader.notice === "offline" ? "offline" : state}
           retry={() => reader.notice === "offline" || reader.notice === "unavailable" ? recover() : refresh(true)} />
           : <div className="p-5">
             {!messages.length && <p role="status" className="py-8 text-sm text-muted-foreground">{t.noMessages}</p>}
@@ -234,6 +238,7 @@ export function InboxNotice({ locale, state, retry }: { locale: DeskLocale; stat
   const t = deskCopy[locale];
   const query = useSearchParams().toString();
   const text = state === "expired" || state === "stale" ? t.denied : state === "loading" ? t.loading : state === "conflict" ? t.conflict
+    : state === "assignmentLost" ? t.assignmentLost
     : state === "denied" ? t.denied : state === "offline" ? t.offline : state === "validation" ? t.validation : state === "missing" ? t.missing
       : state === "conversationUnavailable" ? t.conversationError : t.error;
   return <div role={state === "loading" ? "status" : "alert"} aria-busy={state === "loading"} className="p-6 text-sm">

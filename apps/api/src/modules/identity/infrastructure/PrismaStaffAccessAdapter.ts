@@ -12,6 +12,15 @@ export class PrismaStaffAccessAdapter implements StaffAccessPort {
     @Inject(SystemClockAdapter) private readonly clock: ClockPort,
   ) {}
 
+  async findAssignableActor({ userId }: Parameters<StaffAccessPort["findAssignableActor"]>[0]): Promise<StaffActor | null> {
+    const user = await this.prisma.user.findFirst({ where: {
+      id: userId, suspendedAt: null, deletionScheduledAt: null,
+      OR: [{ phone: { not: null } }, { email: { not: null } }],
+      staffGrants: { some: { purpose: "vehicle_history", revokedAt: null, grantedAt: { lte: this.clock.now() } } },
+    }, select: { id: true, displayName: true, nameNumber: true } });
+    return user ?? null;
+  }
+
   async findCurrentActor(input: Parameters<StaffAccessPort["findCurrentActor"]>[0]): Promise<StaffActor | null> {
     return this.findActor(input, true);
   }

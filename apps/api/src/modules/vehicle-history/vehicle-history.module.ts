@@ -33,6 +33,7 @@ import { HistoryRequestError } from "./domain/HistoryRequestError";
 import { HistoryQueueProjection } from "./application/HistoryQueueProjection";
 import { HistoryRequestProjection } from "./application/HistoryRequestProjection";
 import { ClaimHistoryRequest } from "./application/ClaimHistoryRequest";
+import { HandoverHistoryRequest } from "./application/HandoverHistoryRequest";
 import { GetOperatorHistoryRequest } from "./application/GetOperatorHistoryRequest";
 import { HISTORY_CLOCK, HistoryWaiting, type HistoryClock } from "./domain/HistoryWaiting";
 import { ChangeHistoryWaiting } from "./application/ChangeHistoryWaiting";
@@ -61,7 +62,7 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
     { provide: HISTORY_WAITING_LIFECYCLE, useExisting: ChangeHistoryWaiting },
     { provide: HISTORY_CLOCK, useFactory: (): HistoryClock => ({ now: () => new Date() }) },
     { provide: HistoryWaiting, inject: [HISTORY_CLOCK], useFactory: (clock: HistoryClock) => new HistoryWaiting(clock) },
-    CurrentHistoryOperator, ListOperatorHistoryRequests, HistoryQueueProjection, HistoryRequestProjection, ClaimHistoryRequest, GetOperatorHistoryRequest,
+    CurrentHistoryOperator, ListOperatorHistoryRequests, HistoryQueueProjection, HistoryRequestProjection, ClaimHistoryRequest, HandoverHistoryRequest, GetOperatorHistoryRequest,
     { provide: HISTORY_ASSIGNMENT_REPOSITORY, useClass: PrismaHistoryAssignmentRepository },
     CurrentHistoryRequester, CreateHistoryRequest, ListHistoryRequests, GetHistoryRequest,
     { provide: HISTORY_REQUEST_REPOSITORY, useClass: PrismaHistoryRequestRepository }],

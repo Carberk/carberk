@@ -88,6 +88,69 @@ export async function historyInboxAction(locale: DeskLocale, value: unknown): Pr
   }
 }
 
+type HistoryHandoverFailure = Exclude<HistoryInboxResult, { status: "ok" }>;
+export type HistoryAssigneesResult = HistoryHandoverFailure |
+  (Scope & { status: "ok"; data: Parsed<typeof V.HistoryAssigneesResponseSchema> });
+export type HistoryHandoverResult = HistoryHandoverFailure |
+  (Scope & { status: "ok"; data: Parsed<typeof V.HandoverHistoryResponseSchema> });
+
+export async function historyAssigneesAction(locale: DeskLocale, value: unknown): Promise<HistoryAssigneesResult> {
+  await rejectExpiredSession();
+  const input = V.HistoryAssigneesActionSchema.safeParse(value);
+  if (!input.success || !["tk", "ru", "en"].includes(locale)) return { status: "validation" };
+  const selection = { ...input.data, kind: "detail" };
+  const before = await historyInboxAction(locale, selection);
+  if (before.status !== "ok") return before;
+  if (before.kind !== "detail") return { status: "unavailable", scope: before.scope };
+  let response: unknown, failure: unknown;
+  try { response = await apiFetchOptional<unknown>("/vehicle-history/operator/requests/assignees", {
+    cache: "no-store", headers: { "Accept-Language": locale },
+  }); } catch (error) { unstable_rethrow(error); failure = error; }
+  const after = await historyInboxAction(locale, selection);
+  if (after.status !== "ok") return after;
+  if (after.kind !== "detail" || after.scope !== before.scope || after.actor.id !== before.actor.id) return { status: "stale", scope: after.scope };
+  if (failure instanceof ApiError && failure.status === 403) return { status: "denied", scope: after.scope };
+  if (failure) return { status: "unavailable", scope: after.scope };
+  if (response === null) return { status: "expired", scope: after.scope };
+  const data = V.HistoryAssigneesResponseSchema.safeParse(response);
+  if (!data.success || data.data.items.some((item) => item.id === after.actor.id) ||
+    new Set(data.data.items.map((item) => item.id)).size !== data.data.items.length) return { status: "unavailable", scope: after.scope };
+  return { status: "ok", scope: after.scope, actor: after.actor, data: data.data };
+}
+
+export async function historyHandoverAction(locale: DeskLocale, value: unknown): Promise<HistoryHandoverResult> {
+  await rejectExpiredSession();
+  const input = V.HistoryHandoverActionSchema.safeParse(value);
+  if (!input.success || !["tk", "ru", "en"].includes(locale) || input.data.targetOperatorId === undefined) return { status: "validation" };
+  const selection = { kind: "detail", id: input.data.id, scope: input.data.scope,
+    expectedAssignmentVersion: input.data.expectedAssignmentVersion };
+  const before = await historyInboxAction(locale, selection);
+  if (before.status !== "ok") return before;
+  if (before.kind !== "detail") return { status: "unavailable", scope: before.scope };
+  let response: unknown, failure: unknown;
+  try { response = await apiFetchOptional<unknown>(`/vehicle-history/operator/requests/${input.data.id}/handover`, {
+    method: "POST", cache: "no-store", headers: { "Accept-Language": locale },
+    body: { targetOperatorId: input.data.targetOperatorId, expectedAssignmentVersion: input.data.expectedAssignmentVersion },
+  }); } catch (error) { unstable_rethrow(error); failure = error; }
+  if (response === null) return { status: "expired" };
+  if (failure instanceof ApiError && failure.status === 403) return { status: "denied", scope: before.scope };
+  if (failure instanceof ApiError && failure.status === 409) return { status: "conflict", scope: before.scope };
+  let after: Scope | null;
+  try { after = await currentScope(locale); }
+  catch (error) {
+    unstable_rethrow(error);
+    return { status: error instanceof ApiError && error.status === 403 ? "denied" : "unavailable", scope: before.scope };
+  }
+  if (!after) return { status: "expired" };
+  if (after.scope !== before.scope || after.actor.id !== before.actor.id) return { status: "stale", scope: after.scope };
+  if (failure instanceof ApiError && failure.status === 400) return { status: "validation", scope: after.scope };
+  if (failure) return { status: "unavailable", scope: after.scope };
+  const data = V.HandoverHistoryResponseSchema.safeParse(response);
+  if (!data.success || data.data.id !== input.data.id || data.data.assignmentVersion !== input.data.expectedAssignmentVersion + 1 ||
+    data.data.assignedOperator.id !== input.data.targetOperatorId) return { status: "unavailable", scope: after.scope };
+  return { status: "ok", scope: after.scope, actor: after.actor, data: data.data };
+}
+
 export type HistoryMessageResult = Exclude<HistoryInboxResult, { status: "ok" }> |
   (Scope & { status: "ok" } & (
     { kind: "send"; data: V.HistoryMessage } |

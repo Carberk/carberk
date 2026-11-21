@@ -37,6 +37,12 @@ export const ListHistoryRequestsResponseSchema = z.object({
 });
 
 export const ClaimHistoryRequestSchema = z.object({ expectedAssignmentVersion: z.number().int().min(0).max(2147483647) }).strict();
+export const HandoverHistoryRequestSchema = ClaimHistoryRequestSchema.extend({ targetOperatorId: HistoryOperatorSchema.shape.id }).strict();
+export const HandoverHistoryResponseSchema = z.object({ id: HistoryRequestSchema.shape.id,
+  assignmentVersion: ClaimHistoryRequestSchema.shape.expectedAssignmentVersion,
+  assignedOperator: HistoryOperatorSchema.strict(),
+}).strict();
+export const HistoryAssigneesResponseSchema = z.object({ items: z.array(HistoryOperatorSchema.strict()) }).strict();
 export const HistoryQueueQuerySchema = z.object({
   filter: z.enum(["unassigned", "mine"]).optional(),
   search: z.string().trim().min(1).max(64).optional(),
@@ -117,6 +123,8 @@ export type HistoryReminder = z.infer<typeof HistoryReminderSchema>;
 const InboxScopeSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const InboxSelectionSchema = z.object({ id: z.string().guid(), scope: InboxScopeSchema,
   expectedAssignmentVersion: AssignmentVersionSchema }).strict();
+export const HistoryAssigneesActionSchema = InboxSelectionSchema;
+export const HistoryHandoverActionSchema = InboxSelectionSchema.extend({ targetOperatorId: HistoryOperatorSchema.shape.id }).strict();
 export const HistoryInboxActionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("queue"), query: HistoryQueueQuerySchema, scope: InboxScopeSchema.optional() }).strict(),
   InboxSelectionSchema.extend({ kind: z.literal("detail") }).strict(),

@@ -6,6 +6,10 @@ The feature owns the local synthetic public offer and original fictional educati
 
 `RequestConversation` reads ascending HTTP pages and owns the exact-text reply composer. `useHistoryReply` and `retainedDrafts` retain account/request drafts and each original uncertain send ID on the device across navigation and session replacement. Ordered writes precede transport; acknowledgement clears only its draft revision. Hydration and send results remain fenced to the mounted session/assignment. Send responses remain separate from fetched-page evidence; only contiguous HTTP pages permit receipts. Its mounted lifecycle owns contiguous page evidence and explicit received/read acknowledgements; only focused foreground viewable rows can become read. The current assigned operator and assignment epoch select other-party delivery facts. Query caches never establish receipt evidence for a new reader/session/assignment. Focus, reconnect and the active reader reconcile through HTTP using the root connectivity owners.
 
+`PrivateReader` shows the current named operator and marks a later assignment
+version as a handover in the customer's enquiry header. Pull refresh reads the
+same requester-owned request; handover does not remove customer access.
+
 `SourceListing` composes the existing public Listing route after the current private request supplies matching source context. Its read-only presentation omits seller/contact/owner mutations and returns through the original native stack, with the exact request as the cold-link fallback. It never widens Listing/media read authority or rewrites request facts.
 
 `StopReminders` reads the server preference and retains an uncertain Stop version on the device, scoped to the customer/request/assignment. Stop is explicit and permanent; stale-version refusals reconcile before another explicit choice. Current session, request metadata and foreground fences discard late work. The conversation and its ordinary receipts remain available.
