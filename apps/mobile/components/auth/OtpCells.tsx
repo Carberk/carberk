@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ interface OtpCellsRef {
 
 const OtpCells = forwardRef<OtpCellsRef, OtpCellsProps>(
   ({ value, onChange, hasError, length = 6, disabled }, ref) => {
+    const { t } = useTranslation("auth");
     const reduceMotion = useReducedMotion();
     const inputRef = useRef<TextInput>(null);
     const shake = useRef(new Animated.Value(0)).current;
@@ -76,9 +78,14 @@ const OtpCells = forwardRef<OtpCellsRef, OtpCellsProps>(
     }
 
     return (
-      <Pressable onPress={() => !disabled && inputRef.current?.focus()}>
+      <Pressable
+        accessible={false}
+        onPress={() => !disabled && inputRef.current?.focus()}
+      >
         <Animated.View
+          accessibilityElementsHidden
           className="flex-row gap-2"
+          importantForAccessibility="no-hide-descendants"
           style={{ transform: [{ translateX: shake }] }}
         >
           {Array.from({ length }, (_, index) => {
@@ -117,16 +124,21 @@ const OtpCells = forwardRef<OtpCellsRef, OtpCellsProps>(
         </Animated.View>
 
         <TextInput
+          accessible
+          accessibilityLabel={t("otpTitle")}
+          accessibilityState={{ disabled: !!disabled }}
           autoComplete="sms-otp"
           caretHidden
-          className="absolute inset-0 opacity-0"
+          className="absolute inset-0 bg-transparent text-transparent"
           editable={!disabled}
           inputMode="numeric"
           keyboardType="number-pad"
           maxLength={length}
           onChangeText={handleChange}
           ref={inputRef}
+          selectionColor="transparent"
           textContentType="oneTimeCode"
+          underlineColorAndroid="transparent"
           value={value}
         />
       </Pressable>
