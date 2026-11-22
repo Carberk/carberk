@@ -19,6 +19,7 @@ Every change follows the [delivery workflow](docs/agents/coding-workflow.md): on
 | Running the app or signing in on the iOS Simulator | [Local testing](docs/agents/local-testing.md) |
 | Opening, signing in to, or proving Admin UI | [Admin access](docs/agents/admin-access.md) |
 | Railway reads, billing, investigations or changes | [Required Railway tooling and authority](docs/agents/environment.md#railway) |
+| Turkmenistan staging gateway access, TLS reachability or VPS SSH host-key changes | [Gateway access runbook](docs/prd/ops/staging-gateway.md#connect-to-the-turkmenistan-staging-gateway) |
 | Devices, CI, staging or deploys | [Environment guide](docs/agents/environment.md) and [deployment runbook](docs/prd/ops/80-deployment-runbook.md) |
 
 Write only in your own worktree or `/tmp`, and remove your worktree after its PR merges. Preserve unrelated changes and report host guard refusals without retrying through another tool.
