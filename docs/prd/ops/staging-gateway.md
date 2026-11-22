@@ -19,7 +19,7 @@ gateway hostname, and `gateway_ipv4` to its current public IPv4 from a trusted
 DNS resolver.
 
 ```sh
-curl --noproxy '*' --interface "$wifi_interface" \
+curl -q --noproxy '*' --interface "$wifi_interface" \
   --resolve "$gateway_host:443:$gateway_ipv4" \
   --connect-timeout 5 --max-time 8 \
   -sS -o /dev/null -w 'HTTP %{http_code}\n' "https://$gateway_host/healthz"
@@ -45,13 +45,19 @@ proxy settings and the shared Snikket services intact.
   Read the current fingerprint from the trusted console or an already verified
   shell. For the standard Ed25519 host key, run
   `ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub` on the VPS.
-  On the Mac, use `ssh-keyscan -T 5 -p "$vps_ssh_port" -t ed25519 "$vps_ssh_host"`
-  to collect the advertised public key in a private temporary file. Run
-  `ssh-keygen -E sha256 -lf "$gateway_known_hosts"` against that file and compare
-  its fingerprint to the trusted value. Stop on a mismatch or missing key.
-  After an exact match, keep the file mode 0600 and use it for a fresh connection
-  to the same host and port. Preserve the shared `known_hosts` and existing
-  sessions.
+  On the Mac, set `vps_ssh_host`, `vps_ssh_port` and `vps_ssh_user` from the
+  private operator handoff. Collect and print the advertised key fingerprint:
+
+  ```sh
+  gateway_known_hosts=$(mktemp "${TMPDIR:-/tmp}/carberk-gateway-known-hosts.XXXXXX")
+  ssh-keyscan -T 5 -p "$vps_ssh_port" -t ed25519 "$vps_ssh_host" > "$gateway_known_hosts"
+  ssh-keygen -E sha256 -lf "$gateway_known_hosts"
+  ```
+
+  Each fingerprint in the file must match the trusted value. Stop on a mismatch
+  or missing key. After an exact match, use the mode-0600 file for a fresh
+  connection to the same host and port. Preserve the shared `known_hosts` and
+  existing sessions.
 
 ```sh
 ssh -p "$vps_ssh_port" -o ControlPath=none \
