@@ -6,6 +6,63 @@ independence proof. R05 adds the fixed photo alias below; R08 adds Socket.IO
 forwarding. R06 adds the multipart video alias below. R03 adds
 optional signed client attribution as described below. A gateway key does not grant API business permissions.
 
+## Connect to the Turkmenistan staging gateway
+
+### HTTPS from the Mac
+
+Use the direct China-to-Turkmenistan path for the gateway. If the Mac's default
+path stalls before TLS completes while Shadowsocks is active, test on the
+physical Wi-Fi interface. The Japan and US exits can have different reachability
+from the direct route. Use `networksetup -listallhardwareports` to identify the
+Wi-Fi device. Set `wifi_interface` to that device, `gateway_host` to the configured
+gateway hostname, and `gateway_ipv4` to its current public IPv4 from a trusted
+DNS resolver.
+
+```sh
+curl --noproxy '*' --interface "$wifi_interface" \
+  --resolve "$gateway_host:443:$gateway_ipv4" \
+  --connect-timeout 5 --max-time 8 \
+  -sS -o /dev/null -w 'HTTP %{http_code}\n' "https://$gateway_host/healthz"
+```
+
+This probe bypasses curl's proxy for one request and preserves the hostname for
+TLS SNI, certificate validation and HTTP Host. The verified direct path returned
+`403` without a gateway key. That confirms HTTPS ingress and denial of anonymous
+access. Check authorized readiness and playback separately. Keep global routes,
+proxy settings and the shared Snikket services intact.
+
+### SSH reachability and host-key changes
+
+- **Timeout before the SSH banner.** Confirm the provisioned SSH address, port
+  and network path with the VPS operator. Host-key checks happen after the
+  banner, so editing `known_hosts` cannot resolve this timeout. Use an authorized
+  VPS provider console or existing trusted shell if SSH is unreachable. From
+  the VPS, probe gateway port 443 on loopback with
+  `--resolve "$gateway_host:443:127.0.0.1"` and the gateway hostname in the URL.
+  Loopback tests the installed gateway. Use the client-side probe above for
+  public ingress.
+- **Unknown or changed host key.** Confirm any rotation with the VPS operator.
+  Read the current fingerprint from the trusted console or an already verified
+  shell. For the standard Ed25519 host key, run
+  `ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub` on the VPS.
+  On the Mac, use `ssh-keyscan -T 5 -p "$vps_ssh_port" -t ed25519 "$vps_ssh_host"`
+  to collect the advertised public key in a private temporary file. Run
+  `ssh-keygen -E sha256 -lf "$gateway_known_hosts"` against that file and compare
+  its fingerprint to the trusted value. Stop on a mismatch or missing key.
+  After an exact match, keep the file mode 0600 and use it for a fresh connection
+  to the same host and port. Preserve the shared `known_hosts` and existing
+  sessions.
+
+```sh
+ssh -p "$vps_ssh_port" -o ControlPath=none \
+  -o StrictHostKeyChecking=yes -o UpdateHostKeys=no \
+  -o HostKeyAlgorithms=ssh-ed25519 \
+  -o UserKnownHostsFile="$gateway_known_hosts" "$vps_ssh_user@$vps_ssh_host"
+```
+
+Keep the provisioned SSH access details and credentials in the approved private
+operator handoff.
+
 ## Runtime contract
 
 `infra/gateway/serve.mjs` reads a private JSON file containing `origin`, `proxy`,
@@ -206,9 +263,8 @@ On the actual hostname and **443**, prove:
   intact before and after reload, rollback and reapplication.
 
 Supply secrets through private request files or stdin, never command arguments or
-public receipts. The founder's normal Wi-Fi may need per-request interface/DNS
-selection; do not change global routes or VPN settings. Signed-in native workflows,
-video/photo routing and trustworthy client attribution are not R02 proof.
+public receipts. Signed-in native workflows, video/photo routing and trustworthy
+client attribution are not R02 proof.
 
 ## Rollback and cleanup
 

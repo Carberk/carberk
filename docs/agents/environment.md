@@ -10,6 +10,8 @@ What exists for Carberk, how to use it, and what an agent may change without ask
 | Railway production | Real users later | Read status | Everything else |
 | iOS Simulator | Running the app and taking screenshots | Use the coordinated owned device as below | Nothing |
 
+For the Turkmenistan staging VPS, see [direct HTTPS access and SSH host-key recovery](../prd/ops/staging-gateway.md#connect-to-the-turkmenistan-staging-gateway).
+
 ## Toolchain
 
 Node `>=22.13`, pnpm `12.11.2` (from [package.json](../../package.json)). Install with `pnpm install --frozen-lockfile`. Workspace scripts are the command authority; [CONTEXT-MAP.md](../../CONTEXT-MAP.md) explains the apps and packages.
