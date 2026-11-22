@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({ token: "" }));
@@ -138,13 +138,28 @@ it("requires an exact receipt and a reason for historical access, retaining work
   expect(container.querySelector("img")).toBeNull();
 });
 
-it("opens the assignee receipt in a focused dialog and closes it with Escape", async () => {
+it("lets keyboard users reach the receipt and keeps focus in the dialog until Escape", async () => {
   await act(async () => root.render(panel()));
   await waitFor(() => expect(button("View receipt")).toBeTruthy());
   await act(async () => button("View receipt").click());
-  await waitFor(() => expect(container.querySelector("dialog[open]")).toBeTruthy());
-  expect(document.activeElement?.textContent).toBe("Close receipt");
-  await act(async () => element("dialog").dispatchEvent(new Event("cancel", { cancelable: true })));
+  const dialog = await within(container).findByRole("dialog");
+  const close = within(dialog).getByRole("button", { name: "Close receipt" });
+  const tab = (target: HTMLElement, shiftKey = false) => fireEvent.keyDown(target, { key: "Tab", shiftKey });
+
+  expect(document.activeElement).toBe(close);
+  expect(tab(close)).toBe(true);
+  const receipt = within(dialog).getByRole("region", { name: "Private payment receipt" });
+  expect(receipt.tabIndex).toBe(0);
+  expect(within(receipt).getByRole("img")).toBeTruthy();
+
+  expect(tab(close, true)).toBe(false);
+  expect(document.activeElement).toBe(receipt);
+  expect(fireEvent.keyDown(receipt, { key: "PageDown" })).toBe(true);
+  expect(tab(receipt, true)).toBe(true);
+  expect(tab(receipt)).toBe(false);
+  expect(document.activeElement).toBe(close);
+
+  await act(async () => dialog.dispatchEvent(new Event("cancel", { cancelable: true })));
   expect(container.querySelector("dialog")).toBeNull();
   expect(document.activeElement?.textContent).toBe("View receipt");
 });
