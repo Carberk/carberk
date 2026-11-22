@@ -33,7 +33,7 @@ export function PaymentProofViewer({ locale, content, close, restoreFocus }: {
     <div className="flex h-full min-h-0 flex-col gap-4">
       <div className="flex items-start justify-between gap-4"><h2 id={title} className="text-xl font-semibold">{t.preview}</h2>
         <Button ref={closeButton} variant="secondary" className="h-auto min-h-11 whitespace-normal" onClick={close}>{t.close}</Button></div>
-      <div ref={receipt} role="region" aria-labelledby={title} tabIndex={0} className="min-h-0 flex-1 overflow-auto focus-visible:outline-2 focus-visible:outline-ring">
+      <div ref={receipt} role="region" aria-labelledby={title} tabIndex={0} className="min-h-0 flex-1 overflow-auto focus-visible:outline-2 focus-visible:outline-foreground">
         <img src={`data:${content.file.contentType};base64,${content.dataBase64}`} alt={t.preview} className="mx-auto h-auto min-w-0 max-w-full" />
       </div>
     </div>
