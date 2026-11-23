@@ -116,6 +116,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             {(!accepted || expanded) && proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
             {(!accepted || expanded) && <><Text className="text-callout">{copy("rights")}</Text><Text className="text-callout">{copy("terms")}</Text></>}
             {accepted ? <>
+              <Text>{t("vehicleHistory.offerOrderPrice", { amount: accepted.acceptedOffer.proposal.priceTmt })}</Text>
               <Text>{copy("orderAccepted")}: {timestamp(accepted.acceptedAt)}</Text>
               <Text>{copy("orderHold")}: {timestamp(accepted.holdExpiresAt)}</Text>
               {orderState?.payment?.confirmedAt && <Text>{t("vehicleHistory.paymentConfirmedAt")}: {timestamp(orderState.payment.confirmedAt)}</Text>}

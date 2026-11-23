@@ -154,7 +154,7 @@ it("shows accepted facts and the next action with access to the agreed details",
   expect(view.getByText("DEMA0000000000001 · PDF and provider link")).toBeTruthy();
   expect(view.getByText("Open Details to send or view your test receipt.")).toBeTruthy();
   await fireEvent.press(details);
-  expect(view.getByText("Accepted order · 100 TMT")).toBeTruthy();
+  expect(view.getByRole("header", { name: "Accepted order" })).toBeTruthy();
 });
 
 it("keeps the persistent summary compact and the full correction reachable at accessibility text size", async () => {

@@ -219,6 +219,7 @@ model HistoryOrder {
   privateFiles HistoryPrivateFile[]
   paymentChecks HistoryPaymentCheck[]
   vinAgreements HistoryVinAgreement[]
+  fulfilmentEvents HistoryFulfilmentEvent[]
 
   @@unique([requestId, id])
   @@index([deliveryDay, holdExpiresAt])
@@ -240,6 +241,22 @@ model HistoryVinAgreement {
   @@id([requestId, version])
   @@unique([requestId, attemptKey])
   @@map("history_vin_agreements")
+}
+
+model HistoryFulfilmentEvent {
+  requestId String
+  order HistoryOrder @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+  version Int
+  attemptKey String @db.Uuid
+  input Json
+  state Json
+  actorId String
+  assignmentVersion Int
+  recordedAt DateTime @db.Timestamptz(3)
+
+  @@id([requestId, version])
+  @@unique([requestId, attemptKey])
+  @@map("history_fulfilment_events")
 }
 
 model HistoryPaymentCheck {

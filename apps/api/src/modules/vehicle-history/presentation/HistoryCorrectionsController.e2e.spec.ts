@@ -3,7 +3,7 @@ import { eventually } from "../../../../test/helpers/eventually";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { historyFixture } from "../../../../test/helpers/historyFixture";
-import { HISTORY_FULFILMENT_AUTHORITY, type HistoryFulfilmentAuthority, HISTORY_CLOCK, type HistoryClock } from "../vehicle-history.public";
+import { HISTORY_CLOCK, type HistoryClock } from "../vehicle-history.public";
 
 const root = "/api/v1/vehicle-history";
 describe("renewed VIN agreement on the existing private order", () => {
@@ -15,8 +15,9 @@ describe("renewed VIN agreement on the existing private order", () => {
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 1);
   });
   afterEach(async () => { await f?.close(); });
-  async function accepted(format: string) {
-    const customer = await f.actor(null), operator = await f.actor();
+  async function accepted(format: string, assigned?: Awaited<ReturnType<typeof f.actor>>,
+    [deliveryFrom, deliveryBy] = ["2026-11-21T06:00:00.000Z", "2026-11-21T07:00:00.000Z"]) {
+    const customer = await f.actor(null), operator = assigned ?? await f.actor();
     const id = (await f.request.post(`${root}/requests`).auth(customer.token, { type: "bearer" })
       .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
     const staff = `${root}/operator/requests/${id}`, path = `${root}/requests/${id}`;
@@ -24,7 +25,7 @@ describe("renewed VIN agreement on the existing private order", () => {
     await f.request.post(`${staff}/offer`).auth(operator.token, { type: "bearer" })
       .send({ kind: "check", vin: "DEMA0000000000001", expectedVersion: 0, expectedAssignmentVersion: 1 }).expect(201);
     const offer = (await f.request.post(`${staff}/offer`).auth(operator.token, { type: "bearer" }).send({ kind: "propose", format,
-      expectedVersion: 1, expectedAssignmentVersion: 1, deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" }).expect(201)).body;
+      expectedVersion: 1, expectedAssignmentVersion: 1, deliveryFrom, deliveryBy }).expect(201)).body;
     const original = (await f.request.post(`${path}/order`).auth(customer.token, { type: "bearer" }).send({ offer }).expect(201)).body;
     const change = (input: object) => f.request.post(`${path}/correction`).auth(customer.token, { type: "bearer" }).send(input);
     const review = (input: object) => f.request.post(`${staff}/correction`).auth(operator.token, { type: "bearer" }).send(input);
@@ -75,32 +76,91 @@ describe("renewed VIN agreement on the existing private order", () => {
       evidence: "Synthetic independent wallet ledger", evidenceFileId: null, receivedAt: "2026-11-21T05:00:00.000Z",
     }).expect(201);
   }
+  function fulfil(e: Awaited<ReturnType<typeof accepted>>, input: object, token = e.operator.token) {
+    return f.request.post(`${e.staff}/fulfilment`).auth(token, { type: "bearer" }).send(input);
+  }
+  function start(e: Awaited<ReturnType<typeof accepted>>, format: string, source = "archive") {
+    return { kind: "start", orderId: e.id, expectedAssignmentVersion: 1, expectedVersion: 0, attemptKey: randomUUID(),
+      acceptedRevision: 0, vin: "DEMA0000000000001", provider: "Carfax", format, source };
+  }
+  function outcome(e: Awaited<ReturnType<typeof accepted>>, expectedVersion: number, value: object, kind = "record") {
+    return { kind, orderId: e.id, expectedAssignmentVersion: 1, expectedVersion, attemptKey: randomUUID(), outcome: value };
+  }
+  it.each(["pdf", "link", "both"])("records an explicit archive intent for the accepted %s promise exactly once", async (format) => {
+    const e = await accepted(format);
+    await fulfil(e, start(e, format)).expect(409);
+    await pay(e);
+    const before = (await e.read().expect(200)).body;
+    expect(before).toMatchObject({ preparation: "queued", wallet: null });
+    const input = start(e, format);
+    await fulfil(e, { ...input, format: format === "pdf" ? "link" : "pdf" }).expect(409);
+    expect((await e.read().expect(200)).body.agreement?.handoff ?? null).toBeNull();
+    const r = (await fulfil(e, input).expect(201)).body;
+    expect(r).toMatchObject({ intent: { id: input.attemptKey, version: 1, source: "archive", status: "pending" },
+      accepted: { vin: input.vin, provider: input.provider, format, originalReportDate: "2026-10-14" } });
+    expect((await fulfil(e, input).expect(201)).body).toEqual(r);
+    await fulfil(e, { ...input, attemptKey: randomUUID() }).expect(409);
+    const saved = (await fulfil(e, outcome(e, 1, { kind: "obtained", format,
+      originalReportDate: "2026-10-14", permittedUse: true })).expect(201)).body;
+    expect(saved.intent).toMatchObject({ status: "obtained", attempt: 1 });
+    const customer = (await e.read().expect(200)).body;
+    expect(customer).toMatchObject({ preparation: "preparing", payment: before.payment, order: before.order, wallet: null,
+      agreement: { handoff: { revision: 0 } } });
+    expect(customer.fulfilment).toBeUndefined();
+  });
+  it("keeps an uncertain lookup on its original intent, and routes an incomplete format to recovery", async () => {
+    const e = await accepted("both");
+    await pay(e);
+    const input = start(e, "both", "new_source");
+    await fulfil(e, input).expect(201);
+    await fulfil(e, outcome(e, 1, { kind: "uncertain" })).expect(201);
+    const retry = { kind: "retry", orderId: e.id, expectedAssignmentVersion: 1, expectedVersion: 2, attemptKey: randomUUID() };
+    await fulfil(e, retry).expect(409);
+    await fulfil(e, outcome(e, 2, { kind: "not_started" }, "reconcile")).expect(201);
+    const fresh = { ...retry, expectedVersion: 3 };
+    const resumed = (await fulfil(e, fresh).expect(201)).body;
+    expect(resumed.intent).toMatchObject({ id: input.attemptKey, version: 4, status: "pending", attempt: 2 });
+    expect((await fulfil(e, fresh).expect(201)).body).toEqual(resumed);
+    const failed = (await fulfil(e, outcome(e, 4, { kind: "obtained", format: "pdf", originalReportDate: "2026-10-14",
+      permittedUse: true })).expect(201)).body;
+    expect(failed.intent).toMatchObject({ status: "recovery", reason: "format_unavailable" });
+    await fulfil(e, { ...retry, expectedVersion: 5, attemptKey: randomUUID() }).expect(409);
+    expect((await e.read().expect(200)).body).toMatchObject({ preparation: "recovery", wallet: null });
+  });
+  it.each([
+    [false, "2026-10-14", "rights_unavailable"],
+    [true, "2026-10-15", "original_date_mismatch"],
+  ])("routes unusable original report facts to order recovery", async (permittedUse, originalReportDate, reason) => {
+    const e = await accepted("link");
+    await pay(e);
+    const before = (await e.read().expect(200)).body;
+    await fulfil(e, start(e, "link")).expect(201);
+    const result = await fulfil(e, outcome(e, 1, { kind: "obtained", format: "link", originalReportDate, permittedUse })).expect(201);
+    expect(result.body.intent).toMatchObject({ status: "recovery", reason });
+    expect((await e.read().expect(200)).body).toMatchObject({ preparation: "recovery", order: before.order, payment: before.payment, wallet: null });
+  });
   const reviewInput = (format = "pdf", expectedVersion = 1) => ({ kind: "review", attemptKey: randomUUID(),
     expectedVersion, expectedAssignmentVersion: 1, cause: "customer_correction", format });
-  function gate(e: Awaited<ReturnType<typeof accepted>>, revision: number) {
-    return f.app.get<HistoryFulfilmentAuthority>(HISTORY_FULFILMENT_AUTHORITY).handoff({ operator: true,
-      claims: { sub: e.operator.user.id, sid: e.operator.session.id }, expectedAssignmentVersion: 1 }, e.id, revision);
-  }
   it("hands off only the immutable currently accepted revision and fences all later correction writes", async () => {
     const e = await accepted("both");
-    await expect(gate(e, 0)).rejects.toMatchObject({ code: "HISTORY_ORDER_STALE" });
+    expect((await fulfil(e, start(e, "both")).expect(409)).body.code).toBe("HISTORY_ORDER_STALE");
     await pay(e);
     const checksBefore = (await e.read().expect(200)).body.payment;
     await e.change({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0, attemptKey: randomUUID() }).expect(201);
-    await expect(gate(e, 0)).rejects.toMatchObject({ code: "HISTORY_CORRECTION_CONFLICT" });
+    expect((await fulfil(e, start(e, "both")).expect(409)).body.code).toBe("HISTORY_CORRECTION_CONFLICT");
     const reviewed = (await e.review(reviewInput("link")).expect(201)).body;
-    await expect(gate(e, 0)).rejects.toMatchObject({ code: "HISTORY_CORRECTION_CONFLICT" });
+    expect((await fulfil(e, start(e, "both")).expect(409)).body.code).toBe("HISTORY_CORRECTION_CONFLICT");
     const offer = reviewed.pending.review.offer;
     await e.change({ kind: "accept", offer, expectedVersion: 2, attemptKey: randomUUID() }).expect(201);
-    await expect(gate(e, 0)).rejects.toMatchObject({ code: "HISTORY_CORRECTION_CONFLICT" });
-    const handed = await gate(e, 3);
-    expect(handed).toMatchObject({ accepted: { revision: 3, offer, cause: "customer_correction" },
-      handoff: { revision: 3, recordedAt: "2026-11-21T05:00:00.000Z" } });
-    expect(await gate(e, 3)).toEqual(handed);
+    expect((await fulfil(e, start(e, "both")).expect(409)).body.code).toBe("HISTORY_CORRECTION_CONFLICT");
+    const command = { ...start(e, "link", "new_source"), acceptedRevision: 3, vin: offer.vin, provider: "AutoCheck" };
+    const result = (await fulfil(e, command).expect(201)).body;
+    expect(result).toMatchObject({ accepted: { acceptedRevision: 3, vin: offer.vin, format: "link" } });
+    expect((await fulfil(e, command).expect(201)).body).toEqual(result);
     const state = (await e.read().expect(200)).body;
     expect(state.payment).toEqual(checksBefore);
     expect(state.order.holdExpiresAt).toEqual(e.original.order.holdExpiresAt);
-    expect(state.agreement).toMatchObject({ version: 4, handoff: handed.handoff });
+    expect(state.agreement).toMatchObject({ version: 4, handoff: { revision: 3, recordedAt: "2026-11-21T05:00:00.000Z" } });
     const closed = await e.change({ kind: "request", vin: "DEMA0000000000001", expectedVersion: 4, attemptKey: randomUUID() }).expect(409);
     expect(closed.body.code).toBe("HISTORY_CORRECTION_CLOSED");
     await e.review(reviewInput("both", 4)).expect(409);
@@ -163,7 +223,7 @@ describe("renewed VIN agreement on the existing private order", () => {
     await f.request.post(`${e.staff}/handover`).auth(e.operator.token, { type: "bearer" })
       .send({ expectedAssignmentVersion: 1, targetOperatorId: next.user.id }).expect(201);
     await e.review(reviewInput()).expect(403);
-    await expect(gate(e, 0)).rejects.toMatchObject({ code: "HISTORY_OPERATOR_DENIED" });
+    await fulfil(e, start(e, "both")).expect(403);
     await f.request.get(`${e.staff}/correction?expectedAssignmentVersion=1`).auth(next.token, { type: "bearer" }).expect(409);
     await f.request.get(`${e.staff}/correction?expectedAssignmentVersion=2`).auth(next.token, { type: "bearer" }).expect(200);
     await f.prisma.session.delete({ where: { id: e.customer.session.id } });
@@ -191,12 +251,145 @@ describe("renewed VIN agreement on the existing private order", () => {
   it("arbitrates a paid handoff against a simultaneous customer correction under the same fence", async () => {
     const e = await accepted("both");
     await pay(e);
-    const results = await Promise.allSettled([gate(e, 0), e.change({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0,
-      attemptKey: randomUUID() }).then(response => response)]);
+    f.concurrent(2);
+    const [handoff, correction] = await Promise.all([
+      fulfil(e, start(e, "both")).set("x-history-concurrency", "yes"),
+      e.change({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0, attemptKey: randomUUID() })
+        .set("x-history-concurrency", "yes"),
+    ]);
     const state = (await e.read().expect(200)).body.agreement;
+    const eventCount = await f.prisma.historyFulfilmentEvent.count({ where: { requestId: e.id } });
     expect(Boolean(state.pending)).not.toBe(Boolean(state.handoff));
-    if (state.handoff) expect(results[1]).toMatchObject({ status: "fulfilled", value: { status: 409, body: { code: "HISTORY_CORRECTION_CLOSED" } } });
-    else expect(results[0]).toMatchObject({ status: "rejected", reason: { code: "HISTORY_CORRECTION_CONFLICT" } });
+    if (state.handoff) {
+      expect(eventCount).toBe(1);
+      expect(correction).toMatchObject({ status: 409, body: { code: "HISTORY_CORRECTION_CLOSED" } });
+    } else {
+      expect(eventCount).toBe(0);
+      expect(handoff).toMatchObject({ status: 409, body: { code: "HISTORY_CORRECTION_CONFLICT" } });
+    }
   });
 
+  it("rolls back the handoff if saving the intent fails after the handoff write", async () => {
+    const e = await accepted("pdf");
+    await pay(e);
+    await f.prisma.$executeRawUnsafe(`CREATE FUNCTION reject_history_test_intent() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF NEW."requestId" = '${e.id}' THEN RAISE EXCEPTION 'Injected intent write failure'; END IF; RETURN NEW; END $$`);
+    await f.prisma.$executeRawUnsafe(`CREATE TRIGGER reject_history_test_intent BEFORE INSERT ON history_fulfilment_events
+      FOR EACH ROW EXECUTE FUNCTION reject_history_test_intent()`);
+    const command = start(e, "pdf");
+    try {
+      await fulfil(e, command).expect(503);
+      expect((await e.read().expect(200)).body.agreement).toBeUndefined();
+      expect(await f.prisma.historyFulfilmentEvent.count({ where: { requestId: e.id } })).toBe(0);
+    } finally {
+      await f.prisma.$executeRawUnsafe('DROP TRIGGER reject_history_test_intent ON history_fulfilment_events');
+      await f.prisma.$executeRawUnsafe('DROP FUNCTION reject_history_test_intent()');
+    }
+    await fulfil(e, command).expect(201);
+    expect((await e.read().expect(200)).body.agreement.handoff.revision).toBe(0);
+  });
+
+  it("denies fulfilment for verified funds without a booking", async () => {
+    const e = await accepted("pdf");
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:01:00.000Z");
+    await pay(e);
+    const order = (await e.read().expect(200)).body;
+    expect(order).toMatchObject({ status: "payment_received_no_hold", wallet: null });
+    expect(order.preparation).toBeUndefined();
+    await fulfil(e, start(e, "pdf")).expect(409);
+    expect(await f.prisma.historyVinAgreement.count({ where: { requestId: e.id } })).toBe(0);
+  });
+
+  it("gives one racing start the intent and lets only the new assignee resolve it", async () => {
+    const e = await accepted("link");
+    await pay(e);
+    const command = start(e, "link", "new_source");
+    f.concurrent(2);
+    const results = await Promise.all([command, { ...command, attemptKey: randomUUID() }].map((input) =>
+      fulfil(e, input).set("x-history-concurrency", "yes")));
+    expect(results.map(({ status }) => status).sort()).toEqual([201, 409]);
+    const winner = results.find(({ status }) => status === 201)!.body.intent;
+    const recipient = await f.actor();
+    await f.request.post(`${e.staff}/handover`).auth(e.operator.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: 1, targetOperatorId: recipient.user.id }).expect(201);
+    const mark = outcome(e, 1, { kind: "uncertain" });
+    await fulfil(e, mark).expect(403);
+    await fulfil(e, mark, recipient.token).expect(409);
+    await fulfil(e, { ...mark, expectedAssignmentVersion: 2 }, recipient.token).expect(201);
+    expect((await e.read().expect(200)).body).toMatchObject({ preparation: "checking", wallet: null });
+    const settle = { ...outcome(e, 2, { kind: "obtained", format: "link", originalReportDate: "2026-10-14",
+      permittedUse: true }, "reconcile"), expectedAssignmentVersion: 2 };
+    const reconciled = (await fulfil(e, settle, recipient.token).expect(201)).body.intent;
+    expect(reconciled).toMatchObject({ id: winner.id, attempt: 1, status: "obtained" });
+  });
+
+  it("honours confirmed payment FIFO within the current assignment before recording new intent", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 2);
+    const older = await accepted("pdf"), newer = await accepted("pdf", older.operator, ["2026-11-21T07:00:00.000Z", "2026-11-21T08:00:00.000Z"]);
+    await pay(older);
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    await pay(newer);
+    const nextOrder = await f.request.get(`${newer.staff}/order?expectedAssignmentVersion=1`).auth(newer.operator.token, { type: "bearer" }).expect(200);
+    const command = { ...start(newer, "pdf", "new_source"), provider: nextOrder.body.fulfilment.accepted.provider };
+    expect((await fulfil(newer, command).expect(409)).body.code).toBe("HISTORY_FULFILMENT_FIFO");
+    await fulfil(older, start(older, "pdf")).expect(201);
+    await fulfil(newer, command).expect(409);
+    await fulfil(older, outcome(older, 1, { kind: "no_history" })).expect(201);
+    await fulfil(newer, command).expect(201);
+  });
+
+  it.each(["start", "retry", "company_correction"] as const)("fences new-source %s before the reserved provider reset", async (kind) => {
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    const budget = { allowance: 2, resetUtc: "00:00", externalUsage: { "2026-11-21": 2 } };
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_MORNING_SLOTS", 1);
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: budget });
+    const e = await accepted("pdf", undefined, ["2026-11-22T04:00:00.000Z", "2026-11-22T05:00:00.000Z"]);
+    await pay(e);
+    const first = start(e, "pdf", "new_source");
+    let command: Pick<typeof first, "kind" | "orderId" | "expectedAssignmentVersion" | "expectedVersion" | "attemptKey"> = first;
+    let availableAt = "2026-11-22T00:00:00.000Z";
+    if (kind !== "start") {
+      clock.now = () => new Date("2026-11-22T00:00:00.000Z");
+      await fulfil(e, first).expect(201);
+      let expectedVersion = 2;
+      if (kind === "retry") {
+        await fulfil(e, outcome(e, 1, { kind: "uncertain" })).expect(201);
+        await fulfil(e, outcome(e, 2, { kind: "not_started" }, "reconcile")).expect(201);
+        expectedVersion = 3;
+      } else {
+        await fulfil(e, outcome(e, 1, { kind: "company_error" })).expect(201);
+      }
+      f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { ...budget, resetUtc: "02:00" } });
+      availableAt = "2026-11-22T02:00:00.000Z";
+      command = { kind, orderId: e.id, expectedAssignmentVersion: 1, expectedVersion, attemptKey: randomUUID() };
+    }
+    const before = (await e.read().expect(200)).body;
+    const refusal = await fulfil(e, command).expect(409);
+    expect(refusal.body.code).toBe("HISTORY_ORDER_CAPACITY");
+    expect((await e.read().expect(200)).body).toEqual(before);
+    expect(await f.prisma.historyFulfilmentEvent.count({ where: { requestId: e.id } })).toBe(command.expectedVersion);
+    clock.now = () => new Date(availableAt);
+    const allowed = await fulfil(e, command).expect(201);
+    expect(allowed.body.intent).toMatchObject({ id: first.attemptKey, status: "pending", attempt: kind === "start" ? 1 : 2 });
+  });
+
+  it("makes company correction a distinct, capacity-limited action without a second charge", async () => {
+    const e = await accepted("pdf");
+    await pay(e);
+    const payment = (await e.read().expect(200)).body.payment;
+    const command = start(e, "pdf", "new_source");
+    await fulfil(e, command).expect(201);
+    await fulfil(e, outcome(e, 1, { kind: "company_error" })).expect(201);
+    const correction = { kind: "company_correction", orderId: e.id, expectedAssignmentVersion: 1, expectedVersion: 2, attemptKey: randomUUID() };
+    await fulfil(e, { ...correction, kind: "retry" }).expect(409);
+    const budget = { allowance: 1, resetUtc: "00:00", externalUsage: {} };
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: budget });
+    expect((await fulfil(e, correction).expect(409)).body.code).toBe("HISTORY_ORDER_CAPACITY");
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { ...budget, allowance: 2 } });
+    const corrected = (await fulfil(e, correction).expect(201)).body;
+    expect(corrected.intent).toMatchObject({ id: command.attemptKey, funding: "company", attempt: 2 });
+    expect((await fulfil(e, correction).expect(201)).body).toEqual(corrected);
+    expect((await e.read().expect(200)).body).toMatchObject({ payment, wallet: null });
+    expect(await f.prisma.historyPaymentCheck.count({ where: { requestId: e.id } })).toBe(1);
+  });
 });

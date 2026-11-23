@@ -4,7 +4,7 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 
 import * as PaymentProof from "./schemas/history-payment-proof";
-import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema } from "./schemas/history-order";
+import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema } from "./schemas/history-order";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -490,6 +490,18 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     responses: { [method === "get" ? 200 : 201]: { description: "Private revision history; no new payment, hold, order or provider purchase", content: { "application/json": { schema: HistoryCorrectionStateSchema } } },
       400: { description: "Invalid correction" }, 403: { description: "Current session, purpose and request authority refused" },
       409: { description: "Correction changed, unavailable capacity or fulfilment already started" }, 503: { description: "Read back before retrying the same correction" } },
+  });
+  registry.registerPath({
+    method: "post", path: "/api/v1/vehicle-history/operator/requests/{id}/fulfilment",
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: "Record or reconcile manual synthetic fulfilment for the exact accepted order",
+    request: { params: z.object({ id: z.string().guid() }), query: ReadHistoryOfferSchema,
+      body: { content: { "application/json": { schema: HistoryFulfilmentMutationSchema } } } },
+    responses: { 201: { description: "Current private intent and outcome; no provider or wallet call",
+      content: { "application/json": { schema: HistoryFulfilmentViewSchema } } },
+      400: { description: "Invalid action" }, 403: { description: "Current session, assignment and purpose required" },
+      409: { description: "Action refused by current agreement, payment, queue or intent state" },
+      503: { description: "Read the current order before retrying the exact action" } },
   });
   registry.register("HistoryPaymentVerification", HistoryPaymentVerificationSchema);
   for (const method of ["get", "post"] as const) registry.registerPath({

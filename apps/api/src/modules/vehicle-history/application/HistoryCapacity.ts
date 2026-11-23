@@ -60,6 +60,12 @@ export class HistoryCapacity {
     throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
   }
 
+  async requireFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {
+    const { deliveryFrom, deliveryBy } = order.acceptedOffer.proposal;
+    const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now);
+    if (!budget || now < budget.periodStart || budget.slots < (additional ? 1 : 0)) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+  }
+
   private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date, excludeCurrent = false) {
     const budget = this.config.get("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { infer: true })?.[provider];
     if (!budget?.allowance) return null;
