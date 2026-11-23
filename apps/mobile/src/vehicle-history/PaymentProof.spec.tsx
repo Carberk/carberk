@@ -211,13 +211,16 @@ it("keeps the receipt preview open during request refresh and closes it on acces
   await fireEvent.press(await view.findByRole("button", { name: "Selected receipt preview" }));
   await view.findByRole("button", { name: "Close receipt" });
 
-  const metadata = Promise.withResolvers<Response>();
-  server.use(http.get("*/vehicle-history/requests/:id", () => metadata.promise));
+  const metadata = Promise.withResolvers<undefined>();
+  server.use(http.get("*/vehicle-history/requests/:id", async () => { await metadata.promise; return HttpResponse.json(enquiry); }));
+  let refreshMetadata: Promise<void> | undefined;
   try {
-    await act(async () => { void view.queryClient.refetchQueries(metadataQuery); });
+    await act(async () => { refreshMetadata = view.queryClient.refetchQueries(metadataQuery); });
     await vi.waitFor(() => expect(view.getByRole("button", { name: "Details" })).toBeDisabled());
     expect(view.getByRole("button", { name: "Close receipt" })).toBeTruthy();
-  } finally { await act(() => metadata.resolve(HttpResponse.json(enquiry))); }
+  } finally {
+    await act(async () => { metadata.resolve(undefined); await refreshMetadata; });
+  }
   expect(view.getByRole("button", { name: "Close receipt" })).toBeTruthy();
 
   server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ code: "HISTORY_REQUEST_DENIED" }, { status: 403 })));
@@ -232,23 +235,27 @@ it("keeps the receipt preview open when offer readback finishes during request r
   await fireEvent.press(await view.findByRole("button", { name: "Selected receipt preview" }));
   await view.findByRole("button", { name: "Close receipt" });
 
-  const metadata = Promise.withResolvers<Response>();
-  const offerRead = Promise.withResolvers<Response>();
+  const metadata = Promise.withResolvers<undefined>();
+  const offerRead = Promise.withResolvers<undefined>();
   const offerQuery = { queryKey: [...metadataQuery.queryKey, "offer", enquiry.assignmentVersion], exact: true };
-  server.use(http.get("*/vehicle-history/requests/:id", () => metadata.promise),
-    http.get("*/vehicle-history/requests/:id/offer", () => offerRead.promise));
+  server.use(http.get("*/vehicle-history/requests/:id", async () => { await metadata.promise; return HttpResponse.json(enquiry); }),
+    http.get("*/vehicle-history/requests/:id/offer", async () => { await offerRead.promise; return HttpResponse.json(quote); }));
   let refreshOffer: Promise<void> | undefined;
+  let refreshMetadata: Promise<void> | undefined;
   try {
     await act(async () => { refreshOffer = view.queryClient.refetchQueries(offerQuery); });
     await vi.waitFor(() => expect(view.queryClient.isFetching(offerQuery)).toBe(1));
-    await act(async () => { void view.queryClient.refetchQueries(metadataQuery); });
+    await act(async () => { refreshMetadata = view.queryClient.refetchQueries(metadataQuery); });
     await vi.waitFor(() => expect(view.getByRole("button", { name: "Details" })).toBeDisabled());
-    await act(async () => { offerRead.resolve(HttpResponse.json(quote)); await refreshOffer; });
+    await act(async () => { offerRead.resolve(undefined); await refreshOffer; });
     expect(view.queryClient.getQueryState(offerQuery.queryKey)?.status).toBe("success");
     expect(view.getByRole("button", { name: "Close receipt" })).toBeTruthy();
   } finally {
-    await act(() => offerRead.resolve(HttpResponse.json(quote)));
-    await act(() => metadata.resolve(HttpResponse.json(enquiry)));
+    await act(async () => {
+      offerRead.resolve(undefined);
+      metadata.resolve(undefined);
+      await Promise.all([refreshOffer, refreshMetadata]);
+    });
   }
 });
 
@@ -269,16 +276,20 @@ it("finishes one upload and submission while request refresh is still pending", 
   await act(async () => { void fireEvent.press(send); });
   await view.findByRole("progressbar", { value: { min: 0, max: 100, now: 50 } });
 
-  const metadata = Promise.withResolvers<Response>();
-  server.use(http.get("*/vehicle-history/requests/:id", () => metadata.promise));
+  const metadata = Promise.withResolvers<undefined>();
+  server.use(http.get("*/vehicle-history/requests/:id", async () => { await metadata.promise; return HttpResponse.json(enquiry); }));
+  let refreshMetadata: Promise<void> | undefined;
   try {
-    await act(async () => { void view.queryClient.refetchQueries(metadataQuery); });
+    await act(async () => { refreshMetadata = view.queryClient.refetchQueries(metadataQuery); });
     await vi.waitFor(() => expect(view.queryClient.isFetching(metadataQuery)).toBe(1));
     await act(() => upload.resolve(undefined));
     await view.findByText("Receipt submitted");
     expect(submissions).toBe(1);
   } finally {
-    await act(() => upload.resolve(undefined));
-    await act(() => metadata.resolve(HttpResponse.json(enquiry)));
+    await act(async () => {
+      upload.resolve(undefined);
+      metadata.resolve(undefined);
+      await refreshMetadata;
+    });
   }
 });
