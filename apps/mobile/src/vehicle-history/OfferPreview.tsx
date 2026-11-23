@@ -9,6 +9,7 @@ import { queryKeys } from "../api/queryKeys";
 import { ApiError } from "../api/client";
 
 import { PaymentProof } from "./PaymentProof";
+import { VinCorrection } from "./VinCorrection";
 import { historySessionCurrent, type HistoryViewer } from "./session";
 
 import { Button } from "@/components/ui/button";
@@ -134,6 +135,10 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
           {accepted && <PaymentProof key={`${userId}:${sessionId}:${request.id}:${accepted.id}`}
             viewer={viewer} requestId={request.id} orderId={accepted.id} ready={metadataAvailable && active && connected}
             reviewComplete={!!orderState?.payment?.confirmedAt} onSubmitted={async () => { await state.refetch(); if (canRead()) await reconcileOrder(); }} />}
+          {accepted && orderState && <VinCorrection key={`correction:${userId}:${sessionId}:${request.id}`} state={orderState}
+            storageKey={`carberk.history.vin-correction.v1:${userId}:${request.id}`} stream={stream}
+            enabled={ready && active && connected && !state.isFetching && !state.error} current={current}
+            reconcile={async () => { const result = await state.refetch(); if (result.error) throw result.error; if (canRead()) await reconcileOrder(); }} />}
           {!accepted && <><Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
           <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={setVin} maxLength={80}
             autoCapitalize="characters" autoCorrect={false} editable={canEdit} />

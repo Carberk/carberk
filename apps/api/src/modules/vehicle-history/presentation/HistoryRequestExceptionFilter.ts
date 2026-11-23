@@ -4,6 +4,10 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_CORRECTION_INVALID: "Check the corrected VIN and reviewed quote, then try again.",
+    HISTORY_CORRECTION_CONFLICT: "The correction changed. Refresh before choosing again.",
+    HISTORY_CORRECTION_CLOSED: "Fulfilment has started. Another car needs a new request; contact the operator about a company error.",
+
     HISTORY_PAYMENT_INVALID: "Check the amount, reference, evidence and received time, then confirm the independent wallet check.",
     HISTORY_PAYMENT_CONFLICT: "Payment review changed. Refresh before recording another check; do not request another payment.",
     HISTORY_PAYMENT_CLOSED: "Wallet verification resumes at 09:00 Ashgabat time. Keep the receipt for review.",
@@ -41,6 +45,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_CORRECTION_INVALID: "Проверьте исправленный VIN и предложение оператора и повторите попытку.",
+    HISTORY_CORRECTION_CONFLICT: "Исправление изменилось. Обновите данные перед подтверждением.",
+    HISTORY_CORRECTION_CLOSED: "Выполнение началось. Для другой машины создайте новое обращение; об ошибке компании напишите оператору.",
+
     HISTORY_PAYMENT_INVALID: "Проверьте сумму, номер перевода, основание и время получения, затем подтвердите независимую проверку кошелька.",
     HISTORY_PAYMENT_CONFLICT: "Проверка оплаты изменилась. Обновите данные перед новой проверкой; не запрашивайте повторную оплату.",
     HISTORY_PAYMENT_CLOSED: "Проверка кошелька возобновится в 09:00 по Ашхабаду. Сохраните квитанцию для проверки.",
@@ -78,6 +86,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_CORRECTION_INVALID: "Düzedilen VIN-i we işgäriň teklibini barlap, gaýtadan synanyşyň.",
+    HISTORY_CORRECTION_CONFLICT: "Düzediş üýtgedi. Saýlamazdan öň täzeläň.",
+    HISTORY_CORRECTION_CLOSED: "Ýerine ýetiriş başlandy. Başga ulag üçin täze ýüz tutma açyň; kompaniýanyň ýalňyşlygy barada işgäre ýazyň.",
+
     HISTORY_PAYMENT_INVALID: "Mukdary, geçirim belgisini, delili we alnan wagty barlap, gapjykdaky garaşsyz barlagy tassyklaň.",
     HISTORY_PAYMENT_CONFLICT: "Töleg barlagy üýtgedi. Täze barlagdan öň täzeläň; gaýtadan töleg soramaň.",
     HISTORY_PAYMENT_CLOSED: "Gapjyk barlagy Aşgabat wagty bilen 09:00-da dowam eder. Çegi barlag üçin saklaň.",
@@ -181,8 +193,8 @@ export function historyRequestFailure(error: unknown, language: string | undefin
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
   const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_PAYMENT_UNAVAILABLE" || code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
-    : code === "HISTORY_PAYMENT_CONFLICT" || code === "HISTORY_PAYMENT_CLOSED" || code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
-      : code === "HISTORY_PAYMENT_INVALID" || code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
+    : code === "HISTORY_CORRECTION_CONFLICT" || code === "HISTORY_CORRECTION_CLOSED" || code === "HISTORY_PAYMENT_CONFLICT" || code === "HISTORY_PAYMENT_CLOSED" || code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
+      : code === "HISTORY_CORRECTION_INVALID" || code === "HISTORY_PAYMENT_INVALID" || code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
         || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
 }

@@ -1,6 +1,17 @@
 import { expect, it } from "vitest";
 
-import { AcceptHistoryQuoteSchema } from "./history-order";
+import { AcceptHistoryQuoteSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema } from "./history-order";
+
+it("requires exact correction revisions and keeps staff responsibility separate from customer input", () => {
+  const input = { kind: "request", attemptKey: "11860000-0000-4000-8000-000000000001", expectedVersion: 0, vin: "DEMA0000000000006" };
+  expect(HistoryCorrectionMutationSchema.safeParse(input).success).toBe(true);
+  expect(HistoryCorrectionMutationSchema.safeParse({ ...input, cause: "company_error" }).success).toBe(false);
+  expect(HistoryCorrectionMutationSchema.safeParse({ kind: "accept", attemptKey: input.attemptKey, expectedVersion: 2 }).success).toBe(false);
+  expect(HistoryOperatorCorrectionMutationSchema.safeParse({ kind: "review", attemptKey: input.attemptKey,
+    expectedVersion: 1, expectedAssignmentVersion: 1, cause: "company_error", format: "pdf" }).success).toBe(true);
+  expect(HistoryOperatorCorrectionMutationSchema.safeParse({ kind: "review", attemptKey: input.attemptKey,
+    expectedVersion: 1, expectedAssignmentVersion: 1, format: "pdf" }).success).toBe(false);
+});
 
 it("requires the complete explicitly displayed proposal, including its format and version", () => {
   const offer = { version: 2, vin: "DEMA0000000000001", synthetic: true,

@@ -218,10 +218,28 @@ model HistoryOrder {
 
   privateFiles HistoryPrivateFile[]
   paymentChecks HistoryPaymentCheck[]
+  vinAgreements HistoryVinAgreement[]
 
   @@unique([requestId, id])
   @@index([deliveryDay, holdExpiresAt])
   @@map("vehicle_history_orders")
+}
+
+model HistoryVinAgreement {
+  requestId String
+  order HistoryOrder @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+  version Int
+  attemptKey String? @db.Uuid
+  input Json
+  state Json
+  reservedProvider String
+  actorId String
+  assignmentVersion Int
+  recordedAt DateTime @db.Timestamptz(3)
+
+  @@id([requestId, version])
+  @@unique([requestId, attemptKey])
+  @@map("history_vin_agreements")
 }
 
 model HistoryPaymentCheck {

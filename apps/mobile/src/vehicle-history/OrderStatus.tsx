@@ -23,6 +23,7 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
     <View className="flex-row items-start justify-between gap-3">
       <View className="flex-1 gap-1">
         <PaymentStatus state={state} summary />
+        {state.agreement?.pending && <Text className="text-footnote font-semibold">{t(state.agreement.pending.review ? "vehicleHistory.correctionReviewed" : "vehicleHistory.correctionWaiting")}</Text>}
         <Text selectable className="font-mono text-footnote">{offer.vin} · {copy({ pdf: "Pdf", link: "Link", both: "Both" }[offer.proposal.format])}</Text>
         <Text className="text-footnote">{timestamp(offer.proposal.deliveryFrom)} – {timestamp(offer.proposal.deliveryBy)}</Text>
       </View>

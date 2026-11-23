@@ -175,3 +175,23 @@ it("keeps the accepted status and reply available while typing and restores deta
     expect(view.getByText("DEMA0000000000001 · PDF and provider link")).toBeTruthy();
   } finally { listenerSpy.mockRestore(); }
 });
+
+it("keeps the accepted VIN visible while requesting a correction on that same order", async () => {
+  current = accepted;
+  server.use(http.post("*/vehicle-history/requests/:id/correction", async ({ request }) => {
+    const input = await request.json() as H.HistoryCorrectionMutation;
+    sent.push(input);
+    const agreement: H.HistoryCorrectionState = { version: 1, acceptedRevision: 0, handoff: null,
+      accepted: [{ revision: 0, offer: quote, acceptedAt: "2026-11-21T05:00:00.000Z", cause: null }],
+      pending: { vin: "DEMA0000000000006", requestedAt: "2026-11-21T05:01:00.000Z", review: null } };
+    current = { ...accepted, agreement, wallet: null };
+    return HttpResponse.json(agreement, { status: 201 });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Correct VIN" }));
+  await fireEvent.changeText(view.getByLabelText("Corrected VIN"), "DEMA0000000000006");
+  await fireEvent.press(view.getByRole("button", { name: "Request correction" }));
+  await view.findAllByText("VIN correction under review");
+  expect(view.getAllByText(/DEMA0000000000001/).length).toBeGreaterThan(0);
+  expect(sent).toEqual([expect.objectContaining({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0 })]);
+});
