@@ -9873,6 +9873,10 @@
               }
             ]
           },
+          "paymentDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
           "verificationResumesAt": {
             "type": "string",
             "format": "date-time"
@@ -17711,6 +17715,10 @@
                         }
                       ]
                     },
+                    "paymentDeadline": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
                     "verificationResumesAt": {
                       "type": "string",
                       "format": "date-time"
@@ -19100,6 +19108,10 @@
                         }
                       ]
                     },
+                    "paymentDeadline": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
                     "verificationResumesAt": {
                       "type": "string",
                       "format": "date-time"
@@ -20365,6 +20377,10 @@
                           "additionalProperties": false
                         }
                       ]
+                    },
+                    "paymentDeadline": {
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "verificationResumesAt": {
                       "type": "string",

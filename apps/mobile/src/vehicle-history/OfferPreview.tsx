@@ -63,7 +63,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
     if (!active || !ready || !connected || !accepted) return;
     const serverNow = Date.parse(orderState.serverNow);
     const boundaries = [
-      !orderState.payment?.confirmedAt && accepted.holdExpiresAt,
+      !orderState.payment?.confirmedAt && (orderState.paymentDeadline ?? accepted.holdExpiresAt),
       orderState.verificationResumesAt,
       replacement?.status === "proposed" && replacement.window.deliveryFrom,
     ].flatMap((value) => value && Date.parse(value) > serverNow ? [Date.parse(value) - serverNow] : []);
@@ -134,7 +134,8 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const denied = state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const error = failed || !!state.error;
   const proposal = data?.proposal;
-  const originalWindow = replacement ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
+  const historicalWindow = replacement || orderState?.status === "hold_expired";
+  const originalWindow = historicalWindow ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
   const canEdit = ready && active && connected && !saving && !accepted;
   return <View className="gap-3 rounded-2xl border border-border p-4">
     {!accepted && <Text accessibilityRole="header" className="text-headline font-semibold">{copy("title")}</Text>}
@@ -153,13 +154,14 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
           {proposal && <View className="gap-3 border-y border-border py-4">
             <Text accessibilityRole="header" className="text-headline font-semibold">{copy(accepted ? "orderSummary" : "preview")}</Text>
             <Text>{copy("format")}: {copy(proposal.format)}</Text>
-            {originalWindow && <Text>{replacement ? t("vehicleHistory.replacementOriginal") : copy("window")}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}{replacement && ` · ${t("vehicleHistory.replacementTimeZone")}`}</Text>}
+            {originalWindow && <Text>{historicalWindow ? t("vehicleHistory.replacementOriginal") : copy("window")}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}{historicalWindow ? ` · ${t("vehicleHistory.replacementTimeZone")}` : null}</Text>}
             {(!accepted || expanded) && proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
             {(!accepted || expanded) && <><Text className="text-callout">{copy("rights")}</Text><Text className="text-callout">{copy("terms")}</Text></>}
             {accepted ? <>
               <Text>{t("vehicleHistory.offerOrderPrice", { amount: accepted.acceptedOffer.proposal.priceTmt })}</Text>
               <Text>{copy("orderAccepted")}: {timestamp(accepted.acceptedAt)}</Text>
-              <Text>{copy("orderHold")}: {timestamp(accepted.holdExpiresAt)}</Text>
+              {orderState?.paymentDeadline && <Text>{t("vehicleHistory.replacementPaymentDeadline")}: {timestamp(orderState.paymentDeadline)}</Text>}
+              <Text>{orderState?.paymentDeadline ? t("vehicleHistory.replacementOriginalHold") : copy("orderHold")}: {timestamp(accepted.holdExpiresAt)}</Text>
               {orderState?.payment?.confirmedAt && <Text>{t("vehicleHistory.paymentConfirmedAt")}: {timestamp(orderState.payment.confirmedAt)}</Text>}
               {orderState?.payment?.receivedAt && <Text>{t("vehicleHistory.paymentReceivedAt")}: {timestamp(orderState.payment.receivedAt)}</Text>}
               {orderState?.verificationResumesAt && <Text className="text-footnote text-muted-foreground">{t("vehicleHistory.replacementOvernight")}</Text>}

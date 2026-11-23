@@ -70,6 +70,30 @@ describe("independent manual wallet verification over HTTP/Postgres", () => {
   const newWindow = { deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" };
   const laterWindow = { deliveryFrom: "2026-11-21T09:00:00.000Z", deliveryBy: "2026-11-21T10:00:00.000Z" };
 
+  it("releases payment instructions and both capacity limits when the original window ends first", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { allowance: 1, resetUtc: "00:00", externalUsage: {} } });
+    const e = await accepted({ deliveryFrom: "2026-11-21T05:05:00.000Z", deliveryBy: "2026-11-21T05:10:00.000Z" });
+    expect((await e.read().expect(200)).body).toMatchObject({
+      status: "awaiting_synthetic_payment", wallet: "SYNTHETIC-VH09-NO-TRANSFER", paymentDeadline: "2026-11-21T05:10:00.000Z",
+    });
+    now = new Date("2026-11-21T05:10:00.000Z");
+    expect((await e.read().expect(200)).body).toMatchObject({ status: "hold_expired", wallet: null, order: e.order });
+    await accepted({ deliveryFrom: "2026-11-21T05:15:00.000Z", deliveryBy: "2026-11-21T06:00:00.000Z" });
+    await e.verify().expect(201);
+    expect((await e.read().expect(200)).body).toMatchObject({ status: "payment_received_no_hold", wallet: null, order: e.order,
+      payment: { receivedAt: e.input.receivedAt, confirmedAt: "2026-11-21T05:10:00.000Z", bookingCommitted: false } });
+  });
+
+  it("lets the operator correct an invalid staffed window without refreshing the proposal version", async () => {
+    const e = await accepted();
+    now = new Date(e.order.holdExpiresAt);
+    await e.verify().expect(201);
+    const response = await e.staffReplacement({ kind: "propose", expectedVersion: 0,
+      deliveryFrom: "2026-11-22T05:30:00.000Z", deliveryBy: "2026-11-22T06:00:00.000Z" }).set("Accept-Language", "ru").expect(400);
+    expect(response.body).toMatchObject({ code: "HISTORY_REPLACEMENT_INVALID", message: expect.stringContaining("Проверьте") });
+    await e.staffReplacement({ kind: "propose", expectedVersion: 0, ...newWindow }).expect(201);
+  });
+
   it("holds late funds when a proposal is superseded or expires before the customer's exact acceptance", async () => {
     const e = await accepted();
     now = new Date(e.order.holdExpiresAt);

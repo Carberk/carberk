@@ -112,6 +112,7 @@ export const HistoryOrderStateSchema = z.object({
   status: z.enum(["enquiry", "awaiting_synthetic_payment", "hold_expired", "receipt_submitted", "payment_review", "payment_confirmed", "payment_received_no_hold"]),
   payment: HistoryPaymentSummarySchema.optional(),
   replacement: HistoryReplacementStateSchema.optional(),
+  paymentDeadline: DateTimeSchema.optional(),
   verificationResumesAt: DateTimeSchema.optional(),
   reportPlan: z.object({ primary: ProviderName, second: ProviderName.nullable() }).strict().optional(),
   preparation: HistoryPreparationSchema.optional(), fulfilment: HistoryFulfilmentViewSchema.optional(),

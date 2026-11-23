@@ -387,3 +387,14 @@ it("records only a pending refund decision after explicitly declining in Turkmen
   expect(sent).toMatchObject([{ orderId: id, expectedVersion: 4, kind: "decline" }]);
   expect(view.queryByRole("button", { name: "Täze wagty kabul et" })).toBeNull();
 });
+
+it("shows the effective payment deadline and explains verification after closing while staff are open", async () => {
+  current = { ...accepted, serverNow: "2026-11-21T14:55:00.000Z", verificationResumesAt: "2026-11-22T04:00:00.000Z",
+    paymentDeadline: "2026-11-21T15:00:00.000Z",
+    order: { id, acceptedAt: "2026-11-21T14:55:00.000Z", holdExpiresAt: "2026-11-21T16:55:00.000Z", deliveryDay: "2026-11-21",
+      acceptedOffer: { ...quote, proposal: { ...quote.proposal, deliveryFrom: "2026-11-21T14:58:00.000Z", deliveryBy: "2026-11-21T15:00:00.000Z" } } } };
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("After-hours verification from 09:00 Ashgabat time");
+  expect(view.getByText(/Payment deadline · Ashgabat time.*20:00/)).toBeTruthy();
+  expect(view.getByText(/Original hold expiry · Ashgabat time.*21:55/)).toBeTruthy();
+});

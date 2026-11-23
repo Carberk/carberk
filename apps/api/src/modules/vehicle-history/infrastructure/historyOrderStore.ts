@@ -55,7 +55,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
           count(*) FILTER (WHERE "activeBy" <= ($1 || 'T10:00:00+05:00')::timestamptz)::int AS morning,
           count(*) FILTER (WHERE "activeFrom" < $3 AND "activeBy" > $2)::int AS overlapping
         FROM active_orders o WHERE "activeDay" = $1 AND (NOT $5::boolean OR "requestId" <> $6)
-          AND ("holdExpiresAt" > $4 OR ${hasBooking})`, [day, from, by, now, excludeCurrent, requestId]);
+          AND (LEAST("holdExpiresAt", "deliveryBy") > $4 OR ${hasBooking})`, [day, from, by, now, excludeCurrent, requestId]);
       return rows[0] ?? { total: 0, morning: 0, overlapping: 0 };
     },
     async providerUsage(provider, periodStart, periodEnd, now, { excludeCurrent = false, unreserved = "all" } = {}) {
@@ -76,7 +76,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
               SELECT 1 FROM history_payment_checks older WHERE older."requestId" = o."requestId" AND (older."bookingCommitted" OR o."replacementBooked") AND older."confirmedAt" IS NOT NULL
                 AND ($8::timestamptz IS NULL OR (older."confirmedAt", older."requestId") < ($8::timestamptz, $6::text))
             )))))
-          AND ("holdExpiresAt" > $4 OR ${hasBooking})`,
+          AND (LEAST("holdExpiresAt", "deliveryBy") > $4 OR ${hasBooking})`,
       [provider, periodStart, periodEnd, now, excludeCurrent, requestId, unreservedMode, confirmedBefore]);
       return rows[0]?.used ?? 0;
     },

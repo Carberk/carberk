@@ -4,7 +4,7 @@ import type { HistoryPaymentSchemas as P } from "@auto-tm/contracts";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
-import { historyVerificationResumes } from "../domain/HistoryOrder";
+import { historyPaymentDeadline, historyVerificationResumes } from "../domain/HistoryOrder";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 
 @Injectable()
@@ -38,7 +38,7 @@ export class HistoryPayments {
         }
         if (historyVerificationResumes(now)) throw new HistoryRequestError("HISTORY_PAYMENT_CLOSED");
         const confirmedAt = input.outcome === "matched" ? now.toISOString() : null;
-        const bookingCommitted = !!confirmedAt && new Date(order.holdExpiresAt) > now && new Date(order.acceptedOffer.proposal.deliveryBy) > now;
+        const bookingCommitted = !!confirmedAt && historyPaymentDeadline(order) > now;
         const check = { input, actorId, checkedAt: now.toISOString(), confirmedAt, bookingCommitted, version: state().version + 1 };
         await orders.savePaymentCheck(check);
         checks.push(check);

@@ -62,7 +62,9 @@ export class HistoryReplacementBooking {
             if (input.kind === "accept") booking = plan;
           } catch (error) {
             if (error instanceof HistoryRequestError && error.code === "HISTORY_ORDER_CAPACITY") throw new HistoryRequestError("HISTORY_REPLACEMENT_CAPACITY");
-            if (error instanceof HistoryRequestError && error.code === "HISTORY_ORDER_STALE") throw new HistoryRequestError("HISTORY_REPLACEMENT_CONFLICT");
+            if (error instanceof HistoryRequestError && error.code === "HISTORY_ORDER_STALE") {
+              throw new HistoryRequestError(input.kind === "propose" ? "HISTORY_REPLACEMENT_INVALID" : "HISTORY_REPLACEMENT_CONFLICT");
+            }
             throw error;
           }
           state = input.kind === "propose" ? { status: "proposed", version, window }

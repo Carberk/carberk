@@ -73,7 +73,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
     const serverNow = Date.parse(orderState.serverNow);
     const replacement = orderState.replacement;
     const boundaries = [
-      !orderState.payment?.confirmedAt && orderState.order.holdExpiresAt,
+      !orderState.payment?.confirmedAt && (orderState.paymentDeadline ?? orderState.order.holdExpiresAt),
       orderState.verificationResumesAt,
       replacement?.status === "proposed" && replacement.window.deliveryFrom,
     ].flatMap((value) => value && Date.parse(value) > serverNow ? [Date.parse(value) - serverNow] : []);
@@ -86,7 +86,8 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   const available = data?.preflight?.status === "available";
   const proposal = data?.proposal;
   const replacement = orderState?.replacement;
-  const originalWindow = replacement ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
+  const historicalWindow = replacement || orderState?.status === "hold_expired";
+  const originalWindow = historicalWindow ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
   const recovery = replacementCopy[locale];
   const timestamp = (value: string) => new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
@@ -130,9 +131,11 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       {proposal && <div className="space-y-3 rounded-lg border p-4">
         <h5 className="font-semibold">{accepted ? t.orderSummary : t.preview}</h5><p className="break-all font-mono">{data.vin}</p>
         <p>{t.format}: {t[proposal.format]}</p>
-        {originalWindow && <p>{replacement ? recovery.original : t.window}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}</p>}
+        {originalWindow && <p>{historicalWindow ? `${recovery.original} · ${recovery.timeZone}` : t.window}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}</p>}
         {accepted ? <>
-          <p>{t.orderAccepted}: {timestamp(accepted.acceptedAt)}</p><p>{t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>
+          <p>{t.orderAccepted}: {timestamp(accepted.acceptedAt)}</p>
+          {orderState?.paymentDeadline && <p>{recovery.paymentDeadline} · {recovery.timeZone}: {timestamp(orderState.paymentDeadline)}</p>}
+          <p>{orderState?.paymentDeadline ? `${recovery.originalHold} · ${recovery.timeZone}` : t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>
           {orderState?.reportPlan && <p>{t.reservedReport} {orderState.reportPlan.primary}
             {orderState.reportPlan.second && <> · {t.spareReport} {orderState.reportPlan.second}</>}</p>}
           {!orderState?.payment && <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>}

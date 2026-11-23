@@ -86,22 +86,28 @@ export function historyDeliveryDay(from: Date, by: Date, now: Date) {
   return day;
 }
 
+export function historyPaymentDeadline(order: StoredHistoryOrder) {
+  const { deliveryBy } = (order.originalOffer ?? order.acceptedOffer).proposal;
+  return new Date(Math.min(Date.parse(order.holdExpiresAt), Date.parse(deliveryBy)));
+}
+
 export function historyOrderState(stored: StoredHistoryOrder | null, now: Date, checks: P.HistoryPaymentCheck[] = [], submitted = false): H.HistoryOrderState {
   if (!stored) return { order: null, status: "enquiry", serverNow: now.toISOString(), wallet: null, collectionEnabled: false };
   const { wallet, id, acceptedOffer, deliveryDay, acceptedAt, holdExpiresAt } = stored;
   const order = { id, acceptedOffer, deliveryDay, acceptedAt, holdExpiresAt };
-  const holdUntil = new Date(holdExpiresAt);
-  const active = holdUntil > now;
+  const deadline = historyPaymentDeadline(stored);
+  const active = deadline > now;
   const check = checks.at(-1);
   const committed = !!bookedPayment(stored, checks);
   const replacement = check?.confirmedAt && !check.bookingCommitted ? replacementState(stored, now) : undefined;
-  const verificationResumes = !check?.confirmedAt && historyVerificationResumes(now, active ? holdUntil : now);
+  const verificationResumes = !check?.confirmedAt && historyVerificationResumes(now, active ? deadline : now);
   const payment = check ? { outcome: check.input.outcome, amountMinor: check.input.amountMinor,
     receivedAt: check.input.receivedAt, confirmedAt: check.confirmedAt, bookingCommitted: committed }
     : submitted ? { outcome: "receipt_submitted" as const, amountMinor: 0, receivedAt: null, confirmedAt: null, bookingCommitted: false } : undefined;
   const status = check?.confirmedAt ? committed ? "payment_confirmed" : "payment_received_no_hold"
     : !active ? "hold_expired" : check ? "payment_review" : submitted ? "receipt_submitted" : "awaiting_synthetic_payment";
   return { order, status, serverNow: now.toISOString(), ...(stored.agreement ? { agreement: stored.agreement } : {}), ...(payment ? { payment } : {}),
+    ...(deadline.getTime() < Date.parse(holdExpiresAt) ? { paymentDeadline: deadline.toISOString() } : {}),
     ...(replacement ? { replacement } : {}), ...(verificationResumes ? { verificationResumesAt: verificationResumes.toISOString() } : {}),
     wallet: active && !payment && !stored.agreement?.pending ? wallet : null, collectionEnabled: false };
 }
