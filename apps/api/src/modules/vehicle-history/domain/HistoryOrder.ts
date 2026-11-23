@@ -3,17 +3,30 @@ import { HistoryRequestError } from "./HistoryRequestError";
 
 export type AvailableHistoryReports = Extract<NonNullable<O.HistoryOffer["preflight"]>, { status: "available" }>;
 export type HistoryProvider = AvailableHistoryReports["providers"][number]["name"];
-export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string; reservedProvider?: HistoryProvider };
+export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string; reservedProvider?: HistoryProvider;
+  agreement?: H.HistoryCorrectionState; originalOffer?: H.HistoryAcceptedOrder["acceptedOffer"] };
+export type HistoryAgreementInput = H.HistoryCorrectionMutation | H.HistoryOperatorCorrectionMutation | { kind: "handoff"; expectedRevision: number };
+export interface HistoryAgreementWrite {
+  input: HistoryAgreementInput; state: H.HistoryCorrectionState; provider: HistoryProvider;
+  actorId: string; assignmentVersion: number; recordedAt: string;
+}
 export interface HistoryOrderStore {
   read(): Promise<StoredHistoryOrder | null>;
   serialize<T>(operation: () => Promise<T>): Promise<T>;
   capacity(day: string, from: Date, by: Date, now: Date): Promise<{ total: number; morning: number; overlapping: number }>;
-  providerUsage(provider: HistoryProvider, periodStart: Date, periodEnd: Date, now: Date): Promise<number>;
+  providerUsage(provider: HistoryProvider, periodStart: Date, periodEnd: Date, now: Date, excludeCurrent?: boolean): Promise<number>;
   earlierPaidOrdersForSecondReport(provider: HistoryProvider, periodStart: Date, periodEnd: Date, confirmedAt: string, now: Date): Promise<number>;
   create(order: Omit<StoredHistoryOrder, "reservedProvider">, provider: HistoryProvider): Promise<void>;
   paymentChecks(): Promise<P.HistoryPaymentCheck[]>;
   savePaymentCheck(check: P.HistoryPaymentCheck): Promise<void>;
   submittedProofIds(): Promise<string[]>;
+  agreementAttempt(key: string): Promise<HistoryAgreementInput | null>;
+  saveAgreement(write: HistoryAgreementWrite): Promise<void>;
+}
+
+export function historyAgreement(order: StoredHistoryOrder): H.HistoryCorrectionState {
+  return order.agreement ?? { version: 0, acceptedRevision: 0, pending: null, handoff: null,
+    accepted: [{ revision: 0, offer: order.acceptedOffer, acceptedAt: order.acceptedAt, cause: null }] };
 }
 
 export function historyDeliveryDay(from: Date, by: Date, now: Date) {
@@ -40,6 +53,6 @@ export function historyOrderState(stored: StoredHistoryOrder | null, now: Date, 
     : submitted ? { outcome: "receipt_submitted" as const, amountMinor: 0, receivedAt: null, confirmedAt: null, bookingCommitted: false } : undefined;
   const status = check?.confirmedAt ? check.bookingCommitted ? "payment_confirmed" : "payment_received_no_hold"
     : !active ? "hold_expired" : check ? "payment_review" : submitted ? "receipt_submitted" : "awaiting_synthetic_payment";
-  return { order, status, serverNow: now.toISOString(), ...(payment ? { payment } : {}),
-    wallet: active && !payment ? wallet : null, collectionEnabled: false };
+  return { order, status, serverNow: now.toISOString(), ...(stored.agreement ? { agreement: stored.agreement } : {}), ...(payment ? { payment } : {}),
+    wallet: active && !payment && !stored.agreement?.pending ? wallet : null, collectionEnabled: false };
 }

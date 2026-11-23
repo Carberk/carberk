@@ -47,7 +47,20 @@ export class HistoryCapacity {
     });
   }
 
-  private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date) {
+  async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date) {
+    const from = new Date(order.acceptedOffer.proposal.deliveryFrom), by = new Date(order.acceptedOffer.proposal.deliveryBy);
+    if (by <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+    const names = reports.providers.map(({ name }) => name);
+    const preferred = order.reservedProvider;
+    if (preferred && names.includes(preferred)) names.sort((a) => a === preferred ? -1 : 1);
+    for (const name of names) {
+      const budget = await this.remaining(orders, name, from, by, now, true);
+      if (budget && budget.slots > 0) return name;
+    }
+    throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+  }
+
+  private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date, excludeCurrent = false) {
     const budget = this.config.get("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { infer: true })?.[provider];
     if (!budget?.allowance) return null;
     const periodStart = new Date(`${from.toISOString().slice(0, 10)}T${budget.resetUtc}:00Z`);
@@ -55,7 +68,7 @@ export class HistoryCapacity {
     const periodEnd = new Date(periodStart.getTime() + 86_400_000);
     if (by > periodEnd) return null;
     const external = budget.externalUsage[periodStart.toISOString().slice(0, 10)] ?? 0;
-    const reserved = await orders.providerUsage(provider, periodStart, periodEnd, now);
+    const reserved = await orders.providerUsage(provider, periodStart, periodEnd, now, excludeCurrent);
     return { slots: budget.allowance - external - reserved, periodStart, periodEnd };
   }
 }

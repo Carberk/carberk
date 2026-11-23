@@ -1,16 +1,30 @@
 import { HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
 import type { PoolClient } from "pg";
-import type { HistoryOrderStore, HistoryProvider } from "../domain/HistoryOrder";
+import type { HistoryAgreementInput, HistoryOrderStore, HistoryProvider } from "../domain/HistoryOrder";
+
+const activeOrders = `WITH active_orders AS (
+  SELECT o.*, COALESCE(a."reservedProvider", o."reservedProvider") AS "activeProvider",
+    COALESCE(a.state->'accepted'->-1->'offer', o.snapshot->'acceptedOffer') AS "activeOffer"
+  FROM vehicle_history_orders o LEFT JOIN LATERAL
+    (SELECT state, "reservedProvider" FROM history_vin_agreements WHERE "requestId" = o."requestId" ORDER BY version DESC LIMIT 1) a ON TRUE
+)`;
 
 export function historyOrderStore(client: PoolClient, requestId: string, assertActive: () => void): HistoryOrderStore {
   return {
     async read() {
       assertActive();
-      const { rows } = await client.query<{ snapshot: H.HistoryAcceptedOrder; wallet: string; reservedProvider: HistoryProvider | null }>(
-        'SELECT snapshot, wallet, "reservedProvider" FROM vehicle_history_orders WHERE "requestId" = $1', [requestId]);
+      const { rows } = await client.query<{ snapshot: H.HistoryAcceptedOrder; wallet: string; reservedProvider: HistoryProvider | null; agreement: unknown }>(
+        `${activeOrders} SELECT snapshot, wallet, "activeProvider" AS "reservedProvider",
+          (SELECT state FROM history_vin_agreements WHERE "requestId" = $1 ORDER BY version DESC LIMIT 1) AS agreement
+          FROM active_orders WHERE "requestId" = $1`, [requestId]);
       const row = rows[0];
-      return row ? { ...H.HistoryAcceptedOrderSchema.parse(row.snapshot), wallet: row.wallet,
-        ...(row.reservedProvider ? { reservedProvider: row.reservedProvider } : {}) } : null;
+      if (!row) return null;
+      const original = H.HistoryAcceptedOrderSchema.parse(row.snapshot);
+      const agreement = row.agreement ? H.HistoryCorrectionStateSchema.parse(row.agreement) : null;
+      const accepted = agreement?.accepted.at(-1);
+      if (agreement && (!accepted || agreement.acceptedRevision !== accepted.revision)) throw new Error("Invalid accepted History revision");
+      return { ...original, wallet: row.wallet, ...(row.reservedProvider ? { reservedProvider: row.reservedProvider } : {}),
+        ...(agreement && accepted ? { agreement, acceptedOffer: accepted.offer, originalOffer: original.acceptedOffer } : {}) };
     },
     async serialize(operation) {
       assertActive();
@@ -28,24 +42,25 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
           (SELECT 1 FROM history_payment_checks p WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [day, from, by, now]);
       return rows[0] ?? { total: 0, morning: 0, overlapping: 0 };
     },
-    async providerUsage(provider, periodStart, periodEnd, now) {
+    async providerUsage(provider, periodStart, periodEnd, now, excludeCurrent = false) {
       assertActive();
       const { rows } = await client.query<{ used: number }>(`
-        SELECT count(*)::int AS used FROM vehicle_history_orders o
+        ${activeOrders} SELECT count(*)::int AS used FROM active_orders o
         WHERE "deliveryFrom" < $3 AND "deliveryBy" > $2
-          AND ("reservedProvider" = $1 OR ("reservedProvider" IS NULL AND
-            snapshot->'acceptedOffer'->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))))
+          AND (NOT $5::boolean OR "requestId" <> $6)
+          AND ("activeProvider" = $1 OR ("activeProvider" IS NULL AND
+            "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))))
           AND ("holdExpiresAt" > $4 OR EXISTS (SELECT 1 FROM history_payment_checks p
-            WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [provider, periodStart, periodEnd, now]);
+            WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [provider, periodStart, periodEnd, now, excludeCurrent, requestId]);
       return rows[0]?.used ?? 0;
     },
     async earlierPaidOrdersForSecondReport(provider, periodStart, periodEnd, confirmedAt, now) {
       assertActive();
       const { rows } = await client.query<{ earlier: number }>(`
-        SELECT count(*)::int AS earlier FROM vehicle_history_orders o
+        ${activeOrders} SELECT count(*)::int AS earlier FROM active_orders o
         JOIN history_payment_checks p ON p."requestId" = o."requestId" AND p."bookingCommitted"
-        WHERE o."reservedProvider" <> $1 AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3 AND o."deliveryBy" > $6
-          AND o.snapshot->'acceptedOffer'->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
+        WHERE o."activeProvider" <> $1 AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3 AND o."deliveryBy" > $6
+          AND o."activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
           AND (p."confirmedAt", o."requestId") < ($4::timestamptz, $5::text)`, [provider, periodStart, periodEnd, confirmedAt, requestId, now]);
       return rows[0]?.earlier ?? 0;
     },
@@ -75,6 +90,21 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
       assertActive();
       const { rows } = await client.query<{ id: string }>('SELECT id FROM history_private_files WHERE "requestId" = $1 AND status = $2', [requestId, "submitted"]);
       return rows.map((row) => row.id);
+    },
+    async agreementAttempt(key) {
+      assertActive();
+      const { rows } = await client.query<{ input: HistoryAgreementInput }>(
+        'SELECT input FROM history_vin_agreements WHERE "requestId" = $1 AND "attemptKey" = $2', [requestId, key]);
+      return rows[0]?.input ?? null;
+    },
+    async saveAgreement(write) {
+      assertActive();
+      const state = H.HistoryCorrectionStateSchema.parse(write.state);
+      await client.query(`INSERT INTO history_vin_agreements
+        ("requestId", version, "attemptKey", input, state, "reservedProvider", "actorId", "assignmentVersion", "recordedAt")
+        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)`, [requestId, state.version,
+        "attemptKey" in write.input ? write.input.attemptKey : null, JSON.stringify(write.input), JSON.stringify(state),
+        write.provider, write.actorId, write.assignmentVersion, write.recordedAt]);
     },
   };
 }

@@ -65,6 +65,8 @@ export function historyTranscript(viewer: HistoryViewer, requestId: string, sign
       return message;
     },
     order: (current: () => boolean) => transport("/order", H.HistoryOrderStateSchema, undefined, current),
+    correctVin: (input: H.HistoryCorrectionMutation, current: () => boolean) => transport("/correction", H.HistoryCorrectionStateSchema,
+      H.HistoryCorrectionMutationSchema.parse(input), current),
     acceptQuote: (offer: H.AcceptHistoryQuote["offer"], current: () => boolean) => transport("/order", H.HistoryOrderStateSchema,
       H.AcceptHistoryQuoteSchema.parse({ offer }), current),
     offer: (current: () => boolean) => transport("/offer", O.HistoryOfferSchema, undefined, current),

@@ -2,13 +2,19 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as SecureStore from "expo-secure-store";
 import { focusManager } from "@tanstack/react-query";
-import { Keyboard, type KeyboardEvent } from "react-native";
+import * as Native from "react-native";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
 import { act, fireEvent, renderMobile, routeParams } from "../../test/render";
 import { server } from "../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../auth/session";
+
+const device = vi.hoisted(() => ({ width: 402, height: 874, fontScale: 1, scale: 3 }));
+vi.mock("react-native", async (original) => ({
+  ...await original<typeof Native>(),
+  useWindowDimensions: () => device,
+}));
 
 vi.mock("react-native-safe-area-context", async () => ({
   SafeAreaView: (await import("react-native")).View,
@@ -27,6 +33,7 @@ const accepted: H.HistoryOrderState = { order: { id, acceptedOffer: quote, accep
 let current: H.HistoryOrderState;
 let sent: unknown[];
 beforeEach(async () => {
+  device.fontScale = 1;
   let stored: string | null = null;
   vi.mocked(SecureStore.getItemAsync).mockImplementation(async () => stored);
   vi.mocked(SecureStore.setItemAsync).mockImplementation(async (_key, value) => { stored = value; });
@@ -150,15 +157,27 @@ it("shows accepted facts and the next action with access to the agreed details",
   expect(view.getByText("Accepted order · 100 TMT")).toBeTruthy();
 });
 
+it("keeps the persistent summary compact and the full correction reachable at accessibility text size", async () => {
+  device.fontScale = 2;
+  current = accepted;
+  const view = await renderMobile(<RequestScreen />, { locale: "ru" });
+  await view.findByRole("button", { name: "Условия" });
+  expect(view.getByText("Ожидается тестовая оплата · 100 TMT")).toBeTruthy();
+  expect(view.queryByText("DEMA0000000000001 · PDF и ссылка провайдера")).toBeNull();
+  expect(view.getByText("VIN: DEMA0000000000001")).toBeTruthy();
+  await fireEvent.press(await view.findByRole("button", { name: "Исправить VIN" }));
+  expect(view.getByLabelText("Исправленный VIN").props.editable).toBe(true);
+});
+
 it("keeps the accepted status and reply available while typing and restores details after the keyboard closes", async () => {
   current = accepted;
-  const callbacks = new Map<string, (event: KeyboardEvent) => void>();
-  const subscribe = Keyboard.addListener;
-  const listenerSpy = vi.spyOn(Keyboard, "addListener").mockImplementation((event, callback) => {
+  const callbacks = new Map<string, (event: Native.KeyboardEvent) => void>();
+  const subscribe = Native.Keyboard.addListener;
+  const listenerSpy = vi.spyOn(Native.Keyboard, "addListener").mockImplementation((event, callback) => {
     callbacks.set(event, callback);
     return subscribe(event, callback);
   });
-  const openKeyboard: KeyboardEvent = { duration: 250, easing: "keyboard",
+  const openKeyboard: Native.KeyboardEvent = { duration: 250, easing: "keyboard",
     endCoordinates: { screenX: 0, screenY: 540, width: 402, height: 334 } };
   try {
     const view = await renderMobile(<RequestScreen />);
@@ -174,4 +193,41 @@ it("keeps the accepted status and reply available while typing and restores deta
     expect(view.getByRole("button", { name: "Details" })).toBeTruthy();
     expect(view.getByText("DEMA0000000000001 · PDF and provider link")).toBeTruthy();
   } finally { listenerSpy.mockRestore(); }
+});
+
+it("keeps the accepted VIN visible while requesting a correction on that same order", async () => {
+  current = accepted;
+  server.use(http.post("*/vehicle-history/requests/:id/correction", async ({ request }) => {
+    const input = await request.json() as H.HistoryCorrectionMutation;
+    sent.push(input);
+    const agreement: H.HistoryCorrectionState = { version: 1, acceptedRevision: 0, handoff: null,
+      accepted: [{ revision: 0, offer: quote, acceptedAt: "2026-11-21T05:00:00.000Z", cause: null }],
+      pending: { vin: "DEMA0000000000006", requestedAt: "2026-11-21T05:01:00.000Z", review: null } };
+    current = { ...accepted, agreement, wallet: null };
+    return HttpResponse.json(agreement, { status: 201 });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Correct VIN" }));
+  await fireEvent.changeText(view.getByLabelText("Corrected VIN"), "DEMA0000000000006");
+  await fireEvent.press(view.getByRole("button", { name: "Request correction" }));
+  await view.findAllByText("VIN correction under review");
+  expect(view.getAllByText(/DEMA0000000000001/).length).toBeGreaterThan(0);
+  expect(sent).toEqual([expect.objectContaining({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0 })]);
+});
+it("lets the customer repair a rejected VIN without replaying the invalid request", async () => {
+  current = accepted;
+  const inputs: H.HistoryCorrectionMutation[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/correction", async ({ request }) => {
+    inputs.push(await request.json() as H.HistoryCorrectionMutation);
+    return HttpResponse.json({ code: "HISTORY_CORRECTION_INVALID" }, { status: 400 });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Correct VIN" }));
+  await fireEvent.changeText(view.getByLabelText("Corrected VIN"), "INVALID-O");
+  await fireEvent.press(view.getByRole("button", { name: "Request correction" }));
+  expect(view.getByLabelText("Corrected VIN").props.editable).toBe(true);
+  await fireEvent.changeText(view.getByLabelText("Corrected VIN"), "DEMA0000000000006");
+  await fireEvent.press(view.getByRole("button", { name: "Request correction" }));
+  expect(inputs).toEqual([expect.objectContaining({ vin: "INVALID-O" }), expect.objectContaining({ vin: "DEMA0000000000006" })]);
+  expect(inputs[1]?.attemptKey).not.toBe(inputs[0]?.attemptKey);
 });

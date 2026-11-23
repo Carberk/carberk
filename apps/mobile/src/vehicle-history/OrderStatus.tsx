@@ -6,11 +6,13 @@ import { PaymentStatus } from "./PaymentStatus";
 
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { useLargeText } from "@/lib/font-scale";
 
 export function OrderStatus({ state, compact, ready, onDetails }: {
   state: H.HistoryOrderState; compact: boolean; ready: boolean; onDetails: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const largeText = useLargeText();
   if (!state.order) return null;
   const copy = (key: string) => t(`vehicleHistory.offer${key}`);
   if (compact) return <View className="border-b border-border bg-card px-5 py-2"><PaymentStatus state={state} compact /></View>;
@@ -22,9 +24,12 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
   return <View className="border-b border-border bg-card px-5 py-3">
     <View className="flex-row items-start justify-between gap-3">
       <View className="flex-1 gap-1">
-        <PaymentStatus state={state} summary />
+        <PaymentStatus state={state} summary compact={largeText} />
+        {!largeText && <>
+        {state.agreement?.pending && <Text className="text-footnote font-semibold">{t(state.agreement.pending.review ? "vehicleHistory.correctionReviewed" : "vehicleHistory.correctionWaiting")}</Text>}
         <Text selectable className="font-mono text-footnote">{offer.vin} · {copy({ pdf: "Pdf", link: "Link", both: "Both" }[offer.proposal.format])}</Text>
         <Text className="text-footnote">{timestamp(offer.proposal.deliveryFrom)} – {timestamp(offer.proposal.deliveryBy)}</Text>
+        </>}
       </View>
       <Button variant="secondary" size="sm" disabled={!ready} onPress={onDetails}><Text>{copy("OrderStatusDetails")}</Text></Button>
     </View>

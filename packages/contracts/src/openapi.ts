@@ -4,7 +4,7 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 
 import * as PaymentProof from "./schemas/history-payment-proof";
-import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema } from "./schemas/history-order";
+import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema } from "./schemas/history-order";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -481,6 +481,16 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       409: { description: "Offer or assignment changed; refresh" }, 503: { description: "Temporarily unavailable" } },
   });
   registry.register("HistoryOrderState", HistoryOrderStateSchema);
+  for (const operator of [false, true]) for (const method of ["get", "post"] as const) registry.registerPath({
+    method, path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/correction`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: method === "get" ? "Read accepted VIN revisions and pending correction" : operator ? "Review and recheck a synthetic VIN correction" : "Request or explicitly accept an exact reviewed VIN revision",
+    request: { params: z.object({ id: z.string().guid() }), query: operator && method === "get" ? ReadOperatorHistoryOfferSchema : ReadHistoryOfferSchema,
+      ...(method === "post" ? { body: { content: { "application/json": { schema: operator ? HistoryOperatorCorrectionMutationSchema : HistoryCorrectionMutationSchema } } } } : {}) },
+    responses: { [method === "get" ? 200 : 201]: { description: "Private revision history; no new payment, hold, order or provider purchase", content: { "application/json": { schema: HistoryCorrectionStateSchema } } },
+      400: { description: "Invalid correction" }, 403: { description: "Current session, purpose and request authority refused" },
+      409: { description: "Correction changed, unavailable capacity or fulfilment already started" }, 503: { description: "Read back before retrying the same correction" } },
+  });
   registry.register("HistoryPaymentVerification", HistoryPaymentVerificationSchema);
   for (const method of ["get", "post"] as const) registry.registerPath({
     method, path: "/api/v1/vehicle-history/operator/requests/{id}/payment-verification", tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
