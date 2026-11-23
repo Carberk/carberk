@@ -212,11 +212,23 @@ An enquiry to Carberk about available third-party vehicle history. It can begin 
 
 _Avoid_: Inspection request, diagnosis
 
+**Vehicle History Quote**
+
+An offer of provider history for one confirmed VIN that specifies provider availability, the original report date when known, price, delivery window, and delivery format. The offered format can be a PDF, an approved provider link, or both.
+
 **Vehicle History Order**
 
-A user's accepted purchase of available provider history for one confirmed VIN under an agreed offer and fulfilment commitment.
+A commitment created when a user accepts a Vehicle History Quote. It preserves the agreed terms and can exist before payment is verified.
 
 _Avoid_: Paid inspection, condition check
+
+**Vehicle History Hold**
+
+A temporary reservation of fulfilment capacity for a Vehicle History Order while payment awaits verification.
+
+**Payment Receipt**
+
+A photo or screenshot the customer submits as evidence of a payment for a Vehicle History Order. An operator verifies the payment separately against funds received.
 
 **Provider Report Artifact**
 
