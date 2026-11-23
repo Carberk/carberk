@@ -121,7 +121,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
         'SELECT input FROM history_fulfilment_events WHERE "requestId" = $1 AND "attemptKey" = $2', [requestId, key]);
       return rows[0] ? H.HistoryFulfilmentMutationSchema.parse(rows[0].input) : null;
     },
-    async hasEarlierPaidWork(operatorId, confirmedAt, now) {
+    async hasEarlierPaidWork(confirmedAt, now) {
       assertActive();
       const { rows } = await client.query<{ earlier: boolean }>(`
         SELECT EXISTS (
@@ -131,10 +131,11 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
           LEFT JOIN LATERAL (
             SELECT state FROM history_fulfilment_events WHERE "requestId" = p."requestId" ORDER BY version DESC LIMIT 1
           ) f ON TRUE
-          WHERE p."bookingCommitted" AND o."deliveryBy" > $4
-            AND r."assignedOperatorId" = $1 AND (p."confirmedAt", p."requestId") < ($2::timestamptz, $3::text)
+          WHERE p."bookingCommitted" AND o."deliveryBy" > $3
+            AND r."assignedOperatorId" = (SELECT "assignedOperatorId" FROM vehicle_history_requests WHERE id = $2)
+            AND (p."confirmedAt", p."requestId") < ($1::timestamptz, $2::text)
             AND COALESCE(f.state->>'status', '') NOT IN ('obtained', 'recovery')
-        ) AS earlier`, [operatorId, confirmedAt, requestId, now]);
+        ) AS earlier`, [confirmedAt, requestId, now]);
       return rows[0]?.earlier ?? false;
     },
     async saveFulfilment({ input, state, actorId, assignmentVersion }) {

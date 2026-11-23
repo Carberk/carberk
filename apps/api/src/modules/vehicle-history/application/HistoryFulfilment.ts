@@ -10,12 +10,12 @@ import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessage
 import { HistoryCapacity } from "./HistoryCapacity";
 
 export async function readFulfilment(orders: HistoryOrderStore, order: StoredHistoryOrder, intent: H.HistoryFulfilmentIntent | null,
-  operatorId: string, confirmedAt: string, now: Date, provider: HistoryProvider | undefined): Promise<H.HistoryFulfilmentView | undefined> {
+  confirmedAt: string, now: Date, provider: HistoryProvider | undefined): Promise<H.HistoryFulfilmentView | undefined> {
   const accepted = fulfilmentAgreement(order, provider);
   if (!accepted) return undefined;
   const gate = order.agreement?.pending ? "pending_correction"
     : new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "booking_closed"
-      : await orders.hasEarlierPaidWork(operatorId, confirmedAt, now) ? "fifo" : "ready";
+      : await orders.hasEarlierPaidWork(confirmedAt, now) ? "fifo" : "ready";
   return { accepted, gate, sources: fulfilmentSources(accepted), intent };
 }
 
@@ -40,7 +40,7 @@ export class HistoryFulfilment {
         const now = this.clock.now();
         const provider = await this.capacity.existingProvider(orders, order, now);
         if (!provider) throw new HistoryRequestError(new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
-        const current = await readFulfilment(orders, order, await orders.fulfilment(), actorId, confirmedAt, now, provider);
+        const current = await readFulfilment(orders, order, await orders.fulfilment(), confirmedAt, now, provider);
         if (!current) throw new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE");
         const replay = await orders.fulfilmentAttempt(input.attemptKey);
         if (replay) {

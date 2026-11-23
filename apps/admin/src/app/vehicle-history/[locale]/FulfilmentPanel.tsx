@@ -63,7 +63,7 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
   const canCorrect = intent?.status === "recovery" && intent.reason === "company_error";
   return <section ref={panel} className="space-y-3 border-t pt-4" aria-label={t.title}>
     <h5 ref={heading} tabIndex={-1} className="font-semibold">{t.title}</h5>
-    {!view ? <p>{t.empty}</p> : <>
+    {!view ? <p role="status">{state.fulfilmentUnavailable ? t[state.fulfilmentUnavailable] : t.empty}</p> : <>
       <dl className="space-y-1">
         <div><dt className="sr-only">VIN</dt><dd className="break-all font-mono">{view.accepted.vin}</dd></div>
         <div className="flex flex-wrap gap-x-2"><dt className="sr-only">{t.provider}</dt><dd>{view.accepted.provider}</dd>

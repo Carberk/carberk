@@ -50,25 +50,25 @@ export class HistoryCapacity {
 
   async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date) {
     if (order.reservedProvider || new Date(order.acceptedOffer.proposal.deliveryBy) <= now) return order.reservedProvider;
-    return this.findProvider(orders, order, order.acceptedOffer.preflight, now, { reservedOnly: true });
+    return this.findProvider(orders, order, order.acceptedOffer.preflight, now, true);
   }
 
   async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date) {
     if (new Date(order.acceptedOffer.proposal.deliveryBy) <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
-    const provider = await this.findProvider(orders, order, reports, now, { excludeCurrent: true });
+    const provider = await this.findProvider(orders, order, reports, now);
     if (!provider) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
     return provider;
   }
 
   private async findProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
-    options: HistoryProviderUsageOptions) {
+    requireOpenPeriod = false) {
     const from = new Date(order.acceptedOffer.proposal.deliveryFrom), by = new Date(order.acceptedOffer.proposal.deliveryBy);
     const names = reports.providers.map(({ name }) => name);
     const preferred = order.reservedProvider;
     if (preferred && names.includes(preferred)) names.sort((a) => a === preferred ? -1 : 1);
     for (const name of names) {
-      const budget = await this.remaining(orders, name, from, by, now, options);
-      if (budget && budget.slots > 0) return name;
+      const budget = await this.remaining(orders, name, from, by, now, { excludeCurrent: true, reservedOnly: true });
+      if (budget && budget.slots > 0 && (!requireOpenPeriod || budget.periodStart <= now)) return name;
     }
     return undefined;
   }

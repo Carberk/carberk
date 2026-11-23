@@ -29,6 +29,15 @@ function Panel() {
 
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
+it("shows provider capacity and offers refresh for a paid order without an eligible provider", () => {
+  const view = render(<FulfilmentPanel locale="en" id={id} actorId={actorId} scope={scope} version={1}
+    state={{ order: null, status: "payment_confirmed", serverNow: recordedAt, wallet: null,
+      collectionEnabled: false, fulfilmentUnavailable: "capacity" }} onOrder={vi.fn()} invalidate={vi.fn()} />);
+  expect(view.getByRole("status").textContent).toBe("Provider capacity is unavailable. Refresh before choosing an action.");
+  expect(view.getByRole("button", { name: "Refresh preparation" })).toBeTruthy();
+  expect(view.queryByRole("combobox")).toBeNull();
+});
+
 it.each(["ok", "unavailable"] as const)("keeps keyboard focus in fulfilment and moves it to the %s action", async (status) => {
   let complete!: (result: Awaited<ReturnType<typeof historyFulfilmentAction>>) => void;
   vi.mocked(historyFulfilmentAction).mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));

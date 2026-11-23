@@ -233,7 +233,7 @@ model HistoryVinAgreement {
   attemptKey String? @db.Uuid
   input Json
   state Json
-  reservedProvider String
+  reservedProvider String?
   actorId String
   assignmentVersion Int
   recordedAt DateTime @db.Timestamptz(3)

@@ -8,7 +8,7 @@ export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string; rese
   agreement?: H.HistoryCorrectionState; originalOffer?: H.HistoryAcceptedOrder["acceptedOffer"] };
 export type HistoryAgreementInput = H.HistoryCorrectionMutation | H.HistoryOperatorCorrectionMutation | { kind: "handoff"; expectedRevision: number };
 export interface HistoryAgreementWrite {
-  input: HistoryAgreementInput; state: H.HistoryCorrectionState; provider: HistoryProvider;
+  input: HistoryAgreementInput; state: H.HistoryCorrectionState; provider: HistoryProvider | null;
   actorId: string; assignmentVersion: number; recordedAt: string;
 }
 export interface HistoryFulfilmentWrite {
@@ -29,7 +29,7 @@ export interface HistoryOrderStore {
   saveAgreement(write: HistoryAgreementWrite): Promise<void>;
   fulfilment(): Promise<H.HistoryFulfilmentIntent | null>;
   fulfilmentAttempt(key: string): Promise<H.HistoryFulfilmentMutation | null>;
-  hasEarlierPaidWork(operatorId: string, confirmedAt: string, now: Date): Promise<boolean>;
+  hasEarlierPaidWork(confirmedAt: string, now: Date): Promise<boolean>;
   saveFulfilment(write: HistoryFulfilmentWrite): Promise<void>;
 }
 

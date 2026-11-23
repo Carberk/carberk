@@ -10172,6 +10172,13 @@
             ],
             "additionalProperties": false
           },
+          "fulfilmentUnavailable": {
+            "type": "string",
+            "enum": [
+              "capacity",
+              "booking_closed"
+            ]
+          },
           "serverNow": {
             "type": "string",
             "format": "date-time"
@@ -17191,6 +17198,13 @@
                       ],
                       "additionalProperties": false
                     },
+                    "fulfilmentUnavailable": {
+                      "type": "string",
+                      "enum": [
+                        "capacity",
+                        "booking_closed"
+                      ]
+                    },
                     "serverNow": {
                       "type": "string",
                       "format": "date-time"
@@ -18422,6 +18436,13 @@
                       ],
                       "additionalProperties": false
                     },
+                    "fulfilmentUnavailable": {
+                      "type": "string",
+                      "enum": [
+                        "capacity",
+                        "booking_closed"
+                      ]
+                    },
                     "serverNow": {
                       "type": "string",
                       "format": "date-time"
@@ -19529,6 +19550,13 @@
                         "intent"
                       ],
                       "additionalProperties": false
+                    },
+                    "fulfilmentUnavailable": {
+                      "type": "string",
+                      "enum": [
+                        "capacity",
+                        "booking_closed"
+                      ]
                     },
                     "serverNow": {
                       "type": "string",
