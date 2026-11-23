@@ -9812,7 +9812,8 @@
                   "ready",
                   "pending_correction",
                   "booking_closed",
-                  "fifo"
+                  "fifo",
+                  "capacity"
                 ]
               },
               "sources": {
@@ -10171,6 +10172,13 @@
               "intent"
             ],
             "additionalProperties": false
+          },
+          "fulfilmentUnavailable": {
+            "type": "string",
+            "enum": [
+              "capacity",
+              "booking_closed"
+            ]
           },
           "serverNow": {
             "type": "string",
@@ -15317,7 +15325,8 @@
                         "ready",
                         "pending_correction",
                         "booking_closed",
-                        "fifo"
+                        "fifo",
+                        "capacity"
                       ]
                     },
                     "sources": {
@@ -16831,7 +16840,8 @@
                             "ready",
                             "pending_correction",
                             "booking_closed",
-                            "fifo"
+                            "fifo",
+                            "capacity"
                           ]
                         },
                         "sources": {
@@ -17190,6 +17200,13 @@
                         "intent"
                       ],
                       "additionalProperties": false
+                    },
+                    "fulfilmentUnavailable": {
+                      "type": "string",
+                      "enum": [
+                        "capacity",
+                        "booking_closed"
+                      ]
                     },
                     "serverNow": {
                       "type": "string",
@@ -18062,7 +18079,8 @@
                             "ready",
                             "pending_correction",
                             "booking_closed",
-                            "fifo"
+                            "fifo",
+                            "capacity"
                           ]
                         },
                         "sources": {
@@ -18421,6 +18439,13 @@
                         "intent"
                       ],
                       "additionalProperties": false
+                    },
+                    "fulfilmentUnavailable": {
+                      "type": "string",
+                      "enum": [
+                        "capacity",
+                        "booking_closed"
+                      ]
                     },
                     "serverNow": {
                       "type": "string",
@@ -19170,7 +19195,8 @@
                             "ready",
                             "pending_correction",
                             "booking_closed",
-                            "fifo"
+                            "fifo",
+                            "capacity"
                           ]
                         },
                         "sources": {
@@ -19529,6 +19555,13 @@
                         "intent"
                       ],
                       "additionalProperties": false
+                    },
+                    "fulfilmentUnavailable": {
+                      "type": "string",
+                      "enum": [
+                        "capacity",
+                        "booking_closed"
+                      ]
                     },
                     "serverNow": {
                       "type": "string",

@@ -38,7 +38,7 @@ export class HistoryCorrections {
       return orders.serialize(async () => {
         const now = this.clock.now(), at = now.toISOString(), version = previous.version + 1;
         let state: H.HistoryCorrectionState = { ...previous, version };
-        let provider = order.reservedProvider;
+        let provider = order.reservedProvider ?? null;
         if (input.kind === "request") {
           if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(input.vin) || input.vin === order.acceptedOffer.vin) throw new HistoryRequestError("HISTORY_CORRECTION_INVALID");
           state = { ...state, pending: { vin: input.vin, requestedAt: at, review: null } };
@@ -52,11 +52,11 @@ export class HistoryCorrections {
         } else {
           const review = previous.pending?.review;
           if (!review || !isDeepStrictEqual(review.offer, input.offer)) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
-          provider = await this.capacity.correctionProvider(orders, order, input.offer.preflight, now);
+          const confirmedBefore = (await orders.paymentChecks()).find((check) => check.bookingCommitted)?.confirmedAt ?? null;
+          provider = await this.capacity.correctionProvider(orders, order, input.offer.preflight, now, { confirmedBefore });
           state = { ...state, pending: null, acceptedRevision: version,
             accepted: [...previous.accepted, { revision: version, offer: input.offer, acceptedAt: at, cause: review.cause }] };
         }
-        if (!provider) throw new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE");
         await orders.saveAgreement({ input, state, provider, actorId, assignmentVersion: participant.assignmentVersion, recordedAt: at });
         return state;
       });

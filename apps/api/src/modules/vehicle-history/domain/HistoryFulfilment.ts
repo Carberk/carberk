@@ -7,9 +7,9 @@ type Format = FulfilmentAgreement["format"];
 type Intent = H.HistoryFulfilmentIntent;
 type Outcome = Extract<H.HistoryFulfilmentMutation, { kind: "record" | "reconcile" }>["outcome"];
 
-export function fulfilmentAgreement(order: StoredHistoryOrder): FulfilmentAgreement | null {
+export function fulfilmentAgreement(order: StoredHistoryOrder, reservedProvider = order.reservedProvider): FulfilmentAgreement | null {
   const { vin, preflight, proposal } = order.acceptedOffer;
-  const provider = preflight.providers.find(({ name }) => name === order.reservedProvider);
+  const provider = preflight.providers.find(({ name }) => name === reservedProvider);
   return provider ? { acceptedRevision: historyAgreement(order).acceptedRevision, vin, provider: provider.name,
     format: proposal.format, originalReportDate: provider.originalReportDate } : null;
 }

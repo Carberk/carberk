@@ -82,7 +82,7 @@ export const HistoryFulfilmentIntentSchema = z.discriminatedUnion("status", [
 ]);
 export type HistoryFulfilmentIntent = z.infer<typeof HistoryFulfilmentIntentSchema>;
 export const HistoryFulfilmentViewSchema = z.object({
-  accepted: FulfilmentAgreement, gate: z.enum(["ready", "pending_correction", "booking_closed", "fifo"]),
+  accepted: FulfilmentAgreement, gate: z.enum(["ready", "pending_correction", "booking_closed", "fifo", "capacity"]),
   sources: z.array(FulfilmentSource), intent: HistoryFulfilmentIntentSchema.nullable(),
 }).strict();
 export type HistoryFulfilmentView = z.infer<typeof HistoryFulfilmentViewSchema>;
@@ -95,6 +95,7 @@ export const HistoryOrderStateSchema = z.object({
   payment: HistoryPaymentSummarySchema.optional(),
   reportPlan: z.object({ primary: ProviderName, second: ProviderName.nullable() }).strict().optional(),
   preparation: HistoryPreparationSchema.optional(), fulfilment: HistoryFulfilmentViewSchema.optional(),
+  fulfilmentUnavailable: z.enum(["capacity", "booking_closed"]).optional(),
   serverNow: DateTimeSchema, wallet: z.string().regex(/^SYNTHETIC-[A-Z0-9-]{1,64}$/).nullable(), collectionEnabled: z.literal(false),
 }).strict();
 export type HistoryOrderState = z.infer<typeof HistoryOrderStateSchema>;

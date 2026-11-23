@@ -42,8 +42,10 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
           (SELECT 1 FROM history_payment_checks p WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [day, from, by, now]);
       return rows[0] ?? { total: 0, morning: 0, overlapping: 0 };
     },
-    async providerUsage(provider, periodStart, periodEnd, now, excludeCurrent = false) {
+    async providerUsage(provider, periodStart, periodEnd, now, { excludeCurrent = false, unreserved = "all" } = {}) {
       assertActive();
+      const unreservedMode = typeof unreserved === "string" ? unreserved : "earlier_paid";
+      const confirmedBefore = typeof unreserved === "string" ? null : unreserved.confirmedBefore;
       const { rows } = await client.query<{ used: number }>(`
         ${activeOrders} SELECT COALESCE(sum(1 + (
           SELECT count(*) FROM history_fulfilment_events f WHERE f."requestId" = o."requestId"
@@ -51,10 +53,16 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
         )), 0)::int AS used FROM active_orders o
         WHERE "deliveryFrom" < $3 AND "deliveryBy" > $2
           AND (NOT $5::boolean OR "requestId" <> $6)
-          AND ("activeProvider" = $1 OR ("activeProvider" IS NULL AND
-            "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))))
+          AND ("activeProvider" = $1 OR ("activeProvider" IS NULL
+            AND "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
+            AND ($7 = 'all' OR ($7 = 'earlier_paid' AND o."deliveryBy" > $4
+              AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3 AND EXISTS (
+              SELECT 1 FROM history_payment_checks older WHERE older."requestId" = o."requestId" AND older."bookingCommitted"
+                AND ($8::timestamptz IS NULL OR (older."confirmedAt", older."requestId") < ($8::timestamptz, $6::text))
+            )))))
           AND ("holdExpiresAt" > $4 OR EXISTS (SELECT 1 FROM history_payment_checks p
-            WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [provider, periodStart, periodEnd, now, excludeCurrent, requestId]);
+            WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`,
+      [provider, periodStart, periodEnd, now, excludeCurrent, requestId, unreservedMode, confirmedBefore]);
       return rows[0]?.used ?? 0;
     },
     async earlierPaidOrdersForSecondReport(provider, periodStart, periodEnd, confirmedAt, now) {
@@ -121,7 +129,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
         'SELECT input FROM history_fulfilment_events WHERE "requestId" = $1 AND "attemptKey" = $2', [requestId, key]);
       return rows[0] ? H.HistoryFulfilmentMutationSchema.parse(rows[0].input) : null;
     },
-    async hasEarlierPaidWork(operatorId, confirmedAt, now) {
+    async hasEarlierPaidWork(confirmedAt, now) {
       assertActive();
       const { rows } = await client.query<{ earlier: boolean }>(`
         SELECT EXISTS (
@@ -131,10 +139,11 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
           LEFT JOIN LATERAL (
             SELECT state FROM history_fulfilment_events WHERE "requestId" = p."requestId" ORDER BY version DESC LIMIT 1
           ) f ON TRUE
-          WHERE p."bookingCommitted" AND o."deliveryBy" > $4
-            AND r."assignedOperatorId" = $1 AND (p."confirmedAt", p."requestId") < ($2::timestamptz, $3::text)
+          WHERE p."bookingCommitted" AND o."deliveryBy" > $3
+            AND r."assignedOperatorId" = (SELECT "assignedOperatorId" FROM vehicle_history_requests WHERE id = $2)
+            AND ($1::timestamptz IS NULL OR (p."confirmedAt", p."requestId") < ($1::timestamptz, $2::text))
             AND COALESCE(f.state->>'status', '') NOT IN ('obtained', 'recovery')
-        ) AS earlier`, [operatorId, confirmedAt, requestId, now]);
+        ) AS earlier`, [confirmedAt, requestId, now]);
       return rows[0]?.earlier ?? false;
     },
     async saveFulfilment({ input, state, actorId, assignmentVersion }) {

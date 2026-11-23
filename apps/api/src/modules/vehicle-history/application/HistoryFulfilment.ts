@@ -3,20 +3,25 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 import { applyFulfilmentOutcome, checkFulfilmentVersion, fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
-import { historyAgreement, type HistoryOrderStore, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { historyAgreement, type HistoryOrderStore, type HistoryProvider, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
 import { HistoryCapacity } from "./HistoryCapacity";
 
 export async function readFulfilment(orders: HistoryOrderStore, order: StoredHistoryOrder, intent: H.HistoryFulfilmentIntent | null,
-  operatorId: string, confirmedAt: string, now: Date): Promise<H.HistoryFulfilmentView | undefined> {
-  const accepted = fulfilmentAgreement(order);
+  confirmedAt: string, now: Date, provider: HistoryProvider | undefined, capacity: HistoryCapacity): Promise<H.HistoryFulfilmentView | undefined> {
+  const accepted = fulfilmentAgreement(order, provider);
   if (!accepted) return undefined;
   const gate = order.agreement?.pending ? "pending_correction"
     : new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "booking_closed"
-      : await orders.hasEarlierPaidWork(operatorId, confirmedAt, now) ? "fifo" : "ready";
-  return { accepted, gate, sources: fulfilmentSources(accepted), intent };
+      : await orders.hasEarlierPaidWork(confirmedAt, now) ? "fifo" : "ready";
+  const sources = fulfilmentSources(accepted);
+  if (gate === "ready" && !await capacity.canUseFulfilmentBudget(orders, order, accepted.provider, now, false)) {
+    const available = sources.filter((source) => source !== "new_source");
+    return { accepted, gate: !intent && available.length === 0 ? "capacity" : gate, sources: available, intent };
+  }
+  return { accepted, gate, sources, intent };
 }
 
 @Injectable()
@@ -38,7 +43,9 @@ export class HistoryFulfilment {
       if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       return orders.serialize(async () => {
         const now = this.clock.now();
-        const current = await readFulfilment(orders, order, await orders.fulfilment(), actorId, confirmedAt, now);
+        const provider = await this.capacity.existingProvider(orders, order, now);
+        if (!provider) throw new HistoryRequestError(new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
+        const current = await readFulfilment(orders, order, await orders.fulfilment(), confirmedAt, now, provider, this.capacity);
         if (!current) throw new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE");
         const replay = await orders.fulfilmentAttempt(input.attemptKey);
         if (replay) {
@@ -62,11 +69,11 @@ export class HistoryFulfilment {
         throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
       }
       if (intent || input.vin !== accepted.vin || input.provider !== accepted.provider || input.format !== accepted.format
-        || !current.sources.includes(input.source)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
+        || !fulfilmentSources(accepted).includes(input.source)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
+      if (gate === "capacity" || gate === "ready" && !current.sources.includes(input.source)) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
       if (gate !== "ready") throw new HistoryRequestError(gate === "fifo" ? "HISTORY_FULFILMENT_FIFO" : "HISTORY_ORDER_STALE");
       const agreement = historyAgreement(order);
       if (agreement.handoff || agreement.version === 2147483647) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
-      if (input.source === "new_source") await this.capacity.requireFulfilmentBudget(orders, order, accepted.provider, now, false);
       const handoff = { revision: accepted.acceptedRevision, recordedAt };
       await orders.saveAgreement({ input: { kind: "handoff", expectedRevision: accepted.acceptedRevision },
         state: { ...agreement, version: agreement.version + 1, handoff }, provider: accepted.provider, actorId, assignmentVersion, recordedAt });
@@ -82,7 +89,9 @@ export class HistoryFulfilment {
     if (input.kind === "retry" && intent.status === "retry_ready" || correction && intent.status === "recovery" && intent.reason === "company_error") {
       if (gate === "fifo") throw new HistoryRequestError("HISTORY_FULFILMENT_FIFO");
       if (gate !== "ready") throw new HistoryRequestError("HISTORY_ORDER_STALE");
-      if (intent.source === "new_source") await this.capacity.requireFulfilmentBudget(orders, order, accepted.provider, now, correction);
+      if (intent.source === "new_source" && !await this.capacity.canUseFulfilmentBudget(orders, order, accepted.provider, now, correction)) {
+        throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+      }
       const { id, version, attempt, source, funding } = intent;
       return { id, version: version + 1, attempt: attempt + 1, source, funding: correction ? "company" : funding,
         accepted: intent.accepted, status: "pending", recordedAt };

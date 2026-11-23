@@ -16,7 +16,7 @@ export class ReadHistoryOrder {
     @Inject(IDENTITY_CHECK_PORT) private readonly checks: IdentityCheckPort) {}
 
   execute(actor: HistoryMessageActor, id: string) {
-    return this.access.run(actor, id, async (requesterId, senderId, _object, _participant, _waiting, _offer, orders) => {
+    return this.access.run(actor, id, async (requesterId, _sender, _object, _participant, _waiting, _offer, orders) => {
       const [requester, deleting] = await Promise.all([this.identity.findUserById(requesterId), this.checks.isDeletionScheduled(requesterId)]);
       if (!requester || requester.deleted || requester.suspendedAt || deleting) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
       const order = await orders.read(), checks = await orders.paymentChecks(), proofs = await orders.submittedProofIds();
@@ -28,8 +28,10 @@ export class ReadHistoryOrder {
       state.preparation = !intent ? "queued" : intent.status === "recovery" ? "recovery"
         : intent.status === "uncertain" ? "checking" : "preparing";
       if (actor.operator) {
-        const view = await readFulfilment(orders, order, intent, senderId, confirmedAt, now);
+        const provider = order.reservedProvider ?? await orders.serialize(() => this.capacity.existingProvider(orders, order, now));
+        const view = await readFulfilment(orders, order, intent, confirmedAt, now, provider, this.capacity);
         if (view) state.fulfilment = view;
+        if (!provider) state.fulfilmentUnavailable = new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "booking_closed" : "capacity";
         const reportPlan = await this.capacity.paidReportPlan(orders, order, confirmedAt, now);
         if (reportPlan) state.reportPlan = reportPlan;
       }
