@@ -60,13 +60,14 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
   const timestamp = (value: string) => new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
     dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ashgabat", hourCycle: "h23",
   }).format(new Date(value));
-  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"]) {
+  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], current = false) {
+    const window = current && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
     return <dl className="space-y-2">
       <div><dt>VIN</dt><dd className="break-all font-mono">{offer.vin}</dd></div>
       <div><dt>{t.Price}</dt><dd>{offer.proposal.priceTmt} TMT</dd></div>
       <div><dt>{o.format}</dt><dd>{o[offer.proposal.format]}</dd></div>
       {offer.preflight.providers.map((p) => <div key={p.name}><dt>{p.name} · {o.date}</dt><dd>{p.originalReportDate ?? o.unknown}</dd></div>)}
-      <div><dt>{o.window}</dt><dd>{timestamp(offer.proposal.deliveryFrom)} – {timestamp(offer.proposal.deliveryBy)}</dd></div>
+      <div><dt>{o.window}</dt><dd>{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</dd></div>
     </dl>;
   }
   if (!state.order) return null;
@@ -74,7 +75,7 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
     <h5 className="font-semibold">{agreement?.handoff ? t.Closed : pending ? review ? t.Reviewed : t.Waiting : t.Title}</h5>
     {!agreement?.handoff && <p className="text-muted-foreground">{t.Policy}</p>}
     {pending && <>
-      <h6 className="font-semibold">{t.Current}</h6>{facts(state.order.acceptedOffer)}
+      <h6 className="font-semibold">{t.Current}</h6>{facts(state.order.acceptedOffer, true)}
       <h6 className="font-semibold">{t.Proposed}</h6>{!review?.offer.proposal && <p className="break-all font-mono">{pending.vin}</p>}
       {review && <><p>{review.cause === "company_error" ? t.Company : t.Customer}</p>
         <p role="status">{review.offer.preflight ? o[review.offer.preflight.status] : o.unchecked}</p>

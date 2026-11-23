@@ -18,6 +18,8 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
   if (compact) return <View className="border-b border-border bg-card px-5 py-2"><PaymentStatus state={state} compact /></View>;
 
   const offer = state.order.acceptedOffer;
+  const replacement = state.replacement;
+  const window = replacement ? replacement.status === "accepted" || replacement.status === "proposed" ? replacement.window : null : offer.proposal;
   const timestamp = (value: string) => new Intl.DateTimeFormat(i18n.language === "tk" ? "en-GB" : i18n.language, {
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
   }).format(new Date(value));
@@ -28,7 +30,7 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
         {!largeText && <>
         {state.agreement?.pending && <Text className="text-footnote font-semibold">{t(state.agreement.pending.review ? "vehicleHistory.correctionReviewed" : "vehicleHistory.correctionWaiting")}</Text>}
         <Text selectable className="font-mono text-footnote">{offer.vin} · {copy({ pdf: "Pdf", link: "Link", both: "Both" }[offer.proposal.format])}</Text>
-        <Text className="text-footnote">{timestamp(offer.proposal.deliveryFrom)} – {timestamp(offer.proposal.deliveryBy)}</Text>
+        {window && <Text className="text-footnote">{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>}
         </>}
       </View>
       <Button variant="secondary" size="sm" disabled={!ready} onPress={onDetails}><Text>{copy("OrderStatusDetails")}</Text></Button>

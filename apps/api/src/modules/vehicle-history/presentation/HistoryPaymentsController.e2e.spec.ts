@@ -37,8 +37,193 @@ describe("independent manual wallet verification over HTTP/Postgres", () => {
     const verify = (body: object = input, token = operator.token) => f.request.post(`${staff}/payment-verification`).auth(token, { type: "bearer" }).send(body);
     const read = () => f.request.get(`${root}/requests/${id}/order`).auth(customer.token, { type: "bearer" });
     const checks = () => f.request.get(`${staff}/payment-verification?expectedAssignmentVersion=1`).auth(operator.token, { type: "bearer" });
-    return { id, staff, customer, operator, input, order, verify, read, checks };
+    const staffReplacement = (body: object, token = operator.token) => f.request.post(`${staff}/replacement-booking`)
+      .auth(token, { type: "bearer" }).send({ attemptKey: randomUUID(), orderId: order.id, expectedAssignmentVersion: 1, ...body });
+    const decide = (body: object, token = customer.token) => f.request.post(`${root}/requests/${id}/replacement-booking`)
+      .auth(token, { type: "bearer" }).send({ attemptKey: randomUUID(), orderId: order.id, ...body });
+    return { id, staff, customer, operator, input, order, verify, read, checks, staffReplacement, decide };
   }
+  it("commits a separately agreed window on the original paid order and replays a lost acceptance", async () => {
+    const e = await accepted();
+    now = new Date(e.order.holdExpiresAt);
+    await e.verify().expect(201);
+    const initial = (await e.read().expect(200)).body;
+    const deliveryFrom = "2026-11-21T08:00:00.000Z", deliveryBy = "2026-11-21T09:00:00.000Z";
+    await f.request.post(`${e.staff}/replacement-booking`).auth(e.operator.token, { type: "bearer" })
+      .send({ kind: "propose", orderId: e.order.id, expectedVersion: 0, expectedAssignmentVersion: 1,
+        attemptKey: randomUUID(), deliveryFrom, deliveryBy }).expect(201);
+    const proposal = (await e.read().expect(200)).body.replacement;
+    expect(proposal).toMatchObject({ status: "proposed", version: 1, window: { deliveryFrom, deliveryBy } });
+    const input = { kind: "accept", orderId: e.order.id, expectedVersion: proposal.version, attemptKey: randomUUID() };
+    const decide = () => f.request.post(`${root}/requests/${e.id}/replacement-booking`).auth(e.customer.token, { type: "bearer" }).send(input);
+    await decide().expect(201);
+    now = new Date(deliveryBy);
+    await decide().expect(201);
+    const current = (await e.read().expect(200)).body;
+    expect(current).toMatchObject({ status: "payment_confirmed", wallet: null, preparation: "queued",
+      order: initial.order, payment: { ...initial.payment, bookingCommitted: true },
+      replacement: { status: "accepted", version: 2, window: { deliveryFrom, deliveryBy } } });
+    expect((await e.checks().expect(200)).body.checks).toEqual([
+      expect.objectContaining({ bookingCommitted: false, confirmedAt: initial.payment.confirmedAt, input: e.input }),
+    ]);
+  });
+  const newWindow = { deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" };
+  const laterWindow = { deliveryFrom: "2026-11-21T09:00:00.000Z", deliveryBy: "2026-11-21T10:00:00.000Z" };
+
+  it("holds late funds when a proposal is superseded or expires before the customer's exact acceptance", async () => {
+    const e = await accepted();
+    now = new Date(e.order.holdExpiresAt);
+    await e.verify().expect(201);
+    await e.staffReplacement({ kind: "propose", expectedVersion: 0, ...newWindow }).expect(201);
+    await e.staffReplacement({ kind: "propose", expectedVersion: 1, ...laterWindow }).expect(201);
+    const superseded = await e.decide({ kind: "accept", expectedVersion: 1 }).set("Accept-Language", "ru").expect(409);
+    expect(superseded.body).toMatchObject({ code: "HISTORY_REPLACEMENT_CONFLICT", message: expect.stringContaining("Обновите заказ") });
+    expect((await e.read().expect(200)).body.replacement).toEqual({ status: "proposed", version: 2, window: laterWindow });
+    now = new Date(laterWindow.deliveryFrom);
+    const expired = await e.decide({ kind: "accept", expectedVersion: 2 }).set("Accept-Language", "tk").expect(409);
+    expect(expired.body).toMatchObject({ code: "HISTORY_REPLACEMENT_CONFLICT", message: expect.stringContaining("Sargydy täzeläň") });
+    expect((await e.read().expect(200)).body).toMatchObject({ status: "payment_received_no_hold", wallet: null,
+      payment: { confirmedAt: "2026-11-21T07:00:00.000Z", bookingCommitted: false },
+      replacement: { status: "expired", version: 2 } });
+    await e.decide({ kind: "decline", expectedVersion: 2 }).expect(201);
+    expect((await e.read().expect(200)).body.replacement).toEqual({
+      status: "refund_decision_pending", reason: "declined", version: 3, requestedAt: laterWindow.deliveryFrom,
+    });
+  });
+
+  it.each(["staff", "provider"])("fails acceptance while a competing commitment consumes %s capacity", async (constraint) => {
+    if (constraint === "provider") {
+      f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 10);
+      f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { allowance: 1, resetUtc: "00:00", externalUsage: {} } });
+    }
+    const e = await accepted();
+    now = new Date(e.order.holdExpiresAt);
+    await e.verify().expect(201);
+    await e.staffReplacement({ kind: "propose", expectedVersion: 0, ...newWindow }).expect(201);
+    const competitor = await accepted(constraint === "staff" ? newWindow : laterWindow);
+    await competitor.verify({ ...competitor.input, receivedAt: now.toISOString() }).expect(201);
+    const result = await e.decide({ kind: "accept", expectedVersion: 1 }).expect(409);
+    expect(result.body.code).toBe("HISTORY_REPLACEMENT_CAPACITY");
+    expect((await e.read().expect(200)).body).toMatchObject({ status: "payment_received_no_hold",
+      payment: { confirmedAt: "2026-11-21T07:00:00.000Z", bookingCommitted: false },
+      replacement: { status: "proposed", version: 1 } });
+    await e.staffReplacement({ kind: "no_window", expectedVersion: 1 }).expect(201);
+    expect((await e.read().expect(200)).body.replacement).toMatchObject({ status: "refund_decision_pending", reason: "no_window" });
+    await e.decide({ kind: "accept", expectedVersion: 1 }).expect(409);
+  });
+
+  it("lets two unreserved proposals compete atomically for one remaining window", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 2);
+    const first = await accepted();
+    const second = await accepted({ deliveryFrom: "2026-11-21T07:00:00.000Z", deliveryBy: "2026-11-21T08:00:00.000Z" });
+    now = new Date(first.order.holdExpiresAt);
+    for (const order of [first, second]) {
+      await order.verify().expect(201);
+      await order.staffReplacement({ kind: "propose", expectedVersion: 0, ...newWindow }).expect(201);
+    }
+    f.concurrent(2);
+    const replies = await Promise.all([first, second].map((order) =>
+      order.decide({ kind: "accept", expectedVersion: 1 }).set("x-history-concurrency", "yes")));
+    expect(replies.map(({ status }) => status).sort()).toEqual([201, 409]);
+    for (const [index, order] of [first, second].entries()) {
+      const booked = replies[index]?.status === 201;
+      expect((await order.read().expect(200)).body).toMatchObject({
+        status: booked ? "payment_confirmed" : "payment_received_no_hold",
+        payment: { confirmedAt: "2026-11-21T07:00:00.000Z", bookingCommitted: booked }, order: order.order,
+      });
+    }
+  });
+
+  it("orders an accepted replacement by original confirmation and opens the same order's preparation", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 4);
+    const e = await accepted();
+    now = new Date(e.order.holdExpiresAt);
+    await e.verify().expect(201);
+    await e.staffReplacement({ kind: "propose", expectedVersion: 0, ...newWindow }).expect(201);
+    now = new Date("2026-11-21T07:15:00.000Z");
+    const newer = await accepted(laterWindow, e.operator);
+    await newer.verify({ ...newer.input, receivedAt: now.toISOString() }).expect(201);
+    await e.decide({ kind: "accept", expectedVersion: 1 }).expect(201);
+    const readStaff = (path: string) => f.request.get(path).auth(e.operator.token, { type: "bearer" }).expect(200);
+    expect((await readStaff(`${root}/operator/requests?filter=mine&queue=paid`)).body.items.map((item: { id: string }) => item.id))
+      .toEqual([e.id, newer.id]);
+    const paidAfterOriginal = await readStaff(`${root}/operator/requests?filter=mine&queue=paid&cursor=${e.id}`);
+    expect(paidAfterOriginal.body.items.map((item: { id: string }) => item.id)).toEqual([newer.id]);
+    const firstOrder = (await readStaff(`${e.staff}/order?expectedAssignmentVersion=1`)).body;
+    expect(firstOrder).toMatchObject({ preparation: "queued", fulfilment: { gate: "ready", accepted: { vin: "DEMA0000000000001", format: "both" } } });
+    expect((await readStaff(`${newer.staff}/order?expectedAssignmentVersion=1`)).body.fulfilment.gate).toBe("fifo");
+    const { acceptedRevision, vin, provider, format } = firstOrder.fulfilment.accepted;
+    await f.request.post(`${e.staff}/fulfilment`).auth(e.operator.token, { type: "bearer" })
+      .send({ kind: "start", attemptKey: randomUUID(), orderId: e.order.id, expectedAssignmentVersion: 1, expectedVersion: 0,
+        acceptedRevision, vin, provider, format, source: firstOrder.fulfilment.sources[0] }).expect(201);
+    expect((await e.read().expect(200)).body).toMatchObject({ preparation: "preparing", order: e.order });
+  });
+
+  it("arbitrates acceptance and handover against the current assignment on the same row", async () => {
+    const e = await accepted(), next = await f.actor();
+    now = new Date(e.order.holdExpiresAt);
+    await e.verify().expect(201);
+    await e.staffReplacement({ kind: "propose", expectedVersion: 0, ...newWindow }).expect(201);
+    const handover = () => f.request.post(`${e.staff}/handover`).auth(e.operator.token, { type: "bearer" })
+      .send({ expectedAssignmentVersion: 1, targetOperatorId: next.user.id });
+    f.concurrent(2);
+    const [decision, moved] = await Promise.all([e.decide({ kind: "accept", expectedVersion: 1 }).set("x-history-concurrency", "yes"),
+      handover().set("x-history-concurrency", "yes")]);
+    expect(moved.status).toBe(201);
+    expect([201, 409]).toContain(decision.status);
+    expect((await e.read().expect(200)).body.replacement.status).toBe(decision.status === 201 ? "accepted" : "superseded");
+    await e.staffReplacement({ kind: "propose", expectedVersion: 1, ...laterWindow }).expect(403);
+    if (decision.status === 409) {
+      await e.decide({ kind: "accept", expectedVersion: 1 }).expect(409);
+      await e.staffReplacement({ kind: "propose", expectedVersion: 1, expectedAssignmentVersion: 2, ...laterWindow }, next.token).expect(201);
+    }
+  });
+
+  it("does not commit when the customer loses the current Session while waiting for the order lock", async () => {
+    const e = await accepted();
+    now = new Date(e.order.holdExpiresAt);
+    await e.verify().expect(201);
+    await e.staffReplacement({ kind: "propose", expectedVersion: 0, ...newWindow }).expect(201);
+    let blocked: Promise<{ status: number }> | undefined;
+    await f.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM vehicle_history_requests WHERE id = ${e.id} FOR UPDATE`;
+      blocked = e.decide({ kind: "accept", expectedVersion: 1 }).then((response) => response);
+      await eventually(async () => {
+        const [row] = await f.prisma.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database()
+          AND wait_event_type = 'Lock' AND query LIKE '%vehicle_history_requests%' AND pid <> pg_backend_pid()) AS waiting`;
+        return row?.waiting ? true : null;
+      }, { timeoutMs: 2500, intervalMs: 20, description: "replacement acceptance waiting for its request lock" });
+      await tx.session.delete({ where: { id: e.customer.session.id } });
+    }, { timeout: 10000 });
+    expect((await blocked)?.status).toBe(403);
+    const staff = await f.request.get(`${e.staff}/order?expectedAssignmentVersion=1`).auth(e.operator.token, { type: "bearer" }).expect(200);
+    expect(staff.body).toMatchObject({ status: "payment_received_no_hold", replacement: { status: "proposed", version: 1 } });
+  });
+  it("keeps overnight proof separate from payment and the released hold at opening", async () => {
+    now = new Date("2026-11-21T14:55:00.000Z");
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_MORNING_SLOTS", 1);
+    const e = await accepted({ deliveryFrom: "2026-11-22T04:05:00.000Z", deliveryBy: "2026-11-22T05:00:00.000Z" });
+    const proofPath = `${root}/requests/${e.id}/payment-proofs`;
+    const owner = { type: "bearer" } as const;
+    const image = await sharp({ create: { width: 16, height: 16, channels: 3, background: "white" } }).png().toBuffer();
+    expect((await e.read().expect(200)).body.verificationResumesAt).toBe("2026-11-22T04:00:00.000Z");
+    now = new Date("2026-11-21T15:05:00.000Z");
+    const file = (await f.request.post(proofPath).auth(e.customer.token, owner)
+      .send({ orderId: e.order.id, attemptKey: randomUUID(), contentType: "image/png", sizeBytes: image.length }).expect(201)).body;
+    await f.request.put(`${proofPath}/${file.id}/content`).auth(e.customer.token, owner).set("Content-Type", "image/png").send(image).expect(200);
+    await f.request.post(`${proofPath}/${file.id}/submit`).auth(e.customer.token, owner).send({ orderId: e.order.id }).expect(201);
+    const input = { ...e.input, receivedAt: now.toISOString(), evidenceFileId: file.id };
+    expect((await e.verify(input).expect(409)).body.code).toBe("HISTORY_PAYMENT_CLOSED");
+    now = new Date("2026-11-22T03:59:59.999Z");
+    expect((await e.read().expect(200)).body).toMatchObject({ order: e.order, status: "hold_expired", wallet: null,
+      verificationResumesAt: "2026-11-22T04:00:00.000Z", payment: { outcome: "receipt_submitted", confirmedAt: null, bookingCommitted: false } });
+    await e.verify(input).expect(409);
+    now = new Date("2026-11-22T04:00:00.000Z");
+    await e.verify(input).expect(201);
+    expect((await e.read().expect(200)).body).toMatchObject({ order: e.order, status: "payment_received_no_hold", wallet: null,
+      payment: { confirmedAt: "2026-11-22T04:00:00.000Z", receivedAt: input.receivedAt, bookingCommitted: false } });
+    expect((await e.checks().expect(200)).body.checks).toEqual([expect.objectContaining({ input })]);
+  });
   it("shows only the operator's committed paid work in confirmation order", async () => {
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 4);
     const operator = await f.actor();

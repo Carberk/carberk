@@ -329,3 +329,61 @@ it("finishes one upload and submission while request refresh is still pending", 
     });
   }
 });
+
+const replacementWindow = { deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" };
+function offeredReplacement(): H.HistoryOrderState {
+  return { ...accepted, wallet: null, status: "payment_received_no_hold", serverNow: "2026-11-21T07:00:00.000Z",
+    payment: { outcome: "matched", amountMinor: 10000, receivedAt: "2026-11-21T06:55:00.000Z", confirmedAt: "2026-11-21T07:00:00.000Z", bookingCommitted: false },
+    replacement: { status: "proposed", version: 4, window: replacementWindow } };
+}
+
+it("reads back an accepted replacement after a lost response and offers no second payment", async () => {
+  current = offeredReplacement();
+  server.use(http.post("*/vehicle-history/requests/:id/replacement-booking", async ({ request }) => {
+    sent.push(await request.json());
+    const payment = current.payment;
+    if (!payment) throw new Error("Expected recorded payment");
+    current = { ...current, status: "payment_confirmed", preparation: "queued",
+      payment: { ...payment, bookingCommitted: true },
+      replacement: { status: "accepted", version: 5, window: replacementWindow, acceptedAt: "2026-11-21T07:00:00.000Z" } };
+    return HttpResponse.error();
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Accept new window" }));
+  await view.findByRole("header", { name: "New delivery window agreed" });
+  expect(sent).toMatchObject([{ orderId: id, expectedVersion: 4, kind: "accept" }]);
+  expect(view.queryByRole("button", { name: "Accept new window" })).toBeNull();
+  expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
+});
+
+it("shows a Russian capacity conflict and refreshes to the changed offer before another choice", async () => {
+  current = offeredReplacement();
+  server.use(http.post("*/vehicle-history/requests/:id/replacement-booking", async ({ request }) => {
+    sent.push(await request.json());
+    return HttpResponse.json({ code: "HISTORY_REPLACEMENT_CAPACITY" }, { status: 409 });
+  }));
+  const view = await renderMobile(<RequestScreen />, { locale: "ru" });
+  await fireEvent.press(await view.findByRole("button", { name: "Принять новый срок" }));
+  await view.findByText("На это время мест уже нет. Обновите заказ или напишите оператору.");
+  expect(view.getByRole("button", { name: "Принять новый срок" })).toBeDisabled();
+  current = { ...current, replacement: { status: "expired", version: 5, window: replacementWindow } };
+  await fireEvent.press(view.getByRole("button", { name: "Обновить заказ" }));
+  await view.findByRole("header", { name: "Предложенный срок истёк" });
+  expect(view.queryByRole("button", { name: "Принять новый срок" })).toBeNull();
+  expect(sent).toMatchObject([{ orderId: id, expectedVersion: 4, kind: "accept" }]);
+});
+
+it("records only a pending refund decision after explicitly declining in Turkmen", async () => {
+  current = offeredReplacement();
+  server.use(http.post("*/vehicle-history/requests/:id/replacement-booking", async ({ request }) => {
+    sent.push(await request.json());
+    current = { ...current, replacement: { status: "refund_decision_pending", version: 5, reason: "declined",
+      requestedAt: "2026-11-21T07:00:00.000Z" } };
+    return HttpResponse.json(current.replacement, { status: 201 });
+  }));
+  const view = await renderMobile(<RequestScreen />, { locale: "tk" });
+  await fireEvent.press(await view.findByRole("button", { name: "Täze wagty ret et" }));
+  await view.findByRole("header", { name: "Puly yzyna gaýtarmak kararyna garaşylýar" });
+  expect(sent).toMatchObject([{ orderId: id, expectedVersion: 4, kind: "decline" }]);
+  expect(view.queryByRole("button", { name: "Täze wagty kabul et" })).toBeNull();
+});

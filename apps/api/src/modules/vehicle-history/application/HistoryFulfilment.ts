@@ -3,7 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 import { applyFulfilmentOutcome, checkFulfilmentVersion, fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
-import { historyAgreement, type HistoryOrderStore, type HistoryProvider, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { bookedPayment, historyAgreement, historyBookingWindow, type HistoryOrderStore, type HistoryProvider, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
@@ -14,7 +14,7 @@ export async function readFulfilment(orders: HistoryOrderStore, order: StoredHis
   const accepted = fulfilmentAgreement(order, provider);
   if (!accepted) return undefined;
   const gate = order.agreement?.pending ? "pending_correction"
-    : new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "booking_closed"
+    : new Date(historyBookingWindow(order).deliveryBy) <= now ? "booking_closed"
       : await orders.hasEarlierPaidWork(confirmedAt, now) ? "fifo" : "ready";
   const sources = fulfilmentSources(accepted);
   if (gate === "ready" && !await capacity.canUseFulfilmentBudget(orders, order, accepted.provider, now, false)) {
@@ -39,12 +39,12 @@ export class HistoryFulfilment {
       if (!owner || owner.deleted || owner.suspendedAt || deleting) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
       const order = await orders.read();
       if (order?.id !== input.orderId) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
-      const confirmedAt = (await orders.paymentChecks()).find((check) => check.bookingCommitted)?.confirmedAt;
+      const confirmedAt = bookedPayment(order, await orders.paymentChecks())?.confirmedAt;
       if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       return orders.serialize(async () => {
         const now = this.clock.now();
         const provider = await this.capacity.existingProvider(orders, order, now);
-        if (!provider) throw new HistoryRequestError(new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
+        if (!provider) throw new HistoryRequestError(new Date(historyBookingWindow(order).deliveryBy) <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
         const current = await readFulfilment(orders, order, await orders.fulfilment(), confirmedAt, now, provider, this.capacity);
         if (!current) throw new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE");
         const replay = await orders.fulfilmentAttempt(input.attemptKey);

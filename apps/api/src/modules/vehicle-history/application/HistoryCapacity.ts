@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Env } from "../../../env.schema";
 import { fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
-import { historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider,
+import { historyBookingWindow, historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider,
   type HistoryPaidProviderPriority, type HistoryProviderUsageOptions, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 
@@ -10,12 +10,12 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 export class HistoryCapacity {
   constructor(@Inject(ConfigService) private readonly config: ConfigService<Env, true>) {}
 
-  async plan(orders: HistoryOrderStore, reports: AvailableHistoryReports, from: Date, by: Date, now: Date) {
+  async plan(orders: HistoryOrderStore, reports: AvailableHistoryReports, from: Date, by: Date, now: Date, excludeCurrent = false) {
     const day = historyDeliveryDay(from, by, now);
     const today = new Date(now.getTime() + 5 * 3_600_000).toISOString().slice(0, 10);
     const daily = this.config.get("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", { infer: true }) ?? 0;
     const morning = this.config.get("VEHICLE_HISTORY_SYNTHETIC_MORNING_SLOTS", { infer: true }) ?? 0;
-    const used = await orders.capacity(day, from, by, now);
+    const used = await orders.capacity(day, from, by, now, excludeCurrent);
     if (used.total >= daily || used.overlapping > 0 || day !== today && used.morning >= morning) {
       throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
     }
@@ -23,7 +23,7 @@ export class HistoryCapacity {
     let provider: HistoryProvider | undefined;
     let mostRemaining = 0;
     for (const { name } of reports.providers) {
-      const budget = await this.remaining(orders, name, from, by, now);
+      const budget = await this.remaining(orders, name, from, by, now, { excludeCurrent });
       if (budget && budget.slots > mostRemaining) {
         mostRemaining = budget.slots;
         provider = name;
@@ -38,7 +38,7 @@ export class HistoryCapacity {
     if (!primary) return undefined;
     const alternate = order.acceptedOffer.preflight.providers.find(({ name }) => name !== primary)?.name;
     if (!alternate) return { primary, second: null };
-    const { deliveryFrom, deliveryBy } = order.acceptedOffer.proposal;
+    const { deliveryFrom, deliveryBy } = historyBookingWindow(order);
     const from = new Date(deliveryFrom), by = new Date(deliveryBy);
     if (by <= now) return { primary, second: null };
     return orders.serialize(async () => {
@@ -50,13 +50,13 @@ export class HistoryCapacity {
   }
 
   async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date) {
-    if (order.reservedProvider || new Date(order.acceptedOffer.proposal.deliveryBy) <= now) return order.reservedProvider;
+    if (order.reservedProvider || new Date(historyBookingWindow(order).deliveryBy) <= now) return order.reservedProvider;
     return this.findProvider(orders, order, order.acceptedOffer.preflight, now, true);
   }
 
   async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
     priority?: HistoryPaidProviderPriority) {
-    if (new Date(order.acceptedOffer.proposal.deliveryBy) <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+    if (new Date(historyBookingWindow(order).deliveryBy) <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
     const provider = await this.findProvider(orders, order, reports, now, false, priority);
     if (priority && (!provider || provider !== order.reservedProvider) && await orders.hasEarlierPaidWork(priority.confirmedBefore, now)) {
       throw new HistoryRequestError("HISTORY_FULFILMENT_FIFO");
@@ -67,7 +67,8 @@ export class HistoryCapacity {
 
   private async findProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
     requireAvailableSource = false, priority?: HistoryPaidProviderPriority) {
-    const from = new Date(order.acceptedOffer.proposal.deliveryFrom), by = new Date(order.acceptedOffer.proposal.deliveryBy);
+    const { deliveryFrom, deliveryBy } = historyBookingWindow(order);
+    const from = new Date(deliveryFrom), by = new Date(deliveryBy);
     const names = reports.providers.map(({ name }) => name);
     const preferred = order.reservedProvider;
     if (preferred && names.includes(preferred)) names.sort((a) => a === preferred ? -1 : 1);
@@ -84,7 +85,7 @@ export class HistoryCapacity {
   }
 
   async canUseFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {
-    const { deliveryFrom, deliveryBy } = order.acceptedOffer.proposal;
+    const { deliveryFrom, deliveryBy } = historyBookingWindow(order);
     const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now,
       { unreserved: additional ? "all" : "none" });
     const needed = additional || order.reservedProvider !== provider ? 1 : 0;

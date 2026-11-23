@@ -9727,6 +9727,156 @@
             ],
             "additionalProperties": false
           },
+          "replacement": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "awaiting_proposal"
+                    ]
+                  }
+                },
+                "required": [
+                  "version",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "proposed",
+                      "expired",
+                      "superseded"
+                    ]
+                  },
+                  "window": {
+                    "type": "object",
+                    "properties": {
+                      "deliveryFrom": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deliveryBy": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "deliveryFrom",
+                      "deliveryBy"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "version",
+                  "status",
+                  "window"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "accepted"
+                    ]
+                  },
+                  "window": {
+                    "type": "object",
+                    "properties": {
+                      "deliveryFrom": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deliveryBy": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "deliveryFrom",
+                      "deliveryBy"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "acceptedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "version",
+                  "status",
+                  "window",
+                  "acceptedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "refund_decision_pending"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "declined",
+                      "no_window"
+                    ]
+                  },
+                  "requestedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "version",
+                  "status",
+                  "reason",
+                  "requestedAt"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "verificationResumesAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "reportPlan": {
             "type": "object",
             "properties": {
@@ -10204,6 +10354,152 @@
           "collectionEnabled"
         ],
         "additionalProperties": false
+      },
+      "HistoryReplacementState": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "awaiting_proposal"
+                ]
+              }
+            },
+            "required": [
+              "version",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "proposed",
+                  "expired",
+                  "superseded"
+                ]
+              },
+              "window": {
+                "type": "object",
+                "properties": {
+                  "deliveryFrom": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "deliveryBy": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "deliveryFrom",
+                  "deliveryBy"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "version",
+              "status",
+              "window"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "accepted"
+                ]
+              },
+              "window": {
+                "type": "object",
+                "properties": {
+                  "deliveryFrom": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "deliveryBy": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "deliveryFrom",
+                  "deliveryBy"
+                ],
+                "additionalProperties": false
+              },
+              "acceptedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "version",
+              "status",
+              "window",
+              "acceptedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "refund_decision_pending"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "declined",
+                  "no_window"
+                ]
+              },
+              "requestedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "version",
+              "status",
+              "reason",
+              "requestedAt"
+            ],
+            "additionalProperties": false
+          }
+        ]
       },
       "HistoryPaymentVerification": {
         "type": "object",
@@ -12924,6 +13220,520 @@
           },
           "503": {
             "description": "Temporarily unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/replacement-booking": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Explicitly accept or decline the exact replacement for the paid order",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "attemptKey": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "accept",
+                      "decline"
+                    ]
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "expectedVersion",
+                  "attemptKey",
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Current private replacement state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "awaiting_proposal"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "proposed",
+                            "expired",
+                            "superseded"
+                          ]
+                        },
+                        "window": {
+                          "type": "object",
+                          "properties": {
+                            "deliveryFrom": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "deliveryBy": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "deliveryFrom",
+                            "deliveryBy"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "window"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "accepted"
+                          ]
+                        },
+                        "window": {
+                          "type": "object",
+                          "properties": {
+                            "deliveryFrom": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "deliveryBy": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "deliveryFrom",
+                            "deliveryBy"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "acceptedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "window",
+                        "acceptedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "refund_decision_pending"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "declined",
+                            "no_window"
+                          ]
+                        },
+                        "requestedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "reason",
+                        "requestedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid replacement action"
+          },
+          "403": {
+            "description": "Current session and request authority required"
+          },
+          "409": {
+            "description": "Replacement changed, expired or filled; refresh the order"
+          },
+          "503": {
+            "description": "Read back before retrying"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/replacement-booking": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Propose a feasible replacement window or request a refund decision",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "propose"
+                        ]
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "deliveryFrom": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deliveryBy": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind",
+                      "expectedAssignmentVersion",
+                      "deliveryFrom",
+                      "deliveryBy"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "no_window"
+                        ]
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind",
+                      "expectedAssignmentVersion"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Current private replacement state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "awaiting_proposal"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "proposed",
+                            "expired",
+                            "superseded"
+                          ]
+                        },
+                        "window": {
+                          "type": "object",
+                          "properties": {
+                            "deliveryFrom": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "deliveryBy": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "deliveryFrom",
+                            "deliveryBy"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "window"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "accepted"
+                          ]
+                        },
+                        "window": {
+                          "type": "object",
+                          "properties": {
+                            "deliveryFrom": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "deliveryBy": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "deliveryFrom",
+                            "deliveryBy"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "acceptedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "window",
+                        "acceptedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "refund_decision_pending"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "declined",
+                            "no_window"
+                          ]
+                        },
+                        "requestedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "reason",
+                        "requestedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid replacement action"
+          },
+          "403": {
+            "description": "Current session and request authority required"
+          },
+          "409": {
+            "description": "Replacement changed, expired or filled; refresh the order"
+          },
+          "503": {
+            "description": "Read back before retrying"
           }
         }
       }
@@ -16755,6 +17565,156 @@
                       ],
                       "additionalProperties": false
                     },
+                    "replacement": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "awaiting_proposal"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "proposed",
+                                "expired",
+                                "superseded"
+                              ]
+                            },
+                            "window": {
+                              "type": "object",
+                              "properties": {
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "deliveryFrom",
+                                "deliveryBy"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "window"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "accepted"
+                              ]
+                            },
+                            "window": {
+                              "type": "object",
+                              "properties": {
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "deliveryFrom",
+                                "deliveryBy"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "acceptedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "window",
+                            "acceptedAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "refund_decision_pending"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "declined",
+                                "no_window"
+                              ]
+                            },
+                            "requestedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "reason",
+                            "requestedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "verificationResumesAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
                     "reportPlan": {
                       "type": "object",
                       "properties": {
@@ -17994,6 +18954,156 @@
                       ],
                       "additionalProperties": false
                     },
+                    "replacement": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "awaiting_proposal"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "proposed",
+                                "expired",
+                                "superseded"
+                              ]
+                            },
+                            "window": {
+                              "type": "object",
+                              "properties": {
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "deliveryFrom",
+                                "deliveryBy"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "window"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "accepted"
+                              ]
+                            },
+                            "window": {
+                              "type": "object",
+                              "properties": {
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "deliveryFrom",
+                                "deliveryBy"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "acceptedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "window",
+                            "acceptedAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "refund_decision_pending"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "declined",
+                                "no_window"
+                              ]
+                            },
+                            "requestedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "reason",
+                            "requestedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "verificationResumesAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
                     "reportPlan": {
                       "type": "object",
                       "properties": {
@@ -19109,6 +20219,156 @@
                         "bookingCommitted"
                       ],
                       "additionalProperties": false
+                    },
+                    "replacement": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "awaiting_proposal"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "proposed",
+                                "expired",
+                                "superseded"
+                              ]
+                            },
+                            "window": {
+                              "type": "object",
+                              "properties": {
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "deliveryFrom",
+                                "deliveryBy"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "window"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "accepted"
+                              ]
+                            },
+                            "window": {
+                              "type": "object",
+                              "properties": {
+                                "deliveryFrom": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "deliveryBy": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "deliveryFrom",
+                                "deliveryBy"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "acceptedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "window",
+                            "acceptedAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "refund_decision_pending"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "declined",
+                                "no_window"
+                              ]
+                            },
+                            "requestedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "status",
+                            "reason",
+                            "requestedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "verificationResumesAt": {
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "reportPlan": {
                       "type": "object",

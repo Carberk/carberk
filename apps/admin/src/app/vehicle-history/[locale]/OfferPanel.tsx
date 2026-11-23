@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { HistoryOrderSchemas as H, HistoryOfferSchemas as O } from "@auto-tm/contracts";
 import { Button } from "@auto-tm/ui/components";
 
+import { ReplacementBookingPanel } from "./ReplacementBookingPanel";
 import { PaymentProofPanel } from "./PaymentProofPanel";
 import { PaymentVerificationPanel } from "./PaymentVerificationPanel";
 import { FulfilmentPanel } from "./FulfilmentPanel";
@@ -10,6 +11,7 @@ import { VinCorrectionPanel } from "./VinCorrectionPanel";
 import { historyOfferAction } from "./offer-actions";
 import type { HistoryInboxResult } from "./actions";
 
+import { replacementCopy } from "@/lib/history-replacement-copy";
 import { paymentCopy } from "@/lib/history-payment-copy";
 import { offerCopy } from "@/lib/history-offer-copy";
 import type { DeskLocale } from "@/lib/history-desk-copy";
@@ -32,6 +34,14 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   const currentBinding = useRef(binding); currentBinding.current = binding;
   const load = useRef<() => void>(() => {});
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  function updateOrder(next: H.HistoryOrderState) {
+    setOrderState((current) => {
+      if (current?.order?.id !== next.order?.id) return next;
+      const currentVersion = current?.replacement?.version ?? -1;
+      const nextVersion = next.replacement?.version ?? -1;
+      return current && (currentVersion > nextVersion || (currentVersion === nextVersion && current.serverNow > next.serverNow)) ? current : next;
+    });
+  }
   async function run(mutation?: O.HistoryOperatorOfferMutation) {
     if (busy.current || !alive.current) return;
     busy.current = true;
@@ -50,7 +60,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
         return;
       }
       if (result.scope !== scope || result.actorId !== actorId) { setQuote(null); setPhase("error"); return; }
-      setQuote(result.data); setOrderState(result.order); setPhase("ready");
+      setQuote(result.data); updateOrder(result.order); setPhase("ready");
       if (mutation) setWindowIssue(null);
       if (!vin || mutation?.kind === "check") setVin(result.data.vin ?? "");
     } catch { if (alive.current && expected === currentBinding.current) { setQuote(null); setPhase("error"); } }
@@ -59,22 +69,32 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   load.current = () => { void run(); };
   useEffect(() => { load.current(); }, [binding, revision]);
   useEffect(() => {
-    if (!orderState?.order || orderState.status !== "awaiting_synthetic_payment" || phase !== "ready") return;
-    const remaining = new Date(orderState.order.holdExpiresAt).getTime() - new Date(orderState.serverNow).getTime();
-    const timer = setTimeout(() => load.current(), Math.max(0, remaining));
+    if (!orderState?.order || phase !== "ready") return;
+    const serverNow = Date.parse(orderState.serverNow);
+    const replacement = orderState.replacement;
+    const boundaries = [
+      !orderState.payment?.confirmedAt && orderState.order.holdExpiresAt,
+      orderState.verificationResumesAt,
+      replacement?.status === "proposed" && replacement.window.deliveryFrom,
+    ].flatMap((value) => value && Date.parse(value) > serverNow ? [Date.parse(value) - serverNow] : []);
+    if (!boundaries.length) return;
+    const timer = setTimeout(() => load.current(), Math.min(...boundaries));
     return () => clearTimeout(timer);
   }, [orderState, phase]);
   const accepted = orderState?.order;
   const data = accepted?.acceptedOffer ?? quote;
   const available = data?.preflight?.status === "available";
   const proposal = data?.proposal;
+  const replacement = orderState?.replacement;
+  const originalWindow = replacement ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
+  const recovery = replacementCopy[locale];
   const timestamp = (value: string) => new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
   }).format(new Date(value));
   return <section aria-label={t.title} className="mt-6 space-y-4 border-t pt-5 text-sm">
     <h4 className="font-semibold">{accepted ? orderState?.status === "payment_confirmed" ? paymentCopy[locale].confirmed
-      : orderState?.status === "payment_received_no_hold" ? paymentCopy[locale].noHold : orderState?.payment ? paymentCopy[locale].review
-        : orderState?.status === "hold_expired" ? t.orderExpired : t.orderWaiting : t.title}</h4>
+      : orderState?.status === "payment_received_no_hold" ? paymentCopy[locale].noHold
+        : orderState?.status === "hold_expired" ? t.orderExpired : orderState?.payment ? paymentCopy[locale].review : t.orderWaiting : t.title}</h4>
     <p className="text-muted-foreground">{t.synthetic}</p>
     {phase === "loading" ? <p role="status">{t.loading}</p> : phase === "error" ? <div role="alert">
       <p>{t.error}</p><Button className="mt-3" variant="secondary" onClick={() => { void run(); }}>{t.refresh}</Button>
@@ -109,19 +129,23 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       </fieldset>}
       {proposal && <div className="space-y-3 rounded-lg border p-4">
         <h5 className="font-semibold">{accepted ? t.orderSummary : t.preview}</h5><p className="break-all font-mono">{data.vin}</p>
-        <p>{t.format}: {t[proposal.format]}</p><p>{t.window}: {timestamp(proposal.deliveryFrom)} – {timestamp(proposal.deliveryBy)}</p>
+        <p>{t.format}: {t[proposal.format]}</p>
+        {originalWindow && <p>{replacement ? recovery.original : t.window}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}</p>}
         {accepted ? <>
           <p>{t.orderAccepted}: {timestamp(accepted.acceptedAt)}</p><p>{t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>
           {orderState?.reportPlan && <p>{t.reservedReport} {orderState.reportPlan.primary}
             {orderState.reportPlan.second && <> · {t.spareReport} {orderState.reportPlan.second}</>}</p>}
           {!orderState?.payment && <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>}
+          {orderState?.verificationResumesAt && <p role="status" className="text-muted-foreground">{recovery.overnight}</p>}
+          {replacement && <ReplacementBookingPanel key={`replacement:${binding}`} {...{ locale, id, version, scope, timestamp, invalidate }}
+            state={replacement} onOrder={updateOrder} />}
           {orderState?.wallet && phase === "ready" && <p className="break-all font-mono">{orderState.wallet}</p>}
           <PaymentProofPanel key={`${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} />
-          <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} onOrder={setOrderState} />
+          <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} hasReplacement={!!replacement} onOrder={updateOrder} />
           {orderState && <FulfilmentPanel key={`fulfilment:${id}:${version}:${scope}:${actorId}:${locale}`}
-            {...{ locale, id, version, scope, actorId, invalidate }} state={orderState} onOrder={setOrderState} />}
+            {...{ locale, id, version, scope, actorId, invalidate }} state={orderState} onOrder={updateOrder} />}
           {orderState && <VinCorrectionPanel key={`correction:${id}:${version}:${scope}:${actorId}:${locale}`} {...{ locale, id, version, scope, actorId, invalidate }}
-            state={orderState} onOrder={setOrderState} />}
+            state={orderState} onOrder={updateOrder} />}
           <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>
             {data.preflight?.status === "available" && <><p>{t.rule}</p><dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt>{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl><p>{t.limits}</p></>}
             {proposal.format !== "pdf" && <p>{t.links}</p>}<p>{t.rights}</p><p>{t.terms}</p>

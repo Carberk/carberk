@@ -76,6 +76,7 @@ export async function historyFixture(configure?: (config: ConfigService) => void
         await prisma.historyPaymentCheck.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.historyFulfilmentEvent.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.historyVinAgreement.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
+        await prisma.historyReplacementEvent.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.historyOrder.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.vehicleHistoryRequest.deleteMany({ where: { requesterId: { in: users } } });
         await prisma.user.deleteMany({ where: { id: { in: users } } });

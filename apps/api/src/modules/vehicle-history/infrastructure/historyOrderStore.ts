@@ -3,27 +3,43 @@ import type { PoolClient } from "pg";
 import type { HistoryAgreementInput, HistoryOrderStore, HistoryProvider } from "../domain/HistoryOrder";
 
 const activeOrders = `WITH active_orders AS (
-  SELECT o.*, COALESCE(a."reservedProvider", o."reservedProvider") AS "activeProvider",
+  SELECT o.*,
+    COALESCE(CASE WHEN b."requestId" IS NULL OR (a.state->>'acceptedRevision')::int > b."acceptedRevision"
+      THEN a."reservedProvider" END, b."bookingProvider", o."reservedProvider") AS "activeProvider",
+    COALESCE(b."bookingDay", o."deliveryDay") AS "activeDay",
+    COALESCE(b."bookingFrom", o."deliveryFrom") AS "activeFrom",
+    COALESCE(b."bookingBy", o."deliveryBy") AS "activeBy",
+    b."requestId" IS NOT NULL AS "replacementBooked",
     COALESCE(a.state->'accepted'->-1->'offer', o.snapshot->'acceptedOffer') AS "activeOffer"
   FROM vehicle_history_orders o LEFT JOIN LATERAL
     (SELECT state, "reservedProvider" FROM history_vin_agreements WHERE "requestId" = o."requestId" ORDER BY version DESC LIMIT 1) a ON TRUE
+  LEFT JOIN history_replacement_events b ON b."requestId" = o."requestId" AND b."bookingDay" IS NOT NULL
 )`;
+const hasBooking = `(o."replacementBooked" OR EXISTS (
+  SELECT 1 FROM history_payment_checks p WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`;
 
-export function historyOrderStore(client: PoolClient, requestId: string, assertActive: () => void): HistoryOrderStore {
+export function historyOrderStore(client: PoolClient, requestId: string, assignmentVersion: number, assertActive: () => void): HistoryOrderStore {
   return {
+    assignmentVersion,
     async read() {
       assertActive();
-      const { rows } = await client.query<{ snapshot: H.HistoryAcceptedOrder; wallet: string; reservedProvider: HistoryProvider | null; agreement: unknown }>(
+      const { rows } = await client.query<{ snapshot: H.HistoryAcceptedOrder; wallet: string; reservedProvider: HistoryProvider | null; agreement: unknown; replacement: unknown; replacementAssignment: number; replacementRevision: number }>(
         `${activeOrders} SELECT snapshot, wallet, "activeProvider" AS "reservedProvider",
-          (SELECT state FROM history_vin_agreements WHERE "requestId" = $1 ORDER BY version DESC LIMIT 1) AS agreement
-          FROM active_orders WHERE "requestId" = $1`, [requestId]);
+          (SELECT state FROM history_vin_agreements WHERE "requestId" = $1 ORDER BY version DESC LIMIT 1) AS agreement,
+          r.state AS replacement, r."assignmentVersion" AS "replacementAssignment", r."acceptedRevision" AS "replacementRevision"
+          FROM active_orders o LEFT JOIN LATERAL (
+            SELECT state, "assignmentVersion", "acceptedRevision" FROM history_replacement_events
+            WHERE "requestId" = $1 ORDER BY version DESC LIMIT 1
+          ) r ON TRUE WHERE o."requestId" = $1`, [requestId]);
       const row = rows[0];
       if (!row) return null;
       const original = H.HistoryAcceptedOrderSchema.parse(row.snapshot);
       const agreement = row.agreement ? H.HistoryCorrectionStateSchema.parse(row.agreement) : null;
       const accepted = agreement?.accepted.at(-1);
       if (agreement && (!accepted || agreement.acceptedRevision !== accepted.revision)) throw new Error("Invalid accepted History revision");
-      return { ...original, wallet: row.wallet, ...(row.reservedProvider ? { reservedProvider: row.reservedProvider } : {}),
+      const replacement = row.replacement ? { state: H.HistoryReplacementStateSchema.parse(row.replacement),
+        current: row.replacementAssignment === assignmentVersion && row.replacementRevision === (agreement?.acceptedRevision ?? 0) } : null;
+      return { ...original, wallet: row.wallet, ...(replacement ? { replacement } : {}), ...(row.reservedProvider ? { reservedProvider: row.reservedProvider } : {}),
         ...(agreement && accepted ? { agreement, acceptedOffer: accepted.offer, originalOffer: original.acceptedOffer } : {}) };
     },
     async serialize(operation) {
@@ -32,14 +48,14 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
       assertActive();
       return operation();
     },
-    async capacity(day, from, by, now) {
+    async capacity(day, from, by, now, excludeCurrent = false) {
       assertActive();
       const { rows } = await client.query<{ total: number; morning: number; overlapping: number }>(`
-        SELECT count(*)::int AS total,
-          count(*) FILTER (WHERE "deliveryBy" <= ($1 || 'T10:00:00+05:00')::timestamptz)::int AS morning,
-          count(*) FILTER (WHERE "deliveryFrom" < $3 AND "deliveryBy" > $2)::int AS overlapping
-        FROM vehicle_history_orders o WHERE "deliveryDay" = $1 AND ("holdExpiresAt" > $4 OR EXISTS
-          (SELECT 1 FROM history_payment_checks p WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [day, from, by, now]);
+        ${activeOrders} SELECT count(*)::int AS total,
+          count(*) FILTER (WHERE "activeBy" <= ($1 || 'T10:00:00+05:00')::timestamptz)::int AS morning,
+          count(*) FILTER (WHERE "activeFrom" < $3 AND "activeBy" > $2)::int AS overlapping
+        FROM active_orders o WHERE "activeDay" = $1 AND (NOT $5::boolean OR "requestId" <> $6)
+          AND ("holdExpiresAt" > $4 OR ${hasBooking})`, [day, from, by, now, excludeCurrent, requestId]);
       return rows[0] ?? { total: 0, morning: 0, overlapping: 0 };
     },
     async providerUsage(provider, periodStart, periodEnd, now, { excludeCurrent = false, unreserved = "all" } = {}) {
@@ -51,17 +67,16 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
           SELECT count(*) FROM history_fulfilment_events f WHERE f."requestId" = o."requestId"
             AND f.input->>'kind' = 'company_correction' AND f.state->>'source' = 'new_source'
         )), 0)::int AS used FROM active_orders o
-        WHERE "deliveryFrom" < $3 AND "deliveryBy" > $2
+        WHERE "activeFrom" < $3 AND "activeBy" > $2
           AND (NOT $5::boolean OR "requestId" <> $6)
           AND ("activeProvider" = $1 OR ("activeProvider" IS NULL
             AND "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
-            AND ($7 = 'all' OR ($7 = 'earlier_paid' AND o."deliveryBy" > $4
-              AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3 AND EXISTS (
-              SELECT 1 FROM history_payment_checks older WHERE older."requestId" = o."requestId" AND older."bookingCommitted"
+            AND ($7 = 'all' OR ($7 = 'earlier_paid' AND o."activeBy" > $4
+              AND o."activeFrom" >= $2 AND o."activeBy" <= $3 AND EXISTS (
+              SELECT 1 FROM history_payment_checks older WHERE older."requestId" = o."requestId" AND (older."bookingCommitted" OR o."replacementBooked") AND older."confirmedAt" IS NOT NULL
                 AND ($8::timestamptz IS NULL OR (older."confirmedAt", older."requestId") < ($8::timestamptz, $6::text))
             )))))
-          AND ("holdExpiresAt" > $4 OR EXISTS (SELECT 1 FROM history_payment_checks p
-            WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`,
+          AND ("holdExpiresAt" > $4 OR ${hasBooking})`,
       [provider, periodStart, periodEnd, now, excludeCurrent, requestId, unreservedMode, confirmedBefore]);
       return rows[0]?.used ?? 0;
     },
@@ -69,8 +84,8 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
       assertActive();
       const { rows } = await client.query<{ earlier: number }>(`
         ${activeOrders} SELECT count(*)::int AS earlier FROM active_orders o
-        JOIN history_payment_checks p ON p."requestId" = o."requestId" AND p."bookingCommitted"
-        WHERE o."activeProvider" <> $1 AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3 AND o."deliveryBy" > $6
+        JOIN history_payment_checks p ON p."requestId" = o."requestId" AND p."confirmedAt" IS NOT NULL AND (p."bookingCommitted" OR o."replacementBooked")
+        WHERE o."activeProvider" <> $1 AND o."activeFrom" >= $2 AND o."activeBy" <= $3 AND o."activeBy" > $6
           AND o."activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
           AND (p."confirmedAt", o."requestId") < ($4::timestamptz, $5::text)`, [provider, periodStart, periodEnd, confirmedAt, requestId, now]);
       return rows[0]?.earlier ?? 0;
@@ -96,6 +111,23 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
         ("requestId", "orderId", "attemptKey", version, "actorId", input, "checkedAt", "confirmedAt", "bookingCommitted")
         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)`, [requestId, check.input.orderId, check.input.attemptKey,
         check.version, check.actorId, JSON.stringify(check.input), check.checkedAt, check.confirmedAt, check.bookingCommitted]);
+    },
+    async replacementAttempt(key) {
+      assertActive();
+      const { rows } = await client.query<{ input: H.HistoryReplacementMutation }>(
+        'SELECT input FROM history_replacement_events WHERE "requestId" = $1 AND "attemptKey" = $2', [requestId, key]);
+      return rows[0]?.input ?? null;
+    },
+    async saveReplacement({ input, state, actorId, acceptedRevision, recordedAt, booking }) {
+      assertActive();
+      const window = state.status === "accepted" ? state.window : null;
+      await client.query(`INSERT INTO history_replacement_events
+        ("requestId", version, "attemptKey", input, state, "actorId", "assignmentVersion", "acceptedRevision", "recordedAt",
+          "bookingDay", "bookingFrom", "bookingBy", "bookingProvider")
+        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      [requestId, state.version, input.attemptKey, JSON.stringify(input), JSON.stringify(H.HistoryReplacementStateSchema.parse(state)),
+        actorId, assignmentVersion, acceptedRevision, recordedAt, booking?.day ?? null, window?.deliveryFrom ?? null,
+        window?.deliveryBy ?? null, booking?.provider ?? null]);
     },
     async submittedProofIds() {
       assertActive();
@@ -132,14 +164,14 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
     async hasEarlierPaidWork(confirmedAt, now) {
       assertActive();
       const { rows } = await client.query<{ earlier: boolean }>(`
-        SELECT EXISTS (
+        ${activeOrders} SELECT EXISTS (
           SELECT 1 FROM history_payment_checks p
           JOIN vehicle_history_requests r ON r.id = p."requestId"
-          JOIN vehicle_history_orders o ON o."requestId" = p."requestId"
+          JOIN active_orders o ON o."requestId" = p."requestId"
           LEFT JOIN LATERAL (
             SELECT state FROM history_fulfilment_events WHERE "requestId" = p."requestId" ORDER BY version DESC LIMIT 1
           ) f ON TRUE
-          WHERE p."bookingCommitted" AND o."deliveryBy" > $3
+          WHERE p."confirmedAt" IS NOT NULL AND (p."bookingCommitted" OR o."replacementBooked") AND o."activeBy" > $3
             AND r."assignedOperatorId" = (SELECT "assignedOperatorId" FROM vehicle_history_requests WHERE id = $2)
             AND ($1::timestamptz IS NULL OR (p."confirmedAt", p."requestId") < ($1::timestamptz, $2::text))
             AND COALESCE(f.state->>'status', '') NOT IN ('obtained', 'recovery')

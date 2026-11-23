@@ -14,7 +14,10 @@ import type { Env } from "../../../env.schema";
 import { MESSAGE_AUTHORITY_FENCE_PORT, type MessageAuthorityFencePort } from "../../identity/identity.public";
 
 const queueSelect = { id: true, createdAt: true, requesterId: true, assignmentVersion: true, assignedOperatorId: true } as const;
-const committedPayment = { bookingCommitted: true, confirmedAt: { not: null } } satisfies Prisma.HistoryPaymentCheckWhereInput;
+const replacementBooked = { replacementEvents: { some: { bookingDay: { not: null } } } } satisfies Prisma.HistoryOrderWhereInput;
+const committedPayment = { confirmedAt: { not: null },
+  OR: [{ bookingCommitted: true }, { order: replacementBooked }],
+} satisfies Prisma.HistoryPaymentCheckWhereInput;
 
 function queueScope(operatorId: string, query: HistoryQueueQuery): Prisma.VehicleHistoryRequestWhereInput {
   const assignment = query.filter === "mine" ? { assignedOperatorId: operatorId } : query.filter === "unassigned"
@@ -111,7 +114,7 @@ export class HistoryMessageLocks {
           await client.query("UPDATE vehicle_history_requests SET offer = $2::jsonb WHERE id = $1", [id, JSON.stringify(O.HistoryOfferSchema.parse(value))]);
         },
       };
-      try { return await operation(request, waiting, offer, historyOrderStore(client, id, assertActive)); }
+      try { return await operation(request, waiting, offer, historyOrderStore(client, id, request?.assignmentVersion ?? 0, assertActive)); }
       finally { active = false; }
     });
   }
@@ -187,9 +190,9 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
     }) : null;
     if (query.cursor && !after?.confirmedAt) throw new HistoryRequestError("HISTORY_OPERATOR_DENIED");
     const rows = await this.prisma.historyPaymentCheck.findMany({
-      where: { ...scope, ...(after?.confirmedAt ? { OR: [
+      where: { AND: [scope, ...(after?.confirmedAt ? [{ OR: [
         { confirmedAt: { gt: after.confirmedAt } }, { confirmedAt: after.confirmedAt, requestId: { gt: after.requestId } },
-      ] } : {}) },
+      ] }] : [])] },
       orderBy: [{ confirmedAt: "asc" }, { requestId: "asc" }], take: 51, select,
     });
     return {
