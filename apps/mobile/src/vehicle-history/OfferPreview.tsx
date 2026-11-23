@@ -8,33 +8,42 @@ import { historyTranscript } from "../api/vehicle-history/messages";
 import { queryKeys } from "../api/queryKeys";
 import { ApiError } from "../api/client";
 
+import { PaymentProof } from "./PaymentProof";
 import { historySessionCurrent, type HistoryViewer } from "./session";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, active, connected, reconcileOrder }: {
-  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; active: boolean; connected: boolean; reconcileOrder: () => Promise<unknown>;
+export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, reconcileOrder }: {
+  viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; metadataAvailable: boolean;
+  active: boolean; connected: boolean; reconcileOrder: () => Promise<unknown>;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
   const [vin, setVin] = useState(""), [saving, setSaving] = useState(false), [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [orderFailure, setOrderFailure] = useState<string | null>(null);
-  const mounted = useRef(true), busy = useRef(false), generation = useRef(0);
-  const latest = useRef({ ready, active, connected });
-  if (latest.current.active && !active || latest.current.ready && !ready) generation.current++;
-  latest.current = { ready, active, connected };
+  const mounted = useRef(true), busy = useRef(false);
+  const readGeneration = useRef(0), writeGeneration = useRef(0);
+  const latest = useRef({ ready, metadataAvailable, active, connected });
+  const suspended = latest.current.active && !active || latest.current.connected && !connected
+    || latest.current.metadataAvailable && !metadataAvailable;
+  if (suspended) readGeneration.current++;
+  if (suspended || latest.current.ready && !ready) writeGeneration.current++;
+  latest.current = { ready, metadataAvailable, active, connected };
   const controller = useMemo(() => new AbortController(), []);
   const stream = useMemo(() => historyTranscript({ userId, sessionId }, request.id, controller.signal), [userId, sessionId, request.id, controller]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  useEffect(() => focusManager.subscribe(() => { if (!focusManager.isFocused()) generation.current++; }), []);
-  const current = () => mounted.current && latest.current.ready && latest.current.active && latest.current.connected && historySessionCurrent(viewer)
-    && AppState.currentState === "active" && focusManager.isFocused();
+  useEffect(() => focusManager.subscribe(() => {
+    if (!focusManager.isFocused()) { readGeneration.current++; writeGeneration.current++; }
+  }), []);
+  const canRead = () => mounted.current && latest.current.metadataAvailable && latest.current.active && latest.current.connected
+    && historySessionCurrent(viewer) && AppState.currentState === "active" && focusManager.isFocused();
+  const current = () => latest.current.ready && canRead();
   const state = useQuery({ queryKey: [...queryKeys.vehicleHistory.detail(viewer.userId, viewer.sessionId, request.id), "offer", request.assignmentVersion],
-    queryFn: () => { const attempt = generation.current;
-      const owns = () => current() && attempt === generation.current;
+    queryFn: () => { const attempt = readGeneration.current;
+      const owns = () => canRead() && attempt === readGeneration.current;
       return Promise.all([stream.offer(owns), stream.order(owns)]).then(([offer, order]) => ({ offer, order })); },
     enabled: ready && active && connected, retry: false, staleTime: 0, networkMode: "always",
     refetchOnWindowFocus: false, refetchOnReconnect: false });
@@ -53,8 +62,8 @@ export function OfferPreview({ viewer, request, ready, active, connected, reconc
     const parsed = H.AcceptHistoryQuoteSchema.safeParse({ offer: data });
     if (!parsed.success) return;
     busy.current = true; setSaving(true); setOrderFailure(null);
-    const attempt = generation.current;
-    const owns = () => current() && attempt === generation.current;
+    const attempt = writeGeneration.current;
+    const owns = () => current() && attempt === writeGeneration.current;
     try {
       await stream.acceptQuote(parsed.data.offer, owns);
       if (owns()) { await state.refetch(); if (owns()) await reconcileOrder(); }
@@ -68,8 +77,8 @@ export function OfferPreview({ viewer, request, ready, active, connected, reconc
   async function send() {
     if (!data || !current() || !vin.trim() || busy.current || state.isFetching || state.error) return;
     busy.current = true; setSaving(true); setFailed(false);
-    const attempt = generation.current;
-    const owns = () => current() && attempt === generation.current;
+    const attempt = writeGeneration.current;
+    const owns = () => current() && attempt === writeGeneration.current;
     try {
       await stream.sendVin(vin, data.version, owns);
       if (!owns()) return;
@@ -121,6 +130,8 @@ export function OfferPreview({ viewer, request, ready, active, connected, reconc
               <Button variant="secondary" disabled={!ready || !active || !connected || state.isFetching} onPress={() => { setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button>
             </View>}
           </View>}
+          {accepted && <PaymentProof key={`${userId}:${sessionId}:${request.id}:${accepted.id}`}
+            viewer={viewer} requestId={request.id} orderId={accepted.id} ready={metadataAvailable && active && connected} />}
           {!accepted && <><Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
           <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={setVin} maxLength={80}
             autoCapitalize="characters" autoCorrect={false} editable={canEdit} />

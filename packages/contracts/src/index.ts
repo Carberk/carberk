@@ -50,3 +50,4 @@ export { DateTimeSchema } from "./zod";
 export { generateOpenApiDocument } from "./openapi";
 
 export * as ServiceMessagesSchemas from "./schemas/service-messages";
+export * as HistoryPaymentProofSchemas from "./schemas/history-payment-proof";

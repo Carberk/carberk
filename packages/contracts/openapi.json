@@ -12751,6 +12751,1229 @@
         }
       }
     },
+    "/api/v1/vehicle-history/requests/{id}/payment-proofs": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read authorized receipt metadata",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store evidence; never payment confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "orderId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "purpose": {
+                            "type": "string",
+                            "enum": [
+                              "payment_evidence"
+                            ]
+                          },
+                          "contentType": {
+                            "type": "string",
+                            "enum": [
+                              "image/jpeg",
+                              "image/png",
+                              "image/webp"
+                            ]
+                          },
+                          "sizeBytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 8388608
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "uploaded",
+                              "submitted",
+                              "deleted"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "submittedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "orderId",
+                          "purpose",
+                          "contentType",
+                          "sizeBytes",
+                          "status",
+                          "createdAt",
+                          "expiresAt",
+                          "submittedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 10
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current owner, assignment, session or purpose refused"
+          },
+          "409": {
+            "description": "Evidence or assignment changed"
+          },
+          "503": {
+            "description": "Retry without another payment"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Stage a retry-safe receipt for the exact accepted order",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "attemptKey": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "contentType": {
+                    "type": "string",
+                    "enum": [
+                      "image/jpeg",
+                      "image/png",
+                      "image/webp"
+                    ]
+                  },
+                  "sizeBytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8388608
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "attemptKey",
+                  "contentType",
+                  "sizeBytes"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store receipt state; no payment confirmation or hold renewal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "enum": [
+                        "payment_evidence"
+                      ]
+                    },
+                    "contentType": {
+                      "type": "string",
+                      "enum": [
+                        "image/jpeg",
+                        "image/png",
+                        "image/webp"
+                      ]
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8388608
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "uploaded",
+                        "submitted",
+                        "deleted"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "submittedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "orderId",
+                    "purpose",
+                    "contentType",
+                    "sizeBytes",
+                    "status",
+                    "createdAt",
+                    "expiresAt",
+                    "submittedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded image or input"
+          },
+          "403": {
+            "description": "Current owner/session refused"
+          },
+          "409": {
+            "description": "Exact order, attempt or lifecycle conflict"
+          },
+          "503": {
+            "description": "Retry the same receipt without paying again"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/payment-proofs/{fileId}/content": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read exact private receipt bytes with current authority",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store evidence; never payment confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "orderId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "purpose": {
+                          "type": "string",
+                          "enum": [
+                            "payment_evidence"
+                          ]
+                        },
+                        "contentType": {
+                          "type": "string",
+                          "enum": [
+                            "image/jpeg",
+                            "image/png",
+                            "image/webp"
+                          ]
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 8388608
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "uploaded",
+                            "submitted",
+                            "deleted"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "orderId",
+                        "purpose",
+                        "contentType",
+                        "sizeBytes",
+                        "status",
+                        "createdAt",
+                        "expiresAt",
+                        "submittedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "dataBase64": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 11184812,
+                      "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+                    }
+                  },
+                  "required": [
+                    "file",
+                    "dataBase64"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current owner, assignment, session or purpose refused"
+          },
+          "409": {
+            "description": "Evidence or assignment changed"
+          },
+          "503": {
+            "description": "Retry without another payment"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Upload bounded private JPEG, PNG or WebP bytes",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Private, no-store receipt state; no payment confirmation or hold renewal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "enum": [
+                        "payment_evidence"
+                      ]
+                    },
+                    "contentType": {
+                      "type": "string",
+                      "enum": [
+                        "image/jpeg",
+                        "image/png",
+                        "image/webp"
+                      ]
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8388608
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "uploaded",
+                        "submitted",
+                        "deleted"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "submittedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "orderId",
+                    "purpose",
+                    "contentType",
+                    "sizeBytes",
+                    "status",
+                    "createdAt",
+                    "expiresAt",
+                    "submittedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded image or input"
+          },
+          "403": {
+            "description": "Current owner/session refused"
+          },
+          "409": {
+            "description": "Exact order, attempt or lifecycle conflict"
+          },
+          "503": {
+            "description": "Retry the same receipt without paying again"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/payment-proofs": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read authorized receipt metadata",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store evidence; never payment confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "orderId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "purpose": {
+                            "type": "string",
+                            "enum": [
+                              "payment_evidence"
+                            ]
+                          },
+                          "contentType": {
+                            "type": "string",
+                            "enum": [
+                              "image/jpeg",
+                              "image/png",
+                              "image/webp"
+                            ]
+                          },
+                          "sizeBytes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 8388608
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "uploaded",
+                              "submitted",
+                              "deleted"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "submittedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "orderId",
+                          "purpose",
+                          "contentType",
+                          "sizeBytes",
+                          "status",
+                          "createdAt",
+                          "expiresAt",
+                          "submittedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 10
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current owner, assignment, session or purpose refused"
+          },
+          "409": {
+            "description": "Evidence or assignment changed"
+          },
+          "503": {
+            "description": "Retry without another payment"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/payment-proofs/{fileId}/content": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read exact private receipt bytes with current authority",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store evidence; never payment confirmation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "orderId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "purpose": {
+                          "type": "string",
+                          "enum": [
+                            "payment_evidence"
+                          ]
+                        },
+                        "contentType": {
+                          "type": "string",
+                          "enum": [
+                            "image/jpeg",
+                            "image/png",
+                            "image/webp"
+                          ]
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 8388608
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "uploaded",
+                            "submitted",
+                            "deleted"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "orderId",
+                        "purpose",
+                        "contentType",
+                        "sizeBytes",
+                        "status",
+                        "createdAt",
+                        "expiresAt",
+                        "submittedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "dataBase64": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 11184812,
+                      "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+                    }
+                  },
+                  "required": [
+                    "file",
+                    "dataBase64"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current owner, assignment, session or purpose refused"
+          },
+          "409": {
+            "description": "Evidence or assignment changed"
+          },
+          "503": {
+            "description": "Retry without another payment"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/payment-proofs/{fileId}/submit": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Atomically submit the uploaded receipt for the accepted order",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "orderId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store receipt state; no payment confirmation or hold renewal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "enum": [
+                        "payment_evidence"
+                      ]
+                    },
+                    "contentType": {
+                      "type": "string",
+                      "enum": [
+                        "image/jpeg",
+                        "image/png",
+                        "image/webp"
+                      ]
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8388608
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "uploaded",
+                        "submitted",
+                        "deleted"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "submittedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "orderId",
+                    "purpose",
+                    "contentType",
+                    "sizeBytes",
+                    "status",
+                    "createdAt",
+                    "expiresAt",
+                    "submittedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded image or input"
+          },
+          "403": {
+            "description": "Current owner/session refused"
+          },
+          "409": {
+            "description": "Exact order, attempt or lifecycle conflict"
+          },
+          "503": {
+            "description": "Retry the same receipt without paying again"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/payment-proofs/{fileId}": {
+      "delete": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Discard an unsubmitted exact object",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private, no-store receipt state; no payment confirmation or hold renewal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "enum": [
+                        "payment_evidence"
+                      ]
+                    },
+                    "contentType": {
+                      "type": "string",
+                      "enum": [
+                        "image/jpeg",
+                        "image/png",
+                        "image/webp"
+                      ]
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8388608
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "uploaded",
+                        "submitted",
+                        "deleted"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "submittedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "orderId",
+                    "purpose",
+                    "contentType",
+                    "sizeBytes",
+                    "status",
+                    "createdAt",
+                    "expiresAt",
+                    "submittedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid bounded image or input"
+          },
+          "403": {
+            "description": "Current owner/session refused"
+          },
+          "409": {
+            "description": "Exact order, attempt or lifecycle conflict"
+          },
+          "503": {
+            "description": "Retry the same receipt without paying again"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/payment-evidence/read": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reasoned and audited exact-object historical receipt read with a separate current capability",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "fileId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "payment_evidence"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "requestId",
+                  "fileId",
+                  "purpose",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private, no-store bytes after current session/purpose/lifecycle checks and access audit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "orderId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "purpose": {
+                          "type": "string",
+                          "enum": [
+                            "payment_evidence"
+                          ]
+                        },
+                        "contentType": {
+                          "type": "string",
+                          "enum": [
+                            "image/jpeg",
+                            "image/png",
+                            "image/webp"
+                          ]
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 8388608
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "uploaded",
+                            "submitted",
+                            "deleted"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "submittedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "orderId",
+                        "purpose",
+                        "contentType",
+                        "sizeBytes",
+                        "status",
+                        "createdAt",
+                        "expiresAt",
+                        "submittedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "dataBase64": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 11184812,
+                      "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+                    }
+                  },
+                  "required": [
+                    "file",
+                    "dataBase64"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Exact request/object, purpose and bounded reason required"
+          },
+          "403": {
+            "description": "Separate historical evidence authority refused"
+          },
+          "503": {
+            "description": "Evidence unavailable; retry"
+          }
+        }
+      }
+    },
     "/api/v1/vehicle-history/operator/requests/{id}/reminder": {
       "post": {
         "tags": [

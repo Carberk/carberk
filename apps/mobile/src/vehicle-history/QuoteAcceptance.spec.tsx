@@ -38,6 +38,7 @@ beforeEach(async () => {
   current = { order: null, status: "enquiry", serverNow: "2026-11-21T05:00:00.000Z", wallet: null, collectionEnabled: false };
   sent = [];
   server.use(
+    http.get("*/vehicle-history/requests/:id/payment-proofs", () => HttpResponse.json({ items: [] })),
     http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ id, sourceListingId: null,
       createdAt: "2026-11-21T04:00:00.000Z", status: "enquiry", assignmentVersion: 1, assignedOperator: null })),
     http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })),
@@ -144,7 +145,7 @@ it("shows accepted facts and the next action with access to the agreed details",
   const view = await renderMobile(<RequestScreen />);
   const details = await view.findByRole("button", { name: "Details" });
   expect(view.getByText("DEMA0000000000001 · PDF and provider link")).toBeTruthy();
-  expect(view.getByText("Send a test reference here.")).toBeTruthy();
+  expect(view.getByText("Open Details to send or view your test receipt.")).toBeTruthy();
   await fireEvent.press(details);
   expect(view.getByText("Accepted order · 100 TMT")).toBeTruthy();
 });

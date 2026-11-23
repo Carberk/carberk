@@ -4,6 +4,12 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_PROOF_INVALID: "Use one JPEG, PNG or WebP image up to 8 MB. Try a smaller screenshot.",
+    HISTORY_PROOF_DENIED: "This receipt is unavailable. Sign in again or refresh the request.",
+    HISTORY_PROOF_EXPIRED: "Receipt upload expired. Select the receipt again and retry; do not pay again.",
+    HISTORY_PROOF_CONFLICT: "Receipt state changed. Refresh and retry the selected receipt. Do not pay again.",
+    HISTORY_PROOF_UNAVAILABLE: "Could not send or open the receipt. Retry the same receipt. Do not pay again.",
+
     HISTORY_ORDER_INVALID: "Check the complete quote before confirming.",
     HISTORY_ORDER_STALE: "The quote changed or its window is no longer feasible. Refresh and ask the operator for a new quote.",
     HISTORY_ORDER_CAPACITY: "This day or window is full. Ask the operator for another quote; do not transfer money.",
@@ -31,6 +37,12 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_PROOF_INVALID: "Выберите одно изображение JPEG, PNG или WebP до 8 МБ. Попробуйте меньший скриншот.",
+    HISTORY_PROOF_DENIED: "Квитанция недоступна. Войдите снова или обновите обращение.",
+    HISTORY_PROOF_EXPIRED: "Срок загрузки истёк. Выберите квитанцию ещё раз; не платите повторно.",
+    HISTORY_PROOF_CONFLICT: "Состояние квитанции изменилось. Обновите и повторите отправку выбранного файла. Не платите повторно.",
+    HISTORY_PROOF_UNAVAILABLE: "Не удалось отправить или открыть квитанцию. Повторите попытку с тем же файлом. Не платите повторно.",
+
     HISTORY_ORDER_INVALID: "Проверьте полное предложение перед подтверждением.",
     HISTORY_ORDER_STALE: "Предложение изменилось или срок уже недоступен. Обновите его и запросите новое у оператора.",
     HISTORY_ORDER_CAPACITY: "На этот день или срок мест нет. Запросите другое предложение; не переводите деньги.",
@@ -58,6 +70,12 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_PROOF_INVALID: "8 MB çenli bir JPEG, PNG ýa-da WebP suratyny saýlaň. Kiçiräk ekran suratyny synanyşyň.",
+    HISTORY_PROOF_DENIED: "Bu çek elýeterli däl. Gaýtadan giriň ýa-da ýüz tutmany täzeläň.",
+    HISTORY_PROOF_EXPIRED: "Çegi ýüklemegiň möhleti gutardy. Çegi täzeden saýlaň; gaýtadan pul tölemäň.",
+    HISTORY_PROOF_CONFLICT: "Çegiň ýagdaýy üýtgedi. Täzeläp, saýlanan çegi täzeden iberiň. Gaýtadan pul tölemäň.",
+    HISTORY_PROOF_UNAVAILABLE: "Çegi iberip ýa-da açyp bolmady. Şol çek bilen gaýtadan synanyşyň. Gaýtadan pul tölemäň.",
+
     HISTORY_ORDER_INVALID: "Tassyklamazdan öň doly teklibi barlaň.",
     HISTORY_ORDER_STALE: "Teklip üýtgedi ýa-da möhleti indi mümkin däl. Täzeläp, işgärden täze teklip soraň.",
     HISTORY_ORDER_CAPACITY: "Bu güne ýa-da wagta ýer ýok. Işgärden başga teklip soraň; pul geçirmäň.",
@@ -139,13 +157,20 @@ export class HistoryOrdersExceptionFilter extends HistoryRequestExceptionFilter 
   }
 }
 
+@Catch()
+export class HistoryProofsExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    super.catch(error instanceof HistoryRequestError || error instanceof HttpException ? error : new HistoryRequestError("HISTORY_PROOF_UNAVAILABLE"), host);
+  }
+}
+
 export function historyRequestFailure(error: unknown, language: string | undefined) {
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
-    : code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
-      : code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
+  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
+    : code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
+      : code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
         || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
 }

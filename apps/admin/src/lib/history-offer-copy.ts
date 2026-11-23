@@ -4,7 +4,7 @@ export const offerCopy = {
     "orderExpired": "Payment hold expired",
     "orderAccepted": "Accepted",
     "orderHold": "Payment hold until · Ashgabat time",
-    "orderNext": "Await a fictional transfer reference from the customer. Do not collect real money. Manual wallet verification is separate; a receipt never confirms payment. After 20:00, verification resumes at 09:00.",
+    "orderNext": "Review the customer’s test receipt below. Do not collect real money. Manual wallet verification is separate; a receipt never confirms payment. After 20:00, verification resumes at 09:00.",
     "orderExpiredNext": "The slot is released. Contact the operator for a new feasible agreement. If you transferred money, tell the operator; do not pay again.",
 
     "title": "VIN and offer",
@@ -52,7 +52,7 @@ export const offerCopy = {
     "orderExpired": "Срок брони оплаты истёк",
     "orderAccepted": "Принято",
     "orderHold": "Бронь оплаты до · время Ашхабада",
-    "orderNext": "Ожидайте вымышленный номер перевода от клиента. Не принимайте реальные деньги. Проверка кошелька выполняется отдельно; чек не подтверждает оплату. После 20:00 проверка возобновляется в 09:00.",
+    "orderNext": "Посмотрите тестовую квитанцию клиента ниже. Не принимайте реальные деньги. Проверка кошелька выполняется отдельно; чек не подтверждает оплату. После 20:00 проверка возобновляется в 09:00.",
     "orderExpiredNext": "Место освобождено. Согласуйте с оператором новый доступный срок. Если уже перевели деньги, сообщите оператору; не платите повторно.",
 
     "title": "VIN и предложение",
@@ -100,7 +100,7 @@ export const offerCopy = {
     "orderExpired": "Töleg bronunyň möhleti gutardy",
     "orderAccepted": "Kabul edildi",
     "orderHold": "Töleg bronunyň soňky wagty · Aşgabat wagty",
-    "orderNext": "Müşderiden oýlanyp tapylan geçiriş belgisine garaşyň. Hakyky pul kabul etmäň. Gapjyk aýratyn el bilen barlanýar; çek tölegi tassyklamaýar. 20:00-dan soň barlag 09:00-da dowam edýär.",
+    "orderNext": "Müşderiniň synag çegini aşakda görüň. Hakyky pul kabul etmäň. Gapjyk aýratyn el bilen barlanýar; çek tölegi tassyklamaýar. 20:00-dan soň barlag 09:00-da dowam edýär.",
     "orderExpiredNext": "Ýer boşadyldy. Işgär bilen täze mümkin möhleti ylalaşyň. Pul geçiren bolsaňyz, işgäre habar beriň; täzeden tölemäň.",
 
     "title": "VIN we teklip",

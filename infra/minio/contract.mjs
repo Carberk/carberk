@@ -23,7 +23,10 @@ export const MEDIA_BUCKETS = [
   "listing-videos",
   "chat-attachments",
   "catalog-assets",
+  "vehicle-history-private",
 ];
+
+const privateBucket = (bucket) => bucket === "listing-videos" || bucket === "vehicle-history-private";
 
 export function publicReadPolicy(bucket) {
   return {
@@ -103,7 +106,7 @@ export async function bootstrapBuckets(client, buckets = MEDIA_BUCKETS) {
       created = true;
     }
 
-    if (bucket === "listing-videos") {
+    if (privateBucket(bucket)) {
       await client.send(new DeleteBucketPolicyCommand({ Bucket: bucket }));
     } else {
       const policy = publicReadPolicy(bucket);
@@ -133,12 +136,12 @@ export async function backupBuckets(client, outputDir, buckets = MEDIA_BUCKETS) 
   await mkdir(join(outputDir, "policies"), { recursive: true });
 
   for (const bucket of buckets) {
-    let policy = JSON.stringify(bucket === "listing-videos" ? null : publicReadPolicy(bucket), null, 2);
+    let policy = JSON.stringify(privateBucket(bucket) ? null : publicReadPolicy(bucket), null, 2);
     try {
       const response = await client.send(new GetBucketPolicyCommand({ Bucket: bucket }));
       if (response.Policy) {
-        if (bucket === "listing-videos") {
-          throw new Error("Bucket listing-videos must have no bucket policy during the video hold; re-bootstrap before backup");
+        if (privateBucket(bucket)) {
+          throw new Error(`Private bucket ${bucket} must have no bucket policy; re-bootstrap before backup`);
         }
         assertPublicReadOnlyPolicy(response.Policy, bucket);
         policy = JSON.stringify(JSON.parse(response.Policy), null, 2);
@@ -181,7 +184,7 @@ export async function restoreBuckets(client, backupDir) {
     await bootstrapBuckets(client, [bucket.name]);
 
     const policy = await readFile(join(backupDir, bucket.policyFile), "utf8");
-    if (bucket.name !== "listing-videos") {
+    if (!privateBucket(bucket.name)) {
       assertPublicReadOnlyPolicy(policy, bucket.name);
       await client.send(new PutBucketPolicyCommand({ Bucket: bucket.name, Policy: policy }));
     }

@@ -11,6 +11,7 @@ import { AccountDeletionPendingGuard } from "../../src/common/account-deletion-p
 import { GlobalErrorFilter } from "../../src/common/error.filter";
 import { IDENTITY_CHECK_PORT } from "../../src/modules/identity/identity.public";
 import { VehicleHistoryModule } from "../../src/modules/vehicle-history/vehicle-history.module";
+import { HISTORY_PRIVATE_STORAGE, type HistoryPrivateStorage, type HistoryPrivateFile } from "../../src/modules/vehicle-history/domain/HistoryPrivateFile";
 import { bullTestRoot } from "./bullTestRoot";
 
 /** Listening test-only HTTP/auth target; never provisions a browser/device session. */
@@ -66,6 +67,10 @@ export async function historyFixture(configure?: (config: ConfigService) => void
         await prisma.serviceMessage.deleteMany({ where: scope });
         await prisma.serviceConversation.deleteMany({ where: { id: scope.conversationId } });
         await prisma.historyPrivateNote.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
+        const files = await prisma.historyPrivateFile.findMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
+        const storage = app.get<HistoryPrivateStorage>(HISTORY_PRIVATE_STORAGE);
+        for (const file of files) await storage.delete(file as HistoryPrivateFile);
+        await prisma.historyPrivateFile.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.historyOrder.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.vehicleHistoryRequest.deleteMany({ where: { requesterId: { in: users } } });
         await prisma.user.deleteMany({ where: { id: { in: users } } });

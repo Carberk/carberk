@@ -215,8 +215,32 @@ model HistoryOrder {
   deliveryBy    DateTime @db.Timestamptz(3)
   holdExpiresAt DateTime @db.Timestamptz(3)
 
+  privateFiles HistoryPrivateFile[]
+
+  @@unique([requestId, id])
   @@index([deliveryDay, holdExpiresAt])
   @@map("vehicle_history_orders")
+}
+
+model HistoryPrivateFile {
+  id          String @id @default(uuid()) @db.Uuid
+  requestId   String
+  orderId     String @db.Uuid
+  order       HistoryOrder @relation(fields: [requestId, orderId], references: [requestId, id], onDelete: Restrict, onUpdate: NoAction, map: "history_private_files_order_fkey")
+  attemptKey  String @db.Uuid
+  purpose     String
+  policy      String
+  contentType String
+  sizeBytes   Int
+  sha256      String?
+  status      String @default("pending")
+  createdAt   DateTime @db.Timestamptz(3)
+  expiresAt   DateTime @db.Timestamptz(3)
+  submittedAt DateTime? @db.Timestamptz(3)
+
+  @@unique([requestId, attemptKey])
+  @@index([status, expiresAt])
+  @@map("history_private_files")
 }
 
 model HistoryPrivateNote {

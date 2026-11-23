@@ -82,6 +82,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 300 }).current;
   const denied = [pages.error, receipts.error, thread.receiptError].some((error) =>
     error instanceof ApiError && [401, 403, 404].includes(error.status));
+  const metadataAvailable = metadataCurrent || (metadataRefreshing && !metadataError);
   const ready = metadataCurrent && thread.connected && thread.active && !denied && !pages.isPending && !pages.error;
   linkReader.current.ready = ready;
   const linkCurrent = () => linkReader.current.mounted && linkReader.current.ready
@@ -210,7 +211,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
       {header}
-      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
+      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} metadataAvailable={metadataAvailable}
+        active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
       {!thread.connected && <Text accessibilityRole="alert">{t("vehicleHistory.offline")}</Text>}
