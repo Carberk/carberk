@@ -20,6 +20,7 @@ import { BackButton, StackHeader } from "@/components/navigation/StackHeader";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { ErrorState } from "@/components/ErrorState";
+import { useLargeText } from "@/lib/font-scale";
 
 type Viewer = ReturnType<typeof useHistoryViewer>;
 const historyPath = "/vehicle-history/requests";
@@ -35,6 +36,7 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const largeText = useLargeText();
   const back = useSafeBack(detail ? historyPath : "/(tabs)/chat");
   const navigation = useNavigation();
   const state = navigation.getState();
@@ -97,7 +99,7 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
 
   const screen = (
     <>
-      <StackHeader large
+      <StackHeader large={!(detail && largeText)}
         title={detail ? `Carberk · ${t("vehicleHistory.title")}` : t("vehicleHistory.historyTitle")}
         leading={<BackButton ref={heading} onPress={back}
           accessibilityLabel={t(fromOffer ? "vehicleHistory.backOffer" : detail ? "vehicleHistory.backRequests" : "back")} />}
