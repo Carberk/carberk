@@ -2167,3 +2167,38 @@ it.each([
   expect(screen.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(requests.filter((request) => request.method === "POST" && /\/(order|offer)$/.test(request.path))).toEqual([]);
 });
+
+it("shows the renewed agreement in both the accepted order and preparation after refreshing preparation", async () => {
+  selectAssigned();
+  const originalOffer = { version: 2, vin: "DEMA0000000000001", synthetic: true,
+    preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
+    proposal: { format: "both", priceTmt: 100, providerRule: "either_available_both_when_obtainable",
+      terms: "service_failure_review", deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" } };
+  const renewedOffer = { ...originalOffer, version: 3, vin: "DEMA0000000000006",
+    preflight: { status: "available", providers: [{ name: "AutoCheck", originalReportDate: "2026-10-15" }] },
+    proposal: { ...originalOffer.proposal, format: "link" } };
+  let renewed = false;
+  server.use(
+    http.get("http://api.test/api/v1/vehicle-history/operator/requests/:id/offer", () => Response.json(originalOffer)),
+    http.get("http://api.test/api/v1/vehicle-history/operator/requests/:id/order", () => {
+      const offer = renewed ? renewedOffer : originalOffer;
+      return Response.json({
+        order: { id, acceptedOffer: offer, acceptedAt: "2026-11-21T05:00:00.000Z",
+          holdExpiresAt: "2026-11-21T07:00:00.000Z", deliveryDay: "2026-11-21" },
+        status: "payment_confirmed", serverNow: "2026-11-21T05:00:00.000Z", wallet: null, collectionEnabled: false,
+        fulfilment: { accepted: { acceptedRevision: renewed ? 3 : 0, vin: offer.vin, format: offer.proposal.format,
+          provider: offer.preflight.providers[0]?.name, originalReportDate: offer.preflight.providers[0]?.originalReportDate },
+        gate: "ready", sources: ["new_source"], intent: null },
+      });
+    }),
+  );
+  render(view());
+  await screen.findByText("Delivery format: PDF and provider link");
+  renewed = true;
+  fireEvent.click(screen.getByRole("button", { name: "Refresh preparation" }));
+  const preparation = within(screen.getByRole("region", { name: "Prepare report" }));
+  await preparation.findByText("DEMA0000000000006");
+  expect(screen.getByText("Delivery format: Provider link only")).toBeTruthy();
+  expect(screen.queryByText("DEMA0000000000001")).toBeNull();
+  expect(screen.getByText("AutoCheck · Original report date")).toBeTruthy();
+});
