@@ -23,12 +23,32 @@ test("actual comment tokens fail in every authored JS and TS extension", () => {
 
 test("JavaScript dependency patches admit checked statements and reject new comments or invalid hunks", () => {
   const path = "patches/fixture@1.0.0.patch";
-  const header = "diff --git a/worker.mjs b/worker.mjs\nindex abcd..1234 100644\n--- a/worker.mjs\n+++ b/worker.mjs\n";
-  const hunk = "@@ -1 +1,2 @@\n const original = 1;\n";
-  assert.deepEqual(check({ [path]: header + hunk + '+const extra = "// literal";\n' }), []);
-  assert.match(check({ [path]: header + hunk + "+const extra = 2; // explanation\n" }).join("\n"), /explanatory comment/);
-  assert.match(check({ [path]: header + hunk + "+const extra = ;\n" }).join("\n"), /unsupported/);
-  assert.match(check({ [path]: header + hunk }).join("\n"), /Incomplete JavaScript patch hunk/);
+  const blob = (text) => createHash("sha1").update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest("hex");
+  const original = "const original = 1; // upstream\n";
+  const withPatch = (before, after, hunk, installed = after) => {
+    const header = `diff --git a/worker.mjs b/worker.mjs\nindex ${blob(before)}..${blob(after)} 100644\n--- a/worker.mjs\n+++ b/worker.mjs\n`;
+    return checkSources({ current: sources({ [path]: header + hunk }), legacy: sources({}), trusted: sources({}),
+      readDependency: (patch, target) => {
+        assert.equal(patch, path);
+        assert.equal(target, "worker.mjs");
+        return installed;
+      },
+    });
+  };
+  const hunk = "@@ -1 +1,2 @@\n " + original;
+  const literal = 'const extra = "// literal";\n';
+  assert.deepEqual(withPatch(original, original + literal, hunk + "+" + literal), []);
+  const tail = "export { original };";
+  assert.deepEqual(withPatch(original + tail, original + literal + tail, hunk + "+" + literal), []);
+  const comment = "const extra = 2; // explanation\n";
+  assert.match(withPatch(original, original + comment, hunk + "+" + comment).join("\n"), /explanatory comment/);
+  assert.match(withPatch(original, original + "const extra = ;\n", hunk + "+const extra = ;\n").join("\n"), /unsupported/);
+  assert.match(withPatch(original, original + literal, hunk).join("\n"), /Incomplete JavaScript patch hunk/);
+  assert.match(withPatch(original, original + literal, hunk + "+" + literal, original).join("\n"), /exact patched JavaScript/);
+  const template = 'const text = `before\nunchanged`;\n';
+  const applied = 'const text = `before\n`; // explanation\nconst after = `\nunchanged`;\n';
+  assert.match(withPatch(template, applied, '@@ -1,2 +1,4 @@\n const text = `before\n+`; // explanation\n+const after = `\n unchanged`;\n')
+    .join("\n"), /fixture@1\.0\.0\.patch:7:5: new or moved explanatory comment/);
 });
 
 test("regex, strings, templates, JSX attributes and ASI are parsed as code", () => {

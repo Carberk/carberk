@@ -5,6 +5,7 @@ import { createServer } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type AddressInfo } from "node:net";
+import { deflateSync } from "node:zlib";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { PDFDocument, PDFRawStream, PDFStream, rgb } from "pdf-lib";
 import sharp from "sharp";
@@ -18,7 +19,8 @@ const facts = { reportId: "fixture-14", provider: "Carfax", vin: "DEMA0000000000
   originalReportDate: "2026-10-14", language: "ru", permittedUse: true };
 
 async function document(overrides: Partial<typeof facts> = {}, options: {
-  invisiblePage?: number; chart?: "readable" | "damaged" | "inline" | "inline-missing-width" | "inline-short" | "mask" | "mask-short";
+  invisiblePage?: number;
+  chart?: "readable" | "damaged" | "inline" | "inline-missing-width" | "inline-short" | "mask" | "mask-short" | "flate" | "flate-short";
 } = {}) {
   const pdf = await PDFDocument.create();
   const report = { ...facts, ...overrides };
@@ -28,16 +30,20 @@ async function document(overrides: Partial<typeof facts> = {}, options: {
       color: options.invisiblePage === page ? rgb(1, 1, 1) : rgb(0, 0, 0),
     });
   }
-  if (options.chart === "inline" || options.chart === "inline-missing-width" || options.chart === "inline-short") {
+  const flate = options.chart === "flate" || options.chart === "flate-short";
+  if (flate || options.chart === "inline" || options.chart === "inline-missing-width" || options.chart === "inline-short") {
     const raster = Buffer.alloc(48 * 32, 240);
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 48; x++) {
         if (x % 12 < 8 && y >= 29 - Math.floor(x / 12) * 6) raster[y * 48 + x] = 20;
       }
     }
-    const content = ["q", "220 0 0 180 45 220 cm", "BI",
-      options.chart === "inline-missing-width" ? "/H 32 /BPC 8 /CS /G /F /AHx" : "/W 48 /H 32 /BPC 8 /CS /G /F /AHx",
-      "ID", (options.chart === "inline-short" ? raster.subarray(0, 48 * 8) : raster).toString("hex") + ">", "EI", "Q"].join("\n");
+    const pixels = flate ? deflateSync(raster, { level: 0 }) : raster;
+    const length = options.chart === "flate-short" ? 7 + 48 * 8 : options.chart === "inline-short" ? 48 * 8 : pixels.length;
+    const width = options.chart === "inline-missing-width" ? "" : "/W 48 ";
+    const filter = flate ? "[/AHx /Fl]" : "/AHx";
+    const content = ["q", "220 0 0 180 45 220 cm", "BI", `${width}/H 32 /BPC 8 /CS /G /F ${filter}`,
+      "ID", pixels.subarray(0, length).toString("hex") + ">", "EI", "Q"].join("\n");
     pdf.getPage(1).node.addContentStream(pdf.context.register(pdf.context.flateStream(content)));
   } else if (options.chart === "mask" || options.chart === "mask-short") {
     const raster = Buffer.alloc((48 / 8) * (options.chart === "mask" ? 32 : 8), 0b01010101);
@@ -82,6 +88,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       const reports = new Map([
         ["damaged", damagedChart], ["readable", chart], ["inline", inline],
         ["inline-missing-width", missingWidth], ["inline-short", shortInline], ["mask", mask], ["mask-short", shortMask],
+        ["flate", await document({}, { chart: "flate" })], ["flate-short", await document({}, { chart: "flate-short" })],
       ]);
       server = createServer({ key: readFileSync(key), cert: certificate }, (req, res) => {
         received.push(req.url ?? "");
@@ -124,7 +131,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     } finally { s3.destroy(); await f.close(); }
   });
 
-  async function obtained(format: "pdf" | "link" | "both", vin = facts.vin) {
+  async function obtained(format: "pdf" | "link" | "both", vin = facts.vin, { lateReceipt = false } = {}) {
     const operator = await f.actor(), customer = await f.actor(null);
     const customerHttp = (path: string) => f.request.post(path).auth(customer.token, { type: "bearer" });
     const id = (await customerHttp(`${root}/requests`).send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
@@ -136,9 +143,17 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     const offer = (await operatorHttp("/offer").send({ kind: "propose", format, expectedVersion: 1, expectedAssignmentVersion,
       deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" }).expect(201)).body;
     const orderId = (await customerHttp(`${root}/requests/${id}/order`).send({ offer }).expect(201)).body.order.id as string;
+    if (lateReceipt) f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:05:00.000Z");
     await operatorHttp("/payment-verification").send({ orderId, expectedAssignmentVersion, attemptKey: randomUUID(),
       expectedPaymentVersion: 0, walletChecked: true, outcome: "matched", amountMinor: 10000, reference: "SYNTHETIC-VH14-REFERENCE",
       evidence: "Synthetic independent ledger", evidenceFileId: null, receivedAt: now }).expect(201);
+    if (lateReceipt) {
+      await operatorHttp("/replacement-booking").send({ kind: "propose", orderId, expectedAssignmentVersion, expectedVersion: 0,
+        attemptKey: randomUUID(), deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" }).expect(201);
+      await customerHttp(`${root}/requests/${id}/replacement-booking`).send({
+        kind: "accept", orderId, expectedVersion: 1, attemptKey: randomUUID(),
+      }).expect(201);
+    }
     const intentId = randomUUID(), acceptedRevision = 0;
     const provider = checked.preflight.providers[0].name;
     await operatorHttp("/fulfilment").send({ kind: "start", orderId, expectedAssignmentVersion, expectedVersion: 0, attemptKey: intentId,
@@ -208,6 +223,20 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     expect((await e.read().expect(200)).body).toEqual({ status: "empty" });
   });
 
+  it("validates the original on the same paid order after a replacement booking", async () => {
+    const e = await obtained("pdf", facts.vin, { lateReceipt: true });
+    const { pdf, bytes } = await document();
+    await e.validate({ pdf }).expect(201).expect(({ body }) => expect(body).toMatchObject({
+      status: "validated", artifact: { format: "pdf", report: facts },
+    }));
+    const content = await e.read("/content").expect(200);
+    expect(Buffer.from(content.body.dataBase64, "base64")).toEqual(bytes);
+    const customerOrder = await f.request.get(`${root}/requests/${e.id}/order`)
+      .auth(e.customer.token, { type: "bearer" }).expect(200);
+    expect(customerOrder.body).toMatchObject({ order: { id: e.target.orderId }, replacement: { status: "accepted" },
+      preparation: "preparing", wallet: null, payment: { outcome: "matched", amountMinor: 10000, bookingCommitted: true } });
+  });
+
   it("rejects an invisible page even when its PDF stream and report metadata are present", async () => {
     const e = await obtained("pdf");
     const { pdf } = await document({}, { invisiblePage: 2 });
@@ -222,6 +251,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     ["pdf", "inline-missing-width", "inline"], ["link", "inline-missing-width", "inline"],
     ["pdf", "inline-short", "inline"], ["link", "inline-short", "inline"],
     ["pdf", "mask-short", "mask"], ["link", "mask-short", "mask"],
+    ["pdf", "flate-short", "flate"], ["link", "flate-short", "flate"],
   ] as const)("refuses a %s report with a %s chart beside readable text", async (format, damaged, intact) => {
     const e = await obtained(format);
     const endpoint = origin + "/report/" + facts.reportId + "?scenario=";

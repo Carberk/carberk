@@ -62,7 +62,7 @@ function retained(beforeSource, afterSource, beforeComments, afterComments, dire
   });
 }
 
-export function checkSources({ current, legacy, trusted, exclusions = [], notices = [], report = {} }) {
+export function checkSources({ current, legacy, trusted, exclusions = [], notices = [], report = {}, readDependency }) {
   const errors = [];
   report.coverage ??= {};
   report.files ??= [];
@@ -75,7 +75,7 @@ export function checkSources({ current, legacy, trusted, exclusions = [], notice
     if (!parsedSources.has(path)) parsedSources.set(path, new Map());
     const cache = parsedSources.get(path);
     if (cache.has(source)) return cache.get(source);
-    const parsed = inspectSource(path, source, notices);
+    const parsed = inspectSource(path, source, notices, readDependency);
     const result = { ...parsed, comments: parsed.comments.filter((comment) => !comment.exception),
       deferred: parsed.deferred.map((item) => ({ ...commentSpan(source, item.startOffset, item.endOffset),
         identity: digest(JSON.stringify([item.fileType, item.reason, source.slice(item.startOffset, item.endOffset)])),
@@ -113,7 +113,7 @@ export function checkSources({ current, legacy, trusted, exclusions = [], notice
         const originalSource = legacy.get(path) ?? "";
         const mainSource = trusted.get(path) ?? "";
         const original = legacy.has(path) ? findings(path, originalSource) : { comments: [], deferred: [] };
-        const main = trusted.has(path) ? findings(path, mainSource) : { comments: [], deferred: [] };
+        const main = legacy.has(path) && trusted.has(path) ? findings(path, mainSource) : { comments: [], deferred: [] };
         for (const kind of ["comments", "deferred"]) {
           const mainLegacy = retained(originalSource, mainSource, original[kind], main[kind], directory);
           const allowed = new Set(retained(mainSource, source, mainLegacy, parsed[kind], directory));

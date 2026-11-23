@@ -230,7 +230,7 @@ for (const [names, adapter] of [
   [["json", "jsonc"], parseJson], [["markdown", "md"], parseMarkdown],
 ]) for (const name of names) adapters[name] = adapter;
 
-export function inspectSource(path, source, notices = []) {
+export function inspectSource(path, source, notices = [], readDependency) {
   const fileType = sourceType(path);
   if (fileType === "data" || fileType === "empty" && source === "") return { comments: [], deferred: [], fileType };
   if (fileType.startsWith("asset:")) {
@@ -243,7 +243,7 @@ export function inspectSource(path, source, notices = []) {
   if (/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(path)) {
     result = { comments: javascriptComments(path, source, notices), deferred: [] };
   } else if (adapters[fileType]) {
-    try { result = adapters[fileType]({ path, source, fileType, adapters }); }
+    try { result = adapters[fileType]({ path, source, fileType, adapters, readDependency }); }
     catch (error) { result = { comments: [], deferred: [{ path, fileType, startOffset: 0, endOffset: source.length, reason: error.message }] }; }
   } else result = { comments: [], deferred: [{ path, fileType, startOffset: 0, endOffset: source.length, reason: `unsupported source grammar ${fileType}` }] };
   for (const comment of result.comments) {
