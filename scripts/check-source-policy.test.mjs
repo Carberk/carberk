@@ -21,6 +21,16 @@ test("actual comment tokens fail in every authored JS and TS extension", () => {
   }
 });
 
+test("JavaScript dependency patches admit checked statements and reject new comments or invalid hunks", () => {
+  const path = "patches/fixture@1.0.0.patch";
+  const header = "diff --git a/worker.mjs b/worker.mjs\nindex abcd..1234 100644\n--- a/worker.mjs\n+++ b/worker.mjs\n";
+  const hunk = "@@ -1 +1,2 @@\n const original = 1;\n";
+  assert.deepEqual(check({ [path]: header + hunk + '+const extra = "// literal";\n' }), []);
+  assert.match(check({ [path]: header + hunk + "+const extra = 2; // explanation\n" }).join("\n"), /explanatory comment/);
+  assert.match(check({ [path]: header + hunk + "+const extra = ;\n" }).join("\n"), /unsupported/);
+  assert.match(check({ [path]: header + hunk }).join("\n"), /Incomplete JavaScript patch hunk/);
+});
+
 test("regex, strings, templates, JSX attributes and ASI are parsed as code", () => {
   const examples = {
     "regex.js": 'const pattern = /https?:\\/\\/[^/]+/; const other = /[/][*]/;\n',

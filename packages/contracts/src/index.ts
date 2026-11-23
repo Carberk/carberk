@@ -52,3 +52,4 @@ export { generateOpenApiDocument } from "./openapi";
 
 export * as ServiceMessagesSchemas from "./schemas/service-messages";
 export * as HistoryPaymentProofSchemas from "./schemas/history-payment-proof";
+export * as HistoryReportArtifactSchemas from "./schemas/history-report-artifact";

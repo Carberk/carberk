@@ -2,6 +2,8 @@ import { HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/c
 import type { PoolClient } from "pg";
 import type { HistoryAgreementInput, HistoryOrderStore, HistoryProvider } from "../domain/HistoryOrder";
 
+import { historyReportStore } from "./historyReportStore";
+
 const activeOrders = `WITH active_orders AS (
   SELECT o.*,
     COALESCE(CASE WHEN b."requestId" IS NULL OR (a.state->>'acceptedRevision')::int > b."acceptedRevision"
@@ -21,6 +23,7 @@ const hasBooking = `(o."replacementBooked" OR EXISTS (
 export function historyOrderStore(client: PoolClient, requestId: string, assignmentVersion: number, assertActive: () => void): HistoryOrderStore {
   return {
     assignmentVersion,
+    reportArtifacts: historyReportStore(client, requestId, assertActive),
     async read() {
       assertActive();
       const { rows } = await client.query<{ snapshot: H.HistoryAcceptedOrder; wallet: string; reservedProvider: HistoryProvider | null; agreement: unknown; replacement: unknown; replacementAssignment: number; replacementRevision: number }>(

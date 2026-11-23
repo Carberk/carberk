@@ -4,6 +4,7 @@ import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { Button } from "@auto-tm/ui/components";
 
 import type { HistoryInboxResult } from "./actions";
+import { ReportArtifactPanel } from "./ReportArtifactPanel";
 import { historyFulfilmentAction } from "./fulfilment-actions";
 
 import type { DeskLocale } from "@/lib/history-desk-copy";
@@ -99,6 +100,9 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
           onClick={() => { void run({ ...command(), kind: "record", outcome: { kind: "company_error" } }); }}>{t.reportError}</Button>}
       </>}
     </>}
+    {phase === "ready" && intent?.status === "obtained" && state.order && <ReportArtifactPanel
+      key={`${state.order.id}:${intent.id}:${intent.version}`} locale={locale} id={id} scope={scope}
+      orderId={state.order.id} version={version} intent={intent} invalidate={invalidate} />}
     {phase !== "ready" && <p role={phase === "saving" || phase === "loading" ? "status" : "alert"}>{t[phase]}</p>}
     {phase !== "saving" && phase !== "loading" && <Button ref={refresh} type="button" className={action} variant="secondary"
       onClick={() => { void run(); }}>{t.refresh}</Button>}

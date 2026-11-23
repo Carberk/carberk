@@ -7,6 +7,14 @@ const messages = {
     HISTORY_REPLACEMENT_INVALID: "Check the new delivery window and try again.",
     HISTORY_REPLACEMENT_CONFLICT: "This delivery window changed or is no longer available. Refresh the order.",
     HISTORY_REPLACEMENT_CAPACITY: "This delivery window is full. Refresh the order for your next step. Your payment is still recorded.",
+    HISTORY_REPORT_INVALID: "Check the report files and try again.",
+    HISTORY_REPORT_CONFLICT: "The report or its order changed. Refresh and check the current order.",
+    HISTORY_REPORT_UNAVAILABLE: "The report could not be saved or opened. Retry with the same report.",
+    HISTORY_REPORT_MISSING: "Add all agreed report formats.",
+    HISTORY_REPORT_MISMATCH: "Use originals for the same agreed VIN, provider, report and date.",
+    HISTORY_REPORT_PDF: "Choose a readable original synthetic PDF.",
+    HISTORY_REPORT_LINK: "Use an approved report link that opens without signing in or paying.",
+    HISTORY_REPORT_RIGHTS: "Choose a report that may be shared with the customer.",
     HISTORY_FULFILMENT_INVALID: "Check the accepted VIN, provider, format and fulfilment action.",
     HISTORY_FULFILMENT_CONFLICT: "Fulfilment changed or this action is unavailable. Refresh and check the recorded intent.",
     HISTORY_FULFILMENT_FIFO: "Work on the earlier confirmed order first.",
@@ -54,6 +62,14 @@ const messages = {
     HISTORY_REPLACEMENT_INVALID: "Проверьте новое время доставки и повторите попытку.",
     HISTORY_REPLACEMENT_CONFLICT: "Время доставки изменилось или больше недоступно. Обновите заказ.",
     HISTORY_REPLACEMENT_CAPACITY: "На это время мест уже нет. Обновите заказ, чтобы узнать, что делать дальше. Ваша оплата учтена.",
+    HISTORY_REPORT_INVALID: "Проверьте данные отчёта и повторите попытку.",
+    HISTORY_REPORT_CONFLICT: "Отчёт или заказ изменился. Обновите и проверьте текущий заказ.",
+    HISTORY_REPORT_UNAVAILABLE: "Не удалось сохранить или открыть отчёт. Повторите с тем же отчётом.",
+    HISTORY_REPORT_MISSING: "Добавьте все согласованные форматы отчёта.",
+    HISTORY_REPORT_MISMATCH: "Используйте оригиналы с согласованными VIN, поставщиком, отчётом и датой.",
+    HISTORY_REPORT_PDF: "Выберите читаемый оригинал тестового PDF.",
+    HISTORY_REPORT_LINK: "Укажите одобренную ссылку на отчёт, доступную без входа и оплаты.",
+    HISTORY_REPORT_RIGHTS: "Выберите отчёт, который можно передать клиенту.",
     HISTORY_FULFILMENT_INVALID: "Проверьте согласованные VIN, поставщика, формат и выбранное действие.",
     HISTORY_FULFILMENT_CONFLICT: "Состояние заказа изменилось или действие недоступно. Обновите данные и проверьте записанное намерение.",
     HISTORY_FULFILMENT_FIFO: "Сначала обработайте заказ, оплаченный раньше.",
@@ -101,6 +117,14 @@ const messages = {
     HISTORY_REPLACEMENT_INVALID: "Täze gowşuryş wagtyny barlap, gaýtadan synanyşyň.",
     HISTORY_REPLACEMENT_CONFLICT: "Gowşuryş wagty üýtgedi ýa-da indi elýeterli däl. Sargydy täzeläň.",
     HISTORY_REPLACEMENT_CAPACITY: "Bu wagta boş ýer ýok. Indiki ädimi görmek üçin sargydy täzeläň. Tölegiňiz hasaba alyndy.",
+    HISTORY_REPORT_INVALID: "Hasabatyň maglumatlaryny barlap, gaýtadan synanyşyň.",
+    HISTORY_REPORT_CONFLICT: "Hasabat ýa-da sargyt üýtgedi. Täzeläp, häzirki sargydy barlaň.",
+    HISTORY_REPORT_UNAVAILABLE: "Hasabaty ýazdyryp ýa-da açyp bolmady. Şol hasabat bilen gaýtadan synanyşyň.",
+    HISTORY_REPORT_MISSING: "Hasabatyň ylalaşylan ähli görnüşlerini goşuň.",
+    HISTORY_REPORT_MISMATCH: "Ylalaşylan VIN-e, üpjün edijä, hasabata we senä gabat gelýän asyl nusgalary ulanyň.",
+    HISTORY_REPORT_PDF: "Okap bolýan asyl synag PDF-ni saýlaň.",
+    HISTORY_REPORT_LINK: "Giriş ýa-da töleg talap etmeýän tassyklanan hasabat baglanyşygyny ulanyň.",
+    HISTORY_REPORT_RIGHTS: "Müşderä berip bolýan hasabaty saýlaň.",
     HISTORY_FULFILMENT_INVALID: "Kabul edilen VIN-i, üpjün edijini, görnüşi we saýlanan amaly barlaň.",
     HISTORY_FULFILMENT_CONFLICT: "Sargydyň ýagdaýy üýtgedi ýa-da amal elýeterli däl. Täzeläp, ýazylan amaly barlaň.",
     HISTORY_FULFILMENT_FIFO: "Ilki tölegi has ir tassyklanan sargydy işläň.",
@@ -206,11 +230,27 @@ export class HistoryProofsExceptionFilter extends HistoryRequestExceptionFilter 
   }
 }
 
+@Catch()
+export class HistoryReportsExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    const unavailable = error instanceof HistoryRequestError && error.code === "HISTORY_MESSAGE_UNAVAILABLE";
+    super.catch(!unavailable && (error instanceof HistoryRequestError || error instanceof HttpException)
+      ? error : new HistoryRequestError("HISTORY_REPORT_UNAVAILABLE"), host);
+  }
+}
+
+const reportStatuses = {
+  HISTORY_REPORT_INVALID: 400, HISTORY_REPORT_CONFLICT: 409, HISTORY_REPORT_UNAVAILABLE: 503,
+  HISTORY_REPORT_MISSING: 422, HISTORY_REPORT_MISMATCH: 422, HISTORY_REPORT_PDF: 422,
+  HISTORY_REPORT_LINK: 422, HISTORY_REPORT_RIGHTS: 422,
+} as const;
+
 export function historyRequestFailure(error: unknown, language: string | undefined) {
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_PAYMENT_UNAVAILABLE" || code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
+  const status = error instanceof HttpException ? error.getStatus() : code in reportStatuses ? reportStatuses[code as keyof typeof reportStatuses]
+    : code === "HISTORY_PAYMENT_UNAVAILABLE" || code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
     : code === "HISTORY_REPLACEMENT_CONFLICT" || code === "HISTORY_REPLACEMENT_CAPACITY" || code === "HISTORY_FULFILMENT_CONFLICT" || code === "HISTORY_FULFILMENT_FIFO" || code === "HISTORY_CORRECTION_CONFLICT" || code === "HISTORY_CORRECTION_CLOSED" || code === "HISTORY_PAYMENT_CONFLICT" || code === "HISTORY_PAYMENT_CLOSED" || code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
       : code === "HISTORY_REPLACEMENT_INVALID" || code === "HISTORY_FULFILMENT_INVALID" || code === "HISTORY_CORRECTION_INVALID" || code === "HISTORY_PAYMENT_INVALID" || code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
         || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;

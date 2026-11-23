@@ -1,4 +1,5 @@
 import type { HistoryOfferSchemas as O, HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
+import type { HistoryReportStore } from "./HistoryReportArtifact";
 import { HistoryRequestError } from "./HistoryRequestError";
 
 export type AvailableHistoryReports = Extract<NonNullable<O.HistoryOffer["preflight"]>, { status: "available" }>;
@@ -23,6 +24,7 @@ export interface HistoryFulfilmentWrite {
 
 export interface HistoryOrderStore {
   readonly assignmentVersion: number;
+  reportArtifacts: HistoryReportStore;
   read(): Promise<StoredHistoryOrder | null>;
   serialize<T>(operation: () => Promise<T>): Promise<T>;
   capacity(day: string, from: Date, by: Date, now: Date, excludeCurrent?: boolean): Promise<{ total: number; morning: number; overlapping: number }>;
