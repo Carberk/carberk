@@ -67,7 +67,13 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       if (owns()) { setVin(""); setPhase(""); await reconcile(); }
     } catch (error) {
       if (!owns()) return;
-      setPhase(error instanceof ApiError && [401, 403, 404].includes(error.status) ? "denied"
+      if (error instanceof ApiError && error.status === 400) {
+        try {
+          await retained.remove(mutation);
+          intent.current = null;
+          if (owns()) setPhase("invalid");
+        } catch { if (owns()) setPhase("storage"); }
+      } else setPhase(error instanceof ApiError && [401, 403, 404].includes(error.status) ? "denied"
         : error instanceof ApiError && error.status === 409 ? "changed" : "uncertain");
       await reconcile().catch(() => undefined);
     } finally { busy.current = false; if (owns()) setPhase((value) => value === "pending" ? "uncertain" : value); }
@@ -94,8 +100,8 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       <Text className="text-callout">{offerCopy("window")}: {timestamp(offer.proposal.deliveryFrom)} – {timestamp(offer.proposal.deliveryBy)}</Text>
     </View>;
   }
-  const failure = ["uncertain", "changed", "denied", "storage"].includes(phase);
-  const usable = enabled && phase === "";
+  const failure = ["uncertain", "changed", "denied", "storage", "invalid"].includes(phase);
+  const usable = enabled && ["", "invalid"].includes(phase);
   return <View className="gap-3 border-t border-border pt-4">
     {agreement?.handoff ? <Text>{copy("Closed")}</Text> : <>
       {!pending && <Button variant="secondary" accessibilityState={{ expanded: open }} disabled={!enabled || phase === "loading"}
@@ -121,7 +127,7 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
         <Button variant="secondary" disabled={!usable || !vin.trim()} accessibilityState={{ busy: phase === "pending" }}
           onPress={() => { void run({ kind: "request", vin, attemptKey: attemptKey(), expectedVersion: agreement?.version ?? 0 }); }}><Text>{copy("Send")}</Text></Button>
         {phase === "pending" && <Text accessibilityRole="alert">{copy("Saving")}</Text>}
-        {failure && <Text accessibilityRole="alert">{copy(phase === "denied" ? "Denied" : phase === "storage" ? "Storage" : phase === "changed" ? "Changed" : "Error")}</Text>}
+        {failure && <Text accessibilityRole="alert">{phase === "invalid" ? offerCopy("malformed") : copy(phase === "denied" ? "Denied" : phase === "storage" ? "Storage" : phase === "changed" ? "Changed" : "Error")}</Text>}
         {phase === "uncertain" && <Button variant="secondary" disabled={!enabled} onPress={() => { void run(); }}><Text>{copy("Retry")}</Text></Button>}
         <Button variant="secondary" disabled={!enabled || busy.current} onPress={() => { void refresh(); }}><Text>{copy("Refresh")}</Text></Button>
       </>}

@@ -195,3 +195,20 @@ it("keeps the accepted VIN visible while requesting a correction on that same or
   expect(view.getAllByText(/DEMA0000000000001/).length).toBeGreaterThan(0);
   expect(sent).toEqual([expect.objectContaining({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0 })]);
 });
+it("lets the customer repair a rejected VIN without replaying the invalid request", async () => {
+  current = accepted;
+  const inputs: H.HistoryCorrectionMutation[] = [];
+  server.use(http.post("*/vehicle-history/requests/:id/correction", async ({ request }) => {
+    inputs.push(await request.json() as H.HistoryCorrectionMutation);
+    return HttpResponse.json({ code: "HISTORY_CORRECTION_INVALID" }, { status: 400 });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Correct VIN" }));
+  await fireEvent.changeText(view.getByLabelText("Corrected VIN"), "INVALID-O");
+  await fireEvent.press(view.getByRole("button", { name: "Request correction" }));
+  expect(view.getByLabelText("Corrected VIN").props.editable).toBe(true);
+  await fireEvent.changeText(view.getByLabelText("Corrected VIN"), "DEMA0000000000006");
+  await fireEvent.press(view.getByRole("button", { name: "Request correction" }));
+  expect(inputs).toEqual([expect.objectContaining({ vin: "INVALID-O" }), expect.objectContaining({ vin: "DEMA0000000000006" })]);
+  expect(inputs[1]?.attemptKey).not.toBe(inputs[0]?.attemptKey);
+});
