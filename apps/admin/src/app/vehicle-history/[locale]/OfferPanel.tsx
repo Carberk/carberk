@@ -19,7 +19,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   invalidate: (result: HistoryInboxResult) => void;
 }) {
   const t = offerCopy[locale];
-  const [data, setData] = useState<O.HistoryOffer | null>(null);
+  const [quote, setQuote] = useState<O.HistoryOffer | null>(null);
   const [orderState, setOrderState] = useState<H.HistoryOrderState | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "pending" | "error">("loading");
   const [vin, setVin] = useState("");
@@ -45,15 +45,15 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
         return;
       }
       if (result.status !== "ok") {
-        setData(null); setPhase("error");
+        setQuote(null); setPhase("error");
         if (result.status === "expired" || result.status === "denied" || result.status === "stale") invalidate({ status: result.status });
         return;
       }
-      if (result.scope !== scope || result.actorId !== actorId) { setData(null); setPhase("error"); return; }
-      setData(result.order.order?.acceptedOffer ?? result.data); setOrderState(result.order); setPhase("ready");
+      if (result.scope !== scope || result.actorId !== actorId) { setQuote(null); setPhase("error"); return; }
+      setQuote(result.data); setOrderState(result.order); setPhase("ready");
       if (mutation) setWindowIssue(null);
       if (!vin || mutation?.kind === "check") setVin(result.data.vin ?? "");
-    } catch { if (alive.current && expected === currentBinding.current) { setData(null); setPhase("error"); } }
+    } catch { if (alive.current && expected === currentBinding.current) { setQuote(null); setPhase("error"); } }
     finally { busy.current = false; }
   }
   load.current = () => { void run(); };
@@ -65,6 +65,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
     return () => clearTimeout(timer);
   }, [orderState, phase]);
   const accepted = orderState?.order;
+  const data = accepted?.acceptedOffer ?? quote;
   const available = data?.preflight?.status === "available";
   const proposal = data?.proposal;
   const timestamp = (value: string) => new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
@@ -120,7 +121,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
           {orderState && <FulfilmentPanel key={`fulfilment:${id}:${version}:${scope}:${actorId}:${locale}`}
             {...{ locale, id, version, scope, actorId, invalidate }} state={orderState} onOrder={setOrderState} />}
           {orderState && <VinCorrectionPanel key={`correction:${id}:${version}:${scope}:${actorId}:${locale}`} {...{ locale, id, version, scope, actorId, invalidate }}
-            state={orderState} onOrder={(state) => { setOrderState(state); if (state.order) setData(state.order.acceptedOffer); }} />}
+            state={orderState} onOrder={setOrderState} />}
           <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>
             {data.preflight?.status === "available" && <><p>{t.rule}</p><dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt>{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl><p>{t.limits}</p></>}
             {proposal.format !== "pdf" && <p>{t.links}</p>}<p>{t.rights}</p><p>{t.terms}</p>
