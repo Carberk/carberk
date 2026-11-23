@@ -30,7 +30,7 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
         {!largeText && <>
         {state.agreement?.pending && <Text className="text-footnote font-semibold">{t(state.agreement.pending.review ? "vehicleHistory.correctionReviewed" : "vehicleHistory.correctionWaiting")}</Text>}
         <Text selectable className="font-mono text-footnote">{offer.vin} · {copy({ pdf: "Pdf", link: "Link", both: "Both" }[offer.proposal.format])}</Text>
-        {window && <Text className="text-footnote">{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>}
+        {window && !state.verificationResumesAt && <Text className="text-footnote">{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>}
         </>}
       </View>
       <Button variant="secondary" size="sm" disabled={!ready} onPress={onDetails}><Text>{copy("OrderStatusDetails")}</Text></Button>

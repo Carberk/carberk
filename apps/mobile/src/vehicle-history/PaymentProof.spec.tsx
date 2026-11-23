@@ -394,7 +394,9 @@ it("shows the effective payment deadline and explains verification after closing
     order: { id, acceptedAt: "2026-11-21T14:55:00.000Z", holdExpiresAt: "2026-11-21T16:55:00.000Z", deliveryDay: "2026-11-21",
       acceptedOffer: { ...quote, proposal: { ...quote.proposal, deliveryFrom: "2026-11-21T14:58:00.000Z", deliveryBy: "2026-11-21T15:00:00.000Z" } } } };
   const view = await renderMobile(<RequestScreen />);
-  await view.findByText("After-hours verification from 09:00 Ashgabat time");
+  await view.findByText("After-hours verification from 09:00 Ashgabat time. A receipt does not reserve a morning slot.");
+  expect(view.queryByText("11/21, 19:58 – 11/21, 20:00")).toBeNull();
+  expect(view.getByText(/Proposed delivery window · Ashgabat time.*19:58.*20:00/)).toBeTruthy();
   expect(view.getByText(/Payment deadline · Ashgabat time.*20:00/)).toBeTruthy();
   expect(view.getByText(/Original hold expiry · Ashgabat time.*21:55/)).toBeTruthy();
 });
