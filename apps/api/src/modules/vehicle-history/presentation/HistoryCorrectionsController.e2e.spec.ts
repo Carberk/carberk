@@ -193,7 +193,7 @@ describe("renewed VIN agreement on the existing private order", () => {
     const e = await accepted("both", undefined, undefined, true);
     await pay(e);
     const budget = { allowance: 1, resetUtc: "06:00", externalUsage: {} };
-    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: budget });
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {});
     const operator = () => f.request.get(`${e.staff}/order?expectedAssignmentVersion=1`)
       .auth(e.operator.token, { type: "bearer" }).expect(200);
     const previous = (await e.read().expect(200)).body;
@@ -247,9 +247,27 @@ describe("renewed VIN agreement on the existing private order", () => {
     await fulfil(e, command).expect(201);
   });
 
-  it("lets an operator use a qualified archive while the reserved new lookup period is closed", async () => {
+  it("does not count an earlier pre-reservation order whose window crosses the provider reset", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 2);
+    const first = await accepted("link", undefined, ["2026-11-21T05:30:00.000Z", "2026-11-21T06:30:00.000Z"],
+      true, "DEMA0000000000006");
+    const second = await accepted("both", undefined, ["2026-11-21T07:00:00.000Z", "2026-11-21T08:00:00.000Z"], true);
+    await pay(first);
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    await pay(second);
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { AutoCheck: { allowance: 1, resetUtc: "06:00", externalUsage: {} } });
+    const firstOrder = await f.request.get(`${first.staff}/order?expectedAssignmentVersion=1`).auth(first.operator.token, { type: "bearer" }).expect(200);
+    expect(firstOrder.body.fulfilmentUnavailable).toBe("capacity");
+    const before = (await second.read().expect(200)).body;
+    await second.change({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0, attemptKey: randomUUID() }).expect(201);
+    const reviewed = (await second.review(reviewInput("link")).expect(201)).body;
+    await second.change({ kind: "accept", offer: reviewed.pending.review.offer, expectedVersion: 2, attemptKey: randomUUID() }).expect(201);
+    expect((await second.read().expect(200)).body).toMatchObject({ payment: before.payment, agreement: { acceptedRevision: 3 } });
+  });
+
+  it.each([false, true])("offers a qualified archive before reset for a paid order (pre-reservation: %s)", async (legacy) => {
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { allowance: 1, resetUtc: "06:00", externalUsage: {} } });
-    const e = await accepted("pdf");
+    const e = await accepted("pdf", undefined, undefined, legacy);
     await pay(e);
     const projected = (await f.request.get(`${e.staff}/order?expectedAssignmentVersion=1`)
       .auth(e.operator.token, { type: "bearer" }).expect(200)).body.fulfilment;

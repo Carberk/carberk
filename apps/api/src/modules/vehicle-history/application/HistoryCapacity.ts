@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Env } from "../../../env.schema";
+import { fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
 import { historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider,
   type HistoryPaidProviderPriority, type HistoryProviderUsageOptions, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
@@ -65,17 +66,21 @@ export class HistoryCapacity {
   }
 
   private async findProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
-    requireOpenPeriod = false, priority?: HistoryPaidProviderPriority) {
+    requireAvailableSource = false, priority?: HistoryPaidProviderPriority) {
     const from = new Date(order.acceptedOffer.proposal.deliveryFrom), by = new Date(order.acceptedOffer.proposal.deliveryBy);
     const names = reports.providers.map(({ name }) => name);
     const preferred = order.reservedProvider;
     if (preferred && names.includes(preferred)) names.sort((a) => a === preferred ? -1 : 1);
+    let archiveProvider: HistoryProvider | undefined;
     for (const name of names) {
       const unreserved = name === preferred ? "none" : priority ?? "none";
       const budget = await this.remaining(orders, name, from, by, now, { excludeCurrent: true, unreserved });
-      if (budget && budget.slots > 0 && (!requireOpenPeriod || budget.periodStart <= now)) return name;
+      if (!budget || budget.slots < 1) continue;
+      if (!requireAvailableSource || budget.periodStart <= now) return name;
+      const accepted = fulfilmentAgreement(order, name);
+      if (accepted && fulfilmentSources(accepted).includes("archive")) archiveProvider ??= name;
     }
-    return undefined;
+    return archiveProvider;
   }
 
   async canUseFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {

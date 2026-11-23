@@ -55,7 +55,8 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
           AND (NOT $5::boolean OR "requestId" <> $6)
           AND ("activeProvider" = $1 OR ("activeProvider" IS NULL
             AND "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
-            AND ($7 = 'all' OR ($7 = 'earlier_paid' AND o."deliveryBy" > $4 AND EXISTS (
+            AND ($7 = 'all' OR ($7 = 'earlier_paid' AND o."deliveryBy" > $4
+              AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3 AND EXISTS (
               SELECT 1 FROM history_payment_checks older WHERE older."requestId" = o."requestId" AND older."bookingCommitted"
                 AND ($8::timestamptz IS NULL OR (older."confirmedAt", older."requestId") < ($8::timestamptz, $6::text))
             )))))
