@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 import { VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
 export function historyInboxScope(token: string): { actorId: string; scope: string } | null {
