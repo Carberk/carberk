@@ -42,7 +42,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
           (SELECT 1 FROM history_payment_checks p WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [day, from, by, now]);
       return rows[0] ?? { total: 0, morning: 0, overlapping: 0 };
     },
-    async providerUsage(provider, periodStart, periodEnd, now, excludeCurrent = false) {
+    async providerUsage(provider, periodStart, periodEnd, now, { excludeCurrent = false, reservedOnly = false } = {}) {
       assertActive();
       const { rows } = await client.query<{ used: number }>(`
         ${activeOrders} SELECT COALESCE(sum(1 + (
@@ -51,10 +51,10 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
         )), 0)::int AS used FROM active_orders o
         WHERE "deliveryFrom" < $3 AND "deliveryBy" > $2
           AND (NOT $5::boolean OR "requestId" <> $6)
-          AND ("activeProvider" = $1 OR ("activeProvider" IS NULL AND
+          AND ("activeProvider" = $1 OR (NOT $7::boolean AND "activeProvider" IS NULL AND
             "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))))
           AND ("holdExpiresAt" > $4 OR EXISTS (SELECT 1 FROM history_payment_checks p
-            WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [provider, periodStart, periodEnd, now, excludeCurrent, requestId]);
+            WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [provider, periodStart, periodEnd, now, excludeCurrent, requestId, reservedOnly]);
       return rows[0]?.used ?? 0;
     },
     async earlierPaidOrdersForSecondReport(provider, periodStart, periodEnd, confirmedAt, now) {

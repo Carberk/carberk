@@ -1,7 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Env } from "../../../env.schema";
-import { historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider,
+  type HistoryProviderUsageOptions, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 @Injectable()
@@ -47,26 +48,39 @@ export class HistoryCapacity {
     });
   }
 
+  async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date) {
+    if (order.reservedProvider || new Date(order.acceptedOffer.proposal.deliveryBy) <= now) return order.reservedProvider;
+    return this.findProvider(orders, order, order.acceptedOffer.preflight, now, { reservedOnly: true });
+  }
+
   async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date) {
+    if (new Date(order.acceptedOffer.proposal.deliveryBy) <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+    const provider = await this.findProvider(orders, order, reports, now, { excludeCurrent: true });
+    if (!provider) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+    return provider;
+  }
+
+  private async findProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
+    options: HistoryProviderUsageOptions) {
     const from = new Date(order.acceptedOffer.proposal.deliveryFrom), by = new Date(order.acceptedOffer.proposal.deliveryBy);
-    if (by <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
     const names = reports.providers.map(({ name }) => name);
     const preferred = order.reservedProvider;
     if (preferred && names.includes(preferred)) names.sort((a) => a === preferred ? -1 : 1);
     for (const name of names) {
-      const budget = await this.remaining(orders, name, from, by, now, true);
+      const budget = await this.remaining(orders, name, from, by, now, options);
       if (budget && budget.slots > 0) return name;
     }
-    throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+    return undefined;
   }
 
   async requireFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {
     const { deliveryFrom, deliveryBy } = order.acceptedOffer.proposal;
-    const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now);
-    if (!budget || now < budget.periodStart || budget.slots < (additional ? 1 : 0)) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+    const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now, { reservedOnly: !additional });
+    const needed = additional || order.reservedProvider !== provider ? 1 : 0;
+    if (!budget || now < budget.periodStart || budget.slots < needed) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
   }
 
-  private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date, excludeCurrent = false) {
+  private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date, options?: HistoryProviderUsageOptions) {
     const budget = this.config.get("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { infer: true })?.[provider];
     if (!budget?.allowance) return null;
     const periodStart = new Date(`${from.toISOString().slice(0, 10)}T${budget.resetUtc}:00Z`);
@@ -74,7 +88,7 @@ export class HistoryCapacity {
     const periodEnd = new Date(periodStart.getTime() + 86_400_000);
     if (by > periodEnd) return null;
     const external = budget.externalUsage[periodStart.toISOString().slice(0, 10)] ?? 0;
-    const reserved = await orders.providerUsage(provider, periodStart, periodEnd, now, excludeCurrent);
+    const reserved = await orders.providerUsage(provider, periodStart, periodEnd, now, options);
     return { slots: budget.allowance - external - reserved, periodStart, periodEnd };
   }
 }

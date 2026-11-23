@@ -3,6 +3,7 @@ import { HistoryRequestError } from "./HistoryRequestError";
 
 export type AvailableHistoryReports = Extract<NonNullable<O.HistoryOffer["preflight"]>, { status: "available" }>;
 export type HistoryProvider = AvailableHistoryReports["providers"][number]["name"];
+export type HistoryProviderUsageOptions = { excludeCurrent?: boolean; reservedOnly?: boolean };
 export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string; reservedProvider?: HistoryProvider;
   agreement?: H.HistoryCorrectionState; originalOffer?: H.HistoryAcceptedOrder["acceptedOffer"] };
 export type HistoryAgreementInput = H.HistoryCorrectionMutation | H.HistoryOperatorCorrectionMutation | { kind: "handoff"; expectedRevision: number };
@@ -18,7 +19,7 @@ export interface HistoryOrderStore {
   read(): Promise<StoredHistoryOrder | null>;
   serialize<T>(operation: () => Promise<T>): Promise<T>;
   capacity(day: string, from: Date, by: Date, now: Date): Promise<{ total: number; morning: number; overlapping: number }>;
-  providerUsage(provider: HistoryProvider, periodStart: Date, periodEnd: Date, now: Date, excludeCurrent?: boolean): Promise<number>;
+  providerUsage(provider: HistoryProvider, periodStart: Date, periodEnd: Date, now: Date, options?: HistoryProviderUsageOptions): Promise<number>;
   earlierPaidOrdersForSecondReport(provider: HistoryProvider, periodStart: Date, periodEnd: Date, confirmedAt: string, now: Date): Promise<number>;
   create(order: Omit<StoredHistoryOrder, "reservedProvider">, provider: HistoryProvider): Promise<void>;
   paymentChecks(): Promise<P.HistoryPaymentCheck[]>;

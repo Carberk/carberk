@@ -28,7 +28,8 @@ export class ReadHistoryOrder {
       state.preparation = !intent ? "queued" : intent.status === "recovery" ? "recovery"
         : intent.status === "uncertain" ? "checking" : "preparing";
       if (actor.operator) {
-        const view = await readFulfilment(orders, order, intent, senderId, confirmedAt, now);
+        const provider = order.reservedProvider ?? await orders.serialize(() => this.capacity.existingProvider(orders, order, now));
+        const view = await readFulfilment(orders, order, intent, senderId, confirmedAt, now, provider);
         if (view) state.fulfilment = view;
         const reportPlan = await this.capacity.paidReportPlan(orders, order, confirmedAt, now);
         if (reportPlan) state.reportPlan = reportPlan;

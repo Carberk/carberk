@@ -3,15 +3,15 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 import { applyFulfilmentOutcome, checkFulfilmentVersion, fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
-import { historyAgreement, type HistoryOrderStore, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { historyAgreement, type HistoryOrderStore, type HistoryProvider, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
 import { HistoryCapacity } from "./HistoryCapacity";
 
 export async function readFulfilment(orders: HistoryOrderStore, order: StoredHistoryOrder, intent: H.HistoryFulfilmentIntent | null,
-  operatorId: string, confirmedAt: string, now: Date): Promise<H.HistoryFulfilmentView | undefined> {
-  const accepted = fulfilmentAgreement(order);
+  operatorId: string, confirmedAt: string, now: Date, provider: HistoryProvider | undefined): Promise<H.HistoryFulfilmentView | undefined> {
+  const accepted = fulfilmentAgreement(order, provider);
   if (!accepted) return undefined;
   const gate = order.agreement?.pending ? "pending_correction"
     : new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "booking_closed"
@@ -38,7 +38,9 @@ export class HistoryFulfilment {
       if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       return orders.serialize(async () => {
         const now = this.clock.now();
-        const current = await readFulfilment(orders, order, await orders.fulfilment(), actorId, confirmedAt, now);
+        const provider = await this.capacity.existingProvider(orders, order, now);
+        if (!provider) throw new HistoryRequestError(new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
+        const current = await readFulfilment(orders, order, await orders.fulfilment(), actorId, confirmedAt, now, provider);
         if (!current) throw new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE");
         const replay = await orders.fulfilmentAttempt(input.attemptKey);
         if (replay) {
