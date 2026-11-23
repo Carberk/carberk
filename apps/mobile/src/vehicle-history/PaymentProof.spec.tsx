@@ -112,6 +112,19 @@ it.each([
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(sent).toEqual([]);
 });
+it.each([
+  ["en", "preparing", "Preparing your report", "Check progress here. Your payment is confirmed."],
+  ["ru", "checking", "Оператор проверяет результат", "Мы обновим статус после проверки у поставщика."],
+  ["tk", "recovery", "Işgär çözgüt gözleýär", "Indiki ädimi maslahatlaşmak üçin şu söhbetde işgäre ýazyň."],
+] as const)("renders %s %s preparation on reopen without showing a second transfer action", async (locale, preparation, title, next) => {
+  current = { ...accepted, wallet: null, status: "payment_confirmed", preparation, payment: { outcome: "matched", amountMinor: 10000,
+    receivedAt: "2026-11-21T05:00:00.000Z", confirmedAt: "2026-11-21T05:01:00.000Z", bookingCommitted: true } };
+  const view = await renderMobile(<RequestScreen />, { locale });
+  await view.findAllByText(`${title} · 100 TMT`);
+  await view.findAllByText(next);
+  expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
+  expect(sent).toEqual([]);
+});
 it("retains selection across interruption and route reopen, retrying the same attempt with no second payment", async () => {
   proofDevice.failUpload = true;
   const view = await renderMobile(<RequestScreen />);

@@ -12,10 +12,13 @@ export function PaymentStatus({ state, compact = false, summary = false }: {
   const key = state.status === "payment_confirmed" ? "Confirmed" : state.status === "payment_received_no_hold" ? "NoHold"
     : outcome === "partial" ? "Partial" : outcome === "unmatched" ? "Unmatched" : outcome === "uncertain" ? "Review"
       : outcome === "receipt_submitted" ? "Submitted" : state.status === "hold_expired" ? "Expired" : "Waiting";
-  const copy = (suffix: string) => t(`vehicleHistory.payment${key}${suffix}`);
+  const preparation = state.preparation && state.status === "payment_confirmed" && !state.agreement?.pending ? state.preparation : undefined;
+  const copy = (suffix: string) => preparation
+    ? t(`vehicleHistory.preparation_${preparation}${suffix}`)
+    : t(`vehicleHistory.payment${key}${suffix}`);
   return <View className="gap-1">
     <Text accessibilityLiveRegion="polite" className="text-callout font-semibold">{copy("")} · 100 TMT</Text>
-    {!compact && state.payment && outcome !== "receipt_submitted" && <Text className="text-footnote">{t("vehicleHistory.paymentAmount", {
+    {!compact && !preparation && state.payment && outcome !== "receipt_submitted" && <Text className="text-footnote">{t("vehicleHistory.paymentAmount", {
       amount: new Intl.NumberFormat(i18n.language === "tk" ? "en-GB" : i18n.language).format(state.payment.amountMinor / 100),
     })}</Text>}
     {!compact && <Text className="text-footnote text-muted-foreground">{summary && !outcome && state.status !== "hold_expired"

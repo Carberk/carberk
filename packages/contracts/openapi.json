@@ -9752,6 +9752,426 @@
             ],
             "additionalProperties": false
           },
+          "preparation": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "preparing",
+              "checking",
+              "recovery"
+            ]
+          },
+          "fulfilment": {
+            "type": "object",
+            "properties": {
+              "accepted": {
+                "type": "object",
+                "properties": {
+                  "acceptedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "vin": {
+                    "type": "string",
+                    "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "Carfax",
+                      "AutoCheck"
+                    ]
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "link",
+                      "both"
+                    ]
+                  },
+                  "originalReportDate": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "acceptedRevision",
+                  "vin",
+                  "provider",
+                  "format",
+                  "originalReportDate"
+                ],
+                "additionalProperties": false
+              },
+              "gate": {
+                "type": "string",
+                "enum": [
+                  "ready",
+                  "pending_correction",
+                  "booking_closed",
+                  "fifo"
+                ]
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "archive",
+                    "new_source"
+                  ]
+                }
+              },
+              "intent": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "archive",
+                          "new_source"
+                        ]
+                      },
+                      "funding": {
+                        "type": "string",
+                        "enum": [
+                          "order",
+                          "company"
+                        ]
+                      },
+                      "accepted": {
+                        "type": "object",
+                        "properties": {
+                          "acceptedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647
+                          },
+                          "vin": {
+                            "type": "string",
+                            "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "Carfax",
+                              "AutoCheck"
+                            ]
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
+                          },
+                          "originalReportDate": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date"
+                          }
+                        },
+                        "required": [
+                          "acceptedRevision",
+                          "vin",
+                          "provider",
+                          "format",
+                          "originalReportDate"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "recordedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "uncertain",
+                          "retry_ready"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "attempt",
+                      "source",
+                      "funding",
+                      "accepted",
+                      "recordedAt",
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "archive",
+                          "new_source"
+                        ]
+                      },
+                      "funding": {
+                        "type": "string",
+                        "enum": [
+                          "order",
+                          "company"
+                        ]
+                      },
+                      "accepted": {
+                        "type": "object",
+                        "properties": {
+                          "acceptedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647
+                          },
+                          "vin": {
+                            "type": "string",
+                            "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "Carfax",
+                              "AutoCheck"
+                            ]
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
+                          },
+                          "originalReportDate": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date"
+                          }
+                        },
+                        "required": [
+                          "acceptedRevision",
+                          "vin",
+                          "provider",
+                          "format",
+                          "originalReportDate"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "recordedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "obtained"
+                        ]
+                      },
+                      "report": {
+                        "type": "object",
+                        "properties": {
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
+                          },
+                          "originalReportDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "permittedUse": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "format",
+                          "originalReportDate",
+                          "permittedUse"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "attempt",
+                      "source",
+                      "funding",
+                      "accepted",
+                      "recordedAt",
+                      "status",
+                      "report"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "archive",
+                          "new_source"
+                        ]
+                      },
+                      "funding": {
+                        "type": "string",
+                        "enum": [
+                          "order",
+                          "company"
+                        ]
+                      },
+                      "accepted": {
+                        "type": "object",
+                        "properties": {
+                          "acceptedRevision": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 2147483647
+                          },
+                          "vin": {
+                            "type": "string",
+                            "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "Carfax",
+                              "AutoCheck"
+                            ]
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
+                          },
+                          "originalReportDate": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date"
+                          }
+                        },
+                        "required": [
+                          "acceptedRevision",
+                          "vin",
+                          "provider",
+                          "format",
+                          "originalReportDate"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "recordedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "recovery"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "no_history",
+                          "format_unavailable",
+                          "rights_unavailable",
+                          "original_date_mismatch",
+                          "company_error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "attempt",
+                      "source",
+                      "funding",
+                      "accepted",
+                      "recordedAt",
+                      "status",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "nullable": true
+                  }
+                ]
+              }
+            },
+            "required": [
+              "accepted",
+              "gate",
+              "sources",
+              "intent"
+            ],
+            "additionalProperties": false
+          },
           "serverNow": {
             "type": "string",
             "format": "date-time"
@@ -14448,6 +14868,833 @@
         }
       }
     },
+    "/api/v1/vehicle-history/operator/requests/{id}/fulfilment": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Record or reconcile manual synthetic fulfilment for the exact accepted order",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "acceptedRevision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "vin": {
+                        "type": "string",
+                        "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "Carfax",
+                          "AutoCheck"
+                        ]
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "pdf",
+                          "link",
+                          "both"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "start"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "archive",
+                          "new_source"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedAssignmentVersion",
+                      "expectedVersion",
+                      "attemptKey",
+                      "acceptedRevision",
+                      "vin",
+                      "provider",
+                      "format",
+                      "kind",
+                      "source"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "record"
+                        ]
+                      },
+                      "outcome": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "obtained"
+                                ]
+                              },
+                              "format": {
+                                "type": "string",
+                                "enum": [
+                                  "pdf",
+                                  "link",
+                                  "both"
+                                ]
+                              },
+                              "originalReportDate": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "permittedUse": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "format",
+                              "originalReportDate",
+                              "permittedUse"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "no_history",
+                                  "format_unavailable",
+                                  "company_error"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "uncertain"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedAssignmentVersion",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind",
+                      "outcome"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "reconcile"
+                        ]
+                      },
+                      "outcome": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "obtained"
+                                ]
+                              },
+                              "format": {
+                                "type": "string",
+                                "enum": [
+                                  "pdf",
+                                  "link",
+                                  "both"
+                                ]
+                              },
+                              "originalReportDate": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "permittedUse": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "format",
+                              "originalReportDate",
+                              "permittedUse"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "no_history",
+                                  "format_unavailable",
+                                  "company_error"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "not_started"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedAssignmentVersion",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind",
+                      "outcome"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "retry"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedAssignmentVersion",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "company_correction"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedAssignmentVersion",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Current private intent and outcome; no provider or wallet call",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "object",
+                      "properties": {
+                        "acceptedRevision": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "vin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "originalReportDate": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date"
+                        }
+                      },
+                      "required": [
+                        "acceptedRevision",
+                        "vin",
+                        "provider",
+                        "format",
+                        "originalReportDate"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "gate": {
+                      "type": "string",
+                      "enum": [
+                        "ready",
+                        "pending_correction",
+                        "booking_closed",
+                        "fifo"
+                      ]
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "archive",
+                          "new_source"
+                        ]
+                      }
+                    },
+                    "intent": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "archive",
+                                "new_source"
+                              ]
+                            },
+                            "funding": {
+                              "type": "string",
+                              "enum": [
+                                "order",
+                                "company"
+                              ]
+                            },
+                            "accepted": {
+                              "type": "object",
+                              "properties": {
+                                "acceptedRevision": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "vin": {
+                                  "type": "string",
+                                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Carfax",
+                                    "AutoCheck"
+                                  ]
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "format": "date"
+                                }
+                              },
+                              "required": [
+                                "acceptedRevision",
+                                "vin",
+                                "provider",
+                                "format",
+                                "originalReportDate"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "recordedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending",
+                                "uncertain",
+                                "retry_ready"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "version",
+                            "attempt",
+                            "source",
+                            "funding",
+                            "accepted",
+                            "recordedAt",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "archive",
+                                "new_source"
+                              ]
+                            },
+                            "funding": {
+                              "type": "string",
+                              "enum": [
+                                "order",
+                                "company"
+                              ]
+                            },
+                            "accepted": {
+                              "type": "object",
+                              "properties": {
+                                "acceptedRevision": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "vin": {
+                                  "type": "string",
+                                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Carfax",
+                                    "AutoCheck"
+                                  ]
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "format": "date"
+                                }
+                              },
+                              "required": [
+                                "acceptedRevision",
+                                "vin",
+                                "provider",
+                                "format",
+                                "originalReportDate"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "recordedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "obtained"
+                              ]
+                            },
+                            "report": {
+                              "type": "object",
+                              "properties": {
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "format": "date"
+                                },
+                                "permittedUse": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "format",
+                                "originalReportDate",
+                                "permittedUse"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "version",
+                            "attempt",
+                            "source",
+                            "funding",
+                            "accepted",
+                            "recordedAt",
+                            "status",
+                            "report"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "archive",
+                                "new_source"
+                              ]
+                            },
+                            "funding": {
+                              "type": "string",
+                              "enum": [
+                                "order",
+                                "company"
+                              ]
+                            },
+                            "accepted": {
+                              "type": "object",
+                              "properties": {
+                                "acceptedRevision": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "vin": {
+                                  "type": "string",
+                                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Carfax",
+                                    "AutoCheck"
+                                  ]
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "format": "date"
+                                }
+                              },
+                              "required": [
+                                "acceptedRevision",
+                                "vin",
+                                "provider",
+                                "format",
+                                "originalReportDate"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "recordedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "recovery"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "no_history",
+                                "format_unavailable",
+                                "rights_unavailable",
+                                "original_date_mismatch",
+                                "company_error"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "version",
+                            "attempt",
+                            "source",
+                            "funding",
+                            "accepted",
+                            "recordedAt",
+                            "status",
+                            "reason"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "accepted",
+                    "gate",
+                    "sources",
+                    "intent"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid action"
+          },
+          "403": {
+            "description": "Current session, assignment and purpose required"
+          },
+          "409": {
+            "description": "Action refused by current agreement, payment, queue or intent state"
+          },
+          "503": {
+            "description": "Read the current order before retrying the exact action"
+          }
+        }
+      }
+    },
     "/api/v1/vehicle-history/operator/requests/{id}/payment-verification": {
       "get": {
         "tags": [
@@ -15524,6 +16771,426 @@
                       ],
                       "additionalProperties": false
                     },
+                    "preparation": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "preparing",
+                        "checking",
+                        "recovery"
+                      ]
+                    },
+                    "fulfilment": {
+                      "type": "object",
+                      "properties": {
+                        "accepted": {
+                          "type": "object",
+                          "properties": {
+                            "acceptedRevision": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "vin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "Carfax",
+                                "AutoCheck"
+                              ]
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
+                            },
+                            "originalReportDate": {
+                              "type": "string",
+                              "nullable": true,
+                              "format": "date"
+                            }
+                          },
+                          "required": [
+                            "acceptedRevision",
+                            "vin",
+                            "provider",
+                            "format",
+                            "originalReportDate"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "gate": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "pending_correction",
+                            "booking_closed",
+                            "fifo"
+                          ]
+                        },
+                        "sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "archive",
+                              "new_source"
+                            ]
+                          }
+                        },
+                        "intent": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "uncertain",
+                                    "retry_ready"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "obtained"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "format",
+                                    "originalReportDate",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status",
+                                "report"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "recovery"
+                                  ]
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "no_history",
+                                    "format_unavailable",
+                                    "rights_unavailable",
+                                    "original_date_mismatch",
+                                    "company_error"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status",
+                                "reason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "accepted",
+                        "gate",
+                        "sources",
+                        "intent"
+                      ],
+                      "additionalProperties": false
+                    },
                     "serverNow": {
                       "type": "string",
                       "format": "date-time"
@@ -16335,6 +18002,426 @@
                       ],
                       "additionalProperties": false
                     },
+                    "preparation": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "preparing",
+                        "checking",
+                        "recovery"
+                      ]
+                    },
+                    "fulfilment": {
+                      "type": "object",
+                      "properties": {
+                        "accepted": {
+                          "type": "object",
+                          "properties": {
+                            "acceptedRevision": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "vin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "Carfax",
+                                "AutoCheck"
+                              ]
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
+                            },
+                            "originalReportDate": {
+                              "type": "string",
+                              "nullable": true,
+                              "format": "date"
+                            }
+                          },
+                          "required": [
+                            "acceptedRevision",
+                            "vin",
+                            "provider",
+                            "format",
+                            "originalReportDate"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "gate": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "pending_correction",
+                            "booking_closed",
+                            "fifo"
+                          ]
+                        },
+                        "sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "archive",
+                              "new_source"
+                            ]
+                          }
+                        },
+                        "intent": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "uncertain",
+                                    "retry_ready"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "obtained"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "format",
+                                    "originalReportDate",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status",
+                                "report"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "recovery"
+                                  ]
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "no_history",
+                                    "format_unavailable",
+                                    "rights_unavailable",
+                                    "original_date_mismatch",
+                                    "company_error"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status",
+                                "reason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "accepted",
+                        "gate",
+                        "sources",
+                        "intent"
+                      ],
+                      "additionalProperties": false
+                    },
                     "serverNow": {
                       "type": "string",
                       "format": "date-time"
@@ -17020,6 +19107,426 @@
                       "required": [
                         "primary",
                         "second"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "preparation": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "preparing",
+                        "checking",
+                        "recovery"
+                      ]
+                    },
+                    "fulfilment": {
+                      "type": "object",
+                      "properties": {
+                        "accepted": {
+                          "type": "object",
+                          "properties": {
+                            "acceptedRevision": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 2147483647
+                            },
+                            "vin": {
+                              "type": "string",
+                              "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "Carfax",
+                                "AutoCheck"
+                              ]
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
+                            },
+                            "originalReportDate": {
+                              "type": "string",
+                              "nullable": true,
+                              "format": "date"
+                            }
+                          },
+                          "required": [
+                            "acceptedRevision",
+                            "vin",
+                            "provider",
+                            "format",
+                            "originalReportDate"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "gate": {
+                          "type": "string",
+                          "enum": [
+                            "ready",
+                            "pending_correction",
+                            "booking_closed",
+                            "fifo"
+                          ]
+                        },
+                        "sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "archive",
+                              "new_source"
+                            ]
+                          }
+                        },
+                        "intent": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "uncertain",
+                                    "retry_ready"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "obtained"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "format",
+                                    "originalReportDate",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status",
+                                "report"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "attempt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 2147483647
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "funding": {
+                                  "type": "string",
+                                  "enum": [
+                                    "order",
+                                    "company"
+                                  ]
+                                },
+                                "accepted": {
+                                  "type": "object",
+                                  "properties": {
+                                    "acceptedRevision": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 2147483647
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "format": "date"
+                                    }
+                                  },
+                                  "required": [
+                                    "acceptedRevision",
+                                    "vin",
+                                    "provider",
+                                    "format",
+                                    "originalReportDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "recordedAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "recovery"
+                                  ]
+                                },
+                                "reason": {
+                                  "type": "string",
+                                  "enum": [
+                                    "no_history",
+                                    "format_unavailable",
+                                    "rights_unavailable",
+                                    "original_date_mismatch",
+                                    "company_error"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "version",
+                                "attempt",
+                                "source",
+                                "funding",
+                                "accepted",
+                                "recordedAt",
+                                "status",
+                                "reason"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "accepted",
+                        "gate",
+                        "sources",
+                        "intent"
                       ],
                       "additionalProperties": false
                     },

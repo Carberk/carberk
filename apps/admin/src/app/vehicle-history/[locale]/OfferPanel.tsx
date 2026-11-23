@@ -5,6 +5,7 @@ import { Button } from "@auto-tm/ui/components";
 
 import { PaymentProofPanel } from "./PaymentProofPanel";
 import { PaymentVerificationPanel } from "./PaymentVerificationPanel";
+import { FulfilmentPanel } from "./FulfilmentPanel";
 import { VinCorrectionPanel } from "./VinCorrectionPanel";
 import { historyOfferAction } from "./offer-actions";
 import type { HistoryInboxResult } from "./actions";
@@ -116,6 +117,8 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
           {orderState?.wallet && phase === "ready" && <p className="break-all font-mono">{orderState.wallet}</p>}
           <PaymentProofPanel key={`${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} />
           <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} onOrder={setOrderState} />
+          {orderState && <FulfilmentPanel key={`fulfilment:${id}:${version}:${scope}:${actorId}:${locale}`}
+            {...{ locale, id, version, scope, actorId, invalidate }} state={orderState} onOrder={setOrderState} />}
           {orderState && <VinCorrectionPanel key={`correction:${id}:${version}:${scope}:${actorId}:${locale}`} {...{ locale, id, version, scope, actorId, invalidate }}
             state={orderState} onOrder={(state) => { setOrderState(state); if (state.order) setData(state.order.acceptedOffer); }} />}
           <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>

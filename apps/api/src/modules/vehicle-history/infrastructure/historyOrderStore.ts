@@ -45,7 +45,10 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
     async providerUsage(provider, periodStart, periodEnd, now, excludeCurrent = false) {
       assertActive();
       const { rows } = await client.query<{ used: number }>(`
-        ${activeOrders} SELECT count(*)::int AS used FROM active_orders o
+        ${activeOrders} SELECT COALESCE(sum(1 + (
+          SELECT count(*) FROM history_fulfilment_events f WHERE f."requestId" = o."requestId"
+            AND f.input->>'kind' = 'company_correction' AND f.state->>'source' = 'new_source'
+        )), 0)::int AS used FROM active_orders o
         WHERE "deliveryFrom" < $3 AND "deliveryBy" > $2
           AND (NOT $5::boolean OR "requestId" <> $6)
           AND ("activeProvider" = $1 OR ("activeProvider" IS NULL AND
@@ -105,6 +108,42 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)`, [requestId, state.version,
         "attemptKey" in write.input ? write.input.attemptKey : null, JSON.stringify(write.input), JSON.stringify(state),
         write.provider, write.actorId, write.assignmentVersion, write.recordedAt]);
+    },
+    async fulfilment() {
+      assertActive();
+      const { rows } = await client.query<{ state: unknown }>(
+        'SELECT state FROM history_fulfilment_events WHERE "requestId" = $1 ORDER BY version DESC LIMIT 1', [requestId]);
+      return rows[0] ? H.HistoryFulfilmentIntentSchema.parse(rows[0].state) : null;
+    },
+    async fulfilmentAttempt(key) {
+      assertActive();
+      const { rows } = await client.query<{ input: unknown }>(
+        'SELECT input FROM history_fulfilment_events WHERE "requestId" = $1 AND "attemptKey" = $2', [requestId, key]);
+      return rows[0] ? H.HistoryFulfilmentMutationSchema.parse(rows[0].input) : null;
+    },
+    async hasEarlierPaidWork(operatorId, confirmedAt, now) {
+      assertActive();
+      const { rows } = await client.query<{ earlier: boolean }>(`
+        SELECT EXISTS (
+          SELECT 1 FROM history_payment_checks p
+          JOIN vehicle_history_requests r ON r.id = p."requestId"
+          JOIN vehicle_history_orders o ON o."requestId" = p."requestId"
+          LEFT JOIN LATERAL (
+            SELECT state FROM history_fulfilment_events WHERE "requestId" = p."requestId" ORDER BY version DESC LIMIT 1
+          ) f ON TRUE
+          WHERE p."bookingCommitted" AND o."deliveryBy" > $4
+            AND r."assignedOperatorId" = $1 AND (p."confirmedAt", p."requestId") < ($2::timestamptz, $3::text)
+            AND COALESCE(f.state->>'status', '') NOT IN ('obtained', 'recovery')
+        ) AS earlier`, [operatorId, confirmedAt, requestId, now]);
+      return rows[0]?.earlier ?? false;
+    },
+    async saveFulfilment({ input, state, actorId, assignmentVersion }) {
+      assertActive();
+      await client.query(`INSERT INTO history_fulfilment_events
+        ("requestId", version, "attemptKey", input, state, "actorId", "assignmentVersion", "recordedAt")
+        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)`,
+      [requestId, state.version, input.attemptKey, JSON.stringify(input), JSON.stringify(H.HistoryFulfilmentIntentSchema.parse(state)),
+        actorId, assignmentVersion, state.recordedAt]);
     },
   };
 }

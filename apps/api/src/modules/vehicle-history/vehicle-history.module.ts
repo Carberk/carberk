@@ -1,6 +1,6 @@
 import { HistoryPayments } from "./application/HistoryPayments";
 import { HistoryCorrections } from "./application/HistoryCorrections";
-import { HistoryFulfilmentGate } from "./application/HistoryFulfilmentGate";
+import { HistoryFulfilment } from "./application/HistoryFulfilment";
 import { HistoryCorrectionsController } from "./presentation/HistoryCorrectionsController";
 import { HistoryPaymentsController } from "./presentation/HistoryPaymentsController";
 import { HistoryPaymentProofsController } from "./presentation/HistoryPaymentProofsController";
@@ -63,7 +63,7 @@ import { HandoverHistoryRequest } from "./application/HandoverHistoryRequest";
 import { GetOperatorHistoryRequest } from "./application/GetOperatorHistoryRequest";
 import { HISTORY_CLOCK, HistoryWaiting, type HistoryClock } from "./domain/HistoryWaiting";
 import { ChangeHistoryWaiting } from "./application/ChangeHistoryWaiting";
-import { HISTORY_WAITING_LIFECYCLE, HISTORY_FULFILMENT_AUTHORITY } from "./vehicle-history.public";
+import { HISTORY_WAITING_LIFECYCLE } from "./vehicle-history.public";
 import { SyncHistoryWaiting } from "./application/SyncHistoryWaiting";
 import { ReadHistoryReminder } from "./application/ReadHistoryReminder";
 import { StopHistoryReminders } from "./application/StopHistoryReminders";
@@ -79,9 +79,9 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
 
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
-  exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK, HISTORY_FULFILMENT_AUTHORITY],
+  exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
   controllers: [HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
-  providers: [HistoryCorrections, HistoryFulfilmentGate, { provide: HISTORY_FULFILMENT_AUTHORITY, useExisting: HistoryFulfilmentGate }, HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
+  providers: [HistoryCorrections, HistoryFulfilment, HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
     { provide: HISTORY_PRIVATE_FILES, useClass: PrismaHistoryPrivateFiles },
     { provide: HISTORY_PRIVATE_STORAGE, useClass: MinioHistoryPrivateStorage }, AcceptHistoryQuote, HistoryCapacity, ReadHistoryOrder, HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
     AddHistoryPrivateNote, ReadHistoryPrivateNotes, HistoryPrivateNoteProjection,
@@ -107,7 +107,7 @@ export class VehicleHistoryModule implements NestModule {
       const reminder = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/reminder(?:\/stop)?$/.test(route.url);
       const offer = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/offer$/.test(route.url);
       const payment = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/payment-verification$/.test(route.url);
-      const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction)$/.test(route.url);
+      const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment)$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
       if (!payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.

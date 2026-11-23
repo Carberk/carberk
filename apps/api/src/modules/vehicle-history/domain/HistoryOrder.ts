@@ -10,6 +10,10 @@ export interface HistoryAgreementWrite {
   input: HistoryAgreementInput; state: H.HistoryCorrectionState; provider: HistoryProvider;
   actorId: string; assignmentVersion: number; recordedAt: string;
 }
+export interface HistoryFulfilmentWrite {
+  input: H.HistoryFulfilmentMutation; state: H.HistoryFulfilmentIntent; actorId: string; assignmentVersion: number;
+}
+
 export interface HistoryOrderStore {
   read(): Promise<StoredHistoryOrder | null>;
   serialize<T>(operation: () => Promise<T>): Promise<T>;
@@ -22,6 +26,10 @@ export interface HistoryOrderStore {
   submittedProofIds(): Promise<string[]>;
   agreementAttempt(key: string): Promise<HistoryAgreementInput | null>;
   saveAgreement(write: HistoryAgreementWrite): Promise<void>;
+  fulfilment(): Promise<H.HistoryFulfilmentIntent | null>;
+  fulfilmentAttempt(key: string): Promise<H.HistoryFulfilmentMutation | null>;
+  hasEarlierPaidWork(operatorId: string, confirmedAt: string, now: Date): Promise<boolean>;
+  saveFulfilment(write: HistoryFulfilmentWrite): Promise<void>;
 }
 
 export function historyAgreement(order: StoredHistoryOrder): H.HistoryCorrectionState {
