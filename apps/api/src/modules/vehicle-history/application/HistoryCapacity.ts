@@ -42,7 +42,7 @@ export class HistoryCapacity {
     return orders.serialize(async () => {
       const budget = await this.remaining(orders, alternate, from, by, now);
       if (!budget || budget.slots < 1) return { primary, second: null };
-      const earlier = await orders.earlierPaidOrdersForSecondReport(alternate, budget.periodStart, budget.periodEnd, confirmedAt);
+      const earlier = await orders.earlierPaidOrdersForSecondReport(alternate, budget.periodStart, budget.periodEnd, confirmedAt, now);
       return { primary, second: budget.slots > earlier ? alternate : null };
     });
   }

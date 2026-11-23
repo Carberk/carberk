@@ -22,7 +22,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   const [revision, setRevision] = useState(0);
   const [readerRevision, setReaderRevision] = useState(0);
   const queueGeneration = useRef(0);
-  const queueUrl = new URLSearchParams([...url].filter(([name]) => ["filter", "queue", "search", "cursor", "selected", "v"].includes(name))).toString();
+  const queueUrl = new URLSearchParams([...url].filter(([name]) => ["filter", "queue", "search", "cursor"].includes(name))).toString();
   const key = `${locale}?${queueUrl}`;
   const [queue, setQueue] = useState<{ key: string; source: HistoryInboxResult | undefined; result: HistoryInboxResult } | null>(
     initial ? { key, source: initial, result: initial } : null,
@@ -51,7 +51,7 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
     setReaderRevision((value) => value + 1);
   }
   useEffect(() => {
-    const back = () => { openedHere.current = false; setLocalUrl(window.location.search.slice(1)); setRevision((value) => value + 1); };
+    const back = () => { openedHere.current = false; setLocalUrl(window.location.search.slice(1)); };
     const revalidate = () => {
       setOffline(!navigator.onLine);
       if (navigator.onLine && document.visibilityState !== "hidden") setRevision((value) => value + 1);
@@ -151,7 +151,13 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
             row={selectedRow} scope={admitted.scope} actor={admitted.actor}
             listingOpen={url.get("source") === "listing"} listing={listing} returnQuery={raw}
             refresh={refresh} invalidate={(result) => { queueGeneration.current++; setQueue({ key, source: initial, result }); }}
-            claimed={(assignmentVersion) => navigate({ selected: id.data, v: String(assignmentVersion) }, true)}
+            claimed={(assignmentVersion) => {
+              setQueue((previous) => previous?.key === key && previous.source === initial && previous.result.status === "ok" && previous.result.kind === "queue"
+                ? { ...previous, result: { ...previous.result, data: { ...previous.result.data, items: previous.result.data.items.filter((row) => row.id !== id.data) } } }
+                : previous);
+              navigate({ selected: id.data, v: String(assignmentVersion) }, true);
+              setRevision((value) => value + 1);
+            }}
             handedOver={(name) => { refresh(true); setHandoverNotice(t.handoverComplete.replace("{name}", name)); }} />
             : <p className="p-6 text-sm text-muted-foreground lg:col-span-1 xl:col-span-2">{t.select}</p>}
         </div>}

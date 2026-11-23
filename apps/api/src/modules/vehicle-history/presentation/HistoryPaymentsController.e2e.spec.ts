@@ -70,8 +70,8 @@ describe("independent manual wallet verification over HTTP/Postgres", () => {
       Carfax: { allowance: 4, resetUtc: "00:00", externalUsage: {} },
       AutoCheck: { allowance: 1, resetUtc: "00:00", externalUsage: {} },
     });
-    const newerPayment = await accepted();
-    const olderPayment = await accepted({ deliveryFrom: "2026-11-21T07:00:00.000Z", deliveryBy: "2026-11-21T08:00:00.000Z" });
+    const newerPayment = await accepted({ deliveryFrom: "2026-11-21T07:00:00.000Z", deliveryBy: "2026-11-21T08:00:00.000Z" });
+    const olderPayment = await accepted();
     await olderPayment.verify().expect(201);
     now = new Date("2026-11-21T05:10:00.000Z");
     await newerPayment.verify().expect(201);
@@ -80,6 +80,9 @@ describe("independent manual wallet verification over HTTP/Postgres", () => {
     expect(await plan(olderPayment)).toEqual({ primary: "Carfax", second: "AutoCheck" });
     expect(await plan(newerPayment)).toEqual({ primary: "Carfax", second: null });
     expect((await olderPayment.read().expect(200)).body).not.toHaveProperty("reportPlan");
+    now = new Date("2026-11-21T07:00:00.000Z");
+    expect(await plan(olderPayment)).toEqual({ primary: "Carfax", second: null });
+    expect(await plan(newerPayment)).toEqual({ primary: "Carfax", second: "AutoCheck" });
   });
   it("records one independent check, confirms full funds once and preserves the accepted snapshot", async () => {
     const e = await accepted();

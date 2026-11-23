@@ -9,7 +9,7 @@ export interface HistoryOrderStore {
   serialize<T>(operation: () => Promise<T>): Promise<T>;
   capacity(day: string, from: Date, by: Date, now: Date): Promise<{ total: number; morning: number; overlapping: number }>;
   providerUsage(provider: HistoryProvider, periodStart: Date, periodEnd: Date, now: Date): Promise<number>;
-  earlierPaidOrdersForSecondReport(provider: HistoryProvider, periodStart: Date, periodEnd: Date, confirmedAt: string): Promise<number>;
+  earlierPaidOrdersForSecondReport(provider: HistoryProvider, periodStart: Date, periodEnd: Date, confirmedAt: string, now: Date): Promise<number>;
   create(order: Omit<StoredHistoryOrder, "reservedProvider">, provider: HistoryProvider): Promise<void>;
   paymentChecks(): Promise<P.HistoryPaymentCheck[]>;
   savePaymentCheck(check: P.HistoryPaymentCheck): Promise<void>;

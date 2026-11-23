@@ -39,14 +39,14 @@ export function historyOrderStore(client: PoolClient, requestId: string, assertA
             WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`, [provider, periodStart, periodEnd, now]);
       return rows[0]?.used ?? 0;
     },
-    async earlierPaidOrdersForSecondReport(provider, periodStart, periodEnd, confirmedAt) {
+    async earlierPaidOrdersForSecondReport(provider, periodStart, periodEnd, confirmedAt, now) {
       assertActive();
       const { rows } = await client.query<{ earlier: number }>(`
         SELECT count(*)::int AS earlier FROM vehicle_history_orders o
         JOIN history_payment_checks p ON p."requestId" = o."requestId" AND p."bookingCommitted"
-        WHERE o."reservedProvider" <> $1 AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3
+        WHERE o."reservedProvider" <> $1 AND o."deliveryFrom" >= $2 AND o."deliveryBy" <= $3 AND o."deliveryBy" > $6
           AND o.snapshot->'acceptedOffer'->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
-          AND (p."confirmedAt", o."requestId") < ($4::timestamptz, $5::text)`, [provider, periodStart, periodEnd, confirmedAt, requestId]);
+          AND (p."confirmedAt", o."requestId") < ($4::timestamptz, $5::text)`, [provider, periodStart, periodEnd, confirmedAt, requestId, now]);
       return rows[0]?.earlier ?? 0;
     },
     async create(stored, provider) {

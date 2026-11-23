@@ -437,6 +437,29 @@ it("links the paid count to the paid queue and retains the active search", async
   mounted.rerender(view());
   expect(screen.getByRole("link", { name: "RU" }).getAttribute("href")).toContain("queue=paid");
 });
+
+it("keeps the queue mounted while selecting an enquiry and then a paid order", async () => {
+  const paidId = "12150000-0000-4000-8000-000000000004";
+  window.history.replaceState(null, "", "?filter=mine");
+  assigned = true;
+  const queues: string[] = [];
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests", ({ request }) => {
+    const mode = new URL(request.url).searchParams.get("queue") ?? "enquiry";
+    queues.push(mode);
+    const selected = { ...row, mine: true, assignmentVersion: 1, assignedOperator: actor };
+    return Response.json({ items: [mode === "paid" ? { ...selected, id: paidId, status: "paid",
+      requester: { ...row.requester, displayName: "Paid customer" } } : selected], nextCursor: null,
+      queueCounts: { unassigned: 0, mine: 1, paid: 1 } });
+  }), http.get(`http://api.test/api/v1/vehicle-history/operator/requests/${paidId}`, () => Response.json({ ...detail(), id: paidId })));
+  render(view());
+  fireEvent.click(await screen.findByRole("link", { name: /Merdan/ }));
+  await screen.findByText("Can you check this car?");
+  fireEvent.click(screen.getByRole("button", { name: "Paid orders 1" }));
+  fireEvent.click(await screen.findByRole("link", { name: /Paid customer/ }));
+  await screen.findByText("Can you check this car?");
+  expect(queues).toEqual(["enquiry", "paid"]);
+});
+
 it("retains the transcript when offline and reconciles after reconnect", async () => {
   assigned = true; window.history.replaceState(null, "", `?selected=${id}&v=1`);
   render(view()); await screen.findByText("Can you check this car?");

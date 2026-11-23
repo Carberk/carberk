@@ -102,7 +102,7 @@ it.each(["actor", "session"])("rejects an old %s scope with fixed request cookie
     sid: changed === "session" ? other : session })).toString("base64url")}.synthetic`;
   if (changed === "actor") { deskActor = { ...actor, id: other }; requestBody = { ...selected, assignedOperator: deskActor }; }
   expect(await historyListingAction("en", input)).toMatchObject({ status: "stale" });
-  expect(seen.map((entry) => entry.path)).toEqual(["/api/v1/vehicle-history/desk"]);
+  expect(seen).toEqual([]);
 });
 
 it.each([401, 403, 409, 503])("refuses current assignment/purpose/session HTTP %s before Listing access", async (code) => {
@@ -211,12 +211,11 @@ it("reads only the currently assigned source through anonymous public HTTP", asy
 it.each((["cover", "play"] as const).flatMap((kind) =>
   ["before", "finally", "catch"].map((stage) => [kind, stage] as const),
 ))("keeps History refusal hard around viewer %s failure at %s", async (kind, stage) => {
-  let mediaReached = false, selectedReads = 0;
+  let mediaReached = false, rechecksAfterMedia = 0;
   responseStatus = (path) => {
     if (path.startsWith(mediaPath)) { mediaReached = true; return 404; }
     if (path.includes("/vehicle-history/operator/requests/")) {
-      selectedReads += 1;
-      if (stage === "before" || (mediaReached && selectedReads >= (stage === "finally" ? 3 : 5))) return 404;
+      if (stage === "before" || (mediaReached && ++rechecksAfterMedia >= (stage === "finally" ? 1 : 2))) return 404;
     }
     return 200;
   };
