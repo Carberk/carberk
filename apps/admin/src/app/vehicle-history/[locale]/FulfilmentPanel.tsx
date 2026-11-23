@@ -35,6 +35,7 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
   if (state.status !== "payment_confirmed") return null;
   const view = state.fulfilment;
   const intent = view?.intent;
+  const selectedSource = source && view?.sources.includes(source) ? source : "";
   const command = () => ({ orderId: id, expectedAssignmentVersion: version, expectedVersion: intent?.version ?? 0, attemptKey: crypto.randomUUID() });
 
   async function run(mutation?: Mutation) {
@@ -77,12 +78,12 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
       {view.gate !== "ready" && (!intent || intent.status === "retry_ready" || canCorrect) && <p role="status">{t[view.gate]}</p>}
       {phase === "ready" && <>
         {!intent && view.gate === "ready" && <>
-          <label className="block">{t.source}<select data-fulfilment-next className={control} value={source} onChange={(e) => setSource(e.target.value as typeof source)}>
+          <label className="block">{t.source}<select data-fulfilment-next className={control} value={selectedSource} onChange={(e) => setSource(e.target.value as typeof source)}>
             <option value="">{t.chooseSource}</option>{view.sources.map((value) => <option key={value} value={value}>{t[value]}</option>)}
           </select></label>
-          <Button type="button" className={action} disabled={!source} onClick={() => {
+          <Button type="button" className={action} disabled={!selectedSource} onClick={() => {
             const { acceptedRevision, vin, provider, format } = view.accepted;
-            if (source) void run({ ...command(), kind: "start", source, acceptedRevision, vin, provider, format });
+            if (selectedSource) void run({ ...command(), kind: "start", source: selectedSource, acceptedRevision, vin, provider, format });
           }}>{t.start}</Button>
         </>}
         {(intent?.status === "pending" || reconcile) && <OutcomeForm key={intent.version} locale={locale} reconcile={reconcile} newLookup={intent.source === "new_source"}

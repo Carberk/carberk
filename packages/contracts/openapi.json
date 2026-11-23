@@ -9812,7 +9812,8 @@
                   "ready",
                   "pending_correction",
                   "booking_closed",
-                  "fifo"
+                  "fifo",
+                  "capacity"
                 ]
               },
               "sources": {
@@ -15324,7 +15325,8 @@
                         "ready",
                         "pending_correction",
                         "booking_closed",
-                        "fifo"
+                        "fifo",
+                        "capacity"
                       ]
                     },
                     "sources": {
@@ -16838,7 +16840,8 @@
                             "ready",
                             "pending_correction",
                             "booking_closed",
-                            "fifo"
+                            "fifo",
+                            "capacity"
                           ]
                         },
                         "sources": {
@@ -18076,7 +18079,8 @@
                             "ready",
                             "pending_correction",
                             "booking_closed",
-                            "fifo"
+                            "fifo",
+                            "capacity"
                           ]
                         },
                         "sources": {
@@ -19191,7 +19195,8 @@
                             "ready",
                             "pending_correction",
                             "booking_closed",
-                            "fifo"
+                            "fifo",
+                            "capacity"
                           ]
                         },
                         "sources": {

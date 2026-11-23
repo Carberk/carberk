@@ -52,11 +52,8 @@ export class HistoryCorrections {
         } else {
           const review = previous.pending?.review;
           if (!review || !isDeepStrictEqual(review.offer, input.offer)) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
-          if (!provider) {
-            const confirmedAt = (await orders.paymentChecks()).find((check) => check.bookingCommitted)?.confirmedAt;
-            if (confirmedAt && await orders.hasEarlierPaidWork(confirmedAt, now)) throw new HistoryRequestError("HISTORY_FULFILMENT_FIFO");
-          }
-          provider = await this.capacity.correctionProvider(orders, order, input.offer.preflight, now);
+          const confirmedBefore = (await orders.paymentChecks()).find((check) => check.bookingCommitted)?.confirmedAt ?? null;
+          provider = await this.capacity.correctionProvider(orders, order, input.offer.preflight, now, { confirmedBefore });
           state = { ...state, pending: null, acceptedRevision: version,
             accepted: [...previous.accepted, { revision: version, offer: input.offer, acceptedAt: at, cause: review.cause }] };
         }

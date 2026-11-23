@@ -29,7 +29,7 @@ export class ReadHistoryOrder {
         : intent.status === "uncertain" ? "checking" : "preparing";
       if (actor.operator) {
         const provider = order.reservedProvider ?? await orders.serialize(() => this.capacity.existingProvider(orders, order, now));
-        const view = await readFulfilment(orders, order, intent, confirmedAt, now, provider);
+        const view = await readFulfilment(orders, order, intent, confirmedAt, now, provider, this.capacity);
         if (view) state.fulfilment = view;
         if (!provider) state.fulfilmentUnavailable = new Date(order.acceptedOffer.proposal.deliveryBy) <= now ? "booking_closed" : "capacity";
         const reportPlan = await this.capacity.paidReportPlan(orders, order, confirmedAt, now);

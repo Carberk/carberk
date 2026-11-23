@@ -82,7 +82,7 @@ export const HistoryFulfilmentIntentSchema = z.discriminatedUnion("status", [
 ]);
 export type HistoryFulfilmentIntent = z.infer<typeof HistoryFulfilmentIntentSchema>;
 export const HistoryFulfilmentViewSchema = z.object({
-  accepted: FulfilmentAgreement, gate: z.enum(["ready", "pending_correction", "booking_closed", "fifo"]),
+  accepted: FulfilmentAgreement, gate: z.enum(["ready", "pending_correction", "booking_closed", "fifo", "capacity"]),
   sources: z.array(FulfilmentSource), intent: HistoryFulfilmentIntentSchema.nullable(),
 }).strict();
 export type HistoryFulfilmentView = z.infer<typeof HistoryFulfilmentViewSchema>;

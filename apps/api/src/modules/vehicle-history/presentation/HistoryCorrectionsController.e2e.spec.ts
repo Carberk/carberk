@@ -16,14 +16,15 @@ describe("renewed VIN agreement on the existing private order", () => {
   });
   afterEach(async () => { await f?.close(); });
   async function accepted(format: string, assigned?: Awaited<ReturnType<typeof f.actor>>,
-    [deliveryFrom, deliveryBy] = ["2026-11-21T06:00:00.000Z", "2026-11-21T07:00:00.000Z"], legacy = false) {
+    [deliveryFrom, deliveryBy] = ["2026-11-21T06:00:00.000Z", "2026-11-21T07:00:00.000Z"], legacy = false,
+    vin = "DEMA0000000000001") {
     const customer = await f.actor(null), operator = assigned ?? await f.actor();
     const id = (await f.request.post(`${root}/requests`).auth(customer.token, { type: "bearer" })
       .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
     const staff = `${root}/operator/requests/${id}`, path = `${root}/requests/${id}`;
     await f.request.post(`${staff}/claim`).auth(operator.token, { type: "bearer" }).send({ expectedAssignmentVersion: 0 }).expect(201);
     await f.request.post(`${staff}/offer`).auth(operator.token, { type: "bearer" })
-      .send({ kind: "check", vin: "DEMA0000000000001", expectedVersion: 0, expectedAssignmentVersion: 1 }).expect(201);
+      .send({ kind: "check", vin, expectedVersion: 0, expectedAssignmentVersion: 1 }).expect(201);
     const offer = (await f.request.post(`${staff}/offer`).auth(operator.token, { type: "bearer" }).send({ kind: "propose", format,
       expectedVersion: 1, expectedAssignmentVersion: 1, deliveryFrom, deliveryBy }).expect(201)).body;
     if (legacy) {
@@ -204,6 +205,60 @@ describe("renewed VIN agreement on the existing private order", () => {
     expect(offered.fulfilmentUnavailable).toBeUndefined();
     await fulfil(e, { ...start(e, "both", "new_source"), provider: "AutoCheck" }).expect(201);
     expect((await e.read().expect(200)).body).toMatchObject({ order: previous.order, payment: previous.payment });
+  });
+
+  it.each(["paid with a reservation", "unpaid without a reservation"] as const)(
+    "protects an earlier paid pre-reservation order from a correction that is %s", async (kind) => {
+      f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 2);
+      const budget = { allowance: 1, resetUtc: "00:00", externalUsage: {} };
+      f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { ...budget, allowance: 3 }, AutoCheck: budget });
+      const older = await accepted("link", undefined, undefined, true, "DEMA0000000000006");
+      const paid = kind === "paid with a reservation";
+      const newer = await accepted("both", paid ? older.operator : undefined, ["2026-11-21T07:00:00.000Z", "2026-11-21T08:00:00.000Z"], !paid);
+      await pay(older);
+      f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+      if (paid) await pay(newer);
+      const prior = (await newer.read().expect(200)).body;
+      await newer.change({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0, attemptKey: randomUUID() }).expect(201);
+      const reviewed = (await newer.review(reviewInput("link")).expect(201)).body;
+      const refused = await newer.change({ kind: "accept", offer: reviewed.pending.review.offer, expectedVersion: 2,
+        attemptKey: randomUUID() }).expect(409);
+      expect(refused.body.code).toBe(paid ? "HISTORY_FULFILMENT_FIFO" : "HISTORY_ORDER_CAPACITY");
+      expect((await newer.read().expect(200)).body).toMatchObject({ order: prior.order, agreement: { acceptedRevision: 0 } });
+      await fulfil(older, { ...start(older, "link", "new_source"), vin: "DEMA0000000000006", provider: "AutoCheck" }).expect(201);
+    },
+  );
+
+  it("shows the same provider reset gate for a corrected pre-reservation order on read and start", async () => {
+    const e = await accepted("both", undefined, undefined, true);
+    await pay(e);
+    const budget = { allowance: 1, resetUtc: "06:00", externalUsage: {} };
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { AutoCheck: budget });
+    await e.change({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0, attemptKey: randomUUID() }).expect(201);
+    const reviewed = (await e.review(reviewInput("link")).expect(201)).body;
+    await e.change({ kind: "accept", offer: reviewed.pending.review.offer, expectedVersion: 2, attemptKey: randomUUID() }).expect(201);
+    const read = () => f.request.get(`${e.staff}/order?expectedAssignmentVersion=1`)
+      .auth(e.operator.token, { type: "bearer" }).expect(200);
+    const command = { ...start(e, "link", "new_source"), acceptedRevision: 3, vin: "DEMA0000000000006", provider: "AutoCheck" };
+    expect((await read()).body.fulfilment).toMatchObject({ gate: "capacity", sources: [], accepted: { provider: "AutoCheck" } });
+    expect((await fulfil(e, command).expect(409)).body.code).toBe("HISTORY_ORDER_CAPACITY");
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T06:00:00.000Z");
+    expect((await read()).body.fulfilment).toMatchObject({ gate: "ready", sources: ["new_source"] });
+    await fulfil(e, command).expect(201);
+  });
+
+  it("lets an operator use a qualified archive while the reserved new lookup period is closed", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { allowance: 1, resetUtc: "06:00", externalUsage: {} } });
+    const e = await accepted("pdf");
+    await pay(e);
+    const projected = (await f.request.get(`${e.staff}/order?expectedAssignmentVersion=1`)
+      .auth(e.operator.token, { type: "bearer" }).expect(200)).body.fulfilment;
+    expect(projected).toMatchObject({ gate: "ready", sources: ["archive"], accepted: { provider: "Carfax" } });
+    expect((await fulfil(e, start(e, "pdf", "new_source")).expect(409)).body.code).toBe("HISTORY_ORDER_CAPACITY");
+    const command = start(e, "pdf");
+    const result = (await fulfil(e, command).expect(201)).body;
+    expect(result).toMatchObject({ intent: { source: "archive" }, sources: ["archive"] });
+    expect((await fulfil(e, command).expect(201)).body).toEqual(result);
   });
 
   it("lets two paid pre-reservation orders use distinct available providers in paid queue order", async () => {

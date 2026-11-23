@@ -3,7 +3,8 @@ import { HistoryRequestError } from "./HistoryRequestError";
 
 export type AvailableHistoryReports = Extract<NonNullable<O.HistoryOffer["preflight"]>, { status: "available" }>;
 export type HistoryProvider = AvailableHistoryReports["providers"][number]["name"];
-export type HistoryProviderUsageOptions = { excludeCurrent?: boolean; reservedOnly?: boolean };
+export type HistoryPaidProviderPriority = { confirmedBefore: string | null };
+export type HistoryProviderUsageOptions = { excludeCurrent?: boolean; unreserved?: "all" | "none" | HistoryPaidProviderPriority };
 export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string; reservedProvider?: HistoryProvider;
   agreement?: H.HistoryCorrectionState; originalOffer?: H.HistoryAcceptedOrder["acceptedOffer"] };
 export type HistoryAgreementInput = H.HistoryCorrectionMutation | H.HistoryOperatorCorrectionMutation | { kind: "handoff"; expectedRevision: number };
@@ -29,7 +30,7 @@ export interface HistoryOrderStore {
   saveAgreement(write: HistoryAgreementWrite): Promise<void>;
   fulfilment(): Promise<H.HistoryFulfilmentIntent | null>;
   fulfilmentAttempt(key: string): Promise<H.HistoryFulfilmentMutation | null>;
-  hasEarlierPaidWork(confirmedAt: string, now: Date): Promise<boolean>;
+  hasEarlierPaidWork(confirmedAt: string | null, now: Date): Promise<boolean>;
   saveFulfilment(write: HistoryFulfilmentWrite): Promise<void>;
 }
 

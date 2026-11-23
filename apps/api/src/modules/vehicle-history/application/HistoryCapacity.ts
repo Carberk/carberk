@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Env } from "../../../env.schema";
 import { historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider,
-  type HistoryProviderUsageOptions, type StoredHistoryOrder } from "../domain/HistoryOrder";
+  type HistoryPaidProviderPriority, type HistoryProviderUsageOptions, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 @Injectable()
@@ -53,31 +53,37 @@ export class HistoryCapacity {
     return this.findProvider(orders, order, order.acceptedOffer.preflight, now, true);
   }
 
-  async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date) {
+  async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
+    priority?: HistoryPaidProviderPriority) {
     if (new Date(order.acceptedOffer.proposal.deliveryBy) <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
-    const provider = await this.findProvider(orders, order, reports, now);
+    const provider = await this.findProvider(orders, order, reports, now, false, priority);
+    if (priority && (!provider || provider !== order.reservedProvider) && await orders.hasEarlierPaidWork(priority.confirmedBefore, now)) {
+      throw new HistoryRequestError("HISTORY_FULFILMENT_FIFO");
+    }
     if (!provider) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
     return provider;
   }
 
   private async findProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
-    requireOpenPeriod = false) {
+    requireOpenPeriod = false, priority?: HistoryPaidProviderPriority) {
     const from = new Date(order.acceptedOffer.proposal.deliveryFrom), by = new Date(order.acceptedOffer.proposal.deliveryBy);
     const names = reports.providers.map(({ name }) => name);
     const preferred = order.reservedProvider;
     if (preferred && names.includes(preferred)) names.sort((a) => a === preferred ? -1 : 1);
     for (const name of names) {
-      const budget = await this.remaining(orders, name, from, by, now, { excludeCurrent: true, reservedOnly: true });
+      const unreserved = name === preferred ? "none" : priority ?? "none";
+      const budget = await this.remaining(orders, name, from, by, now, { excludeCurrent: true, unreserved });
       if (budget && budget.slots > 0 && (!requireOpenPeriod || budget.periodStart <= now)) return name;
     }
     return undefined;
   }
 
-  async requireFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {
+  async canUseFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {
     const { deliveryFrom, deliveryBy } = order.acceptedOffer.proposal;
-    const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now, { reservedOnly: !additional });
+    const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now,
+      { unreserved: additional ? "all" : "none" });
     const needed = additional || order.reservedProvider !== provider ? 1 : 0;
-    if (!budget || now < budget.periodStart || budget.slots < needed) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+    return !!budget && now >= budget.periodStart && budget.slots >= needed;
   }
 
   private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date, options?: HistoryProviderUsageOptions) {
