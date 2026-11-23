@@ -23,11 +23,7 @@ member is unavailable, report it instead of substituting.
 
 ## Carberk
 
-Unless the user names members, use the council in
-[models and effort](../../../docs/agents/models.md): GPT Sol 6.1, Claude Opus
-5.5 and Muse Wonder 1.0 at high effort. This replaces the three-provider rule
-above: if Opus or Muse is unavailable, run with the members you can reach and
-name the missing ones. Sol is required.
+Unless the user names members, follow the [Carberk council roster and effort](../../../docs/agents/models.md#council), including its rules for unavailable members.
 
 Give each delegate the request and relevant context. For review or feedback,
 keep their work read-only. Collect their responses and summarize the useful
