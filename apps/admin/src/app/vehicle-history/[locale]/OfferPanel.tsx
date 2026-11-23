@@ -4,9 +4,11 @@ import type { HistoryOrderSchemas as H, HistoryOfferSchemas as O } from "@auto-t
 import { Button } from "@auto-tm/ui/components";
 
 import { PaymentProofPanel } from "./PaymentProofPanel";
+import { PaymentVerificationPanel } from "./PaymentVerificationPanel";
 import { historyOfferAction } from "./offer-actions";
 import type { HistoryInboxResult } from "./actions";
 
+import { paymentCopy } from "@/lib/history-payment-copy";
 import { offerCopy } from "@/lib/history-offer-copy";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
@@ -67,7 +69,9 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
     day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
   }).format(new Date(value));
   return <section aria-label={t.title} className="mt-6 space-y-4 border-t pt-5 text-sm">
-    <h4 className="font-semibold">{accepted ? orderState?.status === "hold_expired" ? t.orderExpired : t.orderWaiting : t.title}</h4>
+    <h4 className="font-semibold">{accepted ? orderState?.status === "payment_confirmed" ? paymentCopy[locale].confirmed
+      : orderState?.status === "payment_received_no_hold" ? paymentCopy[locale].noHold : orderState?.payment ? paymentCopy[locale].review
+        : orderState?.status === "hold_expired" ? t.orderExpired : t.orderWaiting : t.title}</h4>
     <p className="text-muted-foreground">{t.synthetic}</p>
     {phase === "loading" ? <p role="status">{t.loading}</p> : phase === "error" ? <div role="alert">
       <p>{t.error}</p><Button className="mt-3" variant="secondary" onClick={() => { void run(); }}>{t.refresh}</Button>
@@ -105,9 +109,10 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
         <p>{t.format}: {t[proposal.format]}</p><p>{t.window}: {timestamp(proposal.deliveryFrom)} – {timestamp(proposal.deliveryBy)}</p>
         {accepted ? <>
           <p>{t.orderAccepted}: {timestamp(accepted.acceptedAt)}</p><p>{t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>
-          <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>
+          {!orderState?.payment && <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>}
           {orderState?.wallet && phase === "ready" && <p className="break-all font-mono">{orderState.wallet}</p>}
           <PaymentProofPanel key={`${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} />
+          <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} onOrder={setOrderState} />
           <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>
             {data.preflight?.status === "available" && <><p>{t.rule}</p><dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt>{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl><p>{t.limits}</p></>}
             {proposal.format !== "pdf" && <p>{t.links}</p>}<p>{t.rights}</p><p>{t.terms}</p>

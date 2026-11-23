@@ -1,6 +1,4 @@
 "use server";
-import { createHash } from "node:crypto";
-
 import { VehicleHistorySchemas as V } from "@auto-tm/contracts";
 import { unstable_rethrow } from "next/navigation";
 
@@ -9,6 +7,7 @@ import { rejectExpiredSession } from "../../../lib/action-session";
 import { getAccessToken } from "../../../lib/cookies";
 import type { DeskLocale } from "../../../lib/history-desk-copy";
 import { parseHistoryMessageInput } from "../../../lib/history-message-input";
+import { historyInboxScope } from "../../../lib/history-inbox-scope";
 
 type Parsed<S extends { parse: (value: unknown) => unknown }> = ReturnType<S["parse"]>;
 type Scope = { scope: string; actor: V.HistoryDesk["actor"] };
@@ -26,10 +25,9 @@ async function currentScope(locale: DeskLocale): Promise<Scope | null> {
   const response = await apiFetchOptional<unknown>("/vehicle-history/desk", { cache: "no-store", headers: { "Accept-Language": locale } });
   if (!response) return null;
   const desk = V.HistoryDeskSchema.parse(response);
-  const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8")) as { sub?: unknown; sid?: unknown };
-  const session = V.HistoryOperatorSchema.shape.id.safeParse(claims.sid);
-  if (claims.sub !== desk.actor.id || !session.success || token !== await getAccessToken()) return null;
-  return { actor: desk.actor, scope: createHash("sha256").update(`history-inbox\0${desk.actor.id}\0${session.data}`).digest("hex") };
+  const binding = historyInboxScope(token);
+  if (binding?.actorId !== desk.actor.id || token !== await getAccessToken()) return null;
+  return { actor: desk.actor, scope: binding.scope };
 }
 
 /** Read/claim only. Receipt ACKs and client selection/disposal belong to their UI owners. */

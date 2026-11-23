@@ -111,8 +111,9 @@ export async function apiFetch<T>(
 export async function apiFetchOptional<T>(
   path: string,
   options: Omit<RequestInit, "body"> & { body?: unknown } = {},
+  sessionToken?: string,
 ): Promise<T | null> {
-  const accessToken = await getAccessToken();
+  const accessToken = sessionToken ?? await getAccessToken();
 
   const headers = new Headers(options.headers);
   if (accessToken) {

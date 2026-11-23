@@ -95,7 +95,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const proposal = data?.proposal;
   const canEdit = ready && active && connected && !saving && !accepted;
   return <View className="gap-3 rounded-2xl border border-border p-4">
-    <Text accessibilityRole="header" className="text-headline font-semibold">{accepted ? copy(orderState?.status === "hold_expired" ? "orderExpired" : "orderWaiting") : copy("title")}</Text>
+    {!accepted && <Text accessibilityRole="header" className="text-headline font-semibold">{copy("title")}</Text>}
     <Text className="text-footnote text-muted-foreground">{copy("synthetic")}</Text>
     {!active || (!ready && !data) ? null : state.isPending && !error ? <ActivityIndicator accessibilityLabel={copy("loading")} />
       : error ? <View className="gap-3"><Text accessibilityRole="alert">{copy(denied ? "denied" : "error")}</Text>
@@ -117,7 +117,8 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             {accepted ? <>
               <Text>{copy("orderAccepted")}: {timestamp(accepted.acceptedAt)}</Text>
               <Text>{copy("orderHold")}: {timestamp(accepted.holdExpiresAt)}</Text>
-              <Text accessibilityLiveRegion="polite">{copy(orderState?.status === "hold_expired" ? "orderExpiredNext" : "orderNext")}</Text>
+              {orderState?.payment?.confirmedAt && <Text>{t("vehicleHistory.paymentConfirmedAt")}: {timestamp(orderState.payment.confirmedAt)}</Text>}
+              {orderState?.payment?.receivedAt && <Text>{t("vehicleHistory.paymentReceivedAt")}: {timestamp(orderState.payment.receivedAt)}</Text>}
               {orderState?.wallet && ready && active && connected && !state.isFetching && <Text selectable className="font-mono text-callout">{orderState.wallet}</Text>}
               <Button variant="secondary" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)}><Text>{copy(expanded ? "orderHideDetails" : "orderDetails")}</Text></Button>
             </> : <>
@@ -131,7 +132,8 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             </View>}
           </View>}
           {accepted && <PaymentProof key={`${userId}:${sessionId}:${request.id}:${accepted.id}`}
-            viewer={viewer} requestId={request.id} orderId={accepted.id} ready={metadataAvailable && active && connected} />}
+            viewer={viewer} requestId={request.id} orderId={accepted.id} ready={metadataAvailable && active && connected}
+            reviewComplete={!!orderState?.payment?.confirmedAt} onSubmitted={async () => { await state.refetch(); if (canRead()) await reconcileOrder(); }} />}
           {!accepted && <><Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
           <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={setVin} maxLength={80}
             autoCapitalize="characters" autoCorrect={false} editable={canEdit} />

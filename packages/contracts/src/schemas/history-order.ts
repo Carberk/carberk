@@ -1,6 +1,7 @@
 import { DateTimeSchema, z } from "../zod";
 
 import { HistoryOfferSchema, HistoryPreflightSchema, HistoryQuotePreviewSchema } from "./history-offer";
+import { HistoryPaymentSummarySchema } from "./history-payment";
 
 export const AcceptedHistoryOfferSchema = HistoryOfferSchema.extend({
   vin: z.string().regex(/^[A-HJ-NPR-Z0-9]{17}$/),
@@ -16,7 +17,8 @@ export const HistoryAcceptedOrderSchema = z.object({
 export type HistoryAcceptedOrder = z.infer<typeof HistoryAcceptedOrderSchema>;
 export const HistoryOrderStateSchema = z.object({
   order: HistoryAcceptedOrderSchema.nullable(),
-  status: z.enum(["enquiry", "awaiting_synthetic_payment", "hold_expired"]),
+  status: z.enum(["enquiry", "awaiting_synthetic_payment", "hold_expired", "receipt_submitted", "payment_review", "payment_confirmed", "payment_received_no_hold"]),
+  payment: HistoryPaymentSummarySchema.optional(),
   serverNow: DateTimeSchema, wallet: z.string().regex(/^SYNTHETIC-[A-Z0-9-]{1,64}$/).nullable(), collectionEnabled: z.literal(false),
 }).strict();
 export type HistoryOrderState = z.infer<typeof HistoryOrderStateSchema>;

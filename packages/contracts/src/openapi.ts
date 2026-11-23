@@ -5,6 +5,7 @@ import {
 
 import * as PaymentProof from "./schemas/history-payment-proof";
 import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema } from "./schemas/history-order";
+import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
   ReadHistoryOfferSchema, ReadOperatorHistoryOfferSchema,
@@ -480,6 +481,16 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       409: { description: "Offer or assignment changed; refresh" }, 503: { description: "Temporarily unavailable" } },
   });
   registry.register("HistoryOrderState", HistoryOrderStateSchema);
+  registry.register("HistoryPaymentVerification", HistoryPaymentVerificationSchema);
+  for (const method of ["get", "post"] as const) registry.registerPath({
+    method, path: "/api/v1/vehicle-history/operator/requests/{id}/payment-verification", tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: method === "get" ? "Read assigned independent synthetic wallet checks" : "Record one independent synthetic wallet check without wallet access",
+    request: { params: z.object({ id: z.string().guid() }), query: method === "get" ? ReadOperatorHistoryOfferSchema : ReadHistoryOfferSchema,
+      ...(method === "post" ? { body: { content: { "application/json": { schema: HistoryPaymentCheckInputSchema } } } } : {}) },
+    responses: { [method === "get" ? 200 : 201]: { description: "Private checks; verified funds without a valid hold do not commit a booking", content: { "application/json": { schema: HistoryPaymentVerificationSchema } } },
+      400: { description: "Independent wallet check and valid amount/reference/evidence/time required" }, 403: { description: "Current session/purpose/assignment/object authority refused" },
+      409: { description: "Review changed or outside staffed hours; reconcile through readback" }, 503: { description: "Refresh before retrying the same check" } },
+  });
   for (const [operator, method] of [[false, "get"], [false, "post"], [true, "get"]] as const) registry.registerPath({
     method, path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/order`,
     tags: ["Vehicle History"], security: [{ bearerAuth: [] }],

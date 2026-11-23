@@ -4,6 +4,10 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_PAYMENT_INVALID: "Check the amount, reference, evidence and received time, then confirm the independent wallet check.",
+    HISTORY_PAYMENT_CONFLICT: "Payment review changed. Refresh before recording another check; do not request another payment.",
+    HISTORY_PAYMENT_CLOSED: "Wallet verification resumes at 09:00 Ashgabat time. Keep the receipt for review.",
+    HISTORY_PAYMENT_UNAVAILABLE: "Could not save the wallet check. Refresh to reconcile before trying again.",
     HISTORY_PROOF_INVALID: "Use one JPEG, PNG or WebP image up to 8 MB. Try a smaller screenshot.",
     HISTORY_PROOF_DENIED: "This receipt is unavailable. Sign in again or refresh the request.",
     HISTORY_PROOF_EXPIRED: "Receipt upload expired. Select the receipt again and retry; do not pay again.",
@@ -37,6 +41,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_PAYMENT_INVALID: "Проверьте сумму, номер перевода, основание и время получения, затем подтвердите независимую проверку кошелька.",
+    HISTORY_PAYMENT_CONFLICT: "Проверка оплаты изменилась. Обновите данные перед новой проверкой; не запрашивайте повторную оплату.",
+    HISTORY_PAYMENT_CLOSED: "Проверка кошелька возобновится в 09:00 по Ашхабаду. Сохраните квитанцию для проверки.",
+    HISTORY_PAYMENT_UNAVAILABLE: "Не удалось сохранить проверку. Обновите данные перед повторной попыткой.",
     HISTORY_PROOF_INVALID: "Выберите одно изображение JPEG, PNG или WebP до 8 МБ. Попробуйте меньший скриншот.",
     HISTORY_PROOF_DENIED: "Квитанция недоступна. Войдите снова или обновите обращение.",
     HISTORY_PROOF_EXPIRED: "Срок загрузки истёк. Выберите квитанцию ещё раз; не платите повторно.",
@@ -70,6 +78,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_PAYMENT_INVALID: "Mukdary, geçirim belgisini, delili we alnan wagty barlap, gapjykdaky garaşsyz barlagy tassyklaň.",
+    HISTORY_PAYMENT_CONFLICT: "Töleg barlagy üýtgedi. Täze barlagdan öň täzeläň; gaýtadan töleg soramaň.",
+    HISTORY_PAYMENT_CLOSED: "Gapjyk barlagy Aşgabat wagty bilen 09:00-da dowam eder. Çegi barlag üçin saklaň.",
+    HISTORY_PAYMENT_UNAVAILABLE: "Gapjyk barlagy saklanylmady. Gaýtadan synanyşmazdan öň täzeläň.",
     HISTORY_PROOF_INVALID: "8 MB çenli bir JPEG, PNG ýa-da WebP suratyny saýlaň. Kiçiräk ekran suratyny synanyşyň.",
     HISTORY_PROOF_DENIED: "Bu çek elýeterli däl. Gaýtadan giriň ýa-da ýüz tutmany täzeläň.",
     HISTORY_PROOF_EXPIRED: "Çegi ýüklemegiň möhleti gutardy. Çegi täzeden saýlaň; gaýtadan pul tölemäň.",
@@ -168,9 +180,18 @@ export function historyRequestFailure(error: unknown, language: string | undefin
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
-    : code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
-      : code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
+  const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_PAYMENT_UNAVAILABLE" || code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
+    : code === "HISTORY_PAYMENT_CONFLICT" || code === "HISTORY_PAYMENT_CLOSED" || code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
+      : code === "HISTORY_PAYMENT_INVALID" || code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
         || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
+}
+
+@Catch()
+export class HistoryPaymentsExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    const unavailable = error instanceof HistoryRequestError && error.code === "HISTORY_MESSAGE_UNAVAILABLE";
+    super.catch(!unavailable && (error instanceof HistoryRequestError || error instanceof HttpException)
+      ? error : new HistoryRequestError("HISTORY_PAYMENT_UNAVAILABLE"), host);
+  }
 }
