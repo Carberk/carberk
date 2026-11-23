@@ -14,6 +14,7 @@ import { PrismaHistoryPrivateFiles } from "./infrastructure/PrismaHistoryPrivate
 import { MinioHistoryPrivateStorage } from "./infrastructure/MinioHistoryPrivateStorage";
 import { HistoryPaymentProofSchemas as P } from "@auto-tm/contracts";
 import { AcceptHistoryQuote } from "./application/AcceptHistoryQuote";
+import { HistoryCapacity } from "./application/HistoryCapacity";
 import { ReadHistoryOrder } from "./application/ReadHistoryOrder";
 import { HistoryOrdersController } from "./presentation/HistoryOrdersController";
 import { HistoryOffersController } from "./presentation/HistoryOffersController";
@@ -79,7 +80,7 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
   controllers: [HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
   providers: [HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
     { provide: HISTORY_PRIVATE_FILES, useClass: PrismaHistoryPrivateFiles },
-    { provide: HISTORY_PRIVATE_STORAGE, useClass: MinioHistoryPrivateStorage }, AcceptHistoryQuote, ReadHistoryOrder, HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
+    { provide: HISTORY_PRIVATE_STORAGE, useClass: MinioHistoryPrivateStorage }, AcceptHistoryQuote, HistoryCapacity, ReadHistoryOrder, HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
     AddHistoryPrivateNote, ReadHistoryPrivateNotes, HistoryPrivateNoteProjection,
     { provide: HISTORY_PRIVATE_NOTE_REPOSITORY, useClass: PrismaHistoryPrivateNoteRepository },
     SyncHistoryWaiting, ChangeHistoryWaiting, ReadHistoryReminder, StopHistoryReminders, SendHistoryReminder, HistoryReminderProjection,

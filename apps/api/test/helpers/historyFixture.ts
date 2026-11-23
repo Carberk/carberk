@@ -34,6 +34,8 @@ export async function historyFixture(configure?: (config: ConfigService) => void
   beforeListen?.(app);
   await app.listen(0, "127.0.0.1");
   const prisma = app.get(PrismaService), config = app.get(ConfigService);
+  const providerBudget = { allowance: 12, resetUtc: "00:00", externalUsage: {} };
+  config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: providerBudget, AutoCheck: providerBudget });
   configure?.(config);
   const request = supertest(app.getHttpServer());
   const users: string[] = [];

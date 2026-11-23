@@ -32,9 +32,11 @@ export class ListOperatorHistoryRequests {
       }
       cursor = page.nextCursor ?? undefined;
     } while (cursor && items.length < 51);
+    const queueCounts = query.queue ? await this.assignments.queueCounts(actor.id) : undefined;
     // Identity enrichment can wait: never publish a stale grant or assignment.
     await this.assignments.confirmQueue(actor.id, query, candidates);
     await this.operator.require(claims);
-    return { items: items.slice(0, 50), nextCursor: items.length > 50 ? items[49]?.id ?? null : null };
+    return { items: items.slice(0, 50), nextCursor: items.length > 50 ? items[49]?.id ?? null : null,
+      ...(queueCounts ? { queueCounts } : {}) };
   }
 }

@@ -22,7 +22,7 @@ export type HistoryInboxResult = (Scope & { status: "ok" } & (
 async function currentScope(locale: DeskLocale): Promise<Scope | null> {
   const token = await getAccessToken();
   if (!token) return null;
-  const response = await apiFetchOptional<unknown>("/vehicle-history/desk", { cache: "no-store", headers: { "Accept-Language": locale } });
+  const response = await apiFetchOptional<unknown>("/vehicle-history/desk", { cache: "no-store", headers: { "Accept-Language": locale } }, token);
   if (!response) return null;
   const desk = V.HistoryDeskSchema.parse(response);
   const binding = historyInboxScope(token);
@@ -36,12 +36,18 @@ export async function historyInboxAction(locale: DeskLocale, value: unknown): Pr
   const parsed = V.HistoryInboxActionSchema.safeParse(value);
   if (!parsed.success || !["tk", "ru", "en"].includes(locale)) return { status: "validation" };
   const input = parsed.data;
-  let context: Scope | null = null;
+  let scope: string | undefined;
   try {
-    context = await currentScope(locale);
-    if (!context) return { status: "expired" };
-    // This comparison precedes every claim, even an uncertain same-owner retry.
-    if (input.scope && input.scope !== context.scope) return { status: "stale", scope: context.scope };
+    const token = await getAccessToken();
+    const binding = token ? historyInboxScope(token) : null;
+    if (!token || !binding) return { status: "expired" };
+    scope = binding.scope;
+    if (input.kind === "queue" || input.kind === "claim") {
+      const current = await currentScope(locale);
+      if (!current) return { status: "expired" };
+      if (token !== await getAccessToken()) return { status: "stale", scope: current.scope };
+    }
+    if (input.scope && input.scope !== scope) return { status: "stale", scope };
     const base = "/vehicle-history/operator/requests";
     const queryValues = input.kind === "queue" ? input.query : input.kind === "transcript"
       ? { expectedAssignmentVersion: String(input.expectedAssignmentVersion), ...(input.cursor ? { cursor: input.cursor } : {}) } : {};
@@ -51,34 +57,33 @@ export async function historyInboxAction(locale: DeskLocale, value: unknown): Pr
     const response = await apiFetchOptional<unknown>(`${path}${query.size ? `?${query}` : ""}`, {
       method: input.kind === "claim" ? "POST" : "GET", cache: "no-store", headers: { "Accept-Language": locale },
       ...(input.kind === "claim" ? { body: { expectedAssignmentVersion: input.expectedAssignmentVersion } } : {}),
-    });
+    }, token);
     if (!response) return { status: "expired" };
     const result = input.kind === "queue" ? { kind: input.kind, data: V.HistoryQueueResponseSchema.parse(response) } as const
       : input.kind === "transcript" ? { kind: input.kind, data: V.HistoryMessagesPageSchema.parse(response) } as const
         : { kind: input.kind, data: V.OperatorHistoryRequestSchema.parse(response) } as const;
     if ((result.kind === "detail" || result.kind === "claim") && (result.data.id !== ("id" in input ? input.id : undefined) || !result.data.mine ||
-      result.data.assignedOperator?.id !== context.actor.id || (input.kind === "detail" && result.data.assignmentVersion !== input.expectedAssignmentVersion))) {
-      return { status: "conflict", scope: context.scope };
+      result.data.assignedOperator?.id !== binding.actorId || (input.kind === "detail" && result.data.assignmentVersion !== input.expectedAssignmentVersion))) {
+      return { status: "conflict", scope };
     }
-    if (input.kind !== "queue") {
-      const selectedResponse = await apiFetchOptional<unknown>(`${base}/${input.id}`, { cache: "no-store", headers: { "Accept-Language": locale } });
+    if (input.kind === "claim" || input.kind === "transcript") {
+      const selectedResponse = await apiFetchOptional<unknown>(`${base}/${input.id}`, { cache: "no-store", headers: { "Accept-Language": locale } }, token);
       if (!selectedResponse) return { status: "expired" };
       const selected = V.OperatorHistoryRequestSchema.parse(selectedResponse);
-      const version = result.kind === "queue" || result.kind === "transcript" ? input.expectedAssignmentVersion : result.data.assignmentVersion;
-      if (selected.id !== input.id || !selected.mine || selected.assignedOperator?.id !== context.actor.id || selected.assignmentVersion !== version ||
+      const version = result.kind === "claim" ? result.data.assignmentVersion : input.expectedAssignmentVersion;
+      if (selected.id !== input.id || !selected.mine || selected.assignedOperator?.id !== binding.actorId || selected.assignmentVersion !== version ||
         (input.kind === "claim" && version !== input.expectedAssignmentVersion && !(input.expectedAssignmentVersion === 0 && version === 1))) {
-        return { status: "conflict", scope: context.scope };
+        return { status: "conflict", scope };
       }
     }
     const final = await currentScope(locale);
     if (!final) return { status: "expired" };
-    if (final.scope !== context.scope) return { status: "stale", scope: final.scope };
+    if (final.scope !== scope || token !== await getAccessToken()) return { status: "stale", scope: final.scope };
     return { ...result, ...final, status: "ok" };
   } catch (error) {
     unstable_rethrow(error);
-    const scope = context?.scope;
     if (error instanceof ApiError) {
-      if (error.status === 403) return { status: "denied", ...(scope ? { scope } : {}) };
+      if (error.status === 403) return { status: "denied", ...(scope && (input.kind === "queue" || input.kind === "claim") ? { scope } : {}) };
       if (error.status === 409) return { status: "conflict", ...(scope ? { scope } : {}) };
       if (error.status === 400) return { status: "validation", ...(scope ? { scope } : {}) };
     }

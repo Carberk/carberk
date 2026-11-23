@@ -1,12 +1,16 @@
-import type { HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
+import type { HistoryOfferSchemas as O, HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
 import { HistoryRequestError } from "./HistoryRequestError";
 
-export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string };
+export type AvailableHistoryReports = Extract<NonNullable<O.HistoryOffer["preflight"]>, { status: "available" }>;
+export type HistoryProvider = AvailableHistoryReports["providers"][number]["name"];
+export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string; reservedProvider?: HistoryProvider };
 export interface HistoryOrderStore {
   read(): Promise<StoredHistoryOrder | null>;
   serialize<T>(operation: () => Promise<T>): Promise<T>;
   capacity(day: string, from: Date, by: Date, now: Date): Promise<{ total: number; morning: number; overlapping: number }>;
-  create(order: StoredHistoryOrder): Promise<void>;
+  providerUsage(provider: HistoryProvider, periodStart: Date, periodEnd: Date, now: Date): Promise<number>;
+  earlierPaidOrdersForSecondReport(provider: HistoryProvider, periodStart: Date, periodEnd: Date, confirmedAt: string, now: Date): Promise<number>;
+  create(order: Omit<StoredHistoryOrder, "reservedProvider">, provider: HistoryProvider): Promise<void>;
   paymentChecks(): Promise<P.HistoryPaymentCheck[]>;
   savePaymentCheck(check: P.HistoryPaymentCheck): Promise<void>;
   submittedProofIds(): Promise<string[]>;
@@ -27,7 +31,8 @@ export function historyDeliveryDay(from: Date, by: Date, now: Date) {
 
 export function historyOrderState(stored: StoredHistoryOrder | null, now: Date, checks: P.HistoryPaymentCheck[] = [], submitted = false): H.HistoryOrderState {
   if (!stored) return { order: null, status: "enquiry", serverNow: now.toISOString(), wallet: null, collectionEnabled: false };
-  const { wallet, ...order } = stored;
+  const { wallet, id, acceptedOffer, deliveryDay, acceptedAt, holdExpiresAt } = stored;
+  const order = { id, acceptedOffer, deliveryDay, acceptedAt, holdExpiresAt };
   const active = new Date(order.holdExpiresAt) > now;
   const check = checks.at(-1);
   const payment = check ? { outcome: check.input.outcome, amountMinor: check.input.amountMinor,

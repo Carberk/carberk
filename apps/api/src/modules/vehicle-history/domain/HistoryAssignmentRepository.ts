@@ -9,7 +9,12 @@ export interface HistoryWaitingStore {
   save(facts: HistoryWaitingFacts): Promise<void>;
 }
 
-export interface HistoryQueueQuery { filter?: "unassigned" | "mine" | undefined; search?: string | undefined; cursor?: string | undefined }
+export interface HistoryQueueQuery {
+  filter?: "unassigned" | "mine" | undefined;
+  queue?: "enquiry" | "paid" | undefined;
+  search?: string | undefined;
+  cursor?: string | undefined;
+}
 export interface HistoryQueueItem {
   id: string;
   createdAt: Date;
@@ -28,6 +33,7 @@ export interface HistoryAssignmentRepository {
   withMessageLock<T>(id: string, authority: HistoryMessageAuthority,
     operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore, orders: HistoryOrderStore) => Promise<T>): Promise<T>;
   list(operatorId: string, query: HistoryQueueQuery): Promise<{ items: HistoryQueueItem[]; nextCursor: string | null; anchor: HistoryQueueItem | null }>;
+  queueCounts(operatorId: string): Promise<{ unassigned: number; mine: number; paid: number }>;
   confirmQueue(operatorId: string, query: HistoryQueueQuery, items: HistoryQueueItem[]): Promise<void>;
   /** The database arbitrates competing claims; no prior read grants a write. */
   claimUnassigned(operatorId: string, id: string, expectedVersion: number, confirmAuthority: () => Promise<void>): Promise<void>;

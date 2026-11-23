@@ -15,10 +15,12 @@ export const HistoryAcceptedOrderSchema = z.object({
   acceptedAt: DateTimeSchema, holdExpiresAt: DateTimeSchema, deliveryDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 }).strict();
 export type HistoryAcceptedOrder = z.infer<typeof HistoryAcceptedOrderSchema>;
+const ProviderName = HistoryPreflightSchema.options[1].shape.providers.element.shape.name;
 export const HistoryOrderStateSchema = z.object({
   order: HistoryAcceptedOrderSchema.nullable(),
   status: z.enum(["enquiry", "awaiting_synthetic_payment", "hold_expired", "receipt_submitted", "payment_review", "payment_confirmed", "payment_received_no_hold"]),
   payment: HistoryPaymentSummarySchema.optional(),
+  reportPlan: z.object({ primary: ProviderName, second: ProviderName.nullable() }).strict().optional(),
   serverNow: DateTimeSchema, wallet: z.string().regex(/^SYNTHETIC-[A-Z0-9-]{1,64}$/).nullable(), collectionEnabled: z.literal(false),
 }).strict();
 export type HistoryOrderState = z.infer<typeof HistoryOrderStateSchema>;

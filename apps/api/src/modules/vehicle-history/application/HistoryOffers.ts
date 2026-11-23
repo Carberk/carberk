@@ -4,11 +4,13 @@ import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessage
 import { HISTORY_PREFLIGHT, normalizeHistoryVin, type HistoryPreflightPort } from "../domain/HistoryOffer";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
+import { HistoryCapacity } from "./HistoryCapacity";
 
 @Injectable()
 export class HistoryOffers {
   constructor(@Inject(HistoryMessageAccess) private readonly access: HistoryMessageAccess,
     @Inject(HISTORY_PREFLIGHT) private readonly preflight: HistoryPreflightPort,
+    @Inject(HistoryCapacity) private readonly capacity: HistoryCapacity,
     @Inject(HISTORY_CLOCK) private readonly clock: HistoryClock) {}
 
   read(actor: HistoryMessageActor, id: string) {
@@ -24,14 +26,12 @@ export class HistoryOffers {
       if (input.kind === "propose") {
         if (!actor.operator || previous.preflight?.status !== "available" || !previous.vin) throw new HistoryRequestError("HISTORY_OFFER_INVALID");
         const from = new Date(input.deliveryFrom), by = new Date(input.deliveryBy), now = this.clock.now();
-        const local = (date: Date) => new Date(date.getTime() + 5 * 3_600_000);
-        const first = local(from), last = local(by), today = local(now).toISOString().slice(0, 10);
-        const tomorrow = local(new Date(now.getTime() + 86_400_000)).toISOString().slice(0, 10);
-        const day = first.toISOString().slice(0, 10);
-        if (from <= now || by <= from || last.toISOString().slice(0, 10) !== day || ![today, tomorrow].includes(day)
-          || first.getUTCHours() < 9 || last.getUTCHours() > 20
-          || last.getUTCHours() === 20 && (last.getUTCMinutes() !== 0 || last.getUTCSeconds() !== 0 || last.getUTCMilliseconds() !== 0)) {
-          throw new HistoryRequestError("HISTORY_OFFER_INVALID");
+        try { await this.capacity.plan(orders, previous.preflight, from, by, now); }
+        catch (error) {
+          if (error instanceof HistoryRequestError && error.code === "HISTORY_ORDER_STALE") {
+            throw new HistoryRequestError("HISTORY_OFFER_INVALID");
+          }
+          throw error;
         }
         next = { ...previous, version: previous.version + 1, proposal: { format: input.format,
           deliveryFrom: from.toISOString(), deliveryBy: by.toISOString(), priceTmt: 100,

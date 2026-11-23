@@ -9347,6 +9347,31 @@
             ],
             "additionalProperties": false
           },
+          "reportPlan": {
+            "type": "object",
+            "properties": {
+              "primary": {
+                "type": "string",
+                "enum": [
+                  "Carfax",
+                  "AutoCheck"
+                ]
+              },
+              "second": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "Carfax",
+                  "AutoCheck"
+                ]
+              }
+            },
+            "required": [
+              "primary",
+              "second"
+            ],
+            "additionalProperties": false
+          },
           "serverNow": {
             "type": "string",
             "format": "date-time"
@@ -12766,6 +12791,31 @@
                       ],
                       "additionalProperties": false
                     },
+                    "reportPlan": {
+                      "type": "object",
+                      "properties": {
+                        "primary": {
+                          "type": "string",
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        },
+                        "second": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "primary",
+                        "second"
+                      ],
+                      "additionalProperties": false
+                    },
                     "serverNow": {
                       "type": "string",
                       "format": "date-time"
@@ -13172,6 +13222,31 @@
                       ],
                       "additionalProperties": false
                     },
+                    "reportPlan": {
+                      "type": "object",
+                      "properties": {
+                        "primary": {
+                          "type": "string",
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        },
+                        "second": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "primary",
+                        "second"
+                      ],
+                      "additionalProperties": false
+                    },
                     "serverNow": {
                       "type": "string",
                       "format": "date-time"
@@ -13452,6 +13527,31 @@
                         "receivedAt",
                         "confirmedAt",
                         "bookingCommitted"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reportPlan": {
+                      "type": "object",
+                      "properties": {
+                        "primary": {
+                          "type": "string",
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        },
+                        "second": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "primary",
+                        "second"
                       ],
                       "additionalProperties": false
                     },
@@ -16826,6 +16926,18 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "enquiry",
+                "paid"
+              ]
+            },
+            "required": false,
+            "name": "queue",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "minLength": 1,
               "maxLength": 64
             },
@@ -16867,7 +16979,8 @@
                           "status": {
                             "type": "string",
                             "enum": [
-                              "enquiry"
+                              "enquiry",
+                              "paid"
                             ]
                           },
                           "assignmentVersion": {
@@ -16943,6 +17056,29 @@
                       "type": "string",
                       "nullable": true,
                       "format": "uuid"
+                    },
+                    "queueCounts": {
+                      "type": "object",
+                      "properties": {
+                        "unassigned": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "mine": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "paid": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "unassigned",
+                        "mine",
+                        "paid"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [

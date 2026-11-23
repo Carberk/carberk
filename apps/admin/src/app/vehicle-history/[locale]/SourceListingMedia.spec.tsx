@@ -330,12 +330,11 @@ it.each((["cover", "play"] as const).flatMap((kind) =>
 ))("invalidates photos for hard History loss during %s at %s", async (kind, stage) => {
   const view = await mount();
   await screen.findByAltText("Video cover");
-  let mediaReached = false, selectedReads = 0;
+  let mediaReached = false, rechecksAfterMedia = 0;
   world.before = async (path) => {
     if (path.includes("/video-access/")) { mediaReached = true; return Response.json({}, { status: 404 }); }
     if (path.includes("/vehicle-history/operator/requests/")) {
-      selectedReads += 1;
-      if (stage === "before" || (mediaReached && selectedReads >= (stage === "finally" ? 3 : 5))) return Response.json({}, { status: 404 });
+      if (stage === "before" || (mediaReached && ++rechecksAfterMedia >= (stage === "finally" ? 1 : 2))) return Response.json({}, { status: 404 });
     }
     return undefined;
   };

@@ -214,6 +214,7 @@ model HistoryOrder {
   deliveryFrom  DateTime @db.Timestamptz(3)
   deliveryBy    DateTime @db.Timestamptz(3)
   holdExpiresAt DateTime @db.Timestamptz(3)
+  reservedProvider String?
 
   privateFiles HistoryPrivateFile[]
   paymentChecks HistoryPaymentCheck[]

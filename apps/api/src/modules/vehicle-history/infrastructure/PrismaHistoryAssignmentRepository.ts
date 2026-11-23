@@ -13,6 +13,18 @@ import { isDeepStrictEqual } from "node:util";
 import type { Env } from "../../../env.schema";
 import { MESSAGE_AUTHORITY_FENCE_PORT, type MessageAuthorityFencePort } from "../../identity/identity.public";
 
+const queueSelect = { id: true, createdAt: true, requesterId: true, assignmentVersion: true, assignedOperatorId: true } as const;
+const committedPayment = { bookingCommitted: true, confirmedAt: { not: null } } satisfies Prisma.HistoryPaymentCheckWhereInput;
+
+function queueScope(operatorId: string, query: HistoryQueueQuery): Prisma.VehicleHistoryRequestWhereInput {
+  const assignment = query.filter === "mine" ? { assignedOperatorId: operatorId } : query.filter === "unassigned"
+    ? { assignedOperatorId: null } : { OR: [{ assignedOperatorId: null }, { assignedOperatorId: operatorId }] };
+  const paid = { order: { is: { paymentChecks: { some: committedPayment } } } };
+  if (query.queue === "paid") return { ...assignment, ...paid };
+  if (query.queue === "enquiry") return { ...assignment, NOT: paid };
+  return assignment;
+}
+
 type WaitingRow = Omit<Prisma.VehicleHistoryRequestGetPayload<true>, "publicMessageOrder" | "reminderOrder"> & {
   publicMessageOrder: string; reminderOrder: string | null;
 };
@@ -151,13 +163,10 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
   }
 
   async list(operatorId: string, query: HistoryQueueQuery) {
-    const scope: Prisma.VehicleHistoryRequestWhereInput = {
-      ...(query.filter === "mine" ? { assignedOperatorId: operatorId } : query.filter === "unassigned"
-        ? { assignedOperatorId: null } : { OR: [{ assignedOperatorId: null }, { assignedOperatorId: operatorId }] }),
-    };
-    const select = { id: true, createdAt: true, requesterId: true, assignmentVersion: true, assignedOperatorId: true } as const;
+    if (query.queue === "paid") return this.listPaid(operatorId, query);
+    const scope = queueScope(operatorId, query);
     const after = query.cursor ? await this.prisma.vehicleHistoryRequest.findFirst({
-      where: { AND: [scope, { id: query.cursor }] }, select,
+      where: { ...scope, id: query.cursor }, select: queueSelect,
     }) : null;
     if (query.cursor && !after) throw new HistoryRequestError("HISTORY_OPERATOR_DENIED");
     const rows = await this.prisma.vehicleHistoryRequest.findMany({
@@ -165,19 +174,47 @@ export class PrismaHistoryAssignmentRepository implements HistoryAssignmentRepos
         { createdAt: { lt: after.createdAt } }, { createdAt: after.createdAt, id: { lt: after.id } },
       ] }] : [])] },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51,
-      select,
+      select: queueSelect,
     });
     return { items: rows.slice(0, 50), anchor: after, nextCursor: rows.length > 50 ? rows[49]?.id ?? null : null };
+  }
+
+  private async listPaid(operatorId: string, query: HistoryQueueQuery) {
+    const scope = { ...committedPayment, order: { request: queueScope(operatorId, { filter: query.filter }) } };
+    const select = { requestId: true, confirmedAt: true, order: { select: { request: { select: queueSelect } } } } as const;
+    const after = query.cursor ? await this.prisma.historyPaymentCheck.findFirst({
+      where: { ...scope, requestId: query.cursor }, select,
+    }) : null;
+    if (query.cursor && !after?.confirmedAt) throw new HistoryRequestError("HISTORY_OPERATOR_DENIED");
+    const rows = await this.prisma.historyPaymentCheck.findMany({
+      where: { ...scope, ...(after?.confirmedAt ? { OR: [
+        { confirmedAt: { gt: after.confirmedAt } }, { confirmedAt: after.confirmedAt, requestId: { gt: after.requestId } },
+      ] } : {}) },
+      orderBy: [{ confirmedAt: "asc" }, { requestId: "asc" }], take: 51, select,
+    });
+    return {
+      items: rows.slice(0, 50).map(({ order }) => order.request),
+      anchor: after?.order.request ?? null,
+      nextCursor: rows.length > 50 ? rows[49]?.requestId ?? null : null,
+    };
   }
 
   async confirmQueue(operatorId: string, query: HistoryQueueQuery, items: HistoryQueueItem[]) {
     if (!items.length) return;
     const count = await this.prisma.vehicleHistoryRequest.count({ where: {
       AND: [{ OR: items.map(({ id, assignmentVersion, assignedOperatorId }) => ({ id, assignmentVersion, assignedOperatorId })) },
-        query.filter === "mine" ? { assignedOperatorId: operatorId } : query.filter === "unassigned"
-          ? { assignedOperatorId: null } : { OR: [{ assignedOperatorId: null }, { assignedOperatorId: operatorId }] }],
+        queueScope(operatorId, query)],
     } });
     if (count !== items.length) throw new HistoryRequestError("HISTORY_ASSIGNMENT_CONFLICT");
+  }
+
+  async queueCounts(operatorId: string) {
+    const [unassigned, mine, paid] = await this.prisma.$transaction([
+      this.prisma.vehicleHistoryRequest.count({ where: queueScope(operatorId, { filter: "unassigned", queue: "enquiry" }) }),
+      this.prisma.vehicleHistoryRequest.count({ where: queueScope(operatorId, { filter: "mine", queue: "enquiry" }) }),
+      this.prisma.vehicleHistoryRequest.count({ where: queueScope(operatorId, { filter: "mine", queue: "paid" }) }),
+    ], { isolationLevel: "RepeatableRead" });
+    return { unassigned, mine, paid };
   }
 
   async claimUnassigned(operatorId: string, id: string, expectedVersion: number, confirmAuthority: () => Promise<void>) {
