@@ -6,7 +6,7 @@ import * as Native from "react-native";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
-import { act, fireEvent, renderMobile, routeParams } from "../../test/render";
+import { act, fireEvent, getHost, renderMobile, routeParams } from "../../test/render";
 import { server } from "../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../auth/session";
 
@@ -214,6 +214,46 @@ it("keeps the accepted VIN visible while requesting a correction on that same or
   expect(view.getAllByText(/DEMA0000000000001/).length).toBeGreaterThan(0);
   expect(sent).toEqual([expect.objectContaining({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0 })]);
 });
+
+it("lets the customer retry the same correction after a request refresh invalidates its response", async () => {
+  current = accepted;
+  const agreement: H.HistoryCorrectionState = { version: 1, acceptedRevision: 0, handoff: null,
+    accepted: [{ revision: 0, offer: quote, acceptedAt: "2026-11-21T05:00:00.000Z", cause: null }],
+    pending: { vin: "DEMA0000000000006", requestedAt: "2026-11-21T05:01:00.000Z", review: null } };
+  let finishWrite!: () => void, finishRefresh!: () => void;
+  const write = new Promise<void>((resolve) => { finishWrite = resolve; });
+  const refresh = new Promise<void>((resolve) => { finishRefresh = resolve; });
+  server.use(http.post("*/vehicle-history/requests/:id/correction", async ({ request }) => {
+    sent.push(await request.json());
+    await write;
+    current = { ...accepted, agreement, wallet: null };
+    return HttpResponse.json(agreement, { status: 201 });
+  }));
+  const view = await renderMobile(<RequestScreen />);
+  await fireEvent.press(await view.findByRole("button", { name: "Correct VIN" }));
+  await fireEvent.changeText(view.getByLabelText("Corrected VIN"), "DEMA0000000000006");
+  await fireEvent.press(view.getByRole("button", { name: "Request correction" }));
+  await vi.waitFor(() => expect(sent).toHaveLength(1));
+  let refreshing = false;
+  server.use(http.get("*/vehicle-history/requests/:id", async () => {
+    refreshing = true;
+    await refresh;
+    return HttpResponse.json({ id, sourceListingId: null, createdAt: "2026-11-21T04:00:00.000Z",
+      status: "enquiry", assignmentVersion: 1, assignedOperator: null });
+  }));
+  await act(() => getHost(view.container, "RCTScrollView").props.refreshControl.props.onRefresh());
+  await vi.waitFor(() => expect(refreshing).toBe(true));
+  await act(() => finishWrite());
+  await act(() => finishRefresh());
+  const retry = await view.findByRole("button", { name: "Retry correction" });
+  await vi.waitFor(() => expect(retry).toBeEnabled());
+  expect(view.queryByText("Saving correction…")).toBeNull();
+  await fireEvent.press(retry);
+  await vi.waitFor(() => expect(sent).toHaveLength(2));
+  expect(sent).toEqual([expect.objectContaining({ kind: "request", vin: "DEMA0000000000006" }), sent[0]]);
+  await vi.waitFor(() => expect(view.queryByRole("button", { name: "Retry correction" })).toBeNull());
+});
+
 it("lets the customer repair a rejected VIN without replaying the invalid request", async () => {
   current = accepted;
   const inputs: H.HistoryCorrectionMutation[] = [];

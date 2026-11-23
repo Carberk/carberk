@@ -76,7 +76,7 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       } else setPhase(error instanceof ApiError && [401, 403, 404].includes(error.status) ? "denied"
         : error instanceof ApiError && error.status === 409 ? "changed" : "uncertain");
       await reconcile().catch(() => undefined);
-    } finally { busy.current = false; if (owns()) setPhase((value) => value === "pending" ? "uncertain" : value); }
+    } finally { busy.current = false; if (alive.current) setPhase((value) => value === "pending" ? "uncertain" : value); }
   }
   async function refresh() {
     if (busy.current || !enabled || !latest.current()) return;
