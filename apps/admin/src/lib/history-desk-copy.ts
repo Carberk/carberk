@@ -1,5 +1,15 @@
 export const deskCopy = {
   tk: {
+    reportLink: "Hasabat salgysy {number}",
+    openReport: "Hasabaty aç",
+    copyLink: "Salgyny göçür",
+    retryOpenReport: "Açmagy gaýtadan synan",
+    retryCopyLink: "Göçürmegi gaýtadan synan",
+    linkCopied: "Salgy göçürildi.",
+    copyLinkFailed: "Salgy göçürilmedi. Täzeden synanyşyň ýa-da habardan saýlap göçüriň.",
+    openReportHelp: "Hasabat açylmasa, täze penjirelere rugsat beriň we täzeden synanyşyň ýa-da salgyny göçüriň.",
+    openReportFailed: "Hasabat açylmady. Täzeden synanyşyň ýa-da salgyny göçüriň.",
+
     reminder: "Ýatlatma",
     reminderOffline: "Tor ýok wagty ýatlatma iberilmeýär.",
     sendReminder: "Bir ýatlatma iber",
@@ -115,6 +125,16 @@ export const deskCopy = {
     skip: "Mazmuna geç",
   },
   ru: {
+    reportLink: "Ссылка на отчёт {number}",
+    openReport: "Открыть отчёт",
+    copyLink: "Скопировать ссылку",
+    retryOpenReport: "Повторить открытие",
+    retryCopyLink: "Повторить копирование",
+    linkCopied: "Ссылка скопирована.",
+    copyLinkFailed: "Не удалось скопировать ссылку. Повторите попытку или выделите и скопируйте её из сообщения.",
+    openReportHelp: "Если отчёт не открылся, разрешите всплывающие окна и повторите попытку или скопируйте ссылку.",
+    openReportFailed: "Не удалось открыть отчёт. Повторите попытку или скопируйте ссылку.",
+
     reminder: "Напоминание",
     reminderOffline: "Без подключения напоминание не отправится.",
     sendReminder: "Отправить одно напоминание",
@@ -230,6 +250,16 @@ export const deskCopy = {
     skip: "Перейти к содержимому",
   },
   en: {
+    reportLink: "Report link {number}",
+    openReport: "Open report",
+    copyLink: "Copy link",
+    retryOpenReport: "Retry opening",
+    retryCopyLink: "Retry copying",
+    linkCopied: "Link copied.",
+    copyLinkFailed: "Could not copy the link. Try again or select and copy it from the message.",
+    openReportHelp: "If the report did not open, allow pop-ups and retry, or copy the link.",
+    openReportFailed: "Could not open the report. Retry or copy the link.",
+
     reminder: "Reminder",
     reminderOffline: "Reminders cannot be sent offline.",
     sendReminder: "Send one reminder",

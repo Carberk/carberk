@@ -12,6 +12,7 @@ import { useOperatorConversation } from "./useOperatorConversation";
 import { SourceListing } from "./SourceListing";
 import { OfferPanel } from "./OfferPanel";
 import { HandoverControl } from "./HandoverControl";
+import { ReportLinks } from "./ReportLinks";
 
 
 import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
@@ -194,6 +195,7 @@ export function SelectedRequest({ locale, id, version, row, scope, actor, revisi
               <p className="mb-2 text-xs text-muted-foreground">{IdentitySchemas.formatDisplayName(message.author, locale)} · <time dateTime={message.createdAt}>{formatTime(message.createdAt, locale)}</time>
       </p>
               <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.text}</p>
+              <ReportLinks text={message.text} locale={locale} remember={remember} enabled={!listingOpen && !["offline", "unavailable", "reconnecting", "refreshing"].includes(reader.notice)} />
               {message.author.kind === "operator" && <p role="status" aria-live="polite" className="mt-2 text-xs text-foreground/80">{messageStatus(message)}</p>}
             </li>)}</ol>
             <div role="status" aria-live="polite" className="mb-3 text-sm text-muted-foreground">{reader.notice === "refreshing" ? t.refreshing
