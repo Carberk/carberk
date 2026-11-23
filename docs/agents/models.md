@@ -1,10 +1,8 @@
 # Models and effort
 
-The founder has more GPT Sol 6.1 quota than Claude Opus 5.5 quota, so agents lean on Sol. This holds until the founder changes this page.
-
 ## Default model
 
-Use GPT Sol 6.1 (`gpt-6.1-sol`, on the Codex provider) for agent work: implementation, research, `sol-loop` review, `babysit-pr` fixes and other delegated tasks. When a newer Sol appears, keep 6.1 until this page names the new one.
+Use GPT Sol 6.2 (`gpt-6.2-sol`, on the Codex provider) for implementation, research, `sol-loop` review, `babysit-pr` fixes and other delegated tasks. Keep this Sol version until the founder changes this guide.
 
 Use Claude Opus 5.5 (`claude-opus-5-5`) only as a `council` member, or when the founder names Opus for a task. An Opus session the founder starts stays on Opus, but it sends delegated implementation, research and review to Sol through `delegate_task` instead of starting Opus subagents.
 
@@ -12,7 +10,7 @@ In T3 Code, `orchestrator_capabilities` lists the providers, model IDs and optio
 
 ## Effort
 
-| Work | Sol 6.1 effort |
+| Work | Sol effort |
 |---|---|
 | Lookups, simple research, mechanical edits | `low` |
 | Implementation, `sol-loop` review, `babysit-pr` fixes | `medium` |
@@ -25,7 +23,7 @@ Sol's option is `reasoningEffort`, Opus's is `effort`. Do not use `max`, `ultra`
 
 `council` uses three members at `high` effort:
 
-- GPT Sol 6.1 (`gpt-6.1-sol`, Codex)
+- GPT Sol from [Default model](#default-model)
 - Claude Opus 5.5 (`claude-opus-5-5`, Claude)
 - Muse Wonder 1.0 (`muse-wonder-1.0`, Muse Code)
 
