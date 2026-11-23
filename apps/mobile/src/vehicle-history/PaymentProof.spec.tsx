@@ -123,7 +123,10 @@ it.each([
   await view.findAllByText(title);
   await view.findAllByText(next);
   expect(view.queryByText(`${title} · 100 TMT`)).toBeNull();
-  expect(view.getByText({ en: "Agreed price: 100 TMT", ru: "Согласованная цена: 100 TMT", tk: "Ylalaşylan nyrh: 100 TMT" }[locale])).toBeTruthy();
+  expect(view.getByRole("header", { name: { en: "Accepted order", ru: "Принятый заказ", tk: "Kabul edilen sargyt" }[locale] })).toBeTruthy();
+  expect(view.getAllByText(/100 TMT/)).toEqual([
+    view.getByText({ en: "Agreed price: 100 TMT", ru: "Согласованная цена: 100 TMT", tk: "Ylalaşylan nyrh: 100 TMT" }[locale]),
+  ]);
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(sent).toEqual([]);
 });
