@@ -17,7 +17,7 @@ export function PaymentStatus({ state, compact = false, summary = false }: {
     ? t(`vehicleHistory.preparation_${preparation}${suffix}`)
     : t(`vehicleHistory.payment${key}${suffix}`);
   return <View className="gap-1">
-    <Text accessibilityLiveRegion="polite" className="text-callout font-semibold">{copy("")} · 100 TMT</Text>
+    <Text accessibilityLiveRegion="polite" className="text-callout font-semibold">{copy("")}{!preparation && " · 100 TMT"}</Text>
     {!compact && !preparation && state.payment && outcome !== "receipt_submitted" && <Text className="text-footnote">{t("vehicleHistory.paymentAmount", {
       amount: new Intl.NumberFormat(i18n.language === "tk" ? "en-GB" : i18n.language).format(state.payment.amountMinor / 100),
     })}</Text>}

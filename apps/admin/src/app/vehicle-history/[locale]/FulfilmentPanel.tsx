@@ -25,7 +25,13 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
   const [source, setSource] = useState<Source | "">("");
   const [phase, setPhase] = useState<"ready" | "saving" | "loading" | "conflict" | "capacity" | "unavailable" | "validation">("ready");
   const busy = useRef(false), alive = useRef(true);
+  const panel = useRef<HTMLElement>(null), heading = useRef<HTMLHeadingElement>(null);
+  const refresh = useRef<HTMLButtonElement>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useEffect(() => {
+    if (phase === "saving" || phase === "loading" || document.activeElement !== heading.current) return;
+    (panel.current?.querySelector<HTMLElement>("[data-fulfilment-next]") ?? refresh.current)?.focus();
+  }, [phase]);
   if (state.status !== "payment_confirmed") return null;
   const view = state.fulfilment;
   const intent = view?.intent;
@@ -34,6 +40,7 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
   async function run(mutation?: Mutation) {
     if (busy.current) return;
     busy.current = true;
+    if (panel.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
     setPhase(mutation ? "saving" : "loading");
     try {
       const result = await historyFulfilmentAction(locale, { id, scope, expectedAssignmentVersion: version, mutation });
@@ -54,8 +61,8 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
 
   const reconcile = intent?.status === "uncertain";
   const canCorrect = intent?.status === "recovery" && intent.reason === "company_error";
-  return <section className="space-y-3 border-t pt-4" aria-label={t.title}>
-    <h5 className="font-semibold">{t.title}</h5>
+  return <section ref={panel} className="space-y-3 border-t pt-4" aria-label={t.title}>
+    <h5 ref={heading} tabIndex={-1} className="font-semibold">{t.title}</h5>
     {!view ? <p>{t.empty}</p> : <>
       <dl className="space-y-1">
         <div><dt className="sr-only">VIN</dt><dd className="break-all font-mono">{view.accepted.vin}</dd></div>
@@ -66,11 +73,11 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
         {intent && <div className="flex flex-wrap gap-x-2"><dt className="text-muted-foreground">{t.source}</dt><dd>{t[intent.source]}</dd></div>}
       </dl>
       {intent?.funding === "company" && <p>{t.companyFunding}</p>}
-      {intent && <p role="status">{intent.status === "recovery" ? t[intent.reason] : t[intent.status]}</p>}
+      {intent && <p role="status">{intent.status === "recovery" ? `${t[intent.reason]} ${t.recoveryNext}` : t[intent.status]}</p>}
       {view.gate !== "ready" && (!intent || intent.status === "retry_ready" || canCorrect) && <p role="status">{t[view.gate]}</p>}
       {phase === "ready" && <>
         {!intent && view.gate === "ready" && <>
-          <label className="block">{t.source}<select className={control} value={source} onChange={(e) => setSource(e.target.value as typeof source)}>
+          <label className="block">{t.source}<select data-fulfilment-next className={control} value={source} onChange={(e) => setSource(e.target.value as typeof source)}>
             <option value="">{t.chooseSource}</option>{view.sources.map((value) => <option key={value} value={value}>{t[value]}</option>)}
           </select></label>
           <Button type="button" className={action} disabled={!source} onClick={() => {
@@ -83,7 +90,7 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
             if (reconcile && outcome.kind !== "uncertain") void run({ ...command(), kind: "reconcile", outcome });
             if (!reconcile && outcome.kind !== "not_started") void run({ ...command(), kind: "record", outcome });
           }} />}
-        {view.gate === "ready" && (intent?.status === "retry_ready" || canCorrect) && <Button type="button" className={action}
+        {view.gate === "ready" && (intent?.status === "retry_ready" || canCorrect) && <Button data-fulfilment-next type="button" className={action}
           onClick={() => { void run({ ...command(), kind: canCorrect ? "company_correction" : "retry" }); }}>
           {canCorrect ? t.correct : t.retry}
         </Button>}
@@ -92,7 +99,7 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
       </>}
     </>}
     {phase !== "ready" && <p role={phase === "saving" || phase === "loading" ? "status" : "alert"}>{t[phase]}</p>}
-    {phase !== "saving" && phase !== "loading" && <Button type="button" className={action} variant="secondary"
+    {phase !== "saving" && phase !== "loading" && <Button ref={refresh} type="button" className={action} variant="secondary"
       onClick={() => { void run(); }}>{t.refresh}</Button>}
   </section>;
 }
@@ -114,7 +121,7 @@ function OutcomeForm({ locale, reconcile, newLookup, onSave }: {
     if (result === "obtained" && format && date && rights) onSave({ kind: result, format, originalReportDate: date, permittedUse: rights === "yes" });
     else if (result && result !== "obtained") onSave({ kind: result });
   }}>
-    <label className="block">{t.outcome}<select className={control} required value={result} onChange={(e) => setResult(e.target.value as typeof result)}>
+    <label className="block">{t.outcome}<select data-fulfilment-next className={control} required value={result} onChange={(e) => setResult(e.target.value as typeof result)}>
       <option value="">{t.chooseOutcome}</option>{choices.map((choice) => <option key={choice} value={choice}>{t.outcomes[choice]}</option>)}
     </select></label>
     {result === "obtained" && <>

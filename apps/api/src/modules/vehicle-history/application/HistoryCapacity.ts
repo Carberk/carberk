@@ -63,7 +63,7 @@ export class HistoryCapacity {
   async requireFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {
     const { deliveryFrom, deliveryBy } = order.acceptedOffer.proposal;
     const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now);
-    if (!budget || budget.slots < (additional ? 1 : 0)) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
+    if (!budget || now < budget.periodStart || budget.slots < (additional ? 1 : 0)) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
   }
 
   private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date, excludeCurrent = false) {

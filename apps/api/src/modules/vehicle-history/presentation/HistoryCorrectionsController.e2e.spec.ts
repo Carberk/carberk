@@ -15,7 +15,8 @@ describe("renewed VIN agreement on the existing private order", () => {
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 1);
   });
   afterEach(async () => { await f?.close(); });
-  async function accepted(format: string, assigned?: Awaited<ReturnType<typeof f.actor>>, later = false) {
+  async function accepted(format: string, assigned?: Awaited<ReturnType<typeof f.actor>>,
+    [deliveryFrom, deliveryBy] = ["2026-11-21T06:00:00.000Z", "2026-11-21T07:00:00.000Z"]) {
     const customer = await f.actor(null), operator = assigned ?? await f.actor();
     const id = (await f.request.post(`${root}/requests`).auth(customer.token, { type: "bearer" })
       .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
@@ -24,8 +25,7 @@ describe("renewed VIN agreement on the existing private order", () => {
     await f.request.post(`${staff}/offer`).auth(operator.token, { type: "bearer" })
       .send({ kind: "check", vin: "DEMA0000000000001", expectedVersion: 0, expectedAssignmentVersion: 1 }).expect(201);
     const offer = (await f.request.post(`${staff}/offer`).auth(operator.token, { type: "bearer" }).send({ kind: "propose", format,
-      expectedVersion: 1, expectedAssignmentVersion: 1, deliveryFrom: later ? "2026-11-21T07:00:00.000Z" : "2026-11-21T06:00:00.000Z",
-      deliveryBy: later ? "2026-11-21T08:00:00.000Z" : "2026-11-21T07:00:00.000Z" }).expect(201)).body;
+      expectedVersion: 1, expectedAssignmentVersion: 1, deliveryFrom, deliveryBy }).expect(201)).body;
     const original = (await f.request.post(`${path}/order`).auth(customer.token, { type: "bearer" }).send({ offer }).expect(201)).body;
     const change = (input: object) => f.request.post(`${path}/correction`).auth(customer.token, { type: "bearer" }).send(input);
     const review = (input: object) => f.request.post(`${staff}/correction`).auth(operator.token, { type: "bearer" }).send(input);
@@ -325,7 +325,7 @@ describe("renewed VIN agreement on the existing private order", () => {
 
   it("honours confirmed payment FIFO within the current assignment before recording new intent", async () => {
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 2);
-    const older = await accepted("pdf"), newer = await accepted("pdf", older.operator, true);
+    const older = await accepted("pdf"), newer = await accepted("pdf", older.operator, ["2026-11-21T07:00:00.000Z", "2026-11-21T08:00:00.000Z"]);
     await pay(older);
     f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
     await pay(newer);
@@ -336,6 +336,41 @@ describe("renewed VIN agreement on the existing private order", () => {
     await fulfil(newer, command).expect(409);
     await fulfil(older, outcome(older, 1, { kind: "no_history" })).expect(201);
     await fulfil(newer, command).expect(201);
+  });
+
+  it.each(["start", "retry", "company_correction"] as const)("fences new-source %s before the reserved provider reset", async (kind) => {
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    const budget = { allowance: 2, resetUtc: "00:00", externalUsage: { "2026-11-21": 2 } };
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_MORNING_SLOTS", 1);
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: budget });
+    const e = await accepted("pdf", undefined, ["2026-11-22T04:00:00.000Z", "2026-11-22T05:00:00.000Z"]);
+    await pay(e);
+    const first = start(e, "pdf", "new_source");
+    let command: Pick<typeof first, "kind" | "orderId" | "expectedAssignmentVersion" | "expectedVersion" | "attemptKey"> = first;
+    let availableAt = "2026-11-22T00:00:00.000Z";
+    if (kind !== "start") {
+      clock.now = () => new Date("2026-11-22T00:00:00.000Z");
+      await fulfil(e, first).expect(201);
+      let expectedVersion = 2;
+      if (kind === "retry") {
+        await fulfil(e, outcome(e, 1, { kind: "uncertain" })).expect(201);
+        await fulfil(e, outcome(e, 2, { kind: "not_started" }, "reconcile")).expect(201);
+        expectedVersion = 3;
+      } else {
+        await fulfil(e, outcome(e, 1, { kind: "company_error" })).expect(201);
+      }
+      f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { ...budget, resetUtc: "02:00" } });
+      availableAt = "2026-11-22T02:00:00.000Z";
+      command = { kind, orderId: e.id, expectedAssignmentVersion: 1, expectedVersion, attemptKey: randomUUID() };
+    }
+    const before = (await e.read().expect(200)).body;
+    const refusal = await fulfil(e, command).expect(409);
+    expect(refusal.body.code).toBe("HISTORY_ORDER_CAPACITY");
+    expect((await e.read().expect(200)).body).toEqual(before);
+    expect(await f.prisma.historyFulfilmentEvent.count({ where: { requestId: e.id } })).toBe(command.expectedVersion);
+    clock.now = () => new Date(availableAt);
+    const allowed = await fulfil(e, command).expect(201);
+    expect(allowed.body.intent).toMatchObject({ id: first.attemptKey, status: "pending", attempt: kind === "start" ? 1 : 2 });
   });
 
   it("makes company correction a distinct, capacity-limited action without a second charge", async () => {

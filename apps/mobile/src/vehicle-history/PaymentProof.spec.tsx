@@ -120,8 +120,10 @@ it.each([
   current = { ...accepted, wallet: null, status: "payment_confirmed", preparation, payment: { outcome: "matched", amountMinor: 10000,
     receivedAt: "2026-11-21T05:00:00.000Z", confirmedAt: "2026-11-21T05:01:00.000Z", bookingCommitted: true } };
   const view = await renderMobile(<RequestScreen />, { locale });
-  await view.findAllByText(`${title} · 100 TMT`);
+  await view.findAllByText(title);
   await view.findAllByText(next);
+  expect(view.queryByText(`${title} · 100 TMT`)).toBeNull();
+  expect(view.getByText({ en: "Agreed price: 100 TMT", ru: "Согласованная цена: 100 TMT", tk: "Ylalaşylan nyrh: 100 TMT" }[locale])).toBeTruthy();
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(sent).toEqual([]);
 });
