@@ -36,13 +36,13 @@ describe("explicit customer acceptance and capacity over HTTP/Postgres", () => {
     const e = await enquiry("both");
     expect((await e.read().expect(200)).body.order).toBeNull();
     await e.accept({ offer: { ...e.offer, proposal: { ...e.offer.proposal, format: "link" } } }).expect(409);
+    const other = await enquiry("pdf", { deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" });
     const accepted = await e.accept().expect(201);
     expect(accepted.headers["cache-control"]).toBe("private, no-store");
     expect(accepted.body).toMatchObject({ status: "awaiting_synthetic_payment", wallet: "SYNTHETIC-VH07-NO-TRANSFER", collectionEnabled: false,
       order: { acceptedOffer: e.offer, acceptedAt: "2026-11-21T05:00:00.000Z", holdExpiresAt: "2026-11-21T07:00:00.000Z", deliveryDay: "2026-11-21" } });
     expect((await e.accept().expect(201)).body).toEqual(accepted.body);
     await e.write({ kind: "check", vin: "DEMA0000000000006", expectedVersion: 2, expectedAssignmentVersion: 1 }).expect(409);
-    const other = await enquiry("pdf", { deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" });
     await other.accept().expect(409);
     now = new Date("2026-11-21T07:00:00.000Z");
     const expired = (await e.read().expect(200)).body;
@@ -71,6 +71,34 @@ describe("explicit customer acceptance and capacity over HTTP/Postgres", () => {
     expect(results.filter((result) => result.status === 201).every((result) => result.body.order.id === replay.order.id)).toBe(true);
     expect(results.some((result) => result.status === 409)).toBe(true);
   });
+  it("reserves a single provider for each competing hold and releases it at expiry", async () => {
+    const budget = { allowance: 1, resetUtc: "00:00", externalUsage: {} };
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: budget, AutoCheck: budget });
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 5);
+    const a = await enquiry();
+    const b = await enquiry("both", { deliveryFrom: "2026-11-21T07:00:00.000Z", deliveryBy: "2026-11-21T08:00:00.000Z" });
+    const c = await enquiry("pdf", { deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" });
+
+    f.concurrent(2);
+    const results = await Promise.all([a, b].map((entry) => entry.accept().set("x-history-concurrency", "yes")));
+    expect(results.map((result) => result.status)).toEqual([201, 201]);
+    expect((await a.accept().expect(201)).body).toEqual(results[0]!.body);
+    await c.accept().expect(409);
+    expect((await c.read().expect(200)).body).toMatchObject({ order: null, wallet: null });
+    now = new Date("2026-11-21T07:00:00.000Z");
+    await c.accept().expect(201);
+  });
+  it("honors provider reset periods and other-channel usage before offering a window", async () => {
+    const entry = await enquiry();
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {
+      Carfax: { allowance: 1, resetUtc: "08:00", externalUsage: { "2026-11-20": 1 } },
+    });
+    const proposal = { kind: "propose", format: "pdf", expectedVersion: 2, expectedAssignmentVersion: 1 };
+    await entry.write({ ...proposal, ...window }).expect(409);
+    await entry.accept().expect(409);
+    const offer = (await entry.write({ ...proposal, deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" }).expect(201)).body;
+    await entry.accept({ offer }).expect(201);
+  });
   it("requires renewed acceptance for missing, stale or mutated offer facts", async () => {
     const e = await enquiry();
     for (const proposal of [{ ...e.offer.proposal, format: undefined }, { ...e.offer.proposal, priceTmt: 99 }]) {
@@ -85,8 +113,9 @@ describe("explicit customer acceptance and capacity over HTTP/Postgres", () => {
     await e.accept({ offer: { ...e.offer, version: 3, proposal: { ...e.offer.proposal, format: "link" } } }).expect(409);
   });
   it("bounds tomorrow to demonstrated 09:00–10:00 capacity and refuses farther days", async () => {
-    const late = await enquiry("pdf", { deliveryFrom: "2026-11-22T05:00:00.000Z", deliveryBy: "2026-11-22T06:00:00.000Z" });
-    await late.accept().expect(409);
+    const entry = await enquiry();
+    await entry.write({ kind: "propose", format: "pdf", expectedVersion: 2, expectedAssignmentVersion: 1,
+      deliveryFrom: "2026-11-22T05:00:00.000Z", deliveryBy: "2026-11-22T06:00:00.000Z" }).expect(400);
     const first = await enquiry("pdf", { deliveryFrom: "2026-11-22T04:00:00.000Z", deliveryBy: "2026-11-22T05:00:00.000Z" });
     const second = await enquiry("both", { deliveryFrom: "2026-11-22T04:00:00.000Z", deliveryBy: "2026-11-22T05:00:00.000Z" });
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 11);

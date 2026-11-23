@@ -23,7 +23,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   const [vin, setVin] = useState("");
   const [format, setFormat] = useState<"" | "pdf" | "link" | "both">("");
   const [from, setFrom] = useState(""), [by, setBy] = useState("");
-  const [windowInvalid, setWindowInvalid] = useState(false);
+  const [windowIssue, setWindowIssue] = useState<"invalid" | "capacity" | null>(null);
   const windowHelp = useId();
   const alive = useRef(true), busy = useRef(false), generation = useRef(0);
   const binding = `${id}:${version}:${scope}:${actorId}:${locale}`;
@@ -38,18 +38,18 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
     try {
       const result = await historyOfferAction(locale, { id, scope, expectedAssignmentVersion: version, ...(mutation ? { mutation } : {}) });
       if (!alive.current || expected !== currentBinding.current || attempt !== generation.current) return;
-      if (result.status === "validation" && mutation?.kind === "propose") {
-        setWindowInvalid(true); setPhase("ready");
+      if ((result.status === "validation" || result.status === "capacity") && mutation?.kind === "propose" && result.scope === scope) {
+        setWindowIssue(result.status === "capacity" ? "capacity" : "invalid"); setPhase("ready");
         return;
       }
       if (result.status !== "ok") {
         setData(null); setPhase("error");
-        if (["expired", "denied", "stale"].includes(result.status)) invalidate({ status: result.status });
+        if (result.status === "expired" || result.status === "denied" || result.status === "stale") invalidate({ status: result.status });
         return;
       }
       if (result.scope !== scope || result.actorId !== actorId) { setData(null); setPhase("error"); return; }
       setData(result.order.order?.acceptedOffer ?? result.data); setOrderState(result.order); setPhase("ready");
-      if (mutation) setWindowInvalid(false);
+      if (mutation) setWindowIssue(null);
       if (!vin || mutation?.kind === "check") setVin(result.data.vin ?? "");
     } catch { if (alive.current && expected === currentBinding.current) { setData(null); setPhase("error"); } }
     finally { busy.current = false; }
@@ -93,11 +93,11 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
           <option value="">{t.choose}</option>{(["pdf", "link", "both"] as const).map((value) => <option key={value} value={value}>{t[value]}</option>)}
         </select></label>
         <label className="block">{t.fromLabel}<input className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" type="datetime-local" value={from}
-          aria-invalid={windowInvalid || undefined} aria-describedby={windowHelp} onChange={(event) => { setFrom(event.target.value); setWindowInvalid(false); }} /></label>
+          aria-invalid={!!windowIssue || undefined} aria-describedby={windowHelp} onChange={(event) => { setFrom(event.target.value); setWindowIssue(null); }} /></label>
         <label className="block">{t.byLabel}<input className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" type="datetime-local" value={by}
-          aria-invalid={windowInvalid || undefined} aria-describedby={windowHelp} onChange={(event) => { setBy(event.target.value); setWindowInvalid(false); }} /></label>
-        <p key={String(windowInvalid)} id={windowHelp} role={windowInvalid ? "alert" : undefined}
-          className={windowInvalid ? "text-destructive" : "text-muted-foreground"}>{t.windowHelp}</p>
+          aria-invalid={!!windowIssue || undefined} aria-describedby={windowHelp} onChange={(event) => { setBy(event.target.value); setWindowIssue(null); }} /></label>
+        <p key={windowIssue ?? "help"} id={windowHelp} role={windowIssue ? "alert" : undefined}
+          className={windowIssue ? "text-destructive" : "text-muted-foreground"}>{windowIssue === "capacity" ? t.windowFull : t.windowHelp}</p>
         <Button className="h-auto min-h-11 w-full whitespace-normal" disabled={!format || !from || !by || from >= by} onClick={() => {
           if (!format) return;
           void run({ kind: "propose", format, expectedVersion: data.version, expectedAssignmentVersion: version,
@@ -109,6 +109,8 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
         <p>{t.format}: {t[proposal.format]}</p><p>{t.window}: {timestamp(proposal.deliveryFrom)} – {timestamp(proposal.deliveryBy)}</p>
         {accepted ? <>
           <p>{t.orderAccepted}: {timestamp(accepted.acceptedAt)}</p><p>{t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>
+          {orderState?.reportPlan && <p>{t.reservedReport} {orderState.reportPlan.primary}
+            {orderState.reportPlan.second && <> · {t.spareReport} {orderState.reportPlan.second}</>}</p>}
           {!orderState?.payment && <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>}
           {orderState?.wallet && phase === "ready" && <p className="break-all font-mono">{orderState.wallet}</p>}
           <PaymentProofPanel key={`${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} />

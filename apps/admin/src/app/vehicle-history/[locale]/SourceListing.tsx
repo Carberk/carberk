@@ -133,7 +133,7 @@ function ListingDialog(props: Props & { current: () => boolean }) {
       {props.returnQuery !== undefined && <nav aria-label={props.locale === "tk" ? "Dil" : props.locale === "ru" ? "Язык" : "Language"} className="flex w-full gap-1">
         {(["tk", "ru", "en"] as const).map((language) => <a key={language} lang={language} aria-current={language === props.locale ? "page" : undefined}
           href={`/vehicle-history/${language}?${new URLSearchParams([...new URLSearchParams(props.returnQuery)].filter(([name, value]) =>
-            ["filter", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"))}`}
+            ["filter", "queue", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"))}`}
           className="rounded-md px-3 py-3 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:bg-muted">{language.toUpperCase()}</a>)}
       </nav>}
     </header>

@@ -4,11 +4,13 @@ import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { historyOrderState } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
+import { HistoryCapacity } from "./HistoryCapacity";
 
 @Injectable()
 export class ReadHistoryOrder {
   constructor(@Inject(HistoryMessageAccess) private readonly access: HistoryMessageAccess,
     @Inject(HISTORY_CLOCK) private readonly clock: HistoryClock,
+    @Inject(HistoryCapacity) private readonly capacity: HistoryCapacity,
     @Inject(IDENTITY_READ_PORT) private readonly identity: IdentityReadPort,
     @Inject(IDENTITY_CHECK_PORT) private readonly checks: IdentityCheckPort) {}
 
@@ -17,7 +19,12 @@ export class ReadHistoryOrder {
       const [requester, deleting] = await Promise.all([this.identity.findUserById(requesterId), this.checks.isDeletionScheduled(requesterId)]);
       if (!requester || requester.deleted || requester.suspendedAt || deleting) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
       const order = await orders.read(), checks = await orders.paymentChecks(), proofs = await orders.submittedProofIds();
-      return historyOrderState(order, this.clock.now(), checks, proofs.length > 0);
+      const now = this.clock.now();
+      const state = historyOrderState(order, now, checks, proofs.length > 0);
+      const confirmedAt = state.status === "payment_confirmed" ? state.payment?.confirmedAt : null;
+      if (!actor.operator || !order || !confirmedAt) return state;
+      const reportPlan = await this.capacity.paidReportPlan(orders, order, confirmedAt, now);
+      return reportPlan ? { ...state, reportPlan } : state;
     });
   }
 }

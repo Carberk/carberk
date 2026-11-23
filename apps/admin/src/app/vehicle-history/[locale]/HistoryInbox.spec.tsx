@@ -100,7 +100,7 @@ afterEach(async () => {
 });
 it("shows safe enquiry metadata, then claims atomically before opening the real transcript", async () => {
   render(view());
-  await waitFor(() => expect(requests.map(r => r.path)).toContain("/api/v1/vehicle-history/operator/requests?filter=unassigned"));
+  await waitFor(() => expect(requests.map(r => r.path)).toContain("/api/v1/vehicle-history/operator/requests?filter=unassigned&queue=enquiry"));
   fireEvent.click(await screen.findByRole("link", { name: /Merdan/ }));
   await screen.findByRole("button", { name: "Claim enquiry" });
   await waitFor(() => expect(document.activeElement?.id).toBe("selected-enquiry"));
@@ -421,6 +421,22 @@ it("retains queue, search, page and selection in locale links and restores Back/
   fireEvent.submit(searchForm());
   expect(window.location.search).toBe("?filter=mine&search=New+name");
 });
+it("links the paid count to the paid queue and retains the active search", async () => {
+  window.history.replaceState(null, "", "?filter=mine&search=Merdan");
+  server.use(http.get("http://api.test/api/v1/vehicle-history/operator/requests", ({ request }) => {
+    const paid = new URL(request.url).searchParams.get("queue") === "paid";
+    return Response.json({ items: paid ? [{ ...row, status: "paid", mine: true, assignmentVersion: 1, assignedOperator: actor }] : [],
+      nextCursor: null, queueCounts: { unassigned: 0, mine: 0, paid: 1 } });
+  }));
+  const mounted = render(view());
+  fireEvent.click(await screen.findByRole("button", { name: "Paid orders 1" }));
+  expect((await screen.findByRole("link", { name: /Merdan/ })).getAttribute("href")).toContain("queue=paid");
+  expect(screen.getByRole("heading", { name: "Paid orders" })).toBeDefined();
+  expect(screen.getByRole("button", { name: "Paid orders 1" }).getAttribute("aria-pressed")).toBe("true");
+  expect(new URLSearchParams(window.location.search).get("search")).toBe("Merdan");
+  mounted.rerender(view());
+  expect(screen.getByRole("link", { name: "RU" }).getAttribute("href")).toContain("queue=paid");
+});
 it("retains the transcript when offline and reconciles after reconnect", async () => {
   assigned = true; window.history.replaceState(null, "", `?selected=${id}&v=1`);
   render(view()); await screen.findByText("Can you check this car?");
@@ -630,9 +646,9 @@ it("pages the queue and transcript through real cursor URLs with explicit Receiv
   expect(requests.filter((r) => r.method === "POST").every((r) => r.path.includes("receipts") && JSON.parse(String(r.body)).kind === "received")).toBe(true);
 });
 it.each([
-  ["tk", "Ýüz tutmany al", "Ýüz tutmalaryň nobaty"],
-  ["ru", "Взять обращение", "Очередь обращений"],
-  ["en", "Claim enquiry", "Enquiry queue"],
+  ["tk", "Ýüz tutmany al", "Iş nobatlary"],
+  ["ru", "Взять обращение", "Рабочие очереди"],
+  ["en", "Claim enquiry", "Work queues"],
 ] as const)("renders the real workbench and claim feedback in %s", async (locale, claim, filter) => {
   platform.path = `/vehicle-history/${locale}`;
   render(<HistoryWorkbench locale={locale} section="desk"><HistoryInbox locale={locale} /></HistoryWorkbench>);
@@ -2052,11 +2068,14 @@ it.each(["pdf", "link", "both"] as const)("preflights the explicit VIN and propo
   expect(screen.queryByRole("button", { name: /accept|pay/i })).toBeNull();
 });
 
-it("keeps the quote and date editors when the proposed delivery window is refused", async () => {
+it.each([
+  [400, "HISTORY_OFFER_INVALID", "Choose a future window today within 09:00–20:00, or tomorrow within 09:00–10:00, Ashgabat time."],
+  [409, "HISTORY_ORDER_CAPACITY", "This window is full. Try another window or keep the enquiry open."],
+])("keeps the quote and date editors when the proposed delivery window is refused with %s", async (status, code, message) => {
   assigned = true;
   window.history.replaceState(null, "", `/vehicle-history/en?selected=${id}&v=1`);
   server.use(http.all("http://api.test/api/v1/vehicle-history/operator/requests/:id/offer", ({ request }) => {
-    if (request.method === "POST") return Response.json({ code: "HISTORY_OFFER_INVALID" }, { status: 400 });
+    if (request.method === "POST") return Response.json({ code }, { status });
     return Response.json({ version: 2, vin: "DEMA0000000000001", synthetic: true,
       preflight: { status: "available", providers: [{ name: "Carfax", originalReportDate: "2026-10-14" }] },
       proposal: { format: "pdf", priceTmt: 100, providerRule: "either_available_both_when_obtainable",
@@ -2071,7 +2090,7 @@ it("keeps the quote and date editors when the proposed delivery window is refuse
   fireEvent.change(screen.getByLabelText(fromLabel), { target: { value: "2026-11-21T08:00" } });
   fireEvent.change(screen.getByLabelText(byLabel), { target: { value: "2026-11-21T08:30" } });
   fireEvent.click(await enabledButton("Propose 100 TMT offer"));
-  expect((await screen.findByRole("alert")).textContent).toMatch(/today or tomorrow.*09:00–20:00/);
+  expect((await screen.findByRole("alert")).textContent).toBe(message);
   expect(screen.getByText("Delivery format: PDF only")).toBeTruthy();
   expect(screen.getByLabelText<HTMLInputElement>(fromLabel).value).toBe("2026-11-21T08:00");
   expect(screen.getByLabelText<HTMLInputElement>(byLabel).disabled).toBe(false);

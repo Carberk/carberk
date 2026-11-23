@@ -9,6 +9,18 @@ const booleanFlag = z
   .default("false")
   .transform((v) => v === "true");
 
+const providerBudgets = z.string().default("{}").transform((value, ctx): unknown => {
+  try { return JSON.parse(value); }
+  catch {
+    ctx.addIssue({ code: "custom", message: "Expected a JSON object of synthetic provider budgets" });
+    return z.NEVER;
+  }
+}).pipe(z.partialRecord(z.enum(["Carfax", "AutoCheck"]), z.object({
+  allowance: z.number().int().nonnegative(),
+  resetUtc: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
+  externalUsage: z.record(z.iso.date(), z.number().int().nonnegative()).default({}),
+}).strict()));
+
 const BaseSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /**
@@ -94,6 +106,7 @@ const BaseSchema = z.object({
   VEHICLE_HISTORY_SYNTHETIC_WALLET: z.string().regex(/^SYNTHETIC-[A-Z0-9-]{1,64}$/).or(z.literal("")).default(""),
   VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS: z.coerce.number().int().min(0).max(11).default(0),
   VEHICLE_HISTORY_SYNTHETIC_MORNING_SLOTS: z.coerce.number().int().min(0).max(1).default(0),
+  VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS: providerBudgets,
 
   /** Listing video uploads (ADR-0112): off by default; testers are User IDs. */
   LISTING_VIDEO_UPLOADS_ENABLED: booleanFlag,

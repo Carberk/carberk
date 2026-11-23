@@ -25,12 +25,12 @@ async function AuthorizedInbox({ locale, searchParams }: {
   locale: DeskLocale; searchParams: Promise<Record<string, string | string[] | undefined>> | undefined;
 }) {
   const search = await searchParams ?? {};
-  const values = Object.fromEntries(["filter", "search", "cursor"].flatMap((name) => {
+  const values = Object.fromEntries(["filter", "queue", "search", "cursor"].flatMap((name) => {
     const value = search[name];
     const last = Array.isArray(value) ? value.at(-1) : value;
     return last === undefined ? [] : [[name, last]];
   }));
-  const query = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned", ...values });
+  const query = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned", queue: "enquiry", ...values });
   const initial = query.success
     ? await historyInboxAction(locale, { kind: "queue", query: query.data })
     : { status: "validation" } as const;

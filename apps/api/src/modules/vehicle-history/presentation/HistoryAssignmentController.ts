@@ -34,8 +34,8 @@ export class HistoryAssignmentController {
     const input = VehicleHistorySchemas.HistoryQueueQuerySchema.safeParse(query);
     if (!input.success) throw new HistoryRequestError("HISTORY_REQUEST_INVALID");
     const result = await this.listRequests.execute(request.user ?? {}, input.data);
-    return { items: result.items.map((item) => ({ ...item, createdAt: item.createdAt.toISOString(), status: "enquiry" })),
-      nextCursor: result.nextCursor };
+    const status = input.data.queue === "paid" ? "paid" : "enquiry";
+    return { ...result, items: result.items.map((item) => ({ ...item, createdAt: item.createdAt.toISOString(), status })) };
   }
 
   @Get(":id")

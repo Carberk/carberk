@@ -17,8 +17,11 @@ describe("independent manual wallet verification over HTTP/Postgres", () => {
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 1);
   });
   afterEach(async () => { await f?.close(); });
-  async function accepted(times = { deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" }) {
-    const customer = await f.actor(null), operator = await f.actor();
+  async function accepted(
+    times = { deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" },
+    assignee?: Awaited<ReturnType<typeof f.actor>>,
+  ) {
+    const customer = await f.actor(null), operator = assignee ?? await f.actor();
     const id = (await f.request.post(`${root}/requests`).auth(customer.token, { type: "bearer" })
       .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
     const staff = `${root}/operator/requests/${id}`;
@@ -36,6 +39,48 @@ describe("independent manual wallet verification over HTTP/Postgres", () => {
     const checks = () => f.request.get(`${staff}/payment-verification?expectedAssignmentVersion=1`).auth(operator.token, { type: "bearer" });
     return { id, staff, customer, operator, input, order, verify, read, checks };
   }
+  it("shows only the operator's committed paid work in confirmation order", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 4);
+    const operator = await f.actor();
+    const createdFirst = await accepted(undefined, operator);
+    const confirmedFirst = await accepted({ deliveryFrom: "2026-11-21T07:00:00.000Z", deliveryBy: "2026-11-21T08:00:00.000Z" }, operator);
+    const late = await accepted({ deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" }, operator);
+    const other = await accepted({ deliveryFrom: "2026-11-21T09:00:00.000Z", deliveryBy: "2026-11-21T10:00:00.000Z" });
+    await other.verify().expect(201);
+    await confirmedFirst.verify().expect(201);
+    now = new Date("2026-11-21T05:10:00.000Z");
+    await createdFirst.verify().expect(201);
+    now = new Date(late.order.holdExpiresAt);
+    await late.verify().expect(201);
+
+    const response = await f.request.get(`${root}/operator/requests?filter=mine&queue=paid`)
+      .auth(operator.token, { type: "bearer" }).expect(200);
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.body.items.map(({ id, status }: { id: string; status: string }) => ({ id, status }))).toEqual([
+      { id: confirmedFirst.id, status: "paid" }, { id: createdFirst.id, status: "paid" },
+    ]);
+    expect(response.body.queueCounts).toEqual({ unassigned: 0, mine: 1, paid: 2 });
+    const enquiries = await f.request.get(`${root}/operator/requests?filter=mine&queue=enquiry`)
+      .auth(operator.token, { type: "bearer" }).expect(200);
+    expect(enquiries.body.items.map((item: { id: string }) => item.id)).toEqual([late.id]);
+  });
+  it("offers a spare second report to the oldest confirmed order first", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 4);
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {
+      Carfax: { allowance: 4, resetUtc: "00:00", externalUsage: {} },
+      AutoCheck: { allowance: 1, resetUtc: "00:00", externalUsage: {} },
+    });
+    const newerPayment = await accepted();
+    const olderPayment = await accepted({ deliveryFrom: "2026-11-21T07:00:00.000Z", deliveryBy: "2026-11-21T08:00:00.000Z" });
+    await olderPayment.verify().expect(201);
+    now = new Date("2026-11-21T05:10:00.000Z");
+    await newerPayment.verify().expect(201);
+    const plan = async (entry: typeof olderPayment) => (await f.request.get(`${entry.staff}/order?expectedAssignmentVersion=1`)
+      .auth(entry.operator.token, { type: "bearer" }).expect(200)).body.reportPlan;
+    expect(await plan(olderPayment)).toEqual({ primary: "Carfax", second: "AutoCheck" });
+    expect(await plan(newerPayment)).toEqual({ primary: "Carfax", second: null });
+    expect((await olderPayment.read().expect(200)).body).not.toHaveProperty("reportPlan");
+  });
   it("records one independent check, confirms full funds once and preserves the accepted snapshot", async () => {
     const e = await accepted();
     await e.verify({ ...e.input, walletChecked: false }).expect(400);
@@ -173,9 +218,9 @@ describe("independent manual wallet verification over HTTP/Postgres", () => {
     const path = `${root}/operator/requests/${id}`;
     await f.request.post(`${path}/claim`).auth(operator.token, { type: "bearer" }).send({ expectedAssignmentVersion: 0 }).expect(201);
     await f.request.post(`${path}/offer`).auth(operator.token, { type: "bearer" }).send({ kind: "check", vin: "DEMA0000000000001", expectedVersion: 0, expectedAssignmentVersion: 1 }).expect(201);
-    const offer = (await f.request.post(`${path}/offer`).auth(operator.token, { type: "bearer" }).send({ kind: "propose", expectedVersion: 1, expectedAssignmentVersion: 1,
-      format: "pdf", deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" }).expect(201)).body;
-    await f.request.post(`${root}/requests/${id}/order`).auth(other.token, { type: "bearer" }).send({ offer }).expect(409);
+    const blocked = await f.request.post(`${path}/offer`).auth(operator.token, { type: "bearer" }).send({ kind: "propose", expectedVersion: 1, expectedAssignmentVersion: 1,
+      format: "pdf", deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" }).expect(409);
+    expect(blocked.body.code).toBe("HISTORY_ORDER_CAPACITY");
     expect((await e.read().expect(200)).body.status).toBe("payment_confirmed");
   });
   it("refuses deleted requester authority after a row wait and refuses after-hours confirmation", async () => {

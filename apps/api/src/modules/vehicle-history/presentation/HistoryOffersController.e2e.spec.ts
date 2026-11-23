@@ -13,6 +13,7 @@ describe("VIN preflight and quote preview over current-authorized HTTP/Postgres"
   let f: Awaited<ReturnType<typeof historyFixture>>;
   beforeAll(async () => {
     f = await historyFixture();
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 4);
     f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:00:00.000Z");
   });
   afterAll(async () => { await f?.close(); });

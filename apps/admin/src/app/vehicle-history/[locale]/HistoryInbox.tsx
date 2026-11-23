@@ -15,14 +15,14 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   const openedHere = useRef(false);
   const raw = localUrl ?? params.toString();
   const url = new URLSearchParams(raw);
-  const query = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned",
-    ...Object.fromEntries([...url].filter(([name]) => ["filter", "search", "cursor"].includes(name))) });
+  const query = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned", queue: "enquiry",
+    ...Object.fromEntries([...url].filter(([name]) => ["filter", "queue", "search", "cursor"].includes(name))) });
   const id = V.HistoryRequestSchema.shape.id.safeParse(url.get("selected"));
   const version = V.ClaimHistoryRequestSchema.shape.expectedAssignmentVersion.safeParse(Number(url.get("v") ?? 0));
   const [revision, setRevision] = useState(0);
   const [readerRevision, setReaderRevision] = useState(0);
   const queueGeneration = useRef(0);
-  const queueUrl = new URLSearchParams([...url].filter(([name]) => ["filter", "search", "cursor", "selected", "v"].includes(name))).toString();
+  const queueUrl = new URLSearchParams([...url].filter(([name]) => ["filter", "queue", "search", "cursor", "selected", "v"].includes(name))).toString();
   const key = `${locale}?${queueUrl}`;
   const [queue, setQueue] = useState<{ key: string; source: HistoryInboxResult | undefined; result: HistoryInboxResult } | null>(
     initial ? { key, source: initial, result: initial } : null,
@@ -35,8 +35,8 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
   function navigate(changes: Record<string, string | null>, replace = false) {
     const next = new URLSearchParams(raw);
     for (const [name, value] of Object.entries(changes)) { if (value === null) next.delete(name); else next.set(name, value); }
-    if ("selected" in changes || "filter" in changes || "search" in changes || "cursor" in changes) next.delete("source");
-    const safe = new URLSearchParams([...next].filter(([name, value]) => ["filter", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"));
+    if ("selected" in changes || "filter" in changes || "queue" in changes || "search" in changes || "cursor" in changes) next.delete("source");
+    const safe = new URLSearchParams([...next].filter(([name, value]) => ["filter", "queue", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"));
     window.history[replace ? "replaceState" : "pushState"](null, "", `/vehicle-history/${locale}?${safe}${window.location.hash}`);
     setLocalUrl(safe.toString());
   }
@@ -73,8 +73,8 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
     let active = true;
     const generation = ++queueGeneration.current;
     const valid = () => active && generation === queueGeneration.current;
-    const parsed = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned",
-      ...Object.fromEntries([...new URLSearchParams(queueUrl)].filter(([name]) => ["filter", "search", "cursor"].includes(name))) });
+    const parsed = V.HistoryQueueQuerySchema.safeParse({ filter: "unassigned", queue: "enquiry",
+      ...Object.fromEntries([...new URLSearchParams(queueUrl)].filter(([name]) => ["filter", "queue", "search", "cursor"].includes(name))) });
     if (!parsed.success || offline) return;
     void historyInboxAction(locale, { kind: "queue", query: parsed.data,
       ...(initial?.status === "ok" ? { scope: initial.scope } : {}),
@@ -87,6 +87,9 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
     return () => { active = false; };
   }, [key, locale, queueUrl, revision, offline, initial]);
   const admitted = current?.status === "ok" && current.kind === "queue" ? current : null;
+  const paid = query.success && query.data.queue === "paid";
+  const counts = admitted?.data.queueCounts;
+  const countLabel = (count: number | undefined) => count === undefined ? null : <span className="tabular-nums">{count.toLocaleString(locale)}</span>;
   const selectedRow = admitted?.data.items.find((row) => id.success && row.id === id.data);
   const assignmentLost = selectedRow && version.success && version.data > 0 &&
     (!selectedRow.mine || selectedRow.assignmentVersion !== version.data || selectedRow.assignedOperator?.id !== admitted?.actor.id);
@@ -100,9 +103,14 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
     </header>
     {handoverNotice && <p role="status" aria-live="polite" className="mb-5 rounded-md border p-3 text-sm">{handoverNotice}</p>}
     <div className="mb-5 flex flex-wrap items-end gap-3">
-      <div className="flex flex-wrap gap-2" aria-label={t.filter}>
-        {(["unassigned", "mine"] as const).map((filter) => <Button key={filter} variant={query.success && query.data.filter === filter ? "primary" : "secondary"}
-          aria-pressed={query.success && query.data.filter === filter} onClick={() => navigate({ filter, cursor: null, selected: null, v: null })}>{t[filter]}</Button>)}
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t.filter}>
+        {(["unassigned", "mine"] as const).map((filter) => {
+          const selected = !paid && query.success && query.data.filter === filter;
+          return <Button key={filter} className="min-h-11" variant={selected ? "primary" : "secondary"} aria-pressed={selected}
+            onClick={() => navigate({ filter, queue: null, cursor: null, selected: null, v: null })}>{t[filter]}{countLabel(counts?.[filter])}</Button>;
+        })}
+        <Button className="min-h-11" variant={paid ? "primary" : "secondary"} aria-pressed={paid}
+          onClick={() => navigate({ filter: "mine", queue: "paid", cursor: null, selected: null, v: null })}>{t.paid}{countLabel(counts?.paid)}</Button>
       </div>
       <form className="w-full min-w-0 sm:min-w-72 sm:max-w-md sm:flex-1" onSubmit={(event) => {
         event.preventDefault(); const search = String(new FormData(event.currentTarget).get("search") ?? "").trim();
@@ -117,12 +125,12 @@ export function HistoryInbox({ locale, initial }: { locale: DeskLocale; initial?
       <Button variant="secondary" onClick={() => refresh()}>{t.refresh}</Button>
     </div>
     {admitted && !id.success && (offline || failure?.key === key) && <InboxNotice locale={locale} state={offline ? "offline" : "unavailable"} retry={() => refresh()} />}
-    {!query.success ? <InboxNotice locale={locale} state="validation" retry={() => navigate({ filter: "unassigned", search: null, cursor: null, selected: null, v: null }, true)} />
+    {!query.success ? <InboxNotice locale={locale} state="validation" retry={() => navigate({ filter: "unassigned", queue: null, search: null, cursor: null, selected: null, v: null }, true)} />
       : !admitted ? <InboxNotice locale={locale} state={offline ? "offline" : current?.status ?? (failure?.key === key ? failure.state : "loading")} retry={() => refresh()} />
         : <div className="grid min-h-[34rem] overflow-hidden rounded-lg border bg-background lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_22rem]">
           <section aria-labelledby="enquiry-queue" className="min-w-0 border-b p-3 lg:border-r lg:border-b-0">
-            <h2 id="enquiry-queue" className="mb-3 px-2 text-base font-semibold">{t.requests}</h2>
-            {!admitted.data.items.length && <p role="status" className="px-2 py-8 text-sm text-muted-foreground">{query.data.search ? t.noResults : query.data.cursor ? t.emptyPage : t.empty}</p>}
+            <h2 id="enquiry-queue" className="mb-3 px-2 text-base font-semibold">{paid ? t.paid : t.requests}</h2>
+            {!admitted.data.items.length && <p role="status" className="px-2 py-8 text-sm text-muted-foreground">{query.data.search ? t.noResults : query.data.cursor ? t.emptyPage : paid ? t.paidEmpty : t.empty}</p>}
             <ul id="history-queue" className="max-h-[30rem] space-y-1 overflow-y-auto">{admitted.data.items.map((row) => <li key={row.id}>
               <a href={`/vehicle-history/${locale}?${new URLSearchParams({ ...Object.fromEntries(Object.entries(query.data).filter((entry): entry is [string, string] => typeof entry[1] === "string")), selected: row.id, v: String(row.assignmentVersion) })}`}
                 aria-current={id.success && id.data === row.id ? "true" : undefined} onClick={(event) => {

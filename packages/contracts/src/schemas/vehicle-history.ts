@@ -45,19 +45,22 @@ export const HandoverHistoryResponseSchema = z.object({ id: HistoryRequestSchema
 export const HistoryAssigneesResponseSchema = z.object({ items: z.array(HistoryOperatorSchema.strict()) }).strict();
 export const HistoryQueueQuerySchema = z.object({
   filter: z.enum(["unassigned", "mine"]).optional(),
+  queue: z.enum(["enquiry", "paid"]).optional(),
   search: z.string().trim().min(1).max(64).optional(),
   cursor: z.string().guid().optional(),
 }).strict();
 export const HistoryRequesterIdentitySchema = PublicIdentitySchema.pick({ displayName: true, nameNumber: true, deleted: true }).strict();
 export const HistoryQueueItemSchema = z.object({
-  id: z.string().guid(), createdAt: DateTimeSchema, status: z.literal("enquiry"),
+  id: z.string().guid(), createdAt: DateTimeSchema, status: z.enum(["enquiry", "paid"]),
   assignmentVersion: z.number().int().min(0).max(2147483647), mine: z.boolean(),
   requester: HistoryRequesterIdentitySchema.nullable(), assignedOperator: HistoryOperatorSchema.strict().nullable(),
 }).strict();
-export const OperatorHistoryRequestSchema = HistoryQueueItemSchema.extend({ sourceListingId: z.string().guid().nullable() }).strict();
+export const OperatorHistoryRequestSchema = HistoryQueueItemSchema.extend({ status: z.literal("enquiry"), sourceListingId: z.string().guid().nullable() }).strict();
 export const HistoryQueueResponseSchema = z.object({
   items: z.array(HistoryQueueItemSchema).max(50),
   nextCursor: z.string().guid().nullable(),
+  queueCounts: z.object({ unassigned: z.number().int().nonnegative(), mine: z.number().int().nonnegative(),
+    paid: z.number().int().nonnegative() }).strict().optional(),
 }).strict();
 
 const MessageKeySchema = ServiceMessageSchema.shape.id;
