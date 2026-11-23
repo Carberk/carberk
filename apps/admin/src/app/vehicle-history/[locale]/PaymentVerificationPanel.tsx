@@ -9,8 +9,9 @@ import type { HistoryInboxResult } from "./actions";
 import { paymentCopy } from "@/lib/history-payment-copy";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
-export function PaymentVerificationPanel({ locale, id, version, scope, actorId, revision, invalidate, onOrder }: {
+export function PaymentVerificationPanel({ locale, id, version, scope, actorId, revision, invalidate, onOrder, hasReplacement = false }: {
   locale: DeskLocale; id: string; version: number; scope: string; actorId: string; revision: number;
+  hasReplacement?: boolean;
   invalidate: (result: HistoryInboxResult) => void; onOrder: (order: H.HistoryOrderState) => void;
 }) {
   const t = paymentCopy[locale];
@@ -87,9 +88,9 @@ export function PaymentVerificationPanel({ locale, id, version, scope, actorId, 
     {error && <p id={`payment-error-${id}`} role="alert" className="text-destructive">{error}</p>}
     {data && <>
       <div role="status" aria-live="polite" className="space-y-2">
-        <p className="font-medium">{confirmed ? confirmed.bookingCommitted ? t.confirmed : t.noHold
+        <p className="font-medium">{confirmed ? (confirmed.bookingCommitted || hasReplacement ? t.confirmed : t.noHold)
           : data.data.checks.length ? t.review : data.receipts.length ? t.receiptSubmitted : t.empty}</p>
-        {(confirmed || data.data.checks.length > 0) && <p>{confirmed ? confirmed.bookingCommitted ? t.next : t.noHoldNext : t.reviewNext}</p>}
+        {(!hasReplacement && (confirmed || data.data.checks.length > 0)) && <p>{confirmed ? confirmed.bookingCommitted ? t.next : t.noHoldNext : t.reviewNext}</p>}
       </div>
       {!confirmed && <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="space-y-4">
         <fieldset disabled={phase !== "ready" || !!intent} className="min-w-0 space-y-4" aria-describedby={error ? `payment-error-${id}` : undefined}>

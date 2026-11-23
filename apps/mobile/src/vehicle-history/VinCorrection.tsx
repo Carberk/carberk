@@ -6,18 +6,12 @@ import { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { ApiError } from "../api/client";
 import type { historyTranscript } from "../api/vehicle-history/messages";
 
+import { historyAttemptKey } from "./historyAttemptKey";
 import { retainedVinCorrection } from "./retainedVinCorrection";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-
-function attemptKey(random = Math.random) {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = Math.floor(random() * 16);
-    return (c === "x" ? r : r & 3 | 8).toString(16);
-  });
-}
 
 export function VinCorrection({ state, storageKey, stream, enabled, current, reconcile }: {
   state: H.HistoryOrderState; storageKey: string; stream: ReturnType<typeof historyTranscript>;
@@ -91,13 +85,14 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
   const timestamp = (value: string) => new Intl.DateTimeFormat(i18n.language === "tk" ? "en-GB" : i18n.language, {
     dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ashgabat", hourCycle: "h23",
   }).format(new Date(value));
-  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"]) {
+  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], current = false) {
+    const window = current && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
     return <View className="gap-2">
       <Text selectable className="font-mono text-callout">{offer.vin}</Text>
       <Text>{offer.proposal.priceTmt} TMT</Text>
       <Text>{offerCopy("format")}: {offerCopy(offer.proposal.format)}</Text>
       {offer.preflight.providers.map((p) => <Text key={p.name} className="text-callout">{p.name} · {offerCopy("date")}: {p.originalReportDate ?? offerCopy("unknown")}</Text>)}
-      <Text className="text-callout">{offerCopy("window")}: {timestamp(offer.proposal.deliveryFrom)} – {timestamp(offer.proposal.deliveryBy)}</Text>
+      <Text className="text-callout">{offerCopy("window")}: {timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>
     </View>;
   }
   const failure = ["uncertain", "changed", "denied", "storage", "invalid"].includes(phase);
@@ -109,7 +104,7 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       {(open || pending || failure) && <>
         <Text accessibilityRole="header" className="text-headline font-semibold">{copy(pending ? review ? "Reviewed" : "Waiting" : "Title")}</Text>
         <Text className="text-footnote text-muted-foreground">{copy("Policy")}</Text>
-        {pending && <><Text className="font-semibold">{copy("Current")}</Text>{facts(order.acceptedOffer)}
+        {pending && <><Text className="font-semibold">{copy("Current")}</Text>{facts(order.acceptedOffer, true)}
           <Text className="font-semibold">{copy("Proposed")}</Text>{!review?.offer.proposal && <Text selectable className="font-mono">{pending.vin}</Text>}</>}
         {review && <>
           <Text>{copy(review.cause === "company_error" ? "Company" : "Customer")}</Text>
@@ -117,7 +112,7 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
           {H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && <>
             {facts(H.AcceptedHistoryOfferSchema.parse(review.offer))}
             <Text>{offerCopy("rule")}</Text><Text>{offerCopy("rights")}</Text><Text>{offerCopy("terms")}</Text>
-            <Button disabled={!usable || !!vin.trim()} accessibilityState={{ busy: phase === "pending" }} onPress={() => { void run({ kind: "accept", attemptKey: attemptKey(),
+            <Button disabled={!usable || !!vin.trim()} accessibilityState={{ busy: phase === "pending" }} onPress={() => { void run({ kind: "accept", attemptKey: historyAttemptKey(),
               expectedVersion: agreement?.version ?? 0, offer: H.AcceptedHistoryOfferSchema.parse(review.offer) }); }}><Text>{copy("Accept")}</Text></Button>
           </>}
         </>}
@@ -125,7 +120,7 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
         <Input accessibilityLabel={copy("Vin")} accessibilityLabelledBy="corrected-vin-label" value={vin} onChangeText={setVin}
           maxLength={80} autoCapitalize="characters" autoCorrect={false} editable={usable} />
         <Button variant="secondary" disabled={!usable || !vin.trim()} accessibilityState={{ busy: phase === "pending" }}
-          onPress={() => { void run({ kind: "request", vin, attemptKey: attemptKey(), expectedVersion: agreement?.version ?? 0 }); }}><Text>{copy("Send")}</Text></Button>
+          onPress={() => { void run({ kind: "request", vin, attemptKey: historyAttemptKey(), expectedVersion: agreement?.version ?? 0 }); }}><Text>{copy("Send")}</Text></Button>
         {phase === "pending" && <Text accessibilityRole="alert">{copy("Saving")}</Text>}
         {failure && <Text accessibilityRole="alert">{phase === "invalid" ? offerCopy("malformed") : copy(phase === "denied" ? "Denied" : phase === "storage" ? "Storage" : phase === "changed" ? "Changed" : "Error")}</Text>}
         {phase === "uncertain" && <Button variant="secondary" disabled={!enabled} onPress={() => { void run(); }}><Text>{copy("Retry")}</Text></Button>}

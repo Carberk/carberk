@@ -4,7 +4,7 @@ import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
 import { HistoryCapacity } from "./HistoryCapacity";
 import { HISTORY_PREFLIGHT, normalizeHistoryVin, type HistoryPreflightPort } from "../domain/HistoryOffer";
-import { historyAgreement } from "../domain/HistoryOrder";
+import { bookedPayment, historyAgreement, historyBookingWindow } from "../domain/HistoryOrder";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
@@ -47,12 +47,12 @@ export class HistoryCorrections {
           const preflight = await this.preflight.check(previous.pending.vin);
           if (preflight?.status === "available") await this.capacity.correctionProvider(orders, order, preflight, now);
           const offer = { version, vin: previous.pending.vin, preflight, synthetic: true as const,
-            proposal: preflight?.status === "available" ? { ...order.acceptedOffer.proposal, format: input.format } : null };
+            proposal: preflight?.status === "available" ? { ...order.acceptedOffer.proposal, ...historyBookingWindow(order), format: input.format } : null };
           state = { ...state, pending: { ...previous.pending, review: { offer, cause: input.cause } } };
         } else {
           const review = previous.pending?.review;
           if (!review || !isDeepStrictEqual(review.offer, input.offer)) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
-          const confirmedBefore = (await orders.paymentChecks()).find((check) => check.bookingCommitted)?.confirmedAt ?? null;
+          const confirmedBefore = bookedPayment(order, await orders.paymentChecks())?.confirmedAt ?? null;
           provider = await this.capacity.correctionProvider(orders, order, input.offer.preflight, now, { confirmedBefore });
           state = { ...state, pending: null, acceptedRevision: version,
             accepted: [...previous.accepted, { revision: version, offer: input.offer, acceptedAt: at, cause: review.cause }] };

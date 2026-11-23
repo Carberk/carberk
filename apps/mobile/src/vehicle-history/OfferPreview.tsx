@@ -8,6 +8,8 @@ import { historyTranscript } from "../api/vehicle-history/messages";
 import { queryKeys } from "../api/queryKeys";
 import { ApiError } from "../api/client";
 
+import { ReplacementBooking } from "./ReplacementBooking";
+import { historyAttemptKey } from "./historyAttemptKey";
 import { PaymentProof } from "./PaymentProof";
 import { VinCorrection } from "./VinCorrection";
 import { historySessionCurrent, type HistoryViewer } from "./session";
@@ -25,6 +27,8 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const [vin, setVin] = useState(""), [saving, setSaving] = useState(false), [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [orderFailure, setOrderFailure] = useState<string | null>(null);
+  const [replacementIssue, setReplacementIssue] = useState<"Full" | "Changed" | "Denied" | "Unavailable" | null>(null);
+  const [deciding, setDeciding] = useState(false);
   const mounted = useRef(true), busy = useRef(false);
   const readGeneration = useRef(0), writeGeneration = useRef(0);
   const latest = useRef({ ready, metadataAvailable, active, connected });
@@ -49,15 +53,51 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
     enabled: ready && active && connected, retry: false, staleTime: 0, networkMode: "always",
     refetchOnWindowFocus: false, refetchOnReconnect: false });
   const refresh = state.refetch;
+  const refreshSummary = useRef(reconcileOrder);
+  refreshSummary.current = reconcileOrder;
   const orderState = state.data?.order;
   const accepted = orderState?.order;
   const data = accepted?.acceptedOffer ?? state.data?.offer;
+  const replacement = orderState?.replacement;
   useEffect(() => {
-    if (!active || !ready || !connected || !accepted || orderState.status !== "awaiting_synthetic_payment") return;
-    const remaining = new Date(accepted.holdExpiresAt).getTime() - new Date(orderState.serverNow).getTime();
-    const timer = setTimeout(() => { void refresh(); }, Math.max(0, remaining));
+    if (!active || !ready || !connected || !accepted) return;
+    const serverNow = Date.parse(orderState.serverNow);
+    const boundaries = [
+      !orderState.payment?.confirmedAt && (orderState.paymentDeadline ?? accepted.holdExpiresAt),
+      orderState.verificationResumesAt,
+      replacement?.status === "proposed" && replacement.window.deliveryFrom,
+    ].flatMap((value) => value && Date.parse(value) > serverNow ? [Date.parse(value) - serverNow] : []);
+    if (!boundaries.length) return;
+    const timer = setTimeout(() => { void refresh(); void refreshSummary.current(); }, Math.min(...boundaries));
     return () => clearTimeout(timer);
-  }, [active, ready, connected, accepted, orderState, refresh]);
+  }, [active, ready, connected, accepted, orderState, replacement, refresh]);
+  async function refreshReplacement() {
+    const result = await state.refetch();
+    if (!current()) return;
+    await reconcileOrder();
+    if (current() && !result.error) setReplacementIssue(null);
+  }
+  async function decideReplacement(kind: "accept" | "decline") {
+    if (!accepted || !replacement || replacementIssue || !current() || busy.current || state.isFetching || state.error) return;
+    busy.current = true; setDeciding(true);
+    const attempt = writeGeneration.current;
+    const owns = () => current() && attempt === writeGeneration.current;
+    try {
+      await stream.decideReplacement({ kind, attemptKey: historyAttemptKey(), orderId: accepted.id, expectedVersion: replacement.version }, owns);
+    } catch (error) {
+      if (owns()) setReplacementIssue(error instanceof ApiError && error.code === "HISTORY_REPLACEMENT_CAPACITY" ? "Full"
+        : error instanceof ApiError && error.status === 409 ? "Changed"
+          : error instanceof ApiError && [401, 403, 404].includes(error.status) ? "Denied" : "Unavailable");
+    } finally {
+      if (owns()) {
+        const result = await state.refetch();
+        if (owns()) await reconcileOrder();
+        if (owns() && result.error) setReplacementIssue("Unavailable");
+      }
+      busy.current = false;
+      if (mounted.current) setDeciding(false);
+    }
+  }
   async function accept() {
     if (!data || !current() || busy.current || state.isFetching || state.error || accepted || vin.trim()) return;
     const parsed = H.AcceptHistoryQuoteSchema.safeParse({ offer: data });
@@ -94,6 +134,8 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const denied = state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const error = failed || !!state.error;
   const proposal = data?.proposal;
+  const historicalWindow = replacement || orderState?.status === "hold_expired";
+  const originalWindow = historicalWindow ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
   const canEdit = ready && active && connected && !saving && !accepted;
   return <View className="gap-3 rounded-2xl border border-border p-4">
     {!accepted && <Text accessibilityRole="header" className="text-headline font-semibold">{copy("title")}</Text>}
@@ -112,15 +154,17 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
           {proposal && <View className="gap-3 border-y border-border py-4">
             <Text accessibilityRole="header" className="text-headline font-semibold">{copy(accepted ? "orderSummary" : "preview")}</Text>
             <Text>{copy("format")}: {copy(proposal.format)}</Text>
-            <Text>{copy("window")}: {timestamp(proposal.deliveryFrom)} – {timestamp(proposal.deliveryBy)}</Text>
+            {originalWindow && <Text>{historicalWindow ? t("vehicleHistory.replacementOriginal") : copy("window")}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}{historicalWindow ? ` · ${t("vehicleHistory.replacementTimeZone")}` : null}</Text>}
             {(!accepted || expanded) && proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
             {(!accepted || expanded) && <><Text className="text-callout">{copy("rights")}</Text><Text className="text-callout">{copy("terms")}</Text></>}
             {accepted ? <>
               <Text>{t("vehicleHistory.offerOrderPrice", { amount: accepted.acceptedOffer.proposal.priceTmt })}</Text>
               <Text>{copy("orderAccepted")}: {timestamp(accepted.acceptedAt)}</Text>
-              <Text>{copy("orderHold")}: {timestamp(accepted.holdExpiresAt)}</Text>
+              {orderState?.paymentDeadline && <Text>{t("vehicleHistory.replacementPaymentDeadline")}: {timestamp(orderState.paymentDeadline)}</Text>}
+              <Text>{orderState?.paymentDeadline ? t("vehicleHistory.replacementOriginalHold") : copy("orderHold")}: {timestamp(accepted.holdExpiresAt)}</Text>
               {orderState?.payment?.confirmedAt && <Text>{t("vehicleHistory.paymentConfirmedAt")}: {timestamp(orderState.payment.confirmedAt)}</Text>}
               {orderState?.payment?.receivedAt && <Text>{t("vehicleHistory.paymentReceivedAt")}: {timestamp(orderState.payment.receivedAt)}</Text>}
+              {orderState?.verificationResumesAt && <Text className="text-footnote text-muted-foreground">{t("vehicleHistory.replacementOvernight")}</Text>}
               {orderState?.wallet && ready && active && connected && !state.isFetching && <Text selectable className="font-mono text-callout">{orderState.wallet}</Text>}
               <Button variant="secondary" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)}><Text>{copy(expanded ? "orderHideDetails" : "orderDetails")}</Text></Button>
             </> : <>
@@ -133,6 +177,9 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
               <Button variant="secondary" disabled={!ready || !active || !connected || state.isFetching} onPress={() => { setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button>
             </View>}
           </View>}
+          {replacement && <ReplacementBooking replacement={replacement} formatTime={timestamp} enabled={ready && active && connected && !state.isFetching}
+            busy={deciding} issue={replacementIssue} onDecision={(kind) => { void decideReplacement(kind); }}
+            onRefresh={() => { void refreshReplacement(); }} />}
           {accepted && <PaymentProof key={`${userId}:${sessionId}:${request.id}:${accepted.id}`}
             viewer={viewer} requestId={request.id} orderId={accepted.id} ready={metadataAvailable && active && connected}
             reviewComplete={!!orderState?.payment?.confirmedAt} onSubmitted={async () => { await state.refetch(); if (canRead()) await reconcileOrder(); }} />}

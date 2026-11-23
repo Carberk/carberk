@@ -18,6 +18,8 @@ import { MinioHistoryPrivateStorage } from "./infrastructure/MinioHistoryPrivate
 import { HistoryPaymentProofSchemas as P } from "@auto-tm/contracts";
 import { AcceptHistoryQuote } from "./application/AcceptHistoryQuote";
 import { HistoryCapacity } from "./application/HistoryCapacity";
+import { HistoryReplacementBooking } from "./application/HistoryReplacementBooking";
+import { HistoryReplacementController } from "./presentation/HistoryReplacementController";
 import { ReadHistoryOrder } from "./application/ReadHistoryOrder";
 import { HistoryOrdersController } from "./presentation/HistoryOrdersController";
 import { HistoryOffersController } from "./presentation/HistoryOffersController";
@@ -80,10 +82,10 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
-  controllers: [HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
+  controllers: [HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryReplacementController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
   providers: [HistoryCorrections, HistoryFulfilment, HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
     { provide: HISTORY_PRIVATE_FILES, useClass: PrismaHistoryPrivateFiles },
-    { provide: HISTORY_PRIVATE_STORAGE, useClass: MinioHistoryPrivateStorage }, AcceptHistoryQuote, HistoryCapacity, ReadHistoryOrder, HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
+    { provide: HISTORY_PRIVATE_STORAGE, useClass: MinioHistoryPrivateStorage }, AcceptHistoryQuote, HistoryCapacity, HistoryReplacementBooking, ReadHistoryOrder, HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
     AddHistoryPrivateNote, ReadHistoryPrivateNotes, HistoryPrivateNoteProjection,
     { provide: HISTORY_PRIVATE_NOTE_REPOSITORY, useClass: PrismaHistoryPrivateNoteRepository },
     SyncHistoryWaiting, ChangeHistoryWaiting, ReadHistoryReminder, StopHistoryReminders, SendHistoryReminder, HistoryReminderProjection,
@@ -107,7 +109,7 @@ export class VehicleHistoryModule implements NestModule {
       const reminder = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/reminder(?:\/stop)?$/.test(route.url);
       const offer = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/offer$/.test(route.url);
       const payment = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/payment-verification$/.test(route.url);
-      const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment)$/.test(route.url);
+      const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment|replacement-booking)$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
       if (!payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
@@ -121,6 +123,6 @@ export class VehicleHistoryModule implements NestModule {
     // Runs before JSON parsing, so malformed payloads are private as well.
     consumer.apply((_request: unknown, response: ServerResponse, next: () => void) => {
       response.setHeader("Cache-Control", "private, no-store"); next();
-    }).forRoutes(HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController, HistoryOffersController, HistoryOrdersController);
+    }).forRoutes(HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController, HistoryOffersController, HistoryOrdersController, HistoryReplacementController);
   }
 }

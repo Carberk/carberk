@@ -220,10 +220,32 @@ model HistoryOrder {
   paymentChecks HistoryPaymentCheck[]
   vinAgreements HistoryVinAgreement[]
   fulfilmentEvents HistoryFulfilmentEvent[]
+  replacementEvents HistoryReplacementEvent[]
 
   @@unique([requestId, id])
   @@index([deliveryDay, holdExpiresAt])
   @@map("vehicle_history_orders")
+}
+
+model HistoryReplacementEvent {
+  requestId String
+  order HistoryOrder @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+  version Int
+  attemptKey String @db.Uuid
+  input Json
+  state Json
+  actorId String
+  assignmentVersion Int
+  acceptedRevision Int
+  recordedAt DateTime @db.Timestamptz(3)
+  bookingDay String?
+  bookingFrom DateTime? @db.Timestamptz(3)
+  bookingBy DateTime? @db.Timestamptz(3)
+  bookingProvider String?
+
+  @@id([requestId, version])
+  @@unique([requestId, attemptKey])
+  @@map("history_replacement_events")
 }
 
 model HistoryVinAgreement {

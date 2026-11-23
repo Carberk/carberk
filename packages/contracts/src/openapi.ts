@@ -4,7 +4,7 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 
 import * as PaymentProof from "./schemas/history-payment-proof";
-import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema } from "./schemas/history-order";
+import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema } from "./schemas/history-order";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -481,6 +481,19 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       409: { description: "Offer or assignment changed; refresh" }, 503: { description: "Temporarily unavailable" } },
   });
   registry.register("HistoryOrderState", HistoryOrderStateSchema);
+  registry.register("HistoryReplacementState", HistoryReplacementStateSchema);
+  for (const operator of [false, true]) registry.registerPath({
+    method: "post", path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/replacement-booking`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: operator ? "Propose a feasible replacement window or request a refund decision"
+      : "Explicitly accept or decline the exact replacement for the paid order",
+    request: { params: z.object({ id: z.string().guid() }), query: ReadHistoryOfferSchema,
+      body: { content: { "application/json": { schema: operator ? HistoryOperatorReplacementSchema : HistoryReplacementDecisionSchema } } } },
+    responses: { 201: { description: "Current private replacement state",
+      content: { "application/json": { schema: HistoryReplacementStateSchema } } },
+      400: { description: "Invalid replacement action" }, 403: { description: "Current session and request authority required" },
+      409: { description: "Replacement changed, expired or filled; refresh the order" }, 503: { description: "Read back before retrying" } },
+  });
   for (const operator of [false, true]) for (const method of ["get", "post"] as const) registry.registerPath({
     method, path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/correction`,
     tags: ["Vehicle History"], security: [{ bearerAuth: [] }],

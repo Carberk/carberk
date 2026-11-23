@@ -88,11 +88,32 @@ export const HistoryFulfilmentViewSchema = z.object({
 export type HistoryFulfilmentView = z.infer<typeof HistoryFulfilmentViewSchema>;
 export const HistoryPreparationSchema = z.enum(["queued", "preparing", "checking", "recovery"]);
 
+const ReplacementWindow = HistoryQuotePreviewSchema.pick({ deliveryFrom: true, deliveryBy: true });
+const ReplacementIntent = z.object({ orderId: z.string().guid(), expectedVersion: Version, attemptKey: z.string().guid() });
+export const HistoryReplacementDecisionSchema = ReplacementIntent.extend({ kind: z.enum(["accept", "decline"]) }).strict();
+export const HistoryOperatorReplacementSchema = z.discriminatedUnion("kind", [
+  ReplacementIntent.extend({ kind: z.literal("propose"), expectedAssignmentVersion: Version, ...ReplacementWindow.shape }).strict(),
+  ReplacementIntent.extend({ kind: z.literal("no_window"), expectedAssignmentVersion: Version }).strict(),
+]);
+export type HistoryReplacementDecision = z.infer<typeof HistoryReplacementDecisionSchema>;
+export type HistoryOperatorReplacement = z.infer<typeof HistoryOperatorReplacementSchema>;
+export type HistoryReplacementMutation = HistoryReplacementDecision | HistoryOperatorReplacement;
+export const HistoryReplacementStateSchema = z.discriminatedUnion("status", [
+  z.object({ version: Version, status: z.literal("awaiting_proposal") }).strict(),
+  z.object({ version: Version, status: z.enum(["proposed", "expired", "superseded"]), window: ReplacementWindow }).strict(),
+  z.object({ version: Version, status: z.literal("accepted"), window: ReplacementWindow, acceptedAt: DateTimeSchema }).strict(),
+  z.object({ version: Version, status: z.literal("refund_decision_pending"), reason: z.enum(["declined", "no_window"]), requestedAt: DateTimeSchema }).strict(),
+]);
+export type HistoryReplacementState = z.infer<typeof HistoryReplacementStateSchema>;
+
 export const HistoryOrderStateSchema = z.object({
   order: HistoryAcceptedOrderSchema.nullable(),
   agreement: HistoryCorrectionStateSchema.optional(),
   status: z.enum(["enquiry", "awaiting_synthetic_payment", "hold_expired", "receipt_submitted", "payment_review", "payment_confirmed", "payment_received_no_hold"]),
   payment: HistoryPaymentSummarySchema.optional(),
+  replacement: HistoryReplacementStateSchema.optional(),
+  paymentDeadline: DateTimeSchema.optional(),
+  verificationResumesAt: DateTimeSchema.optional(),
   reportPlan: z.object({ primary: ProviderName, second: ProviderName.nullable() }).strict().optional(),
   preparation: HistoryPreparationSchema.optional(), fulfilment: HistoryFulfilmentViewSchema.optional(),
   fulfilmentUnavailable: z.enum(["capacity", "booking_closed"]).optional(),

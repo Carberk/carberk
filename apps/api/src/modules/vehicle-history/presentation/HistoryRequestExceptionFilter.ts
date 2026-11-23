@@ -4,6 +4,9 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_REPLACEMENT_INVALID: "Check the new delivery window and try again.",
+    HISTORY_REPLACEMENT_CONFLICT: "This delivery window changed or is no longer available. Refresh the order.",
+    HISTORY_REPLACEMENT_CAPACITY: "This delivery window is full. Refresh the order for your next step. Your payment is still recorded.",
     HISTORY_FULFILMENT_INVALID: "Check the accepted VIN, provider, format and fulfilment action.",
     HISTORY_FULFILMENT_CONFLICT: "Fulfilment changed or this action is unavailable. Refresh and check the recorded intent.",
     HISTORY_FULFILMENT_FIFO: "Work on the earlier confirmed order first.",
@@ -48,6 +51,9 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_REPLACEMENT_INVALID: "Проверьте новое время доставки и повторите попытку.",
+    HISTORY_REPLACEMENT_CONFLICT: "Время доставки изменилось или больше недоступно. Обновите заказ.",
+    HISTORY_REPLACEMENT_CAPACITY: "На это время мест уже нет. Обновите заказ, чтобы узнать, что делать дальше. Ваша оплата учтена.",
     HISTORY_FULFILMENT_INVALID: "Проверьте согласованные VIN, поставщика, формат и выбранное действие.",
     HISTORY_FULFILMENT_CONFLICT: "Состояние заказа изменилось или действие недоступно. Обновите данные и проверьте записанное намерение.",
     HISTORY_FULFILMENT_FIFO: "Сначала обработайте заказ, оплаченный раньше.",
@@ -92,6 +98,9 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_REPLACEMENT_INVALID: "Täze gowşuryş wagtyny barlap, gaýtadan synanyşyň.",
+    HISTORY_REPLACEMENT_CONFLICT: "Gowşuryş wagty üýtgedi ýa-da indi elýeterli däl. Sargydy täzeläň.",
+    HISTORY_REPLACEMENT_CAPACITY: "Bu wagta boş ýer ýok. Indiki ädimi görmek üçin sargydy täzeläň. Tölegiňiz hasaba alyndy.",
     HISTORY_FULFILMENT_INVALID: "Kabul edilen VIN-i, üpjün edijini, görnüşi we saýlanan amaly barlaň.",
     HISTORY_FULFILMENT_CONFLICT: "Sargydyň ýagdaýy üýtgedi ýa-da amal elýeterli däl. Täzeläp, ýazylan amaly barlaň.",
     HISTORY_FULFILMENT_FIFO: "Ilki tölegi has ir tassyklanan sargydy işläň.",
@@ -202,8 +211,8 @@ export function historyRequestFailure(error: unknown, language: string | undefin
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
   const status = error instanceof HttpException ? error.getStatus() : code === "HISTORY_PAYMENT_UNAVAILABLE" || code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
-    : code === "HISTORY_FULFILMENT_CONFLICT" || code === "HISTORY_FULFILMENT_FIFO" || code === "HISTORY_CORRECTION_CONFLICT" || code === "HISTORY_CORRECTION_CLOSED" || code === "HISTORY_PAYMENT_CONFLICT" || code === "HISTORY_PAYMENT_CLOSED" || code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
-      : code === "HISTORY_FULFILMENT_INVALID" || code === "HISTORY_CORRECTION_INVALID" || code === "HISTORY_PAYMENT_INVALID" || code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
+    : code === "HISTORY_REPLACEMENT_CONFLICT" || code === "HISTORY_REPLACEMENT_CAPACITY" || code === "HISTORY_FULFILMENT_CONFLICT" || code === "HISTORY_FULFILMENT_FIFO" || code === "HISTORY_CORRECTION_CONFLICT" || code === "HISTORY_CORRECTION_CLOSED" || code === "HISTORY_PAYMENT_CONFLICT" || code === "HISTORY_PAYMENT_CLOSED" || code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
+      : code === "HISTORY_REPLACEMENT_INVALID" || code === "HISTORY_FULFILMENT_INVALID" || code === "HISTORY_CORRECTION_INVALID" || code === "HISTORY_PAYMENT_INVALID" || code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"
         || code === "HISTORY_NOTE_INVALID" || code === "HISTORY_NOTE_CURSOR" ? 400 : 403;
   return { statusCode: status, code, message: messages[locale === "tk" || locale === "ru" ? locale : "en"][code] };
 }
