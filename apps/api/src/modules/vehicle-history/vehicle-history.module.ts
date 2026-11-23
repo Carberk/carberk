@@ -1,3 +1,5 @@
+import { HistoryPayments } from "./application/HistoryPayments";
+import { HistoryPaymentsController } from "./presentation/HistoryPaymentsController";
 import { HistoryPaymentProofsController } from "./presentation/HistoryPaymentProofsController";
 import { HistoryPrivateFileAccess } from "./application/HistoryPrivateFileAccess";
 import { ListHistoryPaymentProofs } from "./application/ListHistoryPaymentProofs";
@@ -74,8 +76,8 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
-  controllers: [HistoryPaymentProofsController, HistoryOrdersController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
-  providers: [HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
+  controllers: [HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
+  providers: [HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
     { provide: HISTORY_PRIVATE_FILES, useClass: PrismaHistoryPrivateFiles },
     { provide: HISTORY_PRIVATE_STORAGE, useClass: MinioHistoryPrivateStorage }, AcceptHistoryQuote, ReadHistoryOrder, HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
     AddHistoryPrivateNote, ReadHistoryPrivateNotes, HistoryPrivateNoteProjection,
@@ -100,20 +102,21 @@ export class VehicleHistoryModule implements NestModule {
       const message = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(messages|receipts)$/.test(route.url);
       const reminder = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/reminder(?:\/stop)?$/.test(route.url);
       const offer = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/offer$/.test(route.url);
+      const payment = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/payment-verification$/.test(route.url);
       const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/order$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
-      if (!proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
+      if (!payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
       route.errorHandler = (error, request, reply) => {
         const response = historyRequestFailure(new HistoryRequestError(error.statusCode && error.statusCode < 500
-          ? proof ? "HISTORY_PROOF_INVALID" : order ? "HISTORY_ORDER_INVALID" : offer ? "HISTORY_OFFER_INVALID" : reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
-          : proof ? "HISTORY_PROOF_UNAVAILABLE" : order ? "HISTORY_ORDER_UNAVAILABLE" : offer ? "HISTORY_OFFER_UNAVAILABLE" : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
+          ? payment ? "HISTORY_PAYMENT_INVALID" : proof ? "HISTORY_PROOF_INVALID" : order ? "HISTORY_ORDER_INVALID" : offer ? "HISTORY_OFFER_INVALID" : reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
+          : payment ? "HISTORY_PAYMENT_UNAVAILABLE" : proof ? "HISTORY_PROOF_UNAVAILABLE" : order ? "HISTORY_ORDER_UNAVAILABLE" : offer ? "HISTORY_OFFER_UNAVAILABLE" : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
         void reply.header("Cache-Control", "private, no-store").status(response.statusCode).send(response);
       };
     });
     // Runs before JSON parsing, so malformed payloads are private as well.
     consumer.apply((_request: unknown, response: ServerResponse, next: () => void) => {
       response.setHeader("Cache-Control", "private, no-store"); next();
-    }).forRoutes(HistoryPaymentProofsController, HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController, HistoryOffersController, HistoryOrdersController);
+    }).forRoutes(HistoryPaymentsController, HistoryPaymentProofsController, HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController, HistoryOffersController, HistoryOrdersController);
   }
 }

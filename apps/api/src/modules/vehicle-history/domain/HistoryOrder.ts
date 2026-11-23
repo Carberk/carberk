@@ -1,4 +1,4 @@
-import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
+import type { HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
 import { HistoryRequestError } from "./HistoryRequestError";
 
 export type StoredHistoryOrder = H.HistoryAcceptedOrder & { wallet: string };
@@ -7,6 +7,9 @@ export interface HistoryOrderStore {
   serialize<T>(operation: () => Promise<T>): Promise<T>;
   capacity(day: string, from: Date, by: Date, now: Date): Promise<{ total: number; morning: number; overlapping: number }>;
   create(order: StoredHistoryOrder): Promise<void>;
+  paymentChecks(): Promise<P.HistoryPaymentCheck[]>;
+  savePaymentCheck(check: P.HistoryPaymentCheck): Promise<void>;
+  submittedProofIds(): Promise<string[]>;
 }
 
 export function historyDeliveryDay(from: Date, by: Date, now: Date) {
@@ -22,10 +25,16 @@ export function historyDeliveryDay(from: Date, by: Date, now: Date) {
   return day;
 }
 
-export function historyOrderState(stored: StoredHistoryOrder | null, now: Date): H.HistoryOrderState {
+export function historyOrderState(stored: StoredHistoryOrder | null, now: Date, checks: P.HistoryPaymentCheck[] = [], submitted = false): H.HistoryOrderState {
   if (!stored) return { order: null, status: "enquiry", serverNow: now.toISOString(), wallet: null, collectionEnabled: false };
   const { wallet, ...order } = stored;
   const active = new Date(order.holdExpiresAt) > now;
-  return { order, status: active ? "awaiting_synthetic_payment" : "hold_expired", serverNow: now.toISOString(),
-    wallet: active ? wallet : null, collectionEnabled: false };
+  const check = checks.at(-1);
+  const payment = check ? { outcome: check.input.outcome, amountMinor: check.input.amountMinor,
+    receivedAt: check.input.receivedAt, confirmedAt: check.confirmedAt, bookingCommitted: check.bookingCommitted }
+    : submitted ? { outcome: "receipt_submitted" as const, amountMinor: 0, receivedAt: null, confirmedAt: null, bookingCommitted: false } : undefined;
+  const status = check?.confirmedAt ? check.bookingCommitted ? "payment_confirmed" : "payment_received_no_hold"
+    : !active ? "hold_expired" : check ? "payment_review" : submitted ? "receipt_submitted" : "awaiting_synthetic_payment";
+  return { order, status, serverNow: now.toISOString(), ...(payment ? { payment } : {}),
+    wallet: active && !payment ? wallet : null, collectionEnabled: false };
 }

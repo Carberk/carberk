@@ -2,6 +2,8 @@ import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 
+import { PaymentStatus } from "./PaymentStatus";
+
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 
@@ -10,10 +12,8 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
 }) {
   const { t, i18n } = useTranslation();
   if (!state.order) return null;
-  const expired = state.status === "hold_expired";
   const copy = (key: string) => t(`vehicleHistory.offer${key}`);
-  const status = <Text accessibilityLiveRegion="polite" className="text-callout font-semibold">{copy(expired ? "OrderExpired" : "OrderWaiting")} · 100 TMT</Text>;
-  if (compact) return <View className="border-b border-border bg-card px-5 py-2">{status}</View>;
+  if (compact) return <View className="border-b border-border bg-card px-5 py-2"><PaymentStatus state={state} compact /></View>;
 
   const offer = state.order.acceptedOffer;
   const timestamp = (value: string) => new Intl.DateTimeFormat(i18n.language === "tk" ? "en-GB" : i18n.language, {
@@ -22,10 +22,9 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
   return <View className="border-b border-border bg-card px-5 py-3">
     <View className="flex-row items-start justify-between gap-3">
       <View className="flex-1 gap-1">
-        {status}
+        <PaymentStatus state={state} summary />
         <Text selectable className="font-mono text-footnote">{offer.vin} · {copy({ pdf: "Pdf", link: "Link", both: "Both" }[offer.proposal.format])}</Text>
         <Text className="text-footnote">{timestamp(offer.proposal.deliveryFrom)} – {timestamp(offer.proposal.deliveryBy)}</Text>
-        <Text className="text-footnote text-muted-foreground">{copy(expired ? "OrderStatusExpired" : "OrderStatusNext")}</Text>
       </View>
       <Button variant="secondary" size="sm" disabled={!ready} onPress={onDetails}><Text>{copy("OrderStatusDetails")}</Text></Button>
     </View>

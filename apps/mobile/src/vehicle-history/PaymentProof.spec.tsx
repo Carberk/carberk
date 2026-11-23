@@ -94,6 +94,24 @@ it.each([
   expect(sent).toMatchObject([{ orderId: id, contentType: "image/png", sizeBytes: 100 }]);
   expect(current).toEqual(accepted);
 });
+it.each([
+  ["receipt_submitted", "receipt_submitted", "Receipt submitted", "Wait for the operator to check the receiving wallet. Do not pay again."],
+  ["payment_review", "partial", "Partial payment under review", "The operator is reconciling the amount. Continue in this conversation; do not pay again."],
+  ["payment_review", "unmatched", "Transfer not matched", "Check the transfer destination and send its reference here. Do not pay again."],
+  ["payment_review", "uncertain", "Payment under review", "The operator is checking the transfer. Continue in this conversation; do not pay again."],
+  ["payment_confirmed", "matched", "Payment confirmed", "Your accepted booking is confirmed. No further payment is needed."],
+  ["payment_received_no_hold", "matched", "Money received · booking needs agreement", "Your money is recorded. Contact the operator to agree a feasible window; do not pay again."],
+] as const)("renders authoritative %s / %s in the real request route without showing transfer instructions", async (status, outcome, heading, next) => {
+  current = { ...accepted, wallet: null, status, payment: { outcome, amountMinor: outcome === "partial" ? 6000 : 10000,
+    receivedAt: "2026-11-21T05:00:00.000Z", confirmedAt: outcome === "matched" ? "2026-11-21T05:01:00.000Z" : null,
+    bookingCommitted: status === "payment_confirmed" } };
+  const view = await renderMobile(<RequestScreen />);
+  await view.findAllByText(`${heading} · 100 TMT`);
+  await view.findAllByText(next);
+  if (outcome === "partial") expect(view.getByText("Amount checked: 60 TMT")).toBeTruthy();
+  expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
+  expect(sent).toEqual([]);
+});
 it("retains selection across interruption and route reopen, retrying the same attempt with no second payment", async () => {
   proofDevice.failUpload = true;
   const view = await renderMobile(<RequestScreen />);

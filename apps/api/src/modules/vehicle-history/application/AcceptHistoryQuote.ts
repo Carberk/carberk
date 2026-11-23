@@ -23,7 +23,7 @@ export class AcceptHistoryQuote {
       const previous = await orders.read();
       if (previous) {
         if (!isDeepStrictEqual(previous.acceptedOffer, input.offer)) throw new HistoryRequestError("HISTORY_ORDER_CONFLICT");
-        return historyOrderState(previous, this.clock.now());
+        return historyOrderState(previous, this.clock.now(), await orders.paymentChecks(), (await orders.submittedProofIds()).length > 0);
       }
       if (!isDeepStrictEqual(await offer.read(), input.offer)) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       const facts = await this.sync.execute(requester, objectId, waiting);

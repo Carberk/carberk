@@ -216,10 +216,28 @@ model HistoryOrder {
   holdExpiresAt DateTime @db.Timestamptz(3)
 
   privateFiles HistoryPrivateFile[]
+  paymentChecks HistoryPaymentCheck[]
 
   @@unique([requestId, id])
   @@index([deliveryDay, holdExpiresAt])
   @@map("vehicle_history_orders")
+}
+
+model HistoryPaymentCheck {
+  requestId String
+  orderId String @db.Uuid
+  order HistoryOrder @relation(fields: [requestId, orderId], references: [requestId, id], onDelete: Restrict, onUpdate: NoAction)
+  attemptKey String @db.Uuid
+  version Int
+  actorId String
+  input Json
+  checkedAt DateTime @db.Timestamptz(3)
+  confirmedAt DateTime? @db.Timestamptz(3)
+  bookingCommitted Boolean
+
+  @@id([requestId, attemptKey])
+  @@unique([requestId, version])
+  @@map("history_payment_checks")
 }
 
 model HistoryPrivateFile {

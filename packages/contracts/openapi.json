@@ -9300,8 +9300,52 @@
             "enum": [
               "enquiry",
               "awaiting_synthetic_payment",
-              "hold_expired"
+              "hold_expired",
+              "receipt_submitted",
+              "payment_review",
+              "payment_confirmed",
+              "payment_received_no_hold"
             ]
+          },
+          "payment": {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "receipt_submitted",
+                  "matched",
+                  "partial",
+                  "unmatched",
+                  "uncertain"
+                ]
+              },
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "receivedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "confirmedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "bookingCommitted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "outcome",
+              "amountMinor",
+              "receivedAt",
+              "confirmedAt",
+              "bookingCommitted"
+            ],
+            "additionalProperties": false
           },
           "serverNow": {
             "type": "string",
@@ -9325,6 +9369,137 @@
           "serverNow",
           "wallet",
           "collectionEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "HistoryPaymentVerification": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "type": "object",
+                  "properties": {
+                    "attemptKey": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "expectedAssignmentVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "expectedPaymentVersion": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "walletChecked": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": [
+                        "matched",
+                        "partial",
+                        "unmatched",
+                        "uncertain"
+                      ]
+                    },
+                    "amountMinor": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000000
+                    },
+                    "reference": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "evidence": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "evidenceFileId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "attemptKey",
+                    "orderId",
+                    "expectedAssignmentVersion",
+                    "expectedPaymentVersion",
+                    "walletChecked",
+                    "outcome",
+                    "amountMinor",
+                    "reference",
+                    "evidence",
+                    "evidenceFileId",
+                    "receivedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "actorId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "checkedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "confirmedAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "date-time"
+                },
+                "bookingCommitted": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "input",
+                "actorId",
+                "version",
+                "checkedAt",
+                "confirmedAt",
+                "bookingCommitted"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "orderId",
+          "version",
+          "checks"
         ],
         "additionalProperties": false
       },
@@ -11920,6 +12095,446 @@
         }
       }
     },
+    "/api/v1/vehicle-history/operator/requests/{id}/payment-verification": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read assigned independent synthetic wallet checks",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private checks; verified funds without a valid hold do not commit a booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "object",
+                            "properties": {
+                              "attemptKey": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "orderId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "expectedAssignmentVersion": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "expectedPaymentVersion": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "walletChecked": {
+                                "type": "boolean",
+                                "enum": [
+                                  true
+                                ]
+                              },
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "matched",
+                                  "partial",
+                                  "unmatched",
+                                  "uncertain"
+                                ]
+                              },
+                              "amountMinor": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000000
+                              },
+                              "reference": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "evidence": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "evidenceFileId": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uuid"
+                              },
+                              "receivedAt": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "attemptKey",
+                              "orderId",
+                              "expectedAssignmentVersion",
+                              "expectedPaymentVersion",
+                              "walletChecked",
+                              "outcome",
+                              "amountMinor",
+                              "reference",
+                              "evidence",
+                              "evidenceFileId",
+                              "receivedAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "actorId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "checkedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "confirmedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time"
+                          },
+                          "bookingCommitted": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "input",
+                          "actorId",
+                          "version",
+                          "checkedAt",
+                          "confirmedAt",
+                          "bookingCommitted"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "orderId",
+                    "version",
+                    "checks"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Independent wallet check and valid amount/reference/evidence/time required"
+          },
+          "403": {
+            "description": "Current session/purpose/assignment/object authority refused"
+          },
+          "409": {
+            "description": "Review changed or outside staffed hours; reconcile through readback"
+          },
+          "503": {
+            "description": "Refresh before retrying the same check"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Record one independent synthetic wallet check without wallet access",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "attemptKey": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "expectedAssignmentVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "expectedPaymentVersion": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "walletChecked": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "matched",
+                      "partial",
+                      "unmatched",
+                      "uncertain"
+                    ]
+                  },
+                  "amountMinor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100000000
+                  },
+                  "reference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "evidence": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "evidenceFileId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  },
+                  "receivedAt": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "attemptKey",
+                  "orderId",
+                  "expectedAssignmentVersion",
+                  "expectedPaymentVersion",
+                  "walletChecked",
+                  "outcome",
+                  "amountMinor",
+                  "reference",
+                  "evidence",
+                  "evidenceFileId",
+                  "receivedAt"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Private checks; verified funds without a valid hold do not commit a booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orderId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "input": {
+                            "type": "object",
+                            "properties": {
+                              "attemptKey": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "orderId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "expectedAssignmentVersion": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "expectedPaymentVersion": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "walletChecked": {
+                                "type": "boolean",
+                                "enum": [
+                                  true
+                                ]
+                              },
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "matched",
+                                  "partial",
+                                  "unmatched",
+                                  "uncertain"
+                                ]
+                              },
+                              "amountMinor": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100000000
+                              },
+                              "reference": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "evidence": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "evidenceFileId": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uuid"
+                              },
+                              "receivedAt": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "attemptKey",
+                              "orderId",
+                              "expectedAssignmentVersion",
+                              "expectedPaymentVersion",
+                              "walletChecked",
+                              "outcome",
+                              "amountMinor",
+                              "reference",
+                              "evidence",
+                              "evidenceFileId",
+                              "receivedAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "actorId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "checkedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "confirmedAt": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "date-time"
+                          },
+                          "bookingCommitted": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "input",
+                          "actorId",
+                          "version",
+                          "checkedAt",
+                          "confirmedAt",
+                          "bookingCommitted"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "orderId",
+                    "version",
+                    "checks"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Independent wallet check and valid amount/reference/evidence/time required"
+          },
+          "403": {
+            "description": "Current session/purpose/assignment/object authority refused"
+          },
+          "409": {
+            "description": "Review changed or outside staffed hours; reconcile through readback"
+          },
+          "503": {
+            "description": "Refresh before retrying the same check"
+          }
+        }
+      }
+    },
     "/api/v1/vehicle-history/requests/{id}/order": {
       "get": {
         "tags": [
@@ -12104,8 +12719,52 @@
                       "enum": [
                         "enquiry",
                         "awaiting_synthetic_payment",
-                        "hold_expired"
+                        "hold_expired",
+                        "receipt_submitted",
+                        "payment_review",
+                        "payment_confirmed",
+                        "payment_received_no_hold"
                       ]
+                    },
+                    "payment": {
+                      "type": "object",
+                      "properties": {
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "receipt_submitted",
+                            "matched",
+                            "partial",
+                            "unmatched",
+                            "uncertain"
+                          ]
+                        },
+                        "amountMinor": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "receivedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "confirmedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "bookingCommitted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "outcome",
+                        "amountMinor",
+                        "receivedAt",
+                        "confirmedAt",
+                        "bookingCommitted"
+                      ],
+                      "additionalProperties": false
                     },
                     "serverNow": {
                       "type": "string",
@@ -12466,8 +13125,52 @@
                       "enum": [
                         "enquiry",
                         "awaiting_synthetic_payment",
-                        "hold_expired"
+                        "hold_expired",
+                        "receipt_submitted",
+                        "payment_review",
+                        "payment_confirmed",
+                        "payment_received_no_hold"
                       ]
+                    },
+                    "payment": {
+                      "type": "object",
+                      "properties": {
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "receipt_submitted",
+                            "matched",
+                            "partial",
+                            "unmatched",
+                            "uncertain"
+                          ]
+                        },
+                        "amountMinor": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "receivedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "confirmedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "bookingCommitted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "outcome",
+                        "amountMinor",
+                        "receivedAt",
+                        "confirmedAt",
+                        "bookingCommitted"
+                      ],
+                      "additionalProperties": false
                     },
                     "serverNow": {
                       "type": "string",
@@ -12705,8 +13408,52 @@
                       "enum": [
                         "enquiry",
                         "awaiting_synthetic_payment",
-                        "hold_expired"
+                        "hold_expired",
+                        "receipt_submitted",
+                        "payment_review",
+                        "payment_confirmed",
+                        "payment_received_no_hold"
                       ]
+                    },
+                    "payment": {
+                      "type": "object",
+                      "properties": {
+                        "outcome": {
+                          "type": "string",
+                          "enum": [
+                            "receipt_submitted",
+                            "matched",
+                            "partial",
+                            "unmatched",
+                            "uncertain"
+                          ]
+                        },
+                        "amountMinor": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "receivedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "confirmedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "bookingCommitted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "outcome",
+                        "amountMinor",
+                        "receivedAt",
+                        "confirmedAt",
+                        "bookingCommitted"
+                      ],
+                      "additionalProperties": false
                     },
                     "serverNow": {
                       "type": "string",

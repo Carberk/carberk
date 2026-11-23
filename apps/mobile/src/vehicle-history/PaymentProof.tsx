@@ -22,7 +22,9 @@ function receiptAttemptKey() {
   });
 }
 
-export function PaymentProof({ viewer, requestId, orderId, ready }: { viewer: HistoryViewer; requestId: string; orderId: string; ready: boolean }) {
+export function PaymentProof({ viewer, requestId, orderId, ready, reviewComplete = false, onSubmitted }: {
+  viewer: HistoryViewer; requestId: string; orderId: string; ready: boolean; reviewComplete?: boolean; onSubmitted?: () => Promise<unknown>;
+}) {
   const { t } = useTranslation();
   const copy = (key: string, values?: Record<string, unknown>) => t(`vehicleHistory.proof${key}`, values);
   const store = useMemo(() => retainedPaymentProof(viewer.userId, requestId), [viewer.userId, requestId]);
@@ -112,6 +114,7 @@ export function PaymentProof({ viewer, requestId, orderId, ready }: { viewer: Hi
       setItems((previous) => [...previous.filter((item) => item.id !== file.id), file]);
       await store.remove(selected);
       if (owns()) setSelection(null);
+      if (current()) await onSubmitted?.();
     } catch (failure) {
       if (owns() && !signal.aborted && failure instanceof ApiError && failure.code === "HISTORY_PROOF_EXPIRED") {
         const attemptKey = receiptAttemptKey(), uri = `${store.directory}${attemptKey}`;
@@ -153,7 +156,7 @@ export function PaymentProof({ viewer, requestId, orderId, ready }: { viewer: Hi
     <Text className="text-footnote text-muted-foreground">{copy("Privacy")}</Text>
     {phase === "loading" ? <ActivityIndicator accessibilityLabel={t("loading")} /> : <>
       {items.length > 0 && <Text accessibilityLiveRegion="polite" className="font-semibold">{copy("Submitted")}</Text>}
-      <Text className="text-footnote">{copy(items.length > 0 ? "Review" : "Limits")}</Text>
+      {!reviewComplete && <Text className="text-footnote">{copy(items.length > 0 ? "Review" : "Limits")}</Text>}
       {items.map((file, index) => <Button key={file.id} variant="secondary" disabled={pending} onPress={() => { void open(file); }}><Text>{copy("View")} {items.length > 1 ? index + 1 : ""}</Text></Button>)}
       {phase === "reading" && <ActivityIndicator accessibilityLabel={copy("Opening")} />}
 

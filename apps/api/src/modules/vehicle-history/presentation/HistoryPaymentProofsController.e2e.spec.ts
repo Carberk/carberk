@@ -59,7 +59,8 @@ describe("private payment proof over HTTP, Postgres and MinIO", () => {
     expect(read.headers["cache-control"]).toBe("private, no-store");
     expect(Buffer.from(read.body.dataBase64, "base64")).toEqual(image);
     const state = (await f.request.get(`${root}/requests/${e.id}/order`).auth(e.customer.token, { type: "bearer" }).expect(200)).body;
-    expect(state).toEqual({ ...e.order, status: "hold_expired", wallet: null, serverNow: now.toISOString() });
+    expect(state).toEqual({ ...e.order, status: "hold_expired", wallet: null, serverNow: now.toISOString(),
+      payment: { outcome: "receipt_submitted", amountMinor: 0, receivedAt: null, confirmedAt: null, bookingCommitted: false } });
     const anonymous = await fetch(`${process.env["MINIO_ENDPOINT"]}/${bucket}/payment-evidence/${e.id}/${staged.id}`);
     expect(anonymous.status).toBe(403);
     await f.request.get(`${e.path}/${staged.id}/content`).expect(401);
