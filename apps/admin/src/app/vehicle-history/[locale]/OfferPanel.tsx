@@ -112,7 +112,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
           {!orderState?.payment && <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>}
           {orderState?.wallet && phase === "ready" && <p className="break-all font-mono">{orderState.wallet}</p>}
           <PaymentProofPanel key={`${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} />
-          <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} onChanged={() => { void run(); }} />
+          <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} onOrder={setOrderState} />
           <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>
             {data.preflight?.status === "available" && <><p>{t.rule}</p><dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt>{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl><p>{t.limits}</p></>}
             {proposal.format !== "pdf" && <p>{t.links}</p>}<p>{t.rights}</p><p>{t.terms}</p>

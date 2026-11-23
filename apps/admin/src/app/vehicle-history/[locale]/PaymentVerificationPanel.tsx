@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { HistoryPaymentSchemas as P } from "@auto-tm/contracts";
+import { HistoryPaymentSchemas as P, type HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { Button } from "@auto-tm/ui/components";
 
 import { historyPaymentAction, type PaymentResult } from "./payment-actions";
@@ -9,9 +9,9 @@ import type { HistoryInboxResult } from "./actions";
 import { paymentCopy } from "@/lib/history-payment-copy";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
-export function PaymentVerificationPanel({ locale, id, version, scope, actorId, revision, invalidate, onChanged }: {
+export function PaymentVerificationPanel({ locale, id, version, scope, actorId, revision, invalidate, onOrder }: {
   locale: DeskLocale; id: string; version: number; scope: string; actorId: string; revision: number;
-  invalidate: (result: HistoryInboxResult) => void; onChanged: () => void;
+  invalidate: (result: HistoryInboxResult) => void; onOrder: (order: H.HistoryOrderState) => void;
 }) {
   const t = paymentCopy[locale];
   const [data, setData] = useState<Extract<PaymentResult, { status: "ok" }> | null>(null);
@@ -52,7 +52,7 @@ export function PaymentVerificationPanel({ locale, id, version, scope, actorId, 
         } else setIntent(parsed.data);
       } else { if (retained) localStorage.removeItem(storageKey); setIntent(null); }
       setData(result); setPhase("ready");
-      if (mutation) onChanged();
+      onOrder(result.order);
     } catch {
       if (alive.current && current.current === expected && generation.current === attempt) { setData(null); setPhase("error"); setError(t.error); }
     } finally {
