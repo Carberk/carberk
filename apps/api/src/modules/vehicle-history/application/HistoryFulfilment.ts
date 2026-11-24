@@ -51,7 +51,7 @@ export class HistoryFulfilment {
         const recovery = await settleHistoryRecovery(orders, order, now, delivered, existing);
         const recovering = recovery?.status === "agreed";
         const deadline = historyDeliveryDeadline(order, recovery);
-        const provider = existing?.accepted.provider ?? await this.capacity.existingProvider(orders, order, now, deadline, recovering);
+        const provider = existing?.accepted.provider ?? await this.capacity.existingProvider(orders, order, now, deadline, recovery);
         if (!provider) return new HistoryRequestError(!deadline || deadline <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
         const current = await readFulfilment(orders, order, existing, confirmedAt, now, provider, this.capacity, recovery);
         if (!current) throw new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE");

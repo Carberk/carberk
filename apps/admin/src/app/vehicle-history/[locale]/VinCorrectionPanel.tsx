@@ -8,6 +8,7 @@ import type { HistoryInboxResult } from "./actions";
 
 import { correctionCopy } from "@/lib/history-correction-copy";
 import { offerCopy } from "@/lib/history-offer-copy";
+import { promiseRecoveryCopy } from "@/lib/history-promise-recovery-copy";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
 export function VinCorrectionPanel({ locale, id, version, scope, actorId, state, onOrder, invalidate }: {
@@ -31,7 +32,8 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
   }, [key]);
   const agreement = state.agreement;
   const pending = agreement?.pending, review = pending?.review;
-  const recoveryFormat = state.recovery?.status === "agreed" ? state.recovery.originalFormat : undefined;
+  const recovery = state.recovery?.status === "agreed" ? state.recovery : null;
+  const recoveryFormat = recovery?.originalFormat;
   async function run(reviewing = false) {
     if (busy.current || !alive.current || phase === "storage") return;
     if (reviewing && !intent.current && !cause) return;
@@ -58,17 +60,19 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
     } catch { if (owns()) setPhase("unavailable"); }
     finally { busy.current = false; }
   }
-  const timestamp = (value: string) => new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
-    dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ashgabat", hourCycle: "h23",
+  const timestamp = (value: string, timeStyle: "short" | "medium" = "short") => new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
+    dateStyle: "short", timeStyle, timeZone: "Asia/Ashgabat", hourCycle: "h23",
   }).format(new Date(value));
-  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], current = false) {
-    const window = current && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
+  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], section: "current" | "pending" | "history") {
+    const window = section === "current" && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
+    const deadline = section === "pending" ? recovery?.agreedDeadline : null;
     return <dl className="space-y-2">
       <div><dt>VIN</dt><dd className="break-all font-mono">{offer.vin}</dd></div>
       <div><dt>{t.Price}</dt><dd>{offer.proposal.priceTmt} TMT</dd></div>
       <div><dt>{o.format}</dt><dd>{o[offer.proposal.format]}</dd></div>
       {offer.preflight.providers.map((p) => <div key={p.name}><dt>{p.name} · {o.date}</dt><dd>{p.originalReportDate ?? o.unknown}</dd></div>)}
-      <div><dt>{o.window}</dt><dd>{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</dd></div>
+      {deadline ? <div><dt>{promiseRecoveryCopy[locale].agreedDeadline}</dt><dd>{timestamp(deadline, "medium")} · {promiseRecoveryCopy[locale].zone}</dd></div>
+        : <div><dt>{o.window}</dt><dd>{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</dd></div>}
     </dl>;
   }
   if (!state.order) return null;
@@ -76,11 +80,11 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
     <h5 className="font-semibold">{agreement?.handoff ? t.Closed : pending ? review ? t.Reviewed : t.Waiting : t.Title}</h5>
     {!agreement?.handoff && <p className="text-muted-foreground">{t.Policy}</p>}
     {pending && <>
-      <h6 className="font-semibold">{t.Current}</h6>{facts(state.order.acceptedOffer, true)}
+      <h6 className="font-semibold">{t.Current}</h6>{facts(state.order.acceptedOffer, "current")}
       <h6 className="font-semibold">{t.Proposed}</h6>{!review?.offer.proposal && <p className="break-all font-mono">{pending.vin}</p>}
       {review && <><p>{review.cause === "company_error" ? t.Company : t.Customer}</p>
         <p role="status">{review.offer.preflight ? o[review.offer.preflight.status] : o.unchecked}</p>
-        {H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && facts(H.AcceptedHistoryOfferSchema.parse(review.offer))}</>}
+        {H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && facts(H.AcceptedHistoryOfferSchema.parse(review.offer), "pending")}</>}
       <fieldset disabled={phase !== ""} className="space-y-4">
         <label className="block">{t.Cause}<select className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" value={cause}
           onChange={(e) => setCause(e.target.value as typeof cause)}><option value="">{t.Choose}</option>
@@ -99,7 +103,7 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
       onClick={() => { void run(); }}>{t.Refresh}</Button>
     {(agreement?.accepted.length ?? 0) > 1 && <details className="space-y-3"><summary className="min-h-11 cursor-pointer py-3 font-medium">{t.History}</summary>
       {agreement?.accepted.map((revision) => <div key={revision.revision} className="space-y-2 border-t pt-3"><p>{timestamp(revision.acceptedAt)}</p>
-        {revision.cause && <p>{revision.cause === "company_error" ? t.Company : t.Customer}</p>}{facts(revision.offer)}</div>)}
+        {revision.cause && <p>{revision.cause === "company_error" ? t.Company : t.Customer}</p>}{facts(revision.offer, "history")}</div>)}
     </details>}
   </section>;
 }

@@ -163,9 +163,10 @@ export class HistoryMessageLocks implements HistoryRecoveryQueue {
         await client.query("COMMIT");
         return result;
       };
-      return await (authority
-        ? this.identityFence.withSession({ ...authority, ...(rows[0] ? { requesterId: rows[0].requesterId } : {}) }, commit)
-        : commit());
+      const requesterId = rows[0]?.requesterId;
+      if (authority) return await this.identityFence.withSession({ ...authority, ...(requesterId ? { requesterId } : {}) }, commit);
+      if (requesterId) return await this.identityFence.withUserLifecycle(requesterId, commit);
+      return await commit();
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;

@@ -88,15 +88,16 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
   const timestamp = (value: string) => new Intl.DateTimeFormat(i18n.language === "tk" ? "en-GB" : i18n.language, {
     dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ashgabat", hourCycle: "h23",
   }).format(new Date(value));
-  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], current = false) {
-    const window = current && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
+  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], section: "current" | "pending" | "history") {
+    const window = section === "current" && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
+    const deadline = section === "pending" ? recovery?.agreedDeadline : null;
     return <View className="gap-2">
       <Text selectable className="font-mono text-callout">{offer.vin}</Text>
       <Text>{offer.proposal.priceTmt} TMT</Text>
       <Text>{offerCopy("format")}: {offerCopy(offer.proposal.format)}</Text>
       {offer.preflight.providers.map((p) => <Text key={p.name} className="text-callout">{p.name} · {offerCopy("date")}: {p.originalReportDate ?? offerCopy("unknown")}</Text>)}
-      {!current && recovery?.agreedDeadline
-        ? <Text className="text-callout">{t("vehicleHistory.promiseRecovery.agreedDeadline")} · {formatHistoryDeadline(recovery.agreedDeadline, i18n.language)}</Text>
+      {deadline
+        ? <Text className="text-callout">{t("vehicleHistory.promiseRecovery.agreedDeadline")} · {formatHistoryDeadline(deadline, i18n.language)}</Text>
         : <Text className="text-callout">{offerCopy("window")}: {timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>}
     </View>;
   }
@@ -109,14 +110,14 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       {(open || pending || failure) && <>
         <Text accessibilityRole="header" className="text-headline font-semibold">{copy(pending ? review ? "Reviewed" : "Waiting" : "Title")}</Text>
         <Text className="text-footnote text-muted-foreground">{copy("Policy")}</Text>
-        {pending && <><Text className="font-semibold">{copy("Current")}</Text>{facts(order.acceptedOffer, true)}
+        {pending && <><Text className="font-semibold">{copy("Current")}</Text>{facts(order.acceptedOffer, "current")}
           <Text className="font-semibold">{copy("Proposed")}</Text>{!review?.offer.proposal && <Text selectable className="font-mono">{pending.vin}</Text>}</>}
         {review && <>
           <Text>{copy(review.cause === "company_error" ? "Company" : "Customer")}</Text>
           {review.offer.preflight?.status && <Text accessibilityLiveRegion="polite">{offerCopy(review.offer.preflight.status)}</Text>}
           {needsReview && <Text>{t("vehicleHistory.promiseRecovery.correctionFormat")}</Text>}
           {!needsReview && H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && <>
-            {facts(H.AcceptedHistoryOfferSchema.parse(review.offer))}
+            {facts(H.AcceptedHistoryOfferSchema.parse(review.offer), "pending")}
             <Text>{offerCopy("rule")}</Text><Text>{offerCopy("rights")}</Text><Text>{offerCopy("terms")}</Text>
             <Button disabled={!usable || !!vin.trim()} accessibilityState={{ busy: phase === "pending" }} onPress={() => { void run({ kind: "accept", attemptKey: historyAttemptKey(),
               expectedVersion: agreement?.version ?? 0, offer: H.AcceptedHistoryOfferSchema.parse(review.offer) }); }}><Text>{copy("Accept")}</Text></Button>
@@ -139,7 +140,7 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       <Text accessibilityLiveRegion="polite">{copy("Agreed")} · {copy(agreement?.accepted.at(-1)?.cause === "company_error" ? "Company" : "Customer")}</Text>
       <Button variant="secondary" accessibilityState={{ expanded: historyOpen }} onPress={() => setHistoryOpen(!historyOpen)}><Text>{copy("History")}</Text></Button>
       {historyOpen && agreement?.accepted.slice(0, -1).map((revision) => <View key={revision.revision} className="gap-2">
-        <Text>{timestamp(revision.acceptedAt)}</Text>{facts(revision.offer)}
+        <Text>{timestamp(revision.acceptedAt)}</Text>{facts(revision.offer, "history")}
       </View>)}
     </>}
   </View>;

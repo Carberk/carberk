@@ -167,6 +167,27 @@ it("keeps the original and recovery deadlines in the delivered report history", 
   expect(view.queryByText("Recovery time agreed")).toBeNull();
   expect(view.queryByText("The agreed report files or link could not be delivered.")).toBeNull();
 });
+
+it("shows the exact recovery deadline on a pending correction and the saved window in correction history", async () => {
+  const previous = { ...quote, proposal: { ...quote.proposal, deliveryFrom: "2026-11-21T05:00:00.000Z",
+    deliveryBy: "2026-11-21T05:45:00.000Z" } };
+  const vin = "DEMA0000000000006", deadline = "2026-11-21T08:00:31.000Z";
+  current = { ...accepted, status: "payment_confirmed", wallet: null, preparation: "queued",
+    recovery: { version: 2, status: "agreed", originalPromiseBy: quote.proposal.deliveryBy,
+      originalFormat: "both", paymentHoldExpiresAt: quote.proposal.deliveryBy, paymentDeadline: quote.proposal.deliveryBy,
+      failure: "file_delivery", missedAt: quote.proposal.deliveryBy, offeredDeadline: deadline, agreedDeadline: deadline,
+      proposedFormat: null, agreedFormat: "both", agreedAt: "2026-11-21T07:01:00.000Z", pendingReason: null, refundRequestedAt: null },
+    agreement: { version: 5, acceptedRevision: 3, handoff: null,
+      accepted: [{ revision: 0, offer: previous, acceptedAt: accepted.serverNow, cause: null },
+        { revision: 3, offer: quote, acceptedAt: accepted.serverNow, cause: "company_error" }],
+      pending: { vin, requestedAt: accepted.serverNow, review: { cause: "company_error", offer: { ...quote, vin } } } } };
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(vin);
+  expect(view.getAllByText(/Agreed recovery deadline.*13:00:31/)).toHaveLength(3);
+  await fireEvent.press(view.getByRole("button", { name: "Previous agreements" }));
+  expect(view.getByText(/10:00.*10:45/)).toBeTruthy();
+  expect(view.getAllByText(/Agreed recovery deadline.*13:00:31/)).toHaveLength(3);
+});
 it("discards delayed acceptance when the customer session ends", async () => {
   let release!: () => void;
   const delayed = new Promise<void>((resolve) => { release = resolve; });

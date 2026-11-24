@@ -3,6 +3,7 @@ import { eventually } from "../../../../test/helpers/eventually";
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { historyFixture } from "../../../../test/helpers/historyFixture";
+import { HistoryRecoveryWorker } from "../application/HistoryRecoveryWorker";
 import { HISTORY_CLOCK, type HistoryClock } from "../vehicle-history.public";
 
 const root = "/api/v1/vehicle-history";
@@ -202,6 +203,58 @@ describe("renewed VIN agreement on the existing private order", () => {
     await fulfil(waiting, start(waiting, "pdf", "new_source")).expect(409);
     await fulfil(admitted, outcome(admitted, 2, { kind: "not_started" }, "reconcile")).expect(201);
     await fulfil(waiting, start(waiting, "pdf", "new_source")).expect(201);
+  });
+
+  it("starts a corrected VIN with a provider that has recovery quota and keeps the original reservation", async () => {
+    const budget = { allowance: 12, resetUtc: "00:00", externalUsage: {} };
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {
+      Carfax: budget, AutoCheck: { ...budget, externalUsage: { "2026-11-22": 12 } },
+    });
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-21T14:00:00.000Z");
+    const e = await accepted("pdf", undefined, ["2026-11-21T14:35:00.000Z", "2026-11-21T14:50:00.000Z"], false, "DEMA0000000000006");
+    const vin = "DEMA0000000000001";
+    await pay(e);
+    await e.change({ kind: "request", vin, expectedVersion: 0, attemptKey: randomUUID() }).expect(201);
+    clock.now = () => new Date("2026-11-21T14:50:00.000Z");
+    await agreeRecovery(e, "pdf");
+    clock.now = () => new Date("2026-11-22T04:10:00.000Z");
+    const { body: { pending } } = await e.review(reviewInput()).expect(201);
+    await e.change({ kind: "accept", offer: pending.review.offer, expectedVersion: 2, attemptKey: randomUUID() }).expect(201);
+    const { body } = await operatorOrder(e).expect(200);
+    expect(body.fulfilment).toMatchObject({ gate: "ready", accepted: { vin, provider: "Carfax" },
+      sources: expect.arrayContaining(["new_source"]) });
+    await fulfil(e, { ...start(e, "pdf", "new_source"), acceptedRevision: 3 }).expect(201);
+    const reservation = await f.prisma.historyOrder.findUniqueOrThrow({ where: { requestId: e.id } });
+    expect(reservation.reservedProvider).toBe("AutoCheck");
+    const intent = await f.prisma.historyFulfilmentEvent.findFirstOrThrow({ where: { requestId: e.id } });
+    expect(intent.recoveryQuotaProvider).toBe("Carfax");
+  });
+
+  it.each(["suspendedAt", "deletionScheduledAt"] as const)("rechecks %s when the lifecycle write wins the deadline worker race", async (field) => {
+    const e = await accepted("pdf");
+    await pay(e);
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:00:00.000Z");
+    const worker = f.app.get(HistoryRecoveryWorker);
+    let scan: Promise<void> | undefined, settled = false;
+    const race = await f.prisma.$transaction(async (tx) => {
+      const [lock] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      if (!lock) throw new Error("Missing lifecycle transaction PID");
+      await tx.user.update({ where: { id: e.customer.user.id }, data: { [field]: new Date() } });
+      scan = worker.execute().finally(() => { settled = true; });
+      return eventually(async () => {
+        if (settled) return "settled";
+        const [row] = await f.prisma.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+          WHERE ${lock.pid} = ANY(pg_blocking_pids(pid)) AND query LIKE 'SELECT id FROM users%') AS waiting`;
+        return row?.waiting ? "blocked" : null;
+      }, { timeoutMs: 2500, intervalMs: 20, description: "deadline worker reached the requester lifecycle fence" });
+    });
+    await scan;
+    expect(await f.prisma.historyRecoveryEvent.count({ where: { requestId: e.id } })).toBe(0);
+    expect(race).toBe("blocked");
+    await f.prisma.user.update({ where: { id: e.customer.user.id }, data: { [field]: null } });
+    await worker.execute();
+    expect(await f.prisma.historyRecoveryEvent.count({ where: { requestId: e.id } })).toBe(1);
   });
 
   it("prioritizes an older actionable company correction once its recovery is agreed", async () => {

@@ -5,4 +5,5 @@ export const MESSAGE_AUTHORITY_FENCE_PORT = Symbol("MessageAuthorityFencePort");
 export interface MessageAuthorityFencePort {
   withSession<T>(input: { userId: string; sessionId: string; purpose: "vehicle-history" | "vehicle-history-payment-evidence" | null; recipientId?: string; requesterId?: string },
     work: () => Promise<T>): Promise<T>;
+  withUserLifecycle<T>(userId: string, work: () => Promise<T>): Promise<T>;
 }

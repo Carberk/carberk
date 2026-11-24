@@ -84,3 +84,25 @@ it("retries an uncertain review with the original immutable intent and refuses c
   await act(async () => fireEvent.click(view.getByRole("button", { name: "Refresh correction" })));
   await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ status: "denied" }));
 });
+
+it("shows the exact recovery deadline only on the pending correction, keeping historical windows", async () => {
+  const original = state.agreement;
+  const historical = original?.accepted[0];
+  if (!original?.pending || !historical) throw new Error("Missing synthetic correction");
+  const pending = original.pending;
+  const old = { ...offer, proposal: { ...offer.proposal, deliveryFrom: "2026-11-21T05:00:00.000Z", deliveryBy: "2026-11-21T05:45:00.000Z" } };
+  const deadline = "2026-11-21T08:00:31.000Z";
+  state = { ...state,
+    recovery: { version: 2, status: "agreed", originalPromiseBy: offer.proposal.deliveryBy,
+      originalFormat: "both", paymentHoldExpiresAt: offer.proposal.deliveryBy, paymentDeadline: offer.proposal.deliveryBy,
+      failure: "file_delivery", missedAt: offer.proposal.deliveryBy, offeredDeadline: deadline, agreedDeadline: deadline,
+      proposedFormat: null, agreedFormat: "both", agreedAt: "2026-11-21T07:01:00.000Z", pendingReason: null, refundRequestedAt: null },
+    agreement: { ...original, version: 5, acceptedRevision: 3,
+      accepted: [{ ...historical, offer: old }, { revision: 3, offer, cause: "company_error", acceptedAt: state.serverNow }],
+      pending: { ...pending, review: { cause: "company_error", offer: { ...offer, vin: pending.vin } } } } };
+  const view = await render();
+  expect(view.getAllByText("Agreed recovery deadline")).toHaveLength(1);
+  expect(view.getByText(/13:00:31/)).toBeTruthy();
+  expect(view.getByText(/10:00.*10:45/)).toBeTruthy();
+  expect(view.getAllByText(/11:00.*12:00/)).toHaveLength(2);
+});

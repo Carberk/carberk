@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import type { Env } from "../../../env.schema";
 import { fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
 import { historyBookingWindow, historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider,
@@ -50,15 +51,16 @@ export class HistoryCapacity {
   }
 
   async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date,
-    deadline: Date | null = new Date(historyBookingWindow(order).deliveryBy), recovering = false) {
+    deadline: Date | null, recovery: H.HistoryRecoveryState | null) {
     const reports = order.acceptedOffer.preflight;
-    if (!deadline || deadline <= now || reports.providers.some(({ name }) => name === order.reservedProvider)) return order.reservedProvider;
-    if (recovering) return await this.recoveryProvider(orders, order, reports, now)
+    if (!deadline || deadline <= now) return order.reservedProvider;
+    const reserved = reports.providers.find(({ name }) => name === order.reservedProvider)?.name;
+    if (recovery?.status === "agreed") return await this.recoveryProvider(orders, order, reports, now)
       ?? reports.providers.find(({ name }) => {
-        const accepted = fulfilmentAgreement(order, name);
+        const accepted = fulfilmentAgreement(order, name, recovery.agreedFormat ?? undefined);
         return accepted && fulfilmentSources(accepted).includes("archive");
-      })?.name;
-    return this.findProvider(orders, order, order.acceptedOffer.preflight, now, true);
+      })?.name ?? reserved;
+    return reserved ?? await this.findProvider(orders, order, reports, now, true);
   }
 
   async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
