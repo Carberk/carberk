@@ -4,7 +4,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { HistoryReportArtifactSchemas as R, type HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 import { fulfilmentAgreement } from "../domain/HistoryFulfilment";
-import { bookedPayment, historyAgreement, historyBookingWindow, type HistoryOrderStore, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { bookedPayment, historyAgreement, type HistoryOrderStore, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { historyDeliveryDeadline, settleHistoryRecovery } from "../domain/HistoryRecovery";
 import {
   HISTORY_REPORT_ORIGINALS, HISTORY_REPORT_STORAGE, historyReportDigest,
   type HistoryReportOriginals, type HistoryReportStorage, type HistoryReportStore, type StagedHistoryReport,
@@ -52,8 +53,8 @@ export class HistoryReportArtifacts {
       }
       if (row.deliveredAt) return view(row);
       const confirmedAt = bookedPayment(order, await orders.paymentChecks())?.confirmedAt;
-      const deadline = new Date(historyBookingWindow(order).deliveryBy);
-      if (!confirmedAt || this.clock.now() >= deadline) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+      if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+      const deadline = await this.requireDeliveryWindow(orders, order, intent, this.clock.now());
       if (row.artifact.format !== "link") await this.pdf(id, row);
       if (row.artifact.format !== "pdf") {
         if (!row.link || !isDeepStrictEqual(await this.originals.verifyLink(row.link), row.artifact.report)) {
@@ -63,12 +64,15 @@ export class HistoryReportArtifacts {
       return orders.serialize(async () => {
         const earlier = await orders.hasEarlierPaidWork(confirmedAt, this.clock.now(), "delivery");
         const deliveredAt = this.clock.now();
-        if (deliveredAt >= deadline) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+        if (deliveredAt >= deadline) {
+          await settleHistoryRecovery(orders, order, deliveredAt, false, intent);
+          throw new HistoryRequestError("HISTORY_ORDER_STALE");
+        }
         if (earlier) throw new HistoryRequestError("HISTORY_FULFILMENT_FIFO");
         await store.deliver(target, sender, deliveredAt);
         return view({ ...row, deliveredAt });
       });
-    });
+    }, "deliver");
   }
 
   purchaser(claims: HistoryMessageActor["claims"], id: string, asset?: { id: string; kind: "pdf" | "link" }) {
@@ -94,7 +98,7 @@ export class HistoryReportArtifacts {
     const bytes = input.pdf ? Buffer.from(input.pdf.dataBase64, "base64") : null;
     const sha256 = bytes ? historyReportDigest(bytes) : null;
     const link = input.link ?? null;
-    const staged = await this.current(actor, id, input, async (store, intent, sender) => {
+    const staged = await this.current(actor, id, input, async (store, intent, sender, order, orders) => {
       const existing = await store.find(intent.version);
       if (existing) {
         const filename = existing.artifact.format === "link" ? undefined : existing.artifact.pdf.filename;
@@ -123,39 +127,64 @@ export class HistoryReportArtifacts {
         ...(input.pdf && document && bytes ? { pdf: { filename: input.pdf.filename, pages: document.pages, sizeBytes: bytes.length } } : {}),
       });
       const original = { artifact, sha256, link };
+      await this.requireDeliveryWindow(orders, order, intent, this.clock.now());
       await store.stage(input, original, sender);
       return { ...original, orderId: input.orderId, intentId: input.intentId, acceptedRevision: input.acceptedRevision,
         validatedAt: null, deliveredAt: null };
-    });
+    }, "validate");
     if (staged.validatedAt && !bytes) return view(staged);
 
-    return this.current(actor, id, input, async (store, intent, sender) => {
+    return this.current(actor, id, input, async (store, intent, sender, order, orders) => {
       const row = await store.find(intent.version);
       if (row?.artifact.id !== staged.artifact.id) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
       if (row.artifact.format !== "link" && bytes && sha256) await this.storage.put(id, row.artifact, sha256, bytes);
       if (row.validatedAt) return view(row);
       const validatedAt = this.clock.now();
+      await this.requireDeliveryWindow(orders, order, intent, validatedAt);
       await store.validate(intent.version, sender, input.expectedAssignmentVersion, validatedAt);
       return view({ ...row, validatedAt });
-    });
+    }, "validate");
   }
 
-  private current<T>(actor: HistoryMessageActor, id: string, target: R.HistoryReportTarget,
-    work: (store: HistoryReportStore, intent: Obtained, actorId: string, order: StoredHistoryOrder, orders: HistoryOrderStore) => Promise<T>) {
+  private async requireDeliveryWindow(orders: HistoryOrderStore, order: StoredHistoryOrder, intent: Obtained, now: Date) {
+    const recovery = await settleHistoryRecovery(orders, order, now, false, intent);
+    const deadline = historyDeliveryDeadline(order, recovery);
+    if (!deadline || now >= deadline) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+    return deadline;
+  }
+
+  private async current<T>(actor: HistoryMessageActor, id: string, target: R.HistoryReportTarget,
+    work: (store: HistoryReportStore, intent: Obtained, actorId: string, order: StoredHistoryOrder, orders: HistoryOrderStore) => Promise<T>,
+    mutation?: "validate" | "deliver") {
     if (!actor.operator) throw new HistoryRequestError("HISTORY_OPERATOR_DENIED");
-    return this.access.run(actor, id, async (ownerId, actorId, _object, _participant, _waiting, _offer, orders) => {
+    const result = await this.access.run(actor, id, async (ownerId, actorId, _object, _participant, _waiting, _offer, orders) => {
       const [owner, deleting, order, intent] = await Promise.all([
         this.identity.findUserById(ownerId), this.checks.isDeletionScheduled(ownerId), orders.read(), orders.fulfilment(),
       ]);
       if (!owner || owner.deleted || owner.suspendedAt || deleting) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
       const agreement = order && historyAgreement(order);
+      const recovery = await orders.recovery();
       if (!order || order.id !== target.orderId || !agreement || agreement.pending
         || agreement.acceptedRevision !== target.acceptedRevision || agreement.handoff?.revision !== target.acceptedRevision
         || intent?.status !== "obtained" || intent.id !== target.intentId || intent.version !== target.intentVersion
-        || !isDeepStrictEqual(intent.accepted, fulfilmentAgreement(order, order.reservedProvider ?? intent.accepted.provider))) {
+        || !isDeepStrictEqual(intent.accepted, fulfilmentAgreement(order, order.reservedProvider ?? intent.accepted.provider, recovery?.agreedFormat ?? undefined))) {
         throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
       }
-      return work(orders.reportArtifacts, intent, actorId, order, orders);
+      if (!mutation) return work(orders.reportArtifacts, intent, actorId, order, orders);
+      const delivered = !!await orders.reportArtifacts.delivered(order.id);
+      try {
+        if (mutation === "validate" && !delivered) await this.requireDeliveryWindow(orders, order, intent, this.clock.now());
+        return await work(orders.reportArtifacts, intent, actorId, order, orders);
+      } catch (error) {
+        if (!(error instanceof HistoryRequestError)) throw error;
+        if (!delivered && ["HISTORY_REPORT_MISSING", "HISTORY_REPORT_MISMATCH", "HISTORY_REPORT_PDF",
+          "HISTORY_REPORT_LINK", "HISTORY_REPORT_RIGHTS", "HISTORY_REPORT_UNAVAILABLE"].includes(error.code)) {
+          await settleHistoryRecovery(orders, order, this.clock.now(), false, intent, "file_delivery");
+        }
+        return error;
+      }
     });
+    if (result instanceof HistoryRequestError) throw result;
+    return result;
   }
 }

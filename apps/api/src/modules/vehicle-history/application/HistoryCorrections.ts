@@ -37,6 +37,9 @@ export class HistoryCorrections {
       if (previous.version !== input.expectedVersion || previous.version === 2147483647) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
       return orders.serialize(async () => {
         const now = this.clock.now(), at = now.toISOString(), version = previous.version + 1;
+        if (now >= new Date(historyBookingWindow(order).deliveryBy) && bookedPayment(order, await orders.paymentChecks())) {
+          throw new HistoryRequestError("HISTORY_CORRECTION_CLOSED");
+        }
         let state: H.HistoryCorrectionState = { ...previous, version };
         let provider = order.reservedProvider ?? null;
         if (input.kind === "request") {

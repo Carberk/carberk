@@ -18,9 +18,10 @@ type Format = H.HistoryFulfilmentView["accepted"]["format"];
 const control = "mt-2 min-h-11 w-full rounded-md border bg-background px-2";
 const action = "h-auto min-h-11 w-full whitespace-normal";
 
-export function FulfilmentPanel({ locale, id, version, scope, actorId, state, onOrder, invalidate }: {
+export function FulfilmentPanel({ locale, id, version, scope, actorId, state, onOrder, invalidate, refreshOrder }: {
   locale: DeskLocale; id: string; version: number; scope: string; actorId: string; state: H.HistoryOrderState;
   onOrder: (state: H.HistoryOrderState) => void; invalidate: (result: HistoryInboxResult) => void;
+  refreshOrder?: (() => void) | undefined;
 }) {
   const t = fulfilmentCopy[locale], o = offerCopy[locale];
   const [source, setSource] = useState<Source | "">("");
@@ -76,7 +77,8 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
         {intent && <div className="flex flex-wrap gap-x-2"><dt className="text-muted-foreground">{t.source}</dt><dd>{t[intent.source]}</dd></div>}
       </dl>
       {intent?.funding === "company" && <p>{t.companyFunding}</p>}
-      {intent && !delivered && <p role="status">{intent.status === "recovery" ? `${t[intent.reason]} ${t.recoveryNext}` : t[intent.status]}</p>}
+      {intent && !delivered && (intent.status === "recovery" ? !state.recovery && <p role="status">{t[intent.reason]} {t.recoveryNext}</p>
+        : <p role="status">{t[intent.status]}</p>)}
       {!delivered && view.gate !== "ready" && (!intent || intent.status === "obtained" || intent.status === "retry_ready" || canCorrect) && <p role="status">{t[view.gate]}</p>}
       {phase === "ready" && !delivered && <>
         {!intent && view.gate === "ready" && <>
@@ -101,10 +103,10 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
           onClick={() => { void run({ ...command(), kind: "record", outcome: { kind: "company_error" } }); }}>{t.reportError}</Button>}
       </>}
     </>}
-    {phase === "ready" && intent?.status === "obtained" && state.order && <ReportArtifactPanel
+    {phase === "ready" && intent?.status === "obtained" && state.order && (delivered || view?.gate !== "booking_closed") && <ReportArtifactPanel
       key={`${state.order.id}:${intent.id}:${intent.version}`} locale={locale} id={id} scope={scope}
       orderId={state.order.id} version={version} intent={intent} canDeliver={!delivered && view?.gate === "ready"}
-      onDelivered={() => { if (!delivered) onOrder({ ...state, preparation: "delivered" }); }} invalidate={invalidate} />}
+      onDelivered={() => { if (!delivered) onOrder({ ...state, preparation: "delivered" }); }} invalidate={invalidate} onDeliveryIssue={refreshOrder} />}
     {phase !== "ready" && <p role={phase === "saving" || phase === "loading" ? "status" : "alert"}>{t[phase]}</p>}
     {phase !== "saving" && phase !== "loading" && <Button ref={refresh} type="button" className={action} variant="secondary"
       onClick={() => { void run(); }}>{t.refresh}</Button>}

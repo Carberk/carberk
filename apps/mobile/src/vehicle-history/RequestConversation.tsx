@@ -222,9 +222,11 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     ListHeaderComponent={<View className="gap-4 pb-3">
       {!denied && delivered && <DeliveredReport viewer={viewer} requestId={request.id}
         active={thread.active} online={thread.connected} ready={metadataCurrent} openComposer={() => composer.current?.focus()} />}
-      {header}
+      {!thread.order.data?.recovery && header}
       {!denied && !delivered && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} metadataAvailable={metadataAvailable}
+        recoveryVersion={thread.order.data?.recovery?.version}
         active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
+      {thread.order.data?.recovery && header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
       {!thread.connected && <Text accessibilityRole="alert">{t("vehicleHistory.offline")}</Text>}

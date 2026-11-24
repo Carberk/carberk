@@ -3,18 +3,21 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 import { applyFulfilmentOutcome, checkFulfilmentVersion, fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
-import { bookedPayment, historyAgreement, historyBookingWindow, type HistoryOrderStore, type HistoryProvider, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { bookedPayment, historyAgreement, type HistoryOrderStore, type HistoryProvider, type StoredHistoryOrder } from "../domain/HistoryOrder";
+import { historyDeliveryDeadline, settleHistoryRecovery } from "../domain/HistoryRecovery";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
 import { HistoryCapacity } from "./HistoryCapacity";
 
 export async function readFulfilment(orders: HistoryOrderStore, order: StoredHistoryOrder, intent: H.HistoryFulfilmentIntent | null,
-  confirmedAt: string, now: Date, provider: HistoryProvider | undefined, capacity: HistoryCapacity): Promise<H.HistoryFulfilmentView | undefined> {
-  const accepted = fulfilmentAgreement(order, provider);
+  confirmedAt: string, now: Date, provider: HistoryProvider | undefined, capacity: HistoryCapacity,
+  recovery: H.HistoryRecoveryState | null): Promise<H.HistoryFulfilmentView | undefined> {
+  const accepted = fulfilmentAgreement(order, provider, recovery?.agreedFormat ?? undefined);
   if (!accepted) return undefined;
-  const gate = order.agreement?.pending ? "pending_correction"
-    : new Date(historyBookingWindow(order).deliveryBy) <= now ? "booking_closed"
+  const deadline = historyDeliveryDeadline(order, recovery);
+  const gate = !deadline || deadline <= now ? "booking_closed"
+    : order.agreement?.pending ? "pending_correction"
       : await orders.hasEarlierPaidWork(confirmedAt, now, intent?.status === "obtained" ? "delivery" : "fulfilment") ? "fifo" : "ready";
   const sources = fulfilmentSources(accepted);
   if (gate === "ready" && !await capacity.canUseFulfilmentBudget(orders, order, accepted.provider, now, false)) {
@@ -32,9 +35,9 @@ export class HistoryFulfilment {
     @Inject(HISTORY_CLOCK) private readonly clock: HistoryClock,
     @Inject(HistoryCapacity) private readonly capacity: HistoryCapacity) {}
 
-  execute(actor: HistoryMessageActor, id: string, input: H.HistoryFulfilmentMutation) {
+  async execute(actor: HistoryMessageActor, id: string, input: H.HistoryFulfilmentMutation) {
     if (!actor.operator) throw new HistoryRequestError("HISTORY_OPERATOR_DENIED");
-    return this.access.run(actor, id, async (requester, actorId, _object, participant, _waiting, _offer, orders) => {
+    const result = await this.access.run(actor, id, async (requester, actorId, _object, participant, _waiting, _offer, orders) => {
       const [owner, deleting] = await Promise.all([this.identity.findUserById(requester), this.checks.isDeletionScheduled(requester)]);
       if (!owner || owner.deleted || owner.suspendedAt || deleting) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
       const order = await orders.read();
@@ -43,22 +46,34 @@ export class HistoryFulfilment {
       if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       return orders.serialize(async () => {
         const now = this.clock.now();
-        const provider = await this.capacity.existingProvider(orders, order, now);
-        if (!provider) throw new HistoryRequestError(new Date(historyBookingWindow(order).deliveryBy) <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
-        const current = await readFulfilment(orders, order, await orders.fulfilment(), confirmedAt, now, provider, this.capacity);
+        const delivered = !!await orders.reportArtifacts.delivered(order.id);
+        const existing = await orders.fulfilment();
+        const recovery = await settleHistoryRecovery(orders, order, now, delivered, existing);
+        const deadline = historyDeliveryDeadline(order, recovery);
+        const provider = existing?.accepted.provider ?? await this.capacity.existingProvider(orders, order, now, deadline);
+        if (!provider) return new HistoryRequestError(!deadline || deadline <= now ? "HISTORY_ORDER_STALE" : "HISTORY_ORDER_CAPACITY");
+        const current = await readFulfilment(orders, order, existing, confirmedAt, now, provider, this.capacity, recovery);
         if (!current) throw new HistoryRequestError("HISTORY_ORDER_UNAVAILABLE");
         const replay = await orders.fulfilmentAttempt(input.attemptKey);
         if (replay) {
           if (!isDeepStrictEqual(replay, input)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
           return current;
         }
-        if (await orders.reportArtifacts.delivered(order.id)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
+        if (delivered) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
         checkFulfilmentVersion(current.intent, input.expectedVersion);
+        const writingAt = this.clock.now();
+        if (input.kind !== "record" && input.kind !== "reconcile" && (!deadline || writingAt >= deadline)) {
+          await settleHistoryRecovery(orders, order, writingAt, false, existing);
+          return new HistoryRequestError("HISTORY_ORDER_STALE");
+        }
         const intent = await this.transition(orders, order, current, input, actorId, participant.assignmentVersion, now);
         await orders.saveFulfilment({ input, state: intent, actorId, assignmentVersion: participant.assignmentVersion });
+        await settleHistoryRecovery(orders, order, this.clock.now(), false, intent);
         return { ...current, intent };
       });
     });
+    if (result instanceof HistoryRequestError) throw result;
+    return result;
   }
 
   private async transition(orders: HistoryOrderStore, order: StoredHistoryOrder, current: H.HistoryFulfilmentView,

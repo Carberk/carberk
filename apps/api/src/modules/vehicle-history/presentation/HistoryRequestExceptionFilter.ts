@@ -4,6 +4,8 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_RECOVERY_INVALID: "Check the recovery choice and try again.",
+    HISTORY_RECOVERY_CONFLICT: "Recovery changed. Refresh the order before choosing again.",
     HISTORY_REPLACEMENT_INVALID: "Check the new delivery window and try again.",
     HISTORY_REPLACEMENT_CONFLICT: "This delivery window changed or is no longer available. Refresh the order.",
     HISTORY_REPLACEMENT_CAPACITY: "This delivery window is full. Refresh the order for your next step. Your payment is still recorded.",
@@ -59,6 +61,8 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_RECOVERY_INVALID: "Проверьте выбранный вариант и повторите попытку.",
+    HISTORY_RECOVERY_CONFLICT: "Условия изменились. Обновите заказ перед выбором.",
     HISTORY_REPLACEMENT_INVALID: "Проверьте новое время доставки и повторите попытку.",
     HISTORY_REPLACEMENT_CONFLICT: "Время доставки изменилось или больше недоступно. Обновите заказ.",
     HISTORY_REPLACEMENT_CAPACITY: "На это время мест уже нет. Обновите заказ, чтобы узнать, что делать дальше. Ваша оплата учтена.",
@@ -114,6 +118,8 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_RECOVERY_INVALID: "Saýlan çözgüdiňizi barlap, gaýtadan synanyşyň.",
+    HISTORY_RECOVERY_CONFLICT: "Şertler üýtgedi. Täzeden saýlamazdan öň sargydy täzeläň.",
     HISTORY_REPLACEMENT_INVALID: "Täze gowşuryş wagtyny barlap, gaýtadan synanyşyň.",
     HISTORY_REPLACEMENT_CONFLICT: "Gowşuryş wagty üýtgedi ýa-da indi elýeterli däl. Sargydy täzeläň.",
     HISTORY_REPLACEMENT_CAPACITY: "Bu wagta boş ýer ýok. Indiki ädimi görmek üçin sargydy täzeläň. Tölegiňiz hasaba alyndy.",
@@ -240,6 +246,7 @@ export class HistoryReportsExceptionFilter extends HistoryRequestExceptionFilter
 }
 
 const reportStatuses = {
+  HISTORY_RECOVERY_INVALID: 400, HISTORY_RECOVERY_CONFLICT: 409,
   HISTORY_REPORT_INVALID: 400, HISTORY_REPORT_CONFLICT: 409, HISTORY_REPORT_UNAVAILABLE: 503,
   HISTORY_REPORT_MISSING: 422, HISTORY_REPORT_MISMATCH: 422, HISTORY_REPORT_PDF: 422,
   HISTORY_REPORT_LINK: 422, HISTORY_REPORT_RIGHTS: 422,

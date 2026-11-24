@@ -1,5 +1,5 @@
 "use server";
-import { HistoryOrderSchemas as H } from "@auto-tm/contracts";
+import { HistoryOfferSchemas as O, HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { unstable_rethrow } from "next/navigation";
 
 import { rejectExpiredSession } from "@/lib/action-session";
@@ -10,12 +10,16 @@ import { historyInboxScope } from "@/lib/history-inbox-scope";
 
 type Result = { status: "ok"; scope: string; actorId: string; data: H.HistoryOrderState }
   | { status: "expired" | "stale" | "denied" | "conflict" | "capacity" | "unavailable" | "validation" };
+const RecoveryAction = O.HistoryOfferActionSchema.omit({ mutation: true }).extend({ recovery: H.HistoryOperatorRecoverySchema });
 
 export async function historyFulfilmentAction(locale: DeskLocale, value: unknown): Promise<Result> {
   await rejectExpiredSession();
-  const parsed = H.HistoryFulfilmentActionSchema.safeParse(value);
+  const parsed = H.HistoryFulfilmentActionSchema.or(RecoveryAction).safeParse(value);
   if (!parsed.success || !["en", "ru", "tk"].includes(locale)) return { status: "validation" };
-  const { id, expectedAssignmentVersion, scope, mutation } = parsed.data;
+  const { id, expectedAssignmentVersion, scope } = parsed.data;
+  const recovery = "recovery" in parsed.data ? parsed.data.recovery : undefined;
+  const mutation = "mutation" in parsed.data ? parsed.data.mutation : recovery;
+  if (mutation && (mutation.orderId !== id || mutation.expectedAssignmentVersion !== expectedAssignmentVersion)) return { status: "validation" };
   const token = await getAccessToken();
   const binding = token ? historyInboxScope(token) : null;
   if (!token || !binding) return { status: "expired" };
@@ -25,7 +29,7 @@ export async function historyFulfilmentAction(locale: DeskLocale, value: unknown
   const options = { cache: "no-store", headers: { "Accept-Language": locale } } as const;
   try {
     if (mutation) {
-      const saved = await apiFetchOptional<unknown>(base + "/fulfilment", { ...options, method: "POST", body: mutation }, token);
+      const saved = await apiFetchOptional<unknown>(base + (recovery ? "/recovery" : "/fulfilment"), { ...options, method: "POST", body: mutation }, token);
       if (token !== await getAccessToken()) return { status: "stale" };
       if (saved === null) return { status: "expired" };
     }

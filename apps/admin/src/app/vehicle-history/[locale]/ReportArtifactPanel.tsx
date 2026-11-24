@@ -27,9 +27,10 @@ function base64(file: File) {
   });
 }
 
-export function ReportArtifactPanel({ locale, id, scope, orderId, version, intent, canDeliver, onDelivered, invalidate }: {
+export function ReportArtifactPanel({ locale, id, scope, orderId, version, intent, canDeliver, onDelivered, invalidate, onDeliveryIssue }: {
   locale: DeskLocale; id: string; scope: string; orderId: string; version: number; intent: Intent;
   canDeliver: boolean; onDelivered: () => void;
+  onDeliveryIssue?: (() => void) | undefined;
   invalidate: (result: HistoryInboxResult) => void;
 }) {
   const t = reportCopy[locale];
@@ -45,9 +46,10 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
   const previewButton = useRef<HTMLButtonElement>(null);
   const validatedStatus = useRef<HTMLParagraphElement>(null);
   const focusValidation = useRef(false);
-  const current = useRef({ attempt: 0, invalidate, onDelivered });
+  const current = useRef({ attempt: 0, invalidate, onDelivered, onDeliveryIssue });
   current.current.invalidate = invalidate;
   current.current.onDelivered = onDelivered;
+  current.current.onDeliveryIssue = onDeliveryIssue;
   const { id: intentId, version: intentVersion, accepted: { format, acceptedRevision } } = intent;
   const needsPdf = format !== "link", needsLink = format !== "pdf";
 
@@ -85,6 +87,7 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
         if (result.status === "conflict") setView(null);
         setFeedback(action === "restore" && result.status === "mismatch" ? "samePdf"
           : action === "preview" && result.status === "unavailable" ? "previewUnavailable" : result.status);
+        if (action === "validate" || action === "deliver") current.current.onDeliveryIssue?.();
       }
     } catch {
       if (attempt === current.current.attempt) setFeedback(action === "preview" ? "previewUnavailable" : "unavailable");

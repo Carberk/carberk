@@ -1,6 +1,6 @@
 import { HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
 import type { PoolClient } from "pg";
-import type { HistoryAgreementInput, HistoryOrderStore, HistoryProvider } from "../domain/HistoryOrder";
+import type { HistoryAgreementInput, HistoryOrderStore, HistoryProvider, HistoryRecoveryCommand } from "../domain/HistoryOrder";
 
 import { historyReportStore } from "./historyReportStore";
 
@@ -19,6 +19,23 @@ const activeOrders = `WITH active_orders AS (
 )`;
 const hasBooking = `(o."replacementBooked" OR EXISTS (
   SELECT 1 FROM history_payment_checks p WHERE p."requestId" = o."requestId" AND p."bookingCommitted"))`;
+
+export const dueHistoryRecovery = `${activeOrders}
+  SELECT o."requestId" FROM active_orders o JOIN vehicle_history_requests r ON r.id = o."requestId"
+  LEFT JOIN LATERAL (
+    SELECT state FROM history_recovery_events WHERE "requestId" = r.id ORDER BY version DESC LIMIT 1
+  ) h ON TRUE
+  WHERE r."requesterId" = ANY($1::text[]) AND r.id > $3 AND ${hasBooking}
+    AND NOT EXISTS (
+      SELECT 1 FROM history_report_artifacts a WHERE a."requestId" = r.id AND a."deliveredAt" IS NOT NULL
+    )
+    AND CASE h.state->>'status'
+      WHEN 'refund_decision_pending' THEN FALSE
+      WHEN 'agreed' THEN (h.state->>'agreedDeadline')::timestamptz <= $2
+      WHEN 'offered' THEN (h.state->>'offeredDeadline')::timestamptz <= $2
+      ELSE o."activeBy" <= $2
+    END
+  ORDER BY r.id LIMIT 50`;
 
 export function historyOrderStore(client: PoolClient, requestId: string, assignmentVersion: number, assertActive: () => void): HistoryOrderStore {
   return {
@@ -174,7 +191,16 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
           LEFT JOIN LATERAL (
             SELECT state FROM history_fulfilment_events WHERE "requestId" = p."requestId" ORDER BY version DESC LIMIT 1
           ) f ON TRUE
-          WHERE p."confirmedAt" IS NOT NULL AND (p."bookingCommitted" OR o."replacementBooked") AND o."activeBy" > $3
+          LEFT JOIN LATERAL (
+            SELECT state FROM history_recovery_events WHERE "requestId" = p."requestId" ORDER BY version DESC LIMIT 1
+          ) h ON TRUE
+          WHERE p."confirmedAt" IS NOT NULL AND (p."bookingCommitted" OR o."replacementBooked")
+            AND CASE h.state->>'status'
+              WHEN 'refund_decision_pending' THEN FALSE
+              WHEN 'offered' THEN FALSE
+              WHEN 'agreed' THEN (h.state->>'agreedDeadline')::timestamptz > $3
+              ELSE o."activeBy" > $3
+            END
             AND r."assignedOperatorId" = (SELECT "assignedOperatorId" FROM vehicle_history_requests WHERE id = $2)
             AND ($1::timestamptz IS NULL OR (p."confirmedAt", p."requestId") < ($1::timestamptz, $2::text))
             AND CASE WHEN $4 = 'delivery' THEN COALESCE(f.state->>'status', '') <> 'recovery'
@@ -194,6 +220,26 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)`,
       [requestId, state.version, input.attemptKey, JSON.stringify(input), JSON.stringify(H.HistoryFulfilmentIntentSchema.parse(state)),
         actorId, assignmentVersion, state.recordedAt]);
+    },
+    async recovery() {
+      assertActive();
+      const { rows } = await client.query<{ state: unknown }>(
+        'SELECT state FROM history_recovery_events WHERE "requestId" = $1 ORDER BY version DESC LIMIT 1', [requestId]);
+      return rows[0] ? H.HistoryRecoveryStateSchema.parse(rows[0].state) : null;
+    },
+    async recoveryAttempt(key) {
+      assertActive();
+      const { rows } = await client.query<{ input: HistoryRecoveryCommand; actorId: string }>(
+        'SELECT input, "actorId" FROM history_recovery_events WHERE "requestId" = $1 AND "attemptKey" = $2', [requestId, key]);
+      return rows[0] ?? null;
+    },
+    async saveRecovery(state, now, command) {
+      assertActive();
+      await client.query(`INSERT INTO history_recovery_events
+        ("requestId", version, state, "recordedAt", "attemptKey", input, "actorId", "assignmentVersion")
+        VALUES ($1, $2, $3::jsonb, $4, $5, $6::jsonb, $7, $8)`, [requestId, state.version,
+        JSON.stringify(H.HistoryRecoveryStateSchema.parse(state)), now, command?.input.attemptKey ?? null,
+        command ? JSON.stringify(command.input) : null, command?.actorId ?? null, command?.assignmentVersion ?? null]);
     },
   };
 }

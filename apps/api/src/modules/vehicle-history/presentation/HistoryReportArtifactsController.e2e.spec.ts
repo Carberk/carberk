@@ -12,6 +12,7 @@ import sharp from "sharp";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { historyFixture } from "../../../../test/helpers/historyFixture";
 import { HISTORY_CLOCK, type HistoryClock } from "../vehicle-history.public";
+import { HistoryRecoveryWorker } from "../application/HistoryRecoveryWorker";
 
 const root = "/api/v1/vehicle-history";
 const now = "2026-11-21T05:00:00.000Z";
@@ -70,6 +71,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   let origin: string;
   let received: string[];
   let linkAvailable: boolean;
+  let beforeServingReport: (() => Promise<void>) | undefined;
   let certificate: Buffer;
   beforeAll(async () => {
     const directory = mkdtempSync(join(tmpdir(), "carberk-report-test-"));
@@ -91,7 +93,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
         ["inline-missing-width", missingWidth], ["inline-short", shortInline], ["mask", mask], ["mask-short", shortMask],
         ["flate", await document({}, { chart: "flate" })], ["flate-short", await document({}, { chart: "flate-short" })],
       ]);
-      server = createServer({ key: readFileSync(key), cert: certificate }, (req, res) => {
+      server = createServer({ key: readFileSync(key), cert: certificate }, async (req, res) => {
         received.push(req.url ?? "");
         const scenario = new URL(req.url ?? "/", "https://127.0.0.1").searchParams.get("scenario");
         if (req.headers.authorization || req.headers.cookie) { res.writeHead(500).end(); return; }
@@ -100,6 +102,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
         if (scenario === "operator") { res.writeHead(401, { "WWW-Authenticate": "Basic" }).end(); return; }
         if (scenario === "missing" || !linkAvailable) { res.writeHead(404).end(); return; }
         if (scenario === "html") { res.writeHead(200, { "Content-Type": "text/html" }).end("Sign in to view this report"); return; }
+        await beforeServingReport?.();
         const selected = reports.get(scenario ?? "") ?? report;
         res.writeHead(200, { "Content-Type": "application/pdf" }).end(selected.bytes);
       });
@@ -111,6 +114,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   beforeEach(async () => {
     received = [];
     linkAvailable = true;
+    beforeServingReport = undefined;
     f = await historyFixture((config) => {
       config.set("VEHICLE_HISTORY_SYNTHETIC_WALLET", "SYNTHETIC-VH14-NO-TRANSFER");
       config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 10);
@@ -134,7 +138,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   });
 
   async function obtained(format: "pdf" | "link" | "both", vin = facts.vin, options: {
-    lateReceipt?: boolean; operator?: Awaited<ReturnType<typeof f.actor>>; laterWindow?: boolean;
+    lateReceipt?: boolean; operator?: Awaited<ReturnType<typeof f.actor>>; laterWindow?: boolean; closeOfDay?: boolean; outcome?: object;
   } = {}) {
     const { lateReceipt, laterWindow } = options;
     const operator = options.operator ?? await f.actor(), customer = await f.actor(null);
@@ -146,8 +150,8 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     await operatorHttp("/claim").send({ expectedAssignmentVersion: 0 }).expect(201);
     const checked = (await operatorHttp("/offer").send({ kind: "check", vin, expectedVersion: 0, expectedAssignmentVersion }).expect(201)).body;
     const offer = (await operatorHttp("/offer").send({ kind: "propose", format, expectedVersion: 1, expectedAssignmentVersion,
-      deliveryFrom: laterWindow ? "2026-11-21T07:00:00.000Z" : "2026-11-21T06:00:00.000Z",
-      deliveryBy: laterWindow ? "2026-11-21T08:00:00.000Z" : "2026-11-21T07:00:00.000Z" }).expect(201)).body;
+      deliveryFrom: options.closeOfDay ? "2026-11-21T13:30:00.000Z" : laterWindow ? "2026-11-21T07:00:00.000Z" : "2026-11-21T06:00:00.000Z",
+      deliveryBy: options.closeOfDay ? "2026-11-21T14:30:00.000Z" : laterWindow ? "2026-11-21T08:00:00.000Z" : "2026-11-21T07:00:00.000Z" }).expect(201)).body;
     const orderId = (await customerHttp(`${root}/requests/${id}/order`).send({ offer }).expect(201)).body.order.id as string;
     if (lateReceipt) f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:05:00.000Z");
     await operatorHttp("/payment-verification").send({ orderId, expectedAssignmentVersion, attemptKey: randomUUID(),
@@ -172,10 +176,10 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     const path = work + "/report-artifacts";
     const validate = (input: object, token = operator.token) => f.request.post(path).auth(token, { type: "bearer" }).send({ ...target, ...input });
     const read = (suffix = "", token = operator.token, query: object = target) => f.request.get(path + suffix).auth(token, { type: "bearer" }).query(query);
-    const deliver = (artifactId: string, token = operator.token) => f.request.post(path + "/deliver")
-      .auth(token, { type: "bearer" }).send({ ...target, artifactId });
+    const deliver = (artifactId: string, token = operator.token, intentVersion = target.intentVersion) => f.request.post(path + "/deliver")
+      .auth(token, { type: "bearer" }).send({ ...target, artifactId, intentVersion });
     const originalReportDate = checked.preflight.providers[0].originalReportDate ?? facts.originalReportDate;
-    await record({ kind: "obtained", format, originalReportDate, permittedUse: true }).expect(201);
+    await record(options.outcome ?? { kind: "obtained", format, originalReportDate, permittedUse: true }).expect(201);
     return { id, work, customer, operator, target, path, record, validate, read, deliver, offer };
   }
 
@@ -345,6 +349,155 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       ? "2026-11-21T06:59:59.999Z" : "2026-11-21T07:00:00.000Z");
     await e.deliver(artifact.id).expect(409).expect(({ body }) => expect(body.code).toBe("HISTORY_ORDER_STALE"));
     await f.request.get(`${root}/requests/${e.id}/report`).auth(e.customer.token, { type: "bearer" }).expect(200, { status: "empty" });
+  });
+
+  it("keeps the original promise and escalates a second miss after one exact staffed hour across closing", async () => {
+    const e = await obtained("both", facts.vin, { closeOfDay: true });
+    const path = `${root}/requests/${e.id}`;
+    const read = () => f.request.get(path + "/order").auth(e.customer.token, { type: "bearer" });
+    const decide = (body: object) => f.request.post(path + "/recovery").auth(e.customer.token, { type: "bearer" }).send(body);
+    const originalPromiseBy = "2026-11-21T14:30:00.000Z";
+    const deadline = "2026-11-22T04:30:00.000Z";
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    await e.validate({}).expect(422);
+    clock.now = () => new Date(originalPromiseBy);
+    const { body: { recovery } } = await read().expect(200);
+    expect(recovery).toMatchObject({ status: "offered", originalPromiseBy, originalFormat: "both",
+      offeredDeadline: deadline, agreedDeadline: null, failure: "file_delivery" });
+    const input = { kind: "accept", orderId: e.target.orderId, expectedVersion: recovery.version,
+      deadline, format: "both", attemptKey: randomUUID() };
+    await decide({ ...input, format: "pdf" }).expect(409);
+    f.concurrent(2);
+    const [accepted, replay] = await Promise.all([decide(input).set("x-history-concurrency", "1"), decide(input).set("x-history-concurrency", "1")]);
+    expect(accepted.status).toBe(201);
+    expect(replay.status).toBe(201);
+    expect(accepted.body).toMatchObject({ status: "agreed", originalPromiseBy, agreedDeadline: deadline });
+    expect(replay.body).toEqual(accepted.body);
+    clock.now = () => new Date(deadline);
+    await read().expect(200).expect(({ body }) => expect(body.recovery).toMatchObject({
+      status: "refund_decision_pending", pendingReason: "recovery_missed", originalPromiseBy, agreedDeadline: deadline,
+    }));
+    await decide({ ...input, attemptKey: randomUUID() }).expect(409);
+  });
+
+  it("requires agreement to a revised format before delivering any part of the promised pair", async () => {
+    const e = await obtained("both");
+    const { pdf } = await document();
+    const path = `${root}/requests/${e.id}`;
+    const order = () => f.request.get(path + "/order").auth(e.customer.token, { type: "bearer" });
+    const staff = (input: object, token = e.operator.token) => f.request.post(e.work + "/recovery").auth(token, { type: "bearer" }).send(input);
+    const customer = (input: object, token = e.customer.token) => f.request.post(path + "/recovery").auth(token, { type: "bearer" }).send(input);
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    await e.validate({ pdf }).expect(422);
+    await customer({ kind: "decline", attemptKey: randomUUID(), orderId: e.target.orderId, expectedVersion: 1 }).expect(409);
+    clock.now = () => new Date("2026-11-21T07:00:00.000Z");
+    const { body: { recovery } } = await order().expect(200);
+    const proposal = { kind: "propose_format", format: "pdf", expectedAssignmentVersion: 1,
+      expectedVersion: recovery.version, orderId: e.target.orderId, attemptKey: randomUUID() };
+    const wrongPurpose = await f.actor("vehicle_history_payment_evidence");
+    await staff(proposal, wrongPurpose.token).expect(403);
+    await staff({ ...proposal, expectedAssignmentVersion: 0 }).expect(409);
+    const { body } = await staff(proposal).expect(201);
+    const input = { kind: "accept", format: "pdf", deadline: recovery.offeredDeadline,
+      orderId: e.target.orderId, expectedVersion: body.version, attemptKey: randomUUID() };
+    await customer(input, (await f.actor(null)).token).expect(403);
+    await customer({ ...input, expectedVersion: recovery.version }).expect(409);
+    await e.validate({ pdf }).expect(409);
+    await customer(input).expect(201).expect(({ body: state }) => expect(state).toMatchObject({ agreedFormat: "pdf", originalFormat: "both" }));
+    await e.validate({ pdf }).expect(409);
+    const { body: { artifact } } = await e.validate({ pdf, intentVersion: 3 }).expect(201);
+    await e.deliver(artifact.id, e.operator.token, 3).expect(201);
+    await order().expect(200).expect(({ body: current }) => expect(current).toMatchObject({
+      preparation: "delivered", order: { acceptedOffer: { proposal: { format: "both" } } },
+      recovery: { agreedFormat: "pdf", agreedDeadline: "2026-11-21T08:00:00.000Z", originalPromiseBy: "2026-11-21T07:00:00.000Z" },
+    }));
+    await f.request.get(path + "/report").auth(e.customer.token, { type: "bearer" }).expect(200)
+      .expect(({ body: report }) => expect(report).toMatchObject({ status: "delivered", artifact: { format: "pdf", report: facts } }));
+  });
+
+  it("serializes a simultaneous customer decline and acceptance and keeps the winning decision", async () => {
+    const e = await obtained("pdf");
+    const path = `${root}/requests/${e.id}`;
+    const read = () => f.request.get(path + "/order").auth(e.customer.token, { type: "bearer" });
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:00:00.000Z");
+    const { body: { recovery } } = await read().expect(200);
+    const decide = (input: object) => f.request.post(path + "/recovery").auth(e.customer.token, { type: "bearer" })
+      .set("x-history-concurrency", "1").send({ ...input, orderId: e.target.orderId, expectedVersion: recovery.version, attemptKey: randomUUID() });
+    f.concurrent(2);
+    const results = await Promise.all([decide({ kind: "decline" }), decide({ kind: "accept", format: "pdf", deadline: recovery.offeredDeadline })]);
+    expect(results.map((response) => response.status).sort()).toEqual([201, 409]);
+    const winner = results.find((response) => response.status === 201)?.body;
+    const saved = (await read().expect(200)).body.recovery;
+    expect(saved).toEqual(winner);
+    if (results[0]?.status === 201) expect(saved).toMatchObject({ status: "refund_decision_pending", pendingReason: "declined", agreedDeadline: null });
+    else expect(saved).toMatchObject({ status: "agreed", agreedDeadline: recovery.offeredDeadline });
+  });
+
+  it("moves an unanswered offer to refund decision even when the next write is a stale acceptance", async () => {
+    const e = await obtained("link");
+    const path = `${root}/requests/${e.id}`;
+    const read = () => f.request.get(path + "/order").auth(e.customer.token, { type: "bearer" });
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-21T07:00:00.000Z");
+    const { body: { recovery } } = await read().expect(200);
+    clock.now = () => new Date("2026-11-21T08:00:00.000Z");
+    await f.request.post(path + "/recovery").auth(e.customer.token, { type: "bearer" }).send({ kind: "accept", format: "link",
+      deadline: recovery.offeredDeadline, orderId: e.target.orderId, expectedVersion: recovery.version, attemptKey: randomUUID() }).expect(409);
+    await read().expect(200).expect(({ body }) => expect(body.recovery).toMatchObject({
+      status: "refund_decision_pending", pendingReason: "offer_elapsed", agreedDeadline: null,
+    }));
+  });
+
+  it.each(["no_history", "company_error"] as const)("keeps %s context and an explicit pending founder decision", async (kind) => {
+    const e = await obtained("pdf", facts.vin, { outcome: { kind } });
+    const path = `${root}/requests/${e.id}`;
+    const read = () => f.request.get(path + "/order").auth(e.customer.token, { type: "bearer" });
+    if (kind === "company_error") {
+      const { body: { recovery } } = await read().expect(200);
+      expect(recovery).toMatchObject({ status: "attention", failure: "company_error" });
+      await f.request.post(e.work + "/recovery").auth(e.operator.token, { type: "bearer" }).send({ kind: "company_error_refund",
+        orderId: e.target.orderId, expectedAssignmentVersion: 1, expectedVersion: recovery.version, attemptKey: randomUUID() }).expect(201);
+    }
+    await read().expect(200).expect(({ body }) => expect(body).toMatchObject({
+      status: "payment_confirmed", wallet: null,
+      recovery: { status: "refund_decision_pending", pendingReason: kind, failure: kind, originalPromiseBy: "2026-11-21T07:00:00.000Z" },
+    }));
+  });
+
+  it("settles the deadline in the worker and refuses a delivery held across it by the provider response", async () => {
+    const e = await obtained("both");
+    const { pdf } = await document();
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    const worker = f.app.get(HistoryRecoveryWorker);
+    const path = `${root}/requests/${e.id}`;
+    const read = () => f.request.get(path + "/order").auth(e.customer.token, { type: "bearer" });
+    const { body: { artifact } } = await e.validate({ pdf, link: origin + "/report/" + facts.reportId }).expect(201);
+    clock.now = () => new Date("2026-11-21T07:00:00.000Z");
+    await worker.execute();
+    const offered = await f.prisma.historyRecoveryEvent.findFirstOrThrow({ where: { requestId: e.id } });
+    expect(offered.state).toMatchObject({ status: "offered" });
+    await f.request.post(path + "/recovery").auth(e.customer.token, { type: "bearer" }).send({ kind: "accept", format: "both",
+      orderId: e.target.orderId, attemptKey: randomUUID(), expectedVersion: offered.version, deadline: "2026-11-21T08:00:00.000Z" }).expect(201);
+    let inFlight!: () => void, release!: () => void;
+    const serving = new Promise<void>((resolve) => { inFlight = resolve; });
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    beforeServingReport = async () => { inFlight(); await released; };
+    const delivery = e.deliver(artifact.id).then((result) => result);
+    await Promise.race([
+      serving,
+      delivery.then(({ status }) => { throw new Error(`Delivery returned ${status} before link validation`); }),
+    ]);
+    clock.now = () => new Date("2026-11-21T08:00:00.000Z");
+    const scan = worker.execute();
+    release();
+    expect((await delivery).status).toBe(409);
+    await scan;
+    await worker.execute();
+    expect(await f.prisma.historyRecoveryEvent.count({ where: { requestId: e.id } })).toBe(3);
+    await read().expect(200).expect(({ body }) => expect(body.recovery).toMatchObject({
+      status: "refund_decision_pending", pendingReason: "recovery_missed", agreedDeadline: "2026-11-21T08:00:00.000Z",
+    }));
+    await f.request.get(path + "/report").auth(e.customer.token, { type: "bearer" }).expect(200, { status: "empty" });
   });
 
   it("validates the original on the same paid order after a replacement booking", async () => {

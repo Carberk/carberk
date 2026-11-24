@@ -49,8 +49,9 @@ export class HistoryCapacity {
     });
   }
 
-  async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date) {
-    if (order.reservedProvider || new Date(historyBookingWindow(order).deliveryBy) <= now) return order.reservedProvider;
+  async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date,
+    deadline: Date | null = new Date(historyBookingWindow(order).deliveryBy)) {
+    if (order.reservedProvider || !deadline || deadline <= now) return order.reservedProvider;
     return this.findProvider(orders, order, order.acceptedOffer.preflight, now, true);
   }
 

@@ -6,6 +6,9 @@ import { HISTORY_REPORT_ORIGINALS, HISTORY_REPORT_STORAGE } from "./domain/Histo
 import { HistoryPayments } from "./application/HistoryPayments";
 import { HistoryCorrections } from "./application/HistoryCorrections";
 import { HistoryFulfilment } from "./application/HistoryFulfilment";
+import { DecideHistoryRecovery } from "./application/DecideHistoryRecovery";
+import { HistoryRecoveryWorker } from "./application/HistoryRecoveryWorker";
+import { HISTORY_RECOVERY_QUEUE } from "./domain/HistoryRecovery";
 import { HistoryCorrectionsController } from "./presentation/HistoryCorrectionsController";
 import { HistoryPaymentsController } from "./presentation/HistoryPaymentsController";
 import { HistoryPaymentProofsController } from "./presentation/HistoryPaymentProofsController";
@@ -88,7 +91,7 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
   controllers: [HistoryReportArtifactsController, HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryReplacementController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
-  providers: [HistoryReportArtifacts,
+  providers: [HistoryReportArtifacts, DecideHistoryRecovery, HistoryRecoveryWorker, { provide: HISTORY_RECOVERY_QUEUE, useExisting: HistoryMessageLocks },
     { provide: HISTORY_REPORT_STORAGE, useClass: MinioHistoryReportStorage },
     { provide: HISTORY_REPORT_ORIGINALS, useClass: SyntheticHistoryReportOriginals },
     HistoryCorrections, HistoryFulfilment, HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
@@ -117,7 +120,7 @@ export class VehicleHistoryModule implements NestModule {
       const reminder = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/reminder(?:\/stop)?$/.test(route.url);
       const offer = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/offer$/.test(route.url);
       const payment = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/payment-verification$/.test(route.url);
-      const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment|replacement-booking)$/.test(route.url);
+      const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment|replacement-booking|recovery)$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
       const report = /^\/api\/v1\/vehicle-history\/(?:operator\/requests\/:id\/report-artifacts(?:\/content|\/deliver)?|requests\/:id\/report(?:\/:artifactId\/:kind)?)$/.test(route.url);
       if (!report && !payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;

@@ -8,6 +8,11 @@ export function PaymentStatus({ state, compact = false, summary = false }: {
   state: H.HistoryOrderState; compact?: boolean; summary?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  if (state.recovery && state.preparation !== "delivered") {
+    return <Text accessibilityLiveRegion="polite" className="text-callout font-semibold">
+      {t(`vehicleHistory.promiseRecovery.${state.recovery.status}`)}
+    </Text>;
+  }
   const outcome = state.payment?.outcome;
   const key = state.status === "payment_confirmed" ? "Confirmed" : state.status === "payment_received_no_hold" ? "NoHold"
     : outcome === "partial" ? "Partial" : outcome === "unmatched" ? "Unmatched" : outcome === "uncertain" ? "Review"

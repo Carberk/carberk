@@ -115,6 +115,37 @@ it("shows expiry with the original promise and a contact-operator next action", 
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(sent).toEqual([]);
 });
+it.each([
+  ["en", "Accept new format and extra hour", "Original promise", "Agreed recovery deadline", "Awaiting founder refund decision"],
+  ["ru", "Принять новый формат и дополнительный час", "Первоначальный срок", "Согласованный новый срок", "Ожидается решение основателя о возврате"],
+  ["tk", "Täze görnüşi we goşmaça sagady kabul et", "Ilkinji wada berlen möhlet", "Ylalaşylan täze möhlet", "Esaslandyryjynyň pul gaýtarmak kararyna garaşylýar"],
+] as const)("shows the paid promise and revised format choice in %s, then retains both deadlines on a second miss", async (locale, choice, original, agreed, pending) => {
+  const offer: H.HistoryRecoveryState = { version: 2, status: "offered", originalPromiseBy: "2026-11-21T07:00:00.000Z",
+    originalFormat: "both", paymentHoldExpiresAt: "2026-11-21T07:00:00.000Z", paymentDeadline: "2026-11-21T07:00:00.000Z",
+    failure: "file_delivery", missedAt: "2026-11-21T07:00:31.000Z", offeredDeadline: "2026-11-21T08:00:31.000Z", agreedDeadline: null,
+    proposedFormat: "pdf", agreedFormat: null, agreedAt: null, pendingReason: null, refundRequestedAt: null };
+  current = { ...accepted, status: "payment_confirmed", wallet: null, preparation: "preparing", recovery: offer, serverNow: "2026-11-21T07:00:00.000Z" };
+  server.use(http.post("*/vehicle-history/requests/:id/recovery", async ({ request }) => {
+    sent.push(await request.json());
+    const next: H.HistoryRecoveryState = { ...offer, version: 4, status: "refund_decision_pending", agreedDeadline: offer.offeredDeadline,
+      agreedFormat: "pdf", agreedAt: "2026-11-21T07:01:00.000Z", pendingReason: "recovery_missed", refundRequestedAt: "2026-11-21T08:00:31.000Z" };
+    current = { ...current, recovery: next, serverNow: "2026-11-21T08:00:31.000Z" };
+    return HttpResponse.error();
+  }));
+  device.fontScale = 1.5;
+  const view = await renderMobile(<RequestScreen />, { locale });
+  const button = await view.findByRole("button", { name: choice });
+  expect(view.getAllByText(new RegExp(original)).length).toBeGreaterThan(0);
+  expect(sent).toEqual([]);
+  await fireEvent.press(button);
+  await view.findAllByText(pending);
+  expect(view.getAllByText(new RegExp(agreed)).length).toBeGreaterThan(0);
+  expect(view.getAllByText(new RegExp(agreed + ".*13:00:31"))).toHaveLength(2);
+  expect(view.getAllByText(new RegExp(original)).length).toBeGreaterThan(0);
+  expect(view.queryByRole("button", { name: choice })).toBeNull();
+  expect(sent).toEqual([{ kind: "accept", orderId: id, expectedVersion: 2, attemptKey: expect.any(String),
+    deadline: "2026-11-21T08:00:31.000Z", format: "pdf" }]);
+});
 it("discards delayed acceptance when the customer session ends", async () => {
   let release!: () => void;
   const delayed = new Promise<void>((resolve) => { release = resolve; });

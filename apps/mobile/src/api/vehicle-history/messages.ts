@@ -72,6 +72,8 @@ export function historyTranscript(viewer: HistoryViewer, requestId: string, sign
       transport(`/report/${encodeURIComponent(id)}/link`, R.HistoryReportLinkSchema, undefined, current),
     decideReplacement: (input: H.HistoryReplacementDecision, current: () => boolean) =>
       transport("/replacement-booking", H.HistoryReplacementStateSchema, H.HistoryReplacementDecisionSchema.parse(input), current),
+    decideRecovery: (input: H.HistoryRecoveryDecision, current: () => boolean) =>
+      transport("/recovery", H.HistoryRecoveryStateSchema, H.HistoryRecoveryDecisionSchema.parse(input), current),
     correctVin: (input: H.HistoryCorrectionMutation, current: () => boolean) => transport("/correction", H.HistoryCorrectionStateSchema,
       H.HistoryCorrectionMutationSchema.parse(input), current),
     acceptQuote: (offer: H.AcceptHistoryQuote["offer"], current: () => boolean) => transport("/order", H.HistoryOrderStateSchema,
