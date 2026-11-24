@@ -8986,6 +8986,12 @@
             "minimum": 0,
             "maximum": 2147483647,
             "default": 0
+          },
+          "reportReady": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
           }
         },
         "required": [
@@ -9912,7 +9918,8 @@
               "queued",
               "preparing",
               "checking",
-              "recovery"
+              "recovery",
+              "delivered"
             ]
           },
           "fulfilment": {
@@ -16902,6 +16909,301 @@
                         "validatedAt"
                       ],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "delivered"
+                          ]
+                        },
+                        "artifact": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf"
+                                  ]
+                                },
+                                "pdf": {
+                                  "type": "object",
+                                  "properties": {
+                                    "filename": {
+                                      "type": "string",
+                                      "maxLength": 160,
+                                      "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                    },
+                                    "pages": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 100
+                                    },
+                                    "sizeBytes": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 716800
+                                    }
+                                  },
+                                  "required": [
+                                    "filename",
+                                    "pages",
+                                    "sizeBytes"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format",
+                                "pdf"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "link"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "both"
+                                  ]
+                                },
+                                "pdf": {
+                                  "type": "object",
+                                  "properties": {
+                                    "filename": {
+                                      "type": "string",
+                                      "maxLength": 160,
+                                      "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                    },
+                                    "pages": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 100
+                                    },
+                                    "sizeBytes": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 716800
+                                    }
+                                  },
+                                  "required": [
+                                    "filename",
+                                    "pages",
+                                    "sizeBytes"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format",
+                                "pdf"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "deliveredAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "artifact",
+                        "deliveredAt"
+                      ],
+                      "additionalProperties": false
                     }
                   ]
                 }
@@ -17330,6 +17632,301 @@
                         "validatedAt"
                       ],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "delivered"
+                          ]
+                        },
+                        "artifact": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf"
+                                  ]
+                                },
+                                "pdf": {
+                                  "type": "object",
+                                  "properties": {
+                                    "filename": {
+                                      "type": "string",
+                                      "maxLength": 160,
+                                      "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                    },
+                                    "pages": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 100
+                                    },
+                                    "sizeBytes": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 716800
+                                    }
+                                  },
+                                  "required": [
+                                    "filename",
+                                    "pages",
+                                    "sizeBytes"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format",
+                                "pdf"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "link"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "both"
+                                  ]
+                                },
+                                "pdf": {
+                                  "type": "object",
+                                  "properties": {
+                                    "filename": {
+                                      "type": "string",
+                                      "maxLength": 160,
+                                      "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                    },
+                                    "pages": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 100
+                                    },
+                                    "sizeBytes": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 716800
+                                    }
+                                  },
+                                  "required": [
+                                    "filename",
+                                    "pages",
+                                    "sizeBytes"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format",
+                                "pdf"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "deliveredAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "artifact",
+                        "deliveredAt"
+                      ],
+                      "additionalProperties": false
                     }
                   ]
                 }
@@ -17454,6 +18051,882 @@
           },
           "422": {
             "description": "Missing, mismatched or unusable report"
+          },
+          "503": {
+            "description": "Retry the same report"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/report-artifacts/deliver": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Deliver the validated originals for the current accepted order",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "intentId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "intentVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "acceptedRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "expectedAssignmentVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                  },
+                  "artifactId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "intentId",
+                  "intentVersion",
+                  "acceptedRevision",
+                  "expectedAssignmentVersion",
+                  "artifactId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Audited delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "delivered"
+                      ]
+                    },
+                    "artifact": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "archive",
+                                "new_source"
+                              ]
+                            },
+                            "report": {
+                              "type": "object",
+                              "properties": {
+                                "reportId": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Carfax",
+                                    "AutoCheck"
+                                  ]
+                                },
+                                "vin": {
+                                  "type": "string",
+                                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "format": "date"
+                                },
+                                "language": {
+                                  "type": "string",
+                                  "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                },
+                                "permittedUse": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "reportId",
+                                "provider",
+                                "vin",
+                                "originalReportDate",
+                                "language",
+                                "permittedUse"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "pdf"
+                              ]
+                            },
+                            "pdf": {
+                              "type": "object",
+                              "properties": {
+                                "filename": {
+                                  "type": "string",
+                                  "maxLength": 160,
+                                  "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                },
+                                "pages": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 100
+                                },
+                                "sizeBytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 716800
+                                }
+                              },
+                              "required": [
+                                "filename",
+                                "pages",
+                                "sizeBytes"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "source",
+                            "report",
+                            "format",
+                            "pdf"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "archive",
+                                "new_source"
+                              ]
+                            },
+                            "report": {
+                              "type": "object",
+                              "properties": {
+                                "reportId": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Carfax",
+                                    "AutoCheck"
+                                  ]
+                                },
+                                "vin": {
+                                  "type": "string",
+                                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "format": "date"
+                                },
+                                "language": {
+                                  "type": "string",
+                                  "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                },
+                                "permittedUse": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "reportId",
+                                "provider",
+                                "vin",
+                                "originalReportDate",
+                                "language",
+                                "permittedUse"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "link"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "source",
+                            "report",
+                            "format"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "archive",
+                                "new_source"
+                              ]
+                            },
+                            "report": {
+                              "type": "object",
+                              "properties": {
+                                "reportId": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                },
+                                "provider": {
+                                  "type": "string",
+                                  "enum": [
+                                    "Carfax",
+                                    "AutoCheck"
+                                  ]
+                                },
+                                "vin": {
+                                  "type": "string",
+                                  "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "format": "date"
+                                },
+                                "language": {
+                                  "type": "string",
+                                  "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                },
+                                "permittedUse": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "reportId",
+                                "provider",
+                                "vin",
+                                "originalReportDate",
+                                "language",
+                                "permittedUse"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "format": {
+                              "type": "string",
+                              "enum": [
+                                "both"
+                              ]
+                            },
+                            "pdf": {
+                              "type": "object",
+                              "properties": {
+                                "filename": {
+                                  "type": "string",
+                                  "maxLength": 160,
+                                  "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                },
+                                "pages": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 100
+                                },
+                                "sizeBytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 716800
+                                }
+                              },
+                              "required": [
+                                "filename",
+                                "pages",
+                                "sizeBytes"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "source",
+                            "report",
+                            "format",
+                            "pdf"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "deliveredAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "artifact",
+                    "deliveredAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid delivery input"
+          },
+          "403": {
+            "description": "Current assigned operator authority required"
+          },
+          "409": {
+            "description": "Order or validated report is no longer deliverable"
+          },
+          "422": {
+            "description": "Original is unusable or no longer matches"
+          },
+          "503": {
+            "description": "Refresh before retrying delivery"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/report": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reopen the purchaser’s delivered report",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current purchaser only, private and no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "empty"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "delivered"
+                          ]
+                        },
+                        "artifact": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf"
+                                  ]
+                                },
+                                "pdf": {
+                                  "type": "object",
+                                  "properties": {
+                                    "filename": {
+                                      "type": "string",
+                                      "maxLength": 160,
+                                      "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                    },
+                                    "pages": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 100
+                                    },
+                                    "sizeBytes": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 716800
+                                    }
+                                  },
+                                  "required": [
+                                    "filename",
+                                    "pages",
+                                    "sizeBytes"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format",
+                                "pdf"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "link"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "archive",
+                                    "new_source"
+                                  ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "reportId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9_-]{1,80}$"
+                                    },
+                                    "provider": {
+                                      "type": "string",
+                                      "enum": [
+                                        "Carfax",
+                                        "AutoCheck"
+                                      ]
+                                    },
+                                    "vin": {
+                                      "type": "string",
+                                      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "language": {
+                                      "type": "string",
+                                      "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "reportId",
+                                    "provider",
+                                    "vin",
+                                    "originalReportDate",
+                                    "language",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "both"
+                                  ]
+                                },
+                                "pdf": {
+                                  "type": "object",
+                                  "properties": {
+                                    "filename": {
+                                      "type": "string",
+                                      "maxLength": 160,
+                                      "pattern": "^[^\\p{Cc}\\p{Cf}/\\\\]+\\.pdf$/iu"
+                                    },
+                                    "pages": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 100
+                                    },
+                                    "sizeBytes": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 716800
+                                    }
+                                  },
+                                  "required": [
+                                    "filename",
+                                    "pages",
+                                    "sizeBytes"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "source",
+                                "report",
+                                "format",
+                                "pdf"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "deliveredAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "artifact",
+                        "deliveredAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current purchaser session required"
+          },
+          "409": {
+            "description": "Requested format or delivery is unavailable"
+          },
+          "503": {
+            "description": "Retry the same report"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/report/{artifactId}/pdf": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the private original PDF",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current purchaser only, private and no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dataBase64": {
+                      "type": "string",
+                      "minLength": 4,
+                      "maxLength": 955736
+                    }
+                  },
+                  "required": [
+                    "dataBase64"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current purchaser session required"
+          },
+          "409": {
+            "description": "Requested format or delivery is unavailable"
+          },
+          "503": {
+            "description": "Retry the same report"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/report/{artifactId}/link": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the original qualified HTTPS address",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "artifactId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current purchaser only, private and no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "maxLength": 2048,
+                      "pattern": "^https:\\/\\/[^\\s\\\\]+$/u"
+                    }
+                  },
+                  "required": [
+                    "address"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Current purchaser session required"
+          },
+          "409": {
+            "description": "Requested format or delivery is unavailable"
           },
           "503": {
             "description": "Retry the same report"
@@ -18697,7 +20170,8 @@
                         "queued",
                         "preparing",
                         "checking",
-                        "recovery"
+                        "recovery",
+                        "delivered"
                       ]
                     },
                     "fulfilment": {
@@ -20090,7 +21564,8 @@
                         "queued",
                         "preparing",
                         "checking",
-                        "recovery"
+                        "recovery",
+                        "delivered"
                       ]
                     },
                     "fulfilment": {
@@ -21360,7 +22835,8 @@
                         "queued",
                         "preparing",
                         "checking",
-                        "recovery"
+                        "recovery",
+                        "delivered"
                       ]
                     },
                     "fulfilment": {
@@ -25885,6 +27361,12 @@
                       "minimum": 0,
                       "maximum": 2147483647,
                       "default": 0
+                    },
+                    "reportReady": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
                     }
                   },
                   "required": [
@@ -25992,6 +27474,12 @@
                             "minimum": 0,
                             "maximum": 2147483647,
                             "default": 0
+                          },
+                          "reportReady": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
                           }
                         },
                         "required": [
@@ -26105,6 +27593,12 @@
                       "minimum": 0,
                       "maximum": 2147483647,
                       "default": 0
+                    },
+                    "reportReady": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
                     }
                   },
                   "required": [

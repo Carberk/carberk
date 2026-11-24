@@ -12,6 +12,7 @@ import RequestScreen from "../../app/vehicle-history/requests/[id]";
 import { act, fireEvent, getHost, renderMobile, routeParams, routerMock, screenFocus } from "../../test/render";
 import { server } from "../../test/msw";
 import { NativeViewability } from "../../test/native-viewability";
+import { onPlatform } from "../../test/keyboardAvoidance";
 import { storeAuthSession } from "../auth/session";
 
 const nativeClipboard = vi.hoisted(() => ({
@@ -101,6 +102,54 @@ beforeEach(async () => {
   await storeAuthSession(session());
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); focusManager.setFocused(true); onlineManager.setOnline(true); vi.unstubAllEnvs(); });
+
+it("reopens a delivered provider link, keeps its original target, and offers operator help on failure", async () => {
+  const artifactId = "30000000-0000-4000-8000-000000000103";
+  const address = "https://fixture.invalid/report/synthetic?opaque=%2f%41&x=plus+space&x=%2B";
+  const linkStarted = deferred<boolean>(), linkResponse = deferred<boolean>();
+  let firstRead = true;
+  server.use(
+    http.get("*/vehicle-history/requests/:id", () => HttpResponse.json({ ...enquiry, reportReady: true })),
+    http.get("*/vehicle-history/requests/:id/report", () => HttpResponse.json({
+      status: "delivered", deliveredAt: "2026-11-14T08:00:00.000Z",
+      artifact: { id: artifactId, source: "new_source", format: "link", report: {
+        reportId: "synthetic", provider: "Carfax", vin: "DEMA0000000000001",
+        originalReportDate: "2026-10-14", language: "ru", permittedUse: true,
+      } },
+    })),
+    http.get(`*/vehicle-history/requests/:id/report/${artifactId}/link`, async () => {
+      if (firstRead) {
+        firstRead = false;
+        linkStarted.resolve(true);
+        await linkResponse.promise;
+      }
+      return HttpResponse.json({ address });
+    }),
+  );
+  const view = await renderMobile(<RequestScreen />);
+  expect(await view.findByText("Reopen from your requests at no charge.")).toBeTruthy();
+  expect(view.getByText("Carfax")).toBeTruthy();
+  expect(view.queryByRole("button", { name: "Open PDF" })).toBeNull();
+  expect(view.queryByText(address)).toBeNull();
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  await linkStarted.promise;
+  await act(() => { focusManager.setFocused(false); focusManager.setFocused(true); });
+  await act(() => linkResponse.resolve(true));
+  await vi.waitFor(() => expect(view.getByRole("button", { name: "Open report" })).toBeEnabled());
+  expect(Linking.openURL).not.toHaveBeenCalled();
+  const announce = vi.spyOn(AccessibilityInfo, "announceForAccessibility");
+  await onPlatform("ios", async () => {
+    await fireEvent.press(view.getByRole("button", { name: "Copy link" }));
+    await view.findByText("Link copied");
+    expect(announce).toHaveBeenCalledWith("Link copied");
+  });
+  expect(nativeClipboard.setStringAsync.mock.lastCall?.[0] === address).toBe(true);
+  vi.mocked(Linking.openURL).mockRejectedValueOnce(new Error("synthetic browser failure"));
+  await fireEvent.press(view.getByRole("button", { name: "Open report" }));
+  expect(await view.findByText("The report link could not open.")).toBeTruthy();
+  expect(vi.mocked(Linking.openURL).mock.lastCall?.[0] === address).toBe(true);
+  expect(view.getByRole("button", { name: "Contact operator" })).toBeEnabled();
+});
 
 it("restores the customer's unsent draft after reopening with a new session", async () => {
   const view = await renderMobile(<RequestScreen />);

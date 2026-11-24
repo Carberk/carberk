@@ -15,7 +15,7 @@ export async function readFulfilment(orders: HistoryOrderStore, order: StoredHis
   if (!accepted) return undefined;
   const gate = order.agreement?.pending ? "pending_correction"
     : new Date(historyBookingWindow(order).deliveryBy) <= now ? "booking_closed"
-      : await orders.hasEarlierPaidWork(confirmedAt, now) ? "fifo" : "ready";
+      : await orders.hasEarlierPaidWork(confirmedAt, now, intent?.status === "obtained" ? "delivery" : "fulfilment") ? "fifo" : "ready";
   const sources = fulfilmentSources(accepted);
   if (gate === "ready" && !await capacity.canUseFulfilmentBudget(orders, order, accepted.provider, now, false)) {
     const available = sources.filter((source) => source !== "new_source");
@@ -52,6 +52,7 @@ export class HistoryFulfilment {
           if (!isDeepStrictEqual(replay, input)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
           return current;
         }
+        if (await orders.reportArtifacts.delivered(order.id)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
         checkFulfilmentVersion(current.intent, input.expectedVersion);
         const intent = await this.transition(orders, order, current, input, actorId, participant.assignmentVersion, now);
         await orders.saveFulfilment({ input, state: intent, actorId, assignmentVersion: participant.assignmentVersion });

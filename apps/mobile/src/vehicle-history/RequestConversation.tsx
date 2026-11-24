@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, Keyboard, Platform, RefreshControl, View, type ViewToken } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, AppState, FlatList, Keyboard, Platform, RefreshControl, View, type TextInput, type ViewToken } from "react-native";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import * as Linking from "expo-linking";
@@ -17,6 +17,7 @@ import { OfferPreview } from "./OfferPreview";
 import { StopReminders } from "./StopReminders";
 import { useHistoryReply } from "./useHistoryReply";
 import { useRequestConversation } from "./useRequestConversation";
+import { DeliveredReport } from "./DeliveredReport";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const linkAttempt = useRef(0);
   const linkReader = useRef({ mounted: true, ready: false });
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
+  const composer = useRef<TextInput>(null);
   const position = useRef({ offset: 0, height: 0 });
   const browserPosition = useRef<{ offset: number; height: number; away: boolean; keyboardReady: boolean } | null>(null);
   const name = useDisplayName();
@@ -83,6 +85,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const denied = [pages.error, receipts.error, thread.receiptError].some((error) =>
     error instanceof ApiError && [401, 403, 404].includes(error.status));
   const metadataAvailable = metadataCurrent || (metadataRefreshing && !metadataError);
+  const delivered = request.reportReady || thread.order.data?.preparation === "delivered";
   const ready = metadataCurrent && thread.connected && thread.active && !denied && !pages.isPending && !pages.error;
   linkReader.current.ready = ready;
   const linkCurrent = () => linkReader.current.mounted && linkReader.current.ready
@@ -192,17 +195,24 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   else if (pages.error && !pages.isFetchNextPageError && (thread.messages.length === 0
     || (pages.error instanceof ApiError && pages.error.status === 409))) notice = <ErrorState error={pages.error} onRetry={retry}
     title={pages.error instanceof ApiError && pages.error.status === 409 ? t("vehicleHistory.threadChanged") : undefined} />;
-  else if (thread.messages.length === 0) notice = <Text className="text-body text-muted-foreground">{t("vehicleHistory.emptyEnquiry")}</Text>;
+  else if (thread.messages.length === 0) notice = <Text className="text-body text-muted-foreground">
+    {t(delivered ? "vehicleHistory.reportNoMessages" : "vehicleHistory.emptyEnquiry")}
+  </Text>;
 
   return <View className="flex-1">
-    {!denied && thread.active && thread.order.data?.order && !thread.order.error && <OrderStatus state={thread.order.data}
+    {!denied && delivered && thread.active && !keyboardVisible && <View className="border-b border-border bg-card px-5 py-2">
+      <Button variant="secondary" className="min-h-12" onPress={() => list.current?.scrollToOffset({ offset: 0, animated: true })}>
+        <Text>{t("vehicleHistory.viewDeliveredReport")}</Text>
+      </Button>
+    </View>}
+    {!denied && !delivered && thread.active && thread.order.data?.order && !thread.order.error && <OrderStatus state={thread.order.data}
       compact={keyboardVisible} ready={metadataCurrent && thread.connected} onDetails={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />}
     <FlatList
     ref={list}
     className="flex-1" contentContainerClassName="gap-3 px-5 pb-8 pt-3"
     data={notice ? [] : thread.messages} keyExtractor={(message) => message.id}
     keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
-    maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+    maintainVisibleContentPosition={delivered && thread.messages.length === 0 ? undefined : { minIndexForVisible: 0 }}
     scrollEventThrottle={16}
     onScroll={(event) => { position.current.offset = event.nativeEvent.contentOffset.y; }}
     onScrollBeginDrag={() => { browserPosition.current = null; }}
@@ -210,8 +220,10 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     onViewableItemsChanged={onVisible} viewabilityConfig={viewabilityConfig}
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
     ListHeaderComponent={<View className="gap-4 pb-3">
+      {!denied && delivered && <DeliveredReport viewer={viewer} requestId={request.id}
+        active={thread.active} online={thread.connected} ready={metadataCurrent} openComposer={() => composer.current?.focus()} />}
       {header}
-      {!denied && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} metadataAvailable={metadataAvailable}
+      {!denied && !delivered && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} metadataAvailable={metadataAvailable}
         active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
@@ -302,7 +314,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     />
     {!denied && <View className="gap-3 border-t-hairline border-border bg-background px-5 py-3">
       <Text nativeID="history-reply-label" className="text-footnote font-semibold">{t("vehicleHistory.replyLabel")}</Text>
-      <Input accessibilityLabel={t("vehicleHistory.replyLabel")} accessibilityLabelledBy="history-reply-label"
+      <Input ref={composer} accessibilityLabel={t("vehicleHistory.replyLabel")} accessibilityLabelledBy="history-reply-label"
         className="max-h-36 min-h-20 py-3" multiline textAlignVertical="top" maxLength={4000}
         editable={reply.loaded}
         placeholder={t("vehicleHistory.replyPlaceholder")} value={reply.draft} onChangeText={reply.edit} />

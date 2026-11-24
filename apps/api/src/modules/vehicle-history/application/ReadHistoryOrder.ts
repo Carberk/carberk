@@ -24,8 +24,9 @@ export class ReadHistoryOrder {
       const state = historyOrderState(order, now, checks, proofs.length > 0);
       const confirmedAt = state.status === "payment_confirmed" ? state.payment?.confirmedAt : null;
       if (!order || !confirmedAt) return state;
+      const delivered = await orders.reportArtifacts.delivered(order.id);
       const intent = await orders.fulfilment();
-      state.preparation = !intent ? "queued" : intent.status === "recovery" ? "recovery"
+      state.preparation = delivered ? "delivered" : !intent ? "queued" : intent.status === "recovery" ? "recovery"
         : intent.status === "uncertain" ? "checking" : "preparing";
       if (actor.operator) {
         const provider = order.reservedProvider ?? await orders.serialize(() => this.capacity.existingProvider(orders, order, now));

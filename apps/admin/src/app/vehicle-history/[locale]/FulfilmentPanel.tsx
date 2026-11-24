@@ -36,6 +36,7 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
   if (state.status !== "payment_confirmed") return null;
   const view = state.fulfilment;
   const intent = view?.intent;
+  const delivered = state.preparation === "delivered";
   const selectedSource = source && view?.sources.includes(source) ? source : "";
   const command = () => ({ orderId: id, expectedAssignmentVersion: version, expectedVersion: intent?.version ?? 0, attemptKey: crypto.randomUUID() });
 
@@ -75,9 +76,9 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
         {intent && <div className="flex flex-wrap gap-x-2"><dt className="text-muted-foreground">{t.source}</dt><dd>{t[intent.source]}</dd></div>}
       </dl>
       {intent?.funding === "company" && <p>{t.companyFunding}</p>}
-      {intent && <p role="status">{intent.status === "recovery" ? `${t[intent.reason]} ${t.recoveryNext}` : t[intent.status]}</p>}
-      {view.gate !== "ready" && (!intent || intent.status === "retry_ready" || canCorrect) && <p role="status">{t[view.gate]}</p>}
-      {phase === "ready" && <>
+      {intent && !delivered && <p role="status">{intent.status === "recovery" ? `${t[intent.reason]} ${t.recoveryNext}` : t[intent.status]}</p>}
+      {!delivered && view.gate !== "ready" && (!intent || intent.status === "obtained" || intent.status === "retry_ready" || canCorrect) && <p role="status">{t[view.gate]}</p>}
+      {phase === "ready" && !delivered && <>
         {!intent && view.gate === "ready" && <>
           <label className="block">{t.source}<select data-fulfilment-next className={control} value={selectedSource} onChange={(e) => setSource(e.target.value as typeof source)}>
             <option value="">{t.chooseSource}</option>{view.sources.map((value) => <option key={value} value={value}>{t[value]}</option>)}
@@ -102,7 +103,8 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
     </>}
     {phase === "ready" && intent?.status === "obtained" && state.order && <ReportArtifactPanel
       key={`${state.order.id}:${intent.id}:${intent.version}`} locale={locale} id={id} scope={scope}
-      orderId={state.order.id} version={version} intent={intent} invalidate={invalidate} />}
+      orderId={state.order.id} version={version} intent={intent} canDeliver={!delivered && view?.gate === "ready"}
+      onDelivered={() => { if (!delivered) onOrder({ ...state, preparation: "delivered" }); }} invalidate={invalidate} />}
     {phase !== "ready" && <p role={phase === "saving" || phase === "loading" ? "status" : "alert"}>{t[phase]}</p>}
     {phase !== "saving" && phase !== "loading" && <Button ref={refresh} type="button" className={action} variant="secondary"
       onClick={() => { void run(); }}>{t.refresh}</Button>}

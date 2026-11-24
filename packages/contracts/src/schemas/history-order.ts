@@ -86,7 +86,7 @@ export const HistoryFulfilmentViewSchema = z.object({
   sources: z.array(FulfilmentSource), intent: HistoryFulfilmentIntentSchema.nullable(),
 }).strict();
 export type HistoryFulfilmentView = z.infer<typeof HistoryFulfilmentViewSchema>;
-export const HistoryPreparationSchema = z.enum(["queued", "preparing", "checking", "recovery"]);
+export const HistoryPreparationSchema = z.enum(["queued", "preparing", "checking", "recovery", "delivered"]);
 
 const ReplacementWindow = HistoryQuotePreviewSchema.pick({ deliveryFrom: true, deliveryBy: true });
 const ReplacementIntent = z.object({ orderId: z.string().guid(), expectedVersion: Version, attemptKey: z.string().guid() });

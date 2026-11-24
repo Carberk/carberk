@@ -40,7 +40,7 @@ export interface HistoryOrderStore {
   saveAgreement(write: HistoryAgreementWrite): Promise<void>;
   fulfilment(): Promise<H.HistoryFulfilmentIntent | null>;
   fulfilmentAttempt(key: string): Promise<H.HistoryFulfilmentMutation | null>;
-  hasEarlierPaidWork(confirmedAt: string | null, now: Date): Promise<boolean>;
+  hasEarlierPaidWork(confirmedAt: string | null, now: Date, stage?: "fulfilment" | "delivery"): Promise<boolean>;
   saveFulfilment(write: HistoryFulfilmentWrite): Promise<void>;
 }
 

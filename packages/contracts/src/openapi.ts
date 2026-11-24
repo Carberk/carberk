@@ -5,7 +5,7 @@ import {
 
 import * as PaymentProof from "./schemas/history-payment-proof";
 import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema } from "./schemas/history-order";
-import { HistoryReportContentSchema, HistoryReportQuerySchema, HistoryReportViewSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
+import { DeliverHistoryReportSchema, DeliveredHistoryReportSchema, HistoryReportContentSchema, HistoryReportLinkSchema, HistoryReportQuerySchema, HistoryReportViewSchema, PurchaserHistoryReportSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -532,6 +532,33 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
         400: { description: "Invalid input" }, 403: { description: "Current assigned operator authority required" },
         409: { description: "The requested order, intent, assignment or artifact is not current" },
         422: { description: "Missing, mismatched or unusable report" }, 503: { description: "Retry the same report" } },
+    });
+  }
+  registry.registerPath({
+    method: "post", path: "/api/v1/vehicle-history/operator/requests/{id}/report-artifacts/deliver",
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: "Deliver the validated originals for the current accepted order",
+    request: { params: z.object({ id: z.string().guid() }), body: { content: { "application/json": { schema: DeliverHistoryReportSchema } } } },
+    responses: {
+      201: { description: "Audited delivery", content: { "application/json": { schema: DeliveredHistoryReportSchema } } },
+      400: { description: "Invalid delivery input" }, 403: { description: "Current assigned operator authority required" },
+      409: { description: "Order or validated report is no longer deliverable" },
+      422: { description: "Original is unusable or no longer matches" }, 503: { description: "Refresh before retrying delivery" },
+    },
+  });
+  for (const asset of ["metadata", "pdf", "link"] as const) {
+    const path = "/api/v1/vehicle-history/requests/{id}/report";
+    registry.registerPath({
+      method: "get", path: asset === "metadata" ? path : `${path}/{artifactId}/${asset}`,
+      tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+      summary: { metadata: "Reopen the purchaser’s delivered report", pdf: "Read the private original PDF", link: "Read the original qualified HTTPS address" }[asset],
+      request: { params: z.object({ id: z.string().guid(), ...(asset === "metadata" ? {} : { artifactId: z.string().guid() }) }) },
+      responses: {
+        200: { description: "Current purchaser only, private and no-store",
+          content: { "application/json": { schema: { metadata: PurchaserHistoryReportSchema, pdf: HistoryReportContentSchema, link: HistoryReportLinkSchema }[asset] } } },
+        403: { description: "Current purchaser session required" }, 409: { description: "Requested format or delivery is unavailable" },
+        503: { description: "Retry the same report" },
+      },
     });
   }
   registry.register("HistoryPaymentVerification", HistoryPaymentVerificationSchema);

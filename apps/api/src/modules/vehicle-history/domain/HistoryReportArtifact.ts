@@ -1,17 +1,26 @@
 import { createHash } from "node:crypto";
 import type { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
 
-export interface StagedHistoryReport {
+export interface HistoryReportOriginal {
   artifact: R.HistoryReportArtifact;
   sha256: string | null;
   link: string | null;
+}
+
+export interface StagedHistoryReport extends HistoryReportOriginal {
+  orderId: string;
+  intentId: string;
+  acceptedRevision: number;
   validatedAt: Date | null;
+  deliveredAt: Date | null;
 }
 
 export interface HistoryReportStore {
   find(intentVersion: number): Promise<StagedHistoryReport | null>;
-  stage(target: R.HistoryReportTarget, report: StagedHistoryReport, actorId: string): Promise<void>;
+  delivered(orderId: string): Promise<StagedHistoryReport | null>;
+  stage(target: R.HistoryReportTarget, report: HistoryReportOriginal, actorId: string): Promise<void>;
   validate(intentVersion: number, actorId: string, assignmentVersion: number, now: Date): Promise<void>;
+  deliver(target: R.DeliverHistoryReport, actorId: string, now: Date): Promise<void>;
 }
 
 export const HISTORY_REPORT_ORIGINALS = Symbol("HISTORY_REPORT_ORIGINALS");
