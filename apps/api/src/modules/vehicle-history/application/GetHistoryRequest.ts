@@ -15,6 +15,8 @@ export class GetHistoryRequest {
     const { requesterId } = await this.requester.require(claims);
     const result = await this.requests.find(requesterId, id);
     if (!result) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
-    return this.projection.one(result);
+    const view = await this.projection.one(result);
+    await this.requester.require(claims);
+    return view;
   }
 }

@@ -69,6 +69,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   let server: ReturnType<typeof createServer>;
   let origin: string;
   let received: string[];
+  let linkAvailable: boolean;
   let certificate: Buffer;
   beforeAll(async () => {
     const directory = mkdtempSync(join(tmpdir(), "carberk-report-test-"));
@@ -97,7 +98,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
         if (scenario === "login") { res.writeHead(302, { location: "/login" }).end(); return; }
         if (scenario === "payment") { res.writeHead(402).end(); return; }
         if (scenario === "operator") { res.writeHead(401, { "WWW-Authenticate": "Basic" }).end(); return; }
-        if (scenario === "missing") { res.writeHead(404).end(); return; }
+        if (scenario === "missing" || !linkAvailable) { res.writeHead(404).end(); return; }
         if (scenario === "html") { res.writeHead(200, { "Content-Type": "text/html" }).end("Sign in to view this report"); return; }
         const selected = reports.get(scenario ?? "") ?? report;
         res.writeHead(200, { "Content-Type": "application/pdf" }).end(selected.bytes);
@@ -109,6 +110,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   afterAll(async () => { if (server) await new Promise<void>((resolve) => server.close(() => resolve())); });
   beforeEach(async () => {
     received = [];
+    linkAvailable = true;
     f = await historyFixture((config) => {
       config.set("VEHICLE_HISTORY_SYNTHETIC_WALLET", "SYNTHETIC-VH14-NO-TRANSFER");
       config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 10);
@@ -131,8 +133,11 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     } finally { s3.destroy(); await f.close(); }
   });
 
-  async function obtained(format: "pdf" | "link" | "both", vin = facts.vin, { lateReceipt = false } = {}) {
-    const operator = await f.actor(), customer = await f.actor(null);
+  async function obtained(format: "pdf" | "link" | "both", vin = facts.vin, options: {
+    lateReceipt?: boolean; operator?: Awaited<ReturnType<typeof f.actor>>; laterWindow?: boolean;
+  } = {}) {
+    const { lateReceipt, laterWindow } = options;
+    const operator = options.operator ?? await f.actor(), customer = await f.actor(null);
     const customerHttp = (path: string) => f.request.post(path).auth(customer.token, { type: "bearer" });
     const id = (await customerHttp(`${root}/requests`).send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
     const work = `${root}/operator/requests/${id}`;
@@ -141,12 +146,15 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     await operatorHttp("/claim").send({ expectedAssignmentVersion: 0 }).expect(201);
     const checked = (await operatorHttp("/offer").send({ kind: "check", vin, expectedVersion: 0, expectedAssignmentVersion }).expect(201)).body;
     const offer = (await operatorHttp("/offer").send({ kind: "propose", format, expectedVersion: 1, expectedAssignmentVersion,
-      deliveryFrom: "2026-11-21T06:00:00.000Z", deliveryBy: "2026-11-21T07:00:00.000Z" }).expect(201)).body;
+      deliveryFrom: laterWindow ? "2026-11-21T07:00:00.000Z" : "2026-11-21T06:00:00.000Z",
+      deliveryBy: laterWindow ? "2026-11-21T08:00:00.000Z" : "2026-11-21T07:00:00.000Z" }).expect(201)).body;
     const orderId = (await customerHttp(`${root}/requests/${id}/order`).send({ offer }).expect(201)).body.order.id as string;
     if (lateReceipt) f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:05:00.000Z");
     await operatorHttp("/payment-verification").send({ orderId, expectedAssignmentVersion, attemptKey: randomUUID(),
-      expectedPaymentVersion: 0, walletChecked: true, outcome: "matched", amountMinor: 10000, reference: "SYNTHETIC-VH14-REFERENCE",
-      evidence: "Synthetic independent ledger", evidenceFileId: null, receivedAt: now }).expect(201);
+      expectedPaymentVersion: 0, walletChecked: true, outcome: "matched", amountMinor: 10000,
+      reference: laterWindow ? "SYNTHETIC-VH15-SECOND" : "SYNTHETIC-VH14-REFERENCE",
+      evidence: "Synthetic independent ledger", evidenceFileId: null,
+      receivedAt: laterWindow ? "2026-11-21T05:01:00.000Z" : now }).expect(201);
     if (lateReceipt) {
       await operatorHttp("/replacement-booking").send({ kind: "propose", orderId, expectedAssignmentVersion, expectedVersion: 0,
         attemptKey: randomUUID(), deliveryFrom: "2026-11-21T08:00:00.000Z", deliveryBy: "2026-11-21T09:00:00.000Z" }).expect(201);
@@ -164,9 +172,11 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     const path = work + "/report-artifacts";
     const validate = (input: object, token = operator.token) => f.request.post(path).auth(token, { type: "bearer" }).send({ ...target, ...input });
     const read = (suffix = "", token = operator.token, query: object = target) => f.request.get(path + suffix).auth(token, { type: "bearer" }).query(query);
+    const deliver = (artifactId: string, token = operator.token) => f.request.post(path + "/deliver")
+      .auth(token, { type: "bearer" }).send({ ...target, artifactId });
     const originalReportDate = checked.preflight.providers[0].originalReportDate ?? facts.originalReportDate;
     await record({ kind: "obtained", format, originalReportDate, permittedUse: true }).expect(201);
-    return { id, work, customer, operator, target, path, record, validate, read, offer };
+    return { id, work, customer, operator, target, path, record, validate, read, deliver, offer };
   }
 
   it.each(["pdf", "link", "both"] as const)("validates the accepted %s formats and preserves only the applicable originals", async (format) => {
@@ -221,6 +231,120 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     }
     expect(received).toHaveLength(count);
     expect((await e.read().expect(200)).body).toEqual({ status: "empty" });
+  });
+
+  it.each(["pdf", "link", "both"] as const)("delivers and reopens the accepted %s report through private HTTP", async (format) => {
+    const e = await obtained(format);
+    const path = `${root}/requests/${e.id}/report`;
+    const purchaser = (suffix = "", token = e.customer.token) => f.request.get(path + suffix).auth(token, { type: "bearer" });
+    const { deliver } = e;
+    const { pdf, bytes } = await document();
+    const address = origin + "/report/" + facts.reportId + "?q=%2f%41&x=plus+space&x=%2B";
+    const pdfInput = format !== "link" ? { pdf } : {};
+    const linkInput = format !== "pdf" ? { link: address } : {};
+    await deliver(randomUUID()).expect(409);
+    const { body: { artifact } } = await e.validate({ ...pdfInput, ...linkInput }).expect(201);
+    await purchaser().expect(200, { status: "empty" }).expect("Cache-Control", "private, no-store");
+    await purchaser(`/${artifact.id}/pdf`).expect(409);
+    await deliver(randomUUID()).expect(409);
+    await deliver(artifact.id, e.customer.token).expect(403);
+    if (format !== "pdf") {
+      linkAvailable = false;
+      await deliver(artifact.id).expect(422).expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_LINK"));
+      await purchaser().expect(200, { status: "empty" });
+      linkAvailable = true;
+    }
+    const { body: delivered } = await deliver(artifact.id).expect(201);
+    expect(delivered).toMatchObject({ status: "delivered", artifact: { id: artifact.id, format, report: facts }, deliveredAt: now });
+    const count = received.length;
+    linkAvailable = false;
+    await deliver(artifact.id).expect(201, delivered);
+    await purchaser().expect(200, delivered);
+    expect(JSON.stringify(delivered).includes(address)).toBe(false);
+    const pdfPath = `/${artifact.id}/pdf`, linkPath = `/${artifact.id}/link`;
+    if (format === "link") await purchaser(pdfPath).expect(409);
+    else {
+      const { body } = await purchaser(pdfPath).expect(200).expect("Cache-Control", "private, no-store");
+      expect(Buffer.from(body.dataBase64, "base64")).toEqual(bytes);
+    }
+    if (format === "pdf") await purchaser(linkPath).expect(409);
+    else {
+      const { body } = await purchaser(linkPath).expect(200).expect("Cache-Control", "private, no-store");
+      expect(body.address === address).toBe(true);
+    }
+    expect(received).toHaveLength(count);
+    const otherBuyer = await f.actor(null), seller = await f.actor(null, "seller");
+    const dealer = await f.actor(null, "seller");
+    await f.prisma.dealership.create({ data: { name: "Synthetic History Dealer", slug: dealer.user.id,
+      members: { create: { userId: dealer.user.id, role: "owner" } } } });
+    await purchaser("", otherBuyer.token).expect(403);
+    await purchaser(pdfPath, seller.token).set("If-None-Match", "*").expect(403).expect("Cache-Control", "private, no-store");
+    await purchaser(linkPath, dealer.token).expect(403);
+    await purchaser(linkPath, e.operator.token).expect(403);
+    await f.request.get(path + pdfPath).expect(401);
+    await purchaser(`/${randomUUID()}/link`).expect(409);
+    await e.record({ kind: "company_error" }, 2).expect(409);
+    expect((await f.request.get(`${root}/requests/${e.id}/order`).auth(e.customer.token, { type: "bearer" }).expect(200)).body)
+      .toMatchObject({ order: { id: e.target.orderId }, preparation: "delivered", collectionEnabled: false, wallet: null });
+    expect((await f.request.get(`${root}/requests`).auth(e.customer.token, { type: "bearer" }).expect(200)).body.items)
+      .toMatchObject([{ id: e.id, reportReady: true }]);
+    await f.prisma.session.delete({ where: { id: e.customer.session.id } });
+    await purchaser().expect(403);
+    await purchaser(pdfPath).expect(403);
+    await purchaser(linkPath).expect(403);
+    await f.prisma.staffGrant.updateMany({ where: { userId: e.operator.user.id }, data: { revokedAt: new Date() } });
+    await deliver(artifact.id).expect(403);
+    await e.read("/content").expect(403);
+  });
+
+  it("restores a missing promised PDF using the identical original before delivering the same order", async () => {
+    const e = await obtained("both");
+    const { pdf, bytes } = await document();
+    const { body: { artifact } } = await e.validate({ pdf, link: origin + "/report/" + facts.reportId }).expect(201);
+    const s3 = new S3Client({ endpoint: process.env["MINIO_ENDPOINT"] ?? "", region: "us-east-1", forcePathStyle: true,
+      credentials: { accessKeyId: process.env["MINIO_ACCESS_KEY"] ?? "", secretAccessKey: process.env["MINIO_SECRET_KEY"] ?? "" } });
+    try {
+      await s3.send(new DeleteObjectCommand({
+        Bucket: "vehicle-history-private", Key: `report-artifacts/${e.id}/${artifact.id}`,
+      }));
+    } finally { s3.destroy(); }
+    await e.deliver(artifact.id).expect(503);
+    await f.request.get(`${root}/requests/${e.id}/report`).auth(e.customer.token, { type: "bearer" }).expect(200, { status: "empty" });
+    await e.validate({ pdf: (await document({ language: "en" })).pdf }).expect(422)
+      .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_MISMATCH"));
+    await e.validate({ pdf: { ...pdf, filename: "Different original.pdf" } }).expect(422)
+      .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_MISMATCH"));
+    await e.validate({ pdf }).expect(201).expect(({ body }) => expect(body.artifact.id).toBe(artifact.id));
+    await e.deliver(artifact.id).expect(201);
+    const response = await f.request.get(`${root}/requests/${e.id}/report/${artifact.id}/pdf`)
+      .auth(e.customer.token, { type: "bearer" }).expect(200);
+    expect(Buffer.from(response.body.dataBase64, "base64")).toEqual(bytes);
+  });
+
+  it("delivers the earlier confirmed report before a newer validated report assigned to the same operator", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {
+      Carfax: { allowance: 12, resetUtc: "00:00", externalUsage: {} },
+      AutoCheck: { allowance: 8, resetUtc: "00:00", externalUsage: {} },
+    });
+    const first = await obtained("link");
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    const second = await obtained("link", facts.vin, { operator: first.operator, laterWindow: true });
+    const original = { link: origin + "/report/" + facts.reportId };
+    const a = (await first.validate(original).expect(201)).body.artifact.id;
+    const b = (await second.validate(original).expect(201)).body.artifact.id;
+    await second.deliver(b).expect(409).expect(({ body }) => expect(body.code).toBe("HISTORY_FULFILMENT_FIFO"));
+    await first.deliver(a).expect(201);
+    await second.deliver(b).expect(201);
+  });
+
+  it("refuses first delivery when the booking deadline elapses during the final queue check", async () => {
+    const e = await obtained("link");
+    const { body: { artifact } } = await e.validate({ link: origin + "/report/" + facts.reportId }).expect(201);
+    let samples = 0;
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date(++samples <= 2
+      ? "2026-11-21T06:59:59.999Z" : "2026-11-21T07:00:00.000Z");
+    await e.deliver(artifact.id).expect(409).expect(({ body }) => expect(body.code).toBe("HISTORY_ORDER_STALE"));
+    await f.request.get(`${root}/requests/${e.id}/report`).auth(e.customer.token, { type: "bearer" }).expect(200, { status: "empty" });
   });
 
   it("validates the original on the same paid order after a replacement booking", async () => {

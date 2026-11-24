@@ -298,6 +298,9 @@ model HistoryReportArtifact {
   validatedBy               String?
   validatedAssignmentVersion Int?
   validatedAt               DateTime? @db.Timestamptz(3)
+  deliveredAt               DateTime? @db.Timestamptz(3)
+  deliveredBy               String?
+  deliveredAssignmentVersion Int?
   order HistoryOrder @relation(fields: [requestId, orderId], references: [requestId, id], onDelete: Restrict, onUpdate: NoAction)
   intent HistoryFulfilmentEvent @relation(fields: [requestId, intentVersion], references: [requestId, version], onDelete: Restrict, onUpdate: NoAction)
 

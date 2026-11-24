@@ -13,6 +13,8 @@ export class ListHistoryRequests {
   async execute(claims: HistoryRequesterClaims, cursor?: string) {
     const { requesterId } = await this.requester.require(claims);
     const page = await this.requests.list(requesterId, cursor);
-    return { ...page, items: await this.projection.many(page.items) };
+    const items = await this.projection.many(page.items);
+    await this.requester.require(claims);
+    return { ...page, items };
   }
 }

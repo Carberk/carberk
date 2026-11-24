@@ -164,7 +164,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
         'SELECT input FROM history_fulfilment_events WHERE "requestId" = $1 AND "attemptKey" = $2', [requestId, key]);
       return rows[0] ? H.HistoryFulfilmentMutationSchema.parse(rows[0].input) : null;
     },
-    async hasEarlierPaidWork(confirmedAt, now) {
+    async hasEarlierPaidWork(confirmedAt, now, stage = "fulfilment") {
       assertActive();
       const { rows } = await client.query<{ earlier: boolean }>(`
         ${activeOrders} SELECT EXISTS (
@@ -177,8 +177,14 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
           WHERE p."confirmedAt" IS NOT NULL AND (p."bookingCommitted" OR o."replacementBooked") AND o."activeBy" > $3
             AND r."assignedOperatorId" = (SELECT "assignedOperatorId" FROM vehicle_history_requests WHERE id = $2)
             AND ($1::timestamptz IS NULL OR (p."confirmedAt", p."requestId") < ($1::timestamptz, $2::text))
-            AND COALESCE(f.state->>'status', '') NOT IN ('obtained', 'recovery')
-        ) AS earlier`, [confirmedAt, requestId, now]);
+            AND CASE WHEN $4 = 'delivery' THEN COALESCE(f.state->>'status', '') <> 'recovery'
+              AND NOT EXISTS (
+                SELECT 1 FROM history_report_artifacts report
+                WHERE report."requestId" = p."requestId" AND report."orderId" = p."orderId" AND report."deliveredAt" IS NOT NULL
+              )
+              ELSE COALESCE(f.state->>'status', '') NOT IN ('obtained', 'recovery')
+            END
+        ) AS earlier`, [confirmedAt, requestId, now, stage]);
       return rows[0]?.earlier ?? false;
     },
     async saveFulfilment({ input, state, actorId, assignmentVersion }) {

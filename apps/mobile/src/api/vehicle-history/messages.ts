@@ -1,4 +1,4 @@
-import { HistoryOrderSchemas as H, HistoryOfferSchemas as O, VehicleHistorySchemas } from "@auto-tm/contracts";
+import { HistoryOrderSchemas as H, HistoryOfferSchemas as O, HistoryReportArtifactSchemas as R, VehicleHistorySchemas } from "@auto-tm/contracts";
 import { onlineManager } from "@tanstack/react-query";
 import type { ZodSchema } from "zod";
 
@@ -65,6 +65,11 @@ export function historyTranscript(viewer: HistoryViewer, requestId: string, sign
       return message;
     },
     order: (current: () => boolean) => transport("/order", H.HistoryOrderStateSchema, undefined, current),
+    report: (current: () => boolean) => transport("/report", R.PurchaserHistoryReportSchema, undefined, current),
+    reportPdf: (id: string, current: () => boolean) =>
+      transport(`/report/${encodeURIComponent(id)}/pdf`, R.HistoryReportContentSchema, undefined, current),
+    reportLink: (id: string, current: () => boolean) =>
+      transport(`/report/${encodeURIComponent(id)}/link`, R.HistoryReportLinkSchema, undefined, current),
     decideReplacement: (input: H.HistoryReplacementDecision, current: () => boolean) =>
       transport("/replacement-booking", H.HistoryReplacementStateSchema, H.HistoryReplacementDecisionSchema.parse(input), current),
     correctVin: (input: H.HistoryCorrectionMutation, current: () => boolean) => transport("/correction", H.HistoryCorrectionStateSchema,

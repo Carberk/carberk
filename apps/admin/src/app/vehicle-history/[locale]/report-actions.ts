@@ -17,12 +17,13 @@ const errors = {
 type Failure = "expired" | "stale" | "denied" | "conflict" | "unavailable" | "invalid" | (typeof errors)[keyof typeof errors];
 type Result = { status: "ok"; view: R.HistoryReportView } | { status: "preview"; dataBase64: string } | { status: Failure };
 
-export async function historyReportAction(locale: DeskLocale, selection: unknown, action: "read" | "validate" | "preview", value: unknown): Promise<Result> {
+export async function historyReportAction(locale: DeskLocale, selection: unknown, action: "read" | "validate" | "preview" | "deliver", value: unknown): Promise<Result> {
   await rejectExpiredSession();
   const selected = Selection.safeParse(selection);
-  const input = (action === "validate" ? R.ValidateHistoryReportSchema : R.HistoryReportTargetSchema).safeParse(value);
+  const input = (action === "validate" ? R.ValidateHistoryReportSchema
+    : action === "deliver" ? R.DeliverHistoryReportSchema : R.HistoryReportTargetSchema).safeParse(value);
   if (!selected.success || !input.success || !["en", "ru", "tk"].includes(locale) ||
-    !["read", "validate", "preview"].includes(action)) return { status: "invalid" };
+    !["read", "validate", "preview", "deliver"].includes(action)) return { status: "invalid" };
   const token = await getAccessToken();
   const binding = token ? historyInboxScope(token) : null;
   if (!token || !binding) return { status: "expired" };
@@ -33,8 +34,9 @@ export async function historyReportAction(locale: DeskLocale, selection: unknown
     .map(([key, value]) => [key, String(value)]));
   const options = { cache: "no-store", headers: { "Accept-Language": locale } } as const;
   try {
-    const response = await apiFetchOptional<unknown>(action === "validate" ? base : `${base}${action === "preview" ? "/content" : ""}?${query}`,
-      action === "validate" ? { ...options, method: "POST", body: input.data } : options, token);
+    const write = action === "validate" || action === "deliver";
+    const path = action === "deliver" ? base + "/deliver" : write ? base : `${base}${action === "preview" ? "/content" : ""}?${query}`;
+    const response = await apiFetchOptional<unknown>(path, write ? { ...options, method: "POST", body: input.data } : options, token);
     if (token !== await getAccessToken()) return { status: "stale" };
     if (response === null) return { status: "expired" };
     if (action === "preview") {

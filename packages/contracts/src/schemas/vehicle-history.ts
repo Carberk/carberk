@@ -27,6 +27,7 @@ export const HistoryRequestSchema = z.object({
   status: z.literal("enquiry"),
   assignedOperator: HistoryOperatorSchema.nullable(),
   assignmentVersion: z.number().int().min(0).max(2147483647).default(0),
+  reportReady: z.literal(true).optional(),
 });
 export type HistoryRequest = z.infer<typeof HistoryRequestSchema>;
 

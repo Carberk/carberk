@@ -144,15 +144,16 @@ export function HistoryList() {
           <Text className="text-footnote text-muted-foreground">
             {t("vehicleHistory.reference", { id: request.id.slice(0, 8).toUpperCase() })}
           </Text>
-          <Text className="text-callout">{t("vehicleHistory.awaitingOperator")}</Text>
+          <Text className="text-callout">{t(request.reportReady ? "vehicleHistory.reportReady" : "vehicleHistory.awaitingOperator")}</Text>
           <Button variant="secondary"
-            accessibilityLabel={t("vehicleHistory.openRequest", { id: request.id.slice(0, 8).toUpperCase() })}
+            accessibilityLabel={t(request.reportReady ? "vehicleHistory.reopenReportRef" : "vehicleHistory.openRequest",
+              { id: request.id.slice(0, 8).toUpperCase() })}
             onPress={() => {
               if (mounted.current && viewer && historySessionCurrent(viewer)) {
                 router.push({ pathname: "/vehicle-history/requests/[id]", params: { id: request.id } });
               }
             }}>
-            <Text>{t("vehicleHistory.open")}</Text>
+            <Text>{t(request.reportReady ? "vehicleHistory.reopenReport" : "vehicleHistory.open")}</Text>
           </Button>
         </View>
       ))}

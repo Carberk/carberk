@@ -2,13 +2,22 @@ import type { PoolClient } from "pg";
 import { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
 import type { HistoryReportStore, StagedHistoryReport } from "../domain/HistoryReportArtifact";
 
+const fields = 'artifact, sha256, link, "orderId", "intentId", "acceptedRevision", "validatedAt", "deliveredAt"';
+const parse = (row: StagedHistoryReport | undefined) => row ? { ...row, artifact: R.HistoryReportArtifactSchema.parse(row.artifact) } : null;
+
 export function historyReportStore(client: PoolClient, requestId: string, assertActive: () => void): HistoryReportStore {
   return {
     async find(intentVersion) {
       assertActive();
-      const { rows: [row] } = await client.query<StagedHistoryReport>(`SELECT artifact, sha256, link, "validatedAt"
+      const { rows: [row] } = await client.query<StagedHistoryReport>(`SELECT ${fields}
         FROM history_report_artifacts WHERE "requestId" = $1 AND "intentVersion" = $2`, [requestId, intentVersion]);
-      return row ? { ...row, artifact: R.HistoryReportArtifactSchema.parse(row.artifact) } : null;
+      return parse(row);
+    },
+    async delivered(orderId) {
+      assertActive();
+      const { rows: [row] } = await client.query<StagedHistoryReport>(`SELECT ${fields}
+        FROM history_report_artifacts WHERE "requestId" = $1 AND "orderId" = $2 AND "deliveredAt" IS NOT NULL`, [requestId, orderId]);
+      return parse(row);
     },
     async stage(target, report, actorId) {
       assertActive();
@@ -24,6 +33,14 @@ export function historyReportStore(client: PoolClient, requestId: string, assert
         "validatedAssignmentVersion" = $5 WHERE "requestId" = $1 AND "intentVersion" = $2 AND "validatedAt" IS NULL`,
       [requestId, intentVersion, now, actorId, assignmentVersion]);
       if (result.rowCount !== 1) throw new Error("History report validation write failed");
+    },
+    async deliver(target, actorId, now) {
+      assertActive();
+      const result = await client.query(`UPDATE history_report_artifacts
+        SET "deliveredAt" = $3, "deliveredBy" = $4, "deliveredAssignmentVersion" = $5
+        WHERE "requestId" = $1 AND id = $2 AND "validatedAt" IS NOT NULL AND "deliveredAt" IS NULL`,
+      [requestId, target.artifactId, now, actorId, target.expectedAssignmentVersion]);
+      if (result.rowCount !== 1) throw new Error("History report delivery write failed");
     },
   };
 }

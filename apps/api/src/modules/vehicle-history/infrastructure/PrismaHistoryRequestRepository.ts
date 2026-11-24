@@ -4,6 +4,10 @@ import { PrismaService } from "@auto-tm/db";
 import { type HistoryRequest, type HistoryRequestRepository } from "../domain/HistoryRequestRepository";
 
 const select = { id: true, sourceListingId: true, createdAt: true, assignedOperatorId: true, assignmentVersion: true } as const;
+const readerSelect = { ...select, order: { select: { reportArtifacts: { where: { deliveredAt: { not: null } }, select: { id: true }, take: 1 } } } } as const;
+function forReader({ order, ...request }: HistoryRequest & { order: { reportArtifacts: { id: string }[] } | null }): HistoryRequest {
+  return order?.reportArtifacts.length ? { ...request, reportReady: true } : request;
+}
 @Injectable()
 export class PrismaHistoryRequestRepository implements HistoryRequestRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -24,7 +28,8 @@ export class PrismaHistoryRequestRepository implements HistoryRequestRepository 
   }
 
   async find(requesterId: string, id: string) {
-    return this.prisma.vehicleHistoryRequest.findFirst({ where: { id, requesterId }, select });
+    const request = await this.prisma.vehicleHistoryRequest.findFirst({ where: { id, requesterId }, select: readerSelect });
+    return request && forReader(request);
   }
 
   async list(requesterId: string, cursor?: string) {
@@ -34,8 +39,9 @@ export class PrismaHistoryRequestRepository implements HistoryRequestRepository 
       where: { requesterId, ...(after ? { OR: [
         { createdAt: { lt: after.createdAt } }, { createdAt: after.createdAt, id: { lt: after.id } },
       ] } : {}) },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, select,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51,
+      select: readerSelect,
     });
-    return { items: rows.slice(0, 50), nextCursor: rows.length > 50 ? rows[49]?.id ?? null : null };
+    return { items: rows.slice(0, 50).map(forReader), nextCursor: rows.length > 50 ? rows[49]?.id ?? null : null };
   }
 }

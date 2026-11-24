@@ -119,7 +119,7 @@ export class VehicleHistoryModule implements NestModule {
       const payment = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/payment-verification$/.test(route.url);
       const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment|replacement-booking)$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
-      const report = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/report-artifacts(?:\/content)?$/.test(route.url);
+      const report = /^\/api\/v1\/vehicle-history\/(?:operator\/requests\/:id\/report-artifacts(?:\/content|\/deliver)?|requests\/:id\/report(?:\/:artifactId\/:kind)?)$/.test(route.url);
       if (!report && !payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
       route.errorHandler = (error, request, reply) => {

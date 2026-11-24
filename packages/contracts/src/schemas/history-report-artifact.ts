@@ -21,6 +21,8 @@ export const ValidateHistoryReportSchema = HistoryReportTargetSchema.extend({
   link: z.string().min(1).max(2048).optional(),
 }).strict();
 export type ValidateHistoryReport = z.infer<typeof ValidateHistoryReportSchema>;
+export const DeliverHistoryReportSchema = HistoryReportTargetSchema.extend({ artifactId: id }).strict();
+export type DeliverHistoryReport = z.infer<typeof DeliverHistoryReportSchema>;
 
 export const HistoryReportFactsSchema = z.object({
   reportId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
@@ -39,9 +41,19 @@ export const HistoryReportArtifactSchema = z.discriminatedUnion("format", [
   Artifact.extend({ format: z.literal("both"), pdf: Pdf }).strict(),
 ]);
 export type HistoryReportArtifact = z.infer<typeof HistoryReportArtifactSchema>;
+export const DeliveredHistoryReportSchema = z.object({
+  status: z.literal("delivered"), artifact: HistoryReportArtifactSchema, deliveredAt: DateTimeSchema,
+}).strict();
+export const PurchaserHistoryReportSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("empty") }).strict(), DeliveredHistoryReportSchema,
+]);
 export const HistoryReportViewSchema = z.discriminatedUnion("status", [
   z.object({ status: z.enum(["empty", "staged"]) }).strict(),
   z.object({ status: z.literal("validated"), artifact: HistoryReportArtifactSchema, validatedAt: DateTimeSchema }).strict(),
+  DeliveredHistoryReportSchema,
 ]);
 export type HistoryReportView = z.infer<typeof HistoryReportViewSchema>;
 export const HistoryReportContentSchema = z.object({ dataBase64: PdfBase64 }).strict();
+export const HistoryReportLinkSchema = z.object({
+  address: z.string().max(2048).regex(/^https:\/\/[^\s\\]+$/u),
+}).strict();

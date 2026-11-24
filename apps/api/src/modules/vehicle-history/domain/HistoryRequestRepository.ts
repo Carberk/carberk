@@ -4,6 +4,7 @@ export interface HistoryRequest {
   createdAt: Date;
   assignedOperatorId: string | null;
   assignmentVersion: number;
+  reportReady?: true;
 }
 export interface HistoryRequestRepository {
   create(input: { requesterId: string; sessionId: string; attemptKey: string; sourceListingId: string | null }): Promise<HistoryRequest>;

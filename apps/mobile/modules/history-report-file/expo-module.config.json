@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["HistoryReportFileModule"] },
+  "android": { "modules": ["tm.auto.historyreportfile.HistoryReportFileModule"] }
+}
