@@ -231,6 +231,28 @@ describe("renewed VIN agreement on the existing private order", () => {
     expect(intent.recoveryQuotaProvider).toBe("Carfax");
   });
 
+  it("keeps a usable reserved archive through recovery when only the alternate has new lookup quota", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {
+      Carfax: { allowance: 12, resetUtc: "00:00", externalUsage: { "2026-11-22": 12 } },
+      AutoCheck: { allowance: 6, resetUtc: "00:00", externalUsage: {} },
+    });
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-21T14:00:00.000Z");
+    const e = await accepted("pdf", undefined, ["2026-11-21T14:35:00.000Z", "2026-11-21T14:50:00.000Z"]);
+    await pay(e);
+    clock.now = () => new Date("2026-11-21T14:50:00.000Z");
+    await agreeRecovery(e, "pdf");
+    clock.now = () => new Date("2026-11-22T04:10:00.000Z");
+    const { body } = await operatorOrder(e).expect(200);
+    expect(body.fulfilment).toMatchObject({ gate: "ready", accepted: { format: "pdf", provider: "Carfax" }, sources: ["archive"] });
+    await fulfil(e, start(e, "pdf", "new_source")).expect(409).expect(({ body }) => expect(body.code).toBe("HISTORY_ORDER_CAPACITY"));
+    await fulfil(e, start(e, "pdf")).expect(201).expect(({ body }) => expect(body.intent).toMatchObject({
+      source: "archive", accepted: { format: "pdf", provider: "Carfax", originalReportDate: "2026-10-14" },
+    }));
+    const event = await f.prisma.historyFulfilmentEvent.findFirstOrThrow({ where: { requestId: e.id } });
+    expect(event.recoveryQuotaProvider).toBeNull();
+  });
+
   it.each(["suspendedAt", "deletionScheduledAt"] as const)("rechecks %s when the lifecycle write wins the deadline worker race", async (field) => {
     const e = await accepted("pdf");
     await pay(e);

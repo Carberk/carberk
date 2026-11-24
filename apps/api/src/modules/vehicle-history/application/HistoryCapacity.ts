@@ -55,12 +55,14 @@ export class HistoryCapacity {
     const reports = order.acceptedOffer.preflight;
     if (!deadline || deadline <= now) return order.reservedProvider;
     const reserved = reports.providers.find(({ name }) => name === order.reservedProvider)?.name;
-    if (recovery?.status === "agreed") return await this.recoveryProvider(orders, order, reports, now)
-      ?? reports.providers.find(({ name }) => {
-        const accepted = fulfilmentAgreement(order, name, recovery.agreedFormat ?? undefined);
-        return accepted && fulfilmentSources(accepted).includes("archive");
-      })?.name ?? reserved;
-    return reserved ?? await this.findProvider(orders, order, reports, now, true);
+    if (recovery?.status !== "agreed") return reserved ?? await this.findProvider(orders, order, reports, now, true);
+    const hasArchive = (provider: HistoryProvider) => {
+      const accepted = fulfilmentAgreement(order, provider, recovery.agreedFormat ?? undefined);
+      return accepted && fulfilmentSources(accepted).includes("archive");
+    };
+    if (reserved && hasArchive(reserved)) return reserved;
+    return await this.recoveryProvider(orders, order, reports, now)
+      ?? reports.providers.find(({ name }) => hasArchive(name))?.name ?? reserved;
   }
 
   async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
