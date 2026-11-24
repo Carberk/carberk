@@ -83,7 +83,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     thread.setVisibleIds(viewableItems.filter((item) => item.isViewable).map((item) => item.item.id));
   }).current;
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 300 }).current;
-  const denied = [pages.error, receipts.error, thread.receiptError].some((error) =>
+  const denied = [pages.error, receipts.error, thread.receiptError, thread.order.error].some((error) =>
     error instanceof ApiError && [401, 403, 404].includes(error.status));
   const metadataAvailable = metadataCurrent || (metadataRefreshing && !metadataError);
   const delivered = request.reportReady || thread.order.data?.preparation === "delivered";
@@ -227,7 +227,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         <PromiseRecovery recovery={thread.order.data.recovery} delivered />}
       {!thread.order.data?.recovery && header}
       {!denied && !delivered && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} metadataAvailable={metadataAvailable}
-        recoveryVersion={thread.order.data?.recovery?.version}
+        recoveryVersion={thread.order.data?.recovery?.version} refund={thread.order.error ? undefined : thread.order.data?.refund}
         active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
       {thread.order.data?.recovery && header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}

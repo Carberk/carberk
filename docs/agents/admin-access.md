@@ -79,7 +79,7 @@ Use an existing local actor authorized for the selected flow. The documented sha
      --purpose vehicle-history
    ```
 
-   History purposes are `vehicle-history`, `vehicle-history-payment-evidence` and `vehicle-history-staff-management`. Each requires its exact current nonrevoked, nonfuture grant and an eligible User. Marketplace admin role or another purpose's grant does not substitute. Omitted purpose defaults to `legacyAdmin`, which requires the admin role. Both pending and verified enrollment use the same private-file handoff; only the real browser verification elevates the session.
+   History purposes are `vehicle-history`, `vehicle-history-payment-evidence`, `vehicle-history-staff-management`, `vehicle-history-refund-decision` and `vehicle-history-refund-execution`. Each requires its exact current nonrevoked, nonfuture grant and an eligible User. Marketplace admin role or another purpose's grant does not substitute. Omitted purpose defaults to `legacyAdmin`, which requires the admin role. Both pending and verified enrollment use the same private-file handoff; only the real browser verification elevates the session.
 
 5. Confirm the intended signed-in actor and target page, then capture proof. Preserve the session for reuse. Close only your preview tab; stop only your owned server. Record worktree/revision, API/Admin origins and observed identity/elevation, with codes/tokens/QR/backup codes excluded.
 

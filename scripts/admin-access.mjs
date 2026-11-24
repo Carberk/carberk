@@ -16,7 +16,7 @@ const HELP = `Usage: pnpm admin:access check|serve|otp|totp --api http://127.0.0
   otp:  --phone <existing-local-admin> --api-log /absolute/private-api.log
         --request-id UUID --requested-at ISO_TIMESTAMP
   totp: --phone <existing-local-actor> [--purpose legacyAdmin|vehicle-history|
-        vehicle-history-payment-evidence|vehicle-history-staff-management]
+        vehicle-history-payment-evidence|vehicle-history-staff-management|vehicle-history-refund-decision|vehicle-history-refund-execution]
 check is read-only; serve starts only your foreground Admin process with these origins.
 otp/totp write a new private temporary code file. No sign-in request, promotion,
 quota reset, session injection or remote targets. See docs/agents/admin-access.md.`;

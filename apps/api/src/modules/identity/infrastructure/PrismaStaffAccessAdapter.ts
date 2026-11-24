@@ -31,7 +31,9 @@ export class PrismaStaffAccessAdapter implements StaffAccessPort {
 
   private async findActor(input: Parameters<StaffAccessPort["findCurrentActor"]>[0], elevated: boolean): Promise<StaffActor | null> {
     const purposes = { "vehicle-history": "vehicle_history", "vehicle-history-payment-evidence": "vehicle_history_payment_evidence",
-      "vehicle-history-staff-management": "vehicle_history_staff_management" } as const;
+      "vehicle-history-staff-management": "vehicle_history_staff_management",
+      "vehicle-history-refund-decision": "vehicle_history_refund_decision",
+      "vehicle-history-refund-execution": "vehicle_history_refund_execution" } as const;
     const purpose = purposes[input.purpose];
     if (!purpose) return null;
     const now = this.clock.now();

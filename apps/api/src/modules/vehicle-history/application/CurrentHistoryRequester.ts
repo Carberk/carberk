@@ -18,12 +18,15 @@ export class CurrentHistoryRequester {
     @Inject(ConfigService) private readonly config: ConfigService<Env, true>,
   ) {}
 
-  async require({ sub, sid }: HistoryRequesterClaims): Promise<{ requesterId: string; sessionId: string }> {
+  admits(userId: string) {
     const environment = this.config.get("APP_ENV", { infer: true });
     const testers = this.config.get("VEHICLE_HISTORY_SYNTHETIC_USER_IDS", { infer: true }) ?? "";
-    if (this.config.get("VEHICLE_HISTORY_SYNTHETIC_ENABLED", { infer: true }) !== true ||
-      !["development", "test"].includes(environment) || typeof sub !== "string" || typeof sid !== "string" ||
-      !testers.split(",").some((id) => id.trim() === sub)) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
+    return this.config.get("VEHICLE_HISTORY_SYNTHETIC_ENABLED", { infer: true }) === true &&
+      ["development", "test"].includes(environment) && testers.split(",").some((id) => id.trim() === userId);
+  }
+
+  async require({ sub, sid }: HistoryRequesterClaims): Promise<{ requesterId: string; sessionId: string }> {
+    if (typeof sub !== "string" || typeof sid !== "string" || !this.admits(sub)) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
     const [session, user, deleting] = await Promise.all([
       this.sessions.findById(sid), this.identity.findUserById(sub), this.checks.isDeletionScheduled(sub),
     ]);

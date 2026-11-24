@@ -719,7 +719,7 @@ describe("renewed VIN agreement on the existing private order", () => {
     const corrected = (await fulfil(e, correction).expect(201)).body;
     expect(corrected.intent).toMatchObject({ id: command.attemptKey, funding: "company", attempt: 2 });
     expect((await fulfil(e, correction).expect(201)).body).toEqual(corrected);
-    expect((await e.read().expect(200)).body).toMatchObject({ payment, wallet: null });
+    expect((await e.read().expect(200)).body).toMatchObject({ payment, wallet: null, companyFundedCorrection: true });
     expect(await f.prisma.historyPaymentCheck.count({ where: { requestId: e.id } })).toBe(1);
   });
 });

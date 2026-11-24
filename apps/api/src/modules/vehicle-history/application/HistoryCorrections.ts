@@ -7,6 +7,7 @@ import { HISTORY_PREFLIGHT, normalizeHistoryVin, type HistoryPreflightPort } fro
 import { bookedPayment, historyAgreement, historyBookingWindow } from "../domain/HistoryOrder";
 import { historyDeliveryDeadline } from "../domain/HistoryRecovery";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
+import { historyRefundReason } from "../domain/HistoryRefund";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 
@@ -39,6 +40,7 @@ export class HistoryCorrections {
       return orders.serialize(async () => {
         const confirmedBefore = bookedPayment(order, await orders.paymentChecks())?.confirmedAt ?? null;
         const recovery = confirmedBefore ? await orders.recovery() : null;
+        if (historyRefundReason(order, recovery)) throw new HistoryRequestError("HISTORY_CORRECTION_CLOSED");
         const recovering = recovery?.status === "agreed";
         const deadline = historyDeliveryDeadline(order, recovery);
         const now = this.clock.now(), at = now.toISOString(), version = previous.version + 1;

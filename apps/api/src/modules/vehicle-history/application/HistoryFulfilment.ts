@@ -60,7 +60,7 @@ export class HistoryFulfilment {
           if (!isDeepStrictEqual(replay, input)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
           return current;
         }
-        if (delivered) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
+        if (delivered || recovery?.status === "refund_decision_pending") throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
         checkFulfilmentVersion(current.intent, input.expectedVersion);
         const startsAttempt = input.kind === "start" || input.kind === "retry" || input.kind === "company_correction";
         const writingAt = this.clock.now();

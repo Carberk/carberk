@@ -1,7 +1,7 @@
 import { DateTimeSchema, z } from "../zod";
 
 import { HistoryOfferSchema, HistoryPreflightSchema, HistoryQuotePreviewSchema } from "./history-offer";
-import { HistoryPaymentSummarySchema } from "./history-payment";
+import { HistoryPaymentCheckInputSchema, HistoryPaymentSummarySchema } from "./history-payment";
 
 export const AcceptedHistoryOfferSchema = HistoryOfferSchema.extend({
   vin: z.string().regex(/^[A-HJ-NPR-Z0-9]{17}$/),
@@ -139,6 +139,37 @@ export const HistoryOperatorRecoverySchema = z.discriminatedUnion("kind", [
 export type HistoryRecoveryDecision = z.infer<typeof HistoryRecoveryDecisionSchema>;
 export type HistoryOperatorRecovery = z.infer<typeof HistoryOperatorRecoverySchema>;
 
+const RefundAmount = z.number().int().positive().max(100_000_000);
+const RefundReference = z.string().trim().min(1).max(160).regex(/^[^\p{Cc}]+$/u);
+const RefundFacts = z.object({
+  amountMinor: RefundAmount, originalPromiseBy: DateTimeSchema, agreedRecoveryDeadline: DateTimeSchema.nullable(),
+});
+export const HistoryRefundStateSchema = z.discriminatedUnion("status", [
+  RefundFacts.extend({ status: z.literal("pending") }).strict(),
+  RefundFacts.extend({ status: z.literal("approved"), approvedAt: DateTimeSchema }).strict(),
+  RefundFacts.extend({ status: z.literal("completed"), approvedAt: DateTimeSchema, recordedAt: DateTimeSchema,
+    externalReference: RefundReference }).strict(),
+]);
+export type HistoryRefundState = z.infer<typeof HistoryRefundStateSchema>;
+
+export const HistoryRefundCaseSchema = z.object({
+  order: z.object({ id: HistoryAcceptedOrderSchema.shape.id, vin: AcceptedHistoryOfferSchema.shape.vin, priceMinor: RefundAmount,
+    format: HistoryQuotePreviewSchema.shape.format, window: HistoryQuotePreviewSchema.pick({ deliveryFrom: true, deliveryBy: true }).strict() }).strict(),
+  payment: z.object({ amountMinor: RefundAmount, receivedAt: DateTimeSchema, confirmedAt: DateTimeSchema, reference: HistoryPaymentCheckInputSchema.shape.reference }).strict(),
+  reason: z.enum(["no_window", "replacement_declined", ...HistoryRecoveryStateSchema.shape.pendingReason.unwrap().options]),
+  failure: PromiseFailure.nullable(),
+  refund: HistoryRefundStateSchema,
+}).strict();
+export type HistoryRefundCase = z.infer<typeof HistoryRefundCaseSchema>;
+
+const RefundCommand = z.object({ orderId: HistoryAcceptedOrderSchema.shape.id, attemptKey: z.string().guid(),
+  amountMinor: RefundAmount, reason: z.string().trim().min(1).max(500).refine((value) => !value.includes("\0")) });
+export const HistoryRefundCommandSchema = z.discriminatedUnion("kind", [
+  RefundCommand.extend({ kind: z.literal("approve") }).strict(),
+  RefundCommand.extend({ kind: z.literal("execute"), returned: z.literal(true), externalReference: RefundReference }).strict(),
+]);
+export type HistoryRefundCommand = z.infer<typeof HistoryRefundCommandSchema>;
+
 export const HistoryOrderStateSchema = z.object({
   order: HistoryAcceptedOrderSchema.nullable(),
   agreement: HistoryCorrectionStateSchema.optional(),
@@ -146,6 +177,8 @@ export const HistoryOrderStateSchema = z.object({
   payment: HistoryPaymentSummarySchema.optional(),
   replacement: HistoryReplacementStateSchema.optional(),
   recovery: HistoryRecoveryStateSchema.optional(),
+  refund: HistoryRefundStateSchema.optional(),
+  companyFundedCorrection: z.literal(true).optional(),
   paymentDeadline: DateTimeSchema.optional(),
   verificationResumesAt: DateTimeSchema.optional(),
   reportPlan: z.object({ primary: ProviderName, second: ProviderName.nullable() }).strict().optional(),

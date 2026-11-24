@@ -344,3 +344,42 @@ it("lets the customer repair a rejected VIN without replaying the invalid reques
   expect(inputs).toEqual([expect.objectContaining({ vin: "INVALID-O" }), expect.objectContaining({ vin: "DEMA0000000000006" })]);
   expect(inputs[1]?.attemptKey).not.toBe(inputs[0]?.attemptKey);
 });
+
+it.each([
+  ["en", "Refund approved", "Refund completed", "Original promise", "Agreed recovery deadline"],
+  ["ru", "Возврат одобрен", "Деньги возвращены", "Первоначальный срок", "Согласованный новый срок"],
+  ["tk", "Pul gaýtarym tassyklandy", "Pul yzyna gaýtaryldy", "Ilkinji wada berlen möhlet", "Ylalaşylan täze möhlet"],
+] as const)("keeps both deadlines visible in %s and shows the return reference only after execution", async (locale, approved, completed, original, recovery) => {
+  const facts = { amountMinor: 12550, originalPromiseBy: quote.proposal.deliveryBy,
+    agreedRecoveryDeadline: "2026-11-21T08:00:00.000Z", approvedAt: "2026-11-21T08:10:00.000Z" };
+  current = { ...accepted, status: "payment_confirmed", wallet: null, refund: { ...facts, status: "approved" } };
+  const view = await renderMobile(<RequestScreen />, { locale });
+  await view.findByText(approved);
+  expect(view.getByText(new RegExp(`${original}.*12:00`))).toBeTruthy();
+  expect(view.getByText(new RegExp(`${recovery}.*13:00`))).toBeTruthy();
+  expect(view.queryByText(/SYNTHETIC-VH18-RETURN/)).toBeNull();
+  await view.unmount();
+
+  current = { ...current, refund: { ...facts, status: "completed", recordedAt: "2026-11-21T08:30:00.000Z",
+    externalReference: "SYNTHETIC-VH18-RETURN" } };
+  const reopened = await renderMobile(<RequestScreen />, { locale });
+  await reopened.findByText(completed);
+  expect(reopened.getByText(new RegExp(`${original}.*12:00`))).toBeTruthy();
+  expect(reopened.getByText(new RegExp(`${recovery}.*13:00`))).toBeTruthy();
+  expect(reopened.getByText(/SYNTHETIC-VH18-RETURN/)).toBeTruthy();
+  expect(sent).toEqual([]);
+});
+
+it("refreshes the refund headline and details together after an external return is recorded", async () => {
+  const facts = { amountMinor: 12550, originalPromiseBy: quote.proposal.deliveryBy,
+    agreedRecoveryDeadline: "2026-11-21T08:00:00.000Z", approvedAt: "2026-11-21T08:10:00.000Z" };
+  current = { ...accepted, status: "payment_confirmed", wallet: null, refund: { ...facts, status: "approved" } };
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("The money return is still pending.");
+  current = { ...current, refund: { ...facts, status: "completed", recordedAt: "2026-11-21T08:30:00.000Z",
+    externalReference: "SYNTHETIC-VH18-RECORDED" } };
+  await act(() => getHost(view.container, "RCTScrollView").props.refreshControl.props.onRefresh());
+  await view.findByText("Refund completed");
+  await view.findByText(/SYNTHETIC-VH18-RECORDED/);
+  expect(view.queryByText("The money return is still pending.")).toBeNull();
+});

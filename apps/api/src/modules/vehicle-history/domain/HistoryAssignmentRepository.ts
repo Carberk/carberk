@@ -25,7 +25,7 @@ export interface HistoryQueueItem {
 export interface HistoryMessageRequest {
   id: string; requesterId: string; assignedOperatorId: string | null; assignmentVersion: number;
 }
-export interface HistoryMessageAuthority { userId: string; sessionId: string; purpose: "vehicle-history" | null }
+export interface HistoryMessageAuthority { userId: string; sessionId: string; purpose: "vehicle-history" | "vehicle-history-refund-decision" | "vehicle-history-refund-execution" | null }
 export interface HistoryHandoverAuthority { userId: string; sessionId: string; purpose: "vehicle-history"; recipientId: string }
 export interface HistoryAssignmentRepository {
   /** Retain request and public Identity fences through the same-connection commit.

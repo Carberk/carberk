@@ -4,7 +4,7 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 
 import * as PaymentProof from "./schemas/history-payment-proof";
-import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema, HistoryRecoveryStateSchema, HistoryOperatorRecoverySchema, HistoryRecoveryDecisionSchema } from "./schemas/history-order";
+import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema, HistoryRecoveryStateSchema, HistoryOperatorRecoverySchema, HistoryRecoveryDecisionSchema, HistoryRefundCaseSchema, HistoryRefundCommandSchema, HistoryRefundStateSchema } from "./schemas/history-order";
 import { DeliverHistoryReportSchema, DeliveredHistoryReportSchema, HistoryReportContentSchema, HistoryReportLinkSchema, HistoryReportQuerySchema, HistoryReportViewSchema, PurchaserHistoryReportSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
@@ -481,7 +481,9 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       400: { description: "Invalid offer input" }, 403: { description: "Current request authority required" },
       409: { description: "Offer or assignment changed; refresh" }, 503: { description: "Temporarily unavailable" } },
   });
-  registry.register("HistoryOrderState", HistoryOrderStateSchema);
+  const refundState = registry.register("HistoryRefundState", HistoryRefundStateSchema);
+  const orderState = HistoryOrderStateSchema.extend({ refund: refundState.optional() });
+  registry.register("HistoryOrderState", orderState);
   registry.register("HistoryRecoveryState", HistoryRecoveryStateSchema);
   for (const operator of [false, true]) registry.registerPath({
     method: "post", path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/recovery`,
@@ -494,6 +496,23 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       content: { "application/json": { schema: HistoryRecoveryStateSchema } } },
       400: { description: "Invalid recovery choice" }, 403: { description: "Current session and request authority required" },
       409: { description: "Recovery terms changed or elapsed; refresh the order" }, 503: { description: "Read back before retrying the same decision" } },
+  });
+  const refundCase = registry.register("HistoryRefundCase", HistoryRefundCaseSchema.extend({ refund: refundState }));
+  for (const execution of [false, true]) for (const method of ["get", "post"] as const) registry.registerPath({
+    method, path: `/api/v1/vehicle-history/refunds/{id}${execution ? "/execution" : ""}`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: method === "get" ? "Read the scoped case for the exact refund"
+      : execution ? "Record the confirmed external return for an approved refund" : "Approve the verified amount for refund",
+    request: { params: z.object({ id: z.string().guid() }),
+      ...(method === "post" ? { body: { content: { "application/json": {
+        schema: HistoryRefundCommandSchema.options[execution ? 1 : 0],
+      } } } } : {}),
+    },
+    responses: { [method === "get" ? 200 : 201]: { description: "Current private refund case and recorded status",
+      content: { "application/json": { schema: refundCase } } },
+      400: { description: "Invalid refund input" }, 403: { description: "Current session and exact refund purpose required" },
+      404: { description: "No eligible refund case" }, 409: { description: "The refund details or recorded state conflict" },
+      503: { description: "Read back before retrying the same action" } },
   });
   registry.register("HistoryReplacementState", HistoryReplacementStateSchema);
   for (const operator of [false, true]) registry.registerPath({
@@ -591,7 +610,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     request: { params: z.object({ id: z.string().guid() }), query: operator ? ReadOperatorHistoryOfferSchema : ReadHistoryOfferSchema,
       ...(method === "post" ? { body: { content: { "application/json": { schema: AcceptHistoryQuoteSchema } } } } : {}) },
     responses: { [method === "get" ? 200 : 201]: { description: "Private synthetic state; collection is disabled",
-      content: { "application/json": { schema: HistoryOrderStateSchema } } },
+      content: { "application/json": { schema: orderState } } },
       400: { description: "Complete explicit quote acceptance required" }, 403: { description: "Current request and assignment authority required" },
       409: { description: "Quote stale, capacity full or order already accepted; refresh" }, 503: { description: "Synthetic instructions unavailable" } },
   });

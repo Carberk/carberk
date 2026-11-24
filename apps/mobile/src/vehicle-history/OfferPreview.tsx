@@ -20,9 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, reconcileOrder }: {
+export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, refund, reconcileOrder }: {
   viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; metadataAvailable: boolean;
-  active: boolean; connected: boolean; recoveryVersion?: number | undefined; reconcileOrder: () => Promise<unknown>;
+  active: boolean; connected: boolean; recoveryVersion?: number | undefined; refund?: H.HistoryRefundState | undefined; reconcileOrder: () => Promise<unknown>;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
@@ -190,6 +190,19 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
     {!active || (!ready && !data) ? null : state.isPending && !error ? <ActivityIndicator accessibilityLabel={copy("loading")} />
       : error ? <View className="gap-3"><Text accessibilityRole="alert">{copy(denied ? "denied" : "error")}</Text>
         <Button variant="secondary" disabled={!ready || !connected || state.isFetching} onPress={() => { setFailed(false); setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
+        : refund ? <View className="gap-2">
+          <Text accessibilityRole="header" className="text-headline font-semibold">{t("vehicleHistory.refund.details")}</Text>
+          {accepted && <>
+            <Text selectable className="font-mono">VIN · {accepted.acceptedOffer.vin}</Text>
+            <Text>{t("vehicleHistory.offerOrderPrice", { amount: accepted.acceptedOffer.proposal.priceTmt })}</Text>
+          </>}
+          <Text>{t("vehicleHistory.refund.amount", {
+            amount: new Intl.NumberFormat(i18n.language === "tk" ? "en-GB" : i18n.language, { minimumFractionDigits: 2 }).format(refund.amountMinor / 100),
+          })}</Text>
+          {refund.status === "completed"
+            ? <Text selectable>{t("vehicleHistory.refund.reference", { reference: refund.externalReference })}</Text>
+            : <Text>{t(refund.status === "approved" ? "vehicleHistory.refund.awaitingReturn" : "vehicleHistory.refund.review")}</Text>}
+        </View>
         : data && <>
           {recovery && <PromiseRecovery recovery={recovery} delivered={orderState?.preparation === "delivered"}
             controls={{ enabled: ready && active && connected && !state.isFetching,
@@ -211,6 +224,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             {(!accepted || expanded) && proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
             {(!accepted || expanded) && <><Text className="text-callout">{copy("rights")}</Text><Text className="text-callout">{copy("terms")}</Text></>}
             {accepted ? <>
+              {orderState?.companyFundedCorrection && <Text>{t("vehicleHistory.refund.companyFunding")}</Text>}
               <Text>{t("vehicleHistory.offerOrderPrice", { amount: accepted.acceptedOffer.proposal.priceTmt })}</Text>
               <Text>{copy("orderAccepted")}: {timestamp(accepted.acceptedAt)}</Text>
               {orderState?.paymentDeadline && <Text>{t("vehicleHistory.replacementPaymentDeadline")}: {timestamp(orderState.paymentDeadline)}</Text>}

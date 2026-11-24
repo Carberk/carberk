@@ -73,6 +73,8 @@ describe("local admin authenticator code", () => {
   it.each([
     ["vehicle-history-payment-evidence", "vehicle_history_payment_evidence"],
     ["vehicle-history-staff-management", "vehicle_history_staff_management"],
+    ["vehicle-history-refund-decision", "vehicle_history_refund_decision"],
+    ["vehicle-history-refund-execution", "vehicle_history_refund_execution"],
   ])("reads only the selected %s grant", async (purpose, storedPurpose) => {
     await expect(run(admin({ role: "buyer", staffGrants: [{ purpose: storedPurpose, grantedAt: new Date(59_000), revokedAt: null }] }), { purpose }).result)
       .resolves.toMatchObject({ exitCode: 0, code: "287082" });

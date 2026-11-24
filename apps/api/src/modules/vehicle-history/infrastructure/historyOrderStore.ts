@@ -1,3 +1,4 @@
+import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
 import type { PoolClient } from "pg";
 import type { HistoryAgreementInput, HistoryOrderStore, HistoryProvider, HistoryRecoveryCommand } from "../domain/HistoryOrder";
@@ -237,6 +238,29 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)`,
       [requestId, state.version, input.attemptKey, JSON.stringify(input), JSON.stringify(H.HistoryFulfilmentIntentSchema.parse(state)),
         actorId, assignmentVersion, state.recordedAt, recoveryQuotaProvider]);
+    },
+    async refundEvents() {
+      assertActive();
+      const { rows } = await client.query<{ input: unknown; actorId: string; recordedAt: Date }>(
+        'SELECT input, "actorId", "recordedAt" FROM history_refund_events WHERE "requestId" = $1', [requestId]);
+      return rows.map(({ input, actorId, recordedAt }) => ({
+        input: H.HistoryRefundCommandSchema.parse(input), actorId, recordedAt: recordedAt.toISOString(),
+      }));
+    },
+    async appendRefund({ input, actorId, recordedAt }, paymentVersion) {
+      assertActive();
+      try {
+        await client.query(`INSERT INTO history_refund_events
+          ("requestId", "paymentVersion", kind, "attemptKey", "actorId", "amountMinor", input, "externalReference", "recordedAt")
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
+        [requestId, paymentVersion, input.kind, input.attemptKey, actorId, input.amountMinor, JSON.stringify(input),
+          input.kind === "execute" ? input.externalReference : null, recordedAt]);
+      } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "23505") {
+          throw new HistoryRequestError("HISTORY_REFUND_CONFLICT");
+        }
+        throw error;
+      }
     },
     async recovery() {
       assertActive();
