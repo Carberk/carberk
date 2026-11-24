@@ -107,6 +107,8 @@ const BaseSchema = z.object({
   VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS: z.coerce.number().int().min(0).max(11).default(0),
   VEHICLE_HISTORY_SYNTHETIC_MORNING_SLOTS: z.coerce.number().int().min(0).max(1).default(0),
   VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS: providerBudgets,
+  VEHICLE_HISTORY_SYNTHETIC_REPORT_ORIGIN: z.string().regex(/^https:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/).or(z.literal("")).default(""),
+  VEHICLE_HISTORY_SYNTHETIC_REPORT_CA: z.base64().max(16384).or(z.literal("")).default(""),
 
   /** Listing video uploads (ADR-0112): off by default; testers are User IDs. */
   LISTING_VIDEO_UPLOADS_ENABLED: booleanFlag,

@@ -1,3 +1,8 @@
+import { HistoryReportArtifacts } from "./application/HistoryReportArtifacts";
+import { HistoryReportArtifactsController } from "./presentation/HistoryReportArtifactsController";
+import { MinioHistoryReportStorage } from "./infrastructure/MinioHistoryReportStorage";
+import { SyntheticHistoryReportOriginals } from "./infrastructure/SyntheticHistoryReport";
+import { HISTORY_REPORT_ORIGINALS, HISTORY_REPORT_STORAGE } from "./domain/HistoryReportArtifact";
 import { HistoryPayments } from "./application/HistoryPayments";
 import { HistoryCorrections } from "./application/HistoryCorrections";
 import { HistoryFulfilment } from "./application/HistoryFulfilment";
@@ -82,8 +87,11 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
-  controllers: [HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryReplacementController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
-  providers: [HistoryCorrections, HistoryFulfilment, HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
+  controllers: [HistoryReportArtifactsController, HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryReplacementController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
+  providers: [HistoryReportArtifacts,
+    { provide: HISTORY_REPORT_STORAGE, useClass: MinioHistoryReportStorage },
+    { provide: HISTORY_REPORT_ORIGINALS, useClass: SyntheticHistoryReportOriginals },
+    HistoryCorrections, HistoryFulfilment, HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
     { provide: HISTORY_PRIVATE_FILES, useClass: PrismaHistoryPrivateFiles },
     { provide: HISTORY_PRIVATE_STORAGE, useClass: MinioHistoryPrivateStorage }, AcceptHistoryQuote, HistoryCapacity, HistoryReplacementBooking, ReadHistoryOrder, HistoryOffers, { provide: HISTORY_PREFLIGHT, useClass: SyntheticHistoryPreflight }, AcknowledgeHistoryMessages, ReadHistoryReceipts, HistoryMessageLocks, HistoryMessageAccess, HistoryMessageProjection, SendHistoryText, ReadHistoryMessages,
     AddHistoryPrivateNote, ReadHistoryPrivateNotes, HistoryPrivateNoteProjection,
@@ -111,18 +119,19 @@ export class VehicleHistoryModule implements NestModule {
       const payment = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/payment-verification$/.test(route.url);
       const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment|replacement-booking)$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
-      if (!payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
+      const report = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/report-artifacts(?:\/content)?$/.test(route.url);
+      if (!report && !payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
       route.errorHandler = (error, request, reply) => {
         const response = historyRequestFailure(new HistoryRequestError(error.statusCode && error.statusCode < 500
-          ? payment ? "HISTORY_PAYMENT_INVALID" : proof ? "HISTORY_PROOF_INVALID" : order ? "HISTORY_ORDER_INVALID" : offer ? "HISTORY_OFFER_INVALID" : reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
-          : payment ? "HISTORY_PAYMENT_UNAVAILABLE" : proof ? "HISTORY_PROOF_UNAVAILABLE" : order ? "HISTORY_ORDER_UNAVAILABLE" : offer ? "HISTORY_OFFER_UNAVAILABLE" : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
+          ? report ? "HISTORY_REPORT_INVALID" : payment ? "HISTORY_PAYMENT_INVALID" : proof ? "HISTORY_PROOF_INVALID" : order ? "HISTORY_ORDER_INVALID" : offer ? "HISTORY_OFFER_INVALID" : reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
+          : report ? "HISTORY_REPORT_UNAVAILABLE" : payment ? "HISTORY_PAYMENT_UNAVAILABLE" : proof ? "HISTORY_PROOF_UNAVAILABLE" : order ? "HISTORY_ORDER_UNAVAILABLE" : offer ? "HISTORY_OFFER_UNAVAILABLE" : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
         void reply.header("Cache-Control", "private, no-store").status(response.statusCode).send(response);
       };
     });
     // Runs before JSON parsing, so malformed payloads are private as well.
     consumer.apply((_request: unknown, response: ServerResponse, next: () => void) => {
       response.setHeader("Cache-Control", "private, no-store"); next();
-    }).forRoutes(HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController, HistoryOffersController, HistoryOrdersController, HistoryReplacementController);
+    }).forRoutes(HistoryReportArtifactsController, HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryMessagesController, HistoryReceiptsController, HistoryAssignmentController, HistoryRemindersController, HistoryNotesController, HistoryOffersController, HistoryOrdersController, HistoryReplacementController);
   }
 }

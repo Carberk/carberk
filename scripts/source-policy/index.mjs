@@ -18,6 +18,7 @@ import { parseYaml } from "./yaml.mjs";
 import { parseNative } from "./native.mjs";
 import { parsePrisma } from "./prisma.mjs";
 import { parseSql } from "./sql.mjs";
+import { parseDependencyPatch } from "./dependency-patch.mjs";
 import { commentSpan, embeddedResult } from "./markup-spans.mjs";
 
 const extensions = new Map(Object.entries({
@@ -49,6 +50,7 @@ export function sourceType(path) {
   }
   if (name === "gradlew" || name === "pr-wait") return "shell";
   const extension = extname(path).slice(1).toLowerCase();
+  if (extension === "patch" && path.startsWith("patches/")) return "dependency-patch";
   if (binary.has(extension)) return `asset:${extension}`;
   if (name === ".gitkeep") return "empty";
   if (dataPaths.has(path)) return "data";
@@ -222,12 +224,13 @@ for (const [names, adapter] of [
   [["docker", "dockerfile"], (input) => parseDocker({ ...input, fileType: "docker" })], [["make", "makefile"], (input) => parseMake({ ...input, fileType: "make" })],
   [["kotlin", "kt", "swift"], (input) => parseNative({ ...input, fileType: input.fileType === "kt" ? "kotlin" : input.fileType })],
   [["kotlin-gradle", "groovy-gradle"], (input) => parseNative({ ...input, fileType: "gradle", dialect: input.fileType.split("-")[0] })],
+  [["dependency-patch"], parseDependencyPatch],
   [["prisma"], parsePrisma], [["sql", "postgresql"], (input) => parseSql({ ...input, fileType: "sql" })],
   [["toml", "ini", "properties", "env", "systemd", "proguard", "caddy", "nginx", "ignore", "npmrc", "nvmrc"], parseConfig],
   [["json", "jsonc"], parseJson], [["markdown", "md"], parseMarkdown],
 ]) for (const name of names) adapters[name] = adapter;
 
-export function inspectSource(path, source, notices = []) {
+export function inspectSource(path, source, notices = [], readDependency) {
   const fileType = sourceType(path);
   if (fileType === "data" || fileType === "empty" && source === "") return { comments: [], deferred: [], fileType };
   if (fileType.startsWith("asset:")) {
@@ -240,7 +243,7 @@ export function inspectSource(path, source, notices = []) {
   if (/\.(?:[cm]?[jt]s|[jt]sx)$/i.test(path)) {
     result = { comments: javascriptComments(path, source, notices), deferred: [] };
   } else if (adapters[fileType]) {
-    try { result = adapters[fileType]({ path, source, fileType, adapters }); }
+    try { result = adapters[fileType]({ path, source, fileType, adapters, readDependency }); }
     catch (error) { result = { comments: [], deferred: [{ path, fileType, startOffset: 0, endOffset: source.length, reason: error.message }] }; }
   } else result = { comments: [], deferred: [{ path, fileType, startOffset: 0, endOffset: source.length, reason: `unsupported source grammar ${fileType}` }] };
   for (const comment of result.comments) {

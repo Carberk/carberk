@@ -5,6 +5,7 @@ import {
 
 import * as PaymentProof from "./schemas/history-payment-proof";
 import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema } from "./schemas/history-order";
+import { HistoryReportContentSchema, HistoryReportQuerySchema, HistoryReportViewSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -516,6 +517,23 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       409: { description: "Action refused by current agreement, payment, queue or intent state" },
       503: { description: "Read the current order before retrying the exact action" } },
   });
+  for (const action of ["read", "validate", "preview"] as const) {
+    const path = "/api/v1/vehicle-history/operator/requests/{id}/report-artifacts";
+    registry.registerPath({
+      method: action === "validate" ? "post" : "get", path: action === "preview" ? path + "/content" : path,
+      tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+      summary: { read: "Read current report validation", validate: "Validate the agreed report formats for the obtained intent",
+        preview: "Preview the current validated original PDF" }[action],
+      request: { params: z.object({ id: z.string().guid() }), ...(action === "validate"
+        ? { body: { content: { "application/json": { schema: ValidateHistoryReportSchema } } } }
+        : { query: HistoryReportQuerySchema }) },
+      responses: { [action === "validate" ? 201 : 200]: { description: "Private report validation",
+        content: { "application/json": { schema: action === "preview" ? HistoryReportContentSchema : HistoryReportViewSchema } } },
+        400: { description: "Invalid input" }, 403: { description: "Current assigned operator authority required" },
+        409: { description: "The requested order, intent, assignment or artifact is not current" },
+        422: { description: "Missing, mismatched or unusable report" }, 503: { description: "Retry the same report" } },
+    });
+  }
   registry.register("HistoryPaymentVerification", HistoryPaymentVerificationSchema);
   for (const method of ["get", "post"] as const) registry.registerPath({
     method, path: "/api/v1/vehicle-history/operator/requests/{id}/payment-verification", tags: ["Vehicle History"], security: [{ bearerAuth: [] }],

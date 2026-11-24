@@ -221,6 +221,7 @@ model HistoryOrder {
   vinAgreements HistoryVinAgreement[]
   fulfilmentEvents HistoryFulfilmentEvent[]
   replacementEvents HistoryReplacementEvent[]
+  reportArtifacts HistoryReportArtifact[]
 
   @@unique([requestId, id])
   @@index([deliveryDay, holdExpiresAt])
@@ -275,10 +276,33 @@ model HistoryFulfilmentEvent {
   actorId String
   assignmentVersion Int
   recordedAt DateTime @db.Timestamptz(3)
+  reportArtifact HistoryReportArtifact?
 
   @@id([requestId, version])
   @@unique([requestId, attemptKey])
   @@map("history_fulfilment_events")
+}
+
+model HistoryReportArtifact {
+  id                        String @id @db.Uuid
+  requestId                 String
+  orderId                   String @db.Uuid
+  intentId                  String @db.Uuid
+  intentVersion             Int
+  acceptedRevision          Int
+  artifact                  Json
+  sha256                    String?
+  link                      String?
+  stagedBy                  String
+  stagedAt                  DateTime @default(now()) @db.Timestamptz(3)
+  validatedBy               String?
+  validatedAssignmentVersion Int?
+  validatedAt               DateTime? @db.Timestamptz(3)
+  order HistoryOrder @relation(fields: [requestId, orderId], references: [requestId, id], onDelete: Restrict, onUpdate: NoAction)
+  intent HistoryFulfilmentEvent @relation(fields: [requestId, intentVersion], references: [requestId, version], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([requestId, intentVersion])
+  @@map("history_report_artifacts")
 }
 
 model HistoryPaymentCheck {

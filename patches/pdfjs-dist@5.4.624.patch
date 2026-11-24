@@ -1,0 +1,35 @@
+diff --git a/legacy/build/pdf.worker.mjs b/legacy/build/pdf.worker.mjs
+index b7416c415e6490b16f642562003f54e78ab345f8..5cebe5084024a8b77259fddea7f3924caaacc933 100644
+--- a/legacy/build/pdf.worker.mjs
++++ b/legacy/build/pdf.worker.mjs
+@@ -14032,7 +14032,7 @@ class FlateStream extends DecodeStream {
+         const block = str.getBytes(blockLen);
+         buffer.set(block, bufferLength);
+         if (block.length < blockLen) {
+-          this.eof = true;
++          throw new FormatError("Incomplete uncompressed block in flate stream.");
+         }
+       }
+       return;
+@@ -37708,6 +37708,9 @@ class PDFImage {
+     const inverseDecode = decode?.[0] > 0;
+     const computedLength = (width + 7 >> 3) * height;
+     const imgArray = await image.getImageData(computedLength);
++    if (imgArray.length < computedLength) {
++      throw new FormatError("Incomplete PDF image mask data.");
++    }
+     const isSingleOpaquePixel = width === 1 && height === 1 && inverseDecode === (imgArray.length === 0 || !!(imgArray[0] & 128));
+     if (isSingleOpaquePixel) {
+       return {
+@@ -38217,6 +38220,11 @@ class PDFImage {
+     this.image.forceRGBA = !!forceRGBA;
+     this.image.forceRGB = !!forceRGB;
+     const imageBytes = await this.image.getImageData(length, this.jpxDecoderOptions);
++    const outputComponents = forceRGBA ? 4 : forceRGB ? 3 : 0;
++    const expectedLength = outputComponents ? this.image.drawWidth * this.image.drawHeight * outputComponents : length;
++    if (imageBytes.length < expectedLength) {
++      throw new FormatError("Incomplete decoded PDF image data.");
++    }
+     if (internal || this.image instanceof DecodeStream) {
+       return imageBytes;
+     }
