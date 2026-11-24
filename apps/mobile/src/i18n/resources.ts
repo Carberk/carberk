@@ -94,6 +94,7 @@ export const resources: Resource = {
         "paymentWaitingNext": "Прикрепите тестовую квитанцию. Не переводите реальные деньги. После 20:00 проверка возобновляется в 09:00 по Ашхабаду.",
         "replacementOriginal": "Прежний срок доставки",
         "replacementTimeZone": "Время Ашхабада",
+        orderStatusUnavailable: "Статус заказа недоступен.",
         refund: {
           pending: "Возврат на рассмотрении",
           approved: "Возврат одобрен",
@@ -1350,6 +1351,7 @@ export const resources: Resource = {
         "paymentWaitingNext": "Synag çekini goşuň. Hakyky pul geçirmäň. 20:00-dan soň barlag Aşgabat wagty bilen 09:00-da dowam eder.",
         "replacementOriginal": "Öňki gowşuryş wagty",
         "replacementTimeZone": "Aşgabat wagty",
+        orderStatusUnavailable: "Sargydyň ýagdaýy elýeterli däl.",
         refund: {
           pending: "Pul gaýtarmak seljerilýär",
           approved: "Pul gaýtarym tassyklandy",
@@ -2606,6 +2608,7 @@ export const resources: Resource = {
         "paymentWaitingNext": "Attach a synthetic receipt. Do not transfer real money. After 20:00, verification resumes at 09:00 Ashgabat time.",
         "replacementOriginal": "Original delivery window",
         "replacementTimeZone": "Ashgabat time",
+        orderStatusUnavailable: "Order status is unavailable.",
         refund: {
           pending: "Refund under review",
           approved: "Refund approved",

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 
 import { RefundCasePanel } from "./RefundCasePanel";
@@ -35,4 +35,24 @@ it("only offers approval on the decision surface and manual return recording aft
   expect(execution.getByRole("checkbox").getAttribute("required")).not.toBeNull();
   expect(execution.getByRole("button", { name: "Record return" })).toBeTruthy();
   expect(execution.queryByRole("button", { name: "Approve refund" })).toBeNull();
+});
+
+it("keeps the entered reason and case when the return reference contains only whitespace", () => {
+  const action = vi.fn(async () => ({ status: "invalid" as const }));
+  const approved: H.HistoryRefundCase = { ...initial, refund: { ...initial.refund, status: "approved", approvedAt: agreedRecoveryDeadline } };
+  const view = render(<RefundCasePanel locale="en" mode="execution" href="/vehicle-history/en/refunds" initial={approved} action={action} />);
+  const reason = view.getByLabelText("Reason");
+  const reference = view.getByLabelText("External return reference");
+  fireEvent.change(reason, { target: { value: "Verified in the synthetic ledger" } });
+  fireEvent.change(reference, { target: { value: "  " } });
+  fireEvent.click(view.getByRole("checkbox"));
+  const form = view.getByRole("button", { name: "Record return" }).closest("form");
+  if (!form) throw new Error("Expected the refund form");
+  fireEvent.submit(form);
+
+  expect(view.getByRole("alert").textContent).toBe("Enter the external return reference.");
+  expect(view.getByLabelText("External return reference").getAttribute("aria-invalid")).toBe("true");
+  expect(reason).toHaveProperty("value", "Verified in the synthetic ledger");
+  expect(view.getByText("Refund approved · return pending")).toBeTruthy();
+  expect(action).not.toHaveBeenCalled();
 });

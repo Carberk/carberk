@@ -383,3 +383,22 @@ it("refreshes the refund headline and details together after an external return 
   await view.findByText(/SYNTHETIC-VH18-RECORDED/);
   expect(view.queryByText("The money return is still pending.")).toBeNull();
 });
+
+it("shows a retry instead of stale refund facts after the current order read fails", async () => {
+  const dates = { amountMinor: 12550, originalPromiseBy: quote.proposal.deliveryBy, agreedRecoveryDeadline: "2026-11-21T08:00:00.000Z" };
+  current = { ...accepted, status: "payment_confirmed", wallet: null, refund: { ...dates, status: "approved",
+    approvedAt: "2026-11-21T08:10:00.000Z" } };
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText("The money return is still pending.");
+  server.use(http.get("*/vehicle-history/requests/:id/order", () => HttpResponse.json({}, { status: 503 })));
+  await act(() => getHost(view.container, "RCTScrollView").props.refreshControl.props.onRefresh());
+  await view.findByText("Order status is unavailable.");
+  expect(view.queryByText("The money return is still pending.")).toBeNull();
+
+  current = { ...current, refund: { ...dates, status: "completed", approvedAt: "2026-11-21T08:10:00.000Z",
+    recordedAt: "2026-11-21T08:30:00.000Z", externalReference: "SYNTHETIC-VH18-RECORDED" } };
+  server.use(http.get("*/vehicle-history/requests/:id/order", () => HttpResponse.json(current)));
+  await fireEvent.press(view.getByRole("button", { name: "Retry" }));
+  await view.findByText("Refund completed");
+  await view.findByText(/SYNTHETIC-VH18-RECORDED/);
+});

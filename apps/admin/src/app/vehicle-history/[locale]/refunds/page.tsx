@@ -29,7 +29,7 @@ export default async function RefundsPage({ params, searchParams }: {
       <nav aria-label={t.title} className="flex flex-wrap gap-3 border-b pb-2">
         {(["decision", "execution"] as const).map((choice) => <a key={choice} href={url(choice)}
           aria-current={mode === choice ? "page" : undefined}
-          className="rounded-md px-3 py-2 font-medium underline aria-[current=page]:bg-muted">{t[choice]}</a>)}
+          className="inline-flex min-h-11 items-center rounded-md px-3 py-2 font-medium underline aria-[current=page]:bg-muted">{t[choice]}</a>)}
       </nav>
       <form method="get" className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="mode" value={mode} />

@@ -13,6 +13,7 @@ import { mapErrorToCopy } from "../api/getErrorCopy";
 
 import { historySessionCurrent, type HistoryViewer } from "./session";
 import { OrderStatus } from "./OrderStatus";
+import { formatHistoryDeadline } from "./formatHistoryDeadline";
 import { OfferPreview } from "./OfferPreview";
 import { StopReminders } from "./StopReminders";
 import { useHistoryReply } from "./useHistoryReply";
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { ErrorState } from "@/components/ErrorState";
+import { useLargeText } from "@/lib/font-scale";
 
 function reportTargets(text: string) {
   const targets: string[] = [];
@@ -64,6 +66,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   metadataError: unknown; metadataCurrent: boolean; metadataRefreshing: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const largeText = useLargeText();
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [copyFailure, setCopyFailure] = useState<string | null>(null);
   const [openFailure, setOpenFailure] = useState<string | null>(null);
@@ -79,6 +82,10 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const name = useDisplayName();
   const thread = useRequestConversation(viewer, request, metadataCurrent);
   const { pages, receipts } = thread;
+  const order = thread.order.error ? undefined : thread.order.data;
+  const refund = order?.refund;
+  const refundReadFailed = !!thread.order.data?.refund && !!thread.order.error;
+  const acceptedOffer = order?.order?.acceptedOffer;
   const onVisible = useRef(({ viewableItems }: { viewableItems: ViewToken<VehicleHistorySchemas.HistoryMessage>[] }) => {
     thread.setVisibleIds(viewableItems.filter((item) => item.isViewable).map((item) => item.item.id));
   }).current;
@@ -206,7 +213,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         <Text>{t("vehicleHistory.viewDeliveredReport")}</Text>
       </Button>
     </View>}
-    {!denied && !delivered && thread.active && thread.order.data?.order && !thread.order.error && <OrderStatus state={thread.order.data}
+    {!denied && !delivered && thread.active && order?.order && (!refund || thread.connected) && <OrderStatus state={order}
       compact={keyboardVisible} ready={metadataCurrent && thread.connected} onDetails={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />}
     <FlatList
     ref={list}
@@ -223,13 +230,32 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     ListHeaderComponent={<View className="gap-4 pb-3">
       {!denied && delivered && <DeliveredReport viewer={viewer} requestId={request.id}
         active={thread.active} online={thread.connected} ready={metadataCurrent} openComposer={() => composer.current?.focus()} />}
-      {!denied && delivered && thread.active && !thread.order.error && thread.order.data?.recovery &&
-        <PromiseRecovery recovery={thread.order.data.recovery} delivered />}
-      {!thread.order.data?.recovery && header}
-      {!denied && !delivered && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} metadataAvailable={metadataAvailable}
-        recoveryVersion={thread.order.data?.recovery?.version} refund={thread.order.error ? undefined : thread.order.data?.refund}
-        active={thread.active} connected={thread.connected} reconcileOrder={() => thread.order.refetch()} />}
-      {thread.order.data?.recovery && header}
+      {!denied && delivered && thread.active && order?.recovery &&
+        <PromiseRecovery recovery={order.recovery} delivered />}
+      {!order?.recovery && !refund && header}
+      {!denied && !delivered && thread.active && thread.connected && refundReadFailed && !pages.error &&
+        <ErrorState error={thread.order.error} title={t("vehicleHistory.orderStatusUnavailable")} onRetry={retry} />}
+      {!denied && !delivered && thread.active && thread.connected && refund && <View className="gap-2 rounded-2xl border border-border p-4">
+        <Text accessibilityRole="header" className="text-headline font-semibold">{t("vehicleHistory.refund.details")}</Text>
+        {(largeText || keyboardVisible) && <>
+          <Text>{t("vehicleHistory.promiseRecovery.original")} · {formatHistoryDeadline(refund.originalPromiseBy, i18n.language)}</Text>
+          {refund.agreedRecoveryDeadline && <Text>{t("vehicleHistory.promiseRecovery.agreedDeadline")} · {formatHistoryDeadline(refund.agreedRecoveryDeadline, i18n.language)}</Text>}
+        </>}
+        {acceptedOffer && <>
+          <Text selectable className="font-mono">VIN · {acceptedOffer.vin}</Text>
+          <Text>{t("vehicleHistory.offerOrderPrice", { amount: acceptedOffer.proposal.priceTmt })}</Text>
+        </>}
+        <Text>{t("vehicleHistory.refund.amount", {
+          amount: new Intl.NumberFormat(i18n.language === "tk" ? "en-GB" : i18n.language, { minimumFractionDigits: 2 }).format(refund.amountMinor / 100),
+        })}</Text>
+        {refund.status === "completed"
+          ? <Text selectable>{t("vehicleHistory.refund.reference", { reference: refund.externalReference })}</Text>
+          : <Text>{t(refund.status === "approved" ? "vehicleHistory.refund.awaitingReturn" : "vehicleHistory.refund.review")}</Text>}
+      </View>}
+      {!denied && !delivered && !refund && !refundReadFailed && <OfferPreview viewer={viewer} request={request}
+        ready={metadataCurrent} metadataAvailable={metadataAvailable} active={thread.active} connected={thread.connected}
+        recoveryVersion={order?.recovery?.version} orderReadError={thread.order.error} reconcileOrder={thread.order.refetch} />}
+      {(order?.recovery || refund) && header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
       {!thread.connected && <Text accessibilityRole="alert">{t("vehicleHistory.offline")}</Text>}

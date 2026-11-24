@@ -16,7 +16,12 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
   const largeText = useLargeText();
   if (!state.order) return null;
   const copy = (key: string) => t(`vehicleHistory.offer${key}`);
-  if (compact) return <View className="border-b border-border bg-card px-5 py-2"><PaymentStatus state={state} compact /></View>;
+  if (compact || (largeText && state.refund)) return <View className="border-b border-border bg-card px-5 py-2">
+    <PaymentStatus state={state} compact />
+    {!compact && <Button variant="secondary" className="mt-2 h-auto min-h-12 self-start" disabled={!ready} onPress={onDetails}>
+      <Text>{t("vehicleHistory.refund.details")}</Text>
+    </Button>}
+  </View>;
 
   const offer = state.order.acceptedOffer;
   const replacement = state.replacement;

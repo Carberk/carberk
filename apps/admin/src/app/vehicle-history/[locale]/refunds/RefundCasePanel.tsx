@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
+import { useActionState, useState, type FormEvent } from "react";
+import { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { Button } from "@auto-tm/ui/components";
 
 import type { RefundResult, RefundMode } from "./actions";
@@ -31,6 +31,7 @@ export function RefundCasePanel({ locale, mode, href, initial, action }: {
 }) {
   const t = refundCopy[locale], recovery = promiseRecoveryCopy[locale], offer = offerCopy[locale];
   const [result, submit, saving] = useActionState<RefundResult, FormData>(action, { status: "ok", data: initial, scope: "" });
+  const [invalidField, setInvalidField] = useState<"reason" | "externalReference" | null>(null);
   if (result.status !== "ok") return <RefundCaseError locale={locale} href={href} status={result.status} />;
   const { order, payment, refund, reason, failure } = result.data;
   const date = new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
@@ -41,6 +42,18 @@ export function RefundCasePanel({ locale, mode, href, initial, action }: {
   const timestamp = (value: string) => date.format(new Date(value));
   const approving = mode === "decision" && refund.status === "pending";
   const executing = mode === "execution" && refund.status === "approved";
+  function validate(event: FormEvent<HTMLFormElement>) {
+    const form = new FormData(event.currentTarget);
+    const { reason, externalReference } = H.HistoryRefundCommandSchema.options[1].shape;
+    const field = !reason.safeParse(form.get("reason")).success ? "reason"
+      : executing && !externalReference.safeParse(form.get("externalReference")).success ? "externalReference" : null;
+    setInvalidField(field);
+    if (field) {
+      event.preventDefault();
+      const control = event.currentTarget.elements.namedItem(field);
+      if (control instanceof HTMLElement) control.focus();
+    }
+  }
   const reasonText = reason === "no_window" ? t.noWindow : reason === "company_error" ? t.companyError
     : reason === "replacement_declined" ? t.lateDeclined : recovery[reason];
   const facts: [string, string][] = [
@@ -67,15 +80,17 @@ export function RefundCasePanel({ locale, mode, href, initial, action }: {
         <dd className="wrap-anywhere">{value}</dd>
       </div>)}
     </dl>
-    {(approving || executing) && <form action={submit} className="border-t pt-4">
+    {(approving || executing) && <form action={submit} onSubmit={validate} className="border-t pt-4">
       <fieldset disabled={saving} className="min-w-0 space-y-3">
         <label className="block font-medium">{t.reason}
-          <textarea name="reason" required maxLength={500} className="mt-1 block min-h-20 w-full rounded-md border bg-background p-2" />
+          <textarea name="reason" required maxLength={500} aria-invalid={invalidField === "reason" || undefined} aria-describedby={invalidField === "reason" ? "refund-reason-error" : undefined} className="mt-1 block min-h-20 w-full rounded-md border bg-background p-2" />
         </label>
+        {invalidField === "reason" && <p id="refund-reason-error" role="alert" className="text-destructive">{t.reasonInvalid}</p>}
         {executing && <>
           <label className="block font-medium">{t.reference}
-            <input name="externalReference" required maxLength={160} className="mt-1 block min-h-11 w-full rounded-md border bg-background px-2" />
+            <input name="externalReference" required maxLength={160} aria-invalid={invalidField === "externalReference" || undefined} aria-describedby={invalidField === "externalReference" ? "refund-reference-error" : undefined} className="mt-1 block min-h-11 w-full rounded-md border bg-background px-2" />
           </label>
+          {invalidField === "externalReference" && <p id="refund-reference-error" role="alert" className="text-destructive">{t.referenceInvalid}</p>}
           <label className="flex min-h-11 items-start gap-2">
             <input name="returned" type="checkbox" required className="mt-1 size-5 shrink-0" />{t.returned}
           </label>
