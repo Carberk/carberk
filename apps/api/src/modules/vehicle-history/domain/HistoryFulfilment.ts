@@ -7,21 +7,21 @@ type Format = FulfilmentAgreement["format"];
 type Intent = H.HistoryFulfilmentIntent;
 type Outcome = Extract<H.HistoryFulfilmentMutation, { kind: "record" | "reconcile" }>["outcome"];
 
-export function fulfilmentAgreement(order: StoredHistoryOrder, reservedProvider = order.reservedProvider): FulfilmentAgreement | null {
+export function fulfilmentAgreement(order: StoredHistoryOrder, reservedProvider = order.reservedProvider, format?: Format): FulfilmentAgreement | null {
   const { vin, preflight, proposal } = order.acceptedOffer;
   const provider = preflight.providers.find(({ name }) => name === reservedProvider);
   return provider ? { acceptedRevision: historyAgreement(order).acceptedRevision, vin, provider: provider.name,
-    format: proposal.format, originalReportDate: provider.originalReportDate } : null;
+    format: format ?? proposal.format, originalReportDate: provider.originalReportDate } : null;
 }
 
-function covers(format: Format, available: Format) {
+export function coversHistoryFormat(format: Format, available: Format) {
   return format === available || available === "both";
 }
 
 export function fulfilmentSources(accepted: FulfilmentAgreement): Intent["source"][] {
   const archive = accepted.vin === "DEMA0000000000001" &&
     (accepted.provider === "Carfax" ? accepted.originalReportDate === "2026-10-14"
-      : accepted.originalReportDate === "2026-10-15" && covers(accepted.format, "link"));
+      : accepted.originalReportDate === "2026-10-15" && coversHistoryFormat(accepted.format, "link"));
   return archive ? ["archive", "new_source"] : ["new_source"];
 }
 
@@ -39,11 +39,12 @@ export function applyFulfilmentOutcome(intent: Intent, outcome: Outcome, recorde
     case "not_started": return { ...next, status: "retry_ready" };
     case "obtained": {
       if (!outcome.permittedUse) return { ...next, status: "recovery", reason: "rights_unavailable" };
-      if (!covers(accepted.format, outcome.format)) return { ...next, status: "recovery", reason: "format_unavailable" };
       if (accepted.originalReportDate && accepted.originalReportDate !== outcome.originalReportDate) {
         return { ...next, status: "recovery", reason: "original_date_mismatch" };
       }
-      return { ...next, status: "obtained", report: { format: outcome.format, originalReportDate: outcome.originalReportDate, permittedUse: true } };
+      const report = { format: outcome.format, originalReportDate: outcome.originalReportDate, permittedUse: true as const };
+      if (!coversHistoryFormat(accepted.format, outcome.format)) return { ...next, status: "recovery", reason: "format_unavailable", report };
+      return { ...next, status: "obtained", report };
     }
     default: return { ...next, status: "recovery", reason: outcome.kind };
   }

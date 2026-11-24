@@ -115,6 +115,79 @@ it("shows expiry with the original promise and a contact-operator next action", 
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(sent).toEqual([]);
 });
+it.each([
+  ["en", "Accept new format and extra hour", "Original promise", "Agreed recovery deadline", "Refund under review", "Delivery deadlines"],
+  ["ru", "Принять новый формат и дополнительный час", "Первоначальный срок", "Согласованный новый срок", "Возврат на рассмотрении", "Сроки доставки"],
+  ["tk", "Täze görnüşi we goşmaça sagady kabul et", "Ilkinji wada berlen möhlet", "Ylalaşylan täze möhlet", "Pul gaýtarmak seljerilýär", "Gowşuryş möhletleri"],
+] as const)("shows the paid promise and revised format choice in %s, then retains both deadlines on a second miss", async (locale, choice, original, agreed, pending, deadlines) => {
+  const offer: H.HistoryRecoveryState = { version: 2, status: "offered", originalPromiseBy: "2026-11-21T07:00:00.000Z",
+    originalFormat: "both", paymentHoldExpiresAt: "2026-11-21T07:00:00.000Z", paymentDeadline: "2026-11-21T07:00:00.000Z",
+    failure: "file_delivery", missedAt: "2026-11-21T07:00:31.000Z", offeredDeadline: "2026-11-21T08:00:31.000Z", agreedDeadline: null,
+    proposedFormat: "pdf", agreedFormat: null, agreedAt: null, pendingReason: null, refundRequestedAt: null };
+  current = { ...accepted, status: "payment_confirmed", wallet: null, preparation: "preparing", recovery: offer, serverNow: "2026-11-21T07:00:00.000Z" };
+  server.use(http.post("*/vehicle-history/requests/:id/recovery", async ({ request }) => {
+    sent.push(await request.json());
+    const next: H.HistoryRecoveryState = { ...offer, version: 4, status: "refund_decision_pending", agreedDeadline: offer.offeredDeadline,
+      agreedFormat: "pdf", agreedAt: "2026-11-21T07:01:00.000Z", pendingReason: "recovery_missed", refundRequestedAt: "2026-11-21T08:00:31.000Z" };
+    current = { ...current, recovery: next, serverNow: "2026-11-21T08:00:31.000Z" };
+    return HttpResponse.error();
+  }));
+  device.fontScale = 1.5;
+  const view = await renderMobile(<RequestScreen />, { locale });
+  const button = await view.findByRole("button", { name: choice });
+  expect(view.getAllByText(new RegExp(original)).length).toBeGreaterThan(0);
+  expect(sent).toEqual([]);
+  await fireEvent.press(button);
+  await view.findByText(pending);
+  expect(view.getByText(deadlines)).toBeTruthy();
+  expect(view.getAllByText(new RegExp(agreed)).length).toBeGreaterThan(0);
+  expect(view.getAllByText(new RegExp(agreed + ".*13:00:31"))).toHaveLength(2);
+  expect(view.getAllByText(new RegExp(original)).length).toBeGreaterThan(0);
+  expect(view.queryByRole("button", { name: choice })).toBeNull();
+  expect(sent).toEqual([{ kind: "accept", orderId: id, expectedVersion: 2, attemptKey: expect.any(String),
+    deadline: "2026-11-21T08:00:31.000Z", format: "pdf" }]);
+});
+
+it("keeps the original and recovery deadlines in the delivered report history", async () => {
+  current = { ...accepted, status: "payment_confirmed", wallet: null, preparation: "delivered",
+    recovery: { version: 2, status: "agreed", originalPromiseBy: "2026-11-21T07:00:00.000Z",
+      originalFormat: "both", paymentHoldExpiresAt: "2026-11-21T07:00:00.000Z", paymentDeadline: "2026-11-21T07:00:00.000Z",
+      failure: "file_delivery", missedAt: "2026-11-21T07:00:31.000Z", offeredDeadline: "2026-11-21T08:00:31.000Z",
+      agreedDeadline: "2026-11-21T08:00:31.000Z", proposedFormat: "link", agreedFormat: "link", agreedAt: "2026-11-21T07:01:00.000Z",
+      pendingReason: null, refundRequestedAt: null } };
+  server.use(http.get("*/vehicle-history/requests/:id/report", () => HttpResponse.json({
+    status: "delivered", deliveredAt: "2026-11-21T07:02:00.000Z", artifact: { id, format: "link", source: "new_source",
+      report: { reportId: "synthetic", provider: "Carfax", vin: quote.vin, originalReportDate: "2026-10-14", language: "en", permittedUse: true } },
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByRole("button", { name: "Open report" });
+  expect(view.getByText("Report delivery history")).toBeTruthy();
+  expect(view.getByText(/Original promise.*12:00/)).toBeTruthy();
+  expect(view.getByText(/Agreed recovery deadline.*13:00:31/)).toBeTruthy();
+  expect(view.queryByText("Recovery time agreed")).toBeNull();
+  expect(view.queryByText("The agreed report files or link could not be delivered.")).toBeNull();
+});
+
+it("shows the exact recovery deadline on a pending correction and the saved window in correction history", async () => {
+  const previous = { ...quote, proposal: { ...quote.proposal, deliveryFrom: "2026-11-21T05:00:00.000Z",
+    deliveryBy: "2026-11-21T05:45:00.000Z" } };
+  const vin = "DEMA0000000000006", deadline = "2026-11-21T08:00:31.000Z";
+  current = { ...accepted, status: "payment_confirmed", wallet: null, preparation: "queued",
+    recovery: { version: 2, status: "agreed", originalPromiseBy: quote.proposal.deliveryBy,
+      originalFormat: "both", paymentHoldExpiresAt: quote.proposal.deliveryBy, paymentDeadline: quote.proposal.deliveryBy,
+      failure: "file_delivery", missedAt: quote.proposal.deliveryBy, offeredDeadline: deadline, agreedDeadline: deadline,
+      proposedFormat: null, agreedFormat: "both", agreedAt: "2026-11-21T07:01:00.000Z", pendingReason: null, refundRequestedAt: null },
+    agreement: { version: 5, acceptedRevision: 3, handoff: null,
+      accepted: [{ revision: 0, offer: previous, acceptedAt: accepted.serverNow, cause: null },
+        { revision: 3, offer: quote, acceptedAt: accepted.serverNow, cause: "company_error" }],
+      pending: { vin, requestedAt: accepted.serverNow, review: { cause: "company_error", offer: { ...quote, vin } } } } };
+  const view = await renderMobile(<RequestScreen />);
+  await view.findByText(vin);
+  expect(view.getAllByText(/Agreed recovery deadline.*13:00:31/)).toHaveLength(3);
+  await fireEvent.press(view.getByRole("button", { name: "Previous agreements" }));
+  expect(view.getByText(/10:00.*10:45/)).toBeTruthy();
+  expect(view.getAllByText(/Agreed recovery deadline.*13:00:31/)).toHaveLength(3);
+});
 it("discards delayed acceptance when the customer session ends", async () => {
   let release!: () => void;
   const delayed = new Promise<void>((resolve) => { release = resolve; });

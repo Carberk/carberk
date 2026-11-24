@@ -19,8 +19,11 @@ export interface HistoryAgreementWrite {
   actorId: string; assignmentVersion: number; recordedAt: string;
 }
 export interface HistoryFulfilmentWrite {
-  input: H.HistoryFulfilmentMutation; state: H.HistoryFulfilmentIntent; actorId: string; assignmentVersion: number;
+  input: H.HistoryFulfilmentMutation | { kind: "recovery_format"; attemptKey: string; format: H.HistoryFulfilmentView["accepted"]["format"] };
+  state: H.HistoryFulfilmentIntent; actorId: string; assignmentVersion: number;
+  recoveryQuotaProvider?: HistoryProvider | null;
 }
+export type HistoryRecoveryCommand = H.HistoryOperatorRecovery | H.HistoryRecoveryDecision;
 
 export interface HistoryOrderStore {
   readonly assignmentVersion: number;
@@ -42,6 +45,9 @@ export interface HistoryOrderStore {
   fulfilmentAttempt(key: string): Promise<H.HistoryFulfilmentMutation | null>;
   hasEarlierPaidWork(confirmedAt: string | null, now: Date, stage?: "fulfilment" | "delivery"): Promise<boolean>;
   saveFulfilment(write: HistoryFulfilmentWrite): Promise<void>;
+  recovery(): Promise<H.HistoryRecoveryState | null>;
+  recoveryAttempt(key: string): Promise<{ input: HistoryRecoveryCommand; actorId: string } | null>;
+  saveRecovery(state: H.HistoryRecoveryState, now: Date, command?: { input: HistoryRecoveryCommand; actorId: string; assignmentVersion: number }): Promise<void>;
 }
 
 export function replacementState(order: StoredHistoryOrder, now: Date): H.HistoryReplacementState {

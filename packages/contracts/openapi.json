@@ -9879,6 +9879,129 @@
               }
             ]
           },
+          "recovery": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "attention",
+                  "offered",
+                  "agreed",
+                  "refund_decision_pending"
+                ]
+              },
+              "paymentHoldExpiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "paymentDeadline": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "originalPromiseBy": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "originalFormat": {
+                "type": "string",
+                "enum": [
+                  "pdf",
+                  "link",
+                  "both"
+                ]
+              },
+              "failure": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "no_history",
+                  "format_unavailable",
+                  "rights_unavailable",
+                  "original_date_mismatch",
+                  "company_error",
+                  "file_delivery"
+                ]
+              },
+              "missedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "offeredDeadline": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "agreedDeadline": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "agreedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "proposedFormat": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "pdf",
+                  "link",
+                  "both"
+                ]
+              },
+              "agreedFormat": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "pdf",
+                  "link",
+                  "both"
+                ]
+              },
+              "pendingReason": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "declined",
+                  "offer_elapsed",
+                  "recovery_missed",
+                  "no_history",
+                  "company_error"
+                ]
+              },
+              "refundRequestedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "version",
+              "status",
+              "paymentHoldExpiresAt",
+              "paymentDeadline",
+              "originalPromiseBy",
+              "originalFormat",
+              "failure",
+              "missedAt",
+              "offeredDeadline",
+              "agreedDeadline",
+              "agreedAt",
+              "proposedFormat",
+              "agreedFormat",
+              "pendingReason",
+              "refundRequestedAt"
+            ],
+            "additionalProperties": false
+          },
           "paymentDeadline": {
             "type": "string",
             "format": "date-time"
@@ -10305,6 +10428,35 @@
                           "original_date_mismatch",
                           "company_error"
                         ]
+                      },
+                      "report": {
+                        "type": "object",
+                        "properties": {
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
+                          },
+                          "originalReportDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "permittedUse": {
+                            "type": "boolean",
+                            "enum": [
+                              true
+                            ]
+                          }
+                        },
+                        "required": [
+                          "format",
+                          "originalReportDate",
+                          "permittedUse"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -10363,6 +10515,129 @@
           "serverNow",
           "wallet",
           "collectionEnabled"
+        ],
+        "additionalProperties": false
+      },
+      "HistoryRecoveryState": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "attention",
+              "offered",
+              "agreed",
+              "refund_decision_pending"
+            ]
+          },
+          "paymentHoldExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentDeadline": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "originalPromiseBy": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "originalFormat": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "link",
+              "both"
+            ]
+          },
+          "failure": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "no_history",
+              "format_unavailable",
+              "rights_unavailable",
+              "original_date_mismatch",
+              "company_error",
+              "file_delivery"
+            ]
+          },
+          "missedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "offeredDeadline": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "agreedDeadline": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "agreedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "proposedFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "pdf",
+              "link",
+              "both"
+            ]
+          },
+          "agreedFormat": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "pdf",
+              "link",
+              "both"
+            ]
+          },
+          "pendingReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "declined",
+              "offer_elapsed",
+              "recovery_missed",
+              "no_history",
+              "company_error"
+            ]
+          },
+          "refundRequestedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "version",
+          "status",
+          "paymentHoldExpiresAt",
+          "paymentDeadline",
+          "originalPromiseBy",
+          "originalFormat",
+          "failure",
+          "missedAt",
+          "offeredDeadline",
+          "agreedDeadline",
+          "agreedAt",
+          "proposedFormat",
+          "agreedFormat",
+          "pendingReason",
+          "refundRequestedAt"
         ],
         "additionalProperties": false
       },
@@ -13231,6 +13506,522 @@
           },
           "503": {
             "description": "Temporarily unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/recovery": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Explicitly agree to exact recovery terms or request a founder refund decision",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "accept",
+                          "accept_format"
+                        ]
+                      },
+                      "deadline": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "pdf",
+                          "link",
+                          "both"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind",
+                      "deadline",
+                      "format"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "decline"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Current private promise recovery state including original and agreed deadlines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "attention",
+                        "offered",
+                        "agreed",
+                        "refund_decision_pending"
+                      ]
+                    },
+                    "paymentHoldExpiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "paymentDeadline": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "originalPromiseBy": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "originalFormat": {
+                      "type": "string",
+                      "enum": [
+                        "pdf",
+                        "link",
+                        "both"
+                      ]
+                    },
+                    "failure": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "no_history",
+                        "format_unavailable",
+                        "rights_unavailable",
+                        "original_date_mismatch",
+                        "company_error",
+                        "file_delivery"
+                      ]
+                    },
+                    "missedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "offeredDeadline": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "agreedDeadline": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "agreedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "proposedFormat": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "pdf",
+                        "link",
+                        "both"
+                      ]
+                    },
+                    "agreedFormat": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "pdf",
+                        "link",
+                        "both"
+                      ]
+                    },
+                    "pendingReason": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "declined",
+                        "offer_elapsed",
+                        "recovery_missed",
+                        "no_history",
+                        "company_error"
+                      ]
+                    },
+                    "refundRequestedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "status",
+                    "paymentHoldExpiresAt",
+                    "paymentDeadline",
+                    "originalPromiseBy",
+                    "originalFormat",
+                    "failure",
+                    "missedAt",
+                    "offeredDeadline",
+                    "agreedDeadline",
+                    "agreedAt",
+                    "proposedFormat",
+                    "agreedFormat",
+                    "pendingReason",
+                    "refundRequestedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recovery choice"
+          },
+          "403": {
+            "description": "Current session and request authority required"
+          },
+          "409": {
+            "description": "Recovery terms changed or elapsed; refresh the order"
+          },
+          "503": {
+            "description": "Read back before retrying the same decision"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/recovery": {
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Propose a format change or escalate an unresolved company error",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "propose_format"
+                        ]
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "format": {
+                        "type": "string",
+                        "enum": [
+                          "pdf",
+                          "link",
+                          "both"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind",
+                      "expectedAssignmentVersion",
+                      "format"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "orderId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      },
+                      "attemptKey": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "company_error_refund"
+                        ]
+                      },
+                      "expectedAssignmentVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                      }
+                    },
+                    "required": [
+                      "orderId",
+                      "expectedVersion",
+                      "attemptKey",
+                      "kind",
+                      "expectedAssignmentVersion"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Current private promise recovery state including original and agreed deadlines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 2147483647
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "attention",
+                        "offered",
+                        "agreed",
+                        "refund_decision_pending"
+                      ]
+                    },
+                    "paymentHoldExpiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "paymentDeadline": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "originalPromiseBy": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "originalFormat": {
+                      "type": "string",
+                      "enum": [
+                        "pdf",
+                        "link",
+                        "both"
+                      ]
+                    },
+                    "failure": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "no_history",
+                        "format_unavailable",
+                        "rights_unavailable",
+                        "original_date_mismatch",
+                        "company_error",
+                        "file_delivery"
+                      ]
+                    },
+                    "missedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "offeredDeadline": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "agreedDeadline": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "agreedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "proposedFormat": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "pdf",
+                        "link",
+                        "both"
+                      ]
+                    },
+                    "agreedFormat": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "pdf",
+                        "link",
+                        "both"
+                      ]
+                    },
+                    "pendingReason": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "declined",
+                        "offer_elapsed",
+                        "recovery_missed",
+                        "no_history",
+                        "company_error"
+                      ]
+                    },
+                    "refundRequestedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "status",
+                    "paymentHoldExpiresAt",
+                    "paymentDeadline",
+                    "originalPromiseBy",
+                    "originalFormat",
+                    "failure",
+                    "missedAt",
+                    "offeredDeadline",
+                    "agreedDeadline",
+                    "agreedAt",
+                    "proposedFormat",
+                    "agreedFormat",
+                    "pendingReason",
+                    "refundRequestedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recovery choice"
+          },
+          "403": {
+            "description": "Current session and request authority required"
+          },
+          "409": {
+            "description": "Recovery terms changed or elapsed; refresh the order"
+          },
+          "503": {
+            "description": "Read back before retrying the same decision"
           }
         }
       }
@@ -16478,6 +17269,35 @@
                                 "original_date_mismatch",
                                 "company_error"
                               ]
+                            },
+                            "report": {
+                              "type": "object",
+                              "properties": {
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
+                                },
+                                "originalReportDate": {
+                                  "type": "string",
+                                  "format": "date"
+                                },
+                                "permittedUse": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "format",
+                                "originalReportDate",
+                                "permittedUse"
+                              ],
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -20131,6 +20951,129 @@
                         }
                       ]
                     },
+                    "recovery": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "attention",
+                            "offered",
+                            "agreed",
+                            "refund_decision_pending"
+                          ]
+                        },
+                        "paymentHoldExpiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "paymentDeadline": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "originalPromiseBy": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "originalFormat": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "failure": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "no_history",
+                            "format_unavailable",
+                            "rights_unavailable",
+                            "original_date_mismatch",
+                            "company_error",
+                            "file_delivery"
+                          ]
+                        },
+                        "missedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "offeredDeadline": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "agreedDeadline": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "agreedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "proposedFormat": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "agreedFormat": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "pendingReason": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "declined",
+                            "offer_elapsed",
+                            "recovery_missed",
+                            "no_history",
+                            "company_error"
+                          ]
+                        },
+                        "refundRequestedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "paymentHoldExpiresAt",
+                        "paymentDeadline",
+                        "originalPromiseBy",
+                        "originalFormat",
+                        "failure",
+                        "missedAt",
+                        "offeredDeadline",
+                        "agreedDeadline",
+                        "agreedAt",
+                        "proposedFormat",
+                        "agreedFormat",
+                        "pendingReason",
+                        "refundRequestedAt"
+                      ],
+                      "additionalProperties": false
+                    },
                     "paymentDeadline": {
                       "type": "string",
                       "format": "date-time"
@@ -20557,6 +21500,35 @@
                                     "original_date_mismatch",
                                     "company_error"
                                   ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "format",
+                                    "originalReportDate",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
@@ -21525,6 +22497,129 @@
                         }
                       ]
                     },
+                    "recovery": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "attention",
+                            "offered",
+                            "agreed",
+                            "refund_decision_pending"
+                          ]
+                        },
+                        "paymentHoldExpiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "paymentDeadline": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "originalPromiseBy": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "originalFormat": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "failure": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "no_history",
+                            "format_unavailable",
+                            "rights_unavailable",
+                            "original_date_mismatch",
+                            "company_error",
+                            "file_delivery"
+                          ]
+                        },
+                        "missedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "offeredDeadline": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "agreedDeadline": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "agreedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "proposedFormat": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "agreedFormat": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "pendingReason": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "declined",
+                            "offer_elapsed",
+                            "recovery_missed",
+                            "no_history",
+                            "company_error"
+                          ]
+                        },
+                        "refundRequestedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "paymentHoldExpiresAt",
+                        "paymentDeadline",
+                        "originalPromiseBy",
+                        "originalFormat",
+                        "failure",
+                        "missedAt",
+                        "offeredDeadline",
+                        "agreedDeadline",
+                        "agreedAt",
+                        "proposedFormat",
+                        "agreedFormat",
+                        "pendingReason",
+                        "refundRequestedAt"
+                      ],
+                      "additionalProperties": false
+                    },
                     "paymentDeadline": {
                       "type": "string",
                       "format": "date-time"
@@ -21951,6 +23046,35 @@
                                     "original_date_mismatch",
                                     "company_error"
                                   ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "format",
+                                    "originalReportDate",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
@@ -22796,6 +23920,129 @@
                         }
                       ]
                     },
+                    "recovery": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 2147483647
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "attention",
+                            "offered",
+                            "agreed",
+                            "refund_decision_pending"
+                          ]
+                        },
+                        "paymentHoldExpiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "paymentDeadline": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "originalPromiseBy": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "originalFormat": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "failure": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "no_history",
+                            "format_unavailable",
+                            "rights_unavailable",
+                            "original_date_mismatch",
+                            "company_error",
+                            "file_delivery"
+                          ]
+                        },
+                        "missedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "offeredDeadline": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "agreedDeadline": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "agreedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        },
+                        "proposedFormat": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "agreedFormat": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "pendingReason": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "declined",
+                            "offer_elapsed",
+                            "recovery_missed",
+                            "no_history",
+                            "company_error"
+                          ]
+                        },
+                        "refundRequestedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "status",
+                        "paymentHoldExpiresAt",
+                        "paymentDeadline",
+                        "originalPromiseBy",
+                        "originalFormat",
+                        "failure",
+                        "missedAt",
+                        "offeredDeadline",
+                        "agreedDeadline",
+                        "agreedAt",
+                        "proposedFormat",
+                        "agreedFormat",
+                        "pendingReason",
+                        "refundRequestedAt"
+                      ],
+                      "additionalProperties": false
+                    },
                     "paymentDeadline": {
                       "type": "string",
                       "format": "date-time"
@@ -23222,6 +24469,35 @@
                                     "original_date_mismatch",
                                     "company_error"
                                   ]
+                                },
+                                "report": {
+                                  "type": "object",
+                                  "properties": {
+                                    "format": {
+                                      "type": "string",
+                                      "enum": [
+                                        "pdf",
+                                        "link",
+                                        "both"
+                                      ]
+                                    },
+                                    "originalReportDate": {
+                                      "type": "string",
+                                      "format": "date"
+                                    },
+                                    "permittedUse": {
+                                      "type": "boolean",
+                                      "enum": [
+                                        true
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "format",
+                                    "originalReportDate",
+                                    "permittedUse"
+                                  ],
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [

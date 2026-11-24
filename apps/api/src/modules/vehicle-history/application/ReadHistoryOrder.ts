@@ -1,7 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
-import { historyBookingWindow, historyOrderState } from "../domain/HistoryOrder";
+import { historyOrderState } from "../domain/HistoryOrder";
+import { historyDeliveryDeadline, settleHistoryRecovery } from "../domain/HistoryRecovery";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 import { readFulfilment } from "./HistoryFulfilment";
@@ -26,13 +27,17 @@ export class ReadHistoryOrder {
       if (!order || !confirmedAt) return state;
       const delivered = await orders.reportArtifacts.delivered(order.id);
       const intent = await orders.fulfilment();
+      const recovery = await settleHistoryRecovery(orders, order, now, !!delivered, intent);
+      if (recovery) state.recovery = recovery;
       state.preparation = delivered ? "delivered" : !intent ? "queued" : intent.status === "recovery" ? "recovery"
         : intent.status === "uncertain" ? "checking" : "preparing";
       if (actor.operator) {
-        const provider = order.reservedProvider ?? await orders.serialize(() => this.capacity.existingProvider(orders, order, now));
-        const view = await readFulfilment(orders, order, intent, confirmedAt, now, provider, this.capacity);
+        const deadline = historyDeliveryDeadline(order, recovery);
+        const provider = intent?.accepted.provider ?? (!recovery?.agreedDeadline ? order.reservedProvider : undefined) ?? await orders.serialize(() =>
+          this.capacity.existingProvider(orders, order, now, deadline, recovery));
+        const view = await readFulfilment(orders, order, intent, confirmedAt, now, provider, this.capacity, recovery);
         if (view) state.fulfilment = view;
-        if (!provider) state.fulfilmentUnavailable = new Date(historyBookingWindow(order).deliveryBy) <= now ? "booking_closed" : "capacity";
+        if (!provider) state.fulfilmentUnavailable = !deadline || deadline <= now ? "booking_closed" : "capacity";
         const reportPlan = await this.capacity.paidReportPlan(orders, order, confirmedAt, now);
         if (reportPlan) state.reportPlan = reportPlan;
       }

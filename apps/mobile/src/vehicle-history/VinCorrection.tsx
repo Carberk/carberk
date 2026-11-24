@@ -7,6 +7,7 @@ import { ApiError } from "../api/client";
 import type { historyTranscript } from "../api/vehicle-history/messages";
 
 import { historyAttemptKey } from "./historyAttemptKey";
+import { formatHistoryDeadline } from "./formatHistoryDeadline";
 import { retainedVinCorrection } from "./retainedVinCorrection";
 
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,8 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
   const agreement = state.agreement;
   const pending = agreement?.pending;
   const review = pending?.review;
+  const recovery = state.recovery?.status === "agreed" ? state.recovery : null;
+  const needsReview = !!recovery && !!review?.offer.proposal && review.offer.proposal.format !== recovery.originalFormat;
   async function run(input?: H.HistoryCorrectionMutation) {
     if (busy.current || !enabled || !latest.current() || ["loading", "storage"].includes(phase)) return;
     const mutation = intent.current ?? input;
@@ -85,14 +88,17 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
   const timestamp = (value: string) => new Intl.DateTimeFormat(i18n.language === "tk" ? "en-GB" : i18n.language, {
     dateStyle: "short", timeStyle: "short", timeZone: "Asia/Ashgabat", hourCycle: "h23",
   }).format(new Date(value));
-  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], current = false) {
-    const window = current && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
+  function facts(offer: H.HistoryAcceptedOrder["acceptedOffer"], section: "current" | "pending" | "history") {
+    const window = section === "current" && state.replacement?.status === "accepted" ? state.replacement.window : offer.proposal;
+    const deadline = section === "pending" ? recovery?.agreedDeadline : null;
     return <View className="gap-2">
       <Text selectable className="font-mono text-callout">{offer.vin}</Text>
       <Text>{offer.proposal.priceTmt} TMT</Text>
       <Text>{offerCopy("format")}: {offerCopy(offer.proposal.format)}</Text>
       {offer.preflight.providers.map((p) => <Text key={p.name} className="text-callout">{p.name} · {offerCopy("date")}: {p.originalReportDate ?? offerCopy("unknown")}</Text>)}
-      <Text className="text-callout">{offerCopy("window")}: {timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>
+      {deadline
+        ? <Text className="text-callout">{t("vehicleHistory.promiseRecovery.agreedDeadline")} · {formatHistoryDeadline(deadline, i18n.language)}</Text>
+        : <Text className="text-callout">{offerCopy("window")}: {timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>}
     </View>;
   }
   const failure = ["uncertain", "changed", "denied", "storage", "invalid"].includes(phase);
@@ -104,23 +110,26 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       {(open || pending || failure) && <>
         <Text accessibilityRole="header" className="text-headline font-semibold">{copy(pending ? review ? "Reviewed" : "Waiting" : "Title")}</Text>
         <Text className="text-footnote text-muted-foreground">{copy("Policy")}</Text>
-        {pending && <><Text className="font-semibold">{copy("Current")}</Text>{facts(order.acceptedOffer, true)}
+        {pending && <><Text className="font-semibold">{copy("Current")}</Text>{facts(order.acceptedOffer, "current")}
           <Text className="font-semibold">{copy("Proposed")}</Text>{!review?.offer.proposal && <Text selectable className="font-mono">{pending.vin}</Text>}</>}
         {review && <>
           <Text>{copy(review.cause === "company_error" ? "Company" : "Customer")}</Text>
           {review.offer.preflight?.status && <Text accessibilityLiveRegion="polite">{offerCopy(review.offer.preflight.status)}</Text>}
-          {H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && <>
-            {facts(H.AcceptedHistoryOfferSchema.parse(review.offer))}
+          {needsReview && <Text>{t("vehicleHistory.promiseRecovery.correctionFormat")}</Text>}
+          {!needsReview && H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && <>
+            {facts(H.AcceptedHistoryOfferSchema.parse(review.offer), "pending")}
             <Text>{offerCopy("rule")}</Text><Text>{offerCopy("rights")}</Text><Text>{offerCopy("terms")}</Text>
             <Button disabled={!usable || !!vin.trim()} accessibilityState={{ busy: phase === "pending" }} onPress={() => { void run({ kind: "accept", attemptKey: historyAttemptKey(),
               expectedVersion: agreement?.version ?? 0, offer: H.AcceptedHistoryOfferSchema.parse(review.offer) }); }}><Text>{copy("Accept")}</Text></Button>
           </>}
         </>}
+        {!recovery && <>
         <Text nativeID="corrected-vin-label" className="font-semibold">{copy("Vin")}</Text>
         <Input accessibilityLabel={copy("Vin")} accessibilityLabelledBy="corrected-vin-label" value={vin} onChangeText={setVin}
           maxLength={80} autoCapitalize="characters" autoCorrect={false} editable={usable} />
         <Button variant="secondary" disabled={!usable || !vin.trim()} accessibilityState={{ busy: phase === "pending" }}
           onPress={() => { void run({ kind: "request", vin, attemptKey: historyAttemptKey(), expectedVersion: agreement?.version ?? 0 }); }}><Text>{copy("Send")}</Text></Button>
+        </>}
         {phase === "pending" && <Text accessibilityRole="alert">{copy("Saving")}</Text>}
         {failure && <Text accessibilityRole="alert">{phase === "invalid" ? offerCopy("malformed") : copy(phase === "denied" ? "Denied" : phase === "storage" ? "Storage" : phase === "changed" ? "Changed" : "Error")}</Text>}
         {phase === "uncertain" && <Button variant="secondary" disabled={!enabled} onPress={() => { void run(); }}><Text>{copy("Retry")}</Text></Button>}
@@ -131,7 +140,7 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       <Text accessibilityLiveRegion="polite">{copy("Agreed")} · {copy(agreement?.accepted.at(-1)?.cause === "company_error" ? "Company" : "Customer")}</Text>
       <Button variant="secondary" accessibilityState={{ expanded: historyOpen }} onPress={() => setHistoryOpen(!historyOpen)}><Text>{copy("History")}</Text></Button>
       {historyOpen && agreement?.accepted.slice(0, -1).map((revision) => <View key={revision.revision} className="gap-2">
-        <Text>{timestamp(revision.acceptedAt)}</Text>{facts(revision.offer)}
+        <Text>{timestamp(revision.acceptedAt)}</Text>{facts(revision.offer, "history")}
       </View>)}
     </>}
   </View>;

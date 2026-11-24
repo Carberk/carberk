@@ -1,5 +1,6 @@
-import { historyOrderStore } from "./historyOrderStore";
+import { dueHistoryRecovery, historyOrderStore } from "./historyOrderStore";
 import type { HistoryOrderStore } from "../domain/HistoryOrder";
+import type { HistoryRecoveryQueue } from "../domain/HistoryRecovery";
 import { HistoryOfferSchemas as O } from "@auto-tm/contracts";
 import type { HistoryOfferStore } from "../domain/HistoryOffer";
 import { Inject, Injectable } from "@nestjs/common";
@@ -56,7 +57,7 @@ function waitingFacts(row: WaitingRow): HistoryWaitingFacts {
 /** Separate from the operation pool: row-lock waiters cannot starve identity or
  * messaging. No callback timeout may release this fence before messaging settles. */
 @Injectable()
-export class HistoryMessageLocks {
+export class HistoryMessageLocks implements HistoryRecoveryQueue {
   private readonly pool: Pool;
   constructor(@Inject(ConfigService) config: ConfigService<Env, true>,
     @Inject(MESSAGE_AUTHORITY_FENCE_PORT) private readonly identityFence: MessageAuthorityFencePort) {
@@ -131,7 +132,22 @@ export class HistoryMessageLocks {
     });
   }
 
-  private async withRequestTransaction<T>(id: string, authority: HistoryMessageAuthority | HistoryHandoverAuthority,
+  async due(testers: string[], now: Date, after: string) {
+    const { rows } = await this.pool.query<{ requestId: string }>(dueHistoryRecovery, [testers, now, after]);
+    return rows.map(({ requestId }) => requestId);
+  }
+
+  settle(id: string, testers: string[], work: (requesterId: string, orders: HistoryOrderStore) => Promise<void>) {
+    return this.withRequestTransaction(id, null, async (client, request) => {
+      if (!request || !testers.includes(request.requesterId)) return;
+      let active = true;
+      const assertActive = () => { if (!active) throw new Error("History recovery lock has ended"); };
+      try { await work(request.requesterId, historyOrderStore(client, id, request.assignmentVersion, assertActive)); }
+      finally { active = false; }
+    });
+  }
+
+  private async withRequestTransaction<T>(id: string, authority: HistoryMessageAuthority | HistoryHandoverAuthority | null,
     operation: (client: PoolClient, request: HistoryMessageRequest | null) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
     // pg emits a checked-out connection failure on the client rather than pool.
@@ -142,11 +158,15 @@ export class HistoryMessageLocks {
       await client.query("SET LOCAL lock_timeout = '5s'");
       const { rows } = await client.query<HistoryMessageRequest>(`SELECT id, "requesterId", "assignedOperatorId", "assignmentVersion"
         FROM vehicle_history_requests WHERE id = $1 FOR NO KEY UPDATE`, [id]);
-      return await this.identityFence.withSession({ ...authority, ...(rows[0] ? { requesterId: rows[0].requesterId } : {}) }, async () => {
+      const commit = async () => {
         const result = await operation(client, rows[0] ?? null);
         await client.query("COMMIT");
         return result;
-      });
+      };
+      const requesterId = rows[0]?.requesterId;
+      if (authority) return await this.identityFence.withSession({ ...authority, ...(requesterId ? { requesterId } : {}) }, commit);
+      if (requesterId) return await this.identityFence.withUserLifecycle(requesterId, commit);
+      return await commit();
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;

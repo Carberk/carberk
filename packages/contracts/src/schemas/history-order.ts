@@ -72,13 +72,13 @@ export const HistoryFulfilmentActionSchema = z.object({
   !mutation || mutation.orderId === id && mutation.expectedAssignmentVersion === expectedAssignmentVersion);
 
 const RecoveryReason = z.enum(["no_history", "format_unavailable", "rights_unavailable", "original_date_mismatch", "company_error"]);
+const ObtainedReport = Obtained.omit({ kind: true, permittedUse: true }).extend({ permittedUse: z.literal(true) }).strict();
 const Intent = z.object({ id: z.string().guid(), version: Version, attempt: Version, source: FulfilmentSource,
   funding: z.enum(["order", "company"]), accepted: FulfilmentAgreement, recordedAt: DateTimeSchema });
 export const HistoryFulfilmentIntentSchema = z.discriminatedUnion("status", [
   Intent.extend({ status: z.enum(["pending", "uncertain", "retry_ready"]) }).strict(),
-  Intent.extend({ status: z.literal("obtained"), report: Obtained.omit({ kind: true, permittedUse: true })
-    .extend({ permittedUse: z.literal(true) }).strict() }).strict(),
-  Intent.extend({ status: z.literal("recovery"), reason: RecoveryReason }).strict(),
+  Intent.extend({ status: z.literal("obtained"), report: ObtainedReport }).strict(),
+  Intent.extend({ status: z.literal("recovery"), reason: RecoveryReason, report: ObtainedReport.optional() }).strict(),
 ]);
 export type HistoryFulfilmentIntent = z.infer<typeof HistoryFulfilmentIntentSchema>;
 export const HistoryFulfilmentViewSchema = z.object({
@@ -106,12 +106,46 @@ export const HistoryReplacementStateSchema = z.discriminatedUnion("status", [
 ]);
 export type HistoryReplacementState = z.infer<typeof HistoryReplacementStateSchema>;
 
+const RecoveryFormat = HistoryQuotePreviewSchema.shape.format;
+const PromiseFailure = z.enum([...RecoveryReason.options, "file_delivery"]);
+export const HistoryRecoveryStateSchema = z.object({
+  version: Version,
+  status: z.enum(["attention", "offered", "agreed", "refund_decision_pending"]),
+  paymentHoldExpiresAt: DateTimeSchema,
+  paymentDeadline: DateTimeSchema,
+  originalPromiseBy: DateTimeSchema,
+  originalFormat: RecoveryFormat,
+  failure: PromiseFailure.nullable(),
+  missedAt: DateTimeSchema.nullable(),
+  offeredDeadline: DateTimeSchema.nullable(),
+  agreedDeadline: DateTimeSchema.nullable(),
+  agreedAt: DateTimeSchema.nullable(),
+  proposedFormat: RecoveryFormat.nullable(),
+  agreedFormat: RecoveryFormat.nullable(),
+  pendingReason: z.enum(["declined", "offer_elapsed", "recovery_missed", "no_history", "company_error"]).nullable(),
+  refundRequestedAt: DateTimeSchema.nullable(),
+}).strict();
+export type HistoryRecoveryState = z.infer<typeof HistoryRecoveryStateSchema>;
+
+const RecoveryCommand = z.object({ orderId: z.string().guid(), expectedVersion: Version, attemptKey: z.string().guid() });
+export const HistoryRecoveryDecisionSchema = z.discriminatedUnion("kind", [
+  RecoveryCommand.extend({ kind: z.enum(["accept", "accept_format"]), deadline: DateTimeSchema, format: RecoveryFormat }).strict(),
+  RecoveryCommand.extend({ kind: z.literal("decline") }).strict(),
+]);
+export const HistoryOperatorRecoverySchema = z.discriminatedUnion("kind", [
+  RecoveryCommand.extend({ kind: z.literal("propose_format"), expectedAssignmentVersion: Version, format: RecoveryFormat }).strict(),
+  RecoveryCommand.extend({ kind: z.literal("company_error_refund"), expectedAssignmentVersion: Version }).strict(),
+]);
+export type HistoryRecoveryDecision = z.infer<typeof HistoryRecoveryDecisionSchema>;
+export type HistoryOperatorRecovery = z.infer<typeof HistoryOperatorRecoverySchema>;
+
 export const HistoryOrderStateSchema = z.object({
   order: HistoryAcceptedOrderSchema.nullable(),
   agreement: HistoryCorrectionStateSchema.optional(),
   status: z.enum(["enquiry", "awaiting_synthetic_payment", "hold_expired", "receipt_submitted", "payment_review", "payment_confirmed", "payment_received_no_hold"]),
   payment: HistoryPaymentSummarySchema.optional(),
   replacement: HistoryReplacementStateSchema.optional(),
+  recovery: HistoryRecoveryStateSchema.optional(),
   paymentDeadline: DateTimeSchema.optional(),
   verificationResumesAt: DateTimeSchema.optional(),
   reportPlan: z.object({ primary: ProviderName, second: ProviderName.nullable() }).strict().optional(),

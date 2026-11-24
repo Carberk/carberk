@@ -221,11 +221,28 @@ model HistoryOrder {
   vinAgreements HistoryVinAgreement[]
   fulfilmentEvents HistoryFulfilmentEvent[]
   replacementEvents HistoryReplacementEvent[]
+  recoveryEvents HistoryRecoveryEvent[]
   reportArtifacts HistoryReportArtifact[]
 
   @@unique([requestId, id])
   @@index([deliveryDay, holdExpiresAt])
   @@map("vehicle_history_orders")
+}
+
+model HistoryRecoveryEvent {
+  requestId String
+  order HistoryOrder @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+  version Int
+  attemptKey String? @db.Uuid
+  input Json?
+  state Json
+  actorId String?
+  assignmentVersion Int?
+  recordedAt DateTime @db.Timestamptz(3)
+
+  @@id([requestId, version])
+  @@unique([requestId, attemptKey])
+  @@map("history_recovery_events")
 }
 
 model HistoryReplacementEvent {
@@ -276,6 +293,7 @@ model HistoryFulfilmentEvent {
   actorId String
   assignmentVersion Int
   recordedAt DateTime @db.Timestamptz(3)
+  recoveryQuotaProvider String?
   reportArtifact HistoryReportArtifact?
 
   @@id([requestId, version])

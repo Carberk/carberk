@@ -7,6 +7,7 @@ import { ReplacementBookingPanel } from "./ReplacementBookingPanel";
 import { PaymentProofPanel } from "./PaymentProofPanel";
 import { PaymentVerificationPanel } from "./PaymentVerificationPanel";
 import { FulfilmentPanel } from "./FulfilmentPanel";
+import { PromiseRecoveryPanel } from "./PromiseRecoveryPanel";
 import { VinCorrectionPanel } from "./VinCorrectionPanel";
 import { historyOfferAction } from "./offer-actions";
 import type { HistoryInboxResult } from "./actions";
@@ -39,14 +40,15 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       if (current?.order?.id !== next.order?.id) return next;
       const currentVersion = current?.replacement?.version ?? -1;
       const nextVersion = next.replacement?.version ?? -1;
+      if (current?.recovery && (next.recovery?.version ?? 0) < current.recovery.version) return current;
       return current && (currentVersion > nextVersion || (currentVersion === nextVersion && current.serverNow > next.serverNow)) ? current : next;
     });
   }
-  async function run(mutation?: O.HistoryOperatorOfferMutation) {
+  async function run(mutation?: O.HistoryOperatorOfferMutation, quiet = false) {
     if (busy.current || !alive.current) return;
     busy.current = true;
     const attempt = ++generation.current, expected = binding;
-    setPhase(mutation ? "pending" : "loading");
+    if (!quiet) setPhase(mutation ? "pending" : "loading");
     try {
       const result = await historyOfferAction(locale, { id, scope, expectedAssignmentVersion: version, ...(mutation ? { mutation } : {}) });
       if (!alive.current || expected !== currentBinding.current || attempt !== generation.current) return;
@@ -76,6 +78,11 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       !orderState.payment?.confirmedAt && (orderState.paymentDeadline ?? orderState.order.holdExpiresAt),
       orderState.verificationResumesAt,
       replacement?.status === "proposed" && replacement.window.deliveryFrom,
+      orderState.payment?.bookingCommitted && orderState.preparation !== "delivered" &&
+        (orderState.recovery?.status === "offered" ? orderState.recovery.offeredDeadline
+          : orderState.recovery?.status === "agreed" ? orderState.recovery.agreedDeadline
+            : orderState.recovery?.status === "refund_decision_pending" ? null
+              : replacement?.status === "accepted" ? replacement.window.deliveryBy : orderState.order.acceptedOffer.proposal.deliveryBy),
     ].flatMap((value) => value && Date.parse(value) > serverNow ? [Date.parse(value) - serverNow] : []);
     if (!boundaries.length) return;
     const timer = setTimeout(() => load.current(), Math.min(...boundaries));
@@ -89,9 +96,13 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   const historicalWindow = replacement || orderState?.status === "hold_expired";
   const originalWindow = historicalWindow ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
   const recovery = replacementCopy[locale];
-  const timestamp = (value: string) => new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
-    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
-  }).format(new Date(value));
+  const timestamp = (value: string) => {
+    const date = new Date(value);
+    return new Intl.DateTimeFormat(locale === "tk" ? "en-GB" : locale, {
+      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
+      ...(date.getUTCSeconds() || date.getUTCMilliseconds() ? { second: "2-digit" } : {}),
+    }).format(date);
+  };
   return <section aria-label={t.title} className="mt-6 space-y-4 border-t pt-5 text-sm">
     <h4 className="font-semibold">{accepted ? orderState?.status === "payment_confirmed" ? paymentCopy[locale].confirmed
       : orderState?.status === "payment_received_no_hold" ? paymentCopy[locale].noHold
@@ -104,7 +115,9 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
         disabled={phase === "pending"} onChange={(event) => setVin(event.target.value)} autoCapitalize="characters" spellCheck={false} /></label>
       <Button className="h-auto min-h-11 w-full whitespace-normal" disabled={phase === "pending" || !vin.trim()} aria-busy={phase === "pending"}
         onClick={() => { void run({ kind: "check", vin, expectedVersion: data.version, expectedAssignmentVersion: version }); }}>{phase === "pending" ? t.pending : t.check}</Button></>}
-      <p role="status" aria-live="polite">{data.preflight ? t[data.preflight.status] : data.vin ? t.unchecked : t.empty}</p>
+      {!orderState?.recovery && <p role="status" aria-live="polite">{data.preflight ? t[data.preflight.status] : data.vin ? t.unchecked : t.empty}</p>}
+      {orderState?.recovery && <PromiseRecoveryPanel key={binding} {...{ locale, id, version, scope, actorId, timestamp, invalidate }}
+        recovery={orderState.recovery} intent={orderState.fulfilment?.intent} delivered={orderState.preparation === "delivered"} onOrder={updateOrder} />}
       {data.vin && !proposal && <p className="break-all font-mono">VIN: {data.vin}</p>}
       {data.preflight?.status === "available" && !accepted && <>
         <p>{t.rule}</p>
@@ -130,12 +143,12 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       </fieldset>}
       {proposal && <div className="space-y-3 rounded-lg border p-4">
         <h5 className="font-semibold">{accepted ? t.orderSummary : t.preview}</h5><p className="break-all font-mono">{data.vin}</p>
-        <p>{t.format}: {t[proposal.format]}</p>
-        {originalWindow && <p>{historicalWindow ? `${recovery.original} · ${recovery.timeZone}` : t.window}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}</p>}
+        {!orderState?.recovery && <p>{t.format}: {t[proposal.format]}</p>}
+        {originalWindow && (!orderState?.recovery || replacement) && <p>{historicalWindow ? `${recovery.original} · ${recovery.timeZone}` : t.window}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}</p>}
         {accepted ? <>
           <p>{t.orderAccepted}: {timestamp(accepted.acceptedAt)}</p>
           {orderState?.paymentDeadline && <p>{recovery.paymentDeadline} · {recovery.timeZone}: {timestamp(orderState.paymentDeadline)}</p>}
-          <p>{orderState?.paymentDeadline ? `${recovery.originalHold} · ${recovery.timeZone}` : t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>
+          {!orderState?.recovery && <p>{orderState?.paymentDeadline ? `${recovery.originalHold} · ${recovery.timeZone}` : t.orderHold}: {timestamp(accepted.holdExpiresAt)}</p>}
           {orderState?.reportPlan && <p>{t.reservedReport} {orderState.reportPlan.primary}
             {orderState.reportPlan.second && <> · {t.spareReport} {orderState.reportPlan.second}</>}</p>}
           {!orderState?.payment && <p role="status">{orderState?.status === "hold_expired" ? t.orderExpiredNext : t.orderNext}</p>}
@@ -146,8 +159,8 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
           <PaymentProofPanel key={`${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} />
           <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} hasReplacement={!!replacement} onOrder={updateOrder} />
           {orderState && <FulfilmentPanel key={`fulfilment:${id}:${version}:${scope}:${actorId}:${locale}`}
-            {...{ locale, id, version, scope, actorId, invalidate }} state={orderState} onOrder={updateOrder} />}
-          {orderState && <VinCorrectionPanel key={`correction:${id}:${version}:${scope}:${actorId}:${locale}`} {...{ locale, id, version, scope, actorId, invalidate }}
+            {...{ locale, id, version, scope, actorId, invalidate }} state={orderState} onOrder={updateOrder} refreshOrder={() => { void run(undefined, true); }} />}
+          {orderState && (!orderState.recovery?.missedAt || orderState.recovery.status === "agreed" && !!orderState.agreement?.pending) && <VinCorrectionPanel key={`correction:${id}:${version}:${scope}:${actorId}:${locale}`} {...{ locale, id, version, scope, actorId, invalidate }}
             state={orderState} onOrder={updateOrder} />}
           <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>
             {data.preflight?.status === "available" && <><p>{t.rule}</p><dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt>{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl><p>{t.limits}</p></>}

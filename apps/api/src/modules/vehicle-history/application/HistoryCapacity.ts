@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import type { Env } from "../../../env.schema";
 import { fulfilmentAgreement, fulfilmentSources } from "../domain/HistoryFulfilment";
 import { historyBookingWindow, historyDeliveryDay, type AvailableHistoryReports, type HistoryOrderStore, type HistoryProvider,
@@ -49,15 +50,26 @@ export class HistoryCapacity {
     });
   }
 
-  async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date) {
-    if (order.reservedProvider || new Date(historyBookingWindow(order).deliveryBy) <= now) return order.reservedProvider;
-    return this.findProvider(orders, order, order.acceptedOffer.preflight, now, true);
+  async existingProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, now: Date,
+    deadline: Date | null, recovery: H.HistoryRecoveryState | null) {
+    const reports = order.acceptedOffer.preflight;
+    if (!deadline || deadline <= now) return order.reservedProvider;
+    const reserved = reports.providers.find(({ name }) => name === order.reservedProvider)?.name;
+    if (recovery?.status !== "agreed") return reserved ?? await this.findProvider(orders, order, reports, now, true);
+    const hasArchive = (provider: HistoryProvider) => {
+      const accepted = fulfilmentAgreement(order, provider, recovery.agreedFormat ?? undefined);
+      return accepted && fulfilmentSources(accepted).includes("archive");
+    };
+    if (reserved && hasArchive(reserved)) return reserved;
+    return await this.recoveryProvider(orders, order, reports, now)
+      ?? reports.providers.find(({ name }) => hasArchive(name))?.name ?? reserved;
   }
 
   async correctionProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date,
-    priority?: HistoryPaidProviderPriority) {
-    if (new Date(historyBookingWindow(order).deliveryBy) <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
-    const provider = await this.findProvider(orders, order, reports, now, false, priority);
+    priority?: HistoryPaidProviderPriority, recovering = false) {
+    if (!recovering && new Date(historyBookingWindow(order).deliveryBy) <= now) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+    const provider = recovering ? await this.recoveryProvider(orders, order, reports, now)
+      : await this.findProvider(orders, order, reports, now, false, priority);
     if (priority && (!provider || provider !== order.reservedProvider) && await orders.hasEarlierPaidWork(priority.confirmedBefore, now)) {
       throw new HistoryRequestError("HISTORY_FULFILMENT_FIFO");
     }
@@ -84,12 +96,25 @@ export class HistoryCapacity {
     return archiveProvider;
   }
 
-  async canUseFulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean) {
+  private async recoveryProvider(orders: HistoryOrderStore, order: StoredHistoryOrder, reports: AvailableHistoryReports, now: Date) {
+    const names = reports.providers.map(({ name }) => name);
+    const preferred = order.reservedProvider;
+    if (preferred && names.includes(preferred)) names.sort((a) => a === preferred ? -1 : 1);
+    for (const name of names) {
+      if (await this.fulfilmentBudget(orders, order, name, now, false, true)) return name;
+    }
+    return undefined;
+  }
+
+  async fulfilmentBudget(orders: HistoryOrderStore, order: StoredHistoryOrder, provider: HistoryProvider, now: Date, additional: boolean, recovering: boolean) {
     const { deliveryFrom, deliveryBy } = historyBookingWindow(order);
-    const budget = await this.remaining(orders, provider, new Date(deliveryFrom), new Date(deliveryBy), now,
+    const from = new Date(deliveryFrom), by = new Date(deliveryBy);
+    const budget = await this.remaining(orders, provider, recovering ? now : from, recovering ? now : by, now,
       { unreserved: additional ? "all" : "none" });
-    const needed = additional || order.reservedProvider !== provider ? 1 : 0;
-    return !!budget && now >= budget.periodStart && budget.slots >= needed;
+    if (!budget || now < budget.periodStart) return null;
+    const reserved = order.reservedProvider === provider && from >= budget.periodStart && by <= budget.periodEnd;
+    const needed = additional || !reserved ? 1 : 0;
+    return budget.slots >= needed ? { recoveryQuotaProvider: recovering && needed ? provider : null } : null;
   }
 
   private async remaining(orders: HistoryOrderStore, provider: HistoryProvider, from: Date, by: Date, now: Date, options?: HistoryProviderUsageOptions) {

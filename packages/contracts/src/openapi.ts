@@ -4,7 +4,7 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 
 import * as PaymentProof from "./schemas/history-payment-proof";
-import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema } from "./schemas/history-order";
+import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema, HistoryRecoveryStateSchema, HistoryOperatorRecoverySchema, HistoryRecoveryDecisionSchema } from "./schemas/history-order";
 import { DeliverHistoryReportSchema, DeliveredHistoryReportSchema, HistoryReportContentSchema, HistoryReportLinkSchema, HistoryReportQuerySchema, HistoryReportViewSchema, PurchaserHistoryReportSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
@@ -482,6 +482,19 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
       409: { description: "Offer or assignment changed; refresh" }, 503: { description: "Temporarily unavailable" } },
   });
   registry.register("HistoryOrderState", HistoryOrderStateSchema);
+  registry.register("HistoryRecoveryState", HistoryRecoveryStateSchema);
+  for (const operator of [false, true]) registry.registerPath({
+    method: "post", path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/recovery`,
+    tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    summary: operator ? "Propose a format change or escalate an unresolved company error"
+      : "Explicitly agree to exact recovery terms or request a founder refund decision",
+    request: { params: z.object({ id: z.string().guid() }), query: ReadHistoryOfferSchema,
+      body: { content: { "application/json": { schema: operator ? HistoryOperatorRecoverySchema : HistoryRecoveryDecisionSchema } } } },
+    responses: { 201: { description: "Current private promise recovery state including original and agreed deadlines",
+      content: { "application/json": { schema: HistoryRecoveryStateSchema } } },
+      400: { description: "Invalid recovery choice" }, 403: { description: "Current session and request authority required" },
+      409: { description: "Recovery terms changed or elapsed; refresh the order" }, 503: { description: "Read back before retrying the same decision" } },
+  });
   registry.register("HistoryReplacementState", HistoryReplacementStateSchema);
   for (const operator of [false, true]) registry.registerPath({
     method: "post", path: `/api/v1/vehicle-history/${operator ? "operator/" : ""}requests/{id}/replacement-booking`,

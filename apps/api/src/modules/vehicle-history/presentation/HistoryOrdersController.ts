@@ -5,6 +5,7 @@ import type { HistoryRequesterClaims } from "../application/CurrentHistoryReques
 import { ReadHistoryOrder } from "../application/ReadHistoryOrder";
 import { HistoryFulfilment } from "../application/HistoryFulfilment";
 import { AcceptHistoryQuote } from "../application/AcceptHistoryQuote";
+import { DecideHistoryRecovery } from "../application/DecideHistoryRecovery";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HistoryOrdersExceptionFilter } from "./HistoryRequestExceptionFilter";
 
@@ -15,6 +16,7 @@ type Request = FastifyRequest & { user?: HistoryRequesterClaims };
 export class HistoryOrdersController {
   constructor(@Inject(HistoryFulfilment) private readonly fulfilment: HistoryFulfilment,
     @Inject(ReadHistoryOrder) private readonly readOrder: ReadHistoryOrder,
+    @Inject(DecideHistoryRecovery) private readonly recovery: DecideHistoryRecovery,
     @Inject(AcceptHistoryQuote) private readonly acceptQuote: AcceptHistoryQuote) {}
 
   @Get("requests/:id/order")
@@ -47,5 +49,19 @@ export class HistoryOrdersController {
     if (!input.success || !O.ReadHistoryOfferSchema.safeParse(query).success) throw new HistoryRequestError("HISTORY_FULFILMENT_INVALID");
     return this.fulfilment.execute({ claims: request.user ?? {}, operator: true,
       expectedAssignmentVersion: input.data.expectedAssignmentVersion }, id, input.data);
+  }
+
+  @Post("requests/:id/recovery")
+  customerRecovery(@Req() request: Request, @Param("id") id: string, @Query() query: unknown, @Body() body: unknown) {
+    const input = H.HistoryRecoveryDecisionSchema.safeParse(body);
+    if (!input.success || !O.ReadHistoryOfferSchema.safeParse(query).success) throw new HistoryRequestError("HISTORY_RECOVERY_INVALID");
+    return this.recovery.execute({ claims: request.user ?? {}, operator: false }, id, input.data);
+  }
+
+  @Post("operator/requests/:id/recovery")
+  operatorRecovery(@Req() request: Request, @Param("id") id: string, @Query() query: unknown, @Body() body: unknown) {
+    const input = H.HistoryOperatorRecoverySchema.safeParse(body);
+    if (!input.success || !O.ReadHistoryOfferSchema.safeParse(query).success) throw new HistoryRequestError("HISTORY_RECOVERY_INVALID");
+    return this.recovery.execute({ claims: request.user ?? {}, operator: true, expectedAssignmentVersion: input.data.expectedAssignmentVersion }, id, input.data);
   }
 }
