@@ -160,7 +160,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
           <PaymentVerificationPanel key={`payment:${id}:${version}:${scope}:${actorId}`} {...{ locale, id, version, scope, actorId, revision, invalidate }} hasReplacement={!!replacement} onOrder={updateOrder} />
           {orderState && <FulfilmentPanel key={`fulfilment:${id}:${version}:${scope}:${actorId}:${locale}`}
             {...{ locale, id, version, scope, actorId, invalidate }} state={orderState} onOrder={updateOrder} refreshOrder={() => { void run(undefined, true); }} />}
-          {orderState && !orderState.recovery?.missedAt && <VinCorrectionPanel key={`correction:${id}:${version}:${scope}:${actorId}:${locale}`} {...{ locale, id, version, scope, actorId, invalidate }}
+          {orderState && (!orderState.recovery?.missedAt || orderState.recovery.status === "agreed" && !!orderState.agreement?.pending) && <VinCorrectionPanel key={`correction:${id}:${version}:${scope}:${actorId}:${locale}`} {...{ locale, id, version, scope, actorId, invalidate }}
             state={orderState} onOrder={updateOrder} />}
           <details className="space-y-3"><summary className="cursor-pointer py-3 font-medium">{t.orderDetails}</summary>
             {data.preflight?.status === "available" && <><p>{t.rule}</p><dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt>{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl><p>{t.limits}</p></>}

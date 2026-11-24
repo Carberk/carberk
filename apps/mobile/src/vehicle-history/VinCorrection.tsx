@@ -7,6 +7,7 @@ import { ApiError } from "../api/client";
 import type { historyTranscript } from "../api/vehicle-history/messages";
 
 import { historyAttemptKey } from "./historyAttemptKey";
+import { formatHistoryDeadline } from "./formatHistoryDeadline";
 import { retainedVinCorrection } from "./retainedVinCorrection";
 
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,8 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
   const agreement = state.agreement;
   const pending = agreement?.pending;
   const review = pending?.review;
+  const recovery = state.recovery?.status === "agreed" ? state.recovery : null;
+  const needsReview = !!recovery && !!review?.offer.proposal && review.offer.proposal.format !== recovery.originalFormat;
   async function run(input?: H.HistoryCorrectionMutation) {
     if (busy.current || !enabled || !latest.current() || ["loading", "storage"].includes(phase)) return;
     const mutation = intent.current ?? input;
@@ -92,7 +95,9 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
       <Text>{offer.proposal.priceTmt} TMT</Text>
       <Text>{offerCopy("format")}: {offerCopy(offer.proposal.format)}</Text>
       {offer.preflight.providers.map((p) => <Text key={p.name} className="text-callout">{p.name} · {offerCopy("date")}: {p.originalReportDate ?? offerCopy("unknown")}</Text>)}
-      <Text className="text-callout">{offerCopy("window")}: {timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>
+      {!current && recovery?.agreedDeadline
+        ? <Text className="text-callout">{t("vehicleHistory.promiseRecovery.agreedDeadline")} · {formatHistoryDeadline(recovery.agreedDeadline, i18n.language)}</Text>
+        : <Text className="text-callout">{offerCopy("window")}: {timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>}
     </View>;
   }
   const failure = ["uncertain", "changed", "denied", "storage", "invalid"].includes(phase);
@@ -109,18 +114,21 @@ export function VinCorrection({ state, storageKey, stream, enabled, current, rec
         {review && <>
           <Text>{copy(review.cause === "company_error" ? "Company" : "Customer")}</Text>
           {review.offer.preflight?.status && <Text accessibilityLiveRegion="polite">{offerCopy(review.offer.preflight.status)}</Text>}
-          {H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && <>
+          {needsReview && <Text>{t("vehicleHistory.promiseRecovery.correctionFormat")}</Text>}
+          {!needsReview && H.AcceptedHistoryOfferSchema.safeParse(review.offer).success && <>
             {facts(H.AcceptedHistoryOfferSchema.parse(review.offer))}
             <Text>{offerCopy("rule")}</Text><Text>{offerCopy("rights")}</Text><Text>{offerCopy("terms")}</Text>
             <Button disabled={!usable || !!vin.trim()} accessibilityState={{ busy: phase === "pending" }} onPress={() => { void run({ kind: "accept", attemptKey: historyAttemptKey(),
               expectedVersion: agreement?.version ?? 0, offer: H.AcceptedHistoryOfferSchema.parse(review.offer) }); }}><Text>{copy("Accept")}</Text></Button>
           </>}
         </>}
+        {!recovery && <>
         <Text nativeID="corrected-vin-label" className="font-semibold">{copy("Vin")}</Text>
         <Input accessibilityLabel={copy("Vin")} accessibilityLabelledBy="corrected-vin-label" value={vin} onChangeText={setVin}
           maxLength={80} autoCapitalize="characters" autoCorrect={false} editable={usable} />
         <Button variant="secondary" disabled={!usable || !vin.trim()} accessibilityState={{ busy: phase === "pending" }}
           onPress={() => { void run({ kind: "request", vin, attemptKey: historyAttemptKey(), expectedVersion: agreement?.version ?? 0 }); }}><Text>{copy("Send")}</Text></Button>
+        </>}
         {phase === "pending" && <Text accessibilityRole="alert">{copy("Saving")}</Text>}
         {failure && <Text accessibilityRole="alert">{phase === "invalid" ? offerCopy("malformed") : copy(phase === "denied" ? "Denied" : phase === "storage" ? "Storage" : phase === "changed" ? "Changed" : "Error")}</Text>}
         {phase === "uncertain" && <Button variant="secondary" disabled={!enabled} onPress={() => { void run(); }}><Text>{copy("Retry")}</Text></Button>}

@@ -31,11 +31,12 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
   }, [key]);
   const agreement = state.agreement;
   const pending = agreement?.pending, review = pending?.review;
+  const recoveryFormat = state.recovery?.status === "agreed" ? state.recovery.originalFormat : undefined;
   async function run(reviewing = false) {
     if (busy.current || !alive.current || phase === "storage") return;
     if (reviewing && !intent.current && !cause) return;
     const mutation = reviewing ? intent.current ?? { kind: "review" as const, attemptKey: crypto.randomUUID(), expectedAssignmentVersion: version,
-      expectedVersion: agreement?.version ?? 0, cause: cause as "customer_correction" | "company_error", format } : undefined;
+      expectedVersion: agreement?.version ?? 0, cause: cause as "customer_correction" | "company_error", format: recoveryFormat ?? format } : undefined;
     busy.current = true; setPhase("pending");
     const expected = binding;
     const owns = () => alive.current && expected === latest.current;
@@ -84,8 +85,9 @@ export function VinCorrectionPanel({ locale, id, version, scope, actorId, state,
         <label className="block">{t.Cause}<select className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" value={cause}
           onChange={(e) => setCause(e.target.value as typeof cause)}><option value="">{t.Choose}</option>
           <option value="customer_correction">{t.Customer}</option><option value="company_error">{t.Company}</option></select></label>
-        <label className="block">{o.format}<select className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" value={format}
-          onChange={(e) => setFormat(e.target.value as typeof format)}>{(["pdf", "link", "both"] as const).map((f) => <option key={f} value={f}>{o[f]}</option>)}</select></label>
+        {recoveryFormat ? <p>{o.format} · {o[recoveryFormat]}</p> :
+          <label className="block">{o.format}<select className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" value={format}
+            onChange={(e) => setFormat(e.target.value as typeof format)}>{(["pdf", "link", "both"] as const).map((f) => <option key={f} value={f}>{o[f]}</option>)}</select></label>}
         <Button className="h-auto min-h-11 w-full whitespace-normal" disabled={!cause} onClick={() => { void run(true); }}>{t.Review}</Button>
       </fieldset>
     </>}

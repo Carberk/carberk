@@ -23,26 +23,28 @@ export class DecideHistoryRecovery {
       if (!requester || requester.deleted || requester.suspendedAt || deleting) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
       const order = await orders.read();
       if (order?.id !== input.orderId || !bookedPayment(order, await orders.paymentChecks())) return null;
-      const delivered = !!await orders.reportArtifacts.delivered(order.id);
-      const intent = await orders.fulfilment();
-      const previous = await orders.recoveryAttempt(input.attemptKey);
-      const state = await settleHistoryRecovery(orders, order, this.clock.now(), delivered, intent);
-      if (!state) return null;
-      if (previous) return previous.actorId === actorId && isDeepStrictEqual(previous.input, input) ? state : null;
-      if (delivered || state.version !== input.expectedVersion || state.version === 2147483647) return null;
-      const now = this.clock.now();
-      const cutoff = state.status === "offered" ? state.offeredDeadline : state.status === "agreed" ? state.agreedDeadline : null;
-      if (cutoff && now >= new Date(cutoff)) {
-        await settleHistoryRecovery(orders, order, now, false, intent);
-        return null;
-      }
-      const next = recoveryDecision(state, input, intent, now);
-      if (!next) return null;
-      if (next.agreedFormat && next.agreedFormat !== state.agreedFormat && intent) {
-        await applyFormatAgreement(orders, intent, next.agreedFormat, actorId, now);
-      }
-      await orders.saveRecovery(next, now, { input, actorId, assignmentVersion: participant.assignmentVersion });
-      return next;
+      return orders.serialize(async () => {
+        const delivered = !!await orders.reportArtifacts.delivered(order.id);
+        const intent = await orders.fulfilment();
+        const previous = await orders.recoveryAttempt(input.attemptKey);
+        const state = await settleHistoryRecovery(orders, order, this.clock.now(), delivered, intent);
+        if (!state) return null;
+        if (previous) return previous.actorId === actorId && isDeepStrictEqual(previous.input, input) ? state : null;
+        if (delivered || state.version !== input.expectedVersion || state.version === 2147483647) return null;
+        const now = this.clock.now();
+        const cutoff = state.status === "offered" ? state.offeredDeadline : state.status === "agreed" ? state.agreedDeadline : null;
+        if (cutoff && now >= new Date(cutoff)) {
+          await settleHistoryRecovery(orders, order, now, false, intent);
+          return null;
+        }
+        const next = recoveryDecision(state, input, intent, now);
+        if (!next) return null;
+        if (next.agreedFormat && next.agreedFormat !== state.agreedFormat && intent) {
+          await applyFormatAgreement(orders, intent, next.agreedFormat, actorId, now);
+        }
+        await orders.saveRecovery(next, now, { input, actorId, assignmentVersion: participant.assignmentVersion });
+        return next;
+      });
     });
     if (!current) throw new HistoryRequestError("HISTORY_RECOVERY_CONFLICT");
     return current;

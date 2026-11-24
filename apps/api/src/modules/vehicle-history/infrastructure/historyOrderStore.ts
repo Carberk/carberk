@@ -83,20 +83,36 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
       const unreservedMode = typeof unreserved === "string" ? unreserved : "earlier_paid";
       const confirmedBefore = typeof unreserved === "string" ? null : unreserved.confirmedBefore;
       const { rows } = await client.query<{ used: number }>(`
-        ${activeOrders} SELECT COALESCE(sum(1 + (
-          SELECT count(*) FROM history_fulfilment_events f WHERE f."requestId" = o."requestId"
-            AND f.input->>'kind' = 'company_correction' AND f.state->>'source' = 'new_source'
-        )), 0)::int AS used FROM active_orders o
-        WHERE "activeFrom" < $3 AND "activeBy" > $2
-          AND (NOT $5::boolean OR "requestId" <> $6)
-          AND ("activeProvider" = $1 OR ("activeProvider" IS NULL
-            AND "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
-            AND ($7 = 'all' OR ($7 = 'earlier_paid' AND o."activeBy" > $4
-              AND o."activeFrom" >= $2 AND o."activeBy" <= $3 AND EXISTS (
-              SELECT 1 FROM history_payment_checks older WHERE older."requestId" = o."requestId" AND (older."bookingCommitted" OR o."replacementBooked") AND older."confirmedAt" IS NOT NULL
-                AND ($8::timestamptz IS NULL OR (older."confirmedAt", older."requestId") < ($8::timestamptz, $6::text))
-            )))))
-          AND (LEAST("holdExpiresAt", "deliveryBy") > $4 OR ${hasBooking})`,
+        ${activeOrders}, booked_usage AS (
+          SELECT COALESCE(sum(1 + (
+            SELECT count(*) FROM history_fulfilment_events f WHERE f."requestId" = o."requestId"
+              AND f.input->>'kind' = 'company_correction' AND f.state->>'source' = 'new_source'
+              AND f."recoveryQuotaProvider" IS NULL
+          )), 0) AS used FROM active_orders o
+          WHERE "activeFrom" < $3 AND "activeBy" > $2
+            AND (NOT $5::boolean OR "requestId" <> $6)
+            AND ("activeProvider" = $1 OR ("activeProvider" IS NULL
+              AND "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))
+              AND ($7 = 'all' OR ($7 = 'earlier_paid' AND o."activeBy" > $4
+                AND o."activeFrom" >= $2 AND o."activeBy" <= $3 AND EXISTS (
+                  SELECT 1 FROM history_payment_checks older
+                  WHERE older."requestId" = o."requestId" AND (older."bookingCommitted" OR o."replacementBooked")
+                    AND older."confirmedAt" IS NOT NULL
+                    AND ($8::timestamptz IS NULL OR (older."confirmedAt", older."requestId") < ($8::timestamptz, $6::text))
+                )))))
+            AND (LEAST("holdExpiresAt", "deliveryBy") > $4 OR ${hasBooking})
+        ), recovery_usage AS (
+          SELECT count(*) AS used FROM history_fulfilment_events quota
+          WHERE quota."recoveryQuotaProvider" = $1 AND quota."recordedAt" >= $2 AND quota."recordedAt" < $3
+            AND (NOT $5::boolean OR quota."requestId" <> $6)
+            AND NOT EXISTS (
+              SELECT 1 FROM history_fulfilment_events reconciled
+              WHERE reconciled."requestId" = quota."requestId" AND reconciled.version > quota.version
+                AND reconciled.state->>'attempt' = quota.state->>'attempt'
+                AND reconciled.state->>'status' = 'retry_ready'
+            )
+        )
+        SELECT (booked_usage.used + recovery_usage.used)::int AS used FROM booked_usage CROSS JOIN recovery_usage`,
       [provider, periodStart, periodEnd, now, excludeCurrent, requestId, unreservedMode, confirmedBefore]);
       return rows[0]?.used ?? 0;
     },
@@ -203,23 +219,24 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
             END
             AND r."assignedOperatorId" = (SELECT "assignedOperatorId" FROM vehicle_history_requests WHERE id = $2)
             AND ($1::timestamptz IS NULL OR (p."confirmedAt", p."requestId") < ($1::timestamptz, $2::text))
-            AND CASE WHEN $4 = 'delivery' THEN COALESCE(f.state->>'status', '') <> 'recovery'
-              AND NOT EXISTS (
+            AND CASE WHEN f.state->>'status' = 'recovery'
+              THEN h.state->>'status' = 'agreed' AND f.state->>'reason' = 'company_error'
+              WHEN $4 = 'delivery' THEN NOT EXISTS (
                 SELECT 1 FROM history_report_artifacts report
                 WHERE report."requestId" = p."requestId" AND report."orderId" = p."orderId" AND report."deliveredAt" IS NOT NULL
               )
-              ELSE COALESCE(f.state->>'status', '') NOT IN ('obtained', 'recovery')
+              ELSE COALESCE(f.state->>'status', '') <> 'obtained'
             END
         ) AS earlier`, [confirmedAt, requestId, now, stage]);
       return rows[0]?.earlier ?? false;
     },
-    async saveFulfilment({ input, state, actorId, assignmentVersion }) {
+    async saveFulfilment({ input, state, actorId, assignmentVersion, recoveryQuotaProvider = null }) {
       assertActive();
       await client.query(`INSERT INTO history_fulfilment_events
-        ("requestId", version, "attemptKey", input, state, "actorId", "assignmentVersion", "recordedAt")
-        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)`,
+        ("requestId", version, "attemptKey", input, state, "actorId", "assignmentVersion", "recordedAt", "recoveryQuotaProvider")
+        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)`,
       [requestId, state.version, input.attemptKey, JSON.stringify(input), JSON.stringify(H.HistoryFulfilmentIntentSchema.parse(state)),
-        actorId, assignmentVersion, state.recordedAt]);
+        actorId, assignmentVersion, state.recordedAt, recoveryQuotaProvider]);
     },
     async recovery() {
       assertActive();

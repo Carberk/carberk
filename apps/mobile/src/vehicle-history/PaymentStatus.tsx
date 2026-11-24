@@ -9,8 +9,9 @@ export function PaymentStatus({ state, compact = false, summary = false }: {
 }) {
   const { t, i18n } = useTranslation();
   if (state.recovery && state.preparation !== "delivered") {
+    const status = state.recovery.status === "refund_decision_pending" ? "pendingShort" : state.recovery.status;
     return <Text accessibilityLiveRegion="polite" className="text-callout font-semibold">
-      {t(`vehicleHistory.promiseRecovery.${state.recovery.status}`)}
+      {t(`vehicleHistory.promiseRecovery.${status}`)}
     </Text>;
   }
   const outcome = state.payment?.outcome;

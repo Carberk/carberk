@@ -293,6 +293,7 @@ model HistoryFulfilmentEvent {
   actorId String
   assignmentVersion Int
   recordedAt DateTime @db.Timestamptz(3)
+  recoveryQuotaProvider String?
   reportArtifact HistoryReportArtifact?
 
   @@id([requestId, version])

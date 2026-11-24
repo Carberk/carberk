@@ -167,7 +167,9 @@ export class HistoryReportArtifacts {
       if (!order || order.id !== target.orderId || !agreement || agreement.pending
         || agreement.acceptedRevision !== target.acceptedRevision || agreement.handoff?.revision !== target.acceptedRevision
         || intent?.status !== "obtained" || intent.id !== target.intentId || intent.version !== target.intentVersion
-        || !isDeepStrictEqual(intent.accepted, fulfilmentAgreement(order, order.reservedProvider ?? intent.accepted.provider, recovery?.agreedFormat ?? undefined))) {
+        || !isDeepStrictEqual(intent.accepted, fulfilmentAgreement(order,
+          recovery?.agreedDeadline ? intent.accepted.provider : order.reservedProvider ?? intent.accepted.provider,
+          recovery?.agreedFormat ?? undefined))) {
         throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
       }
       if (!mutation) return work(orders.reportArtifacts, intent, actorId, order, orders);

@@ -10,6 +10,7 @@ import { ApiError } from "../api/client";
 
 import { ReplacementBooking } from "./ReplacementBooking";
 import { PromiseRecovery, type RecoveryChoice } from "./PromiseRecovery";
+import { formatHistoryDeadline } from "./formatHistoryDeadline";
 import { historyAttemptKey } from "./historyAttemptKey";
 import { PaymentProof } from "./PaymentProof";
 import { VinCorrection } from "./VinCorrection";
@@ -176,13 +177,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
     finally { busy.current = false; if (mounted.current) setSaving(false); }
   }
   const copy = (key: string) => t(`vehicleHistory.offer${key[0]?.toUpperCase()}${key.slice(1)}`);
-  const timestamp = (value: string) => {
-    const date = new Date(value);
-    return new Intl.DateTimeFormat(i18n.language === "tk" ? "en-GB" : i18n.language, {
-      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
-      ...(date.getUTCSeconds() || date.getUTCMilliseconds() ? { second: "2-digit" } : {}),
-    }).format(date);
-  };
+  const timestamp = (value: string) => formatHistoryDeadline(value, i18n.language);
   const denied = state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const error = failed || !!state.error;
   const proposal = data?.proposal;
@@ -196,11 +191,12 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
       : error ? <View className="gap-3"><Text accessibilityRole="alert">{copy(denied ? "denied" : "error")}</Text>
         <Button variant="secondary" disabled={!ready || !connected || state.isFetching} onPress={() => { setFailed(false); setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
         : data && <>
-          {recovery && <PromiseRecovery {...{ recovery, timestamp }} enabled={ready && active && connected && !state.isFetching}
-            busy={deciding} issue={recoveryIssue} decide={(choice) => { void decideRecovery(choice); }}
-            reload={() => { void refresh().then((result) => {
+          {recovery && <PromiseRecovery recovery={recovery} delivered={orderState?.preparation === "delivered"}
+            controls={{ enabled: ready && active && connected && !state.isFetching,
+              busy: deciding, issue: recoveryIssue, decide: (choice) => { void decideRecovery(choice); },
+              reload: () => { void refresh().then((result) => {
               if (current() && !result.error) { setRecoveryIssue(null); void reconcileOrder(); }
-            }); }} />}
+              }); } }} />}
           {!recovery && <Text accessibilityLiveRegion="polite">{copy(data.preflight?.status ?? (data.vin ? "unchecked" : "empty"))}</Text>}
           {data.vin && <Text selectable className="text-body font-mono">VIN: {data.vin}</Text>}
           {data.preflight?.status === "available" && (!accepted || expanded) && <>
@@ -240,7 +236,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
           {accepted && <PaymentProof key={`${userId}:${sessionId}:${request.id}:${accepted.id}`}
             viewer={viewer} requestId={request.id} orderId={accepted.id} ready={metadataAvailable && active && connected}
             reviewComplete={!!orderState?.payment?.confirmedAt} onSubmitted={async () => { await state.refetch(); if (canRead()) await reconcileOrder(); }} />}
-          {accepted && orderState && !recovery?.missedAt && <VinCorrection key={`correction:${userId}:${sessionId}:${request.id}`} state={orderState}
+          {accepted && orderState && (!recovery?.missedAt || recovery.status === "agreed" && !!orderState.agreement?.pending) && <VinCorrection key={`correction:${userId}:${sessionId}:${request.id}`} state={orderState}
             storageKey={`carberk.history.vin-correction.v1:${userId}:${request.id}`} stream={stream}
             enabled={ready && active && connected && !state.isFetching && !state.error} current={current}
             reconcile={async () => { const result = await state.refetch(); if (result.error) throw result.error; if (canRead()) await reconcileOrder(); }} />}

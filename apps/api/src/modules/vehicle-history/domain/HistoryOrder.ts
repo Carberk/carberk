@@ -21,6 +21,7 @@ export interface HistoryAgreementWrite {
 export interface HistoryFulfilmentWrite {
   input: H.HistoryFulfilmentMutation | { kind: "recovery_format"; attemptKey: string; format: H.HistoryFulfilmentView["accepted"]["format"] };
   state: H.HistoryFulfilmentIntent; actorId: string; assignmentVersion: number;
+  recoveryQuotaProvider?: HistoryProvider | null;
 }
 export type HistoryRecoveryCommand = H.HistoryOperatorRecovery | H.HistoryRecoveryDecision;
 

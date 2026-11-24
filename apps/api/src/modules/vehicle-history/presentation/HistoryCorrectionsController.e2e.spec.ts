@@ -80,8 +80,8 @@ describe("renewed VIN agreement on the existing private order", () => {
   async function pay(e: Awaited<ReturnType<typeof accepted>>) {
     await f.request.post(`${e.staff}/payment-verification`).auth(e.operator.token, { type: "bearer" }).send({
       attemptKey: randomUUID(), orderId: e.id, expectedAssignmentVersion: 1, expectedPaymentVersion: 0,
-      walletChecked: true, outcome: "matched", amountMinor: 10000, reference: "SYNTHETIC-VH12-REFERENCE",
-      evidence: "Synthetic independent wallet ledger", evidenceFileId: null, receivedAt: "2026-11-21T05:00:00.000Z",
+      walletChecked: true, outcome: "matched", amountMinor: 10000, reference: `SYNTHETIC-VH12-${e.id}`,
+      evidence: "Synthetic independent wallet ledger", evidenceFileId: null, receivedAt: f.app.get<HistoryClock>(HISTORY_CLOCK).now().toISOString(),
     }).expect(201);
   }
   function fulfil(e: Awaited<ReturnType<typeof accepted>>, input: object, token = e.operator.token) {
@@ -149,6 +149,84 @@ describe("renewed VIN agreement on the existing private order", () => {
   });
   const reviewInput = (format = "pdf", expectedVersion = 1) => ({ kind: "review", attemptKey: randomUUID(),
     expectedVersion, expectedAssignmentVersion: 1, cause: "customer_correction", format });
+  async function agreeRecovery(e: Awaited<ReturnType<typeof accepted>>, format: string) {
+    const { body: { recovery } } = await e.read().expect(200);
+    return (await f.request.post(`${e.path}/recovery`).auth(e.customer.token, { type: "bearer" }).send({
+      kind: "accept", orderId: e.id, expectedVersion: recovery.version, attemptKey: randomUUID(), deadline: recovery.offeredDeadline, format,
+    }).expect(201)).body;
+  }
+  const operatorOrder = (e: Awaited<ReturnType<typeof accepted>>) =>
+    f.request.get(`${e.staff}/order?expectedAssignmentVersion=1`).auth(e.operator.token, { type: "bearer" });
+
+  it("resolves an existing VIN correction inside the agreed recovery while preserving the paid promise", async () => {
+    const e = await accepted("both");
+    await pay(e);
+    expect((await e.change({ kind: "request", vin: "DEMA0000000000006", expectedVersion: 0, attemptKey: randomUUID() }).expect(201)).body)
+      .toMatchObject({ pending: { vin: "DEMA0000000000006" } });
+    const outdated = (await e.review(reviewInput("link")).expect(201)).body.pending.review.offer;
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:00:00.000Z");
+    await agreeRecovery(e, "both");
+    await e.change({ kind: "accept", offer: outdated, expectedVersion: 2, attemptKey: randomUUID() }).expect(409);
+    const reviewed = (await e.review(reviewInput("both", 2)).expect(201)).body;
+    await e.change({ kind: "accept", offer: reviewed.pending.review.offer, expectedVersion: 3, attemptKey: randomUUID() }).expect(201);
+    const current = (await e.read().expect(200)).body;
+    expect(current).toMatchObject({ agreement: { acceptedRevision: 4, pending: null }, recovery: {
+      status: "agreed", originalFormat: "both", originalPromiseBy: "2026-11-21T07:00:00.000Z", agreedDeadline: "2026-11-21T08:00:00.000Z",
+    }, order: { id: e.id, acceptedOffer: { vin: "DEMA0000000000006", proposal: { format: "both" } } } });
+    await fulfil(e, { ...start(e, "both", "new_source"), acceptedRevision: 4, vin: "DEMA0000000000006", provider: "AutoCheck" }).expect(201);
+  });
+
+  it("charges overnight recovery lookups to the current provider quota under concurrent admission", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 3);
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { allowance: 3, resetUtc: "00:00", externalUsage: {} } });
+    const first = await accepted("pdf", undefined, ["2026-11-21T14:20:00.000Z", "2026-11-21T14:35:00.000Z"]);
+    const second = await accepted("pdf", undefined, ["2026-11-21T14:35:00.000Z", "2026-11-21T14:50:00.000Z"]);
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    await pay(first);
+    await pay(second);
+    clock.now = () => new Date("2026-11-21T14:50:00.000Z");
+    expect((await agreeRecovery(first, "pdf")).agreedDeadline).toBe("2026-11-22T04:50:00.000Z");
+    await agreeRecovery(second, "pdf");
+    clock.now = () => new Date("2026-11-22T04:10:00.000Z");
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { allowance: 3, resetUtc: "00:00", externalUsage: { "2026-11-22": 3 } } });
+    expect((await operatorOrder(first).expect(200)).body.fulfilment.sources).not.toContain("new_source");
+    await fulfil(first, start(first, "pdf", "new_source")).expect(409)
+      .expect(({ body }) => expect(body.code).toBe("HISTORY_ORDER_CAPACITY"));
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", { Carfax: { allowance: 3, resetUtc: "00:00", externalUsage: { "2026-11-22": 2 } } });
+    f.concurrent(2);
+    const results = await Promise.all([first, second].map((e) =>
+      fulfil(e, start(e, "pdf", "new_source")).set("x-history-concurrency", "1")));
+    expect(results.map((response) => response.status).sort()).toEqual([201, 409]);
+    const [admitted, waiting] = results[0]?.status === 201 ? [first, second] : [second, first];
+    await fulfil(admitted, outcome(admitted, 1, { kind: "uncertain" })).expect(201);
+    await fulfil(waiting, start(waiting, "pdf", "new_source")).expect(409);
+    await fulfil(admitted, outcome(admitted, 2, { kind: "not_started" }, "reconcile")).expect(201);
+    await fulfil(waiting, start(waiting, "pdf", "new_source")).expect(201);
+  });
+
+  it("prioritizes an older actionable company correction once its recovery is agreed", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 2);
+    const older = await accepted("pdf");
+    await pay(older);
+    await fulfil(older, start(older, "pdf", "new_source")).expect(201);
+    await fulfil(older, outcome(older, 1, { kind: "company_error" })).expect(201);
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-21T05:01:00.000Z");
+    const newer = await accepted("pdf", older.operator, ["2026-11-21T07:15:00.000Z", "2026-11-21T08:15:00.000Z"]);
+    await pay(newer);
+    clock.now = () => new Date("2026-11-21T07:00:00.000Z");
+    expect((await operatorOrder(newer).expect(200)).body.fulfilment.gate).toBe("ready");
+    await agreeRecovery(older, "pdf");
+    expect((await operatorOrder(newer).expect(200)).body.fulfilment.gate).toBe("fifo");
+    const newerProvider = (await operatorOrder(newer).expect(200)).body.fulfilment.accepted.provider;
+    const newerStart = { ...start(newer, "pdf", "new_source"), provider: newerProvider };
+    await fulfil(newer, newerStart).expect(409).expect(({ body }) => expect(body.code).toBe("HISTORY_FULFILMENT_FIFO"));
+    await fulfil(older, { kind: "company_correction", orderId: older.id, expectedAssignmentVersion: 1,
+      expectedVersion: 2, attemptKey: randomUUID() }).expect(201);
+    await fulfil(older, outcome(older, 3, { kind: "obtained", format: "pdf", originalReportDate: "2026-10-14", permittedUse: true })).expect(201);
+    await fulfil(newer, newerStart).expect(201);
+  });
+
   it("lets a paid pre-reservation order renew its agreement without changing its hold or payment", async () => {
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_DAILY_STAFF_SLOTS", 2);
     const e = await accepted("both", undefined, undefined, true);

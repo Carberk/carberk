@@ -5,6 +5,7 @@ import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessage
 import { HistoryCapacity } from "./HistoryCapacity";
 import { HISTORY_PREFLIGHT, normalizeHistoryVin, type HistoryPreflightPort } from "../domain/HistoryOffer";
 import { bookedPayment, historyAgreement, historyBookingWindow } from "../domain/HistoryOrder";
+import { historyDeliveryDeadline } from "../domain/HistoryRecovery";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
@@ -36,8 +37,12 @@ export class HistoryCorrections {
       if (previous.handoff) throw new HistoryRequestError("HISTORY_CORRECTION_CLOSED");
       if (previous.version !== input.expectedVersion || previous.version === 2147483647) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
       return orders.serialize(async () => {
+        const confirmedBefore = bookedPayment(order, await orders.paymentChecks())?.confirmedAt ?? null;
+        const recovery = confirmedBefore ? await orders.recovery() : null;
+        const recovering = recovery?.status === "agreed";
+        const deadline = historyDeliveryDeadline(order, recovery);
         const now = this.clock.now(), at = now.toISOString(), version = previous.version + 1;
-        if (now >= new Date(historyBookingWindow(order).deliveryBy) && bookedPayment(order, await orders.paymentChecks())) {
+        if (confirmedBefore && (!deadline || now >= deadline || recovering && input.kind === "request")) {
           throw new HistoryRequestError("HISTORY_CORRECTION_CLOSED");
         }
         let state: H.HistoryCorrectionState = { ...previous, version };
@@ -47,19 +52,22 @@ export class HistoryCorrections {
           state = { ...state, pending: { vin: input.vin, requestedAt: at, review: null } };
         } else if (input.kind === "review") {
           if (!previous.pending) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
+          if (recovering && input.format !== recovery.originalFormat) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
           const preflight = await this.preflight.check(previous.pending.vin);
-          if (preflight?.status === "available") await this.capacity.correctionProvider(orders, order, preflight, now);
+          if (preflight?.status === "available") await this.capacity.correctionProvider(orders, order, preflight, now, undefined, recovering);
           const offer = { version, vin: previous.pending.vin, preflight, synthetic: true as const,
             proposal: preflight?.status === "available" ? { ...order.acceptedOffer.proposal, ...historyBookingWindow(order), format: input.format } : null };
           state = { ...state, pending: { ...previous.pending, review: { offer, cause: input.cause } } };
         } else {
           const review = previous.pending?.review;
           if (!review || !isDeepStrictEqual(review.offer, input.offer)) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
-          const confirmedBefore = bookedPayment(order, await orders.paymentChecks())?.confirmedAt ?? null;
-          provider = await this.capacity.correctionProvider(orders, order, input.offer.preflight, now, { confirmedBefore });
+          if (recovering && input.offer.proposal.format !== recovery.originalFormat) throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
+          const selected = await this.capacity.correctionProvider(orders, order, input.offer.preflight, now, { confirmedBefore }, recovering);
+          if (!recovering) provider = selected;
           state = { ...state, pending: null, acceptedRevision: version,
             accepted: [...previous.accepted, { revision: version, offer: input.offer, acceptedAt: at, cause: review.cause }] };
         }
+        if (confirmedBefore && deadline && this.clock.now() >= deadline) throw new HistoryRequestError("HISTORY_CORRECTION_CLOSED");
         await orders.saveAgreement({ input, state, provider, actorId, assignmentVersion: participant.assignmentVersion, recordedAt: at });
         return state;
       });

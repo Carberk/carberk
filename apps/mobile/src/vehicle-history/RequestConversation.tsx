@@ -18,6 +18,7 @@ import { StopReminders } from "./StopReminders";
 import { useHistoryReply } from "./useHistoryReply";
 import { useRequestConversation } from "./useRequestConversation";
 import { DeliveredReport } from "./DeliveredReport";
+import { PromiseRecovery } from "./PromiseRecovery";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,6 +223,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     ListHeaderComponent={<View className="gap-4 pb-3">
       {!denied && delivered && <DeliveredReport viewer={viewer} requestId={request.id}
         active={thread.active} online={thread.connected} ready={metadataCurrent} openComposer={() => composer.current?.focus()} />}
+      {!denied && delivered && thread.active && !thread.order.error && thread.order.data?.recovery &&
+        <PromiseRecovery recovery={thread.order.data.recovery} delivered />}
       {!thread.order.data?.recovery && header}
       {!denied && !delivered && <OfferPreview viewer={viewer} request={request} ready={metadataCurrent} metadataAvailable={metadataAvailable}
         recoveryVersion={thread.order.data?.recovery?.version}
