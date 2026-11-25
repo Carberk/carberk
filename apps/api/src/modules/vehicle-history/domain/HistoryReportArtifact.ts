@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
-import type { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
+import type { HistoryOfferSchemas as O, HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
+import { coversHistoryFormat } from "./HistoryFulfilment";
+import { HistoryRequestError } from "./HistoryRequestError";
 
 export interface HistoryReportOriginal {
   artifact: R.HistoryReportArtifact;
   sha256: string | null;
   link: string | null;
+  archiveSourceId?: string | null;
 }
 
 export interface StagedHistoryReport extends HistoryReportOriginal {
@@ -16,11 +19,30 @@ export interface StagedHistoryReport extends HistoryReportOriginal {
 }
 
 export interface HistoryReportStore {
+  archive(vin: string, selectedId?: string): Promise<R.HistoryArchiveItem[]>;
+  archiveOriginal(id: string, vin: string): Promise<(StagedHistoryReport & { requestId: string }) | null>;
+  selectedArchiveId(): Promise<string | null>;
+  previousPurchase(requesterId: string, vin: string): Promise<R.HistoryPreviousPurchase>;
   find(intentVersion: number): Promise<StagedHistoryReport | null>;
   delivered(orderId: string): Promise<StagedHistoryReport | null>;
   stage(target: R.HistoryReportTarget, report: HistoryReportOriginal, actorId: string): Promise<void>;
   validate(intentVersion: number, actorId: string, assignmentVersion: number, now: Date): Promise<void>;
   deliver(target: R.DeliverHistoryReport, actorId: string, now: Date): Promise<void>;
+}
+
+export async function checkHistoryArchiveQuote(
+  store: HistoryReportStore, vin: string, reports: Extract<NonNullable<O.HistoryOffer["preflight"]>, { status: "available" }>,
+  format: R.HistoryReportArtifact["format"],
+) {
+  if (!reports.archiveFormat) return;
+  const id = await store.selectedArchiveId();
+  const original = id && await store.archiveOriginal(id, vin);
+  const provider = reports.providers[0];
+  if (!original || reports.providers.length !== 1 || original.artifact.report.provider !== provider?.name
+    || original.artifact.report.originalReportDate !== provider.originalReportDate
+    || original.artifact.format !== reports.archiveFormat || !coversHistoryFormat(format, original.artifact.format)) {
+    throw new HistoryRequestError("HISTORY_OFFER_CONFLICT");
+  }
 }
 
 export const HISTORY_REPORT_ORIGINALS = Symbol("HISTORY_REPORT_ORIGINALS");

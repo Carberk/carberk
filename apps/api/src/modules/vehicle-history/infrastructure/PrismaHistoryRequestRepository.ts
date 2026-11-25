@@ -1,12 +1,18 @@
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "@auto-tm/db";
+import { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
 import { type HistoryRequest, type HistoryRequestRepository } from "../domain/HistoryRequestRepository";
 
 const select = { id: true, sourceListingId: true, createdAt: true, assignedOperatorId: true, assignmentVersion: true } as const;
-const readerSelect = { ...select, order: { select: { reportArtifacts: { where: { deliveredAt: { not: null } }, select: { id: true }, take: 1 } } } } as const;
-function forReader({ order, ...request }: HistoryRequest & { order: { reportArtifacts: { id: string }[] } | null }): HistoryRequest {
-  return order?.reportArtifacts.length ? { ...request, reportReady: true } : request;
+const readerSelect = { ...select, order: { select: { reportArtifacts: { where: { deliveredAt: { not: null } }, select: { artifact: true }, take: 1 } } } } as const;
+function forReader({ order, ...request }: HistoryRequest & { order: { reportArtifacts: { artifact: unknown }[] } | null }): HistoryRequest {
+  const row = order?.reportArtifacts[0];
+  if (!row) return request;
+  const parsed = R.HistoryReportArtifactSchema.safeParse(row.artifact);
+  if (!parsed.success) return { ...request, reportReady: true };
+  const { format, report: { vin, provider, originalReportDate } } = parsed.data;
+  return { ...request, reportReady: true, purchasedReport: { format, vin, provider, originalReportDate } };
 }
 @Injectable()
 export class PrismaHistoryRequestRepository implements HistoryRequestRepository {

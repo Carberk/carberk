@@ -71,6 +71,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   let origin: string;
   let received: string[];
   let linkAvailable: boolean;
+  let linkRequirement: "login" | "payment" | "operator" | undefined;
   let beforeServingReport: (() => Promise<void>) | undefined;
   let certificate: Buffer;
   beforeAll(async () => {
@@ -95,7 +96,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       ]);
       server = createServer({ key: readFileSync(key), cert: certificate }, async (req, res) => {
         received.push(req.url ?? "");
-        const scenario = new URL(req.url ?? "/", "https://127.0.0.1").searchParams.get("scenario");
+        const scenario = linkRequirement ?? new URL(req.url ?? "/", "https://127.0.0.1").searchParams.get("scenario");
         if (req.headers.authorization || req.headers.cookie) { res.writeHead(500).end(); return; }
         if (scenario === "login") { res.writeHead(302, { location: "/login" }).end(); return; }
         if (scenario === "payment") { res.writeHead(402).end(); return; }
@@ -114,6 +115,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   beforeEach(async () => {
     received = [];
     linkAvailable = true;
+    linkRequirement = undefined;
     beforeServingReport = undefined;
     f = await historyFixture((config) => {
       config.set("VEHICLE_HISTORY_SYNTHETIC_WALLET", "SYNTHETIC-VH14-NO-TRANSFER");
@@ -138,7 +140,8 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   });
 
   async function obtained(format: "pdf" | "link" | "both", vin = facts.vin, options: {
-    lateReceipt?: boolean; operator?: Awaited<ReturnType<typeof f.actor>>; laterWindow?: boolean; closeOfDay?: boolean; outcome?: object;
+    lateReceipt?: boolean; operator?: Awaited<ReturnType<typeof f.actor>>; laterWindow?: boolean; closeOfDay?: boolean;
+    outcome?: object; source?: "archive" | "new_source"; archiveId?: string;
   } = {}) {
     const { lateReceipt, laterWindow } = options;
     const operator = options.operator ?? await f.actor(), customer = await f.actor(null);
@@ -148,8 +151,12 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     const operatorHttp = (path: string) => f.request.post(work + path).auth(operator.token, { type: "bearer" });
     const expectedAssignmentVersion = 1;
     await operatorHttp("/claim").send({ expectedAssignmentVersion: 0 }).expect(201);
-    const checked = (await operatorHttp("/offer").send({ kind: "check", vin, expectedVersion: 0, expectedAssignmentVersion }).expect(201)).body;
-    const offer = (await operatorHttp("/offer").send({ kind: "propose", format, expectedVersion: 1, expectedAssignmentVersion,
+    const check = { kind: "check", vin, expectedAssignmentVersion };
+    const available = (await operatorHttp("/offer").send({ ...check, expectedVersion: 0 }).expect(201)).body;
+    const checked = options.archiveId ? (await operatorHttp("/offer").send({
+      ...check, expectedVersion: 1, archiveId: options.archiveId,
+    }).expect(201)).body : available;
+    const offer = (await operatorHttp("/offer").send({ kind: "propose", format, expectedVersion: checked.version, expectedAssignmentVersion,
       deliveryFrom: options.closeOfDay ? "2026-11-21T13:30:00.000Z" : laterWindow ? "2026-11-21T07:00:00.000Z" : "2026-11-21T06:00:00.000Z",
       deliveryBy: options.closeOfDay ? "2026-11-21T14:30:00.000Z" : laterWindow ? "2026-11-21T08:00:00.000Z" : "2026-11-21T07:00:00.000Z" }).expect(201)).body;
     const orderId = (await customerHttp(`${root}/requests/${id}/order`).send({ offer }).expect(201)).body.order.id as string;
@@ -169,7 +176,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     const intentId = randomUUID(), acceptedRevision = 0;
     const provider = checked.preflight.providers[0].name;
     await operatorHttp("/fulfilment").send({ kind: "start", orderId, expectedAssignmentVersion, expectedVersion: 0, attemptKey: intentId,
-      acceptedRevision, vin, format, provider, source: "new_source" }).expect(201);
+      acceptedRevision, vin, format, provider, source: options.source ?? "new_source" }).expect(201);
     const record = (outcome: object, expectedVersion = 1) => operatorHttp("/fulfilment").send({ kind: "record", orderId,
       expectedAssignmentVersion, expectedVersion, attemptKey: randomUUID(), outcome });
     const target = { orderId, expectedAssignmentVersion, intentId, intentVersion: 2, acceptedRevision };
@@ -182,6 +189,176 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     await record(options.outcome ?? { kind: "obtained", format, originalReportDate, permittedUse: true }).expect(201);
     return { id, work, customer, operator, target, path, record, validate, read, deliver, offer };
   }
+
+  it("shows only permitted exact-VIN archive metadata for a currently assigned request", async () => {
+    const original = await obtained("pdf");
+    const saved = (await original.validate({ pdf: (await document()).pdf }).expect(201)).body;
+    await original.deliver(saved.artifact.id).expect(201);
+    const operator = await f.actor(), customer = await f.actor(null);
+    const { body: { id } } = await f.request.post(`${root}/requests`).auth(customer.token, { type: "bearer" })
+      .send({ attemptKey: randomUUID() }).expect(201);
+    const work = `${root}/operator/requests/${id}`;
+    await f.request.post(work + "/claim").auth(operator.token, { type: "bearer" }).send({ expectedAssignmentVersion: 0 }).expect(201);
+    await f.request.post(work + "/offer").auth(operator.token, { type: "bearer" })
+      .send({ kind: "check", vin: facts.vin, expectedVersion: 0, expectedAssignmentVersion: 1 }).expect(201);
+    const search = (token: string, query: object = {}) => f.request.get(`${work}/report-archive`)
+      .auth(token, { type: "bearer" }).query({ vin: "dema 0000000000001", expectedAssignmentVersion: 1, ...query });
+    await search(operator.token).expect(200).expect(({ headers, body }) => {
+      expect(headers["cache-control"]).toBe("private, no-store");
+      expect(body).toEqual({ items: [{ id: saved.artifact.id, vin: facts.vin, provider: "Carfax", format: "pdf",
+        originalReportDate: "2026-10-14", language: "ru" }] });
+    });
+    await search(original.operator.token).expect(403);
+    await search(operator.token, { expectedAssignmentVersion: 0 }).expect(409);
+    await search(operator.token, { vin: "DEMA0000000000006" }).expect(200, { items: [] });
+  });
+
+  it.each(["pdf", "link", "both"] as const)("associates an original with a later accepted %s promise", async (format) => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {
+      Carfax: { allowance: 12, resetUtc: "00:00", externalUsage: {} },
+      AutoCheck: { allowance: 8, resetUtc: "00:00", externalUsage: {} },
+    });
+    const original = await obtained("both");
+    const { pdf, bytes } = await document();
+    const link = origin + "/report/" + facts.reportId + "?share=Synthetic%2fFixture";
+    const filename = "Previous Buyer Synthetic - private upload.pdf";
+    const first = (await original.validate({ pdf: { ...pdf, filename }, link }).expect(201)).body.artifact.id;
+    await original.deliver(first).expect(201);
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    const later = await obtained(format, facts.vin, { laterWindow: true, source: "archive" });
+    f.concurrent(2);
+    const [firstUse, secondUse] = await Promise.all([
+      later.validate({ archiveId: first }).set("x-history-concurrency", "1").expect(201),
+      later.validate({ archiveId: first }).set("x-history-concurrency", "1").expect(201),
+    ]);
+    expect(secondUse.body).toEqual(firstUse.body);
+    expect(firstUse.body).toMatchObject({ status: "validated", artifact: { format, source: "archive", report: facts } });
+    expect(firstUse.body.artifact.id).not.toBe(first);
+    await later.deliver(firstUse.body.artifact.id).expect(201);
+    const get = (id: string, token: string, asset: string, artifactId = firstUse.body.artifact.id) => f.request
+      .get(`${root}/requests/${id}/report/${artifactId}/${asset}`).auth(token, { type: "bearer" });
+    await get(original.id, later.customer.token, "pdf", first).expect(403);
+    await get(later.id, original.customer.token, "pdf").expect(403);
+    if (format !== "link") {
+      const purchaser = (id: string, token: string) => f.request.get(`${root}/requests/${id}/report`).auth(token, { type: "bearer" });
+      expect(firstUse.body.artifact.pdf.filename).toBe("vehicle-history.pdf");
+      await later.read().expect(200).expect(({ body }) => expect(body.artifact.pdf.filename).toBe("vehicle-history.pdf"));
+      await purchaser(later.id, later.customer.token).expect(200)
+        .expect(({ body }) => expect(body.artifact.pdf.filename).toBe("vehicle-history.pdf"));
+      await purchaser(original.id, original.customer.token).expect(200)
+        .expect(({ body }) => expect(body.artifact.pdf.filename).toBe(filename));
+      expect(Buffer.from((await get(later.id, later.customer.token, "pdf").expect(200)).body.dataBase64, "base64")).toEqual(bytes);
+    }
+    if (format !== "pdf") await get(later.id, later.customer.token, "link").expect(200, { address: link });
+  });
+
+  it("discloses the selected original date before payment when new lookup had no report date", async () => {
+    const vin = "DEMA0000000000006";
+    const original = await obtained("pdf", vin);
+    const saved = (await original.validate({ pdf: (await document({ vin, provider: "AutoCheck" })).pdf }).expect(201)).body;
+    await original.deliver(saved.artifact.id).expect(201);
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    const later = await obtained("pdf", vin, { laterWindow: true, source: "archive", archiveId: saved.artifact.id });
+    expect(later.offer.preflight).toEqual({ status: "available", archiveFormat: "pdf",
+      providers: [{ name: "AutoCheck", originalReportDate: "2026-10-14" }] });
+    expect(JSON.stringify(later.offer)).not.toContain(saved.artifact.id);
+    await later.validate({ archiveId: saved.artifact.id }).expect(201);
+  });
+
+  it.each(["login", "payment", "operator"] as const)("refuses an archived link that now requires %s", async (requirement) => {
+    const original = await obtained("link");
+    const { body: { artifact } } = await original.validate({ link: origin + "/report/" + facts.reportId }).expect(201);
+    await original.deliver(artifact.id).expect(201);
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-21T05:01:00.000Z");
+    const later = await obtained("link", facts.vin, { laterWindow: true, source: "archive", archiveId: artifact.id });
+    const path = `${root}/requests/${later.id}`;
+    linkRequirement = requirement;
+    await later.validate({ archiveId: artifact.id }).expect(422)
+      .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_LINK"));
+    await f.request.get(path + "/report").auth(later.customer.token, { type: "bearer" }).expect(200, { status: "empty" });
+    clock.now = () => new Date("2026-11-21T08:00:00.000Z");
+    await f.app.get(HistoryRecoveryWorker).execute();
+    await f.request.get(path + "/order").auth(later.customer.token, { type: "bearer" }).expect(200)
+      .expect(({ body }) => expect(body.recovery).toMatchObject({
+        status: "offered", originalFormat: "link", originalPromiseBy: "2026-11-21T08:00:00.000Z", failure: "file_delivery",
+      }));
+  });
+
+  it("rechecks archive rights and assignment before associating a previously found artifact", async () => {
+    const original = await obtained("pdf");
+    const { body: { artifact } } = await original.validate({ pdf: (await document()).pdf }).expect(201);
+    await original.deliver(artifact.id).expect(201);
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    const later = await obtained("pdf", facts.vin, { laterWindow: true, source: "archive", archiveId: artifact.id });
+    const lookup = () => f.request.get(later.work + "/report-archive").auth(later.operator.token, { type: "bearer" })
+      .query({ vin: facts.vin, expectedAssignmentVersion: 1 });
+    await lookup().expect(200).expect(({ body }) => expect(body.items[0].id).toBe(artifact.id));
+    await later.validate({ archiveId: artifact.id, expectedAssignmentVersion: 0 }).expect(409);
+    await later.validate({ archiveId: artifact.id }, original.operator.token).expect(403);
+    await f.prisma.historyReportArtifact.update({ where: { id: artifact.id },
+      data: { artifact: { ...artifact, report: { ...artifact.report, permittedUse: false } } } });
+    await lookup().expect(200, { items: [] });
+    await later.validate({ archiveId: artifact.id }).expect(422)
+      .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
+    await later.read().expect(200, { status: "empty" });
+  });
+
+  it("requires a new agreement to use the PDF alone when an archived pair loses its link", async () => {
+    const original = await obtained("both");
+    const { pdf, bytes } = await document();
+    const { body: { artifact } } = await original.validate({ pdf, link: origin + "/report/" + facts.reportId }).expect(201);
+    await original.deliver(artifact.id).expect(201);
+    const clock = f.app.get<HistoryClock>(HISTORY_CLOCK);
+    clock.now = () => new Date("2026-11-21T05:01:00.000Z");
+    const later = await obtained("both", facts.vin, { laterWindow: true, source: "archive", archiveId: artifact.id });
+    linkAvailable = false;
+    await later.validate({ archiveId: artifact.id }).expect(422);
+    const path = `${root}/requests/${later.id}`;
+    const { orderId } = later.target;
+    const customer = (route: string) => f.request.get(path + route).auth(later.customer.token, { type: "bearer" });
+    await customer("/report").expect(200, { status: "empty" });
+    clock.now = () => new Date("2026-11-21T08:00:00.000Z");
+    await f.app.get(HistoryRecoveryWorker).execute();
+    const { body: { recovery } } = await customer("/order").expect(200);
+    const proposed = (await f.request.post(later.work + "/recovery").auth(later.operator.token, { type: "bearer" }).send({
+      kind: "propose_format", orderId, expectedVersion: recovery.version, expectedAssignmentVersion: 1,
+      attemptKey: randomUUID(), format: "pdf",
+    }).expect(201)).body;
+    await customer("/report").expect(200, { status: "empty" });
+    await f.request.post(path + "/recovery").auth(later.customer.token, { type: "bearer" }).send({
+      kind: "accept", orderId, expectedVersion: proposed.version, attemptKey: randomUUID(),
+      format: "pdf", deadline: recovery.offeredDeadline,
+    }).expect(201);
+    await later.validate({ archiveId: artifact.id }).expect(409);
+    const { body: { artifact: replacement } } = await later.validate({ archiveId: artifact.id, intentVersion: 3 }).expect(201);
+    await later.deliver(replacement.id, later.operator.token, 3).expect(201);
+    await customer("/report").expect(200).expect(({ body }) => expect(body.artifact.format).toBe("pdf"));
+    const served = await customer(`/report/${replacement.id}/pdf`).expect(200);
+    expect(Buffer.from(served.body.dataBase64, "base64")).toEqual(bytes);
+    await customer(`/report/${replacement.id}/link`).expect(409);
+  });
+
+  it("finds a previous delivered purchase only for its requester and exact VIN", async () => {
+    const original = await obtained("pdf");
+    const saved = (await original.validate({ pdf: (await document()).pdf }).expect(201)).body;
+    await original.deliver(saved.artifact.id).expect(201);
+    const other = await f.actor(null);
+    async function newRequest(token: string) {
+      return (await f.request.post(`${root}/requests`).auth(token, { type: "bearer" })
+        .send({ attemptKey: randomUUID() }).expect(201)).body.id as string;
+    }
+    const self = await newRequest(original.customer.token), unrelated = await newRequest(other.token);
+    const previous = (id: string, token: string, vin = "dema0000000000001") => f.request.get(`${root}/requests/${id}/previous-purchase`)
+      .auth(token, { type: "bearer" }).query({ vin });
+    await previous(self, original.customer.token).expect(200, { previous: {
+      requestId: original.id, vin: facts.vin, format: "pdf", provider: "Carfax", originalReportDate: "2026-10-14",
+    } });
+    await previous(self, original.customer.token, "DEMA0000000000006").expect(200, { previous: null });
+    await previous(unrelated, other.token).expect(200, { previous: null });
+    await previous(self, other.token).expect(403);
+    await previous(original.id, original.customer.token).expect(200, { previous: null });
+  });
 
   it.each(["pdf", "link", "both"] as const)("validates the accepted %s formats and preserves only the applicable originals", async (format) => {
     const e = await obtained(format);

@@ -182,6 +182,7 @@ model VehicleHistoryRequest {
   privateNotes       HistoryPrivateNote[]
   offer              Json?
   order              HistoryOrder?
+  selectedArchiveId  String? @db.Uuid
 
   waitingReason          String?
   waitingSince           DateTime? @db.Timestamptz(3)
@@ -313,6 +314,7 @@ model HistoryReportArtifact {
   artifact                  Json
   sha256                    String?
   link                      String?
+  archiveSourceId           String? @db.Uuid
   stagedBy                  String
   stagedAt                  DateTime @default(now()) @db.Timestamptz(3)
   validatedBy               String?
@@ -323,6 +325,8 @@ model HistoryReportArtifact {
   deliveredAssignmentVersion Int?
   order HistoryOrder @relation(fields: [requestId, orderId], references: [requestId, id], onDelete: Restrict, onUpdate: NoAction)
   intent HistoryFulfilmentEvent @relation(fields: [requestId, intentVersion], references: [requestId, version], onDelete: Restrict, onUpdate: NoAction)
+  archiveSource HistoryReportArtifact? @relation("HistoryArchiveReuse", fields: [archiveSourceId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  archiveUses HistoryReportArtifact[] @relation("HistoryArchiveReuse")
 
   @@unique([requestId, intentVersion])
   @@map("history_report_artifacts")

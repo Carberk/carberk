@@ -15,30 +15,36 @@ const errors = {
   HISTORY_REPORT_LINK: "linkInvalid", HISTORY_REPORT_RIGHTS: "rightsInvalid",
 } as const;
 type Failure = "expired" | "stale" | "denied" | "conflict" | "unavailable" | "invalid" | (typeof errors)[keyof typeof errors];
-type Result = { status: "ok"; view: R.HistoryReportView } | { status: "preview"; dataBase64: string } | { status: Failure };
+type Result = { status: "ok"; view: R.HistoryReportView } | { status: "preview"; dataBase64: string }
+  | { status: "archive"; items: R.HistoryArchiveItem[] } | { status: Failure };
 
-export async function historyReportAction(locale: DeskLocale, selection: unknown, action: "read" | "validate" | "preview" | "deliver", value: unknown): Promise<Result> {
+export async function historyReportAction(locale: DeskLocale, selection: unknown, action: "read" | "validate" | "preview" | "deliver" | "archive", value: unknown): Promise<Result> {
   await rejectExpiredSession();
   const selected = Selection.safeParse(selection);
-  const input = (action === "validate" ? R.ValidateHistoryReportSchema
+  const input = (action === "archive" ? R.HistoryArchiveTargetSchema : action === "validate" ? R.ValidateHistoryReportSchema
     : action === "deliver" ? R.DeliverHistoryReportSchema : R.HistoryReportTargetSchema).safeParse(value);
   if (!selected.success || !input.success || !["en", "ru", "tk"].includes(locale) ||
-    !["read", "validate", "preview", "deliver"].includes(action)) return { status: "invalid" };
+    !["read", "validate", "preview", "deliver", "archive"].includes(action)) return { status: "invalid" };
   const token = await getAccessToken();
   const binding = token ? historyInboxScope(token) : null;
   if (!token || !binding) return { status: "expired" };
   if (binding.scope !== selected.data.scope) return { status: "stale" };
 
-  const base = `/vehicle-history/operator/requests/${selected.data.id}/report-artifacts`;
-  const query = new URLSearchParams(Object.entries(R.HistoryReportTargetSchema.strip().parse(input.data))
-    .map(([key, value]) => [key, String(value)]));
+  const base = `/vehicle-history/operator/requests/${selected.data.id}`;
   const options = { cache: "no-store", headers: { "Accept-Language": locale } } as const;
   try {
     const write = action === "validate" || action === "deliver";
-    const path = action === "deliver" ? base + "/deliver" : write ? base : `${base}${action === "preview" ? "/content" : ""}?${query}`;
+    const lookup = action === "archive" ? input.data : write ? {} : R.HistoryReportTargetSchema.strip().parse(input.data);
+    const query = new URLSearchParams(Object.entries(lookup).map(([key, value]) => [key, String(value)]));
+    const path = action === "archive" ? `${base}/report-archive?${query}`
+      : `${base}/report-artifacts${action === "deliver" ? "/deliver" : action === "preview" ? "/content" : ""}${write ? "" : `?${query}`}`;
     const response = await apiFetchOptional<unknown>(path, write ? { ...options, method: "POST", body: input.data } : options, token);
     if (token !== await getAccessToken()) return { status: "stale" };
     if (response === null) return { status: "expired" };
+    if (action === "archive") {
+      const archive = R.HistoryArchiveSchema.safeParse(response);
+      return archive.success ? { status: "archive", items: archive.data.items } : { status: "unavailable" };
+    }
     if (action === "preview") {
       const content = R.HistoryReportContentSchema.safeParse(response);
       return content.success ? { status: "preview", dataBase64: content.data.dataBase64 } : { status: "unavailable" };

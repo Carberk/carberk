@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, AppState, Keyboard, View } from "react-native";
+import { router } from "expo-router";
 import { focusManager, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { HistoryOrderSchemas as H, type VehicleHistorySchemas as V } from "@auto-tm/contracts";
+import { HistoryOrderSchemas as H, type HistoryReportArtifactSchemas as R, type VehicleHistorySchemas as V } from "@auto-tm/contracts";
 
 import { historyTranscript } from "../api/vehicle-history/messages";
 import { queryKeys } from "../api/queryKeys";
@@ -21,13 +22,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, orderReadError, reconcileOrder }: {
+export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, orderReadError, reconcileOrder, revealRepeat }: {
   viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; metadataAvailable: boolean;
   active: boolean; connected: boolean; recoveryVersion?: number | undefined; orderReadError: unknown; reconcileOrder: () => Promise<unknown>;
+  revealRepeat: (view: View, current: () => boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
-  const [vin, setVin] = useState(""), [saving, setSaving] = useState(false), [failed, setFailed] = useState(false);
+  const [vin, setVin] = useState(""), [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState<"denied" | "error" | null>(null);
+  const [repeat, setRepeat] = useState<{ vin: string; generation: number; version: number;
+    purchase: NonNullable<R.HistoryPreviousPurchase["previous"]> } | null>(null);
+  const repeatPrompt = useRef<View>(null);
   const [expanded, setExpanded] = useState(false);
   const [orderFailure, setOrderFailure] = useState<string | null>(null);
   const [replacementIssue, setReplacementIssue] = useState<"Full" | "Changed" | "Denied" | "Unavailable" | null>(null);
@@ -169,21 +175,46 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
       await state.refetch(); if (owns()) await reconcileOrder();
     } finally { busy.current = false; if (mounted.current) setSaving(false); }
   }
-  async function send() {
+  const previous = repeat?.vin === vin && repeat.generation === readGeneration.current
+    && repeat.version === data?.version ? repeat.purchase : null;
+  const repeatTitle = t("vehicleHistory.offerRepeatTitle");
+  useEffect(() => {
+    if (previous) AccessibilityInfo.announceForAccessibility(repeatTitle);
+  }, [previous, repeatTitle]);
+  async function send(continueNew = false) {
     if (!data || !current() || !vin.trim() || busy.current || state.isFetching || state.error) return;
-    busy.current = true; setSaving(true); setFailed(false);
+    if (continueNew && !previous) return;
+    busy.current = true; setSaving(true); setFailed(null);
     const attempt = writeGeneration.current;
+    const reader = readGeneration.current;
     const owns = () => current() && attempt === writeGeneration.current;
+    const lookupCurrent = () => canRead() && reader === readGeneration.current;
+    let checking = !continueNew;
     try {
+      if (checking) {
+        const { previous: purchase } = await stream.previousPurchase(vin, lookupCurrent);
+        if (!lookupCurrent()) return;
+        if (purchase && purchase.requestId !== request.id) {
+          Keyboard.dismiss();
+          setRepeat({ vin, generation: reader, version: data.version, purchase });
+          return;
+        }
+      }
+      checking = false;
+      if (!owns()) return;
       await stream.sendVin(vin, data.version, owns);
       if (!owns()) return;
-      setVin(""); await state.refetch();
-    } catch { if (owns()) setFailed(true); }
+      setRepeat(null); setVin(""); await state.refetch();
+    } catch (error) {
+      if (checking ? lookupCurrent() : owns()) {
+        setFailed(error instanceof ApiError && [401, 403, 404].includes(error.status) ? "denied" : "error");
+      }
+    }
     finally { busy.current = false; if (mounted.current) setSaving(false); }
   }
   const copy = (key: string) => t(`vehicleHistory.offer${key[0]?.toUpperCase()}${key.slice(1)}`);
   const timestamp = (value: string) => formatHistoryDeadline(value, i18n.language);
-  const denied = state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
+  const denied = failed === "denied" || state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const error = failed || !!state.error;
   const proposal = data?.proposal;
   const historicalWindow = replacement || orderState?.status === "hold_expired";
@@ -197,7 +228,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
     <Text className="text-footnote text-muted-foreground">{copy("synthetic")}</Text>
     {!active || (!ready && !data) ? null : state.isPending && !error ? <ActivityIndicator accessibilityLabel={copy("loading")} />
       : error ? <View className="gap-3"><Text accessibilityRole="alert">{copy(denied ? "denied" : "error")}</Text>
-        <Button variant="secondary" disabled={!ready || !connected || state.isFetching} onPress={() => { setFailed(false); setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
+        <Button variant="secondary" disabled={!ready || !connected || state.isFetching} onPress={() => { setFailed(null); setRepeat(null); setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button></View>
         : data && <>
           {recovery && <PromiseRecovery recovery={recovery} delivered={orderState?.preparation === "delivered"}
             controls={{ enabled: ready && active && connected && !state.isFetching,
@@ -250,11 +281,29 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             enabled={ready && active && connected && !state.isFetching && !state.error} current={current}
             reconcile={async () => { const result = await state.refetch(); if (result.error) throw result.error; if (canRead()) await reconcileOrder(); }} />}
           {!accepted && <><Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
-          <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={setVin} maxLength={80}
+          <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={(value) => {
+            setVin(value); setRepeat(null);
+          }} maxLength={80}
             autoCapitalize="characters" autoCorrect={false} editable={canEdit} />
-          <Button variant="secondary" disabled={!vin.trim() || !canEdit || state.isFetching} accessibilityState={{ busy: saving }} onPress={() => { void send(); }}>
+          {previous ? <View ref={repeatPrompt} collapsable={false} className="gap-3 border-t border-border pt-3"
+            onLayout={() => {
+              const prompt = repeatPrompt.current;
+              if (prompt) revealRepeat(prompt, () => repeatPrompt.current === prompt && canRead()
+                && repeat?.generation === readGeneration.current);
+            }}>
+            <Text accessibilityRole="header" className="font-semibold">{repeatTitle}</Text>
+            <Text className="text-callout">{previous.provider} · {copy("date")} {previous.originalReportDate}</Text>
+            <Button disabled={!canEdit || state.isFetching} onPress={() => {
+              if (current() && repeat?.generation === readGeneration.current) {
+                router.push({ pathname: "/vehicle-history/requests/[id]", params: { id: previous.requestId } });
+              }
+            }}><Text>{copy("openPrevious")}</Text></Button>
+            <Button variant="secondary" disabled={!canEdit || state.isFetching} accessibilityState={{ busy: saving }}
+              onPress={() => { void send(true); }}><Text>{copy(saving ? "pending" : "repeatNew")}</Text></Button>
+          </View> : <Button variant="secondary" disabled={!vin.trim() || !canEdit || state.isFetching}
+            accessibilityState={{ busy: saving }} onPress={() => { void send(); }}>
             <Text>{copy(saving ? "pending" : "sendVin")}</Text>
-          </Button></>}
+          </Button>}</>}
         </>}
   </View>;
 }

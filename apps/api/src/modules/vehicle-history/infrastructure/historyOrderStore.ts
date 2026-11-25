@@ -91,6 +91,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
               AND f."recoveryQuotaProvider" IS NULL
           )), 0) AS used FROM active_orders o
           WHERE "activeFrom" < $3 AND "activeBy" > $2
+            AND NOT ("activeOffer"->'preflight' ? 'archiveFormat')
             AND (NOT $5::boolean OR "requestId" <> $6)
             AND ("activeProvider" = $1 OR ("activeProvider" IS NULL
               AND "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))

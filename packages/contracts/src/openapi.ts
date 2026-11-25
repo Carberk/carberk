@@ -5,7 +5,7 @@ import {
 
 import * as PaymentProof from "./schemas/history-payment-proof";
 import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema, HistoryRecoveryStateSchema, HistoryOperatorRecoverySchema, HistoryRecoveryDecisionSchema, HistoryRefundCaseSchema, HistoryRefundCommandSchema, HistoryRefundStateSchema } from "./schemas/history-order";
-import { DeliverHistoryReportSchema, DeliveredHistoryReportSchema, HistoryReportContentSchema, HistoryReportLinkSchema, HistoryReportQuerySchema, HistoryReportViewSchema, PurchaserHistoryReportSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
+import { DeliverHistoryReportSchema, DeliveredHistoryReportSchema, HistoryArchiveQuerySchema, HistoryArchiveSchema, HistoryPreviousPurchaseSchema, HistoryPurchaseVinQuerySchema, HistoryReportContentSchema, HistoryReportLinkSchema, HistoryReportQuerySchema, HistoryReportViewSchema, PurchaserHistoryReportSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -554,7 +554,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     registry.registerPath({
       method: action === "validate" ? "post" : "get", path: action === "preview" ? path + "/content" : path,
       tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
-      summary: { read: "Read current report validation", validate: "Validate the agreed report formats for the obtained intent",
+      summary: { read: "Read current report validation", validate: "Validate originals or associate permitted archive formats for the current intent",
         preview: "Preview the current validated original PDF" }[action],
       request: { params: z.object({ id: z.string().guid() }), ...(action === "validate"
         ? { body: { content: { "application/json": { schema: ValidateHistoryReportSchema } } } }
@@ -566,6 +566,15 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
         422: { description: "Missing, mismatched or unusable report" }, 503: { description: "Retry the same report" } },
     });
   }
+  for (const archive of [true, false]) registry.registerPath({
+    method: "get", tags: ["Vehicle History"], security: [{ bearerAuth: [] }],
+    path: `/api/v1/vehicle-history/${archive ? "operator/" : ""}requests/{id}/${archive ? "report-archive" : "previous-purchase"}`,
+    summary: archive ? "Search permitted original report metadata for the assigned request VIN" : "Find the requester’s own previous purchase for an exact VIN",
+    request: { params: z.object({ id: z.string().guid() }), query: archive ? HistoryArchiveQuerySchema : HistoryPurchaseVinQuerySchema },
+    responses: { 200: { description: "Private report metadata", content: { "application/json": { schema: archive ? HistoryArchiveSchema : HistoryPreviousPurchaseSchema } } },
+      400: { description: "Invalid input" }, 403: { description: "Current private authority required" },
+      409: { description: "Assignment changed" }, 503: { description: "Search is unavailable" } },
+  });
   registry.registerPath({
     method: "post", path: "/api/v1/vehicle-history/operator/requests/{id}/report-artifacts/deliver",
     tags: ["Vehicle History"], security: [{ bearerAuth: [] }],

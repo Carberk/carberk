@@ -8992,6 +8992,41 @@
             "enum": [
               true
             ]
+          },
+          "purchasedReport": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "Carfax",
+                  "AutoCheck"
+                ]
+              },
+              "vin": {
+                "type": "string",
+                "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+              },
+              "originalReportDate": {
+                "type": "string",
+                "format": "date"
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "pdf",
+                  "link",
+                  "both"
+                ]
+              }
+            },
+            "required": [
+              "provider",
+              "vin",
+              "originalReportDate",
+              "format"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -9071,6 +9106,14 @@
                     },
                     "minItems": 1,
                     "maxItems": 2
+                  },
+                  "archiveFormat": {
+                    "type": "string",
+                    "enum": [
+                      "pdf",
+                      "link",
+                      "both"
+                    ]
                   }
                 },
                 "required": [
@@ -9332,6 +9375,14 @@
                         },
                         "minItems": 1,
                         "maxItems": 2
+                      },
+                      "archiveFormat": {
+                        "type": "string",
+                        "enum": [
+                          "pdf",
+                          "link",
+                          "both"
+                        ]
                       }
                     },
                     "required": [
@@ -9496,6 +9547,14 @@
                               },
                               "minItems": 1,
                               "maxItems": 2
+                            },
+                            "archiveFormat": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
                             }
                           },
                           "required": [
@@ -9676,6 +9735,14 @@
                                     },
                                     "minItems": 1,
                                     "maxItems": 2
+                                  },
+                                  "archiveFormat": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pdf",
+                                      "link",
+                                      "both"
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -12969,6 +13036,14 @@
                               },
                               "minItems": 1,
                               "maxItems": 2
+                            },
+                            "archiveFormat": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
                             }
                           },
                           "required": [
@@ -13192,6 +13267,14 @@
                               },
                               "minItems": 1,
                               "maxItems": 2
+                            },
+                            "archiveFormat": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
                             }
                           },
                           "required": [
@@ -13393,6 +13476,14 @@
                               },
                               "minItems": 1,
                               "maxItems": 2
+                            },
+                            "archiveFormat": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
                             }
                           },
                           "required": [
@@ -13537,6 +13628,10 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 2147483647
+                      },
+                      "archiveId": {
+                        "type": "string",
+                        "format": "uuid"
                       }
                     },
                     "required": [
@@ -13672,6 +13767,14 @@
                               },
                               "minItems": 1,
                               "maxItems": 2
+                            },
+                            "archiveFormat": {
+                              "type": "string",
+                              "enum": [
+                                "pdf",
+                                "link",
+                                "both"
+                              ]
                             }
                           },
                           "required": [
@@ -15197,6 +15300,14 @@
                                     },
                                     "minItems": 1,
                                     "maxItems": 2
+                                  },
+                                  "archiveFormat": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pdf",
+                                      "link",
+                                      "both"
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -15377,6 +15488,14 @@
                                           },
                                           "minItems": 1,
                                           "maxItems": 2
+                                        },
+                                        "archiveFormat": {
+                                          "type": "string",
+                                          "enum": [
+                                            "pdf",
+                                            "link",
+                                            "both"
+                                          ]
                                         }
                                       },
                                       "required": [
@@ -15647,6 +15766,14 @@
                                 },
                                 "minItems": 1,
                                 "maxItems": 2
+                              },
+                              "archiveFormat": {
+                                "type": "string",
+                                "enum": [
+                                  "pdf",
+                                  "link",
+                                  "both"
+                                ]
                               }
                             },
                             "required": [
@@ -15808,6 +15935,14 @@
                                     },
                                     "minItems": 1,
                                     "maxItems": 2
+                                  },
+                                  "archiveFormat": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pdf",
+                                      "link",
+                                      "both"
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -15988,6 +16123,14 @@
                                           },
                                           "minItems": 1,
                                           "maxItems": 2
+                                        },
+                                        "archiveFormat": {
+                                          "type": "string",
+                                          "enum": [
+                                            "pdf",
+                                            "link",
+                                            "both"
+                                          ]
                                         }
                                       },
                                       "required": [
@@ -16242,6 +16385,14 @@
                                     },
                                     "minItems": 1,
                                     "maxItems": 2
+                                  },
+                                  "archiveFormat": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pdf",
+                                      "link",
+                                      "both"
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -16422,6 +16573,14 @@
                                           },
                                           "minItems": 1,
                                           "maxItems": 2
+                                        },
+                                        "archiveFormat": {
+                                          "type": "string",
+                                          "enum": [
+                                            "pdf",
+                                            "link",
+                                            "both"
+                                          ]
                                         }
                                       },
                                       "required": [
@@ -16720,6 +16879,14 @@
                                     },
                                     "minItems": 1,
                                     "maxItems": 2
+                                  },
+                                  "archiveFormat": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pdf",
+                                      "link",
+                                      "both"
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -16900,6 +17067,14 @@
                                           },
                                           "minItems": 1,
                                           "maxItems": 2
+                                        },
+                                        "archiveFormat": {
+                                          "type": "string",
+                                          "enum": [
+                                            "pdf",
+                                            "link",
+                                            "both"
+                                          ]
                                         }
                                       },
                                       "required": [
@@ -18616,7 +18791,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Validate the agreed report formats for the obtained intent",
+        "summary": "Validate originals or associate permitted archive formats for the current intent",
         "parameters": [
           {
             "schema": {
@@ -18681,6 +18856,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2048
+                  },
+                  "archiveId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 },
                 "required": [
@@ -19434,6 +19613,233 @@
           },
           "503": {
             "description": "Retry the same report"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/operator/requests/{id}/report-archive": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Search permitted original report metadata for the assigned request VIN",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "vin",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,10}$"
+            },
+            "required": true,
+            "name": "expectedAssignmentVersion",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private report metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "Carfax",
+                              "AutoCheck"
+                            ]
+                          },
+                          "vin": {
+                            "type": "string",
+                            "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                          },
+                          "originalReportDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "language": {
+                            "type": "string",
+                            "pattern": "^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,3}$"
+                          },
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "vin",
+                          "originalReportDate",
+                          "language",
+                          "id",
+                          "format"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 25
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "403": {
+            "description": "Current private authority required"
+          },
+          "409": {
+            "description": "Assignment changed"
+          },
+          "503": {
+            "description": "Search is unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/requests/{id}/previous-purchase": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Find the requester’s own previous purchase for an exact VIN",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "vin",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Private report metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "previous": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        },
+                        "vin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                        },
+                        "originalReportDate": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        },
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "vin",
+                        "originalReportDate",
+                        "format",
+                        "requestId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "previous"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "403": {
+            "description": "Current private authority required"
+          },
+          "409": {
+            "description": "Assignment changed"
+          },
+          "503": {
+            "description": "Search is unavailable"
           }
         }
       }
@@ -20839,6 +21245,14 @@
                                   },
                                   "minItems": 1,
                                   "maxItems": 2
+                                },
+                                "archiveFormat": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
                                 }
                               },
                               "required": [
@@ -21003,6 +21417,14 @@
                                         },
                                         "minItems": 1,
                                         "maxItems": 2
+                                      },
+                                      "archiveFormat": {
+                                        "type": "string",
+                                        "enum": [
+                                          "pdf",
+                                          "link",
+                                          "both"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -21183,6 +21605,14 @@
                                               },
                                               "minItems": 1,
                                               "maxItems": 2
+                                            },
+                                            "archiveFormat": {
+                                              "type": "string",
+                                              "enum": [
+                                                "pdf",
+                                                "link",
+                                                "both"
+                                              ]
                                             }
                                           },
                                           "required": [
@@ -22250,6 +22680,14 @@
                             },
                             "minItems": 1,
                             "maxItems": 2
+                          },
+                          "archiveFormat": {
+                            "type": "string",
+                            "enum": [
+                              "pdf",
+                              "link",
+                              "both"
+                            ]
                           }
                         },
                         "required": [
@@ -22394,6 +22832,14 @@
                                   },
                                   "minItems": 1,
                                   "maxItems": 2
+                                },
+                                "archiveFormat": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
                                 }
                               },
                               "required": [
@@ -22558,6 +23004,14 @@
                                         },
                                         "minItems": 1,
                                         "maxItems": 2
+                                      },
+                                      "archiveFormat": {
+                                        "type": "string",
+                                        "enum": [
+                                          "pdf",
+                                          "link",
+                                          "both"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -22738,6 +23192,14 @@
                                               },
                                               "minItems": 1,
                                               "maxItems": 2
+                                            },
+                                            "archiveFormat": {
+                                              "type": "string",
+                                              "enum": [
+                                                "pdf",
+                                                "link",
+                                                "both"
+                                              ]
                                             }
                                           },
                                           "required": [
@@ -23826,6 +24288,14 @@
                                   },
                                   "minItems": 1,
                                   "maxItems": 2
+                                },
+                                "archiveFormat": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pdf",
+                                    "link",
+                                    "both"
+                                  ]
                                 }
                               },
                               "required": [
@@ -23990,6 +24460,14 @@
                                         },
                                         "minItems": 1,
                                         "maxItems": 2
+                                      },
+                                      "archiveFormat": {
+                                        "type": "string",
+                                        "enum": [
+                                          "pdf",
+                                          "link",
+                                          "both"
+                                        ]
                                       }
                                     },
                                     "required": [
@@ -24170,6 +24648,14 @@
                                               },
                                               "minItems": 1,
                                               "maxItems": 2
+                                            },
+                                            "archiveFormat": {
+                                              "type": "string",
+                                              "enum": [
+                                                "pdf",
+                                                "link",
+                                                "both"
+                                              ]
                                             }
                                           },
                                           "required": [
@@ -29230,6 +29716,41 @@
                       "enum": [
                         true
                       ]
+                    },
+                    "purchasedReport": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        },
+                        "vin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                        },
+                        "originalReportDate": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "vin",
+                        "originalReportDate",
+                        "format"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -29343,6 +29864,41 @@
                             "enum": [
                               true
                             ]
+                          },
+                          "purchasedReport": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "enum": [
+                                  "Carfax",
+                                  "AutoCheck"
+                                ]
+                              },
+                              "vin": {
+                                "type": "string",
+                                "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                              },
+                              "originalReportDate": {
+                                "type": "string",
+                                "format": "date"
+                              },
+                              "format": {
+                                "type": "string",
+                                "enum": [
+                                  "pdf",
+                                  "link",
+                                  "both"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "vin",
+                              "originalReportDate",
+                              "format"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -29462,6 +30018,41 @@
                       "enum": [
                         true
                       ]
+                    },
+                    "purchasedReport": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "Carfax",
+                            "AutoCheck"
+                          ]
+                        },
+                        "vin": {
+                          "type": "string",
+                          "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+                        },
+                        "originalReportDate": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "pdf",
+                            "link",
+                            "both"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "vin",
+                        "originalReportDate",
+                        "format"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [

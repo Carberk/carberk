@@ -76,6 +76,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const linkAttempt = useRef(0);
   const linkReader = useRef({ mounted: true, ready: false });
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
+  const listHeader = useRef<View>(null);
   const composer = useRef<TextInput>(null);
   const position = useRef({ offset: 0, height: 0 });
   const browserPosition = useRef<{ offset: number; height: number; away: boolean; keyboardReady: boolean } | null>(null);
@@ -99,6 +100,13 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const linkCurrent = () => linkReader.current.mounted && linkReader.current.ready
     && historySessionCurrent(viewer) && AppState.currentState === "active"
     && focusManager.isFocused() && onlineManager.isOnline();
+  const revealRepeat = (prompt: View, current: () => boolean) => {
+    const header = listHeader.current;
+    if (!header || !current()) return;
+    prompt.measureLayout(header, (_x, y) => {
+      if (current()) list.current?.scrollToOffset({ offset: Math.max(0, y), animated: false });
+    });
+  };
   const restoreBrowserPosition = () => {
     const saved = browserPosition.current;
     if (!saved?.away || !saved.keyboardReady || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
@@ -227,7 +235,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     onLayout={(event) => { position.current.height = event.nativeEvent.layout.height; restoreBrowserPosition(); }}
     onViewableItemsChanged={onVisible} viewabilityConfig={viewabilityConfig}
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
-    ListHeaderComponent={<View className="gap-4 pb-3">
+    ListHeaderComponent={<View ref={listHeader} collapsable={false} className="gap-4 pb-3">
       {!denied && delivered && <DeliveredReport viewer={viewer} requestId={request.id}
         active={thread.active} online={thread.connected} ready={metadataCurrent} openComposer={() => composer.current?.focus()} />}
       {!denied && delivered && thread.active && order?.recovery &&
@@ -254,7 +262,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       </View>}
       {!denied && !delivered && !refund && !refundReadFailed && <OfferPreview viewer={viewer} request={request}
         ready={metadataCurrent} metadataAvailable={metadataAvailable} active={thread.active} connected={thread.connected}
-        recoveryVersion={order?.recovery?.version} orderReadError={thread.order.error} reconcileOrder={thread.order.refetch} />}
+        recoveryVersion={order?.recovery?.version} orderReadError={thread.order.error} reconcileOrder={thread.order.refetch}
+        revealRepeat={revealRepeat} />}
       {(order?.recovery || refund) && header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}

@@ -2,7 +2,7 @@ import type { HistoryOfferSchemas as O } from "@auto-tm/contracts";
 
 export interface HistoryOfferStore {
   read(): Promise<O.HistoryOffer>;
-  save(offer: O.HistoryOffer): Promise<void>;
+  save(offer: O.HistoryOffer, archiveId?: string | null): Promise<void>;
 }
 export interface HistoryPreflightPort {
   check(vin: string): Promise<O.HistoryOffer["preflight"]>;

@@ -110,9 +110,11 @@ export class HistoryMessageLocks implements HistoryRecoveryQueue {
           if (!rows[0]) throw new HistoryRequestError("HISTORY_REQUEST_DENIED");
           return O.HistoryOfferSchema.parse(rows[0].offer ?? { version: 0, vin: null, preflight: null, proposal: null, synthetic: true });
         },
-        save: async (value) => {
+        save: async (value, archiveId) => {
           assertActive();
-          await client.query("UPDATE vehicle_history_requests SET offer = $2::jsonb WHERE id = $1", [id, JSON.stringify(O.HistoryOfferSchema.parse(value))]);
+          await client.query(`UPDATE vehicle_history_requests SET offer = $2::jsonb,
+            "selectedArchiveId" = CASE WHEN $3::boolean THEN $4::uuid ELSE "selectedArchiveId" END WHERE id = $1`,
+          [id, JSON.stringify(O.HistoryOfferSchema.parse(value)), archiveId !== undefined, archiveId ?? null]);
         },
       };
       try { return await operation(request, waiting, offer, historyOrderStore(client, id, request?.assignmentVersion ?? 0, assertActive)); }

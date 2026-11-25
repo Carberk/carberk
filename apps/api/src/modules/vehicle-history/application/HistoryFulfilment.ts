@@ -19,6 +19,7 @@ export async function readFulfilment(orders: HistoryOrderStore, order: StoredHis
   const gate = !deadline || deadline <= now ? "booking_closed"
     : order.agreement?.pending ? "pending_correction"
       : await orders.hasEarlierPaidWork(confirmedAt, now, intent?.status === "obtained" ? "delivery" : "fulfilment") ? "fifo" : "ready";
+  if (order.acceptedOffer.preflight.archiveFormat) return { accepted, gate, sources: ["archive"], intent };
   const sources = fulfilmentSources(accepted);
   if (gate === "ready" && !await capacity.fulfilmentBudget(orders, order, accepted.provider, now, false, recovery?.status === "agreed")) {
     const available = sources.filter((source) => source !== "new_source");
@@ -104,8 +105,9 @@ export class HistoryFulfilment {
       if (gate === "pending_correction" || input.acceptedRevision !== accepted.acceptedRevision) {
         throw new HistoryRequestError("HISTORY_CORRECTION_CONFLICT");
       }
-      if (intent || input.vin !== accepted.vin || input.provider !== accepted.provider || input.format !== accepted.format
-        || !fulfilmentSources(accepted).includes(input.source)) throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
+      if (intent || input.vin !== accepted.vin || input.provider !== accepted.provider || input.format !== accepted.format) {
+        throw new HistoryRequestError("HISTORY_FULFILMENT_CONFLICT");
+      }
       if (gate === "capacity" || gate === "ready" && !current.sources.includes(input.source)) throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
       if (gate !== "ready") throw new HistoryRequestError(gate === "fifo" ? "HISTORY_FULFILMENT_FIFO" : "HISTORY_ORDER_STALE");
       return { id: input.attemptKey, accepted, version: 1, attempt: 1, source: input.source, status: "pending",

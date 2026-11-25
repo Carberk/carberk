@@ -20,6 +20,8 @@ export class HistoryCapacity {
     if (used.total >= daily || used.overlapping > 0 || day !== today && used.morning >= morning) {
       throw new HistoryRequestError("HISTORY_ORDER_CAPACITY");
     }
+    const archiveProvider = reports.archiveFormat && reports.providers[0]?.name;
+    if (archiveProvider) return { day, provider: archiveProvider };
 
     let provider: HistoryProvider | undefined;
     let mostRemaining = 0;

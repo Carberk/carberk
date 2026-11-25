@@ -3,9 +3,10 @@ import { isDeepStrictEqual } from "node:util";
 import { Inject, Injectable } from "@nestjs/common";
 import { HistoryReportArtifactSchemas as R, type HistoryOrderSchemas as H } from "@auto-tm/contracts";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
-import { fulfilmentAgreement } from "../domain/HistoryFulfilment";
+import { coversHistoryFormat, fulfilmentAgreement } from "../domain/HistoryFulfilment";
 import { bookedPayment, historyAgreement, type HistoryOrderStore, type StoredHistoryOrder } from "../domain/HistoryOrder";
 import { historyDeliveryDeadline, settleHistoryRecovery } from "../domain/HistoryRecovery";
+import { normalizeHistoryVin } from "../domain/HistoryOffer";
 import {
   HISTORY_REPORT_ORIGINALS, HISTORY_REPORT_STORAGE, historyReportDigest,
   type HistoryReportOriginals, type HistoryReportStorage, type HistoryReportStore, type StagedHistoryReport,
@@ -30,6 +31,26 @@ export class HistoryReportArtifacts {
     @Inject(HISTORY_REPORT_STORAGE) private readonly storage: HistoryReportStorage,
     @Inject(HISTORY_REPORT_ORIGINALS) private readonly originals: HistoryReportOriginals) {}
 
+  archive(actor: HistoryMessageActor, id: string, input: string) {
+    if (!actor.operator) throw new HistoryRequestError("HISTORY_OPERATOR_DENIED");
+    const vin = normalizeHistoryVin(input);
+    if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) throw new HistoryRequestError("HISTORY_REPORT_INVALID");
+    return this.access.run(actor, id, async (_owner, _sender, _object, _participant, _waiting, offer, orders) => {
+      const order = await orders.read();
+      const current = order ? order.acceptedOffer.vin : (await offer.read()).vin;
+      if (current !== vin) return { items: [] };
+      const pinned = order?.acceptedOffer.preflight.archiveFormat;
+      const selected = pinned ? await orders.reportArtifacts.selectedArchiveId() : null;
+      return { items: pinned && !selected ? [] : await orders.reportArtifacts.archive(vin, selected ?? undefined) };
+    });
+  }
+
+  previous(claims: HistoryMessageActor["claims"], id: string, input: string) {
+    const vin = normalizeHistoryVin(input);
+    return this.access.run({ claims, operator: false }, id, (owner, _sender, _object, _participant, _waiting, _offer, orders) =>
+      /^[A-HJ-NPR-Z0-9]{17}$/.test(vin) ? orders.reportArtifacts.previousPurchase(owner, vin) : Promise.resolve({ previous: null }));
+  }
+
   read(actor: HistoryMessageActor, id: string, target: R.HistoryReportTarget) {
     return this.current(actor, id, target, async (store) => view(await store.find(target.intentVersion)));
   }
@@ -37,7 +58,7 @@ export class HistoryReportArtifacts {
   content(actor: HistoryMessageActor, id: string, target: R.HistoryReportTarget) {
     return this.current(actor, id, target, async (store) => {
       const row = await store.find(target.intentVersion);
-      return this.pdf(id, row);
+      return this.pdf(store, id, row);
     });
   }
 
@@ -55,7 +76,8 @@ export class HistoryReportArtifacts {
       const confirmedAt = bookedPayment(order, await orders.paymentChecks())?.confirmedAt;
       if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       const deadline = await this.requireDeliveryWindow(orders, order, intent, this.clock.now());
-      if (row.artifact.format !== "link") await this.pdf(id, row);
+      if (row.artifact.format === "link") await this.requireArchiveSource(store, row);
+      else await this.pdf(store, id, row);
       if (row.artifact.format !== "pdf") {
         if (!row.link || !isDeepStrictEqual(await this.originals.verifyLink(row.link), row.artifact.report)) {
           throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
@@ -81,25 +103,31 @@ export class HistoryReportArtifacts {
       const row = order && await orders.reportArtifacts.delivered(order.id);
       if (!asset) return view(row);
       if (!row?.deliveredAt || row.artifact.id !== asset.id) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
-      if (asset.kind === "pdf") return this.pdf(id, row);
+      if (asset.kind === "pdf") return this.pdf(orders.reportArtifacts, id, row);
+      if (row.archiveSourceId) await this.requireArchiveSource(orders.reportArtifacts, row);
       if (row.artifact.format === "pdf" || !row.link) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
       return R.HistoryReportLinkSchema.parse({ address: row.link });
     });
   }
 
-  private async pdf(id: string, row: StagedHistoryReport | null) {
+  private async pdf(store: HistoryReportStore, id: string, row: StagedHistoryReport | null) {
     if (!row?.validatedAt || row.artifact.format === "link" || !row.sha256) {
       throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
     }
-    return { dataBase64: (await this.storage.read(id, row.artifact, row.sha256)).toString("base64") };
+    const source = await this.requireArchiveSource(store, row);
+    const artifact = source?.artifact ?? row.artifact;
+    if (artifact.format === "link") throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+    return { dataBase64: (await this.storage.read(source?.requestId ?? id, artifact, row.sha256)).toString("base64") };
   }
 
   async validate(actor: HistoryMessageActor, id: string, input: R.ValidateHistoryReport) {
+    if (input.archiveId) return this.associate(actor, id, input, input.archiveId);
     const bytes = input.pdf ? Buffer.from(input.pdf.dataBase64, "base64") : null;
     const sha256 = bytes ? historyReportDigest(bytes) : null;
     const link = input.link ?? null;
     const staged = await this.current(actor, id, input, async (store, intent, sender, order, orders) => {
       const existing = await store.find(intent.version);
+      if (intent.source === "archive") throw new HistoryRequestError(!bytes && !link ? "HISTORY_REPORT_MISSING" : "HISTORY_REPORT_CONFLICT");
       if (existing) {
         const filename = existing.artifact.format === "link" ? undefined : existing.artifact.pdf.filename;
         const restoringPdf = existing.validatedAt && bytes && existing.artifact.format !== "link" && link === null;
@@ -143,6 +171,62 @@ export class HistoryReportArtifacts {
       await this.requireDeliveryWindow(orders, order, intent, validatedAt);
       await store.validate(intent.version, sender, input.expectedAssignmentVersion, validatedAt);
       return view({ ...row, validatedAt });
+    }, "validate");
+  }
+
+  private async requireArchiveSource(store: HistoryReportStore, row: StagedHistoryReport) {
+    if (!row.archiveSourceId) return null;
+    const source = await store.archiveOriginal(row.archiveSourceId, row.artifact.report.vin);
+    if (!source) throw new HistoryRequestError("HISTORY_REPORT_RIGHTS");
+    if (!isDeepStrictEqual(source.artifact.report, row.artifact.report)
+      || !coversHistoryFormat(row.artifact.format, source.artifact.format)
+      || row.sha256 !== null && row.sha256 !== source.sha256
+      || row.link !== null && row.link !== source.link) throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
+    return source;
+  }
+
+  private associate(actor: HistoryMessageActor, id: string, input: R.HistoryReportTarget, archiveId: string) {
+    return this.current(actor, id, input, async (store, intent, sender, order, orders) => {
+      if (intent.source !== "archive") throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+      if (!bookedPayment(order, await orders.paymentChecks())?.confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+      const { vin, provider, format, originalReportDate } = intent.accepted;
+      if (order.acceptedOffer.preflight.archiveFormat && await store.selectedArchiveId() !== archiveId) {
+        throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+      }
+      const source = await store.archiveOriginal(archiveId, vin);
+      if (!source) throw new HistoryRequestError("HISTORY_REPORT_RIGHTS");
+      const { artifact: original } = source;
+      if (original.report.provider !== provider || !originalReportDate
+        || original.report.originalReportDate !== originalReportDate
+        || original.report.originalReportDate !== intent.report.originalReportDate) throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
+      if (!coversHistoryFormat(format, original.format)) throw new HistoryRequestError("HISTORY_REPORT_MISSING");
+      const existing = await store.find(intent.version);
+      if (existing && existing.archiveSourceId !== archiveId) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+      if (existing) return view(existing);
+      const sha256 = format === "link" ? null : source.sha256;
+      const link = format === "pdf" ? null : source.link;
+      if (format !== "link") {
+        if (original.format === "link" || !sha256) throw new HistoryRequestError("HISTORY_REPORT_MISSING");
+        try { await this.storage.read(source.requestId, original, sha256); }
+        catch { throw new HistoryRequestError("HISTORY_REPORT_UNAVAILABLE"); }
+      }
+      if (format !== "pdf") {
+        if (!link) throw new HistoryRequestError("HISTORY_REPORT_MISSING");
+        if (!isDeepStrictEqual(await this.originals.verifyLink(link), original.report)) {
+          throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
+        }
+      }
+      const validatedAt = this.clock.now();
+      await this.requireDeliveryWindow(orders, order, intent, validatedAt);
+      const artifact = R.HistoryReportArtifactSchema.parse({
+        id: randomUUID(), source: "archive", format, report: original.report,
+        ...(format !== "link" && original.format !== "link"
+          ? { pdf: { filename: "vehicle-history.pdf", pages: original.pdf.pages, sizeBytes: original.pdf.sizeBytes } } : {}),
+      });
+      const report = { artifact, sha256, link, archiveSourceId: archiveId };
+      await store.stage(input, report, sender);
+      await store.validate(intent.version, sender, input.expectedAssignmentVersion, validatedAt);
+      return view({ ...report, orderId: order.id, intentId: intent.id, acceptedRevision: input.acceptedRevision, validatedAt, deliveredAt: null });
     }, "validate");
   }
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
+import { AccessibilityInfo } from "react-native";
 import { useNavigation } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { onlineManager } from "@tanstack/react-query";
@@ -41,6 +42,7 @@ beforeEach(async () => {
   server.use(
     http.get("*/vehicle-history/requests/:id/messages", () => HttpResponse.json({ items: [], nextCursor: null })),
     http.get("*/vehicle-history/requests/:id/receipts", () => HttpResponse.json({ items: [] })),
+    http.get("*/vehicle-history/requests/:id/previous-purchase", () => HttpResponse.json({ previous: null })),
   );
   await storeAuthSession(session());
 });
@@ -87,7 +89,7 @@ it("updates the same customer's header after a real pull refresh observes handov
   expect(view.getByText(/10000000/)).toBeTruthy();
 });
 
-afterEach(() => { onlineManager.setOnline(true); vi.unstubAllEnvs(); });
+afterEach(() => { onlineManager.setOnline(true); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 const detailKey = (id = requestId, sid = "session-one") => queryKeys.vehicleHistory.detail(userId, sid, id);
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -363,6 +365,66 @@ it("submits the exact VIN for review through the real client and rereads the cle
   await view.findByText("VIN: DEMA0000000000001");
   expect(submitted).toEqual({ kind: "vin", vin: " dema 0000000000001 ", expectedVersion: 0 });
   expect(view.getByText("Awaiting an operator availability check.")).toBeTruthy();
+});
+
+it.each([
+  ["en", "VIN", "Send VIN for review", "Open previous report · free", "New request · 100 TMT"],
+  ["ru", "VIN", "Отправить VIN на проверку", "Открыть прежний отчёт · бесплатно", "Новый запрос · 100 TMT"],
+  ["tk", "VIN", "VIN-i barlawa iber", "Öňki hasabaty açmak · mugt", "Täze ýüz tutma · 100 TMT"],
+] as const)("offers free reopening and separate new-request consent for a repeat VIN in %s", async (locale, label, send, open, proceed) => {
+  const announce = vi.spyOn(AccessibilityInfo, "announceForAccessibility");
+  routeParams.id = requestId;
+  const vin = "DEMA0000000000001";
+  let offer = { version: 0, vin: null as string | null, synthetic: true, preflight: null, proposal: null };
+  let submitted: unknown;
+  let refreshing = false;
+  const started = deferred<undefined>(), refreshed = deferred<Response>();
+  const lookupStarted = deferred<undefined>(), lookupFinished = deferred<Response>();
+  const purchase = { previous: { requestId: secondId, vin, provider: "Carfax", format: "pdf", originalReportDate: "2026-10-14" } };
+  server.use(
+    http.get("*/vehicle-history/requests/:id", () => {
+      if (!refreshing) return HttpResponse.json(enquiry());
+      started.resolve(undefined);
+      return refreshed.promise;
+    }),
+    http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json(offer)),
+    http.get("*/vehicle-history/requests/:id/previous-purchase", () => {
+      if (locale !== "en") return HttpResponse.json(purchase);
+      lookupStarted.resolve(undefined);
+      return lookupFinished.promise;
+    }),
+    http.post("*/vehicle-history/requests/:id/offer", async ({ request }) => {
+      submitted = await request.json();
+      offer = { ...offer, version: 1, vin };
+      return HttpResponse.json(offer);
+    }));
+  const view = await renderMobile(<RequestScreen />, { locale });
+  await fireEvent.changeText(await view.findByLabelText(label), vin);
+  await fireEvent.press(view.getByRole("button", { name: send }));
+  if (locale === "en") {
+    await lookupStarted.promise;
+    refreshing = true;
+    await act(async () => {
+      void getHost(view.container, "RCTScrollView").props.refreshControl.props.onRefresh();
+      await started.promise;
+    });
+    await act(() => lookupFinished.resolve(HttpResponse.json(purchase)));
+    expect(await view.findByRole("button", { name: open })).toBeDisabled();
+    refreshing = false;
+    await act(() => refreshed.resolve(HttpResponse.json(enquiry())));
+    await vi.waitFor(() => expect(view.getByRole("button", { name: open })).not.toBeDisabled());
+  }
+  await fireEvent.press(await view.findByRole("button", { name: open }));
+  expect(announce).toHaveBeenCalledWith({
+    en: "You already bought a report for this VIN.",
+    ru: "Вы уже покупали отчёт для этого VIN.",
+    tk: "Bu VIN üçin öň hasabat satyn aldyňyz.",
+  }[locale]);
+  expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/vehicle-history/requests/[id]", params: { id: secondId } });
+  expect(submitted).toBeUndefined();
+  await fireEvent.press(view.getByRole("button", { name: proceed }));
+  await view.findByText("VIN: DEMA0000000000001");
+  expect(submitted).toEqual({ kind: "vin", vin, expectedVersion: 0 });
 });
 
 it("keeps the saved quote visible during a request refresh and removes it on denial", async () => {

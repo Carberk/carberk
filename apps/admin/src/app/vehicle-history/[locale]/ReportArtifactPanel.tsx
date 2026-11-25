@@ -5,14 +5,15 @@ import { HistoryReportArtifactSchemas as R, type HistoryOrderSchemas as H } from
 import { Button } from "@auto-tm/ui/components";
 
 import type { HistoryInboxResult } from "./actions";
+import { ArchivePanel } from "./ArchivePanel";
 import { historyReportAction } from "./report-actions";
 
 import type { DeskLocale } from "@/lib/history-desk-copy";
-import { reportCopy } from "@/lib/history-report-copy";
+import { archiveCopy, reportCopy } from "@/lib/history-report-copy";
 
 type Target = R.HistoryReportTarget;
 type Intent = Extract<H.HistoryFulfilmentIntent, { status: "obtained" }>;
-type Action = "read" | "validate" | "preview" | "deliver" | "restore";
+type Action = "read" | "validate" | "preview" | "deliver" | "restore" | "associate" | "archiveMissing";
 type Copy = (typeof reportCopy)["en"];
 type Feedback = Exclude<keyof Copy, "title">;
 const control = "mt-1 block min-h-11 w-full min-w-0 rounded-md border bg-background px-2 py-2";
@@ -52,6 +53,7 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
   current.current.onDeliveryIssue = onDeliveryIssue;
   const { id: intentId, version: intentVersion, accepted: { format, acceptedRevision } } = intent;
   const needsPdf = format !== "link", needsLink = format !== "pdf";
+  const archived = intent.source === "archive";
 
   const run = useCallback(async (action: Action, artifactId?: string) => {
     const attempt = ++current.current.attempt;
@@ -62,7 +64,9 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
     try {
       let value: Target | R.ValidateHistoryReport | R.DeliverHistoryReport = target;
       if (action === "deliver" && artifactId) value = { ...target, artifactId };
+      if (action === "associate" && artifactId) value = { ...target, archiveId: artifactId };
       const validates = action === "validate" || action === "restore";
+      const associations = action === "associate" || action === "archiveMissing";
       if (validates) {
         const file = pdfInput.current?.files?.[0], link = action === "validate" ? linkInput.current?.value : undefined;
         if (needsPdf && !file || action === "validate" && needsLink && !link) { setFeedback("missing"); return; }
@@ -72,22 +76,22 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
         value = { ...target, ...(file ? { pdf: { filename: file.name, dataBase64: await base64(file) } } : {}), ...(link ? { link } : {}) };
       }
       if (attempt !== current.current.attempt) return;
-      const result = await historyReportAction(locale, { id, scope }, action === "restore" ? "validate" : action, value);
+      const result = await historyReportAction(locale, { id, scope }, validates || associations ? "validate" : action, value);
       if (attempt !== current.current.attempt || document.visibilityState === "hidden") return;
       if (result.status === "expired" || result.status === "stale" || result.status === "denied") {
         current.current.invalidate({ status: result.status });
       } else if (result.status === "ok") {
-        focusValidation.current = validates || action === "deliver";
+        focusValidation.current = validates || associations || action === "deliver";
         setView(result.view);
         if (validates) setRestoring(false);
         if (result.view.status === "delivered") current.current.onDelivered();
       } else if (result.status === "preview") {
         setPreview(result.dataBase64);
-      } else {
+      } else if (result.status !== "archive") {
         if (result.status === "conflict") setView(null);
         setFeedback(action === "restore" && result.status === "mismatch" ? "samePdf"
           : action === "preview" && result.status === "unavailable" ? "previewUnavailable" : result.status);
-        if (action === "validate" || action === "deliver") current.current.onDeliveryIssue?.();
+        if (action === "validate" || associations || action === "deliver") current.current.onDeliveryIssue?.();
       }
     } catch {
       if (attempt === current.current.attempt) setFeedback(action === "preview" ? "previewUnavailable" : "unavailable");
@@ -140,14 +144,19 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
           aria-disabled={pending !== null} onClick={() => { if (!pending) void run("preview"); }}>{feedback === "previewUnavailable" ? t.retryPreview : t.preview}</Button>
         {preview && <ReportPdf dataBase64={preview} title={t.preview} closeLabel={t.close} close={() => setPreview(null)}
           restoreFocus={() => previewButton.current?.focus()} />}
-        {(feedback === "previewUnavailable" || feedback === "unavailable") && <Button type="button" variant="secondary"
+        {!archived && (feedback === "previewUnavailable" || feedback === "unavailable") && <Button type="button" variant="secondary"
           className={button} disabled={pending !== null} onClick={() => {
             setFeedback(null); setFilename(""); setRestoring(true);
           }}>{t.restorePdf}</Button>}
       </>}
       {view.status === "validated" && canDeliver && <Button data-fulfilment-next type="button" className={button}
         disabled={pending !== null} onClick={() => void run("deliver", view.artifact.id)}>{t.deliver}</Button>}
-    </> : view && <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (!pending) void run(restoring ? "restore" : "validate"); }}>
+    </> : view && (archived ? <>
+      <ArchivePanel {...{ locale, id, scope, version, invalidate }} vin={intent.accepted.vin} accepted={intent.accepted}
+        disabled={pending !== null} onChoose={(item) => { if (!pending) void run("associate", item.id); }} />
+      <Button type="button" variant="secondary" className={button} disabled={pending !== null}
+        onClick={() => { void run("archiveMissing"); }}>{archiveCopy[locale].recover}</Button>
+    </> : <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (!pending) void run(restoring ? "restore" : "validate"); }}>
       {!feedback && <p>{restoring ? t.samePdf : t[view.status]}</p>}
       {needsPdf && <div className="space-y-1">
         <p>{t.file}</p>
@@ -165,7 +174,7 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
       </Button>
       {restoring && <Button type="button" variant="secondary" className={button} disabled={pending !== null}
         onClick={() => { setFeedback(null); setRestoring(false); }}>{t.cancelRestore}</Button>}
-    </form>}
+    </form>)}
   </section>;
 }
 

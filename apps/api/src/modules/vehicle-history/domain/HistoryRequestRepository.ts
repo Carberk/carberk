@@ -1,3 +1,5 @@
+import type { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
+
 export interface HistoryRequest {
   id: string;
   sourceListingId: string | null;
@@ -5,6 +7,7 @@ export interface HistoryRequest {
   assignedOperatorId: string | null;
   assignmentVersion: number;
   reportReady?: true;
+  purchasedReport?: R.HistoryPurchasedReport;
 }
 export interface HistoryRequestRepository {
   create(input: { requesterId: string; sessionId: string; attemptKey: string; sourceListingId: string | null }): Promise<HistoryRequest>;
