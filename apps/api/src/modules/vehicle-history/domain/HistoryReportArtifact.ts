@@ -25,7 +25,7 @@ export interface ArchivedHistoryReport extends StagedHistoryReport {
 
 export interface HistoryReportStore {
   archive(vin: string, selectedId?: string): Promise<R.HistoryArchiveItem[]>;
-  archiveOriginal(id: string, vin: string): Promise<ArchivedHistoryReport | null>;
+  archiveOriginal(id: string, vin: string, purchasedAsset?: "pdf" | "link"): Promise<ArchivedHistoryReport | null>;
   selectedArchiveId(): Promise<string | null>;
   previousPurchase(requesterId: string, vin: string): Promise<R.HistoryPreviousPurchase>;
   find(intentVersion: number): Promise<StagedHistoryReport | null>;

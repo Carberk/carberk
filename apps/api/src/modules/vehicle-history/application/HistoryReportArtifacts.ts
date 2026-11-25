@@ -103,10 +103,12 @@ export class HistoryReportArtifacts {
       const order = await orders.read();
       const row = order && await orders.reportArtifacts.delivered(order.id);
       if (!asset) return view(row);
-      if (!row?.deliveredAt || row.artifact.id !== asset.id) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
-      const source = await this.requireArchiveSource(orders.reportArtifacts, row);
+      if (!row?.deliveredAt || row.artifact.id !== asset.id || !coversHistoryFormat(asset.kind, row.artifact.format)) {
+        throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+      }
+      const source = await this.requireArchiveSource(orders.reportArtifacts, row, asset.kind);
       if (asset.kind === "pdf") return this.pdf(id, row, source);
-      if (row.artifact.format === "pdf" || !row.link) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+      if (!row.link) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
       if (source) await this.verifyLink(row.link, row.artifact.report, source.archiveLinkEvidenceSha256);
       return R.HistoryReportLinkSchema.parse({ address: row.link });
     });
@@ -187,9 +189,9 @@ export class HistoryReportArtifacts {
     return linked.evidenceSha256;
   }
 
-  private async requireArchiveSource(store: HistoryReportStore, row: StagedHistoryReport) {
+  private async requireArchiveSource(store: HistoryReportStore, row: StagedHistoryReport, purchasedAsset?: "pdf" | "link") {
     if (!row.archiveSourceId) return null;
-    const source = await store.archiveOriginal(row.archiveSourceId, row.artifact.report.vin);
+    const source = await store.archiveOriginal(row.archiveSourceId, row.artifact.report.vin, purchasedAsset);
     if (!source) throw new HistoryRequestError("HISTORY_REPORT_RIGHTS");
     if (!isDeepStrictEqual(source.artifact.report, row.artifact.report)
       || !coversHistoryFormat(row.artifact.format, source.artifact.format)

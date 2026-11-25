@@ -76,7 +76,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
   let linkRequirement: "login" | "payment" | "operator" | undefined;
   let beforeServingReport: (() => Promise<void>) | undefined;
   let certificate: Buffer;
-  let linkedBytes: Buffer;
+  let linkedReport: Awaited<ReturnType<typeof document>>;
   let changedLinkBytes: Buffer | undefined;
   beforeAll(async () => {
     const directory = mkdtempSync(join(tmpdir(), "carberk-report-test-"));
@@ -85,8 +85,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=127.0.0.1",
         "-addext", "subjectAltName=IP:127.0.0.1", "-keyout", key, "-out", cert], { stdio: "ignore" });
       certificate = readFileSync(cert);
-      const report = await document();
-      linkedBytes = report.bytes;
+      linkedReport = await document();
       const chart = await document({}, { chart: "readable" });
       const damagedChart = await document({}, { chart: "damaged" });
       const inline = await document({}, { chart: "inline" });
@@ -109,7 +108,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
         if (scenario === "missing" || !linkAvailable) { res.writeHead(404).end(); return; }
         if (scenario === "html") { res.writeHead(200, { "Content-Type": "text/html" }).end("Sign in to view this report"); return; }
         await beforeServingReport?.();
-        const selected = reports.get(scenario ?? "") ?? report;
+        const selected = reports.get(scenario ?? "") ?? linkedReport;
         res.writeHead(200, { "Content-Type": "application/pdf" }).end(changedLinkBytes ?? selected.bytes);
       });
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -137,7 +136,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     const sha256 = (input: string | Buffer) => createHash("sha256").update(input).digest("hex");
     f.config.set("VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE", {
       pdf: pdf ? [sha256(pdf)] : [],
-      link: link ? [sha256(`${link}\n${sha256(linkedBytes)}`)] : [],
+      link: link ? [sha256(`${link}\n${sha256(linkedReport.bytes)}`)] : [],
     });
   }
   afterEach(async () => {
@@ -258,7 +257,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       Carfax: { allowance: 12, resetUtc: "00:00", externalUsage: {} },
     });
     const original = await obtained("both");
-    const { pdf, bytes } = await document();
+    const { pdf, bytes } = linkedReport;
     const link = origin + "/report/" + facts.reportId;
     allowArchive(qualified === "pdf" ? { pdf: bytes, link: link + "?share=OtherSyntheticFixture" } : { link });
     const { body: { artifact } } = await original.validate({ pdf, link }).expect(201);
@@ -271,13 +270,38 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
   });
 
+  it("delivers a first purchase with matching report facts and excludes its different PDF bytes from paired archive reuse", async () => {
+    f.config.set("VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS", {
+      Carfax: { allowance: 12, resetUtc: "00:00", externalUsage: {} },
+    });
+    const original = await obtained("both");
+    const { pdf, bytes } = await document({}, { purchaser: "Ayna Synthetic Prior Purchaser" });
+    const link = origin + "/report/" + facts.reportId;
+    expect(bytes.equals(linkedReport.bytes)).toBe(false);
+    allowArchive({ pdf: bytes, link });
+    const { body: { artifact } } = await original.validate({ pdf, link }).expect(201);
+    await original.deliver(artifact.id).expect(201);
+    const open = (kind: "pdf" | "link") => f.request.get(`${root}/requests/${original.id}/report/${artifact.id}/${kind}`)
+      .auth(original.customer.token, { type: "bearer" });
+    expect(Buffer.from((await open("pdf").expect(200)).body.dataBase64, "base64")).toEqual(bytes);
+    await open("link").expect(200, { address: link });
+
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    const later = await obtained("both", facts.vin, { laterWindow: true, source: "archive" });
+    await f.request.get(later.work + "/report-archive").auth(later.operator.token, { type: "bearer" })
+      .query({ vin: facts.vin, expectedAssignmentVersion: 1 }).expect(200, { items: [] });
+    await later.validate({ archiveId: artifact.id }).expect(422)
+      .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
+  });
+
   it.each(["pdf", "link", "both"] as const)("associates an original with a later accepted %s promise", async (format) => {
     const original = await obtained("both");
-    const { pdf, bytes } = await document();
+    const { pdf, bytes } = linkedReport;
     const link = origin + "/report/" + facts.reportId + "?share=Synthetic%2fFixture";
     allowArchive({ pdf: bytes, link });
     const filename = "Previous Buyer Synthetic - private upload.pdf";
-    const first = (await original.validate({ pdf: { ...pdf, filename }, link }).expect(201)).body.artifact.id;
+    const { body: { artifact: originalArtifact } } = await original.validate({ pdf: { ...pdf, filename }, link }).expect(201);
+    const first = originalArtifact.id;
     await original.deliver(first).expect(201);
     f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
     const later = await obtained(format, facts.vin, { laterWindow: true, source: "archive", archiveId: first });
@@ -307,10 +331,28 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     if (format !== "pdf") await get(later.id, later.customer.token, "link").expect(200, { address: link });
 
     allowArchive({ pdf: bytes });
-    await get(later.id, later.customer.token, format === "link" ? "link" : "pdf").expect(422)
+    if (format !== "link") {
+      expect(Buffer.from((await get(later.id, later.customer.token, "pdf").expect(200)).body.dataBase64, "base64")).toEqual(bytes);
+    }
+    if (format !== "pdf") await get(later.id, later.customer.token, "link").expect(422)
       .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
     await get(original.id, original.customer.token, "pdf", first).expect(200);
     await get(original.id, original.customer.token, "link", first).expect(200, { address: link });
+
+    if (format === "both") {
+      allowArchive({ link });
+      await get(later.id, later.customer.token, "link").expect(200, { address: link });
+      await get(later.id, later.customer.token, "pdf").expect(422)
+        .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
+
+      allowArchive({ pdf: bytes, link });
+      await f.prisma.historyReportArtifact.update({ where: { id: first },
+        data: { artifact: { ...originalArtifact, report: { ...originalArtifact.report, permittedUse: false } } } });
+      for (const kind of ["pdf", "link"]) {
+        await get(later.id, later.customer.token, kind).expect(422)
+          .expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
+      }
+    }
   });
 
   it("discloses the selected original date before payment when new lookup had no report date", async () => {
@@ -352,7 +394,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
 
   it("refuses changed archive link bytes at association, delivery and reopening while preserving the purchased PDF", async () => {
     const original = await obtained("both");
-    const { pdf, bytes } = await document();
+    const { pdf, bytes } = linkedReport;
     const link = origin + "/report/" + facts.reportId;
     allowArchive({ pdf: bytes, link });
     const { body: { artifact } } = await original.validate({ pdf, link }).expect(201);
@@ -369,6 +411,12 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     await associate().expect(422).expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_MISMATCH"));
     await later.deliver(archived.id).expect(422).expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_MISMATCH"));
     changedLinkBytes = undefined;
+    allowArchive({ pdf: bytes });
+    await f.request.get(later.work + "/report-archive").auth(later.operator.token, { type: "bearer" })
+      .query({ vin: facts.vin, expectedAssignmentVersion: 1 }).expect(200, { items: [] });
+    await associate().expect(422).expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
+    await later.deliver(archived.id).expect(422).expect(({ body }) => expect(body.code).toBe("HISTORY_REPORT_RIGHTS"));
+    allowArchive({ pdf: bytes, link });
     await later.deliver(archived.id).expect(201);
 
     const open = (kind: "link" | "pdf") => f.request.get(`${root}/requests/${later.id}/report/${archived.id}/${kind}`)
@@ -403,7 +451,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
 
   it("requires a new agreement to use the PDF alone when an archived pair loses its link", async () => {
     const original = await obtained("both");
-    const { pdf, bytes } = await document();
+    const { pdf, bytes } = linkedReport;
     const link = origin + "/report/" + facts.reportId;
     allowArchive({ pdf: bytes, link });
     const { body: { artifact } } = await original.validate({ pdf, link }).expect(201);
