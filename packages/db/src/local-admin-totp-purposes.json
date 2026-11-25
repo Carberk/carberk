@@ -2,5 +2,7 @@
   "legacyAdmin": null,
   "vehicle-history": "vehicle_history",
   "vehicle-history-payment-evidence": "vehicle_history_payment_evidence",
-  "vehicle-history-staff-management": "vehicle_history_staff_management"
+  "vehicle-history-staff-management": "vehicle_history_staff_management",
+  "vehicle-history-refund-decision": "vehicle_history_refund_decision",
+  "vehicle-history-refund-execution": "vehicle_history_refund_execution"
 }

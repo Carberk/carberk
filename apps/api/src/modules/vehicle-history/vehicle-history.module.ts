@@ -1,3 +1,5 @@
+import { HistoryRefunds } from "./application/HistoryRefunds";
+import { HistoryRefundsController } from "./presentation/HistoryRefundsController";
 import { HistoryReportArtifacts } from "./application/HistoryReportArtifacts";
 import { HistoryReportArtifactsController } from "./presentation/HistoryReportArtifactsController";
 import { MinioHistoryReportStorage } from "./infrastructure/MinioHistoryReportStorage";
@@ -90,8 +92,8 @@ import { PrismaHistoryPrivateNoteRepository } from "./infrastructure/PrismaHisto
 @Module({
   imports: [ConfigModule, IdentityModule, PrismaModule, BusinessMessagingModule],
   exports: [HISTORY_WAITING_LIFECYCLE, HISTORY_CLOCK],
-  controllers: [HistoryReportArtifactsController, HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryReplacementController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
-  providers: [HistoryReportArtifacts, DecideHistoryRecovery, HistoryRecoveryWorker, { provide: HISTORY_RECOVERY_QUEUE, useExisting: HistoryMessageLocks },
+  controllers: [HistoryRefundsController, HistoryReportArtifactsController, HistoryCorrectionsController, HistoryPaymentsController, HistoryPaymentProofsController, HistoryOrdersController, HistoryReplacementController, HistoryOffersController, VehicleHistoryController, HistoryRequestsController, HistoryAssignmentController, HistoryMessagesController, HistoryReceiptsController, HistoryRemindersController, HistoryNotesController],
+  providers: [HistoryRefunds, HistoryReportArtifacts, DecideHistoryRecovery, HistoryRecoveryWorker, { provide: HISTORY_RECOVERY_QUEUE, useExisting: HistoryMessageLocks },
     { provide: HISTORY_REPORT_STORAGE, useClass: MinioHistoryReportStorage },
     { provide: HISTORY_REPORT_ORIGINALS, useClass: SyntheticHistoryReportOriginals },
     HistoryCorrections, HistoryFulfilment, HistoryPayments, HistoryPrivateFileAccess, ListHistoryPaymentProofs, StageHistoryPaymentProof, UploadHistoryPaymentProof, SubmitHistoryPaymentProof, ReadHistoryPaymentProof, DiscardHistoryPaymentProof, CleanupHistoryPrivateFiles,
@@ -122,13 +124,14 @@ export class VehicleHistoryModule implements NestModule {
       const payment = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/payment-verification$/.test(route.url);
       const order = /^\/api\/v1\/vehicle-history\/(operator\/)?requests\/:id\/(order|correction|fulfilment|replacement-booking|recovery)$/.test(route.url);
       const note = /^\/api\/v1\/vehicle-history\/operator\/requests\/:id\/notes$/.test(route.url);
+      const refund = /^\/api\/v1\/vehicle-history\/refunds\/:id(?:\/execution)?$/.test(route.url);
       const report = /^\/api\/v1\/vehicle-history\/(?:operator\/requests\/:id\/report-artifacts(?:\/content|\/deliver)?|requests\/:id\/report(?:\/:artifactId\/:kind)?)$/.test(route.url);
-      if (!report && !payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
+      if (!refund && !report && !payment && !proof && !message && !reminder && !note && !offer && !order && !/^\/api\/v1\/vehicle-history\/operator\/requests(?:\/:id(?:\/claim)?)?$/.test(route.url)) return;
       // Fastify parser failures happen before Nest's controller exception filter.
       route.errorHandler = (error, request, reply) => {
         const response = historyRequestFailure(new HistoryRequestError(error.statusCode && error.statusCode < 500
-          ? report ? "HISTORY_REPORT_INVALID" : payment ? "HISTORY_PAYMENT_INVALID" : proof ? "HISTORY_PROOF_INVALID" : order ? "HISTORY_ORDER_INVALID" : offer ? "HISTORY_OFFER_INVALID" : reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
-          : report ? "HISTORY_REPORT_UNAVAILABLE" : payment ? "HISTORY_PAYMENT_UNAVAILABLE" : proof ? "HISTORY_PROOF_UNAVAILABLE" : order ? "HISTORY_ORDER_UNAVAILABLE" : offer ? "HISTORY_OFFER_UNAVAILABLE" : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
+          ? refund ? "HISTORY_REFUND_INVALID" : report ? "HISTORY_REPORT_INVALID" : payment ? "HISTORY_PAYMENT_INVALID" : proof ? "HISTORY_PROOF_INVALID" : order ? "HISTORY_ORDER_INVALID" : offer ? "HISTORY_OFFER_INVALID" : reminder ? "HISTORY_REMINDER_INVALID" : note ? "HISTORY_NOTE_INVALID" : message ? "HISTORY_MESSAGE_INVALID" : "HISTORY_REQUEST_INVALID"
+          : refund ? "HISTORY_REFUND_UNAVAILABLE" : report ? "HISTORY_REPORT_UNAVAILABLE" : payment ? "HISTORY_PAYMENT_UNAVAILABLE" : proof ? "HISTORY_PROOF_UNAVAILABLE" : order ? "HISTORY_ORDER_UNAVAILABLE" : offer ? "HISTORY_OFFER_UNAVAILABLE" : reminder ? "HISTORY_REMINDER_UNAVAILABLE" : note ? "HISTORY_NOTE_UNAVAILABLE" : "HISTORY_MESSAGE_UNAVAILABLE"), request.headers["accept-language"]);
         void reply.header("Cache-Control", "private, no-store").status(response.statusCode).send(response);
       };
     });

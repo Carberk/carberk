@@ -9149,6 +9149,131 @@
         ],
         "additionalProperties": false
       },
+      "HistoryRefundState": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100000000
+              },
+              "originalPromiseBy": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "agreedRecoveryDeadline": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending"
+                ]
+              }
+            },
+            "required": [
+              "amountMinor",
+              "originalPromiseBy",
+              "agreedRecoveryDeadline",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100000000
+              },
+              "originalPromiseBy": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "agreedRecoveryDeadline": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "approved"
+                ]
+              },
+              "approvedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "amountMinor",
+              "originalPromiseBy",
+              "agreedRecoveryDeadline",
+              "status",
+              "approvedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100000000
+              },
+              "originalPromiseBy": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "agreedRecoveryDeadline": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              },
+              "approvedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "recordedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "externalReference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "^[^\\p{Cc}]+$/u"
+              }
+            },
+            "required": [
+              "amountMinor",
+              "originalPromiseBy",
+              "agreedRecoveryDeadline",
+              "status",
+              "approvedAt",
+              "recordedAt",
+              "externalReference"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
       "HistoryOrderState": {
         "type": "object",
         "properties": {
@@ -10002,6 +10127,15 @@
             ],
             "additionalProperties": false
           },
+          "refund": {
+            "$ref": "#/components/schemas/HistoryRefundState"
+          },
+          "companyFundedCorrection": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
           "paymentDeadline": {
             "type": "string",
             "format": "date-time"
@@ -10638,6 +10772,130 @@
           "agreedFormat",
           "pendingReason",
           "refundRequestedAt"
+        ],
+        "additionalProperties": false
+      },
+      "HistoryRefundCase": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "vin": {
+                "type": "string",
+                "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+              },
+              "priceMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100000000
+              },
+              "format": {
+                "type": "string",
+                "enum": [
+                  "pdf",
+                  "link",
+                  "both"
+                ]
+              },
+              "window": {
+                "type": "object",
+                "properties": {
+                  "deliveryFrom": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "deliveryBy": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "deliveryFrom",
+                  "deliveryBy"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "vin",
+              "priceMinor",
+              "format",
+              "window"
+            ],
+            "additionalProperties": false
+          },
+          "payment": {
+            "type": "object",
+            "properties": {
+              "amountMinor": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 100000000
+              },
+              "receivedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "confirmedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "amountMinor",
+              "receivedAt",
+              "confirmedAt",
+              "reference"
+            ],
+            "additionalProperties": false
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "no_window",
+              "replacement_declined",
+              "declined",
+              "offer_elapsed",
+              "recovery_missed",
+              "no_history",
+              "company_error"
+            ]
+          },
+          "failure": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "no_history",
+              "format_unavailable",
+              "rights_unavailable",
+              "original_date_mismatch",
+              "company_error",
+              "file_delivery"
+            ]
+          },
+          "refund": {
+            "$ref": "#/components/schemas/HistoryRefundState"
+          }
+        },
+        "required": [
+          "order",
+          "payment",
+          "reason",
+          "failure",
+          "refund"
         ],
         "additionalProperties": false
       },
@@ -14022,6 +14280,308 @@
           },
           "503": {
             "description": "Read back before retrying the same decision"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/refunds/{id}": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the scoped case for the exact refund",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current private refund case and recorded status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryRefundCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid refund input"
+          },
+          "403": {
+            "description": "Current session and exact refund purpose required"
+          },
+          "404": {
+            "description": "No eligible refund case"
+          },
+          "409": {
+            "description": "The refund details or recorded state conflict"
+          },
+          "503": {
+            "description": "Read back before retrying the same action"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Approve the verified amount for refund",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "attemptKey": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "amountMinor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 100000000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "approve"
+                    ]
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "attemptKey",
+                  "amountMinor",
+                  "reason",
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Current private refund case and recorded status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryRefundCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid refund input"
+          },
+          "403": {
+            "description": "Current session and exact refund purpose required"
+          },
+          "404": {
+            "description": "No eligible refund case"
+          },
+          "409": {
+            "description": "The refund details or recorded state conflict"
+          },
+          "503": {
+            "description": "Read back before retrying the same action"
+          }
+        }
+      }
+    },
+    "/api/v1/vehicle-history/refunds/{id}/execution": {
+      "get": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read the scoped case for the exact refund",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current private refund case and recorded status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryRefundCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid refund input"
+          },
+          "403": {
+            "description": "Current session and exact refund purpose required"
+          },
+          "404": {
+            "description": "No eligible refund case"
+          },
+          "409": {
+            "description": "The refund details or recorded state conflict"
+          },
+          "503": {
+            "description": "Read back before retrying the same action"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle History"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Record the confirmed external return for an approved refund",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "attemptKey": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "amountMinor": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 100000000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "execute"
+                    ]
+                  },
+                  "returned": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "externalReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[^\\p{Cc}]+$/u"
+                  }
+                },
+                "required": [
+                  "orderId",
+                  "attemptKey",
+                  "amountMinor",
+                  "reason",
+                  "kind",
+                  "returned",
+                  "externalReference"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Current private refund case and recorded status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryRefundCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid refund input"
+          },
+          "403": {
+            "description": "Current session and exact refund purpose required"
+          },
+          "404": {
+            "description": "No eligible refund case"
+          },
+          "409": {
+            "description": "The refund details or recorded state conflict"
+          },
+          "503": {
+            "description": "Read back before retrying the same action"
           }
         }
       }
@@ -21074,6 +21634,15 @@
                       ],
                       "additionalProperties": false
                     },
+                    "refund": {
+                      "$ref": "#/components/schemas/HistoryRefundState"
+                    },
+                    "companyFundedCorrection": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
                     "paymentDeadline": {
                       "type": "string",
                       "format": "date-time"
@@ -22620,6 +23189,15 @@
                       ],
                       "additionalProperties": false
                     },
+                    "refund": {
+                      "$ref": "#/components/schemas/HistoryRefundState"
+                    },
+                    "companyFundedCorrection": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
                     "paymentDeadline": {
                       "type": "string",
                       "format": "date-time"
@@ -24042,6 +24620,15 @@
                         "refundRequestedAt"
                       ],
                       "additionalProperties": false
+                    },
+                    "refund": {
+                      "$ref": "#/components/schemas/HistoryRefundState"
+                    },
+                    "companyFundedCorrection": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
                     },
                     "paymentDeadline": {
                       "type": "string",

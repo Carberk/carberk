@@ -150,6 +150,8 @@ enum StaffPurpose {
   vehicle_history @map("vehicle-history")
   vehicle_history_staff_management @map("vehicle-history-staff-management")
   vehicle_history_payment_evidence @map("vehicle-history-payment-evidence")
+  vehicle_history_refund_decision @map("vehicle-history-refund-decision")
+  vehicle_history_refund_execution @map("vehicle-history-refund-execution")
 }
 
 model StaffGrant {
@@ -337,10 +339,28 @@ model HistoryPaymentCheck {
   checkedAt DateTime @db.Timestamptz(3)
   confirmedAt DateTime? @db.Timestamptz(3)
   bookingCommitted Boolean
+  refundEvents HistoryRefundEvent[]
 
   @@id([requestId, attemptKey])
   @@unique([requestId, version])
   @@map("history_payment_checks")
+}
+
+model HistoryRefundEvent {
+  requestId String
+  paymentVersion Int
+  payment HistoryPaymentCheck @relation(fields: [requestId, paymentVersion], references: [requestId, version], onDelete: Restrict, onUpdate: NoAction)
+  kind String
+  attemptKey String @db.Uuid
+  actorId String
+  amountMinor Int
+  input Json
+  externalReference String? @unique
+  recordedAt DateTime @db.Timestamptz(3)
+
+  @@id([requestId, kind])
+  @@unique([requestId, attemptKey])
+  @@map("history_refund_events")
 }
 
 model HistoryPrivateFile {

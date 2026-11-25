@@ -16,11 +16,18 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
   const largeText = useLargeText();
   if (!state.order) return null;
   const copy = (key: string) => t(`vehicleHistory.offer${key}`);
-  if (compact) return <View className="border-b border-border bg-card px-5 py-2"><PaymentStatus state={state} compact /></View>;
+  if (compact || (largeText && state.refund)) return <View className="border-b border-border bg-card px-5 py-2">
+    <PaymentStatus state={state} compact />
+    {!compact && <Button variant="secondary" className="mt-2 h-auto min-h-12 self-start" disabled={!ready} onPress={onDetails}>
+      <Text>{t("vehicleHistory.refund.details")}</Text>
+    </Button>}
+  </View>;
 
   const offer = state.order.acceptedOffer;
   const replacement = state.replacement;
   const recovery = state.recovery;
+  const refund = state.refund;
+  const agreedDeadline = refund?.agreedRecoveryDeadline ?? recovery?.agreedDeadline;
   const window = replacement ? replacement.status === "accepted" || replacement.status === "proposed" ? replacement.window : null : offer.proposal;
   const timestamp = (value: string) => new Intl.DateTimeFormat(i18n.language === "tk" ? "en-GB" : i18n.language, {
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ashgabat",
@@ -29,15 +36,16 @@ export function OrderStatus({ state, compact, ready, onDetails }: {
     <View className="flex-row items-start justify-between gap-3">
       <View className="flex-1 gap-1">
         <PaymentStatus state={state} summary compact={largeText} />
-        {recovery?.agreedDeadline && <Text className="text-footnote">{t("vehicleHistory.promiseRecovery.agreedDeadline")} · {formatHistoryDeadline(recovery.agreedDeadline, i18n.language)}</Text>}
+        {refund && <Text className="text-footnote">{t("vehicleHistory.promiseRecovery.original")} · {formatHistoryDeadline(refund.originalPromiseBy, i18n.language)}</Text>}
+        {agreedDeadline && <Text className="text-footnote">{t("vehicleHistory.promiseRecovery.agreedDeadline")} · {formatHistoryDeadline(agreedDeadline, i18n.language)}</Text>}
         {!largeText && <>
         {state.agreement?.pending && <Text className="text-footnote font-semibold">{t(state.agreement.pending.review ? "vehicleHistory.correctionReviewed" : "vehicleHistory.correctionWaiting")}</Text>}
         <Text selectable className="font-mono text-footnote">{offer.vin} · {copy({ pdf: "Pdf", link: "Link", both: "Both" }[offer.proposal.format])}</Text>
-        {recovery ? <Text className="text-footnote">{t("vehicleHistory.promiseRecovery.original")} · {formatHistoryDeadline(recovery.originalPromiseBy, i18n.language)}</Text>
-          : window && !state.verificationResumesAt && <Text className="text-footnote">{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>}
+        {!refund && (recovery ? <Text className="text-footnote">{t("vehicleHistory.promiseRecovery.original")} · {formatHistoryDeadline(recovery.originalPromiseBy, i18n.language)}</Text>
+          : window && !state.verificationResumesAt && <Text className="text-footnote">{timestamp(window.deliveryFrom)} – {timestamp(window.deliveryBy)}</Text>)}
         </>}
       </View>
-      <Button variant="secondary" size="sm" disabled={!ready} onPress={onDetails}><Text>{copy("OrderStatusDetails")}</Text></Button>
+      <Button variant="secondary" size="sm" disabled={!ready} onPress={onDetails}><Text>{refund ? t("vehicleHistory.refund.details") : copy("OrderStatusDetails")}</Text></Button>
     </View>
   </View>;
 }

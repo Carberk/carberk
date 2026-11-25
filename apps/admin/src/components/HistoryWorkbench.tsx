@@ -4,12 +4,16 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import { deskCopy, type DeskLocale } from "@/lib/history-desk-copy";
 import { proofCopy } from "@/lib/history-proof-copy";
+import { refundCopy } from "@/lib/history-refund-copy";
 import { staffCopy } from "@/lib/history-staff-copy";
 import { historyAuth } from "@/lib/history-auth";
 
-export function HistoryWorkbench({ locale: initialLocale, section, children }: { locale: DeskLocale; section: "desk" | "staff" | "evidence"; children: ReactNode }) {
+const paths = { desk: "", staff: "/staff", evidence: "/payment-evidence", refunds: "/refunds" } as const;
+
+export function HistoryWorkbench({ locale: initialLocale, section, children }: { locale: DeskLocale; section: keyof typeof paths; children: ReactNode }) {
   const locale = historyAuth(usePathname())?.locale ?? initialLocale;
   const t = deskCopy[locale];
+  const sections = { desk: t.title, staff: staffCopy[locale].title, evidence: proofCopy[locale].historical, refunds: refundCopy[locale].title };
   const params = useSearchParams();
   const query = section !== "desk" ? params.toString() : new URLSearchParams(
     [...params].filter(([name, value]) => ["filter", "queue", "search", "cursor", "selected", "v"].includes(name) || name === "source" && value === "listing"),
@@ -19,7 +23,7 @@ export function HistoryWorkbench({ locale: initialLocale, section, children }: {
     <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-background px-5 py-4 sm:px-8">
       <span className="text-xl font-semibold tracking-tight">Carberk</span>
       <nav aria-label={t.language} className="flex gap-1">
-        {(["tk", "ru", "en"] as const).map((language) => <a key={language} href={`/vehicle-history/${language}${section === "staff" ? "/staff" : section === "evidence" ? "/payment-evidence" : ""}${query ? `?${query}` : ""}`} lang={language} aria-current={language === locale ? "page" : undefined} onClick={(event) => {
+        {(["tk", "ru", "en"] as const).map((language) => <a key={language} href={`/vehicle-history/${language}${paths[section]}${query ? `?${query}` : ""}`} lang={language} aria-current={language === locale ? "page" : undefined} onClick={(event) => {
           if (section === "staff" && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
             event.preventDefault();
             window.history.replaceState(null, "", event.currentTarget.href);
@@ -29,7 +33,7 @@ export function HistoryWorkbench({ locale: initialLocale, section, children }: {
     </div>
     <div className="mx-auto grid max-w-screen-2xl md:min-h-[calc(100vh-77px)] md:grid-cols-[200px_1fr]">
       <nav aria-label={t.desk} className="border-b bg-background p-3 md:border-r md:border-b-0 md:py-6">
-        {(["desk", "staff", "evidence"] as const).map((item) => <a key={item} href={`/vehicle-history/${locale}${item === "staff" ? "/staff" : item === "evidence" ? "/payment-evidence" : ""}`} aria-current={section === item ? "page" : undefined} className="block rounded-md px-4 py-3 text-sm font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:bg-muted">{item === "desk" ? t.title : item === "staff" ? staffCopy[locale].title : proofCopy[locale].historical}</a>)}
+        {(["desk", "staff", "evidence", "refunds"] as const).map((item) => <a key={item} href={`/vehicle-history/${locale}${paths[item]}`} aria-current={section === item ? "page" : undefined} className="block rounded-md px-4 py-3 text-sm font-semibold hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring aria-[current=page]:bg-muted">{sections[item]}</a>)}
       </nav>
       <main id="history-content" tabIndex={-1} className="min-w-0 p-5 outline-none sm:p-8">{children}</main>
     </div>

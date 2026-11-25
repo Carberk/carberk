@@ -458,6 +458,9 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       await f.request.post(e.work + "/recovery").auth(e.operator.token, { type: "bearer" }).send({ kind: "company_error_refund",
         orderId: e.target.orderId, expectedAssignmentVersion: 1, expectedVersion: recovery.version, attemptKey: randomUUID() }).expect(201);
     }
+    const founder = await f.actor("vehicle_history_refund_decision");
+    await f.request.get(root + "/refunds/" + e.id).auth(founder.token, { type: "bearer" }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ failure: kind, reason: kind, refund: { status: "pending" } }));
     await read().expect(200).expect(({ body }) => expect(body).toMatchObject({
       status: "payment_confirmed", wallet: null,
       recovery: { status: "refund_decision_pending", pendingReason: kind, failure: kind, originalPromiseBy: "2026-11-21T07:00:00.000Z" },

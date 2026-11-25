@@ -1,4 +1,5 @@
 import type { HistoryOfferSchemas as O, HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/contracts";
+import type { HistoryRefundEvent } from "./HistoryRefund";
 import type { HistoryReportStore } from "./HistoryReportArtifact";
 import { HistoryRequestError } from "./HistoryRequestError";
 
@@ -45,6 +46,8 @@ export interface HistoryOrderStore {
   fulfilmentAttempt(key: string): Promise<H.HistoryFulfilmentMutation | null>;
   hasEarlierPaidWork(confirmedAt: string | null, now: Date, stage?: "fulfilment" | "delivery"): Promise<boolean>;
   saveFulfilment(write: HistoryFulfilmentWrite): Promise<void>;
+  refundEvents(): Promise<HistoryRefundEvent[]>;
+  appendRefund(event: HistoryRefundEvent, paymentVersion: number): Promise<void>;
   recovery(): Promise<H.HistoryRecoveryState | null>;
   recoveryAttempt(key: string): Promise<{ input: HistoryRecoveryCommand; actorId: string } | null>;
   saveRecovery(state: H.HistoryRecoveryState, now: Date, command?: { input: HistoryRecoveryCommand; actorId: string; assignmentVersion: number }): Promise<void>;

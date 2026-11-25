@@ -4,7 +4,7 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { Reflector } from "@nestjs/core";
 import { JwtModule, JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { PrismaService } from "@auto-tm/db";
+import { PrismaService, type Prisma } from "@auto-tm/db";
 import supertest from "supertest";
 import { JwtAuthGuard } from "../../src/common/jwt-auth.guard";
 import { AccountDeletionPendingGuard } from "../../src/common/account-deletion-pending.guard";
@@ -44,7 +44,7 @@ export async function historyFixture(configure?: (config: ConfigService) => void
       let release!: () => void;
       barrier = { remaining: count, ready: new Promise<void>((resolve) => { release = resolve; }), release: () => release() };
     },
-    async actor(purpose: "vehicle_history" | "vehicle_history_payment_evidence" | "vehicle_history_staff_management" | null = "vehicle_history", role: "buyer" | "seller" | "admin" = "buyer") {
+    async actor(purpose: Prisma.StaffGrantCreateInput["purpose"] | null = "vehicle_history", role: "buyer" | "seller" | "admin" = "buyer") {
       const user = await prisma.user.create({ data: { role, email: `history-${randomUUID()}@example.invalid`,
         emailVerifiedAt: new Date(), displayName: "Ayna", nameNumber: 1213,
         ...(purpose ? { staffGrants: { create: { purpose } } } : {}),
@@ -73,6 +73,7 @@ export async function historyFixture(configure?: (config: ConfigService) => void
         const storage = app.get<HistoryPrivateStorage>(HISTORY_PRIVATE_STORAGE);
         for (const file of files) await storage.delete(file as HistoryPrivateFile);
         await prisma.historyPrivateFile.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
+        await prisma.historyRefundEvent.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.historyPaymentCheck.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.historyFulfilmentEvent.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });
         await prisma.historyVinAgreement.deleteMany({ where: { requestId: { in: requests.map((request) => request.id) } } });

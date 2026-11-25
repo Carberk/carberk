@@ -4,6 +4,10 @@ import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const messages = {
   en: {
+    HISTORY_REFUND_INVALID: "Check the refund details and try again.",
+    HISTORY_REFUND_CONFLICT: "The refund changed. Refresh and check the recorded state.",
+    HISTORY_REFUND_NOT_FOUND: "No refund case is available for this request.",
+    HISTORY_REFUND_UNAVAILABLE: "Refund details are unavailable. Refresh before retrying.",
     HISTORY_RECOVERY_INVALID: "Check the recovery choice and try again.",
     HISTORY_RECOVERY_CONFLICT: "Recovery changed. Refresh the order before choosing again.",
     HISTORY_REPLACEMENT_INVALID: "Check the new delivery window and try again.",
@@ -61,6 +65,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Check the request details and try again.",
   },
   ru: {
+    HISTORY_REFUND_INVALID: "Проверьте данные возврата и попробуйте снова.",
+    HISTORY_REFUND_CONFLICT: "Состояние возврата изменилось. Обновите страницу и проверьте запись.",
+    HISTORY_REFUND_NOT_FOUND: "Для этого обращения нет доступного возврата.",
+    HISTORY_REFUND_UNAVAILABLE: "Данные возврата недоступны. Обновите страницу перед повторной попыткой.",
     HISTORY_RECOVERY_INVALID: "Проверьте выбранный вариант и повторите попытку.",
     HISTORY_RECOVERY_CONFLICT: "Условия изменились. Обновите заказ перед выбором.",
     HISTORY_REPLACEMENT_INVALID: "Проверьте новое время доставки и повторите попытку.",
@@ -118,6 +126,10 @@ const messages = {
     HISTORY_REQUEST_INVALID: "Проверьте данные запроса и повторите попытку.",
   },
   tk: {
+    HISTORY_REFUND_INVALID: "Puly yzyna gaýtarmak üçin maglumatlary barlap, gaýtadan synanyşyň.",
+    HISTORY_REFUND_CONFLICT: "Ýagdaý üýtgedi. Sahypany täzeläp, ýazgyny barlaň.",
+    HISTORY_REFUND_NOT_FOUND: "Bu ýüz tutma boýunça pul gaýtarym işi elýeterli däl.",
+    HISTORY_REFUND_UNAVAILABLE: "Pul gaýtarym maglumatlary elýeterli däl. Gaýtadan synanyşmazdan öň sahypany täzeläň.",
     HISTORY_RECOVERY_INVALID: "Saýlan çözgüdiňizi barlap, gaýtadan synanyşyň.",
     HISTORY_RECOVERY_CONFLICT: "Şertler üýtgedi. Täzeden saýlamazdan öň sargydy täzeläň.",
     HISTORY_REPLACEMENT_INVALID: "Täze gowşuryş wagtyny barlap, gaýtadan synanyşyň.",
@@ -252,11 +264,24 @@ const reportStatuses = {
   HISTORY_REPORT_LINK: 422, HISTORY_REPORT_RIGHTS: 422,
 } as const;
 
+const refundStatuses = {
+  HISTORY_REFUND_INVALID: 400, HISTORY_REFUND_CONFLICT: 409, HISTORY_REFUND_NOT_FOUND: 404, HISTORY_REFUND_UNAVAILABLE: 503,
+} as const;
+
+@Catch()
+export class HistoryRefundsExceptionFilter extends HistoryRequestExceptionFilter {
+  override catch(error: unknown, host: ArgumentsHost) {
+    super.catch(error instanceof HistoryRequestError || error instanceof HttpException
+      ? error : new HistoryRequestError("HISTORY_REFUND_UNAVAILABLE"), host);
+  }
+}
+
 export function historyRequestFailure(error: unknown, language: string | undefined) {
   const locale = language?.split(/[-,;]/)[0]?.trim();
   const code = error instanceof HistoryRequestError ? error.code : error instanceof HttpException
     ? "HISTORY_REQUEST_DENIED" : "HISTORY_MESSAGE_UNAVAILABLE";
-  const status = error instanceof HttpException ? error.getStatus() : code in reportStatuses ? reportStatuses[code as keyof typeof reportStatuses]
+  const status = error instanceof HttpException ? error.getStatus() : code in refundStatuses ? refundStatuses[code as keyof typeof refundStatuses]
+    : code in reportStatuses ? reportStatuses[code as keyof typeof reportStatuses]
     : code === "HISTORY_PAYMENT_UNAVAILABLE" || code === "HISTORY_PROOF_UNAVAILABLE" || code === "HISTORY_ORDER_UNAVAILABLE" || code === "HISTORY_OFFER_UNAVAILABLE" || code === "HISTORY_MESSAGE_UNAVAILABLE" || code === "HISTORY_REMINDER_UNAVAILABLE" || code === "HISTORY_NOTE_UNAVAILABLE" ? 503
     : code === "HISTORY_REPLACEMENT_CONFLICT" || code === "HISTORY_REPLACEMENT_CAPACITY" || code === "HISTORY_FULFILMENT_CONFLICT" || code === "HISTORY_FULFILMENT_FIFO" || code === "HISTORY_CORRECTION_CONFLICT" || code === "HISTORY_CORRECTION_CLOSED" || code === "HISTORY_PAYMENT_CONFLICT" || code === "HISTORY_PAYMENT_CLOSED" || code === "HISTORY_PROOF_EXPIRED" || code === "HISTORY_PROOF_CONFLICT" || code === "HISTORY_ORDER_STALE" || code === "HISTORY_ORDER_CONFLICT" || code === "HISTORY_ORDER_CAPACITY" || code === "HISTORY_OFFER_CONFLICT" || code === "HISTORY_REQUEST_CONFLICT" || code === "HISTORY_ASSIGNMENT_CONFLICT" || code === "HISTORY_MESSAGE_CONFLICT" || code === "HISTORY_REMINDER_CONFLICT" || code === "HISTORY_NOTE_CONFLICT" ? 409
       : code === "HISTORY_REPLACEMENT_INVALID" || code === "HISTORY_FULFILMENT_INVALID" || code === "HISTORY_CORRECTION_INVALID" || code === "HISTORY_PAYMENT_INVALID" || code === "HISTORY_PROOF_INVALID" || code === "HISTORY_ORDER_INVALID" || code === "HISTORY_OFFER_INVALID" || code === "HISTORY_REQUEST_INVALID" || code === "HISTORY_MESSAGE_INVALID" || code === "HISTORY_MESSAGE_CURSOR" || code === "HISTORY_REMINDER_INVALID"

@@ -16,13 +16,14 @@ import { PaymentProof } from "./PaymentProof";
 import { VinCorrection } from "./VinCorrection";
 import { historySessionCurrent, type HistoryViewer } from "./session";
 
+import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, reconcileOrder }: {
+export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, orderReadError, reconcileOrder }: {
   viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; metadataAvailable: boolean;
-  active: boolean; connected: boolean; recoveryVersion?: number | undefined; reconcileOrder: () => Promise<unknown>;
+  active: boolean; connected: boolean; recoveryVersion?: number | undefined; orderReadError: unknown; reconcileOrder: () => Promise<unknown>;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
@@ -64,6 +65,10 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const data = accepted?.acceptedOffer ?? state.data?.offer;
   const replacement = orderState?.replacement;
   const recovery = orderState?.recovery;
+  const refundRecorded = !!orderState?.refund;
+  useEffect(() => {
+    if (refundRecorded && ready && active && connected) void reconcileOrder();
+  }, [refundRecorded, ready, active, connected, reconcileOrder]);
   useEffect(() => {
     if (ready && active && connected && recoveryVersion !== undefined && recoveryVersion > (recovery?.version ?? 0)) void refresh();
   }, [active, connected, ready, recoveryVersion, recovery?.version, refresh]);
@@ -184,6 +189,9 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const historicalWindow = replacement || orderState?.status === "hold_expired";
   const originalWindow = historicalWindow ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
   const canEdit = ready && active && connected && !saving && !accepted;
+  if (refundRecorded) return !active || !connected ? null : orderReadError
+    ? <ErrorState error={orderReadError} title={t("vehicleHistory.orderStatusUnavailable")} onRetry={() => { void reconcileOrder(); }} />
+    : <ActivityIndicator accessibilityLabel={t("loading")} />;
   return <View className="gap-3 rounded-2xl border border-border p-4">
     {!accepted && <Text accessibilityRole="header" className="text-headline font-semibold">{copy("title")}</Text>}
     <Text className="text-footnote text-muted-foreground">{copy("synthetic")}</Text>
@@ -211,6 +219,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             {(!accepted || expanded) && proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
             {(!accepted || expanded) && <><Text className="text-callout">{copy("rights")}</Text><Text className="text-callout">{copy("terms")}</Text></>}
             {accepted ? <>
+              {orderState?.companyFundedCorrection && <Text>{t("vehicleHistory.refund.companyFunding")}</Text>}
               <Text>{t("vehicleHistory.offerOrderPrice", { amount: accepted.acceptedOffer.proposal.priceTmt })}</Text>
               <Text>{copy("orderAccepted")}: {timestamp(accepted.acceptedAt)}</Text>
               {orderState?.paymentDeadline && <Text>{t("vehicleHistory.replacementPaymentDeadline")}: {timestamp(orderState.paymentDeadline)}</Text>}

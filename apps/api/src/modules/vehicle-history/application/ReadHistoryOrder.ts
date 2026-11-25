@@ -3,6 +3,7 @@ import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessage
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { historyOrderState } from "../domain/HistoryOrder";
 import { historyDeliveryDeadline, settleHistoryRecovery } from "../domain/HistoryRecovery";
+import { historyRefundCase, historyRefundReason } from "../domain/HistoryRefund";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { IDENTITY_READ_PORT, IDENTITY_CHECK_PORT, type IdentityReadPort, type IdentityCheckPort } from "../../identity/identity.public";
 import { readFulfilment } from "./HistoryFulfilment";
@@ -23,12 +24,23 @@ export class ReadHistoryOrder {
       const order = await orders.read(), checks = await orders.paymentChecks(), proofs = await orders.submittedProofIds();
       const now = this.clock.now();
       const state = historyOrderState(order, now, checks, proofs.length > 0);
-      const confirmedAt = state.status === "payment_confirmed" ? state.payment?.confirmedAt : null;
-      if (!order || !confirmedAt) return state;
-      const delivered = await orders.reportArtifacts.delivered(order.id);
-      const intent = await orders.fulfilment();
-      const recovery = await settleHistoryRecovery(orders, order, now, !!delivered, intent);
+      const payment = checks.find((check) => check.confirmedAt);
+      if (!order || !payment?.confirmedAt) return state;
+      const confirmedAt = payment.confirmedAt;
+      const booked = state.status === "payment_confirmed";
+      const delivered = booked && !!await orders.reportArtifacts.delivered(order.id);
+      const intent = booked ? await orders.fulfilment() : null;
+      const recovery = booked ? await settleHistoryRecovery(orders, order, now, delivered, intent) : null;
       if (recovery) state.recovery = recovery;
+      if (!delivered && historyRefundReason(order, recovery)) {
+        const refund = historyRefundCase(order, payment, recovery, await orders.refundEvents());
+        if (refund) state.refund = refund.refund;
+        return state;
+      }
+      if (!booked) return state;
+      if (intent?.funding === "company" || order.agreement?.accepted.at(-1)?.cause === "company_error") {
+        state.companyFundedCorrection = true;
+      }
       state.preparation = delivered ? "delivered" : !intent ? "queued" : intent.status === "recovery" ? "recovery"
         : intent.status === "uncertain" ? "checking" : "preparing";
       if (actor.operator) {

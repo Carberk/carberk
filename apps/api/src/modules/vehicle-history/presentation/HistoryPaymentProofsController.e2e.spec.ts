@@ -102,6 +102,10 @@ describe("private payment proof over HTTP, Postgres and MinIO", () => {
     await historical({ ...input, reason: "" }).expect(400);
     await historical({ ...input, fileId: randomUUID() }).expect(403);
     await historical(input, next.token).expect(403);
+    for (const purpose of ["vehicle_history_refund_decision", "vehicle_history_refund_execution"] as const) {
+      const refundActor = await f.actor(purpose);
+      await historical(input, refundActor.token).expect(403);
+    }
     expect((await historical(input).expect(201)).body.file.id).toBe(file.id);
     const audit = await f.prisma.auditLog.findFirst({ where: { actorId: reader.user.id, action: "history.payment_evidence.read", targetId: file.id } });
     expect(audit?.details).toMatchObject({ requestId: e.id, reason: input.reason, purpose: "payment_evidence" });

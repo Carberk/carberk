@@ -1,5 +1,6 @@
 export const STAFF_ACCESS_PORT = Symbol("StaffAccessPort");
-export type StaffPurpose = "vehicle-history" | "vehicle-history-payment-evidence" | "vehicle-history-staff-management";
+export type StaffPurpose = "vehicle-history" | "vehicle-history-payment-evidence" | "vehicle-history-staff-management"
+  | "vehicle-history-refund-decision" | "vehicle-history-refund-execution";
 
 export interface StaffActor {
   id: string;
