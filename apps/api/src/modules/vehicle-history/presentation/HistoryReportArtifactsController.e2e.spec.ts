@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:https";
@@ -735,6 +735,28 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     await e.record({ kind: "company_error" }, 2).expect(201);
     await e.read("/content").expect(409);
     expect(received).toEqual([]);
+  });
+
+  it("resumes an already-staged archive upload using only the recorded original", async () => {
+    const e = await obtained("pdf", facts.vin, { source: "archive" });
+    const { pdf, bytes } = await document();
+    const id = randomUUID();
+    await f.prisma.historyReportArtifact.create({ data: {
+      id, requestId: e.id, orderId: e.target.orderId, intentId: e.target.intentId, intentVersion: e.target.intentVersion,
+      acceptedRevision: e.target.acceptedRevision, stagedBy: e.operator.user.id,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      artifact: { id, source: "archive", format: "pdf", report: facts,
+        pdf: { filename: pdf.filename, sizeBytes: bytes.length, pages: 2 } },
+    } });
+
+    await e.read().expect(200, { status: "staged" });
+    await e.validate({ pdf }, (await f.actor()).token).expect(403);
+    await e.validate({ pdf, expectedAssignmentVersion: 0 }).expect(409);
+    await e.validate({ pdf: { ...pdf, filename: "Other original.pdf" } }).expect(409);
+    await e.validate({ pdf: (await document({ reportId: "fixture-different" })).pdf }).expect(409);
+    await e.validate({ pdf }).expect(201).expect(({ body }) => expect(body.artifact.id).toBe(id));
+    const content = await e.read("/content").expect(200);
+    expect(Buffer.from(content.body.dataBase64, "base64")).toEqual(bytes);
   });
 
   it("recovers exact bytes after an interrupted validation write and fences current reads", async () => {

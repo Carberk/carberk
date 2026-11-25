@@ -28,10 +28,11 @@ function base64(file: File) {
   });
 }
 
-export function ReportArtifactPanel({ locale, id, scope, orderId, version, intent, canDeliver, onDelivered, invalidate, onDeliveryIssue }: {
+export function ReportArtifactPanel({ locale, id, scope, orderId, version, intent, canDeliver, onDelivered, invalidate, onDeliveryIssue, recoveryAvailable }: {
   locale: DeskLocale; id: string; scope: string; orderId: string; version: number; intent: Intent;
   canDeliver: boolean; onDelivered: () => void;
   onDeliveryIssue?: (() => void) | undefined;
+  recoveryAvailable?: boolean;
   invalidate: (result: HistoryInboxResult) => void;
 }) {
   const t = reportCopy[locale];
@@ -39,6 +40,7 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
   const [pending, setPending] = useState<Action | null>("read");
   const [restoring, setRestoring] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [problemRecorded, setProblemRecorded] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [filename, setFilename] = useState("");
   const fileStatus = useId();
@@ -46,7 +48,7 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
   const linkInput = useRef<HTMLInputElement>(null);
   const previewButton = useRef<HTMLButtonElement>(null);
   const validatedStatus = useRef<HTMLParagraphElement>(null);
-  const focusValidation = useRef(false);
+  const focusValidation = useRef<"associate" | "focus" | null>(null);
   const current = useRef({ attempt: 0, invalidate, onDelivered, onDeliveryIssue });
   current.current.invalidate = invalidate;
   current.current.onDelivered = onDelivered;
@@ -59,6 +61,7 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
     const attempt = ++current.current.attempt;
     const target: Target = { orderId, expectedAssignmentVersion: version, intentId, intentVersion, acceptedRevision };
     setFeedback(null);
+    setProblemRecorded(false);
     setPreview(null);
     setPending(action);
     try {
@@ -81,12 +84,15 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
       if (result.status === "expired" || result.status === "stale" || result.status === "denied") {
         current.current.invalidate({ status: result.status });
       } else if (result.status === "ok") {
-        focusValidation.current = validates || associations || action === "deliver";
+        focusValidation.current = action === "associate" ? "associate" : validates || action === "deliver" ? "focus" : null;
         setView(result.view);
         if (validates) setRestoring(false);
         if (result.view.status === "delivered") current.current.onDelivered();
       } else if (result.status === "preview") {
         setPreview(result.dataBase64);
+      } else if (action === "archiveMissing" && result.status === "missing") {
+        setProblemRecorded(true);
+        current.current.onDeliveryIssue?.();
       } else if (result.status !== "archive") {
         if (result.status === "conflict") setView(null);
         setFeedback(action === "restore" && result.status === "mismatch" ? "samePdf"
@@ -118,14 +124,21 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
   const isValidated = view?.status === "validated" || view?.status === "delivered";
   useLayoutEffect(() => {
     if (isValidated && focusValidation.current) {
-      focusValidation.current = false;
-      validatedStatus.current?.focus();
+      if (focusValidation.current === "associate") {
+        validatedStatus.current?.focus({ preventScroll: true });
+        validatedStatus.current?.scrollIntoView({ block: "center" });
+      } else validatedStatus.current?.focus();
+      focusValidation.current = null;
     }
   }, [isValidated, status, restoring]);
   return <section lang={locale} className="space-y-3 border-t pt-3" aria-label={t.title} aria-busy={pending !== null}>
     <h6 className="font-semibold">{t.title}</h6>
     {pending && <p role="status">{t[pending === "read" ? "loading" : pending === "preview" ? "previewing" : pending === "deliver" ? "delivering" : "saving"]}</p>}
     {feedback && <p role="alert">{t[feedback]}</p>}
+    {problemRecorded && <>
+      <p role="status">{archiveCopy[locale].problemRecorded}</p>
+      {recoveryAvailable && <a href="#history-delivery-recovery" className="inline-block min-h-11 py-2 underline">{archiveCopy[locale].reviewRecovery}</a>}
+    </>}
     {!view && !pending && feedback !== "conflict" &&
       <Button type="button" variant="secondary" className={button} onClick={() => void run("read")}>{t.retry}</Button>}
     {isValidated && !restoring ? <>
@@ -151,7 +164,7 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
       </>}
       {view.status === "validated" && canDeliver && <Button data-fulfilment-next type="button" className={button}
         disabled={pending !== null} onClick={() => void run("deliver", view.artifact.id)}>{t.deliver}</Button>}
-    </> : view && (archived ? <>
+    </> : view && (archived && status !== "staged" ? <>
       <ArchivePanel {...{ locale, id, scope, version, invalidate }} vin={intent.accepted.vin} accepted={intent.accepted}
         disabled={pending !== null} onChoose={(item) => { if (!pending) void run("associate", item.id); }} />
       <Button type="button" variant="secondary" className={button} disabled={pending !== null}

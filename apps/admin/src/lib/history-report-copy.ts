@@ -68,7 +68,8 @@ export const archiveCopy = {
     denied: "Archive access is unavailable. Sign in again or refresh the inbox.", changed: "Assignment changed. Refresh the inbox.",
     useDate: "Use this report in the quote", selected: "Archive report selected for this quote.",
     associate: "Associate with this order", incompatible: "This report does not cover the agreed provider, date and formats.",
-    recover: "Record a delivery problem",
+    recover: "Record a delivery problem", problemRecorded: "Delivery problem recorded. Review recovery for this order.",
+    reviewRecovery: "View delivery recovery",
   },
   ru: {
     title: "Разрешённый архив", search: "Найти отчёты по этому VIN", loading: "Ищем отчёты в архиве…",
@@ -76,7 +77,8 @@ export const archiveCopy = {
     denied: "Архив недоступен. Войдите снова или обновите входящие.", changed: "Исполнитель сменился. Обновите входящие.",
     useDate: "Использовать отчёт в предложении", selected: "Архивный отчёт выбран для предложения.",
     associate: "Связать с этим заказом", incompatible: "Отчёт не соответствует согласованным поставщику, дате и форматам.",
-    recover: "Зафиксировать проблему с доставкой",
+    recover: "Зафиксировать проблему с доставкой", problemRecorded: "Проблема с доставкой зафиксирована. Проверьте варианты для этого заказа.",
+    reviewRecovery: "Действия по доставке",
   },
   tk: {
     title: "Rugsat berlen arhiw", search: "Şu VIN boýunça hasabatlary tapmak", loading: "Arhiwde gözlenýär…",
@@ -84,6 +86,7 @@ export const archiveCopy = {
     denied: "Arhiw elýeterli däl. Gaýtadan giriň ýa-da giriş gutusyny täzeläň.", changed: "Jogapkär işgär üýtgedi. Giriş gutusyny täzeläň.",
     useDate: "Teklipde şu hasabaty ulanmak", selected: "Teklip üçin arhiw hasabaty saýlandy.",
     associate: "Şu sargyt bilen baglanyşdyrmak", incompatible: "Hasabat ylalaşylan üpjün edijä, senä we görnüşlere gabat gelmeýär.",
-    recover: "Gowşuryş meselesini ýazga almak",
+    recover: "Gowşuryş meselesini ýazga almak", problemRecorded: "Gowşuryş meselesi ýazga alyndy. Şu sargyt boýunça çözgütleri barlaň.",
+    reviewRecovery: "Gowşuryş çözgütlerine seretmek",
   },
 } as const;

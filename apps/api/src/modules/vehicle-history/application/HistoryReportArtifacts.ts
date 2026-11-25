@@ -127,7 +127,12 @@ export class HistoryReportArtifacts {
     const link = input.link ?? null;
     const staged = await this.current(actor, id, input, async (store, intent, sender, order, orders) => {
       const existing = await store.find(intent.version);
-      if (intent.source === "archive") throw new HistoryRequestError(!bytes && !link ? "HISTORY_REPORT_MISSING" : "HISTORY_REPORT_CONFLICT");
+      if (intent.source === "archive") {
+        if (!bytes && !link) throw new HistoryRequestError("HISTORY_REPORT_MISSING");
+        if (!existing || existing.archiveSourceId || existing.artifact.source !== "archive") {
+          throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+        }
+      }
       if (existing) {
         const filename = existing.artifact.format === "link" ? undefined : existing.artifact.pdf.filename;
         const restoringPdf = existing.validatedAt && bytes && existing.artifact.format !== "link" && link === null;

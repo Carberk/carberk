@@ -106,7 +106,8 @@ export function FulfilmentPanel({ locale, id, version, scope, actorId, state, on
     {phase === "ready" && intent?.status === "obtained" && state.order && (delivered || view?.gate !== "booking_closed") && <ReportArtifactPanel
       key={`${state.order.id}:${intent.id}:${intent.version}`} locale={locale} id={id} scope={scope}
       orderId={state.order.id} version={version} intent={intent} canDeliver={!delivered && view?.gate === "ready"}
-      onDelivered={() => { if (!delivered) onOrder({ ...state, preparation: "delivered" }); }} invalidate={invalidate} onDeliveryIssue={refreshOrder} />}
+      onDelivered={() => { if (!delivered) onOrder({ ...state, preparation: "delivered" }); }} invalidate={invalidate}
+      onDeliveryIssue={refreshOrder} recoveryAvailable={!!state.recovery} />}
     {phase !== "ready" && <p role={phase === "saving" || phase === "loading" ? "status" : "alert"}>{t[phase]}</p>}
     {phase !== "saving" && phase !== "loading" && <Button ref={refresh} type="button" className={action} variant="secondary"
       onClick={() => { void run(); }}>{t.refresh}</Button>}
