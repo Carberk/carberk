@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, ActivityIndicator, AppState, Keyboard, View } from "react-native";
 import { router } from "expo-router";
 import { focusManager, useQuery } from "@tanstack/react-query";
@@ -22,10 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
-export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, orderReadError, reconcileOrder, revealRepeat }: {
+export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, orderReadError, reconcileOrder,
+  revealRepeat, onRepeatDecisionChange }: {
   viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; metadataAvailable: boolean;
   active: boolean; connected: boolean; recoveryVersion?: number | undefined; orderReadError: unknown; reconcileOrder: () => Promise<unknown>;
   revealRepeat: (view: View, current: () => boolean) => void;
+  onRepeatDecisionChange: (visible: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
   const { userId, sessionId } = viewer;
@@ -175,8 +177,13 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
       await state.refetch(); if (owns()) await reconcileOrder();
     } finally { busy.current = false; if (mounted.current) setSaving(false); }
   }
-  const previous = repeat?.vin === vin && repeat.generation === readGeneration.current
+  const previous = !accepted && !failed && !state.error && canRead() && repeat?.vin === vin && repeat.generation === readGeneration.current
     && repeat.version === data?.version ? repeat.purchase : null;
+  useLayoutEffect(() => {
+    if (!previous) return;
+    onRepeatDecisionChange(true);
+    return () => onRepeatDecisionChange(false);
+  }, [previous, onRepeatDecisionChange]);
   const repeatTitle = t("vehicleHistory.offerRepeatTitle");
   useEffect(() => {
     if (previous) AccessibilityInfo.announceForAccessibility(repeatTitle);
@@ -217,6 +224,10 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const denied = failed === "denied" || state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
   const error = failed || !!state.error;
   const proposal = data?.proposal;
+  const providers = data?.preflight?.status === "available" ? data.preflight.providers : [];
+  const datesWithConfirmation = !accepted && !!proposal;
+  const providerDate = (provider: (typeof providers)[number]) =>
+    <Text key={provider.name} className="text-callout">{provider.name} · {copy("date")}: {provider.originalReportDate ?? copy("unknown")}</Text>;
   const historicalWindow = replacement || orderState?.status === "hold_expired";
   const originalWindow = historicalWindow ? orderState?.agreement?.accepted[0]?.offer.proposal ?? proposal : proposal;
   const canEdit = ready && active && connected && !saving && !accepted;
@@ -240,7 +251,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
           {data.vin && <Text selectable className="text-body font-mono">VIN: {data.vin}</Text>}
           {data.preflight?.status === "available" && (!accepted || expanded) && <>
             <Text className="text-callout">{copy("rule")}</Text>
-            {data.preflight.providers.map((provider) => <Text key={provider.name} className="text-callout">{provider.name} · {copy("date")}: {provider.originalReportDate ?? copy("unknown")}</Text>)}
+            {providers.filter((provider) => !datesWithConfirmation || !provider.originalReportDate).map(providerDate)}
             <Text className="text-footnote text-muted-foreground">{copy("limits")}</Text>
           </>}
           {proposal && <View className="gap-3 border-y border-border py-4">
@@ -262,9 +273,12 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
               <Button variant="secondary" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)}><Text>{copy(expanded ? "orderHideDetails" : "orderDetails")}</Text></Button>
             </> : <>
               <Text className="text-footnote text-muted-foreground">{copy("orderBefore")}</Text>
-              <Button disabled={!canEdit || state.isFetching || !!vin.trim() || !!orderFailure} accessibilityState={{ busy: saving }} onPress={() => { void accept(); }}>
-                <Text>{copy(saving ? "orderPending" : "orderConfirm")}</Text>
-              </Button>
+              <View className="gap-3">
+                {providers.filter((provider) => provider.originalReportDate).map(providerDate)}
+                <Button disabled={!canEdit || state.isFetching || !!vin.trim() || !!orderFailure} accessibilityState={{ busy: saving }} onPress={() => { void accept(); }}>
+                  <Text>{copy(saving ? "orderPending" : "orderConfirm")}</Text>
+                </Button>
+              </View>
             </>}
             {orderFailure && !accepted && <View className="gap-3"><Text accessibilityRole="alert">{copy(orderFailure)}</Text>
               <Button variant="secondary" disabled={!ready || !active || !connected || state.isFetching} onPress={() => { setOrderFailure(null); void state.refetch(); }}><Text>{copy("refresh")}</Text></Button>

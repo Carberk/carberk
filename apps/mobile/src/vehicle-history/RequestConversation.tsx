@@ -73,6 +73,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const [pendingLink, setPendingLink] = useState<{ key: string; action: "open" | "copy" } | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+  const [composerCollapsed, setComposerCollapsed] = useState(false);
   const linkAttempt = useRef(0);
   const linkReader = useRef({ mounted: true, ready: false });
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
@@ -263,7 +264,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       {!denied && !delivered && !refund && !refundReadFailed && <OfferPreview viewer={viewer} request={request}
         ready={metadataCurrent} metadataAvailable={metadataAvailable} active={thread.active} connected={thread.connected}
         recoveryVersion={order?.recovery?.version} orderReadError={thread.order.error} reconcileOrder={thread.order.refetch}
-        revealRepeat={revealRepeat} />}
+        revealRepeat={revealRepeat} onRepeatDecisionChange={setComposerCollapsed} />}
       {(order?.recovery || refund) && header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
@@ -352,7 +353,11 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       </View>}
     </View>}
     />
-    {!denied && <View className="gap-3 border-t-hairline border-border bg-background px-5 py-3">
+    {!denied && (largeText && composerCollapsed ? <View className="border-t-hairline border-border bg-background px-5 py-2">
+      <Button variant="secondary" className="min-h-12" onPress={() => setComposerCollapsed(false)}>
+        <Text>{t("vehicleHistory.offerRepeatBackToChat")}</Text>
+      </Button>
+    </View> : <View className="gap-3 border-t-hairline border-border bg-background px-5 py-3">
       <Text nativeID="history-reply-label" className="text-footnote font-semibold">{t("vehicleHistory.replyLabel")}</Text>
       <Input ref={composer} accessibilityLabel={t("vehicleHistory.replyLabel")} accessibilityLabelledBy="history-reply-label"
         className="max-h-36 min-h-20 py-3" multiline textAlignVertical="top" maxLength={4000}
@@ -371,6 +376,6 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         onPress={() => void reply.send()}>
         <Text>{t(reply.pending ? "vehicleHistory.sending" : unresolved ? "vehicleHistory.sendNew" : "vehicleHistory.sendMessage")}</Text>
       </Button>
-    </View>}
+    </View>)}
   </View>;
 }
