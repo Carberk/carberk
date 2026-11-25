@@ -60,7 +60,7 @@ export function PromiseRecoveryPanel({ locale, id, version, scope, actorId, reco
   }
   const button = "h-auto min-h-11 max-w-full whitespace-normal text-left";
   const revised = !delivered && !pending && !recovery.agreedFormat && recovery.proposedFormat;
-  return <section className="space-y-3 rounded-md border p-3" aria-busy={saving}>
+  return <section id="history-delivery-recovery" tabIndex={-1} className="space-y-3 rounded-md border p-3" aria-busy={saving}>
     <h5 className="font-semibold"><span role="status">{delivered ? t.delivered : t[recovery.status]}</span></h5>
     <dl className="space-y-1">
       <div><dt>{format.orderHold}</dt><dd>{timestamp(recovery.paymentHoldExpiresAt)}</dd></div>
@@ -72,6 +72,7 @@ export function PromiseRecoveryPanel({ locale, id, version, scope, actorId, reco
       {recovery.agreedFormat && <div><dt>{t.agreedFormat}</dt><dd>{format[recovery.agreedFormat]}</dd></div>}
     </dl>
     {!delivered && recovery.failure && <p>{t[recovery.failure]}</p>}
+    {!delivered && recovery.status === "attention" && recovery.failure === "file_delivery" && <p>{t.deliveryAttention}</p>}
     {offered && <p>{t.customerChoice}</p>}
     {pending && <>
       {recovery.pendingReason && recovery.pendingReason !== recovery.failure && <p>{t[recovery.pendingReason]}</p>}

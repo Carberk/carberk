@@ -2,6 +2,7 @@ import { z, DateTimeSchema } from "../zod";
 
 import { ServiceMessageSchema, ServiceTextSchema, ServiceReceiptSchema, ServiceReceiptsSchema } from "./service-messages";
 import { PublicIdentitySchema } from "./identity";
+import { HistoryPurchasedReportSchema } from "./history-report-artifact";
 
 export const HistoryOperatorSchema = z.object({ id: z.string().guid(), displayName: z.string().nullable(), nameNumber: z.number().int() });
 export const HistoryDeskSchema = z.object({
@@ -28,6 +29,7 @@ export const HistoryRequestSchema = z.object({
   assignedOperator: HistoryOperatorSchema.nullable(),
   assignmentVersion: z.number().int().min(0).max(2147483647).default(0),
   reportReady: z.literal(true).optional(),
+  purchasedReport: HistoryPurchasedReportSchema.optional(),
 });
 export type HistoryRequest = z.infer<typeof HistoryRequestSchema>;
 

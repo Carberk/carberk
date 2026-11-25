@@ -21,6 +21,15 @@ const providerBudgets = z.string().default("{}").transform((value, ctx): unknown
   externalUsage: z.record(z.iso.date(), z.number().int().nonnegative()).default({}),
 }).strict()));
 
+const archiveDigests = z.array(z.string().regex(/^[a-f0-9]{64}$/)).default([]);
+const syntheticArchiveEvidence = z.string().default("{}").transform((value, ctx): unknown => {
+  try { return JSON.parse(value); }
+  catch {
+    ctx.addIssue({ code: "custom", message: "Expected a JSON object of synthetic archive evidence digests" });
+    return z.NEVER;
+  }
+}).pipe(z.strictObject({ pdf: archiveDigests, link: archiveDigests }));
+
 const BaseSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   /**
@@ -109,6 +118,7 @@ const BaseSchema = z.object({
   VEHICLE_HISTORY_SYNTHETIC_PROVIDER_BUDGETS: providerBudgets,
   VEHICLE_HISTORY_SYNTHETIC_REPORT_ORIGIN: z.string().regex(/^https:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/).or(z.literal("")).default(""),
   VEHICLE_HISTORY_SYNTHETIC_REPORT_CA: z.base64().max(16384).or(z.literal("")).default(""),
+  VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE: syntheticArchiveEvidence,
 
   /** Listing video uploads (ADR-0112): off by default; testers are User IDs. */
   LISTING_VIDEO_UPLOADS_ENABLED: booleanFlag,

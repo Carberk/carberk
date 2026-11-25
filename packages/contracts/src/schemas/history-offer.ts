@@ -7,7 +7,7 @@ export const HistoryPreflightSchema = z.discriminatedUnion("status", [
   z.object({ status: z.enum(["malformed", "unsupported", "no_history", "mismatch", "outage"]) }).strict(),
   z.object({ status: z.literal("available"), providers: z.array(z.object({
     name: z.enum(["Carfax", "AutoCheck"]), originalReportDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
-  }).strict()).min(1).max(2) }).strict(),
+  }).strict()).min(1).max(2), archiveFormat: HistoryDeliveryFormatSchema.optional() }).strict(),
 ]);
 export const HistoryQuotePreviewSchema = z.object({
   format: HistoryDeliveryFormatSchema, deliveryFrom: DateTimeSchema, deliveryBy: DateTimeSchema,
@@ -20,7 +20,8 @@ export const HistoryOfferSchema = z.object({
 }).strict();
 export type HistoryOffer = z.infer<typeof HistoryOfferSchema>;
 export const HistoryOfferMutationSchema = z.object({ kind: z.literal("vin"), vin: VinInput, expectedVersion: Version }).strict();
-const Check = z.object({ kind: z.literal("check"), vin: VinInput, expectedVersion: Version, expectedAssignmentVersion: Version }).strict();
+const Check = z.object({ kind: z.literal("check"), vin: VinInput, expectedVersion: Version, expectedAssignmentVersion: Version,
+  archiveId: z.string().guid().optional() }).strict();
 const Propose = z.object({ kind: z.literal("propose"), expectedVersion: Version, expectedAssignmentVersion: Version,
   format: HistoryDeliveryFormatSchema, deliveryFrom: DateTimeSchema, deliveryBy: DateTimeSchema,
 }).strict();

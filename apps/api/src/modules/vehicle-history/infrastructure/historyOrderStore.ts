@@ -3,7 +3,7 @@ import { HistoryOrderSchemas as H, HistoryPaymentSchemas as P } from "@auto-tm/c
 import type { PoolClient } from "pg";
 import type { HistoryAgreementInput, HistoryOrderStore, HistoryProvider, HistoryRecoveryCommand } from "../domain/HistoryOrder";
 
-import { historyReportStore } from "./historyReportStore";
+import { historyReportStore, type ArchiveEvidenceAllowlist } from "./historyReportStore";
 
 const activeOrders = `WITH active_orders AS (
   SELECT o.*,
@@ -38,10 +38,11 @@ export const dueHistoryRecovery = `${activeOrders}
     END
   ORDER BY r.id LIMIT 50`;
 
-export function historyOrderStore(client: PoolClient, requestId: string, assignmentVersion: number, assertActive: () => void): HistoryOrderStore {
+export function historyOrderStore(client: PoolClient, requestId: string, assignmentVersion: number, assertActive: () => void,
+  archiveEvidence?: ArchiveEvidenceAllowlist): HistoryOrderStore {
   return {
     assignmentVersion,
-    reportArtifacts: historyReportStore(client, requestId, assertActive),
+    reportArtifacts: historyReportStore(client, requestId, assertActive, archiveEvidence),
     async read() {
       assertActive();
       const { rows } = await client.query<{ snapshot: H.HistoryAcceptedOrder; wallet: string; reservedProvider: HistoryProvider | null; agreement: unknown; replacement: unknown; replacementAssignment: number; replacementRevision: number }>(
@@ -91,6 +92,7 @@ export function historyOrderStore(client: PoolClient, requestId: string, assignm
               AND f."recoveryQuotaProvider" IS NULL
           )), 0) AS used FROM active_orders o
           WHERE "activeFrom" < $3 AND "activeBy" > $2
+            AND NOT ("activeOffer"->'preflight' ? 'archiveFormat')
             AND (NOT $5::boolean OR "requestId" <> $6)
             AND ("activeProvider" = $1 OR ("activeProvider" IS NULL
               AND "activeOffer"->'preflight'->'providers' @> jsonb_build_array(jsonb_build_object('name', $1::text))

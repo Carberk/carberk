@@ -79,6 +79,8 @@ export function historyTranscript(viewer: HistoryViewer, requestId: string, sign
     acceptQuote: (offer: H.AcceptHistoryQuote["offer"], current: () => boolean) => transport("/order", H.HistoryOrderStateSchema,
       H.AcceptHistoryQuoteSchema.parse({ offer }), current),
     offer: (current: () => boolean) => transport("/offer", O.HistoryOfferSchema, undefined, current),
+    previousPurchase: (vin: string, current: () => boolean) => transport(
+      `/previous-purchase?vin=${encodeURIComponent(vin)}`, R.HistoryPreviousPurchaseSchema, undefined, current),
     sendVin: (vin: string, expectedVersion: number, current: () => boolean) => transport("/offer", O.HistoryOfferSchema,
       O.HistoryOfferMutationSchema.parse({ kind: "vin", vin, expectedVersion }), current),
     reminder: (current: () => boolean) => transport("/reminder", VehicleHistorySchemas.HistoryReminderSchema, undefined, current),

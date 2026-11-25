@@ -19,7 +19,8 @@ export const HistoryReportQuerySchema = HistoryReportTargetSchema.extend({
 export const ValidateHistoryReportSchema = HistoryReportTargetSchema.extend({
   pdf: z.object({ filename: Filename, dataBase64: PdfBase64 }).strict().optional(),
   link: z.string().min(1).max(2048).optional(),
-}).strict();
+  archiveId: id.optional(),
+}).strict().refine((value) => !value.archiveId || !value.pdf && !value.link);
 export type ValidateHistoryReport = z.infer<typeof ValidateHistoryReportSchema>;
 export const DeliverHistoryReportSchema = HistoryReportTargetSchema.extend({ artifactId: id }).strict();
 export type DeliverHistoryReport = z.infer<typeof DeliverHistoryReportSchema>;
@@ -47,12 +48,28 @@ export const DeliveredHistoryReportSchema = z.object({
 export const PurchaserHistoryReportSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("empty") }).strict(), DeliveredHistoryReportSchema,
 ]);
+const canRestorePdf = z.literal(true).optional();
+export const OperatorDeliveredHistoryReportSchema = DeliveredHistoryReportSchema.extend({ canRestorePdf });
 export const HistoryReportViewSchema = z.discriminatedUnion("status", [
   z.object({ status: z.enum(["empty", "staged"]) }).strict(),
-  z.object({ status: z.literal("validated"), artifact: HistoryReportArtifactSchema, validatedAt: DateTimeSchema }).strict(),
-  DeliveredHistoryReportSchema,
+  z.object({ status: z.literal("validated"), artifact: HistoryReportArtifactSchema, validatedAt: DateTimeSchema, canRestorePdf }).strict(),
+  OperatorDeliveredHistoryReportSchema,
 ]);
 export type HistoryReportView = z.infer<typeof HistoryReportViewSchema>;
+export const HistoryPurchaseVinQuerySchema = z.object({ vin: z.string().min(1).max(80) }).strict();
+export const HistoryArchiveTargetSchema = HistoryPurchaseVinQuerySchema.extend({ expectedAssignmentVersion: version }).strict();
+export const HistoryArchiveQuerySchema = HistoryArchiveTargetSchema.extend({ expectedAssignmentVersion: QueryVersion });
+export const HistoryArchiveItemSchema = HistoryReportFactsSchema.pick({
+  provider: true, vin: true, originalReportDate: true, language: true,
+}).extend({ id, format: accepted.shape.format }).strict();
+export type HistoryArchiveItem = z.infer<typeof HistoryArchiveItemSchema>;
+export const HistoryArchiveSchema = z.object({ items: z.array(HistoryArchiveItemSchema).max(25) }).strict();
+export const HistoryPurchasedReportSchema = HistoryArchiveItemSchema.omit({ id: true, language: true });
+export type HistoryPurchasedReport = z.infer<typeof HistoryPurchasedReportSchema>;
+export const HistoryPreviousPurchaseSchema = z.object({
+  previous: HistoryPurchasedReportSchema.extend({ requestId: id }).nullable(),
+}).strict();
+export type HistoryPreviousPurchase = z.infer<typeof HistoryPreviousPurchaseSchema>;
 export const HistoryReportContentSchema = z.object({ dataBase64: PdfBase64 }).strict();
 export const HistoryReportLinkSchema = z.object({
   address: z.string().max(2048).regex(/^https:\/\/[^\s\\]+$/u),

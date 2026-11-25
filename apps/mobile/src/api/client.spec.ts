@@ -186,6 +186,21 @@ describe("apiClient", () => {
   });
 
   describe("non-401 errors", () => {
+    it("keeps a failed previous-purchase lookup's VIN out of diagnostics", async () => {
+      mockedLoadAuthSession.mockResolvedValue(null);
+      const vin = "DEMA0000000000006";
+      const path = "/vehicle-history/requests/local-fixture/previous-purchase";
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ code: "HISTORY_REPORT_UNAVAILABLE" }, 503));
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      await expect(apiClient.get(`${path}?vin=${vin}`)).rejects.toMatchObject({ code: "HISTORY_REPORT_UNAVAILABLE", status: 503 });
+      expect(fetchSpy.mock.calls[0]?.[0]).toEqual(expect.stringContaining(`${path}?vin=${vin}`));
+      expect(log).toHaveBeenCalledWith("[apiClient] request failed", expect.objectContaining({
+        url: expect.stringMatching(/\/previous-purchase$/), status: 503, code: "HISTORY_REPORT_UNAVAILABLE",
+      }));
+      expect(JSON.stringify(log.mock.calls)).not.toContain(vin);
+    });
+
     it("passes through without retry", async () => {
       mockedLoadAuthSession.mockResolvedValue(null);
 

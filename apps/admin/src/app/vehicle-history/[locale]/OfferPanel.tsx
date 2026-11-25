@@ -9,6 +9,7 @@ import { PaymentVerificationPanel } from "./PaymentVerificationPanel";
 import { FulfilmentPanel } from "./FulfilmentPanel";
 import { PromiseRecoveryPanel } from "./PromiseRecoveryPanel";
 import { VinCorrectionPanel } from "./VinCorrectionPanel";
+import { ArchivePanel } from "./ArchivePanel";
 import { historyOfferAction } from "./offer-actions";
 import type { HistoryInboxResult } from "./actions";
 
@@ -17,6 +18,7 @@ import { paymentCopy } from "@/lib/history-payment-copy";
 import { promiseRecoveryCopy } from "@/lib/history-promise-recovery-copy";
 import { refundCopy } from "@/lib/history-refund-copy";
 import { offerCopy } from "@/lib/history-offer-copy";
+import { archiveCopy } from "@/lib/history-report-copy";
 import type { DeskLocale } from "@/lib/history-desk-copy";
 
 export function OfferPanel({ locale, id, version, scope, actorId, revision, invalidate }: {
@@ -93,6 +95,7 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
   const accepted = orderState?.order;
   const data = accepted?.acceptedOffer ?? quote;
   const available = data?.preflight?.status === "available";
+  const archiveFormat = data?.preflight?.status === "available" ? data.preflight.archiveFormat : undefined;
   const proposal = data?.proposal;
   const replacement = orderState?.replacement;
   const historicalWindow = replacement || orderState?.status === "hold_expired";
@@ -122,6 +125,13 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       {!refund && orderState?.recovery && <PromiseRecoveryPanel key={binding} {...{ locale, id, version, scope, actorId, timestamp, invalidate }}
         recovery={orderState.recovery} intent={orderState.fulfilment?.intent} delivered={orderState.preparation === "delivered"} onOrder={updateOrder} />}
       {data.vin && !proposal && <p className="break-all font-mono">VIN: {data.vin}</p>}
+      {!accepted && data.vin && vin === data.vin && /^[A-HJ-NPR-Z0-9]{17}$/.test(data.vin) &&
+        <ArchivePanel key={`${binding}:${data.version}`} {...{ locale, id, scope, version, vin, invalidate }} disabled={phase !== "ready"}
+          onChoose={(item) => {
+            setFormat("");
+            void run({ kind: "check", vin: item.vin, archiveId: item.id, expectedVersion: data.version, expectedAssignmentVersion: version });
+          }} />}
+      {archiveFormat && !accepted && <p role="status">{archiveCopy[locale].selected}</p>}
       {data.preflight?.status === "available" && !accepted && <>
         <p>{t.rule}</p>
         <dl className="space-y-2">{data.preflight.providers.map((provider) => <div key={provider.name}><dt className="font-medium">{provider.name} · {t.date}</dt><dd>{provider.originalReportDate ?? t.unknown}</dd></div>)}</dl>
@@ -130,7 +140,9 @@ export function OfferPanel({ locale, id, version, scope, actorId, revision, inva
       {available && !accepted && <fieldset disabled={phase === "pending" || vin !== data.vin} className="space-y-4">
         <label className="block">{t.format}<select className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" value={format}
           onChange={(event) => setFormat(event.target.value as typeof format)}>
-          <option value="">{t.choose}</option>{(["pdf", "link", "both"] as const).map((value) => <option key={value} value={value}>{t[value]}</option>)}
+          <option value="">{t.choose}</option>{(["pdf", "link", "both"] as const).filter((value) =>
+            !archiveFormat || archiveFormat === "both" || value === archiveFormat).map((value) =>
+            <option key={value} value={value}>{t[value]}</option>)}
         </select></label>
         <label className="block">{t.fromLabel}<input className="mt-2 min-h-11 w-full rounded-md border bg-background px-2" type="datetime-local" value={from}
           aria-invalid={!!windowIssue || undefined} aria-describedby={windowHelp} onChange={(event) => { setFrom(event.target.value); setWindowIssue(null); }} /></label>

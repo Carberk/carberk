@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, expect, it, vi } from "vitest";
 import { http, HttpResponse } from "msw";
 import * as SecureStore from "expo-secure-store";
 import { focusManager } from "@tanstack/react-query";
@@ -6,7 +6,7 @@ import * as Native from "react-native";
 import type { HistoryOrderSchemas as H } from "@auto-tm/contracts";
 
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
-import { act, fireEvent, getHost, renderMobile, routeParams } from "../../test/render";
+import { act, fireEvent, getHost, renderMobile, routeParams, within } from "../../test/render";
 import { server } from "../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../auth/session";
 
@@ -70,8 +70,17 @@ it.each([
 ])("confirms the displayed exact quote in %s and reopens its immutable order without another POST", async (locale, confirm, waiting, details) => {
   const view = await renderMobile(<RequestScreen />, { locale });
   const button = await view.findByRole("button", { name: confirm });
+  const confirmation = button.parent;
+  assert(confirmation);
+  const terms = confirmation.parent;
+  assert(terms);
+  const list = getHost(view.container, "RCTScrollView");
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
-  expect(view.getByText(/2026-10-14/)).toBeTruthy();
+  expect(within(confirmation).getByText(/Carfax.*2026-10-14/)).toBeTruthy();
+  expect(view.getAllByText(/2026-10-14/)).toHaveLength(1);
+  expect(terms.props.onLayout).toEqual(expect.any(Function));
+  expect(within(terms).getByText(`VIN: ${quote.vin}`)).toBeTruthy();
+  expect(list.props.maintainVisibleContentPosition).toBeUndefined();
   await fireEvent.press(button);
   await view.findAllByText(new RegExp(`^${waiting}`));
   await view.findByText("SYNTHETIC-VH07-NO-TRANSFER");
@@ -84,6 +93,21 @@ it.each([
   await reopened.findAllByText(new RegExp(`^${waiting}`));
   await reopened.findByText("SYNTHETIC-VH07-NO-TRANSFER");
   expect(sent).toEqual([{ offer: quote }]);
+});
+it("keeps an unknown original date in availability while showing the known date with confirmation", async () => {
+  server.use(http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json({
+    ...quote,
+    preflight: { status: "available", providers: [
+      { name: "AutoCheck", originalReportDate: null }, { name: "Carfax", originalReportDate: "2026-10-14" },
+    ] },
+  })));
+  const view = await renderMobile(<RequestScreen />);
+  const button = await view.findByRole("button", { name: "Confirm VIN and quote · 100 TMT" });
+  const confirmation = button.parent;
+  assert(confirmation);
+  expect(view.getByText("AutoCheck · Original report date: Unknown before lookup")).toBeTruthy();
+  expect(within(confirmation).getByText("Carfax · Original report date: 2026-10-14")).toBeTruthy();
+  expect(within(confirmation).queryByText(/Unknown before lookup/)).toBeNull();
 });
 it("recovers a committed acceptance after response loss through readback without asking for another transfer", async () => {
   server.use(http.post("*/vehicle-history/requests/:id/order", async ({ request }) => {

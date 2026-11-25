@@ -60,3 +60,33 @@ export const reportCopy = {
     conflict: "Ylalaşylan hasabat ýa-da jogapkär işgär üýtgedi. Maglumatlary täzeläp, sargydy barlaň.",
   },
 } as const;
+
+export const archiveCopy = {
+  en: {
+    title: "Permitted archive", search: "Find reports for this VIN", loading: "Searching the archive…",
+    empty: "No permitted archive reports for this VIN.", error: "Could not search the archive. Try again.",
+    denied: "Archive access is unavailable. Sign in again or refresh the inbox.", changed: "Assignment changed. Refresh the inbox.",
+    useDate: "Use this report in the quote", selected: "Archive report selected for this quote.",
+    associate: "Associate with this order", incompatible: "This report does not cover the agreed provider, date and formats.",
+    recover: "Record a delivery problem", problemRecorded: "Delivery problem recorded.",
+    reviewRecovery: "Review delivery status",
+  },
+  ru: {
+    title: "Разрешённый архив", search: "Найти отчёты по этому VIN", loading: "Ищем отчёты в архиве…",
+    empty: "В архиве нет разрешённых отчётов по этому VIN.", error: "Не удалось выполнить поиск. Попробуйте снова.",
+    denied: "Архив недоступен. Войдите снова или обновите входящие.", changed: "Исполнитель сменился. Обновите входящие.",
+    useDate: "Использовать отчёт в предложении", selected: "Архивный отчёт выбран для предложения.",
+    associate: "Связать с этим заказом", incompatible: "Отчёт не соответствует согласованным поставщику, дате и форматам.",
+    recover: "Зафиксировать проблему с доставкой", problemRecorded: "Проблема с доставкой зафиксирована.",
+    reviewRecovery: "Посмотреть состояние доставки",
+  },
+  tk: {
+    title: "Rugsat berlen arhiw", search: "Şu VIN boýunça hasabatlary tapmak", loading: "Arhiwde gözlenýär…",
+    empty: "Arhiwde şu VIN boýunça rugsat berlen hasabat ýok.", error: "Arhiwde gözläp bolmady. Gaýtadan synanyşyň.",
+    denied: "Arhiw elýeterli däl. Gaýtadan giriň ýa-da giriş gutusyny täzeläň.", changed: "Jogapkär işgär üýtgedi. Giriş gutusyny täzeläň.",
+    useDate: "Teklipde şu hasabaty ulanmak", selected: "Teklip üçin arhiw hasabaty saýlandy.",
+    associate: "Şu sargyt bilen baglanyşdyrmak", incompatible: "Hasabat ylalaşylan üpjün edijä, senä we görnüşlere gabat gelmeýär.",
+    recover: "Gowşuryş meselesini ýazga almak", problemRecorded: "Gowşuryş meselesi ýazga alyndy.",
+    reviewRecovery: "Gowşuryşyň ýagdaýyna seretmek",
+  },
+} as const;

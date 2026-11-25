@@ -9,6 +9,7 @@ import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { historyOrderState } from "../domain/HistoryOrder";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HistoryCapacity } from "./HistoryCapacity";
+import { checkHistoryArchiveQuote } from "../domain/HistoryReportArtifact";
 
 @Injectable()
 export class AcceptHistoryQuote {
@@ -28,6 +29,11 @@ export class AcceptHistoryQuote {
         return historyOrderState(previous, this.clock.now(), await orders.paymentChecks(), (await orders.submittedProofIds()).length > 0);
       }
       if (!isDeepStrictEqual(await offer.read(), input.offer)) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+      try { await checkHistoryArchiveQuote(orders.reportArtifacts, input.offer.vin, input.offer.preflight, input.offer.proposal.format); }
+      catch (error) {
+        if (error instanceof HistoryRequestError) throw new HistoryRequestError("HISTORY_ORDER_STALE");
+        throw error;
+      }
       const facts = await this.sync.execute(requester, objectId, waiting);
       return orders.serialize(async () => {
         const now = this.clock.now();

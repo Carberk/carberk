@@ -73,10 +73,13 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const [pendingLink, setPendingLink] = useState<{ key: string; action: "open" | "copy" } | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+  const [composerCollapsed, setComposerCollapsed] = useState(false);
   const linkAttempt = useRef(0);
   const linkReader = useRef({ mounted: true, ready: false });
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
+  const listHeader = useRef<View>(null);
   const composer = useRef<TextInput>(null);
+  const manuallyScrolled = useRef(false);
   const position = useRef({ offset: 0, height: 0 });
   const browserPosition = useRef<{ offset: number; height: number; away: boolean; keyboardReady: boolean } | null>(null);
   const name = useDisplayName();
@@ -99,6 +102,14 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const linkCurrent = () => linkReader.current.mounted && linkReader.current.ready
     && historySessionCurrent(viewer) && AppState.currentState === "active"
     && focusManager.isFocused() && onlineManager.isOnline();
+  const revealDecision = (kind: "quote" | "repeat", prompt: View, current: () => boolean) => {
+    const header = listHeader.current;
+    const canReveal = () => current() && (kind === "repeat" || !manuallyScrolled.current);
+    if (!header || !canReveal()) return;
+    prompt.measureLayout(header, (_x, y) => {
+      if (canReveal()) list.current?.scrollToOffset({ offset: Math.max(0, y), animated: false });
+    });
+  };
   const restoreBrowserPosition = () => {
     const saved = browserPosition.current;
     if (!saved?.away || !saved.keyboardReady || !linkCurrent() || Math.abs(position.current.height - saved.height) > 1) return;
@@ -220,14 +231,14 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     className="flex-1" contentContainerClassName="gap-3 px-5 pb-8 pt-3"
     data={notice ? [] : thread.messages} keyExtractor={(message) => message.id}
     keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
-    maintainVisibleContentPosition={delivered && thread.messages.length === 0 ? undefined : { minIndexForVisible: 0 }}
+    maintainVisibleContentPosition={notice ? undefined : { minIndexForVisible: 0 }}
     scrollEventThrottle={16}
     onScroll={(event) => { position.current.offset = event.nativeEvent.contentOffset.y; }}
-    onScrollBeginDrag={() => { browserPosition.current = null; }}
+    onScrollBeginDrag={() => { browserPosition.current = null; manuallyScrolled.current = true; }}
     onLayout={(event) => { position.current.height = event.nativeEvent.layout.height; restoreBrowserPosition(); }}
     onViewableItemsChanged={onVisible} viewabilityConfig={viewabilityConfig}
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
-    ListHeaderComponent={<View className="gap-4 pb-3">
+    ListHeaderComponent={<View ref={listHeader} collapsable={false} className="gap-4 pb-3">
       {!denied && delivered && <DeliveredReport viewer={viewer} requestId={request.id}
         active={thread.active} online={thread.connected} ready={metadataCurrent} openComposer={() => composer.current?.focus()} />}
       {!denied && delivered && thread.active && order?.recovery &&
@@ -254,7 +265,8 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       </View>}
       {!denied && !delivered && !refund && !refundReadFailed && <OfferPreview viewer={viewer} request={request}
         ready={metadataCurrent} metadataAvailable={metadataAvailable} active={thread.active} connected={thread.connected}
-        recoveryVersion={order?.recovery?.version} orderReadError={thread.order.error} reconcileOrder={thread.order.refetch} />}
+        recoveryVersion={order?.recovery?.version} orderReadError={thread.order.error} reconcileOrder={thread.order.refetch}
+        revealDecision={revealDecision} onRepeatDecisionChange={setComposerCollapsed} />}
       {(order?.recovery || refund) && header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}
@@ -343,7 +355,11 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       </View>}
     </View>}
     />
-    {!denied && <View className="gap-3 border-t-hairline border-border bg-background px-5 py-3">
+    {!denied && (largeText && composerCollapsed ? <View className="border-t-hairline border-border bg-background px-5 py-2">
+      <Button variant="secondary" className="min-h-12" onPress={() => setComposerCollapsed(false)}>
+        <Text>{t("vehicleHistory.offerRepeatBackToChat")}</Text>
+      </Button>
+    </View> : <View className="gap-3 border-t-hairline border-border bg-background px-5 py-3">
       <Text nativeID="history-reply-label" className="text-footnote font-semibold">{t("vehicleHistory.replyLabel")}</Text>
       <Input ref={composer} accessibilityLabel={t("vehicleHistory.replyLabel")} accessibilityLabelledBy="history-reply-label"
         className="max-h-36 min-h-20 py-3" multiline textAlignVertical="top" maxLength={4000}
@@ -362,6 +378,6 @@ export function RequestConversation({ viewer, request, header, metadataError, me
         onPress={() => void reply.send()}>
         <Text>{t(reply.pending ? "vehicleHistory.sending" : unresolved ? "vehicleHistory.sendNew" : "vehicleHistory.sendMessage")}</Text>
       </Button>
-    </View>}
+    </View>)}
   </View>;
 }

@@ -42,6 +42,7 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
   const state = navigation.getState();
   const previous = state?.routes[(state.index ?? 0) - 1];
   const fromOffer = detail && previous?.name === "vehicle-history/index";
+  const fromChat = detail && previous?.name === "vehicle-history/requests/[id]";
   useEffect(() => {
     const state = navigation.getState();
     const previous = state?.routes[(state.index ?? 0) - 1];
@@ -102,7 +103,8 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
       <StackHeader large={!(detail && largeText)}
         title={detail ? `Carberk · ${t("vehicleHistory.title")}` : t("vehicleHistory.historyTitle")}
         leading={<BackButton ref={heading} onPress={back}
-          accessibilityLabel={t(fromOffer ? "vehicleHistory.backOffer" : detail ? "vehicleHistory.backRequests" : "back")} />}
+          accessibilityLabel={t(fromOffer ? "vehicleHistory.backOffer" : fromChat ? "vehicleHistory.offerRepeatBackToChat"
+            : detail ? "vehicleHistory.backRequests" : "back")} />}
         onLayout={() => {
           if (heading.current) AccessibilityInfo.sendAccessibilityEvent(heading.current, "focus");
         }} />
@@ -137,14 +139,17 @@ export function HistoryList() {
         <Text className="text-body text-muted-foreground">{t("vehicleHistory.emptyRequests")}</Text>
       ) : items.map((request) => (
         <View key={request.id} className="gap-3 border-b-hairline border-border pb-5">
-          <Text className="text-headline font-semibold">{t("vehicleHistory.enquiry")}</Text>
+          <Text className="text-headline font-semibold">{t(request.purchasedReport ? "vehicleHistory.previousPurchase" : "vehicleHistory.enquiry")}</Text>
           <Text className="text-callout text-muted-foreground">
             {new Date(request.createdAt).toLocaleString(localeTag(i18n.language))}
           </Text>
           <Text className="text-footnote text-muted-foreground">
             {t("vehicleHistory.reference", { id: request.id.slice(0, 8).toUpperCase() })}
           </Text>
-          <Text className="text-callout">{t(request.reportReady ? "vehicleHistory.reportReady" : "vehicleHistory.awaitingOperator")}</Text>
+          {request.purchasedReport ? <>
+            <Text className="text-callout">{request.purchasedReport.provider} · {t("vehicleHistory.offerDate")} {request.purchasedReport.originalReportDate}</Text>
+            <Text selectable className="text-callout font-mono">{request.purchasedReport.vin}</Text>
+          </> : <Text className="text-callout">{t(request.reportReady ? "vehicleHistory.reportReady" : "vehicleHistory.awaitingOperator")}</Text>}
           <Button variant="secondary"
             accessibilityLabel={t(request.reportReady ? "vehicleHistory.reopenReportRef" : "vehicleHistory.openRequest",
               { id: request.id.slice(0, 8).toUpperCase() })}

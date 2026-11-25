@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, Req, UseFilters } from "@nestjs/common";
+import { Body, Controller, Get, Header, Inject, Param, Post, Query, Req, UseFilters } from "@nestjs/common";
 import { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
 import type { FastifyRequest } from "fastify";
 import type { HistoryRequesterClaims } from "../application/CurrentHistoryRequester";
@@ -8,7 +8,7 @@ import { HistoryReportsExceptionFilter } from "./HistoryRequestExceptionFilter";
 
 type Request = FastifyRequest & { user?: HistoryRequesterClaims };
 
-function operator(request: Request, target: R.HistoryReportTarget) {
+function operator(request: Request, target: { expectedAssignmentVersion: number }) {
   return { claims: request.user ?? {}, operator: true, expectedAssignmentVersion: target.expectedAssignmentVersion };
 }
 
@@ -19,6 +19,14 @@ const purchaserPath = "requests/:id/report";
 @UseFilters(HistoryReportsExceptionFilter)
 export class HistoryReportArtifactsController {
   constructor(@Inject(HistoryReportArtifacts) private readonly artifacts: HistoryReportArtifacts) {}
+
+  @Get("operator/requests/:id/report-archive")
+  @Header("Cache-Control", "private, no-store")
+  archive(@Req() request: Request, @Param("id") id: string, @Query() query: unknown) {
+    const input = R.HistoryArchiveQuerySchema.safeParse(query);
+    if (!input.success) throw new HistoryRequestError("HISTORY_REPORT_INVALID");
+    return this.artifacts.archive(operator(request, input.data), id, input.data.vin);
+  }
 
   @Get(operatorPath)
   read(@Req() request: Request, @Param("id") id: string, @Query() query: unknown) {
@@ -51,6 +59,14 @@ export class HistoryReportArtifactsController {
   @Get(purchaserPath)
   purchased(@Req() request: Request, @Param("id") id: string) {
     return this.artifacts.purchaser(request.user ?? {}, id);
+  }
+
+  @Get("requests/:id/previous-purchase")
+  @Header("Cache-Control", "private, no-store")
+  previous(@Req() request: Request, @Param("id") id: string, @Query() query: unknown) {
+    const input = R.HistoryPurchaseVinQuerySchema.safeParse(query);
+    if (!input.success) throw new HistoryRequestError("HISTORY_REPORT_INVALID");
+    return this.artifacts.previous(request.user ?? {}, id, input.data.vin);
   }
 
   @Get(purchaserPath + "/:artifactId/:kind")
