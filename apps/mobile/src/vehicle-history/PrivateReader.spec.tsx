@@ -222,6 +222,23 @@ it("retains the calling stack and safely returns a cold list link to Messages", 
   expect(routerMock.replace).toHaveBeenCalledWith("/(tabs)/chat");
 });
 
+it.each([
+  ["en", "Back to chat"],
+  ["ru", "Вернуться в чат"],
+  ["tk", "Çata dolan"],
+] as const)("names the calling enquiry as Back to chat in %s", async (locale, label) => {
+  vi.mocked(useNavigation).mockReturnValue({ getState: () => ({ index: 1, routes: [
+    { name: "vehicle-history/requests/[id]", params: { id: requestId } },
+    { name: "vehicle-history/requests/[id]", params: { id: secondId } },
+  ] }) } as ReturnType<typeof useNavigation>);
+  routeParams.id = secondId;
+  server.use(http.get("*/vehicle-history/requests/:id", () => HttpResponse.json(enquiry(secondId))));
+  const view = await renderMobile(<RequestScreen />, { locale });
+  await fireEvent.press(await view.findByRole("button", { name: label }));
+  expect(routerMock.back).toHaveBeenCalledOnce();
+  expect(routerMock.replace).not.toHaveBeenCalled();
+});
+
 it("refuses private deep links and hides the Messages entry when default off", async () => {
   vi.stubEnv("EXPO_PUBLIC_VEHICLE_HISTORY_SYNTHETIC", undefined);
   routeParams.id = requestId;

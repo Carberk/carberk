@@ -18456,6 +18456,12 @@
                         "validatedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "canRestorePdf": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
                         }
                       },
                       "required": [
@@ -18751,6 +18757,12 @@
                         "deliveredAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "canRestorePdf": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
                         }
                       },
                       "required": [
@@ -19183,6 +19195,12 @@
                         "validatedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "canRestorePdf": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
                         }
                       },
                       "required": [
@@ -19478,6 +19496,12 @@
                         "deliveredAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "canRestorePdf": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
                         }
                       },
                       "required": [
@@ -20204,6 +20228,12 @@
                     "deliveredAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "canRestorePdf": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
                     }
                   },
                   "required": [

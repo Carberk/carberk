@@ -35,6 +35,23 @@ it("offers the same-originals upload when an older archive validation is interru
   expect(view.queryByRole("button", { name: "Find reports for this VIN" })).toBeNull();
 });
 
+it.each([true, undefined])("offers exact PDF restore only for an archive with local restoration support (%s)", async (canRestorePdf) => {
+  const { provider, vin, originalReportDate } = intent.accepted;
+  vi.mocked(historyReportAction).mockResolvedValueOnce({
+    status: "ok", view: { status: "validated", validatedAt: recordedAt, ...(canRestorePdf ? { canRestorePdf } : {}),
+      artifact: { id, source: "archive", format: "pdf", report: { provider, vin, originalReportDate: originalReportDate ?? date,
+        reportId: "fixture", language: "en", permittedUse: true }, pdf: { filename: "Synthetic original.pdf", sizeBytes: 42, pages: 1 } } },
+  }).mockResolvedValueOnce({ status: "unavailable" });
+  const view = panel();
+  fireEvent.click(await view.findByRole("button", { name: "Preview original PDF" }));
+  await view.findByText("Could not open the stored PDF.");
+  if (canRestorePdf) {
+    fireEvent.click(view.getByRole("button", { name: "Restore original PDF" }));
+    expect(view.getByText("Choose the same original PDF to restore it.")).toBeTruthy();
+    expect(view.getByRole("button", { name: "Cancel" })).toBeTruthy();
+  } else expect(view.queryByRole("button", { name: "Restore original PDF" })).toBeNull();
+});
+
 it.each([
   ["en", "Record a delivery problem", "Delivery problem recorded.", "Review delivery status"],
   ["ru", "Зафиксировать проблему с доставкой", "Проблема с доставкой зафиксирована.", "Посмотреть состояние доставки"],

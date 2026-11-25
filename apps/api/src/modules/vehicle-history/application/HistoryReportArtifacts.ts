@@ -16,10 +16,12 @@ import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
 import { HistoryMessageAccess, type HistoryMessageActor } from "./HistoryMessageAccess";
 
 type Obtained = Extract<H.HistoryFulfilmentIntent, { status: "obtained" }>;
-function view(row: StagedHistoryReport | null): R.HistoryReportView {
-  if (row?.deliveredAt) return { status: "delivered", artifact: row.artifact, deliveredAt: row.deliveredAt.toISOString() };
+function view(row: StagedHistoryReport | null, operator = true): R.HistoryReportView {
+  const restore = operator && row?.artifact.source === "archive" && !row.archiveSourceId && row.artifact.format !== "link" && row.sha256
+    ? { canRestorePdf: true as const } : {};
+  if (row?.deliveredAt) return { status: "delivered", artifact: row.artifact, deliveredAt: row.deliveredAt.toISOString(), ...restore };
   if (!row?.validatedAt) return { status: row ? "staged" : "empty" };
-  return { status: "validated", artifact: row.artifact, validatedAt: row.validatedAt.toISOString() };
+  return { status: "validated", artifact: row.artifact, validatedAt: row.validatedAt.toISOString(), ...restore };
 }
 
 @Injectable()
@@ -102,7 +104,7 @@ export class HistoryReportArtifacts {
     return this.access.run({ claims, operator: false }, id, async (_owner, _sender, _object, _participant, _waiting, _offer, orders) => {
       const order = await orders.read();
       const row = order && await orders.reportArtifacts.delivered(order.id);
-      if (!asset) return view(row);
+      if (!asset) return view(row, false);
       if (!row?.deliveredAt || row.artifact.id !== asset.id || !coversHistoryFormat(asset.kind, row.artifact.format)) {
         throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
       }

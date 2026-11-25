@@ -42,6 +42,7 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
   const state = navigation.getState();
   const previous = state?.routes[(state.index ?? 0) - 1];
   const fromOffer = detail && previous?.name === "vehicle-history/index";
+  const fromChat = detail && previous?.name === "vehicle-history/requests/[id]";
   useEffect(() => {
     const state = navigation.getState();
     const previous = state?.routes[(state.index ?? 0) - 1];
@@ -102,7 +103,8 @@ function Reader({ viewer, error, loading, retry, refreshing, detail = false, scr
       <StackHeader large={!(detail && largeText)}
         title={detail ? `Carberk · ${t("vehicleHistory.title")}` : t("vehicleHistory.historyTitle")}
         leading={<BackButton ref={heading} onPress={back}
-          accessibilityLabel={t(fromOffer ? "vehicleHistory.backOffer" : detail ? "vehicleHistory.backRequests" : "back")} />}
+          accessibilityLabel={t(fromOffer ? "vehicleHistory.backOffer" : fromChat ? "vehicleHistory.offerRepeatBackToChat"
+            : detail ? "vehicleHistory.backRequests" : "back")} />}
         onLayout={() => {
           if (heading.current) AccessibilityInfo.sendAccessibilityEvent(heading.current, "focus");
         }} />

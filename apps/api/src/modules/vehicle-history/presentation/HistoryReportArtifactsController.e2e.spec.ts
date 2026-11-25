@@ -884,7 +884,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     expect(received).toEqual([]);
   });
 
-  it("resumes an already-staged archive upload using only the recorded original", async () => {
+  it.each(["staged", "validated"] as const)("restores an already-%s archive upload using only its recorded original", async (status) => {
     const e = await obtained("pdf", facts.vin, { source: "archive" });
     const { pdf, bytes } = await document();
     const id = randomUUID();
@@ -892,18 +892,26 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       id, requestId: e.id, orderId: e.target.orderId, intentId: e.target.intentId, intentVersion: e.target.intentVersion,
       acceptedRevision: e.target.acceptedRevision, stagedBy: e.operator.user.id,
       sha256: createHash("sha256").update(bytes).digest("hex"),
+      ...(status === "validated" ? { validatedAt: new Date(now), validatedBy: e.operator.user.id, validatedAssignmentVersion: 1 } : {}),
       artifact: { id, source: "archive", format: "pdf", report: facts,
         pdf: { filename: pdf.filename, sizeBytes: bytes.length, pages: 2 } },
     } });
 
-    await e.read().expect(200, { status: "staged" });
+    await e.read().expect(200).expect(({ body }) => {
+      if (status === "validated") expect(body).toMatchObject({ status, canRestorePdf: true, artifact: { id } });
+      else expect(body).toEqual({ status });
+    });
+    await e.read("/content").expect(status === "validated" ? 503 : 409);
     await e.validate({ pdf }, (await f.actor()).token).expect(403);
     await e.validate({ pdf, expectedAssignmentVersion: 0 }).expect(409);
-    await e.validate({ pdf: { ...pdf, filename: "Other original.pdf" } }).expect(409);
-    await e.validate({ pdf: (await document({ reportId: "fixture-different" })).pdf }).expect(409);
+    await e.validate({ pdf: { ...pdf, filename: "Other original.pdf" } }).expect(status === "validated" ? 422 : 409);
+    await e.validate({ pdf: (await document({ reportId: "fixture-different" })).pdf }).expect(status === "validated" ? 422 : 409);
     await e.validate({ pdf }).expect(201).expect(({ body }) => expect(body.artifact.id).toBe(id));
     const content = await e.read("/content").expect(200);
     expect(Buffer.from(content.body.dataBase64, "base64")).toEqual(bytes);
+    await e.deliver(id).expect(201).expect(({ body }) => expect(body).toMatchObject({ status: "delivered", canRestorePdf: true }));
+    await f.request.get(`${root}/requests/${e.id}/report`).auth(e.customer.token, { type: "bearer" }).expect(200)
+      .expect(({ body }) => expect(body).not.toHaveProperty("canRestorePdf"));
   });
 
   it("recovers exact bytes after an interrupted validation write and fences current reads", async () => {

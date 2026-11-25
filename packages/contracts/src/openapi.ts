@@ -5,7 +5,7 @@ import {
 
 import * as PaymentProof from "./schemas/history-payment-proof";
 import { AcceptHistoryQuoteSchema, HistoryOrderStateSchema, HistoryCorrectionStateSchema, HistoryCorrectionMutationSchema, HistoryOperatorCorrectionMutationSchema, HistoryFulfilmentMutationSchema, HistoryFulfilmentViewSchema, HistoryOperatorReplacementSchema, HistoryReplacementDecisionSchema, HistoryReplacementStateSchema, HistoryRecoveryStateSchema, HistoryOperatorRecoverySchema, HistoryRecoveryDecisionSchema, HistoryRefundCaseSchema, HistoryRefundCommandSchema, HistoryRefundStateSchema } from "./schemas/history-order";
-import { DeliverHistoryReportSchema, DeliveredHistoryReportSchema, HistoryArchiveQuerySchema, HistoryArchiveSchema, HistoryPreviousPurchaseSchema, HistoryPurchaseVinQuerySchema, HistoryReportContentSchema, HistoryReportLinkSchema, HistoryReportQuerySchema, HistoryReportViewSchema, PurchaserHistoryReportSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
+import { DeliverHistoryReportSchema, HistoryArchiveQuerySchema, HistoryArchiveSchema, HistoryPreviousPurchaseSchema, HistoryPurchaseVinQuerySchema, HistoryReportContentSchema, HistoryReportLinkSchema, HistoryReportQuerySchema, HistoryReportViewSchema, OperatorDeliveredHistoryReportSchema, PurchaserHistoryReportSchema, ValidateHistoryReportSchema } from "./schemas/history-report-artifact";
 import { HistoryPaymentCheckInputSchema, HistoryPaymentVerificationSchema } from "./schemas/history-payment";
 import {
   HistoryOfferSchema, HistoryOfferMutationSchema, HistoryOperatorOfferMutationSchema,
@@ -581,7 +581,7 @@ export function buildOpenApiRegistry(): OpenAPIRegistry {
     summary: "Deliver the validated originals for the current accepted order",
     request: { params: z.object({ id: z.string().guid() }), body: { content: { "application/json": { schema: DeliverHistoryReportSchema } } } },
     responses: {
-      201: { description: "Audited delivery", content: { "application/json": { schema: DeliveredHistoryReportSchema } } },
+      201: { description: "Audited delivery", content: { "application/json": { schema: OperatorDeliveredHistoryReportSchema } } },
       400: { description: "Invalid delivery input" }, 403: { description: "Current assigned operator authority required" },
       409: { description: "Order or validated report is no longer deliverable" },
       422: { description: "Original is unusable or no longer matches" }, 503: { description: "Refresh before retrying delivery" },

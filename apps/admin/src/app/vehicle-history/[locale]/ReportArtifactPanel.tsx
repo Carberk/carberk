@@ -157,14 +157,14 @@ export function ReportArtifactPanel({ locale, id, scope, orderId, version, inten
           aria-disabled={pending !== null} onClick={() => { if (!pending) void run("preview"); }}>{feedback === "previewUnavailable" ? t.retryPreview : t.preview}</Button>
         {preview && <ReportPdf dataBase64={preview} title={t.preview} closeLabel={t.close} close={() => setPreview(null)}
           restoreFocus={() => previewButton.current?.focus()} />}
-        {!archived && (feedback === "previewUnavailable" || feedback === "unavailable") && <Button type="button" variant="secondary"
+        {(!archived || view.canRestorePdf) && (feedback === "previewUnavailable" || feedback === "unavailable") && <Button type="button" variant="secondary"
           className={button} disabled={pending !== null} onClick={() => {
             setFeedback(null); setFilename(""); setRestoring(true);
           }}>{t.restorePdf}</Button>}
       </>}
       {view.status === "validated" && canDeliver && <Button data-fulfilment-next type="button" className={button}
         disabled={pending !== null} onClick={() => void run("deliver", view.artifact.id)}>{t.deliver}</Button>}
-    </> : view && (archived && status !== "staged" ? <>
+    </> : view && (archived && status !== "staged" && !restoring ? <>
       <ArchivePanel {...{ locale, id, scope, version, invalidate }} vin={intent.accepted.vin} accepted={intent.accepted}
         disabled={pending !== null} onChoose={(item) => { if (!pending) void run("associate", item.id); }} />
       <Button type="button" variant="secondary" className={button} disabled={pending !== null}

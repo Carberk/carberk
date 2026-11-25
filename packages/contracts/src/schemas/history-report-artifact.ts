@@ -48,10 +48,12 @@ export const DeliveredHistoryReportSchema = z.object({
 export const PurchaserHistoryReportSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("empty") }).strict(), DeliveredHistoryReportSchema,
 ]);
+const canRestorePdf = z.literal(true).optional();
+export const OperatorDeliveredHistoryReportSchema = DeliveredHistoryReportSchema.extend({ canRestorePdf });
 export const HistoryReportViewSchema = z.discriminatedUnion("status", [
   z.object({ status: z.enum(["empty", "staged"]) }).strict(),
-  z.object({ status: z.literal("validated"), artifact: HistoryReportArtifactSchema, validatedAt: DateTimeSchema }).strict(),
-  DeliveredHistoryReportSchema,
+  z.object({ status: z.literal("validated"), artifact: HistoryReportArtifactSchema, validatedAt: DateTimeSchema, canRestorePdf }).strict(),
+  OperatorDeliveredHistoryReportSchema,
 ]);
 export type HistoryReportView = z.infer<typeof HistoryReportViewSchema>;
 export const HistoryPurchaseVinQuerySchema = z.object({ vin: z.string().min(1).max(80) }).strict();
