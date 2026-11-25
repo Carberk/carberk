@@ -43,7 +43,9 @@ export class HistoryReportArtifacts {
       if (current !== vin) return { items: [] };
       const pinned = order?.acceptedOffer.preflight.archiveFormat;
       const selected = pinned ? await orders.reportArtifacts.selectedArchiveId() : null;
-      return { items: pinned && !selected ? [] : await orders.reportArtifacts.archive(vin, selected ?? undefined) };
+      if (pinned && !selected) return { items: [] };
+      const format = order ? (await orders.recovery())?.agreedFormat ?? order.acceptedOffer.proposal.format : undefined;
+      return { items: await orders.reportArtifacts.archive(vin, selected ?? undefined, format) };
     });
   }
 
@@ -58,10 +60,10 @@ export class HistoryReportArtifacts {
   }
 
   content(actor: HistoryMessageActor, id: string, target: R.HistoryReportTarget) {
-    return this.current(actor, id, target, async (store) => {
+    return this.current(actor, id, target, async (store, intent) => {
       const row = await store.find(target.intentVersion);
       if (!row) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
-      return this.pdf(id, row, await this.requireArchiveSource(store, row));
+      return this.pdf(id, row, await this.requireArchiveSource(store, row, intent.accepted.format));
     });
   }
 
@@ -79,7 +81,7 @@ export class HistoryReportArtifacts {
       const confirmedAt = bookedPayment(order, await orders.paymentChecks())?.confirmedAt;
       if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       const deadline = await this.requireDeliveryWindow(orders, order, intent, this.clock.now());
-      const source = await this.requireArchiveSource(store, row);
+      const source = await this.requireArchiveSource(store, row, intent.accepted.format);
       if (row.artifact.format !== "link") await this.pdf(id, row, source);
       let linkEvidenceSha256 = null;
       if (row.artifact.format !== "pdf") {
@@ -191,9 +193,9 @@ export class HistoryReportArtifacts {
     return linked.evidenceSha256;
   }
 
-  private async requireArchiveSource(store: HistoryReportStore, row: StagedHistoryReport, purchasedAsset?: "pdf" | "link") {
+  private async requireArchiveSource(store: HistoryReportStore, row: StagedHistoryReport, format: R.HistoryReportArtifact["format"]) {
     if (!row.archiveSourceId) return null;
-    const source = await store.archiveOriginal(row.archiveSourceId, row.artifact.report.vin, purchasedAsset);
+    const source = await store.archiveOriginal(row.archiveSourceId, row.artifact.report.vin, format);
     if (!source) throw new HistoryRequestError("HISTORY_REPORT_RIGHTS");
     if (!isDeepStrictEqual(source.artifact.report, row.artifact.report)
       || !coversHistoryFormat(row.artifact.format, source.artifact.format)
@@ -210,7 +212,7 @@ export class HistoryReportArtifacts {
       if (order.acceptedOffer.preflight.archiveFormat && await store.selectedArchiveId() !== archiveId) {
         throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
       }
-      const source = await store.archiveOriginal(archiveId, vin);
+      const source = await store.archiveOriginal(archiveId, vin, format);
       if (!source) throw new HistoryRequestError("HISTORY_REPORT_RIGHTS");
       const { artifact: original } = source;
       if (original.report.provider !== provider || !originalReportDate

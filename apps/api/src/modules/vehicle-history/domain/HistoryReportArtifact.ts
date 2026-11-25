@@ -24,8 +24,8 @@ export interface ArchivedHistoryReport extends StagedHistoryReport {
 }
 
 export interface HistoryReportStore {
-  archive(vin: string, selectedId?: string): Promise<R.HistoryArchiveItem[]>;
-  archiveOriginal(id: string, vin: string, purchasedAsset?: "pdf" | "link"): Promise<ArchivedHistoryReport | null>;
+  archive(vin: string, selectedId?: string, format?: R.HistoryReportArtifact["format"]): Promise<R.HistoryArchiveItem[]>;
+  archiveOriginal(id: string, vin: string, format?: R.HistoryReportArtifact["format"]): Promise<ArchivedHistoryReport | null>;
   selectedArchiveId(): Promise<string | null>;
   previousPurchase(requesterId: string, vin: string): Promise<R.HistoryPreviousPurchase>;
   find(intentVersion: number): Promise<StagedHistoryReport | null>;
@@ -41,7 +41,7 @@ export async function checkHistoryArchiveQuote(
 ) {
   if (!reports.archiveFormat) return;
   const id = await store.selectedArchiveId();
-  const original = id && await store.archiveOriginal(id, vin);
+  const original = id && await store.archiveOriginal(id, vin, format);
   const provider = reports.providers[0];
   if (!original || reports.providers.length !== 1 || original.artifact.report.provider !== provider?.name
     || original.artifact.report.originalReportDate !== provider.originalReportDate

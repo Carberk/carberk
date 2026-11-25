@@ -11,37 +11,37 @@ const parse = <T extends StagedHistoryReport>(row: T | undefined): T | null =>
 const pairedLinkEvidence = "encode(sha256(convert_to(link || chr(10) || sha256, 'UTF8')), 'hex')";
 const permittedArchive = `"deliveredAt" IS NOT NULL AND "validatedAt" IS NOT NULL
   AND "archiveSourceId" IS NULL AND artifact->'report'->'permittedUse' = 'true'::jsonb`;
-const qualifiedPdf = 'sha256 = "archivePdfSha256" AND sha256 = ANY($4::text[])';
-const qualifiedLink = 'link IS NOT NULL AND "archiveLinkEvidenceSha256" = ANY($5::text[])';
+const recordedPdf = 'sha256 = "archivePdfSha256"';
+const allowedPdf = 'sha256 = ANY($4::text[])';
+const allowedLink = '"archiveLinkEvidenceSha256" = ANY($5::text[])';
 const qualifiedArchive = `CASE artifact->>'format'
-  WHEN 'pdf' THEN link IS NULL AND ${qualifiedPdf}
-  WHEN 'link' THEN sha256 IS NULL AND ${qualifiedLink}
-  WHEN 'both' THEN ${qualifiedPdf} AND ${qualifiedLink} AND "archiveLinkEvidenceSha256" = ${pairedLinkEvidence}
+  WHEN 'pdf' THEN link IS NULL AND ${recordedPdf} AND ${allowedPdf}
+  WHEN 'link' THEN sha256 IS NULL AND link IS NOT NULL AND ${allowedLink}
+  WHEN 'both' THEN ${recordedPdf} AND "archiveLinkEvidenceSha256" = ${pairedLinkEvidence}
+    AND (COALESCE($6::text, 'both') = 'link' OR ${allowedPdf})
+    AND (COALESCE($6::text, 'both') = 'pdf' OR ${allowedLink})
   ELSE FALSE END`;
 
 export function historyReportStore(client: PoolClient, requestId: string, assertActive: () => void,
   { pdf, link }: ArchiveEvidenceAllowlist = { pdf: [], link: [] }): HistoryReportStore {
   return {
-    async archive(vin, selectedId) {
+    async archive(vin, selectedId, format) {
       assertActive();
       const { rows } = await client.query(`SELECT id, artifact->>'format' AS format,
         artifact->'report'->>'vin' AS vin, artifact->'report'->>'provider' AS provider,
         artifact->'report'->>'language' AS language, artifact->'report'->>'originalReportDate' AS "originalReportDate"
         FROM history_report_artifacts WHERE "requestId" <> $1 AND artifact->'report'->>'vin' = $2
-          AND ($3::uuid IS NULL OR id = $3) AND ${permittedArchive} AND ${qualifiedArchive}
-        ORDER BY "originalReportDate" DESC, id LIMIT 25`, [requestId, vin, selectedId ?? null, pdf, link]);
+          AND ($3::uuid IS NULL OR id = $3) AND ($6::text IS NULL OR artifact->>'format' IN ($6, 'both'))
+          AND ${permittedArchive} AND ${qualifiedArchive}
+        ORDER BY "originalReportDate" DESC, id LIMIT 25`, [requestId, vin, selectedId ?? null, pdf, link, format ?? null]);
       return R.HistoryArchiveSchema.shape.items.parse(rows);
     },
-    async archiveOriginal(id, vin, purchasedAsset) {
+    async archiveOriginal(id, vin, format) {
       assertActive();
       const { rows: [row] } = await client.query<ArchivedHistoryReport>(`
         SELECT ${fields}, "requestId", "archiveLinkEvidenceSha256" FROM history_report_artifacts WHERE id = $1 AND "requestId" <> $2
-          AND artifact->'report'->>'vin' = $3 AND ${permittedArchive}
-          AND CASE $6::text
-            WHEN 'pdf' THEN ${qualifiedPdf}
-            WHEN 'link' THEN ${qualifiedLink}
-            ELSE ${qualifiedArchive}
-          END FOR SHARE`, [id, requestId, vin, pdf, link, purchasedAsset ?? null]);
+          AND artifact->'report'->>'vin' = $3 AND ${permittedArchive} AND ${qualifiedArchive} FOR SHARE`,
+      [id, requestId, vin, pdf, link, format ?? null]);
       return parse(row);
     },
     async selectedArchiveId() {
