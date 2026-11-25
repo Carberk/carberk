@@ -231,7 +231,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     className="flex-1" contentContainerClassName="gap-3 px-5 pb-8 pt-3"
     data={notice ? [] : thread.messages} keyExtractor={(message) => message.id}
     keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
-    maintainVisibleContentPosition={delivered && thread.messages.length === 0 ? undefined : { minIndexForVisible: 0 }}
+    maintainVisibleContentPosition={notice ? undefined : { minIndexForVisible: 0 }}
     scrollEventThrottle={16}
     onScroll={(event) => { position.current.offset = event.nativeEvent.contentOffset.y; }}
     onScrollBeginDrag={() => { browserPosition.current = null; manuallyScrolled.current = true; }}

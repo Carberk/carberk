@@ -72,6 +72,7 @@ export function PromiseRecoveryPanel({ locale, id, version, scope, actorId, reco
       {recovery.agreedFormat && <div><dt>{t.agreedFormat}</dt><dd>{format[recovery.agreedFormat]}</dd></div>}
     </dl>
     {!delivered && recovery.failure && <p>{t[recovery.failure]}</p>}
+    {!delivered && recovery.status === "attention" && recovery.failure === "file_delivery" && <p>{t.deliveryAttention}</p>}
     {offered && <p>{t.customerChoice}</p>}
     {pending && <>
       {recovery.pendingReason && recovery.pendingReason !== recovery.failure && <p>{t[recovery.pendingReason]}</p>}

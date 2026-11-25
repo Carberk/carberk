@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { HistoryOrderSchemas as H, HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
 
+import { PromiseRecoveryPanel } from "./PromiseRecoveryPanel";
 import { ReportArtifactPanel } from "./ReportArtifactPanel";
 import { historyReportAction } from "./report-actions";
 
@@ -35,10 +36,10 @@ it("offers the same-originals upload when an older archive validation is interru
 });
 
 it.each([
-  ["en", "Record a delivery problem", "Delivery problem recorded. Review recovery for this order."],
-  ["ru", "Зафиксировать проблему с доставкой", "Проблема с доставкой зафиксирована. Проверьте варианты для этого заказа."],
-  ["tk", "Gowşuryş meselesini ýazga almak", "Gowşuryş meselesi ýazga alyndy. Şu sargyt boýunça çözgütleri barlaň."],
-] as const)("confirms a recorded archive delivery problem and refreshes recovery in %s", async (locale, action, feedback) => {
+  ["en", "Record a delivery problem", "Delivery problem recorded.", "Review delivery status"],
+  ["ru", "Зафиксировать проблему с доставкой", "Проблема с доставкой зафиксирована.", "Посмотреть состояние доставки"],
+  ["tk", "Gowşuryş meselesini ýazga almak", "Gowşuryş meselesi ýazga alyndy.", "Gowşuryşyň ýagdaýyna seretmek"],
+] as const)("confirms a recorded archive delivery problem and lets the operator review status in %s", async (locale, action, feedback, link) => {
   const refresh = vi.fn();
   vi.mocked(historyReportAction).mockResolvedValueOnce({ status: "ok", view: { status: "empty" } })
     .mockResolvedValueOnce({ status: "missing" });
@@ -47,7 +48,19 @@ it.each([
   fireEvent.click(await view.findByRole("button", { name: action }));
   expect(await view.findByText(feedback)).toBeTruthy();
   expect(refresh).toHaveBeenCalledOnce();
-  expect(view.getByRole("link").getAttribute("href")).toBe("#history-delivery-recovery");
+  expect(view.getByRole("link", { name: link }).getAttribute("href")).toBe("#history-delivery-recovery");
+});
+
+it("explains the available next step while the original delivery deadline still applies", () => {
+  const view = render(<PromiseRecoveryPanel locale="en" id={id} version={1} scope={scope} actorId={id}
+    delivered={false} onOrder={vi.fn()} invalidate={vi.fn()} timestamp={(value) => value}
+    recovery={{ version: 1, status: "attention", failure: "file_delivery", originalPromiseBy: recordedAt,
+      paymentHoldExpiresAt: recordedAt, paymentDeadline: recordedAt, originalFormat: "pdf", missedAt: null,
+      offeredDeadline: null, agreedDeadline: null, agreedAt: null, proposedFormat: null, agreedFormat: null,
+      pendingReason: null, refundRequestedAt: null }} />);
+
+  expect(view.getByText("Continue preparing the agreed report. If the deadline passes without delivery, the customer can choose how to proceed.")).toBeTruthy();
+  expect(view.queryByRole("button")).toBeNull();
 });
 
 it("brings the validated result into view after association", async () => {

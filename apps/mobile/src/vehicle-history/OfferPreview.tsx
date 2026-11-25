@@ -36,7 +36,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const [repeat, setRepeat] = useState<{ vin: string; generation: number; version: number;
     purchase: NonNullable<R.HistoryPreviousPurchase["previous"]> } | null>(null);
   const repeatPrompt = useRef<View>(null);
-  const quoteConfirmation = useRef<View>(null);
+  const quoteTerms = useRef<View>(null);
   const revealedQuote = useRef<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [orderFailure, setOrderFailure] = useState<string | null>(null);
@@ -229,6 +229,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const providers = data?.preflight?.status === "available" ? data.preflight.providers : [];
   const datesWithConfirmation = !accepted && !!proposal;
   const knownDates = providers.filter((provider) => provider.originalReportDate);
+  const datedQuote = datesWithConfirmation && knownDates.length > 0;
   const providerDate = (provider: (typeof providers)[number]) =>
     <Text key={provider.name} className="text-callout">{provider.name} · {copy("date")}: {provider.originalReportDate ?? copy("unknown")}</Text>;
   const historicalWindow = replacement || orderState?.status === "hold_expired";
@@ -251,14 +252,23 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
               if (current() && !result.error) { setRecoveryIssue(null); void reconcileOrder(); }
               }); } }} />}
           {!recovery && <Text accessibilityLiveRegion="polite">{copy(data.preflight?.status ?? (data.vin ? "unchecked" : "empty"))}</Text>}
-          {data.vin && <Text selectable className="text-body font-mono">VIN: {data.vin}</Text>}
+          {!datedQuote && data.vin && <Text selectable className="text-body font-mono">VIN: {data.vin}</Text>}
           {data.preflight?.status === "available" && (!accepted || expanded) && <>
             <Text className="text-callout">{copy("rule")}</Text>
             {providers.filter((provider) => !datesWithConfirmation || !provider.originalReportDate).map(providerDate)}
             <Text className="text-footnote text-muted-foreground">{copy("limits")}</Text>
           </>}
-          {proposal && <View className="gap-3 border-y border-border py-4">
+          {proposal && <View ref={quoteTerms} collapsable={false} className="gap-3 border-y border-border py-4"
+            onLayout={datedQuote ? () => {
+              const terms = quoteTerms.current;
+              if (!terms || !canRead() || revealedQuote.current === data.version) return;
+              const generation = readGeneration.current;
+              revealedQuote.current = data.version;
+              revealDecision("quote", terms, () => quoteTerms.current === terms
+                && canRead() && readGeneration.current === generation);
+            } : undefined}>
             <Text accessibilityRole="header" className="text-headline font-semibold">{copy(accepted ? "orderSummary" : "preview")}</Text>
+            {datedQuote && data.vin && <Text selectable className="text-body font-mono">VIN: {data.vin}</Text>}
             {!recovery && <Text>{copy("format")}: {copy(proposal.format)}</Text>}
             {originalWindow && (!recovery || replacement) && <Text>{historicalWindow ? t("vehicleHistory.replacementOriginal") : copy("window")}: {timestamp(originalWindow.deliveryFrom)} – {timestamp(originalWindow.deliveryBy)}{historicalWindow ? ` · ${t("vehicleHistory.replacementTimeZone")}` : null}</Text>}
             {(!accepted || expanded) && proposal.format !== "pdf" && <Text className="text-callout">{copy("links")}</Text>}
@@ -276,15 +286,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
               <Button variant="secondary" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)}><Text>{copy(expanded ? "orderHideDetails" : "orderDetails")}</Text></Button>
             </> : <>
               <Text className="text-footnote text-muted-foreground">{copy("orderBefore")}</Text>
-              <View ref={quoteConfirmation} collapsable={false} className="gap-3"
-                onLayout={knownDates.length ? () => {
-                  const confirmation = quoteConfirmation.current;
-                  if (!confirmation || !canRead() || revealedQuote.current === data.version) return;
-                  const generation = readGeneration.current;
-                  revealedQuote.current = data.version;
-                  revealDecision("quote", confirmation, () => quoteConfirmation.current === confirmation
-                    && canRead() && readGeneration.current === generation);
-                } : undefined}>
+              <View className="gap-3">
                 {knownDates.map(providerDate)}
                 <Button disabled={!canEdit || state.isFetching || !!vin.trim() || !!orderFailure} accessibilityState={{ busy: saving }} onPress={() => { void accept(); }}>
                   <Text>{copy(saving ? "orderPending" : "orderConfirm")}</Text>

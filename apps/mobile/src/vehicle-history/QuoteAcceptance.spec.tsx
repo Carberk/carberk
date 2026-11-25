@@ -72,10 +72,15 @@ it.each([
   const button = await view.findByRole("button", { name: confirm });
   const confirmation = button.parent;
   assert(confirmation);
+  const terms = confirmation.parent;
+  assert(terms);
+  const list = getHost(view.container, "RCTScrollView");
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(within(confirmation).getByText(/Carfax.*2026-10-14/)).toBeTruthy();
   expect(view.getAllByText(/2026-10-14/)).toHaveLength(1);
-  expect(confirmation.props.onLayout).toEqual(expect.any(Function));
+  expect(terms.props.onLayout).toEqual(expect.any(Function));
+  expect(within(terms).getByText(`VIN: ${quote.vin}`)).toBeTruthy();
+  expect(list.props.maintainVisibleContentPosition).toBeUndefined();
   await fireEvent.press(button);
   await view.findAllByText(new RegExp(`^${waiting}`));
   await view.findByText("SYNTHETIC-VH07-NO-TRANSFER");
