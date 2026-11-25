@@ -315,6 +315,8 @@ model HistoryReportArtifact {
   sha256                    String?
   link                      String?
   archiveSourceId           String? @db.Uuid
+  archivePdfSha256          String?
+  archiveLinkEvidenceSha256 String?
   stagedBy                  String
   stagedAt                  DateTime @default(now()) @db.Timestamptz(3)
   validatedBy               String?

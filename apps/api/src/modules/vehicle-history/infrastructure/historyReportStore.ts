@@ -1,14 +1,21 @@
 import type { PoolClient } from "pg";
 import { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
-import type { HistoryReportStore, StagedHistoryReport } from "../domain/HistoryReportArtifact";
+import type { Env } from "../../../env.schema";
+import type { ArchivedHistoryReport, HistoryReportStore, StagedHistoryReport } from "../domain/HistoryReportArtifact";
+
+export type ArchiveEvidenceAllowlist = Env["VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE"];
 
 const fields = 'artifact, sha256, link, "archiveSourceId", "orderId", "intentId", "acceptedRevision", "validatedAt", "deliveredAt"';
 const parse = <T extends StagedHistoryReport>(row: T | undefined): T | null =>
   row ? { ...row, artifact: R.HistoryReportArtifactSchema.parse(row.artifact) } : null;
 const permittedArchive = `"deliveredAt" IS NOT NULL AND "validatedAt" IS NOT NULL
-  AND "archiveSourceId" IS NULL AND artifact->'report'->'permittedUse' = 'true'::jsonb`;
+  AND "archiveSourceId" IS NULL AND artifact->'report'->'permittedUse' = 'true'::jsonb
+  AND (sha256 IS NOT NULL OR link IS NOT NULL)
+  AND (sha256 IS NULL OR (sha256 = "archivePdfSha256" AND sha256 = ANY($4::text[])))
+  AND (link IS NULL OR "archiveLinkEvidenceSha256" = ANY($5::text[]))`;
 
-export function historyReportStore(client: PoolClient, requestId: string, assertActive: () => void): HistoryReportStore {
+export function historyReportStore(client: PoolClient, requestId: string, assertActive: () => void,
+  { pdf, link }: ArchiveEvidenceAllowlist = { pdf: [], link: [] }): HistoryReportStore {
   return {
     async archive(vin, selectedId) {
       assertActive();
@@ -17,14 +24,14 @@ export function historyReportStore(client: PoolClient, requestId: string, assert
         artifact->'report'->>'language' AS language, artifact->'report'->>'originalReportDate' AS "originalReportDate"
         FROM history_report_artifacts WHERE "requestId" <> $1 AND artifact->'report'->>'vin' = $2
           AND ($3::uuid IS NULL OR id = $3) AND ${permittedArchive}
-        ORDER BY "originalReportDate" DESC, id LIMIT 25`, [requestId, vin, selectedId ?? null]);
+        ORDER BY "originalReportDate" DESC, id LIMIT 25`, [requestId, vin, selectedId ?? null, pdf, link]);
       return R.HistoryArchiveSchema.shape.items.parse(rows);
     },
     async archiveOriginal(id, vin) {
       assertActive();
-      const { rows: [row] } = await client.query<StagedHistoryReport & { requestId: string }>(`
-        SELECT ${fields}, "requestId" FROM history_report_artifacts WHERE id = $1 AND "requestId" <> $2
-          AND artifact->'report'->>'vin' = $3 AND ${permittedArchive} FOR SHARE`, [id, requestId, vin]);
+      const { rows: [row] } = await client.query<ArchivedHistoryReport>(`
+        SELECT ${fields}, "requestId", "archiveLinkEvidenceSha256" FROM history_report_artifacts WHERE id = $1 AND "requestId" <> $2
+          AND artifact->'report'->>'vin' = $3 AND ${permittedArchive} FOR SHARE`, [id, requestId, vin, pdf, link]);
       return parse(row);
     },
     async selectedArchiveId() {
@@ -70,12 +77,15 @@ export function historyReportStore(client: PoolClient, requestId: string, assert
       [requestId, intentVersion, now, actorId, assignmentVersion]);
       if (result.rowCount !== 1) throw new Error("History report validation write failed");
     },
-    async deliver(target, actorId, now) {
+    async deliver(target, actorId, now, linkEvidenceSha256) {
       assertActive();
       const result = await client.query(`UPDATE history_report_artifacts
-        SET "deliveredAt" = $3, "deliveredBy" = $4, "deliveredAssignmentVersion" = $5
+        SET "deliveredAt" = $3, "deliveredBy" = $4, "deliveredAssignmentVersion" = $5,
+          "archivePdfSha256" = CASE WHEN "archiveSourceId" IS NULL AND sha256 = ANY($6::text[]) THEN sha256 END,
+          "archiveLinkEvidenceSha256" = CASE WHEN "archiveSourceId" IS NULL AND link IS NOT NULL THEN $7::text END
         WHERE "requestId" = $1 AND id = $2 AND "validatedAt" IS NOT NULL AND "deliveredAt" IS NULL`,
-      [requestId, target.artifactId, now, actorId, target.expectedAssignmentVersion]);
+      [requestId, target.artifactId, now, actorId, target.expectedAssignmentVersion, pdf,
+        linkEvidenceSha256 && link.includes(linkEvidenceSha256) ? linkEvidenceSha256 : null]);
       if (result.rowCount !== 1) throw new Error("History report delivery write failed");
     },
   };

@@ -9,7 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import { HistoryReportArtifactSchemas as R } from "@auto-tm/contracts";
 import { PDFArray, PDFDocument, PDFName, PDFNumber, PDFStream } from "pdf-lib";
 import type { Env } from "../../../env.schema";
-import type { HistoryReportOriginals } from "../domain/HistoryReportArtifact";
+import { historyReportDigest, type HistoryReportOriginals } from "../domain/HistoryReportArtifact";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 
 const subjectPrefix = "Carberk synthetic Vehicle History\n";
@@ -105,7 +105,7 @@ export class SyntheticHistoryReportOriginals implements HistoryReportOriginals {
       });
       const { facts } = await readSyntheticHistoryPdf(bytes);
       if (facts.reportId !== match[1]) throw new Error();
-      return facts;
+      return { facts, evidenceSha256: historyReportDigest(Buffer.from(`${address}\n${historyReportDigest(bytes)}`)) };
     } catch {
       throw new HistoryRequestError("HISTORY_REPORT_LINK");
     }

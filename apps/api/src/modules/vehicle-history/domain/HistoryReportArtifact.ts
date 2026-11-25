@@ -18,16 +18,21 @@ export interface StagedHistoryReport extends HistoryReportOriginal {
   deliveredAt: Date | null;
 }
 
+export interface ArchivedHistoryReport extends StagedHistoryReport {
+  requestId: string;
+  archiveLinkEvidenceSha256: string | null;
+}
+
 export interface HistoryReportStore {
   archive(vin: string, selectedId?: string): Promise<R.HistoryArchiveItem[]>;
-  archiveOriginal(id: string, vin: string): Promise<(StagedHistoryReport & { requestId: string }) | null>;
+  archiveOriginal(id: string, vin: string): Promise<ArchivedHistoryReport | null>;
   selectedArchiveId(): Promise<string | null>;
   previousPurchase(requesterId: string, vin: string): Promise<R.HistoryPreviousPurchase>;
   find(intentVersion: number): Promise<StagedHistoryReport | null>;
   delivered(orderId: string): Promise<StagedHistoryReport | null>;
   stage(target: R.HistoryReportTarget, report: HistoryReportOriginal, actorId: string): Promise<void>;
   validate(intentVersion: number, actorId: string, assignmentVersion: number, now: Date): Promise<void>;
-  deliver(target: R.DeliverHistoryReport, actorId: string, now: Date): Promise<void>;
+  deliver(target: R.DeliverHistoryReport, actorId: string, now: Date, linkEvidenceSha256: string | null): Promise<void>;
 }
 
 export async function checkHistoryArchiveQuote(
@@ -48,7 +53,7 @@ export async function checkHistoryArchiveQuote(
 export const HISTORY_REPORT_ORIGINALS = Symbol("HISTORY_REPORT_ORIGINALS");
 export interface HistoryReportOriginals {
   readPdf(bytes: Buffer): Promise<{ facts: R.HistoryReportFacts; pages: number }>;
-  verifyLink(address: string): Promise<R.HistoryReportFacts>;
+  verifyLink(address: string): Promise<{ facts: R.HistoryReportFacts; evidenceSha256: string }>;
 }
 
 export const HISTORY_REPORT_STORAGE = Symbol("HISTORY_REPORT_STORAGE");

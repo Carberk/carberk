@@ -72,6 +72,14 @@ describe("API environment template", () => {
   });
 });
 
+it("defaults synthetic archive evidence to empty and accepts only SHA-256 digests by format", () => {
+  const evidence = { pdf: ["a".repeat(64)], link: ["b".repeat(64)] };
+  expect(EnvSchema.parse(baseEnv).VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE).toEqual({ pdf: [], link: [] });
+  expect(EnvSchema.parse({ ...baseEnv, VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE: JSON.stringify(evidence) })
+    .VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE).toEqual(evidence);
+  expect(EnvSchema.safeParse({ ...baseEnv, VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE: '{"pdf":[true]}' }).success).toBe(false);
+});
+
 const deployedEnv = {
   ...baseEnv,
   NODE_ENV: "production",

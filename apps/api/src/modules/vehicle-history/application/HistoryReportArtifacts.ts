@@ -9,7 +9,7 @@ import { historyDeliveryDeadline, settleHistoryRecovery } from "../domain/Histor
 import { normalizeHistoryVin } from "../domain/HistoryOffer";
 import {
   HISTORY_REPORT_ORIGINALS, HISTORY_REPORT_STORAGE, historyReportDigest,
-  type HistoryReportOriginals, type HistoryReportStorage, type HistoryReportStore, type StagedHistoryReport,
+  type ArchivedHistoryReport, type HistoryReportOriginals, type HistoryReportStorage, type HistoryReportStore, type StagedHistoryReport,
 } from "../domain/HistoryReportArtifact";
 import { HistoryRequestError } from "../domain/HistoryRequestError";
 import { HISTORY_CLOCK, type HistoryClock } from "../domain/HistoryWaiting";
@@ -58,7 +58,8 @@ export class HistoryReportArtifacts {
   content(actor: HistoryMessageActor, id: string, target: R.HistoryReportTarget) {
     return this.current(actor, id, target, async (store) => {
       const row = await store.find(target.intentVersion);
-      return this.pdf(store, id, row);
+      if (!row) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+      return this.pdf(id, row, await this.requireArchiveSource(store, row));
     });
   }
 
@@ -76,12 +77,12 @@ export class HistoryReportArtifacts {
       const confirmedAt = bookedPayment(order, await orders.paymentChecks())?.confirmedAt;
       if (!confirmedAt) throw new HistoryRequestError("HISTORY_ORDER_STALE");
       const deadline = await this.requireDeliveryWindow(orders, order, intent, this.clock.now());
-      if (row.artifact.format === "link") await this.requireArchiveSource(store, row);
-      else await this.pdf(store, id, row);
+      const source = await this.requireArchiveSource(store, row);
+      if (row.artifact.format !== "link") await this.pdf(id, row, source);
+      let linkEvidenceSha256 = null;
       if (row.artifact.format !== "pdf") {
-        if (!row.link || !isDeepStrictEqual(await this.originals.verifyLink(row.link), row.artifact.report)) {
-          throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
-        }
+        if (!row.link) throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
+        linkEvidenceSha256 = await this.verifyLink(row.link, row.artifact.report, source?.archiveLinkEvidenceSha256);
       }
       return orders.serialize(async () => {
         const earlier = await orders.hasEarlierPaidWork(confirmedAt, this.clock.now(), "delivery");
@@ -91,7 +92,7 @@ export class HistoryReportArtifacts {
           throw new HistoryRequestError("HISTORY_ORDER_STALE");
         }
         if (earlier) throw new HistoryRequestError("HISTORY_FULFILMENT_FIFO");
-        await store.deliver(target, sender, deliveredAt);
+        await store.deliver(target, sender, deliveredAt, linkEvidenceSha256);
         return view({ ...row, deliveredAt });
       });
     }, "deliver");
@@ -103,18 +104,18 @@ export class HistoryReportArtifacts {
       const row = order && await orders.reportArtifacts.delivered(order.id);
       if (!asset) return view(row);
       if (!row?.deliveredAt || row.artifact.id !== asset.id) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
-      if (asset.kind === "pdf") return this.pdf(orders.reportArtifacts, id, row);
-      if (row.archiveSourceId) await this.requireArchiveSource(orders.reportArtifacts, row);
+      const source = await this.requireArchiveSource(orders.reportArtifacts, row);
+      if (asset.kind === "pdf") return this.pdf(id, row, source);
       if (row.artifact.format === "pdf" || !row.link) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
+      if (source) await this.verifyLink(row.link, row.artifact.report, source.archiveLinkEvidenceSha256);
       return R.HistoryReportLinkSchema.parse({ address: row.link });
     });
   }
 
-  private async pdf(store: HistoryReportStore, id: string, row: StagedHistoryReport | null) {
-    if (!row?.validatedAt || row.artifact.format === "link" || !row.sha256) {
+  private async pdf(id: string, row: StagedHistoryReport, source: ArchivedHistoryReport | null) {
+    if (!row.validatedAt || row.artifact.format === "link" || !row.sha256) {
       throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
     }
-    const source = await this.requireArchiveSource(store, row);
     const artifact = source?.artifact ?? row.artifact;
     if (artifact.format === "link") throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
     return { dataBase64: (await this.storage.read(source?.requestId ?? id, artifact, row.sha256)).toString("base64") };
@@ -139,9 +140,7 @@ export class HistoryReportArtifacts {
         if (existing.sha256 !== sha256 || filename !== input.pdf?.filename || (!restoringPdf && existing.link !== link)) {
           throw new HistoryRequestError(restoringPdf ? "HISTORY_REPORT_MISMATCH" : "HISTORY_REPORT_CONFLICT");
         }
-        if (!existing.validatedAt && existing.link && !isDeepStrictEqual(await this.originals.verifyLink(existing.link), existing.artifact.report)) {
-          throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
-        }
+        if (!existing.validatedAt && existing.link) await this.verifyLink(existing.link, existing.artifact.report);
         return existing;
       }
       const { format } = intent.accepted;
@@ -149,7 +148,7 @@ export class HistoryReportArtifacts {
       if (needsPdf && !bytes || needsLink && !link) throw new HistoryRequestError("HISTORY_REPORT_MISSING");
       if (needsPdf !== Boolean(bytes) || needsLink !== Boolean(link)) throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
       const document = bytes ? await this.originals.readPdf(bytes) : null;
-      const linked = link ? await this.originals.verifyLink(link) : null;
+      const linked = link ? (await this.originals.verifyLink(link)).facts : null;
       const facts = document?.facts ?? linked;
       if (document?.facts.permittedUse === false || linked?.permittedUse === false) throw new HistoryRequestError("HISTORY_REPORT_RIGHTS");
       if (!facts || (linked && document && !isDeepStrictEqual(document.facts, linked))
@@ -177,6 +176,15 @@ export class HistoryReportArtifacts {
       await store.validate(intent.version, sender, input.expectedAssignmentVersion, validatedAt);
       return view({ ...row, validatedAt });
     }, "validate");
+  }
+
+  private async verifyLink(address: string, facts: R.HistoryReportFacts, expectedEvidenceSha256?: string | null) {
+    const linked = await this.originals.verifyLink(address);
+    if (!isDeepStrictEqual(linked.facts, facts) ||
+      expectedEvidenceSha256 !== undefined && linked.evidenceSha256 !== expectedEvidenceSha256) {
+      throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
+    }
+    return linked.evidenceSha256;
   }
 
   private async requireArchiveSource(store: HistoryReportStore, row: StagedHistoryReport) {
@@ -207,7 +215,6 @@ export class HistoryReportArtifacts {
       if (!coversHistoryFormat(format, original.format)) throw new HistoryRequestError("HISTORY_REPORT_MISSING");
       const existing = await store.find(intent.version);
       if (existing && existing.archiveSourceId !== archiveId) throw new HistoryRequestError("HISTORY_REPORT_CONFLICT");
-      if (existing) return view(existing);
       const sha256 = format === "link" ? null : source.sha256;
       const link = format === "pdf" ? null : source.link;
       if (format !== "link") {
@@ -217,10 +224,9 @@ export class HistoryReportArtifacts {
       }
       if (format !== "pdf") {
         if (!link) throw new HistoryRequestError("HISTORY_REPORT_MISSING");
-        if (!isDeepStrictEqual(await this.originals.verifyLink(link), original.report)) {
-          throw new HistoryRequestError("HISTORY_REPORT_MISMATCH");
-        }
+        await this.verifyLink(link, original.report, source.archiveLinkEvidenceSha256);
       }
+      if (existing) return view(existing);
       const validatedAt = this.clock.now();
       await this.requireDeliveryWindow(orders, order, intent, validatedAt);
       const artifact = R.HistoryReportArtifactSchema.parse({

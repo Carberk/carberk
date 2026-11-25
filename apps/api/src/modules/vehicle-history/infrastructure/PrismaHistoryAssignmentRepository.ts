@@ -59,11 +59,12 @@ function waitingFacts(row: WaitingRow): HistoryWaitingFacts {
 @Injectable()
 export class HistoryMessageLocks implements HistoryRecoveryQueue {
   private readonly pool: Pool;
-  constructor(@Inject(ConfigService) config: ConfigService<Env, true>,
+  constructor(@Inject(ConfigService) private readonly config: ConfigService<Env, true>,
     @Inject(MESSAGE_AUTHORITY_FENCE_PORT) private readonly identityFence: MessageAuthorityFencePort) {
     this.pool = new Pool({ connectionString: config.get("DATABASE_URL", { infer: true }), max: 2, connectionTimeoutMillis: 5000 });
     this.pool.on("error", () => { /* A lost idle connection holds no request fence. */ });
   }
+
   async withRequest<T>(id: string, authority: HistoryMessageAuthority,
     operation: (request: HistoryMessageRequest | null, waiting: HistoryWaitingStore, offer: HistoryOfferStore, orders: HistoryOrderStore) => Promise<T>): Promise<T> {
     return this.withRequestTransaction(id, authority, async (client, request) => {
@@ -117,8 +118,10 @@ export class HistoryMessageLocks implements HistoryRecoveryQueue {
           [id, JSON.stringify(O.HistoryOfferSchema.parse(value)), archiveId !== undefined, archiveId ?? null]);
         },
       };
-      try { return await operation(request, waiting, offer, historyOrderStore(client, id, request?.assignmentVersion ?? 0, assertActive)); }
-      finally { active = false; }
+      try {
+        return await operation(request, waiting, offer,
+          historyOrderStore(client, id, request?.assignmentVersion ?? 0, assertActive, this.archiveEvidence()));
+      } finally { active = false; }
     });
   }
 
@@ -147,6 +150,14 @@ export class HistoryMessageLocks implements HistoryRecoveryQueue {
       try { await work(request.requesterId, historyOrderStore(client, id, request.assignmentVersion, assertActive)); }
       finally { active = false; }
     });
+  }
+
+  private archiveEvidence() {
+    if (["development", "test"].includes(this.config.get("APP_ENV", { infer: true }))
+      && this.config.get("VEHICLE_HISTORY_SYNTHETIC_ENABLED", { infer: true }) === true) {
+      return this.config.get("VEHICLE_HISTORY_SYNTHETIC_ARCHIVE_EVIDENCE", { infer: true });
+    }
+    return undefined;
   }
 
   private async withRequestTransaction<T>(id: string, authority: HistoryMessageAuthority | HistoryHandoverAuthority | null,
