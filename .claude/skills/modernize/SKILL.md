@@ -83,7 +83,8 @@ For a `MODERNIZE` disposition:
    and no already-landed behavior was reintroduced.
 5. Run the repository's focused checks for the touched area. Distinguish real
    failures from pre-existing or infrastructure failures.
-6. Push with `--force-with-lease` tied to the previously observed remote head.
+6. Apply the [Sol approval gate](../sol-loop/SKILL.md#5-stop-and-ship).
+7. Push with `--force-with-lease` tied to the previously observed remote head.
    If the lease fails, fetch and reassess rather than overwriting new work.
 
 Do not merge the PR.

@@ -97,7 +97,8 @@ step, and do not poll or launch replacement work while a delegate is running.
 
 When an agent finishes, inspect the actual diff, acceptance, proof and review.
 Fix real findings before merging. Rebase a ready PR onto current `main`, prove
-any conflict resolution, and rerun review for changed behavior.
+any conflict resolution, and apply the [Sol approval gate](../sol-loop/SKILL.md#5-stop-and-ship)
+before pushing or merging.
 
 Apply these skills to every ticket:
 

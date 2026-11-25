@@ -46,7 +46,7 @@ Draft pull requests run only the lane selector. Their required `pr` check is ski
 
 ## 4. Review
 
-Run [sol-loop](../../.claude/skills/sol-loop/SKILL.md) before filing or updating the PR. One Sol reviewer checks bugs, the issue's acceptance criteria and the [coding standards](coding-standards.md). It runs up to 3 rounds, or 5 for auth, permissions, data loss or concurrency.
+Run [sol-loop](../../.claude/skills/sol-loop/SKILL.md) before filing or updating the PR. A fresh Sol reviewer checks the full candidate diff against its target base each round. It checks bugs, the issue's acceptance criteria and the [coding standards](coding-standards.md). The issue implementer owns [finding decisions and fixes](../../.claude/skills/sol-loop/SKILL.md#3-decide-and-fix-findings). The loop runs up to 3 rounds, or 5 for auth, permissions, data loss or concurrency.
 
 Every reviewer, whatever its model, reviews without touching another session's checkout:
 
@@ -74,7 +74,7 @@ Screenshots go in the review reply or the PR, never in the repository. Either sc
 
 - File the PR with [file-pr](../../.claude/skills/file-pr/SKILL.md). The [PR template](../../.github/pull_request_template.md) has the shape: problem, change, proof, review, and `Closes #<issue>`.
 - Watch it with [babysit-pr](../../.claude/skills/babysit-pr/SKILL.md). Fix real CI failures and findings.
-- Merge only when the founder says "full send" for the task ([full-send](../../.claude/skills/full-send/SKILL.md)) or approves the PR. The merge gate is green required checks, finished review, an up-to-date branch and squash merge. Never bypass branch protection.
+- Merge only when the founder says "full send" for the task ([full-send](../../.claude/skills/full-send/SKILL.md)) or approves the PR. The merge gate is green required checks, the [Sol approval gate](../../.claude/skills/sol-loop/SKILL.md#5-stop-and-ship), an up-to-date branch and squash merge. Never bypass branch protection.
 - After merge, remove your worktree and local branch; `node scripts/worktree-gc.mjs` reports which worktrees are safe to remove, and `--apply` removes only those. GitHub deletes the remote branch.
 
 ## Always ask the founder first
@@ -83,4 +83,4 @@ Production deploys and settings, EAS setting changes, store submissions, paid se
 
 ## Not used any more
 
-Campaign or integration branches, coordinator or Chief of Staff agents, sprint queues, exact-SHA reviewer rounds and committed evidence folders are retired. Old campaign work lives in tags named `archive/2026-11-04/<old-branch>`. Copy useful code from there into new small PRs; never merge an archive branch.
+Campaign and integration branches, coordinator and Chief of Staff agents, sprint queues, the campaign review protocol, and committed evidence folders are retired. Old campaign work lives in tags named `archive/2026-11-04/<old-branch>`. Copy useful code from there into new small PRs. Never merge an archive branch.

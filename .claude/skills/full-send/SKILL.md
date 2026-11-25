@@ -45,10 +45,12 @@ one appears.
 1. **Finish the change.** Complete the goal from the user's request with the
    smallest change that works. Fix the case that happened, not every case
    that could. If you are on the default branch, create a branch first.
-2. **Prove it.** Get proof for every change you made. See "Proof".
+2. **Prove it.** Bring the branch up to date with the default branch, then
+   get proof for every change you made. See "Proof".
 3. **Get feedback.** Use the `sol-loop` skill to verify changes.
-4. **File the PR** with the `file-pr` skill. Rebase onto the latest default
-   branch first. Add one short line to the description that says how you proved
+4. **File the PR** with the `file-pr` skill. If the default branch moved,
+   rebase and apply the [Sol approval gate](../sol-loop/SKILL.md#5-stop-and-ship)
+   before filing. Add one short line to the description that says how you proved
    the change.
 5. **Babysit the PR** with the `babysit-pr` skill. Fix real findings and CI
    failures. Get proof for each fix before you push it.
