@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, ActivityIndicator, AppState, Keyboard, View } from "react-native";
 import { router } from "expo-router";
 import { focusManager, useQuery } from "@tanstack/react-query";
@@ -45,6 +45,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const [recoveryIssue, setRecoveryIssue] = useState<"changed" | "denied" | "unavailable" | null>(null);
   const recoveryAttempt = useRef<H.HistoryRecoveryDecision | null>(null);
   const mounted = useRef(true), busy = useRef(false);
+  const reopenGeneration = useRef<number | null>(null);
   const readGeneration = useRef(0), writeGeneration = useRef(0);
   const latest = useRef({ ready, metadataAvailable, active, connected });
   const suspended = latest.current.active && !active || latest.current.connected && !connected
@@ -190,15 +191,15 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   useEffect(() => {
     if (previous) AccessibilityInfo.announceForAccessibility(repeatTitle);
   }, [previous, repeatTitle]);
-  async function send(continueNew = false) {
+  async function send(intent: "submit" | "new" | "restore" = "submit") {
     if (!data || !current() || !vin.trim() || busy.current || state.isFetching || state.error) return;
-    if (continueNew && !previous) return;
+    if (intent === "new" && !previous) return;
     busy.current = true; setSaving(true); setFailed(null);
     const attempt = writeGeneration.current;
     const reader = readGeneration.current;
     const owns = () => current() && attempt === writeGeneration.current;
     const lookupCurrent = () => canRead() && reader === readGeneration.current;
-    let checking = !continueNew;
+    let checking = intent !== "new";
     try {
       if (checking) {
         const { previous: purchase } = await stream.previousPurchase(vin, lookupCurrent);
@@ -208,6 +209,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
           setRepeat({ vin, generation: reader, version: data.version, purchase });
           return;
         }
+        if (intent === "restore") { setRepeat(null); return; }
       }
       checking = false;
       if (!owns()) return;
@@ -221,6 +223,13 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
     }
     finally { busy.current = false; if (mounted.current) setSaving(false); }
   }
+  const restoreRepeat = useEffectEvent(() => {
+    if (reopenGeneration.current === null || reopenGeneration.current === readGeneration.current || !data || accepted
+      || !current() || !vin.trim() || busy.current || state.isFetching || state.error) return;
+    reopenGeneration.current = null;
+    void send("restore");
+  });
+  useEffect(() => { restoreRepeat(); }, [active, connected, ready, data, saving, state.isFetching, state.error]);
   const copy = (key: string) => t(`vehicleHistory.offer${key[0]?.toUpperCase()}${key.slice(1)}`);
   const timestamp = (value: string) => formatHistoryDeadline(value, i18n.language);
   const denied = failed === "denied" || state.error instanceof ApiError && [401, 403, 404].includes(state.error.status);
@@ -309,6 +318,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             reconcile={async () => { const result = await state.refetch(); if (result.error) throw result.error; if (canRead()) await reconcileOrder(); }} />}
           {!accepted && <><Text nativeID="history-vin-label" className="text-callout font-semibold">{copy("vin")}</Text>
           <Input accessibilityLabel={copy("vin")} accessibilityLabelledBy="history-vin-label" value={vin} onChangeText={(value) => {
+            reopenGeneration.current = null;
             setVin(value); setRepeat(null);
           }} maxLength={80}
             autoCapitalize="characters" autoCorrect={false} editable={canEdit} />
@@ -322,11 +332,12 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
             <Text className="text-callout">{previous.provider} · {copy("date")} {previous.originalReportDate}</Text>
             <Button disabled={!canEdit || state.isFetching} onPress={() => {
               if (current() && repeat?.generation === readGeneration.current) {
+                reopenGeneration.current = readGeneration.current;
                 router.push({ pathname: "/vehicle-history/requests/[id]", params: { id: previous.requestId } });
               }
             }}><Text>{copy("openPrevious")}</Text></Button>
             <Button variant="secondary" disabled={!canEdit || state.isFetching} accessibilityState={{ busy: saving }}
-              onPress={() => { void send(true); }}><Text>{copy(saving ? "pending" : "repeatNew")}</Text></Button>
+              onPress={() => { void send("new"); }}><Text>{copy(saving ? "pending" : "repeatNew")}</Text></Button>
           </View> : <Button variant="secondary" disabled={!vin.trim() || !canEdit || state.isFetching}
             accessibilityState={{ busy: saving }} onPress={() => { void send(); }}>
             <Text>{copy(saving ? "pending" : "sendVin")}</Text>

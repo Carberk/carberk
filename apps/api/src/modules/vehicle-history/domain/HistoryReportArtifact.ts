@@ -21,6 +21,7 @@ export interface StagedHistoryReport extends HistoryReportOriginal {
 export interface ArchivedHistoryReport extends StagedHistoryReport {
   requestId: string;
   archiveLinkEvidenceSha256: string | null;
+  availableFormat: R.HistoryReportArtifact["format"];
 }
 
 export interface HistoryReportStore {
@@ -45,7 +46,7 @@ export async function checkHistoryArchiveQuote(
   const provider = reports.providers[0];
   if (!original || reports.providers.length !== 1 || original.artifact.report.provider !== provider?.name
     || original.artifact.report.originalReportDate !== provider.originalReportDate
-    || original.artifact.format !== reports.archiveFormat || !coversHistoryFormat(format, original.artifact.format)) {
+    || !coversHistoryFormat(format, reports.archiveFormat) || !coversHistoryFormat(format, original.availableFormat)) {
     throw new HistoryRequestError("HISTORY_OFFER_CONFLICT");
   }
 }

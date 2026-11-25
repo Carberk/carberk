@@ -10,7 +10,7 @@ import ChatScreen from "../../app/(tabs)/chat";
 import RequestScreen from "../../app/vehicle-history/requests/[id]";
 import { queryKeys } from "../api/queryKeys";
 import HistoryScreen from "../../app/vehicle-history/requests";
-import { act, fireEvent, getHost, renderMobile, routerMock, routeParams } from "../../test/render";
+import { act, fireEvent, getHost, renderMobile, routerMock, routeParams, screenFocus } from "../../test/render";
 import { server } from "../../test/msw";
 import { clearAuthSession, storeAuthSession } from "../auth/session";
 
@@ -402,6 +402,7 @@ it.each([
   const vin = "DEMA0000000000001";
   let offer = { version: 0, vin: null as string | null, synthetic: true, preflight: null, proposal: null };
   let submitted: unknown;
+  let purchaseReads = 0;
   let refreshing = false;
   const started = deferred<undefined>(), refreshed = deferred<Response>();
   const lookupStarted = deferred<undefined>(), lookupFinished = deferred<Response>();
@@ -414,7 +415,8 @@ it.each([
     }),
     http.get("*/vehicle-history/requests/:id/offer", () => HttpResponse.json(offer)),
     http.get("*/vehicle-history/requests/:id/previous-purchase", () => {
-      if (locale !== "en") return HttpResponse.json(purchase);
+      purchaseReads++;
+      if (locale !== "en" || purchaseReads > 1) return HttpResponse.json(purchase);
       lookupStarted.resolve(undefined);
       return lookupFinished.promise;
     }),
@@ -447,6 +449,14 @@ it.each([
     tk: "Bu VIN üçin öň hasabat satyn aldyňyz.",
   }[locale]);
   expect(routerMock.push).toHaveBeenCalledWith({ pathname: "/vehicle-history/requests/[id]", params: { id: secondId } });
+  expect(submitted).toBeUndefined();
+  screenFocus.focused = false;
+  await view.rerender(<RequestScreen />);
+  expect(view.queryByRole("button", { name: proceed })).toBeNull();
+  screenFocus.focused = true;
+  await view.rerender(<RequestScreen />);
+  expect(await view.findByRole("button", { name: open })).toBeEnabled();
+  expect(purchaseReads).toBe(2);
   expect(submitted).toBeUndefined();
   await fireEvent.press(view.getByRole("button", { name: proceed }));
   await view.findByText("VIN: DEMA0000000000001");

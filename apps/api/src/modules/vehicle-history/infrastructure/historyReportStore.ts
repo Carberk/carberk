@@ -14,20 +14,22 @@ const permittedArchive = `"deliveredAt" IS NOT NULL AND "validatedAt" IS NOT NUL
 const recordedPdf = 'sha256 = "archivePdfSha256"';
 const allowedPdf = 'sha256 = ANY($4::text[])';
 const allowedLink = '"archiveLinkEvidenceSha256" = ANY($5::text[])';
+const effectiveFormat = `CASE WHEN artifact->>'format' = 'both' AND ${allowedPdf} AND ${allowedLink} THEN 'both'
+  WHEN artifact->>'format' IN ('pdf', 'both') AND ${allowedPdf} THEN 'pdf'
+  WHEN artifact->>'format' IN ('link', 'both') AND ${allowedLink} THEN 'link' ELSE '' END`;
 const qualifiedArchive = `CASE artifact->>'format'
-  WHEN 'pdf' THEN link IS NULL AND ${recordedPdf} AND ${allowedPdf}
-  WHEN 'link' THEN sha256 IS NULL AND link IS NOT NULL AND ${allowedLink}
+  WHEN 'pdf' THEN link IS NULL AND ${recordedPdf}
+  WHEN 'link' THEN sha256 IS NULL AND link IS NOT NULL
   WHEN 'both' THEN ${recordedPdf} AND "archiveLinkEvidenceSha256" = ${pairedLinkEvidence}
-    AND (COALESCE($6::text, 'both') = 'link' OR ${allowedPdf})
-    AND (COALESCE($6::text, 'both') = 'pdf' OR ${allowedLink})
-  ELSE FALSE END`;
+  ELSE FALSE END AND ${effectiveFormat} IN (COALESCE($6::text, ${effectiveFormat}), 'both')
+  AND ${effectiveFormat} <> ''`;
 
 export function historyReportStore(client: PoolClient, requestId: string, assertActive: () => void,
   { pdf, link }: ArchiveEvidenceAllowlist = { pdf: [], link: [] }): HistoryReportStore {
   return {
     async archive(vin, selectedId, format) {
       assertActive();
-      const { rows } = await client.query(`SELECT id, artifact->>'format' AS format,
+      const { rows } = await client.query(`SELECT id, ${effectiveFormat} AS format,
         artifact->'report'->>'vin' AS vin, artifact->'report'->>'provider' AS provider,
         artifact->'report'->>'language' AS language, artifact->'report'->>'originalReportDate' AS "originalReportDate"
         FROM history_report_artifacts WHERE "requestId" <> $1 AND artifact->'report'->>'vin' = $2
@@ -39,7 +41,8 @@ export function historyReportStore(client: PoolClient, requestId: string, assert
     async archiveOriginal(id, vin, format) {
       assertActive();
       const { rows: [row] } = await client.query<ArchivedHistoryReport>(`
-        SELECT ${fields}, "requestId", "archiveLinkEvidenceSha256" FROM history_report_artifacts WHERE id = $1 AND "requestId" <> $2
+        SELECT ${fields}, "requestId", "archiveLinkEvidenceSha256", ${effectiveFormat} AS "availableFormat"
+        FROM history_report_artifacts WHERE id = $1 AND "requestId" <> $2
           AND artifact->'report'->>'vin' = $3 AND ${permittedArchive} AND ${qualifiedArchive} FOR SHARE`,
       [id, requestId, vin, pdf, link, format ?? null]);
       return parse(row);

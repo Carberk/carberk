@@ -48,7 +48,7 @@ export class HistoryOffers {
           const original = previous.vin === vin ? await orders.reportArtifacts.archiveOriginal(archiveId, vin) : null;
           if (!original) throw new HistoryRequestError("HISTORY_OFFER_CONFLICT");
           const { provider, originalReportDate } = original.artifact.report;
-          preflight = { status: "available", archiveFormat: original.artifact.format, providers: [{ name: provider, originalReportDate }] };
+          preflight = { status: "available", archiveFormat: original.availableFormat, providers: [{ name: provider, originalReportDate }] };
         } else preflight = input.kind === "check" ? await this.preflight.check(vin) : null;
         next = { version: previous.version + 1, vin, preflight, proposal: null, synthetic: true };
       }

@@ -155,7 +155,8 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
 
   async function obtained(format: "pdf" | "link" | "both", vin = facts.vin, options: {
     lateReceipt?: boolean; operator?: Awaited<ReturnType<typeof f.actor>>; laterWindow?: boolean; closeOfDay?: boolean;
-    outcome?: object; source?: "archive" | "new_source"; archiveId?: string; afterArchiveSelection?: () => void;
+    outcome?: object; source?: "archive" | "new_source"; archiveId?: string;
+    searchableFormat?: "pdf" | "link"; afterArchiveSelection?: () => void; beforeAcceptance?: () => () => void;
   } = {}) {
     const { lateReceipt, laterWindow } = options;
     const operator = options.operator ?? await f.actor(), customer = await f.actor(null);
@@ -167,6 +168,12 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     await operatorHttp("/claim").send({ expectedAssignmentVersion: 0 }).expect(201);
     const check = { kind: "check", vin, expectedAssignmentVersion };
     const available = (await operatorHttp("/offer").send({ ...check, expectedVersion: 0 }).expect(201)).body;
+    if (options.searchableFormat) {
+      const search = await f.request.get(`${work}/report-archive`).auth(operator.token, { type: "bearer" })
+        .query({ vin, expectedAssignmentVersion }).expect(200);
+      expect(search.body).toEqual({ items: [{ id: options.archiveId, format: options.searchableFormat,
+        vin, provider: facts.provider, originalReportDate: facts.originalReportDate, language: facts.language }] });
+    }
     const checked = options.archiveId ? (await operatorHttp("/offer").send({
       ...check, expectedVersion: 1, archiveId: options.archiveId,
     }).expect(201)).body : available;
@@ -174,7 +181,13 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     const offer = (await operatorHttp("/offer").send({ kind: "propose", format, expectedVersion: checked.version, expectedAssignmentVersion,
       deliveryFrom: options.closeOfDay ? "2026-11-21T13:30:00.000Z" : laterWindow ? "2026-11-21T07:00:00.000Z" : "2026-11-21T06:00:00.000Z",
       deliveryBy: options.closeOfDay ? "2026-11-21T14:30:00.000Z" : laterWindow ? "2026-11-21T08:00:00.000Z" : "2026-11-21T07:00:00.000Z" }).expect(201)).body;
-    const orderId = (await customerHttp(`${root}/requests/${id}/order`).send({ offer }).expect(201)).body.order.id as string;
+    const accept = () => customerHttp(`${root}/requests/${id}/order`).send({ offer });
+    if (options.beforeAcceptance) {
+      const restore = options.beforeAcceptance();
+      await accept().expect(409).expect(({ body }) => expect(body.code).toBe("HISTORY_ORDER_STALE"));
+      restore();
+    }
+    const orderId = (await accept().expect(201)).body.order.id as string;
     if (lateReceipt) f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T07:05:00.000Z");
     await operatorHttp("/payment-verification").send({ orderId, expectedAssignmentVersion, attemptKey: randomUUID(),
       expectedPaymentVersion: 0, walletChecked: true, outcome: "matched", amountMinor: 10000,
@@ -388,6 +401,25 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
     expect(later.offer.proposal.format).toBe("pdf");
   });
 
+  it.each(["pdf", "link"] as const)("finds and quotes %s when only that format remains permitted before selection", async (format) => {
+    const original = await obtained("both");
+    const { pdf, bytes } = linkedReport;
+    const link = origin + "/report/" + facts.reportId;
+    allowArchive({ pdf: bytes, link });
+    const { body: { artifact } } = await original.validate({ pdf, link }).expect(201);
+    await original.deliver(artifact.id).expect(201);
+    f.app.get<HistoryClock>(HISTORY_CLOCK).now = () => new Date("2026-11-21T05:01:00.000Z");
+    allowArchive(format === "pdf" ? { pdf: bytes } : { link });
+    const later = await obtained(format, facts.vin, { laterWindow: true, source: "archive", archiveId: artifact.id,
+      searchableFormat: format, beforeAcceptance: () => {
+        allowArchive({});
+        return () => allowArchive(format === "pdf" ? { pdf: bytes } : { link });
+      },
+    });
+    expect(later.offer.preflight).toMatchObject({ archiveFormat: format });
+    await later.validate({ archiveId: artifact.id }).expect(201);
+  });
+
   it("finds, previews and delivers the exact selected PDF after its unused link qualification is withdrawn", async () => {
     const original = await obtained("both");
     const { pdf, bytes } = linkedReport;
@@ -404,7 +436,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
 
     allowArchive({ pdf: bytes });
     linkAvailable = false;
-    await search().expect(200, { items: [{ id: artifact.id, format: "both", vin: facts.vin, provider: facts.provider,
+    await search().expect(200, { items: [{ id: artifact.id, format: "pdf", vin: facts.vin, provider: facts.provider,
       originalReportDate: facts.originalReportDate, language: facts.language }] });
     await later.validate({ archiveId: randomUUID() }).expect(409);
     const { body: { artifact: archived } } = await later.validate({ archiveId: artifact.id }).expect(201);
@@ -552,7 +584,7 @@ describe("assigned original report validation over HTTP, Postgres, private MinIO
       kind: "accept", orderId, expectedVersion: proposed.version, attemptKey: randomUUID(),
       format: "pdf", deadline: recovery.offeredDeadline,
     }).expect(201);
-    await search().expect(200).expect(({ body }) => expect(body.items).toMatchObject([{ id: artifact.id, format: "both" }]));
+    await search().expect(200).expect(({ body }) => expect(body.items).toMatchObject([{ id: artifact.id, format: "pdf" }]));
     await later.validate({ archiveId: artifact.id }).expect(409);
     const { body: { artifact: replacement } } = await later.validate({ archiveId: artifact.id, intentVersion: 3 }).expect(201);
     const preview = await later.read("/content", later.operator.token, { ...later.target, intentVersion: 3 }).expect(200);
