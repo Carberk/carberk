@@ -7,7 +7,7 @@ description: File a concise pull request. Use when the user asks to file, open, 
 
 Before filing, check whether a PR for this branch already exists. Review the
 diff locally against the base branch (usually `origin/main`) to make sure its
-contents match the goal.
+contents match the goal. Apply the [Sol approval gate](../sol-loop/SKILL.md#5-stop-and-ship).
 
 PR titles usually become commit messages, so follow the repository's title
 conventions. Look at recently merged PRs and Git history for examples. Prefer a

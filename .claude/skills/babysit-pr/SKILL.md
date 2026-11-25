@@ -113,5 +113,7 @@ when `pr-wait` exits 0, or in T3 Code when the merge gate passes on the latest
 head. Merge only when the user explicitly requested it;
 otherwise report that the PR is ready. Right before a merge, run `git fetch` and
 check the PR again. Never merge when it is BEHIND or DIRTY, or when base commits
-that landed after the last green run touch this PR's files. Rebase, push, and
-wait for green again.
+that landed after the last green run touch this PR's files. Rebase as needed.
+Apply the [Sol approval gate](../sol-loop/SKILL.md#5-stop-and-ship) before
+pushing any updated candidate, including rebases and fixes from CI or review
+feedback. Wait for green on the pushed head.
