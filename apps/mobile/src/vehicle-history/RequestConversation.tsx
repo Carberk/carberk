@@ -79,6 +79,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const list = useRef<FlatList<VehicleHistorySchemas.HistoryMessage>>(null);
   const listHeader = useRef<View>(null);
   const composer = useRef<TextInput>(null);
+  const manuallyScrolled = useRef(false);
   const position = useRef({ offset: 0, height: 0 });
   const browserPosition = useRef<{ offset: number; height: number; away: boolean; keyboardReady: boolean } | null>(null);
   const name = useDisplayName();
@@ -101,11 +102,12 @@ export function RequestConversation({ viewer, request, header, metadataError, me
   const linkCurrent = () => linkReader.current.mounted && linkReader.current.ready
     && historySessionCurrent(viewer) && AppState.currentState === "active"
     && focusManager.isFocused() && onlineManager.isOnline();
-  const revealRepeat = (prompt: View, current: () => boolean) => {
+  const revealDecision = (kind: "quote" | "repeat", prompt: View, current: () => boolean) => {
     const header = listHeader.current;
-    if (!header || !current()) return;
+    const canReveal = () => current() && (kind === "repeat" || !manuallyScrolled.current);
+    if (!header || !canReveal()) return;
     prompt.measureLayout(header, (_x, y) => {
-      if (current()) list.current?.scrollToOffset({ offset: Math.max(0, y), animated: false });
+      if (canReveal()) list.current?.scrollToOffset({ offset: Math.max(0, y), animated: false });
     });
   };
   const restoreBrowserPosition = () => {
@@ -232,7 +234,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
     maintainVisibleContentPosition={delivered && thread.messages.length === 0 ? undefined : { minIndexForVisible: 0 }}
     scrollEventThrottle={16}
     onScroll={(event) => { position.current.offset = event.nativeEvent.contentOffset.y; }}
-    onScrollBeginDrag={() => { browserPosition.current = null; }}
+    onScrollBeginDrag={() => { browserPosition.current = null; manuallyScrolled.current = true; }}
     onLayout={(event) => { position.current.height = event.nativeEvent.layout.height; restoreBrowserPosition(); }}
     onViewableItemsChanged={onVisible} viewabilityConfig={viewabilityConfig}
     refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { void pullRefresh(); }} />}
@@ -264,7 +266,7 @@ export function RequestConversation({ viewer, request, header, metadataError, me
       {!denied && !delivered && !refund && !refundReadFailed && <OfferPreview viewer={viewer} request={request}
         ready={metadataCurrent} metadataAvailable={metadataAvailable} active={thread.active} connected={thread.connected}
         recoveryVersion={order?.recovery?.version} orderReadError={thread.order.error} reconcileOrder={thread.order.refetch}
-        revealRepeat={revealRepeat} onRepeatDecisionChange={setComposerCollapsed} />}
+        revealDecision={revealDecision} onRepeatDecisionChange={setComposerCollapsed} />}
       {(order?.recovery || refund) && header}
       {!denied && <StopReminders viewer={viewer} request={request} ready={metadataCurrent} active={thread.active} connected={thread.connected}
         revision={pages.dataUpdatedAt} />}

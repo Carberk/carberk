@@ -75,6 +75,7 @@ it.each([
   expect(view.queryByText("SYNTHETIC-VH07-NO-TRANSFER")).toBeNull();
   expect(within(confirmation).getByText(/Carfax.*2026-10-14/)).toBeTruthy();
   expect(view.getAllByText(/2026-10-14/)).toHaveLength(1);
+  expect(confirmation.props.onLayout).toEqual(expect.any(Function));
   await fireEvent.press(button);
   await view.findAllByText(new RegExp(`^${waiting}`));
   await view.findByText("SYNTHETIC-VH07-NO-TRANSFER");

@@ -23,10 +23,10 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 
 export function OfferPreview({ viewer, request, ready, metadataAvailable, active, connected, recoveryVersion, orderReadError, reconcileOrder,
-  revealRepeat, onRepeatDecisionChange }: {
+  revealDecision, onRepeatDecisionChange }: {
   viewer: HistoryViewer; request: V.HistoryRequest; ready: boolean; metadataAvailable: boolean;
   active: boolean; connected: boolean; recoveryVersion?: number | undefined; orderReadError: unknown; reconcileOrder: () => Promise<unknown>;
-  revealRepeat: (view: View, current: () => boolean) => void;
+  revealDecision: (kind: "quote" | "repeat", view: View, current: () => boolean) => void;
   onRepeatDecisionChange: (visible: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -36,6 +36,8 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const [repeat, setRepeat] = useState<{ vin: string; generation: number; version: number;
     purchase: NonNullable<R.HistoryPreviousPurchase["previous"]> } | null>(null);
   const repeatPrompt = useRef<View>(null);
+  const quoteConfirmation = useRef<View>(null);
+  const revealedQuote = useRef<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [orderFailure, setOrderFailure] = useState<string | null>(null);
   const [replacementIssue, setReplacementIssue] = useState<"Full" | "Changed" | "Denied" | "Unavailable" | null>(null);
@@ -226,6 +228,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
   const proposal = data?.proposal;
   const providers = data?.preflight?.status === "available" ? data.preflight.providers : [];
   const datesWithConfirmation = !accepted && !!proposal;
+  const knownDates = providers.filter((provider) => provider.originalReportDate);
   const providerDate = (provider: (typeof providers)[number]) =>
     <Text key={provider.name} className="text-callout">{provider.name} · {copy("date")}: {provider.originalReportDate ?? copy("unknown")}</Text>;
   const historicalWindow = replacement || orderState?.status === "hold_expired";
@@ -273,8 +276,16 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
               <Button variant="secondary" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)}><Text>{copy(expanded ? "orderHideDetails" : "orderDetails")}</Text></Button>
             </> : <>
               <Text className="text-footnote text-muted-foreground">{copy("orderBefore")}</Text>
-              <View className="gap-3">
-                {providers.filter((provider) => provider.originalReportDate).map(providerDate)}
+              <View ref={quoteConfirmation} collapsable={false} className="gap-3"
+                onLayout={knownDates.length ? () => {
+                  const confirmation = quoteConfirmation.current;
+                  if (!confirmation || !canRead() || revealedQuote.current === data.version) return;
+                  const generation = readGeneration.current;
+                  revealedQuote.current = data.version;
+                  revealDecision("quote", confirmation, () => quoteConfirmation.current === confirmation
+                    && canRead() && readGeneration.current === generation);
+                } : undefined}>
+                {knownDates.map(providerDate)}
                 <Button disabled={!canEdit || state.isFetching || !!vin.trim() || !!orderFailure} accessibilityState={{ busy: saving }} onPress={() => { void accept(); }}>
                   <Text>{copy(saving ? "orderPending" : "orderConfirm")}</Text>
                 </Button>
@@ -302,7 +313,7 @@ export function OfferPreview({ viewer, request, ready, metadataAvailable, active
           {previous ? <View ref={repeatPrompt} collapsable={false} className="gap-3 border-t border-border pt-3"
             onLayout={() => {
               const prompt = repeatPrompt.current;
-              if (prompt) revealRepeat(prompt, () => repeatPrompt.current === prompt && canRead()
+              if (prompt) revealDecision("repeat", prompt, () => repeatPrompt.current === prompt && canRead()
                 && repeat?.generation === readGeneration.current);
             }}>
             <Text accessibilityRole="header" className="font-semibold">{repeatTitle}</Text>
